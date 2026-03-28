@@ -161,10 +161,36 @@ export interface ResultSet {
   scopeLabel: string;
 }
 
-export type WorkspaceAction =
-  | { type: "SEARCH"; query: string; results: SearchResultViewModel[] }
-  | { type: "FOCUS"; id: string }
-  | { type: "PIVOT"; source: ResultSetSource; results: SearchResultViewModel[]; scopeLabel: string }
-  | { type: "BACK" }
-  | { type: "PIN"; item: PinnedItem }
-  | { type: "UNPIN"; id: string };
+// ─── Search Constraints (ES-ready shapes) ───
+
+/** High-level context: jurisdictions, languages, source type */
+export interface ContextConstraints {
+  jurisdictions: string[];
+  languages: string[];
+  sourceType: string | null;
+  officialOnly: boolean;
+}
+
+/**
+ * A single refinement filter, shaped to map cleanly to ES query DSL.
+ *
+ * - "terms"      → ES terms aggregation (court, document type)
+ * - "date_range" → ES date_range aggregation
+ * - "range"      → ES range query (numeric)
+ * - "toggle"     → ES term query (boolean field)
+ * - "text"       → ES match query (full-text sub-filter)
+ */
+export interface SearchRefinement {
+  field: string;
+  type: "terms" | "date_range" | "range" | "toggle" | "text";
+  values: string[];
+  from?: string;
+  to?: string;
+  value?: boolean | string;
+}
+
+export interface SearchConstraintsState {
+  context: ContextConstraints;
+  refinements: SearchRefinement[];
+}
+

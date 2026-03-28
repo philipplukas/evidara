@@ -10,17 +10,17 @@ import {
 } from "@/components/ui/resizable-panels";
 import { useDesktop } from "@/hooks/use-desktop";
 import { useWorkspace } from "@/lib/workspace-store";
+import { useDetail } from "@/hooks/use-detail";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { ContextBar } from "@/components/layout/ContextBar";
 import { FilterPanel } from "@/components/filters/FilterPanel";
-import { ExactMatchStrip } from "@/components/results/ExactMatchStrip";
+import { ResultContextHeader } from "@/components/results/ResultContextHeader";
 import { ResultList } from "@/components/results/ResultList";
 import { DetailPanel } from "@/components/detail/DetailPanel";
 import { MobileWorkspace } from "@/components/layout/MobileWorkspace";
 import type {
   SearchContextViewModel,
   FilterViewModel,
-  DetailViewModel,
 } from "@/lib/types";
 
 interface WorkspaceClientProps {
@@ -33,7 +33,7 @@ export default function WorkspaceClient({
   filters,
 }: WorkspaceClientProps) {
   const isDesktop = useDesktop();
-  const { state, dispatch, getDetail } = useWorkspace();
+  const { state, dispatch } = useWorkspace();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -45,7 +45,7 @@ export default function WorkspaceClient({
   // ─── URL-driven selection ───
   const selectedId = searchParams.get("item");
   const isDetailOpen = Boolean(selectedId);
-  const detail = selectedId ? getDetail(selectedId) : null;
+  const { data: detail } = useDetail(selectedId);
 
   const setSelectedId = useCallback(
     (id: string | null) => {
@@ -63,7 +63,7 @@ export default function WorkspaceClient({
     [pathname, router, searchParams]
   );
 
-  const handleFocus = useCallback(
+  const handleSelect = useCallback(
     (id: string) => {
       setSelectedId(id);
       dispatch({
@@ -144,8 +144,8 @@ export default function WorkspaceClient({
         filters={filters}
         results={state.resultSet.items}
         selectedId={selectedId}
-        detail={detail}
-        onFocus={handleFocus}
+        detail={detail ?? null}
+        onFocus={handleSelect}
         onPivot={handlePivot}
         onPin={handlePin}
         pinnedIds={pinnedIds}
@@ -187,20 +187,15 @@ export default function WorkspaceClient({
             minSize={30}
           >
             <div className="h-full overflow-y-auto bg-white">
-              {searchContext.exactMatches &&
-                searchContext.exactMatches.length > 0 && (
-                  <div className="px-5 pt-4">
-                    <ExactMatchStrip
-                      matches={searchContext.exactMatches}
-                      onSelect={handleFocus}
-                    />
-                  </div>
-                )}
+              <ResultContextHeader
+                exactMatches={searchContext.exactMatches}
+                onSelect={handleSelect}
+              />
 
               <ResultList
                 results={state.resultSet.items}
                 selectedId={selectedId}
-                onFocus={handleFocus}
+                onFocus={handleSelect}
                 onPivot={handlePivot}
                 onPin={handlePin}
                 pinnedIds={pinnedIds}
@@ -221,8 +216,8 @@ export default function WorkspaceClient({
           >
             <div className="h-full overflow-y-auto bg-white border-l border-border">
               <DetailPanel
-                detail={detail}
-                onFocus={handleFocus}
+                detail={detail ?? null}
+                onFocus={handleSelect}
                 onPivot={handlePivot}
                 onPin={handlePin}
                 isPinned={

@@ -9,7 +9,6 @@ import {
 } from "react";
 import type {
   SearchResultViewModel,
-  DetailViewModel,
   ResultSet,
   ResultSetSource,
   TrailEntry,
@@ -137,8 +136,6 @@ function workspaceReducer(
 interface WorkspaceContextValue {
   state: WorkspaceState;
   dispatch: Dispatch<WorkspaceAction>;
-  /** Detail map lookup */
-  getDetail: (id: string) => DetailViewModel | null;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -154,25 +151,20 @@ interface WorkspaceProviderProps {
   children: ReactNode;
   initialResults: SearchResultViewModel[];
   initialQuery: string;
-  detailMap: Record<string, DetailViewModel>;
 }
 
 export function WorkspaceProvider({
   children,
   initialResults,
   initialQuery,
-  detailMap,
 }: WorkspaceProviderProps) {
   const [state, dispatch] = useReducer(
     workspaceReducer,
     createInitialState(initialResults, initialQuery)
   );
 
-  const getDetail = (id: string): DetailViewModel | null =>
-    detailMap[id] ?? null;
-
   return (
-    <WorkspaceContext.Provider value={{ state, dispatch, getDetail }}>
+    <WorkspaceContext.Provider value={{ state, dispatch }}>
       {children}
     </WorkspaceContext.Provider>
   );

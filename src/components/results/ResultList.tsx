@@ -2,7 +2,6 @@
 
 import type { SearchResultViewModel } from "@/lib/types";
 import { ResultCard } from "./ResultCard";
-import { ResultSetScopeBar } from "./ResultSetScopeBar";
 
 interface ResultListProps {
   results: SearchResultViewModel[];
@@ -23,25 +22,20 @@ export function ResultList({
 }: ResultListProps) {
   if (results.length === 0) {
     return (
-      <div>
-        <ResultSetScopeBar />
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-            <span className="text-xl text-muted-foreground">⚖</span>
-          </div>
-          <h3 className="text-sm font-medium text-foreground mb-1">No results found</h3>
-          <p className="text-xs text-muted-foreground max-w-xs">
-            Try adjusting your search query or filters to find what you&apos;re looking for.
-          </p>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+          <span className="text-xl text-muted-foreground">⚖</span>
         </div>
+        <h3 className="text-sm font-medium text-foreground mb-1">No results found</h3>
+        <p className="text-xs text-muted-foreground max-w-xs">
+          Try adjusting your search query or filters to find what you&apos;re looking for.
+        </p>
       </div>
     );
   }
 
   return (
     <div>
-      <ResultSetScopeBar />
-
       {/* Result count */}
       <div className="px-5 py-3 border-b border-border/60">
         <span className="text-xs text-muted-foreground">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel } from "@/lib/types";
 import { getIcon } from "@/lib/icons";
 
@@ -25,16 +26,51 @@ export function FilterPanel({ filters }: FilterPanelProps) {
 }
 
 function FilterGroup({ filter }: { filter: FilterViewModel }) {
+  const { state: constraints, dispatch } = useSearchConstraints();
   const [expanded, setExpanded] = useState(true);
-  const [selected, setSelected] = useState<string[]>(filter.selected);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Read selected values from the constraints provider
+  const refinement = constraints.refinements.find(
+    (r) => r.field === filter.key
+  );
+  const selected = refinement?.values ?? filter.selected;
+
   const toggle = (value: string) => {
-    setSelected((prev) =>
-      prev.includes(value)
-        ? prev.filter((v) => v !== value)
-        : [...prev, value]
-    );
+    const next = selected.includes(value)
+      ? selected.filter((v) => v !== value)
+      : [...selected, value];
+
+    if (next.length === 0) {
+      dispatch({ type: "CLEAR_REFINEMENT", field: filter.key });
+    } else {
+      dispatch({
+        type: "SET_REFINEMENT",
+        field: filter.key,
+        refinement: {
+          field: filter.key,
+          type: "terms",
+          values: next,
+        },
+      });
+    }
+  };
+
+  const setSelected = (values: string[]) => {
+    if (values.length === 0) {
+      dispatch({ type: "CLEAR_REFINEMENT", field: filter.key });
+    } else {
+      dispatch({
+        type: "SET_REFINEMENT",
+        field: filter.key,
+        refinement: {
+          field: filter.key,
+          type: filter.type === "toggle" ? "toggle" : "terms",
+          values,
+          value: filter.type === "toggle" ? values.length > 0 : undefined,
+        },
+      });
+    }
   };
 
   const filteredOptions = filter.options.filter((opt) =>

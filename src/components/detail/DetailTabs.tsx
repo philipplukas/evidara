@@ -1,0 +1,63 @@
+"use client";
+
+import { useCallback } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { TabViewModel } from "@/lib/types";
+
+interface DetailTabsProps {
+  tabs: TabViewModel[];
+}
+
+export function DetailTabs({ tabs }: DetailTabsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const activeTab = searchParams.get("tab") ?? "details";
+
+  const setTab = useCallback(
+    (key: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (key === "details") {
+        params.delete("tab"); // default doesn't need URL
+      } else {
+        params.set("tab", key);
+      }
+      const next = params.toString();
+      router.replace(next ? `${pathname}?${next}` : pathname, {
+        scroll: false,
+      });
+    },
+    [pathname, router, searchParams]
+  );
+
+  return (
+    <div className="flex border-b border-border/60 px-2">
+      {tabs.map((tab) => (
+        <button
+          key={tab.key}
+          onClick={() => setTab(tab.key)}
+          className={`px-3 py-2.5 text-xs font-medium border-b-2 transition-colors
+            ${
+              activeTab === tab.key
+                ? "border-[#2563eb] text-[#2563eb]"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+        >
+          {tab.label}
+          {tab.count != null && (
+            <span className="ml-1 text-[10px] text-muted-foreground/60">
+              {tab.count}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Read the active tab from URL search params */
+export function useActiveTab(): string {
+  const searchParams = useSearchParams();
+  return searchParams.get("tab") ?? "details";
+}

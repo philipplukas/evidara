@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Shield } from "lucide-react";
+import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
 import { getIcon } from "@/lib/icons";
 
@@ -9,49 +9,54 @@ interface ContextBarProps {
   context: SearchContextViewModel;
 }
 
+/**
+ * Top-level, high-signal search constraints.
+ * Reads/writes through SearchConstraintsProvider dispatch actions.
+ *
+ * Conceptually: ContextBar = global context, FilterPanel = deeper refinement.
+ */
 export function ContextBar({ context }: ContextBarProps) {
-  const [jurisdictions, setJurisdictions] = useState(context.jurisdictions);
-  const [languages, setLanguages] = useState(context.languages);
-  const [sourceTypes, setSourceTypes] = useState(context.sourceTypes);
-  const [officialOnly, setOfficialOnly] = useState(false);
-
-  const toggleChip = <T extends { key: string; active: boolean }>(
-    items: T[],
-    key: string,
-    setter: (items: T[]) => void
-  ) => {
-    setter(
-      items.map((item) =>
-        item.key === key ? { ...item, active: !item.active } : item
-      )
-    );
-  };
+  const { state: constraints, dispatch } = useSearchConstraints();
 
   return (
     <div className="border-b border-border bg-white px-6 py-2 flex items-center gap-6 text-sm">
       {/* Jurisdiction chips */}
       <ChipGroup
-        items={jurisdictions}
-        onToggle={(key) => toggleChip(jurisdictions, key, setJurisdictions)}
+        items={context.jurisdictions.map((j) => ({
+          ...j,
+          active: constraints.context.jurisdictions.includes(j.key),
+        }))}
+        onToggle={(key) =>
+          dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: key })
+        }
       />
 
       <div className="w-px h-5 bg-border" />
 
       {/* Language chips */}
       <ChipGroup
-        items={languages}
-        onToggle={(key) => toggleChip(languages, key, setLanguages)}
+        items={context.languages.map((l) => ({
+          ...l,
+          active: constraints.context.languages.includes(l.key),
+        }))}
+        onToggle={(key) =>
+          dispatch({ type: "TOGGLE_LANGUAGE", language: key })
+        }
       />
 
       <div className="w-px h-5 bg-border" />
 
       {/* Source type tabs */}
       <TabGroup
-        items={sourceTypes}
+        items={context.sourceTypes.map((t) => ({
+          ...t,
+          active: constraints.context.sourceType === t.key || (constraints.context.sourceType === null && t.key === "all"),
+        }))}
         onSelect={(key) =>
-          setSourceTypes(
-            sourceTypes.map((t) => ({ ...t, active: t.key === key }))
-          )
+          dispatch({
+            type: "SET_SOURCE_TYPE",
+            sourceType: key === "all" ? null : key,
+          })
         }
       />
 
@@ -59,10 +64,15 @@ export function ContextBar({ context }: ContextBarProps) {
 
       {/* Official sources toggle */}
       <button
-        onClick={() => setOfficialOnly(!officialOnly)}
+        onClick={() =>
+          dispatch({
+            type: "SET_OFFICIAL_ONLY",
+            value: !constraints.context.officialOnly,
+          })
+        }
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors
           ${
-            officialOnly
+            constraints.context.officialOnly
               ? "text-[#2563eb] bg-[#2563eb]/5 border border-[#2563eb]/20"
               : "text-muted-foreground hover:text-foreground border border-transparent"
           }`}
