@@ -46,7 +46,7 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
 
       {/* Content language indicator */}
       {detail.contentLanguage?.isTranslation && (
-        <div className="mt-2 px-2 py-1 rounded bg-amber-50 border border-amber-100 text-[11px] text-amber-700 inline-block">
+        <div className="mt-2 px-2 py-1 rounded bg-amber-50 border border-amber-100 text-micro text-amber-700 inline-block">
           {detail.contentLanguage.label}
         </div>
       )}

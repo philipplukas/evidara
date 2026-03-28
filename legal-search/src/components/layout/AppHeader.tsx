@@ -114,7 +114,7 @@ function NavLink({
       {icon}
       {label}
       {count != null && (
-        <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-interactive-accent-muted text-[10px] font-semibold text-brand leading-none">
+        <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-interactive-accent-muted text-tiny font-semibold text-brand leading-none">
           {count}
         </span>
       )}

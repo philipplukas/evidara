@@ -125,7 +125,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                     {icon && <span className="text-xs">{icon}</span>}
                     {opt.label}
                     {opt.count != null && (
-                      <span className={`text-[10px] ${isSelected ? "text-white/60" : "text-muted-foreground/60"}`}>
+                      <span className={`text-tiny ${isSelected ? "text-white/60" : "text-muted-foreground/60"}`}>
                         {opt.count.toLocaleString()}
                       </span>
                     )}
@@ -162,7 +162,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                       {opt.label}
                     </span>
                     {opt.count != null && (
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-tiny text-muted-foreground">
                         {opt.count.toLocaleString()}
                       </span>
                     )}

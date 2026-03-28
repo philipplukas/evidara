@@ -33,7 +33,7 @@ export function AnnotationTab({ annotations }: AnnotationTabProps) {
           <p className="text-sm text-foreground/80 leading-relaxed mb-3 font-document">
             {ann.content}
           </p>
-          <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-4 text-micro text-muted-foreground">
             {ann.provenance && (
               <span className="flex items-center gap-1">
                 <Info className="w-3 h-3" />
@@ -41,7 +41,7 @@ export function AnnotationTab({ annotations }: AnnotationTabProps) {
               </span>
             )}
             {ann.confidence && (
-              <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700 font-medium text-[10px]">
+              <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700 font-medium text-tiny">
                 {ann.confidence} confidence
               </span>
             )}

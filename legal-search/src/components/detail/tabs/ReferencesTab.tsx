@@ -34,7 +34,7 @@ export function ReferencesTab({
           <div className="flex items-center justify-between mb-3">
             <SectionLabel>
               {group.direction}
-              <span className="text-[10px] font-normal text-muted-foreground/60 ml-1">
+              <span className="text-tiny font-normal text-muted-foreground/60 ml-1">
                 ({group.items.length})
               </span>
             </SectionLabel>
@@ -58,7 +58,7 @@ export function ReferencesTab({
                     {item.title}
                   </div>
                   {item.subtitle && (
-                    <div className="text-[11px] text-muted-foreground truncate">
+                    <div className="text-micro text-muted-foreground truncate">
                       {item.subtitle}
                     </div>
                   )}

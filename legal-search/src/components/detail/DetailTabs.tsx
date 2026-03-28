@@ -46,7 +46,7 @@ export function DetailTabs({ tabs }: DetailTabsProps) {
         >
           {tab.label}
           {tab.count != null && (
-            <span className="ml-1 text-[10px] text-muted-foreground/60">
+            <span className="ml-1 text-tiny text-muted-foreground/60">
               {tab.count}
             </span>
           )}

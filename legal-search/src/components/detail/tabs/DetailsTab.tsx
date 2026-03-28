@@ -37,7 +37,7 @@ export function DetailsTab({ detail }: DetailsTabProps) {
               Safe now because contentHtml comes from our own mock data / BFF. */}
           <div
             className="text-sm leading-relaxed text-foreground/85 prose-sm font-document
-              [&_.article-marginal]:text-[11px] [&_.article-marginal]:font-semibold [&_.article-marginal]:text-muted-foreground
+              [&_.article-marginal]:text-micro [&_.article-marginal]:font-semibold [&_.article-marginal]:text-muted-foreground
               [&_.article-marginal]:mt-3 [&_.article-marginal]:mb-1
               [&_strong]:text-foreground [&_strong]:font-semibold
               [&_h4]:text-xs [&_h4]:font-semibold [&_h4]:uppercase [&_h4]:tracking-wider [&_h4]:text-muted-foreground [&_h4]:mt-4 [&_h4]:mb-2
