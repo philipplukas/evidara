@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { ContextBar } from "@/components/layout/ContextBar";
 import { ExactMatchStrip } from "@/components/results/ExactMatchStrip";
 import { ResultList } from "@/components/results/ResultList";
+import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
 import { FiltersSheet } from "@/components/layout/FiltersSheet";
 import { DetailSheet } from "@/components/layout/DetailSheet";
 import type {
@@ -47,6 +48,7 @@ export function MobileWorkspace({
       <ContextBar context={searchContext} />
 
       <div className="flex-1 min-h-0 overflow-y-auto bg-surface-panel">
+        <ResultSetScopeBar />
         {searchContext.exactMatches &&
           searchContext.exactMatches.length > 0 && (
             <div className="px-5 pt-4">

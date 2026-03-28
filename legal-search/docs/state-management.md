@@ -1,14 +1,76 @@
 # State Management
 
-> Workspace state, reducer patterns, and the planned URL-driven migration.
+> Workspace state, search constraints, URL-driven selection, and server data caching.
 
 ---
 
-## Current Architecture
+## Architecture Overview
+
+The application separates state into **five distinct concerns**, each with its own owner:
+
+| Concept | Owner | Mechanism | What It Holds |
+|---------|-------|-----------|---------------|
+| **Search Constraints** | `SearchConstraintsProvider` | Context + `useReducer` | Jurisdictions, languages, source type, refinement filters |
+| **Workspace Navigation** | `WorkspaceProvider` | Context + `useReducer` | Result sets, pivot stack, trail, pins |
+| **Selection** | URL `?item=` | `useSearchParams` | Which item is focused (shareable, deep-linkable) |
+| **Detail Tab** | URL `?tab=` | `useSearchParams` | Active detail panel tab |
+| **Server Data** | React Query | `useQuery` via `useDetail()` | Detail view models (cached, deduped) |
+
+### Provider Hierarchy
+
+```
+<SearchConstraintsProvider>          ← constrains search parameters
+  <WorkspaceProvider>                ← manages result sets + navigation
+    <Suspense>
+      <WorkspaceClient />            ← orchestrates URL + providers + layout
+    </Suspense>
+  </WorkspaceProvider>
+</SearchConstraintsProvider>
+```
+
+---
+
+## 1. Search Constraints (`SearchConstraintsProvider`)
+
+> Source: [`search-constraints-store.tsx`](../src/lib/search-constraints-store.tsx)
+
+High-level search parameters that scope _what_ gets searched. Conceptually separate from
+_how_ results are navigated (that's the workspace).
+
+### State Shape
+
+```typescript
+interface SearchConstraintsState {
+  context: ContextConstraints;     // Jurisdictions, languages, source type, officialOnly
+  refinements: SearchRefinement[]; // Fine-grained filters (terms, date_range, toggle, etc.)
+}
+```
+
+### Actions
+
+| Action | Trigger | Effect |
+|--------|---------|--------|
+| `TOGGLE_JURISDICTION` | ContextBar chip click | Add/remove jurisdiction |
+| `TOGGLE_LANGUAGE` | ContextBar chip click | Add/remove language |
+| `SET_SOURCE_TYPE` | ContextBar tab click | Switch source type filter |
+| `SET_OFFICIAL_ONLY` | ContextBar toggle | Toggle official sources flag |
+| `SET_REFINEMENT` | FilterPanel checkbox/chip | Upsert a field-level refinement |
+| `CLEAR_REFINEMENT` | FilterPanel deselect all | Remove a single field refinement |
+| `CLEAR_ALL_REFINEMENTS` | (planned) Reset button | Clear all refinements |
+| `RESET_ALL` | (planned) | Reset entire state |
+
+### Consumers
+
+- **`ContextBar`** — reads `state.context`, dispatches jurisdiction/language/sourceType/officialOnly changes
+- **`FilterPanel`** → `FilterGroup` — reads `state.refinements`, dispatches `SET_REFINEMENT`/`CLEAR_REFINEMENT`
+
+---
+
+## 2. Workspace Navigation (`WorkspaceProvider`)
 
 > Source: [`workspace-store.tsx`](../src/lib/workspace-store.tsx)
 
-React Context + `useReducer` pattern. Single `WorkspaceProvider` wraps the entire app.
+Manages the core navigation model: result sets, the pivot stack, focus trail, and pinned items.
 
 ### State Shape
 
@@ -16,79 +78,33 @@ React Context + `useReducer` pattern. Single `WorkspaceProvider` wraps the entir
 interface WorkspaceState {
   resultSet: ResultSet;           // Current visible result set (center column)
   resultSetStack: ResultSet[];    // Previous sets for BACK navigation
-  focusedId: string | null;       // Drives right panel content
-  trail: TrailEntry[];            // Focus history (append-only)
+  trail: TrailEntry[];            // Items the user has focused on (append-only)
   pinned: PinnedItem[];           // Persisted across pivots
 }
 ```
 
-### Result Set
+### Result Set Provenance
 
-Each `ResultSet` tracks its provenance:
+Each `ResultSet` tracks where it came from via a linked list:
 
 ```typescript
-interface ResultSet {
-  source: ResultSetSource;             // Where these results came from
-  items: SearchResultViewModel[];      // The actual results
-  scopeLabel: string;                  // Display label (e.g. "Results for 'Art. 754'")
-}
-
 type ResultSetSource =
   | { type: "search"; query: string }
   | { type: "pivot"; label: string; parentSource: ResultSetSource };
 ```
 
-The `parentSource` forms a linked list — you can trace any pivot back to its root search.
+### Actions
 
----
+| Action | Trigger | Effect |
+|--------|---------|--------|
+| `SEARCH` | AppHeader form submit | Replace result set, clear stack |
+| `PIVOT` | ResultCard related count, "Show all" button | Push current set to stack, load new set |
+| `BACK` | ResultSetScopeBar back button | Pop stack, restore previous set |
+| `PUSH_TRAIL` | `handleSelect` in WorkspaceClient | Append item to focus trail |
+| `CLEAR_TRAIL` | (planned) Trail panel clear | Empty the trail |
+| `PIN` / `UNPIN` | ResultCard/DetailPanel pin button | Add/remove from pinned list |
 
-## Reducer Actions
-
-### `SEARCH`
-
-```
-Trigger:  AppHeader form submit
-Effect:   Replace resultSet, clear stack, auto-focus first result
-State:    resultSet ← new, resultSetStack ← [], focusedId ← items[0].id
-```
-
-### `FOCUS`
-
-```
-Trigger:  ResultCard click, RelatedTab item click, ReferencesTab item click, StructureTab item click
-Effect:   Set focusedId, append to trail
-State:    focusedId ← action.id, trail ← [...trail, { id, title, type, timestamp }]
-```
-
-### `PIVOT`
-
-```
-Trigger:  ResultCard relatedCount click, DetailPanel "Show all" button
-Effect:   Push current set to stack, load new result set
-State:    resultSetStack ← [...stack, currentSet], resultSet ← new, focusedId ← items[0].id
-```
-
-### `BACK`
-
-```
-Trigger:  ResultSetScopeBar back button
-Effect:   Pop stack, restore previous set
-State:    resultSet ← stack.pop(), focusedId ← items[0].id
-Guard:    No-op if stack is empty
-```
-
-### `PIN` / `UNPIN`
-
-```
-Trigger:  ResultCard pin button, DetailPanel pin button
-Effect:   Add/remove from pinned list
-Guard:    PIN is idempotent (no duplicates)
-State:    pinned ← [...pinned, item] or pinned.filter(p => p.id !== id)
-```
-
----
-
-## State Machine
+### State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -99,99 +115,113 @@ stateDiagram-v2
   state "Pivot² Result Set" as S3
 
   [*] --> S1 : SEARCH (initial)
-  S1 --> S1 : FOCUS / PIN / UNPIN
+  S1 --> S1 : PUSH_TRAIL / PIN / UNPIN
   S1 --> S2 : PIVOT
   S2 --> S1 : BACK
-  S2 --> S2 : FOCUS / PIN / UNPIN
+  S2 --> S2 : PUSH_TRAIL / PIN / UNPIN
   S2 --> S3 : PIVOT (nested)
   S3 --> S2 : BACK
   S1 --> S1 : SEARCH (resets stack)
 ```
 
-**Orthogonal state**: `focusedId`, `trail`, and `pinned` are independent of the result set stack. Pins persist across pivots and BACKs.
+**Orthogonal state**: `trail` and `pinned` are independent of the result set stack. Pins persist across pivots and BACKs.
+
+### Consumers
+
+- **`AppHeader`** — reads `state.trail.length`, `state.pinned.length` for badge counts; dispatches `SEARCH`
+- **`ResultSetScopeBar`** — reads `state.resultSetStack.length` for back button; reads `state.resultSet.scopeLabel`; dispatches `BACK`
+- **`WorkspaceClient`** — reads `state.resultSet.items` for the results list; dispatches `PUSH_TRAIL`, `PIVOT`, `PIN`/`UNPIN`
 
 ---
 
-## Context API
+## 3. URL-Driven Selection
 
-```typescript
-interface WorkspaceContextValue {
-  state: WorkspaceState;
-  dispatch: Dispatch<WorkspaceAction>;
-  getDetail: (id: string) => DetailViewModel | null;  // Lookup from detailMap
-}
-```
+Selection state lives in URL search parameters — not in any React store. This enables deep-linking, shareability, and browser back/forward.
 
-### Provider Setup
+### Parameters
 
-```typescript
-<WorkspaceProvider
-  initialResults={searchResults}    // Mock data → future: initial SSR fetch
-  initialQuery="Art. 754 OR ..."    // Initial search query
-  detailMap={detailMap}             // Record<id, DetailViewModel> → future: async BFF fetch
->
-```
+| Param | Purpose | Default |
+|-------|---------|---------|
+| `?item=<id>` | Which item is focused → drives detail panel | No selection (panel collapsed) |
+| `?tab=<key>` | Active tab within detail panel | `"details"` |
 
-### Consumer Hook
+### How It Works
 
-```typescript
-const { state, dispatch, getDetail } = useWorkspace();
-```
-
-Used by: `WorkspaceShell`, `AppHeader`, `ResultSetScopeBar`.
-
----
-
-## Derived State (computed in WorkspaceShell)
-
-| Derived | Computation | Used by |
-|---------|-------------|---------|
-| `pinnedIds` | `new Set(state.pinned.map(p => p.id))` | ResultCard, DetailPanel (isPinned check) |
-| `detail` | `state.focusedId ? getDetail(focusedId) : null` | DetailPanel |
-| `canGoBack` | `state.resultSetStack.length > 0` | ResultSetScopeBar |
-
----
-
-## Memoized Callbacks (WorkspaceShell)
-
-| Callback | Dependencies | Dispatches |
-|----------|-------------|------------|
-| `handleFocus` | `[dispatch]` | `FOCUS` |
-| `handlePivot` | `[dispatch, state.resultSet]` | `PIVOT` |
-| `handlePin` | `[dispatch, state.pinned]` | `PIN` or `UNPIN` (toggle) |
-
----
-
-## Planned Migration: URL-Driven Selection
-
-> Source: [Responsive Layout Plan](../../.gemini/antigravity/brain/64dc9795-0b49-44bb-be0a-a0e5c352e678/implementation_plan.md)
-
-### What Changes
-
-| Current | Future |
-|---------|--------|
-| `focusedId` lives in reducer state | `selectedId` comes from URL `?item=` param |
-| `FOCUS` action updates state | URL update via `router.replace()` |
-| Right panel always visible | Right panel **collapses** when no `?item=`, expands on selection |
-| No URL state | Deep-linkable: `?item=law-1` opens detail directly |
-
-### Migration Strategy
-
-The plan keeps `FOCUS` in the reducer (for trail tracking) but treats the URL as source of truth for _which item is selected_. The `WorkspaceClient` component:
-
-1. Reads `useSearchParams().get("item")` → `selectedId`
-2. On result click: `router.replace(?item=id)` + dispatches `FOCUS` (for trail)
-3. Right panel expands/collapses via `ImperativePanelHandle` based on `selectedId`
-4. Escape key → collapses right panel, removes `?item=`
-5. Browser back/forward → panel state follows URL
+1. **Read**: `useSearchParams().get("item")` → `selectedId` (in `WorkspaceClient`)
+2. **Write**: `router.replace(?item=id)` via `setSelectedId()` callback
+3. **Detail data**: `useDetail(selectedId)` → React Query fetch (or mock)
+4. **Panel sync**: `useEffect` expands/collapses the right panel via `ImperativePanelHandle`
+5. **Escape**: Keyboard handler removes `?item=`, collapsing the panel
+6. **Tab sync**: `DetailTabs` reads/writes `?tab=` via `useSearchParams`; `useActiveTab()` hook
 
 ### Mobile Adaptation
 
-On `< 1024px` (determined by `useDesktop()` hook):
-- Filters → `Sheet` from left
-- Detail → `Sheet` from right (driven by `?item=`)
-- Center panel = full-width result list
+On `< 1024px` (via `useDesktop()` hook):
+- Detail opens as a `Sheet` overlay instead of a resizable panel
+- Same `?item=` URL parameter drives both behaviors
 
-### Panel Persistence
+---
 
-`autoSaveId="workspace-layout"` on `ResizablePanelGroup` → panel sizes persist in `localStorage`.
+## 4. Server Data (React Query)
+
+> Source: [`use-detail.ts`](../src/hooks/use-detail.ts), [`query-client.ts`](../src/lib/query-client.ts)
+
+Detail view models are fetched on demand and cached via `@tanstack/react-query`.
+
+```typescript
+export function useDetail(id: string | null) {
+  return useQuery<DetailViewModel | null>({
+    queryKey: ["detail", id],
+    queryFn: () => fetchDetail(id!),
+    enabled: id !== null,  // only fetch when an item is selected
+  });
+}
+```
+
+### Cache Configuration
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| `staleTime` | 5 minutes | Legal data doesn't change often |
+| `gcTime` | 30 minutes | Keep cached details available during session |
+| `refetchOnWindowFocus` | `false` | Avoid unnecessary re-fetches on tab switch |
+
+### Current Phase
+
+**Phase 1 (mock)**: `fetchDetail()` does a synchronous lookup from `mock-data.ts`.
+**Phase 2 (planned)**: Swap to async BFF fetch — the hook interface stays identical.
+
+---
+
+## 5. Derived State & Callbacks (WorkspaceClient)
+
+`WorkspaceClient` is the orchestrator that connects all state sources and passes props down.
+
+### Derived Values
+
+| Derived | Computation | Used by |
+|---------|-------------|---------|
+| `selectedId` | `searchParams.get("item")` | ResultList, DetailPanel |
+| `isDetailOpen` | `Boolean(selectedId)` | Panel expand/collapse |
+| `detail` | `useDetail(selectedId).data` | DetailPanel |
+| `pinnedIds` | `new Set(state.pinned.map(p => p.id))` | ResultCard, DetailPanel (isPinned check) |
+| `canGoBack` | `state.resultSetStack.length > 0` | ResultSetScopeBar (reads directly) |
+
+### Memoized Callbacks
+
+| Callback | Dependencies | Effect |
+|----------|-------------|--------|
+| `setSelectedId` | `[pathname, router, searchParams]` | Updates URL `?item=` param |
+| `handleSelect` | `[setSelectedId, dispatch, state.resultSet.items]` | URL update + `PUSH_TRAIL` |
+| `handlePivot` | `[dispatch, state.resultSet]` | Fetches pivot data + `PIVOT` dispatch |
+| `handlePin` | `[dispatch, state.pinned]` | Toggle `PIN` / `UNPIN` |
+
+---
+
+## Design Principles
+
+1. **URL as source of truth** for navigational state (selection, tab) — enables deep-linking
+2. **Reducers for domain state** (workspace nav, constraints) — predictable, debuggable transitions
+3. **React Query for server data** — automatic caching, deduplication, loading states
+4. **Leaf components are pure** — receive props, render, no side effects
+5. **Single orchestrator** (`WorkspaceClient`) bridges URL, context, and cache

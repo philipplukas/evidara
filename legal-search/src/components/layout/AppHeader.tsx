@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, MapPin, Clock, User, SlidersHorizontal } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useWorkspace } from "@/lib/workspace-store";
 import { searchResults } from "@/lib/mock-data";
 
@@ -11,9 +11,14 @@ interface AppHeaderProps {
 
 export function AppHeader({ onOpenFilters }: AppHeaderProps) {
   const { state, dispatch } = useWorkspace();
-  const initialQuery =
+  const storeQuery =
     state.resultSet.source.type === "search" ? state.resultSet.source.query : "";
-  const [query, setQuery] = useState(initialQuery);
+  const [query, setQuery] = useState(storeQuery);
+
+  // Keep the input in sync when a SEARCH is dispatched from elsewhere
+  useEffect(() => {
+    setQuery(storeQuery);
+  }, [storeQuery]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -27,10 +32,10 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
         {/* Wordmark */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="w-7 h-7 rounded-lg bg-brand-strong flex items-center justify-center">
-            <span className="text-white font-bold text-sm">O</span>
+            <span className="text-white font-bold text-sm">E</span>
           </div>
           <span className="text-lg font-semibold tracking-tight text-brand-strong">
-            Omnilex
+            Evidara
           </span>
         </div>
 

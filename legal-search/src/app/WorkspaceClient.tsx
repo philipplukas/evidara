@@ -15,6 +15,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { ContextBar } from "@/components/layout/ContextBar";
 import { FilterPanel } from "@/components/filters/FilterPanel";
 import { ResultContextHeader } from "@/components/results/ResultContextHeader";
+import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
 import { ResultList } from "@/components/results/ResultList";
 import { DetailPanel } from "@/components/detail/DetailPanel";
 import { MobileWorkspace } from "@/components/layout/MobileWorkspace";
@@ -66,15 +67,13 @@ export default function WorkspaceClient({
   const handleSelect = useCallback(
     (id: string) => {
       setSelectedId(id);
+      const item = state.resultSet.items.find((r) => r.id === id);
       dispatch({
         type: "PUSH_TRAIL",
         entry: {
           id,
-          title:
-            state.resultSet.items.find((r) => r.id === id)?.title ?? id,
-          type:
-            state.resultSet.items.find((r) => r.id === id)?.type ??
-            "unknown",
+          title: item?.title ?? id,
+          type: item?.type ?? "unknown",
           timestamp: Date.now(),
         },
       });
@@ -187,6 +186,7 @@ export default function WorkspaceClient({
             minSize={30}
           >
             <div className="h-full overflow-y-auto bg-surface-panel">
+              <ResultSetScopeBar />
               <ResultContextHeader
                 exactMatches={searchContext.exactMatches}
                 onSelect={handleSelect}
