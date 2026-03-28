@@ -1,0 +1,185 @@
+openapi: 3.1.0
+info:
+  title: Legal Search API
+  description: |
+    API for searching and retrieving legal and regulatory documents
+    in the Evidara legal search experience.
+  version: 0.1.0
+  contact:
+    name: Evidara Team
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+  - url: https://legal-search.evidara.dev
+    description: Production
+
+paths:
+  /v1/search:
+    get:
+      operationId: searchDocuments
+      summary: Search documents
+      tags: [search]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query text
+        - name: jurisdiction
+          in: query
+          schema:
+            type: string
+          description: Filter by jurisdiction
+        - name: document_type
+          in: query
+          schema:
+            type: string
+          description: Filter by document type
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Results per page
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+
+  /v1/documents/{document_id}:
+    get:
+      operationId: getDocument
+      summary: Get document detail
+      tags: [documents]
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentDetail"
+        "404":
+          description: Document not found
+
+  /v1/documents/{document_id}/sections:
+    get:
+      operationId: getDocumentSections
+      summary: Get sections of a document
+      tags: [documents]
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document sections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SectionSummary"
+
+components:
+  schemas:
+    SearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        total_results:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+
+    SearchResult:
+      type: object
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        snippet:
+          type: string
+          description: Highlighted text snippet matching the query
+        jurisdiction:
+          type: string
+        document_type:
+          type: string
+        effective_date:
+          type: string
+          format: date
+        relevance_score:
+          type: number
+
+    DocumentDetail:
+      type: object
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        jurisdiction:
+          type: string
+        document_type:
+          type: string
+        effective_date:
+          type: string
+          format: date
+        source_id:
+          type: string
+        processed_at:
+          type: string
+          format: date-time
+        sections_count:
+          type: integer
+        citations_count:
+          type: integer
+
+    SectionSummary:
+      type: object
+      properties:
+        section_id:
+          type: string
+        title:
+          type: string
+        ordinal:
+          type: integer
+        depth:
+          type: integer
+        content_preview:
+          type: string
+          description: First 200 characters of section content

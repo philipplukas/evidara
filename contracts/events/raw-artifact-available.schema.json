@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/events/raw-artifact-available",
+  "title": "RawArtifactAvailable",
+  "description": "Event emitted by platform-control when a raw artifact has been stored and is ready for processing by document-intelligence.",
+  "type": "object",
+  "required": [
+    "event_type",
+    "event_id",
+    "timestamp",
+    "payload"
+  ],
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "const": "raw_artifact.available",
+      "description": "Event type identifier."
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Unique identifier for this event instance."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the event was emitted."
+    },
+    "payload": {
+      "$ref": "https://evidara.dev/schemas/raw-artifact-envelope",
+      "description": "The raw artifact envelope."
+    }
+  },
+  "additionalProperties": false
+}

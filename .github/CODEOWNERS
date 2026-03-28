@@ -1,0 +1,13 @@
+# Evidara CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+
+# Default owner for everything
+* @philipp
+
+# Component-specific ownership
+platform-control/    @philipp
+document-intelligence/ @philipp
+legal-search/        @philipp
+contracts/           @philipp
+infra/               @philipp
+docs/                @philipp
