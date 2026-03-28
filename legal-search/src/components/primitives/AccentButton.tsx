@@ -25,6 +25,7 @@ export function AccentButton({
 }: AccentButtonProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
       className={`flex items-center gap-1 px-2 py-1 rounded text-micro font-medium transition-all

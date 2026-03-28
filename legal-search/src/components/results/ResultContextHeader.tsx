@@ -17,10 +17,7 @@ interface ResultContextHeaderProps {
  *
  * Together they answer: "what kind of result context am I in?"
  */
-export function ResultContextHeader({
-  exactMatches,
-  onSelect,
-}: ResultContextHeaderProps) {
+export function ResultContextHeader({ exactMatches, onSelect }: ResultContextHeaderProps) {
   const hasExactMatches = exactMatches && exactMatches.length > 0;
 
   return (

@@ -169,5 +169,5 @@
 
 /* ─── Document font utility ─── */
 .font-document {
-  font-family: var(--font-serif), 'Georgia', serif;
+  font-family: var(--font-serif), "Georgia", serif;
 }

@@ -1,18 +1,9 @@
 "use client";
 
-import {
-  FileText,
-  Scale,
-  BookOpen,
-  Bookmark,
-  ArrowRight,
-  Link,
-  Globe,
-  MapPin,
-} from "lucide-react";
-import type { SearchResultViewModel } from "@/lib/types";
+import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
 import { getIcon } from "@/lib/icons";
-import { Badge, AccentButton } from "../primitives";
+import type { SearchResultViewModel } from "@/lib/types";
+import { AccentButton, Badge } from "../primitives";
 
 const iconComponents: Record<string, React.ComponentType<{ className?: string }>> = {
   "file-text": FileText,
@@ -100,8 +91,7 @@ export function ResultCard({
             return (
               <span key={i} className="text-micro text-muted-foreground">
                 <span className="font-medium text-foreground/60">{row.label}:</span>{" "}
-                {icon && <span className="text-xs">{icon}</span>}{" "}
-                {row.value}
+                {icon && <span className="text-xs">{icon}</span>} {row.value}
               </span>
             );
           })}
@@ -113,6 +103,7 @@ export function ResultCard({
         <div className="flex flex-wrap gap-2">
           {result.relatedCounts.map((rc, i) => (
             <button
+              type="button"
               key={i}
               onClick={(e) => {
                 e.stopPropagation();
@@ -142,10 +133,7 @@ export function ResultCard({
           {result.actions.map((action, i) => {
             const IconComp = iconComponents[action.icon] || ArrowRight;
             return (
-              <AccentButton
-                key={i}
-                onClick={(e) => e.stopPropagation()}
-              >
+              <AccentButton key={i} onClick={(e) => e.stopPropagation()}>
                 <IconComp className="w-3 h-3" />
                 {action.label}
               </AccentButton>

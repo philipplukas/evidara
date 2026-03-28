@@ -21,11 +21,11 @@
  * - Detail panel rendering — that's a component concern
  */
 
-import { describe, it, expect } from "vitest";
-import { WorkspaceProvider, useWorkspace } from "@/lib/workspace-store";
-import { renderHook, act } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { describe, expect, it } from "vitest";
 import type { SearchResultViewModel } from "@/lib/types";
+import { useWorkspace, WorkspaceProvider } from "@/lib/workspace-store";
 
 const mockResults: SearchResultViewModel[] = [
   {
@@ -94,7 +94,11 @@ describe("WorkspaceProvider", () => {
     act(() => {
       result.current.dispatch({
         type: "PIVOT",
-        source: { type: "pivot", label: "Decisions", parentSource: result.current.state.resultSet.source },
+        source: {
+          type: "pivot",
+          label: "Decisions",
+          parentSource: result.current.state.resultSet.source,
+        },
         results: pivotResults,
         scopeLabel: "Decisions for Art. 754 OR",
       });
@@ -121,7 +125,11 @@ describe("WorkspaceProvider", () => {
     act(() => {
       result.current.dispatch({
         type: "PIVOT",
-        source: { type: "pivot", label: "Decisions", parentSource: result.current.state.resultSet.source },
+        source: {
+          type: "pivot",
+          label: "Decisions",
+          parentSource: result.current.state.resultSet.source,
+        },
         results: pivotResults,
         scopeLabel: "Decisions for Art. 754 OR",
       });
@@ -160,8 +168,14 @@ describe("WorkspaceProvider", () => {
     const { result } = renderHook(() => useWorkspace(), { wrapper });
 
     act(() => {
-      result.current.dispatch({ type: "PIN", item: { id: "r1", title: "Art. 754 OR", type: "law" } });
-      result.current.dispatch({ type: "PIN", item: { id: "r1", title: "Art. 754 OR", type: "law" } });
+      result.current.dispatch({
+        type: "PIN",
+        item: { id: "r1", title: "Art. 754 OR", type: "law" },
+      });
+      result.current.dispatch({
+        type: "PIN",
+        item: { id: "r1", title: "Art. 754 OR", type: "law" },
+      });
     });
 
     expect(result.current.state.pinned).toHaveLength(1);
@@ -176,8 +190,14 @@ describe("WorkspaceProvider", () => {
     const { result } = renderHook(() => useWorkspace(), { wrapper });
 
     act(() => {
-      result.current.dispatch({ type: "PIN", item: { id: "r1", title: "Art. 754 OR", type: "law" } });
-      result.current.dispatch({ type: "PIN", item: { id: "r2", title: "BGer 4A_123", type: "decision" } });
+      result.current.dispatch({
+        type: "PIN",
+        item: { id: "r1", title: "Art. 754 OR", type: "law" },
+      });
+      result.current.dispatch({
+        type: "PIN",
+        item: { id: "r2", title: "BGer 4A_123", type: "decision" },
+      });
     });
     expect(result.current.state.pinned).toHaveLength(2);
 

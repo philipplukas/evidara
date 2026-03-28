@@ -3,16 +3,16 @@
 import { useState } from "react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { ContextBar } from "@/components/layout/ContextBar";
+import { DetailSheet } from "@/components/layout/DetailSheet";
+import { FiltersSheet } from "@/components/layout/FiltersSheet";
 import { ExactMatchStrip } from "@/components/results/ExactMatchStrip";
 import { ResultList } from "@/components/results/ResultList";
 import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
-import { FiltersSheet } from "@/components/layout/FiltersSheet";
-import { DetailSheet } from "@/components/layout/DetailSheet";
 import type {
-  SearchResultViewModel,
-  SearchContextViewModel,
-  FilterViewModel,
   DetailViewModel,
+  FilterViewModel,
+  SearchContextViewModel,
+  SearchResultViewModel,
 } from "@/lib/types";
 
 interface MobileWorkspaceProps {
@@ -49,15 +49,11 @@ export function MobileWorkspace({
 
       <div className="flex-1 min-h-0 overflow-y-auto bg-surface-panel">
         <ResultSetScopeBar />
-        {searchContext.exactMatches &&
-          searchContext.exactMatches.length > 0 && (
-            <div className="px-5 pt-4">
-              <ExactMatchStrip
-                matches={searchContext.exactMatches}
-                onSelect={onFocus}
-              />
-            </div>
-          )}
+        {searchContext.exactMatches && searchContext.exactMatches.length > 0 && (
+          <div className="px-5 pt-4">
+            <ExactMatchStrip matches={searchContext.exactMatches} onSelect={onFocus} />
+          </div>
+        )}
 
         <ResultList
           results={results}
@@ -69,11 +65,7 @@ export function MobileWorkspace({
         />
       </div>
 
-      <FiltersSheet
-        open={filtersOpen}
-        onOpenChange={setFiltersOpen}
-        filters={filters}
-      />
+      <FiltersSheet open={filtersOpen} onOpenChange={setFiltersOpen} filters={filters} />
 
       <DetailSheet
         open={Boolean(selectedId)}

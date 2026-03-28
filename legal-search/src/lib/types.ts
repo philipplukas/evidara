@@ -193,4 +193,3 @@ export interface SearchConstraintsState {
   context: ContextConstraints;
   refinements: SearchRefinement[];
 }
-

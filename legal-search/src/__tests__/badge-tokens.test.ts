@@ -17,7 +17,7 @@
  * - Badge rendering or styling (that's the Badge primitive)
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { getBadgeColor } from "@/lib/badge-tokens";
 
 describe("getBadgeColor", () => {

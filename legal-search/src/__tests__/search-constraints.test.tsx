@@ -18,18 +18,17 @@
  * - Specific UI interactions (covered by user flow tests)
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // We test the reducer directly by re-implementing it inline.
 // This avoids coupling to the module's internal export structure.
 // When the store exports the reducer, we can import it directly.
 
-import type { SearchRefinement } from "@/lib/types";
-
+import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 // Import the actual provider to test through React hooks
 import { SearchConstraintsProvider, useSearchConstraints } from "@/lib/search-constraints-store";
-import { renderHook, act } from "@testing-library/react";
-import type { ReactNode } from "react";
+import type { SearchRefinement } from "@/lib/types";
 
 function wrapper({ children }: { children: ReactNode }) {
   return <SearchConstraintsProvider>{children}</SearchConstraintsProvider>;

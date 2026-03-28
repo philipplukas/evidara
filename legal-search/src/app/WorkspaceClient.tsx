@@ -1,38 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-  PanelImperativeHandle,
-} from "@/components/ui/resizable-panels";
-import { useDesktop } from "@/hooks/use-desktop";
-import { useWorkspace } from "@/lib/workspace-store";
-import { useDetail } from "@/hooks/use-detail";
+import { useCallback, useEffect, useRef } from "react";
+import { DetailPanel } from "@/components/detail/DetailPanel";
+import { FilterPanel } from "@/components/filters/FilterPanel";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { ContextBar } from "@/components/layout/ContextBar";
-import { FilterPanel } from "@/components/filters/FilterPanel";
-import { ResultContextHeader } from "@/components/results/ResultContextHeader";
-import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
-import { ResultList } from "@/components/results/ResultList";
-import { DetailPanel } from "@/components/detail/DetailPanel";
 import { MobileWorkspace } from "@/components/layout/MobileWorkspace";
-import type {
-  SearchContextViewModel,
-  FilterViewModel,
-} from "@/lib/types";
+import { ResultContextHeader } from "@/components/results/ResultContextHeader";
+import { ResultList } from "@/components/results/ResultList";
+import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
+import {
+  type PanelImperativeHandle,
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable-panels";
+import { useDesktop } from "@/hooks/use-desktop";
+import { useDetail } from "@/hooks/use-detail";
+import type { FilterViewModel, SearchContextViewModel } from "@/lib/types";
+import { useWorkspace } from "@/lib/workspace-store";
 
 interface WorkspaceClientProps {
   searchContext: SearchContextViewModel;
   filters: FilterViewModel[];
 }
 
-export default function WorkspaceClient({
-  searchContext,
-  filters,
-}: WorkspaceClientProps) {
+export default function WorkspaceClient({ searchContext, filters }: WorkspaceClientProps) {
   const isDesktop = useDesktop();
   const { state, dispatch } = useWorkspace();
 
@@ -61,7 +55,7 @@ export default function WorkspaceClient({
         scroll: false,
       });
     },
-    [pathname, router, searchParams]
+    [pathname, router, searchParams],
   );
 
   const handleSelect = useCallback(
@@ -78,7 +72,7 @@ export default function WorkspaceClient({
         },
       });
     },
-    [setSelectedId, dispatch, state.resultSet.items]
+    [setSelectedId, dispatch, state.resultSet.items],
   );
 
   const handlePivot = useCallback(
@@ -97,7 +91,7 @@ export default function WorkspaceClient({
         });
       });
     },
-    [dispatch, state.resultSet]
+    [dispatch, state.resultSet],
   );
 
   const handlePin = useCallback(
@@ -108,7 +102,7 @@ export default function WorkspaceClient({
         dispatch({ type: "PIN", item: { id, title, type } });
       }
     },
-    [dispatch, state.pinned]
+    [dispatch, state.pinned],
   );
 
   const pinnedIds = new Set(state.pinned.map((p) => p.id));
@@ -160,10 +154,7 @@ export default function WorkspaceClient({
       <ContextBar context={searchContext} />
 
       <div className="flex-1 min-h-0">
-        <ResizablePanelGroup
-          direction="horizontal"
-          className="h-full"
-        >
+        <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left: Filters */}
           <ResizablePanel
             panelRef={leftRef}
@@ -181,10 +172,7 @@ export default function WorkspaceClient({
           <ResizableHandle withHandle />
 
           {/* Center: Results */}
-          <ResizablePanel
-            defaultSize={isDetailOpen ? 46 : 78}
-            minSize={30}
-          >
+          <ResizablePanel defaultSize={isDetailOpen ? 46 : 78} minSize={30}>
             <div className="h-full overflow-y-auto bg-surface-panel">
               <ResultSetScopeBar />
               <ResultContextHeader
@@ -220,9 +208,7 @@ export default function WorkspaceClient({
                 onFocus={handleSelect}
                 onPivot={handlePivot}
                 onPin={handlePin}
-                isPinned={
-                  selectedId ? pinnedIds.has(selectedId) : false
-                }
+                isPinned={selectedId ? pinnedIds.has(selectedId) : false}
               />
             </div>
           </ResizablePanel>

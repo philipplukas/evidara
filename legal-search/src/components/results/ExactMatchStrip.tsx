@@ -1,8 +1,8 @@
 "use client";
 
 import { Zap } from "lucide-react";
-import type { SearchResultViewModel } from "@/lib/types";
 import { getIcon } from "@/lib/icons";
+import type { SearchResultViewModel } from "@/lib/types";
 import { Badge } from "../primitives";
 
 interface ExactMatchStripProps {
@@ -21,11 +21,10 @@ export function ExactMatchStrip({ matches, onSelect }: ExactMatchStripProps) {
       </div>
       <div className="flex gap-2">
         {matches.map((match) => {
-          const icon = match.badges[0]?.iconKey
-            ? getIcon(match.badges[0].iconKey)
-            : null;
+          const icon = match.badges[0]?.iconKey ? getIcon(match.badges[0].iconKey) : null;
           return (
             <button
+              type="button"
               key={match.id}
               onClick={() => onSelect(match.id)}
               className="flex items-center gap-2 px-3 py-2 rounded-md bg-surface-panel border border-border
@@ -33,12 +32,8 @@ export function ExactMatchStrip({ matches, onSelect }: ExactMatchStripProps) {
             >
               {icon && <span className="text-sm">{icon}</span>}
               <div>
-                <div className="text-sm font-medium text-foreground">
-                  {match.title}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {match.subtitle}
-                </div>
+                <div className="text-sm font-medium text-foreground">{match.title}</div>
+                <div className="text-xs text-muted-foreground">{match.subtitle}</div>
               </div>
               <Badge
                 label={match.badges[0]?.label ?? ""}

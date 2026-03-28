@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
 
 interface ActionTextLinkProps {
   children: ReactNode;
@@ -23,6 +23,7 @@ export function ActionTextLink({
 }: ActionTextLinkProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`flex items-center gap-0.5 text-micro font-medium text-brand hover:text-brand-hover transition-colors ${className}`}
     >

@@ -4,10 +4,10 @@ import { FileText } from "lucide-react";
 import type { DetailViewModel } from "@/lib/types";
 import { DetailPanelHeader } from "./DetailPanelHeader";
 import { DetailTabs, useActiveTab } from "./DetailTabs";
-import { DetailsTab } from "./tabs/DetailsTab";
-import { RelatedTab } from "./tabs/RelatedTab";
-import { ReferencesTab } from "./tabs/ReferencesTab";
 import { AnnotationTab } from "./tabs/AnnotationTab";
+import { DetailsTab } from "./tabs/DetailsTab";
+import { ReferencesTab } from "./tabs/ReferencesTab";
+import { RelatedTab } from "./tabs/RelatedTab";
 import { StructureTab } from "./tabs/StructureTab";
 
 interface DetailPanelProps {
@@ -27,9 +27,7 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
         <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
           <FileText className="w-6 h-6 text-muted-foreground/40" />
         </div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-1">
-          Select a result
-        </h3>
+        <h3 className="text-sm font-medium text-muted-foreground mb-1">Select a result</h3>
         <p className="text-xs text-muted-foreground/70 max-w-[200px]">
           Click on a search result to view its details, related materials, and references.
         </p>
@@ -40,20 +38,14 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
   return (
     <div className="h-full flex flex-col">
       {/* Stable header — stays constant across tab switches */}
-      <DetailPanelHeader
-        detail={detail}
-        onPin={onPin}
-        isPinned={isPinned}
-      />
+      <DetailPanelHeader detail={detail} onPin={onPin} isPinned={isPinned} />
 
       {/* URL-driven tab bar */}
       <DetailTabs tabs={detail.tabs} />
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "details" && (
-          <DetailsTab detail={detail} />
-        )}
+        {activeTab === "details" && <DetailsTab detail={detail} />}
         {activeTab === "related" && (
           <RelatedTab
             groups={detail.relatedGroups}
@@ -71,9 +63,7 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
             sourceTitle={detail.title}
           />
         )}
-        {activeTab === "annotation" && (
-          <AnnotationTab annotations={detail.annotations} />
-        )}
+        {activeTab === "annotation" && <AnnotationTab annotations={detail.annotations} />}
         {activeTab === "structure" && detail.localStructure && (
           <StructureTab items={detail.localStructure.items} onFocus={onFocus} />
         )}

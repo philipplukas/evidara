@@ -17,12 +17,8 @@ export function DetailsTab({ detail }: DetailsTabProps) {
           <div className="space-y-1.5">
             {detail.metadata.map((row, i) => (
               <div key={i} className="flex items-baseline gap-2 text-xs">
-                <span className="text-muted-foreground w-28 shrink-0 font-medium">
-                  {row.label}
-                </span>
-                <span className="text-foreground/80 flex items-center gap-1">
-                  {row.value}
-                </span>
+                <span className="text-muted-foreground w-28 shrink-0 font-medium">{row.label}</span>
+                <span className="text-foreground/80 flex items-center gap-1">{row.value}</span>
               </div>
             ))}
           </div>

@@ -1,9 +1,9 @@
 "use client";
 
-import { MapPin, Copy } from "lucide-react";
+import { Copy, MapPin } from "lucide-react";
 import type { DetailViewModel } from "@/lib/types";
-import { Breadcrumbs } from "./Breadcrumbs";
 import { AccentButton } from "../primitives";
+import { Breadcrumbs } from "./Breadcrumbs";
 
 interface DetailPanelHeaderProps {
   detail: DetailViewModel;
@@ -15,9 +15,7 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
   return (
     <div className="px-5 py-4 border-b border-border/60">
       {/* Breadcrumbs */}
-      {detail.breadcrumbs.length > 0 && (
-        <Breadcrumbs items={detail.breadcrumbs} />
-      )}
+      {detail.breadcrumbs.length > 0 && <Breadcrumbs items={detail.breadcrumbs} />}
 
       <div className="flex items-start gap-2 mt-2">
         <h2 className="text-base font-semibold text-foreground flex-1 leading-snug">
