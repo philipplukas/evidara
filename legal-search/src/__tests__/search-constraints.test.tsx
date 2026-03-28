@@ -186,6 +186,8 @@ describe("SearchConstraintsProvider", () => {
     });
 
     expect(result.current.state.context.jurisdictions).toEqual(["CH"]);
+    expect(result.current.state.context.languages).toEqual(["de"]);
+    expect(result.current.state.context.sourceType).toBeNull();
     expect(result.current.state.context.officialOnly).toBe(false);
     expect(result.current.state.refinements).toEqual([]);
   });
