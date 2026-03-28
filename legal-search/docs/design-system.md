@@ -1,50 +1,48 @@
 # Design System
 
-> Visual language, tokens, typography, and CSS patterns for Omnilex Search.
+> Visual language, tokens, typography, and CSS patterns for Evidara Legal Search.
 
 ---
 
-## Color Palette
+## Token Architecture
 
-### Brand Colors
+All colors are defined as CSS custom properties in [`globals.css`](../src/app/globals.css) and exposed to Tailwind via `@theme inline`. Components never use hardcoded hex — they reference semantic tokens.
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| Brand accent | `#2563eb` (blue-600) | Active states, focus rings, links, tab underlines, pivot buttons |
-| Brand dark | `#1a2332` | Wordmark logo, active chip backgrounds |
-| Brand accent hover | `#1d4ed8` (blue-700) | Hover state for accent links |
+### Brand Tokens
 
-### Semantic Colors (CSS Custom Properties)
+| Token | Value | Tailwind Classes |
+|-------|-------|-----------------|
+| `--brand` | `#2563eb` | `text-brand`, `bg-brand`, `border-brand` |
+| `--brand-hover` | `#1d4ed8` | `text-brand-hover`, `hover:text-brand-hover` |
+| `--brand-strong` | `#1a2332` | `bg-brand-strong`, `text-brand-strong` |
 
-All theme tokens use `oklch` color space. Light mode only (dark mode tokens present but unused).
+### Surface Tokens
 
-| Token | Light | Purpose |
-|-------|-------|---------|
-| `--background` | `oklch(1 0 0)` | Page background |
-| `--foreground` | `oklch(0.145 0 0)` | Primary text |
-| `--muted` | `oklch(0.97 0 0)` | Inactive chip/button backgrounds |
-| `--muted-foreground` | `oklch(0.556 0 0)` | Secondary text, labels |
-| `--border` | `oklch(0.922 0 0)` | All borders |
-| `--ring` | `oklch(0.708 0 0)` | Focus ring color |
-| `--destructive` | `oklch(0.577 0.245 27.325)` | Error states |
+| Token | Value | Tailwind Class | Usage |
+|-------|-------|----------------|-------|
+| `--surface-page` | `#fafafa` | `bg-surface-page` | Workspace shell, mobile shell |
+| `--surface-panel` | `#ffffff` | `bg-surface-panel` | Panels, cards, sheets, header |
+| `--surface-input` | `#f8f9fa` | `bg-surface-input` | Search input background |
 
-### Badge Colors (type-coded)
+### Interactive Tokens
 
-| Key | Background | Text | Used for |
-|-----|-----------|------|----------|
-| `law` | `#dbeafe` | `#1e40af` | Law documents |
-| `decision` | `#fce7f3` | `#9d174d` | Court decisions |
-| `rechtssatz` | `#e0e7ff` | `#3730a3` | Legal principles |
-| `commentary` | `#d1fae5` | `#065f46` | Commentary documents |
-| fallback | `#f3f4f6` | `#374151` | Unknown types |
+| Token | Value | Tailwind Class | Usage |
+|-------|-------|----------------|-------|
+| `--interactive-accent-subtle` | brand @ 5% | `bg-interactive-accent-subtle` | Hover backgrounds, active ContextBar tabs |
+| `--interactive-accent-muted` | brand @ 10% | `bg-interactive-accent-muted` | Active pin button, nav badge pill |
+| `--focus-ring` | brand @ 20% | `focus:ring-focus-ring` | Input focus rings |
 
-### Special Context Colors
+### shadcn Semantic Tokens
 
-| Element | Color | Usage |
-|---------|-------|-------|
-| Translation badge | `bg-amber-50 text-amber-700` | Machine translation indicator |
-| Confidence badge | `bg-green-50 text-green-700` | AI annotation confidence |
-| Annotation card | `border-[#2563eb]/10 bg-[#2563eb]/[0.02]` | AI/editorial annotation panels |
+Inherited from the shadcn theme and used as-is:
+
+| Token | Tailwind Class | Purpose |
+|-------|----------------|---------|
+| `--muted` | `bg-muted` | Inactive chip/button backgrounds, hover states |
+| `--muted-foreground` | `text-muted-foreground` | Secondary text, labels, metadata |
+| `--border` | `border-border` | All structural borders |
+| `--foreground` | `text-foreground` | Primary text |
+| `--background` | `bg-background` | Base page background |
 
 ---
 
@@ -52,24 +50,137 @@ All theme tokens use `oklch` color space. Light mode only (dark mode tokens pres
 
 ### Font Stack
 
-| Token | Family | Weights | Role |
-|-------|--------|---------|------|
+| Variable | Family | Weights | Role |
+|----------|--------|---------|------|
 | `--font-inter` | Inter | 400–700 | All UI text (headings, labels, buttons, metadata) |
-| `--font-serif` | Source Serif 4 | 400, 600 | Legal content: snippets, annotations, detail HTML |
+| `--font-serif` | Source Serif 4 | 400, 600 | Legal content — snippets, annotations, detail HTML |
 
-Body font set via `font-[family-name:var(--font-inter)]` on `<body>`.
+Body font set via `--font-inter` on `<body>`. Legal content areas use the `.font-document` utility class defined in `globals.css`:
 
-### Type Scale
+```css
+.font-document {
+  font-family: var(--font-serif), "Georgia", serif;
+}
+```
 
-| Usage | Size | Weight | Extra |
-|-------|------|--------|-------|
-| Wordmark | `text-lg` (18px) | `font-semibold` | `tracking-tight` |
-| Card title | `text-sm` (14px) | `font-semibold` | `leading-snug` |
-| Detail title | `text-base` (16px) | `font-semibold` | `leading-snug` |
-| Section headers | `text-xs` (12px) | `font-semibold` | `uppercase tracking-wider` |
-| Body text | `text-sm` (14px) | regular | `leading-relaxed` |
-| Metadata labels | `text-[11px]` | `font-medium` | |
-| Micro text | `text-[10px]` | `font-semibold` | Badge labels, counts |
+### Type Scale (5 sizes + 2 display)
+
+| Token | Size | Tailwind | Usage |
+|-------|------|----------|-------|
+| `text-lg` | 18px | built-in | Wordmark only |
+| `text-base` | 16px | built-in | Detail title |
+| `text-sm` | 14px | built-in | Result titles, content text, search input |
+| `text-xs` | 12px | built-in | Labels, metadata, tabs, filter labels |
+| `text-micro` | 11px | `--font-size-micro` | Actions, structural context, breadcrumbs, AccentButton, ActionTextLink |
+| `text-tiny` | 10px | `--font-size-tiny` | Badge labels, counts, micro pills |
+
+Both `text-micro` and `text-tiny` are registered as custom Tailwind font-size tokens in `@theme inline`.
+
+### Font Weights
+
+| Class | Weight | Usage |
+|-------|--------|-------|
+| `font-bold` | 700 | Wordmark "E" |
+| `font-semibold` | 600 | Titles, active items, section headers, badges |
+| `font-medium` | 500 | Labels, buttons, chip text |
+| `font-normal` | 400 | Body text, counts |
+
+---
+
+## Primitives
+
+Reusable design components in [`src/components/primitives/`](../src/components/primitives/). All primitives use design tokens — no hardcoded hex.
+
+### SectionLabel
+
+Consistent section header. Replaces the repeated `text-xs font-semibold uppercase tracking-wider text-muted-foreground` pattern.
+
+```tsx
+<SectionLabel>Related Documents</SectionLabel>
+```
+
+**Used by:** DetailsTab, RelatedTab, ReferencesTab, StructureTab, FilterPanel
+
+### InteractiveRow
+
+Clickable preview row with hover state. Replaces the repeated `flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors` pattern.
+
+```tsx
+<InteractiveRow onClick={handleClick}>
+  <span>{title}</span>
+</InteractiveRow>
+```
+
+**Used by:** RelatedTab, ReferencesTab
+
+### AccentButton
+
+Small action button with active/inactive states. Uses `text-micro` size.
+
+```tsx
+<AccentButton active={isPinned} onClick={handlePin} title="Pin">
+  <Pin className="w-3 h-3" />
+</AccentButton>
+```
+
+- **Active:** `text-brand bg-interactive-accent-muted`
+- **Inactive:** `text-muted-foreground hover:text-brand hover:bg-interactive-accent-subtle`
+
+**Used by:** DetailPanelHeader, ResultCard
+
+### ActionTextLink
+
+Small accent text link for navigation actions. Uses `text-micro` size.
+
+```tsx
+<ActionTextLink onClick={handleShowAll} showArrow>
+  Show all
+</ActionTextLink>
+```
+
+**Used by:** RelatedTab, ReferencesTab, ResultSetScopeBar
+
+### Badge
+
+Colored document-type pill using the generic palette from [`badge-tokens.ts`](../src/lib/badge-tokens.ts).
+
+```tsx
+<Badge label="Gesetz" colorKey="blue" />
+<Badge label="Entscheidung" colorKey="pink" size="xs" />
+```
+
+The `colorKey` is assigned by the BFF — the UI has no knowledge of document type → color mapping.
+
+**Palette:** blue, pink, indigo, green, amber, slate (+ gray fallback)
+**Sizes:** `sm` (default) and `xs` (preview surfaces)
+
+**Used by:** ResultCard, ExactMatchStrip, RelatedTab
+
+---
+
+## Badge Color Palette
+
+Defined in [`src/lib/badge-tokens.ts`](../src/lib/badge-tokens.ts). The keys are visual, not semantic:
+
+| Key | Background | Text |
+|-----|-----------|------|
+| `blue` | `#dbeafe` | `#1e40af` |
+| `pink` | `#fce7f3` | `#9d174d` |
+| `indigo` | `#e0e7ff` | `#3730a3` |
+| `green` | `#d1fae5` | `#065f46` |
+| `amber` | `#fef3c7` | `#92400e` |
+| `slate` | `#f1f5f9` | `#334155` |
+| fallback | `#f3f4f6` | `#374151` |
+
+### Special Context Colors
+
+These use Tailwind's built-in color palette (not tokens) for domain-specific badges:
+
+| Element | Classes | Usage |
+|---------|---------|-------|
+| Translation badge | `bg-amber-50 text-amber-700` | Machine translation indicator |
+| Confidence badge | `bg-green-50 text-green-700` | AI annotation confidence |
+| Annotation card | `border-brand/10 bg-brand/[0.02]` | AI/editorial annotation panels |
 
 ---
 
@@ -102,7 +213,7 @@ Body font set via `font-[family-name:var(--font-inter)]` on `<body>`.
 ### Transitions
 
 | Pattern | CSS | Duration | Used on |
-|---------|-----|----------|---------|
+|---------|-----|----------|---------| 
 | Color swap | `transition-colors` | 150ms default | Buttons, links, chips |
 | All properties | `transition-all` | 150ms default | Chips, toggles, cards |
 | Opacity reveal | `transition-opacity` | 150ms default | Action bar hover |
@@ -112,20 +223,19 @@ Body font set via `font-[family-name:var(--font-inter)]` on `<body>`.
 
 | Element | Selected | Unselected |
 |---------|----------|------------|
-| Result card | `bg-[#2563eb]/[0.03] border-l-2 border-l-[#2563eb]` | `hover:bg-muted/30 border-l-2 border-l-transparent` |
-| Detail tab | `border-b-2 border-[#2563eb] text-[#2563eb]` | `border-transparent text-muted-foreground` |
-| Structure item | `bg-[#2563eb]/5 text-[#2563eb] border-l-2 border-l-[#2563eb]` | `text-foreground/70 hover:bg-muted/50` |
-| Chip (ContextBar) | `bg-[#1a2332] text-white shadow-sm` | `bg-muted text-muted-foreground` |
-| Chip (FilterPanel) | Same as ContextBar | Same |
-| Tab (ContextBar) | `text-[#2563eb] bg-[#2563eb]/5` | `text-muted-foreground hover:bg-muted` |
-| Pin button | `text-[#2563eb] bg-[#2563eb]/10` | `text-muted-foreground` |
+| Result card | `bg-brand/[0.03] border-l-2 border-l-brand` | `hover:bg-muted/30 border-l-2 border-l-transparent` |
+| Detail tab | `border-b-2 border-brand text-brand` | `border-transparent text-muted-foreground` |
+| Structure item | `bg-interactive-accent-subtle text-brand border-l-2 border-l-brand` | `text-foreground/70 hover:bg-muted/50` |
+| Chip (ContextBar) | `bg-brand-strong text-white shadow-sm` | `bg-muted text-muted-foreground` |
+| Tab (ContextBar) | `text-brand bg-interactive-accent-subtle` | `text-muted-foreground hover:bg-muted` |
+| Pin button | `text-brand bg-interactive-accent-muted` (via AccentButton) | `text-muted-foreground` (via AccentButton) |
 
 ### Focus States
 
 | Element | Ring | Border |
 |---------|------|--------|
-| Search input | `ring-2 ring-[#2563eb]/20` | `border-[#2563eb]` |
-| Filter search | `ring-1 ring-[#2563eb]/30` | — |
+| Search input | `ring-2 ring-focus-ring` | `border-brand` |
+| Filter search | `ring-1 ring-focus-ring` | — |
 | Resize handle | `ring-1 ring-ring` | — |
 
 ### Hover Reveal
@@ -138,7 +248,7 @@ Action buttons on `ResultCard` use `opacity-0 group-hover:opacity-100 transition
 
 ### Lucide Icons (react)
 
-All icons are from `lucide-react`. Standard size: `w-3 h-3` to `w-4 h-4`.
+All icons from `lucide-react`. Standard size: `w-3 h-3` to `w-4 h-4`.
 
 ### Emoji Flag Registry
 
@@ -153,3 +263,11 @@ Country/canton flags use emoji via [`icons.ts`](../src/lib/icons.ts):
 | ... | ... | Other cantons |
 
 Production milestone: replace with SVG flag components or `circle-flags` library.
+
+---
+
+## Future Work
+
+- **Dark Mode:** Brand/surface/interactive tokens need `.dark {}` overrides in globals.css
+- **DOMPurify:** `DetailsTab.tsx` uses `dangerouslySetInnerHTML` — integrate DOMPurify before production
+- **Additional Primitives:** `Chip` component for ContextBar/FilterPanel chip patterns
