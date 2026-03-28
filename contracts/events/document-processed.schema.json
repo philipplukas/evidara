@@ -30,6 +30,7 @@
       "required": [
         "document_id",
         "source_id",
+        "source_version_id",
         "run_id",
         "artifact_id",
         "version",

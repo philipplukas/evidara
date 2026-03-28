@@ -35,7 +35,7 @@ Not yet implemented. Repository scaffolding and component documentation exist. C
 ## Minimal next tasks
 
 - [ ] Define Postgres entities for sources, versions, runs, approvals
-- [ ] Define minimal OpenAPI spec (`contracts/api/platform-control.openapi.yaml`)
+- [x] Define minimal OpenAPI spec (`contracts/api/platform-control.openapi.yaml`)
 - [ ] Define `RawArtifactEnvelope` schema
 - [ ] Define run lifecycle (states, transitions)
 - [ ] Define approval states and transitions

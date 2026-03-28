@@ -14,6 +14,9 @@ servers:
   - url: https://legal-search.evidara.dev
     description: Production
 
+security:
+  - bearerAuth: []
+
 paths:
   /v1/search:
     get:
@@ -106,6 +109,13 @@ paths:
                       $ref: "#/components/schemas/SectionSummary"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from the identity provider.
+
   schemas:
     SearchResponse:
       type: object

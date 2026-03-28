@@ -28,6 +28,8 @@ Evidara uses three cloud/platform providers for its infrastructure:
 | `document-processed` | document-intelligence | legal-search |
 | `index-update-requested` | ops / document-intelligence | legal-search |
 
+> **Naming convention:** Pub/Sub topic names use **kebab-case** (e.g., `raw-artifact-available`) because they are GCP infrastructure resource identifiers. The corresponding internal `event_type` constants use **snake_case with dot-separated namespaces** (e.g., `raw_artifact.available`, `document.processed`, `index_update.requested`) for schema versioning and programmatic routing. The mapping is: topic `raw-artifact-available` → event type `raw_artifact.available`, topic `document-processed` → `document.processed`, topic `index-update-requested` → `index_update.requested`.
+
 ### Cloud Storage Buckets
 
 | Bucket | Purpose |

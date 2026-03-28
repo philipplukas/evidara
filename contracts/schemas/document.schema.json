@@ -16,27 +16,27 @@
     "document_id": {
       "type": "string",
       "description": "Unique identifier for the canonical document. Format: doc_{ulid}",
-      "pattern": "^doc_[a-z0-9]+$"
+      "pattern": "^doc_[a-zA-Z0-9]+$"
     },
     "artifact_id": {
       "type": "string",
       "description": "ID of the raw artifact this document was derived from.",
-      "pattern": "^art_[a-z0-9]+$"
+      "pattern": "^art_[a-zA-Z0-9]+$"
     },
     "source_id": {
       "type": "string",
       "description": "ID of the source. Carried through for lineage.",
-      "pattern": "^src_[a-z0-9]+$"
+      "pattern": "^src_[a-zA-Z0-9]+$"
     },
     "source_version_id": {
       "type": "string",
       "description": "ID of the source version. Carried through for lineage.",
-      "pattern": "^sv_[a-z0-9]+$"
+      "pattern": "^sv_[a-zA-Z0-9]+$"
     },
     "run_id": {
       "type": "string",
       "description": "ID of the run that produced the raw artifact.",
-      "pattern": "^run_[a-z0-9]+$"
+      "pattern": "^run_[a-zA-Z0-9]+$"
     },
     "title": {
       "type": "string",

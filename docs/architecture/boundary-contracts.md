@@ -65,7 +65,7 @@ When document-intelligence produces a canonical document (and optionally section
 - `document_id`, `section_id`, `citation_id`: owned by document-intelligence
 - `source_id`, `run_id`, `artifact_id`: passed through from platform-control
 
-### Principles
+### Boundary Principles
 
 - document-intelligence writes canonical truth to Delta. This is the source of truth.
 - legal-search reads from Delta to build OpenSearch serving projections. OpenSearch is never the source of truth.

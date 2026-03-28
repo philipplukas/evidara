@@ -14,6 +14,9 @@ servers:
   - url: https://platform-control.evidara.dev
     description: Production
 
+security:
+  - bearerAuth: []
+
 paths:
   /v1/sources:
     get:
@@ -159,6 +162,13 @@ paths:
           description: Run not found
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from the identity provider.
+
   schemas:
     Source:
       type: object
