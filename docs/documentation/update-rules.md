@@ -103,12 +103,12 @@ It is acceptable for code to land slightly ahead of documentation. But:
 
 ## Enforcement
 
-| Rule | Enforced by |
-|------|------------|
-| Contract + example updates | CI (schema validation fails on stale examples) |
-| Component doc headings | Pre-commit (heading checker) |
-| Runbook metadata | Pre-commit (metadata checker) |
-| Doc link validity | Pre-commit (link checker) |
-| Behavior and scope updates | AI PR review (advisory) |
-| ADR creation | Manual (PR review) |
-| No future-as-current | AI PR review (advisory) |
+| Rule                       | Enforced by                                     |
+| -------------------------- | ----------------------------------------------- |
+| Contract + example updates | CI (schema validation fails on stale examples)  |
+| Component doc headings     | Pre-commit (heading checker)                    |
+| Runbook metadata           | Pre-commit (metadata checker)                   |
+| Doc link validity          | Pre-commit (link checker)                       |
+| Behavior and scope updates | AI PR review (advisory)                         |
+| ADR creation               | Manual (PR review)                              |
+| No future-as-current       | AI PR review (advisory)                         |
