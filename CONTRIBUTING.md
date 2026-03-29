@@ -28,7 +28,22 @@ adr/0007-auth-strategy
 ## Merge Strategy
 
 - **Squash-merge only.** Every merge to main produces one clean commit.
-- **Semantic PR title required.** PR titles must follow conventional commit format (`feat:`, `fix:`, `chore:`, `docs:`, etc.). CI enforces this.
+- **Semantic PR title required.** PR titles must use one of the following prefixes (enforced by CI):
+
+  | Prefix | Purpose |
+  |---|---|
+  | `feat` | New features or capabilities |
+  | `fix` | Bug fixes |
+  | `chore` | Maintenance, dependencies, config |
+  | `docs` | Documentation changes |
+  | `ci` | CI/CD workflow changes |
+  | `refactor` | Code restructuring without behavior change |
+  | `test` | Test-only changes |
+  | `style` | Formatting, whitespace (no logic change) |
+  | `perf` | Performance improvements |
+
+  Optional scope in parentheses: `feat(legal-search): add jurisdiction filter`
+
 - **The PR title becomes the commit message on main.**
 
 See [docs/setup/branch-rules.md](docs/setup/branch-rules.md) for the full branch rule set.

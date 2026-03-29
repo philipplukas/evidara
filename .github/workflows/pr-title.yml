@@ -2,7 +2,7 @@ name: PR Title
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, edited, reopened]
 
 jobs:
   check-title:
@@ -11,7 +11,8 @@ jobs:
       pull-requests: read
     steps:
       - name: Validate conventional commit PR title
-        uses: amannn/action-semantic-pull-request@v5
+        # Pinned to SHA for supply-chain safety (tag: v5.5.3)
+        uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

@@ -16,13 +16,38 @@ reviews:
     - path: "**/*"
       instructions: |
         Review this PR against the rules in AGENTS.md (root of repo).
-        Focus on:
-        1. Missing sync: behavior changed but tests/docs/contracts/architecture not updated
-        2. Contract drift: API or schema changed but spec not updated
-        3. Architecture drift: boundary changed but Structurizr DSL not updated
-        4. Manual duplication: docs hand-maintain what should be generated
-        5. Pattern violations: new code conflicts with established repo conventions
-        6. Design token misuse: hardcoded values instead of CSS custom properties in legal-search
+
+        ## Change-type sync checks (mirror of AGENTS.md)
+
+        ### user-visible-behavior
+        - Behavior changed but no test changed? Flag it.
+        - Feature docs in docs/components/ or legal-search/docs/ not updated? Flag it.
+        - Runbook not updated when operator flow changed? Flag it.
+
+        ### contract-change
+        - API payloads, event schemas, or entity shapes changed but contracts/api/, contracts/schemas/, or contracts/events/ not updated? Flag it.
+        - Generated clients (orval output in legal-search/src/lib/api/generated/) not regenerated after spec change? Flag it.
+        - Breaking change not documented in PR description? Flag it.
+
+        ### infra-change
+        - Terraform changed but terraform-docs not regenerated? Flag it.
+        - docs/setup/ guides not updated for deployment/environment changes? Flag it.
+        - Infra runbook not updated when recovery or deployment changed? Flag it.
+
+        ### pipeline-change
+        - Data quality checks not updated when pipeline logic changed? Flag it.
+        - Pipeline docs or failure-mode notes missing? Flag it.
+
+        ### architecture-change
+        - Component boundaries, storage choices, or communication patterns changed but structurizr/workspace.dsl not updated? Flag it.
+        - No ADR in docs/adr/ for a significant architecture decision? Flag it.
+        - docs/architecture/ narrative not updated? Flag it.
+
+        ## Quality checks
+        - Manual duplication: docs hand-maintain what should be generated (API tables, terraform module tables). Flag it.
+        - Pattern violations: new code conflicts with established repo conventions. Flag it.
+        - Design token misuse: hardcoded CSS color/spacing values in legal-search instead of CSS custom properties. Flag it.
+        - New patterns introduced without justification. Flag it.
 
         For each concern, state: affected area, why it matters, must-fix vs should-fix, recommendation.
 
