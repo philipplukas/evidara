@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/common/provenance",
+  "title": "Provenance",
+  "description": "Reusable lineage block carried across bundle, canonical, and projection boundaries.",
+  "type": "object",
+  "required": [
+    "tenant_id",
+    "corpus_id",
+    "scope_type",
+    "source_id",
+    "source_version_id",
+    "run_id"
+  ],
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^tenant_[a-z0-9_]+$",
+      "description": "Tenant owning the content. Public data uses a reserved non-null tenant such as tenant_public."
+    },
+    "corpus_id": {
+      "type": "string",
+      "pattern": "^corpus_[a-z0-9_]+$",
+      "description": "Corpus or library boundary within which identity resolution and access control occur."
+    },
+    "scope_type": {
+      "type": "string",
+      "enum": [
+        "global_public",
+        "tenant_private",
+        "tenant_shared"
+      ],
+      "description": "Visibility and sharing model of the content."
+    },
+    "source_id": {
+      "type": "string",
+      "pattern": "^src_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Logical upstream source."
+    },
+    "source_version_id": {
+      "type": "string",
+      "pattern": "^sv_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Approved frozen source version used for acquisition."
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Acquisition run that produced the input bundle."
+    },
+    "source_snapshot_id": {
+      "type": "string",
+      "pattern": "^snap_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Snapshot of one upstream item or record."
+    },
+    "bundle_manifest_id": {
+      "type": "string",
+      "pattern": "^abm_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Artifact bundle manifest ID."
+    },
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^art_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Primary artifact ID when one artifact is the canonical anchor for a document."
+    },
+    "document_id": {
+      "type": "string",
+      "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Stable logical document identity within the corpus."
+    },
+    "document_revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic published canonical revision for the logical document."
+    },
+    "processing_manifest_id": {
+      "type": "string",
+      "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Immutable processing result identity."
+    }
+  },
+  "additionalProperties": false
+}

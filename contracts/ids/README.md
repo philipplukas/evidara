@@ -2,41 +2,74 @@
 
 ## Overview
 
-All entities in Evidara are identified by string IDs. This document defines the naming conventions, formatting rules, and uniqueness expectations for each ID family.
+All contract-level entities in Evidara use string identifiers with stable family prefixes.
+IDs are designed to be:
+
+- globally unique within their family
+- easy to recognize in logs and payloads
+- safe to carry across API, event, and storage boundaries
 
 ## ID Families
 
 | ID | Owner | Format | Example |
 |----|-------|--------|---------|
-| `source_id` | platform-control | `src_{ulid}` | `src_01HZXK7V3QMJY4T5N2P8R6W9` |
-| `source_version_id` | platform-control | `sv_{ulid}` | `sv_01HZXK8A2BMNE6G4R7J3K9L5` |
-| `run_id` | platform-control | `run_{ulid}` | `run_01HZXK9C4DNPF8H6T2M5Q7W3` |
-| `artifact_id` | platform-control | `art_{ulid}` | `art_01HZXKA5EQRSG9J3V4N7P8X2` |
-| `document_id` | document-intelligence | `doc_{ulid}` | `doc_01HZXKB7FSTUH0K5W6P9R2Y4` |
-| `section_id` | document-intelligence | `sec_{ulid}` | `sec_01HZXKC9GUVWI1L7X8Q3S4Z6` |
-| `citation_id` | document-intelligence | `cit_{ulid}` | `cit_01HZXKD0HVWXJ2M8Y9R4T5A7` |
-| `workflow_run_id` | platform-control | `wfr_{ulid}` | `wfr_01HZXKE2IWXYK3N9Z0S5U6B8` |
+| `tenant_id` | platform-control | `tenant_{slug}` | `tenant_public` |
+| `corpus_id` | platform-control | `corpus_{slug}` | `corpus_public_ch_federal_law` |
+| `source_id` | platform-control | `src_{ulid}` | `src_01jq79xv3wdd6yr8q5bn0m3zfk` |
+| `source_version_id` | platform-control | `sv_{ulid}` | `sv_01jq79zcslf4m3m4gm3t5s59xq` |
+| `run_id` | platform-control | `run_{ulid}` | `run_01jq7a3s9b7j4dndd9sgv6pb9d` |
+| `source_snapshot_id` | platform-control | `snap_{ulid}` | `snap_01jq7a7n3nbzj6sk7v95p9frz1` |
+| `artifact_id` | platform-control | `art_{ulid}` | `art_01jq7af3f8qqc46zc6xvkf9y4x` |
+| `bundle_manifest_id` | platform-control | `abm_{ulid}` | `abm_01jq7ab8x4nm7m3qz3b8e9q2fk` |
+| `reference_snapshot_set_ref` | platform-control | `rss_{ulid}` | `rss_01jq7cm7b9qg4w7g6b0k9g4xj2` |
+| `document_id` | document-intelligence | `doc_{ulid}` | `doc_01jq7bdptzqv3xs0c41xpw1ybg` |
+| `section_id` | document-intelligence | `sec_{ulid}` | `sec_01jq7bprm7p1ef4rwr7s2j1bt3` |
+| `citation_id` | document-intelligence | `cit_{ulid}` | `cit_01jq7bwpt6mjjd7c9wqgt28v87` |
+| `processing_manifest_id` | document-intelligence | `pm_{ulid}` | `pm_01jq7bhgy7g0pkj4f1d03f8f8c` |
+| `projection_manifest_id` | legal-search | `prm_{ulid}` | `prm_01jq7cq8m4qydv1w0fdy6jnbn5` |
+| `event_id` | event producer | `evt_{ulid}` | `evt_01jq7c61be9zmhz58mmp3jx0b2` |
+| `jurisdiction_id` | platform-control | `jur_{slug}` | `jur_ch_federal` |
+| `authority_id` | platform-control | `auth_{slug}` | `auth_fedlex` |
 
 ## Format Rules
 
-- **Prefix:** Each ID has a short, lowercase prefix indicating the entity type, followed by an underscore.
-- **Body:** ULIDs (Universally Unique Lexicographically Sortable Identifiers) are recommended. They are sortable by creation time, globally unique, and URL-safe.
-- **Case:** All lowercase.
-- **Character set:** Alphanumeric and underscores only.
-
-## Uniqueness
-
-- IDs are **globally unique within their family.** No two sources share a `source_id`, no two documents share a `document_id`, etc.
-- ULIDs provide sufficient uniqueness for distributed ID generation without coordination.
+- Prefixes are lowercase and indicate the entity family.
+- ULID-backed IDs should use lowercase Crockford base32 for consistency.
+- Slug-backed IDs should use lowercase letters, digits, and underscores only.
+- IDs are opaque to consumers. Prefix recognition is fine; parsing business meaning out of the suffix is not.
 
 ## Ownership
 
-- The component that **creates** an entity **assigns** its ID.
-- IDs are **carried through** as references when crossing boundaries (e.g., `source_id` appears in document records for lineage).
-- IDs are **never reassigned or reused.**
+- The component that creates an entity assigns its ID.
+- IDs are carried across boundaries as references but are never reassigned.
+- `document_id` is stable for the logical document within its corpus.
+- `processing_manifest_id` is immutable for one DI processing result.
+- `document_revision` is not an ID; it is a monotonic revision number owned by document-intelligence.
 
-## Future Considerations
+## Reserved Values
 
-- Generated client libraries may enforce ID format validation.
-- ID prefixes allow quick identification of entity type from any ID string.
-- If ULIDs prove insufficient, the format can evolve with a documented migration.
+- `tenant_public` is the reserved non-null tenant ID for globally shared public data.
+
+## Field Naming Best Practices
+
+- Use `*_id` for stable identity fields.
+- Prefer `*_ref` for typed indirection to a storage object, dataset surface, or manifest.
+- Record timestamps as `*_at` in ISO 8601 UTC.
+- Reserve `*_version` for major contract versions or pipeline/projection versions.
+- Represent lifecycle or workflow state with `*_status`.
+- Use `snake_case` for field names and `dot.separated` `event_type` names.
+
+### Exception: `reference_snapshot_set_ref`
+
+`reference_snapshot_set_ref` is an exception to the `*_ref` naming convention. Despite the `_ref` suffix, it is a scalar ID field (following the `rss_{ulid}` pattern), not a typed indirection object. This name was chosen to emphasize that it references an external reference-data snapshot set owned by platform-control, rather than being a direct identity field within the consuming schema. The `_ref` suffix here indicates cross-boundary reference semantics, not object structure.
+
+## Uniqueness And Stability
+
+- IDs are unique within their family.
+- IDs are never reused.
+- Human-editable names and labels must not be used as cross-component identifiers.
+
+## Evolution Rules
+
+- New ID families should be added here before they appear in contracts.
+- Changing the format or meaning of an existing ID family is breaking and requires an ADR.

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/common/event-envelope",
+  "title": "EventEnvelope",
+  "description": "Shared envelope for Evidara domain events. Uses a small CloudEvents-aligned metadata set with a JSON payload.",
+  "type": "object",
+  "required": [
+    "event_type",
+    "event_version",
+    "event_id",
+    "occurred_at",
+    "producer",
+    "payload"
+  ],
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+      "description": "Stable logical event name. Event names are versionless; breaking changes use a higher event_version."
+    },
+    "event_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Major version of the event contract."
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Unique identifier for this event instance."
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the event occurred."
+    },
+    "producer": {
+      "type": "string",
+      "enum": [
+        "platform-control",
+        "document-intelligence",
+        "legal-search"
+      ],
+      "description": "Component that emitted the event."
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Optional correlation ID spanning multiple events and commands in the same workflow."
+    },
+    "causation_id": {
+      "type": "string",
+      "description": "Optional event or command ID that directly caused this event."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-specific payload."
+    }
+  },
+  "additionalProperties": false
+}

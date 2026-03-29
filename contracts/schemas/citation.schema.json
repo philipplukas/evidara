@@ -13,24 +13,24 @@
     "citation_id": {
       "type": "string",
       "description": "Unique identifier for the citation. Format: cit_{ulid}",
-      "pattern": "^cit_[a-z0-9]+$"
+      "pattern": "^cit_[0-9a-hjkmnp-tv-z]{26}$"
     },
     "source_document_id": {
       "type": "string",
       "description": "ID of the document containing the citation.",
-      "pattern": "^doc_[a-z0-9]+$"
+      "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
     },
     "source_section_id": {
       "type": ["string", "null"],
       "description": "ID of the section containing the citation, if applicable.",
-      "pattern": "^sec_[a-z0-9]+$"
+      "pattern": "^sec_[0-9a-hjkmnp-tv-z]{26}$"
     },
     "target_document_id": {
       "description": "ID of the referenced document, if resolved.",
       "anyOf": [
         {
           "type": "string",
-          "pattern": "^doc_[a-z0-9]+$"
+          "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
         },
         {
           "type": "null"

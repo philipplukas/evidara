@@ -1,0 +1,63 @@
+{
+  "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+  "manifest_version": 1,
+  "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+  "document_revision": 3,
+  "processing_version": "di_2026_03_29",
+  "status": "canonical_ready",
+  "provenance": {
+    "tenant_id": "tenant_public",
+    "corpus_id": "corpus_public_ch_federal_law",
+    "scope_type": "global_public",
+    "source_id": "src_01jq79xv3wdd6yr8q5bn0m3zfk",
+    "source_version_id": "sv_01jq79zcslf4m3m4gm3t5s59xp",
+    "run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+    "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+    "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+    "artifact_id": "art_01jq7af3f8qqc46zc6xvkf9y4x",
+    "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+    "document_revision": 3,
+    "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+  },
+  "input_bundle_manifest_ref": {
+    "manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+    "manifest_type": "artifact_bundle_manifest",
+    "manifest_version": 1,
+    "storage_ref": {
+      "uri": "gs://evidara-manifests-dev/fedlex/run_01jq7a3s9b7j4dndd9sgv6pb9d/bundle-manifest.json",
+      "content_type": "application/json",
+      "byte_size": 2945,
+      "checksum": "dfe0f4da4eaed4f9f96a53e7e030c95ed75467c4d919e595fa91198b889847f8",
+      "checksum_algorithm": "sha256",
+      "created_at": "2026-03-29T09:30:05Z"
+    }
+  },
+  "selected_profiles": {
+    "source_profile_ref": "sp_fedlex_html_v1",
+    "jurisdiction_profile_ref": "jp_ch_federal_v1",
+    "resolution_policy_ref": "rp_official_first_v1",
+    "normalization_profile_ref": "np_html_docling_v1"
+  },
+  "reference_snapshot_set_ref": "rss_01jq7cm7b9qg4w7g6b0k9g4xj2",
+  "published_document_ref": {
+    "surface_name": "published_documents",
+    "surface_version": 1,
+    "record_key": {
+      "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+      "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+    }
+  },
+  "published_sections_ref": {
+    "surface_name": "published_sections",
+    "surface_version": 1,
+    "record_filter": {
+      "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+      "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+    }
+  },
+  "canonical_ready_at": "2026-03-29T09:41:24Z",
+  "supersedes_processing_manifest_id": "pm_01jq79m7jx0n796f7qgpe4cg2k",
+  "document_count": 1,
+  "section_count": 42,
+  "citation_count": 0
+}

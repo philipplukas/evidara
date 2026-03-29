@@ -2,9 +2,9 @@ openapi: 3.1.0
 info:
   title: Platform Control API
   description: |
-    API for managing sources, source versions, runs, approvals, and reference data
-    in the Evidara platform control plane.
-  version: 0.1.0
+    API for managing sources, source versions, runs, approvals, corpora,
+    and reference-owned ingestion configuration in the Evidara control plane.
+  version: 0.2.0
   contact:
     name: Evidara Team
 
@@ -18,6 +18,75 @@ security:
   - bearerAuth: []
 
 paths:
+  /v1/corpora:
+    get:
+      operationId: listCorpora
+      summary: List all corpora
+      tags: [corpora]
+      responses:
+        "200":
+          description: List of corpora
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    maxItems: 1000
+                    items:
+                      $ref: "#/components/schemas/Corpus"
+    post:
+      operationId: createCorpus
+      summary: Create a new corpus
+      tags: [corpora]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCorpusRequest"
+      responses:
+        "201":
+          description: Corpus created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Corpus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/corpora/{corpus_id}:
+    get:
+      operationId: getCorpus
+      summary: Get a corpus by ID
+      tags: [corpora]
+      parameters:
+        - name: corpus_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Corpus details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Corpus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /v1/sources:
     get:
       operationId: listSources
@@ -33,6 +102,7 @@ paths:
                 properties:
                   data:
                     type: array
+                    maxItems: 1000
                     items:
                       $ref: "#/components/schemas/Source"
     post:
@@ -52,6 +122,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Source"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /v1/sources/{source_id}:
     get:
@@ -95,6 +177,7 @@ paths:
                 properties:
                   data:
                     type: array
+                    maxItems: 100
                     items:
                       $ref: "#/components/schemas/SourceVersion"
     post:
@@ -120,6 +203,102 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SourceVersion"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/sources/{source_id}/versions/{source_version_id}/approve:
+    post:
+      operationId: approveSourceVersion
+      summary: Approve a source version
+      tags: [source-versions]
+      parameters:
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: source_version_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveSourceVersionRequest"
+      responses:
+        "200":
+          description: Source version approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceVersion"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/sources/{source_id}/versions/{source_version_id}/reject:
+    post:
+      operationId: rejectSourceVersion
+      summary: Reject a source version
+      tags: [source-versions]
+      parameters:
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: source_version_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectSourceVersionRequest"
+      responses:
+        "200":
+          description: Source version rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceVersion"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /v1/runs:
     post:
@@ -139,6 +318,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Run"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /v1/runs/{run_id}:
     get:
@@ -169,21 +360,146 @@ components:
       bearerFormat: JWT
       description: JWT token obtained from the identity provider.
 
+  responses:
+    BadRequest:
+      description: Request body or parameters are syntactically invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Authentication is required or the bearer token is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Caller is authenticated but not authorized for the operation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: The requested state transition conflicts with current state.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnprocessableEntity:
+      description: Request is well-formed but violates semantic validation rules.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Unexpected server-side failure.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
-    Source:
+    ErrorResponse:
       type: object
+      required:
+        - error_code
+        - message
       properties:
-        source_id:
+        error_code:
           type: string
-          example: src_01hzxk7v3qmjy4t5n2p8r6w9
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    Corpus:
+      type: object
+      required:
+        - corpus_id
+        - tenant_id
+        - name
+        - scope_type
+        - status
+      properties:
+        corpus_id:
+          type: string
+          example: corpus_public_ch_federal_law
+        tenant_id:
+          type: string
+          example: tenant_public
         name:
           type: string
         description:
           type: string
-        jurisdiction:
+        scope_type:
           type: string
-        authority:
+          enum: [global_public, tenant_private, tenant_shared]
+        status:
           type: string
+          enum: [active, archived]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCorpusRequest:
+      type: object
+      required:
+        - tenant_id
+        - name
+        - scope_type
+      properties:
+        tenant_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+
+    Source:
+      type: object
+      required:
+        - source_id
+        - tenant_id
+        - corpus_id
+        - name
+        - connector_type
+        - source_origin_kind
+        - trust_tier
+        - status
+      properties:
+        source_id:
+          type: string
+          example: src_01jq79xv3wdd6yr8q5bn0m3zfk
+        tenant_id:
+          type: string
+          example: tenant_public
+        corpus_id:
+          type: string
+          example: corpus_public_ch_federal_law
+        name:
+          type: string
+        description:
+          type: string
+        connector_type:
+          type: string
+          enum: [rest_api, graphql, soap, sharepoint, drive, http_scrape, dataset]
+        source_origin_kind:
+          $ref: "#/components/schemas/SourceOriginKind"
+        trust_tier:
+          $ref: "#/components/schemas/TrustTier"
         status:
           type: string
           enum: [active, inactive, archived]
@@ -196,47 +512,165 @@ components:
 
     CreateSourceRequest:
       type: object
-      required: [name]
+      required:
+        - tenant_id
+        - corpus_id
+        - name
+        - connector_type
+        - source_origin_kind
       properties:
+        tenant_id:
+          type: string
+        corpus_id:
+          type: string
         name:
           type: string
         description:
           type: string
-        jurisdiction:
+        connector_type:
           type: string
-        authority:
-          type: string
+          enum: [rest_api, graphql, soap, sharepoint, drive, http_scrape, dataset]
+        source_origin_kind:
+          $ref: "#/components/schemas/SourceOriginKind"
+        trust_tier:
+          $ref: "#/components/schemas/TrustTier"
 
     SourceVersion:
       type: object
+      required:
+        - source_version_id
+        - source_id
+        - tenant_id
+        - corpus_id
+        - version_label
+        - status
+        - connector_type
+        - root_locator
+        - sync_strategy
+        - parser_hints
+        - source_defaults
+        - reference_context
       properties:
         source_version_id:
           type: string
-          example: sv_01hzxk8a2bmne6g4r7j3k9l5
+          example: sv_01jq79zcslf4m3m4gm3t5s59xq
         source_id:
+          type: string
+        tenant_id:
+          type: string
+        corpus_id:
           type: string
         version_label:
           type: string
         status:
           type: string
           enum: [draft, pending_approval, approved, rejected, superseded]
+        connector_type:
+          type: string
+          enum: [rest_api, graphql, soap, sharepoint, drive, http_scrape, dataset]
+        root_locator:
+          type: string
+          description: Endpoint, base URL, site path, folder path, or dataset locator.
+        auth_ref:
+          type: string
+          description: Secret reference, never inline credentials.
+        sync_strategy:
+          $ref: "#/components/schemas/SyncStrategy"
+        selectors_or_mappings:
+          type: object
+          additionalProperties: true
+        parser_hints:
+          $ref: "#/components/schemas/ParserHints"
+        source_defaults:
+          $ref: "#/components/schemas/SourceDefaults"
+        acquisition_policy:
+          $ref: "#/components/schemas/AcquisitionPolicy"
+        di_overrides:
+          $ref: "#/components/schemas/DiOverrides"
+        reference_context:
+          $ref: "#/components/schemas/ReferenceContext"
         created_at:
+          type: string
+          format: date-time
+        approved_at:
           type: string
           format: date-time
 
     CreateSourceVersionRequest:
       type: object
-      required: [version_label]
+      required:
+        - version_label
+        - connector_type
+        - root_locator
+        - sync_strategy
+        - parser_hints
+        - source_defaults
+        - reference_context
       properties:
         version_label:
+          type: string
+        connector_type:
+          type: string
+          enum: [rest_api, graphql, soap, sharepoint, drive, http_scrape, dataset]
+        root_locator:
+          type: string
+        auth_ref:
+          type: string
+        sync_strategy:
+          $ref: "#/components/schemas/SyncStrategy"
+        selectors_or_mappings:
+          type: object
+          additionalProperties: true
+        parser_hints:
+          $ref: "#/components/schemas/ParserHints"
+        source_defaults:
+          $ref: "#/components/schemas/SourceDefaults"
+        acquisition_policy:
+          $ref: "#/components/schemas/AcquisitionPolicy"
+        di_overrides:
+          $ref: "#/components/schemas/DiOverrides"
+        reference_context:
+          $ref: "#/components/schemas/ReferenceContext"
+
+    ApproveSourceVersionRequest:
+      type: object
+      required:
+        - approved_by
+      properties:
+        approved_by:
+          type: string
+        approval_note:
+          type: string
+
+    RejectSourceVersionRequest:
+      type: object
+      required:
+        - rejected_by
+        - reason
+      properties:
+        rejected_by:
+          type: string
+        reason:
           type: string
 
     Run:
       type: object
+      required:
+        - run_id
+        - tenant_id
+        - corpus_id
+        - source_id
+        - source_version_id
+        - status
+        - trigger_type
       properties:
         run_id:
           type: string
-          example: run_01hzxk9c4dnpf8h6t2m5q7w3
+          example: run_01jq7a3s9b7j4dndd9sgv6pb9d
+        tenant_id:
+          type: string
+        corpus_id:
+          type: string
         source_id:
           type: string
         source_version_id:
@@ -244,20 +678,177 @@ components:
         status:
           type: string
           enum: [pending, running, completed, failed, cancelled]
+        trigger_type:
+          type: string
+          enum: [manual, scheduled, replay]
+        replay_mode:
+          type: string
+          enum: [none, reprocess, reindex_only, backfill]
+        time_range_start:
+          type: string
+          format: date-time
+        time_range_end:
+          type: string
+          format: date-time
+        partition_scope:
+          type: object
+          additionalProperties: true
+        checkpoint_in:
+          type: object
+          additionalProperties: true
+        checkpoint_out:
+          type: object
+          additionalProperties: true
+        source_snapshot_count:
+          type: integer
+        artifact_count:
+          type: integer
         started_at:
           type: string
           format: date-time
         completed_at:
           type: string
           format: date-time
-        artifacts_count:
-          type: integer
 
     CreateRunRequest:
       type: object
-      required: [source_id, source_version_id]
+      required:
+        - source_id
+        - source_version_id
+        - trigger_type
       properties:
         source_id:
           type: string
         source_version_id:
           type: string
+        trigger_type:
+          type: string
+          enum: [manual, scheduled, replay]
+        replay_mode:
+          type: string
+          enum: [none, reprocess, reindex_only, backfill]
+        time_range_start:
+          type: string
+          format: date-time
+        time_range_end:
+          type: string
+          format: date-time
+        partition_scope:
+          type: object
+          additionalProperties: true
+        checkpoint_in:
+          type: object
+          additionalProperties: true
+
+    SourceOriginKind:
+      type: string
+      enum: [official_primary, official_mirror, licensed_provider, community_curated, tenant_internal]
+
+    TrustTier:
+      type: string
+      enum: [authoritative, preferred, supplemental, untrusted]
+
+    SourceDefaults:
+      type: object
+      required:
+        - jurisdiction_id
+      properties:
+        jurisdiction_id:
+          type: string
+          example: jur_ch_federal
+        authority_id:
+          type:
+            - string
+            - "null"
+          example: auth_fedlex
+        language_codes:
+          type: array
+          items:
+            type: string
+        document_type_hint:
+          type:
+            - string
+            - "null"
+      additionalProperties: false
+
+    ParserHints:
+      type: object
+      properties:
+        expected_modalities:
+          type: array
+          items:
+            type: string
+            enum: [pdf, html, docx, xml, json, text, mixed]
+        expected_content_types:
+          type: array
+          items:
+            type: string
+        preferred_primary_artifact_roles:
+          type: array
+          items:
+            type: string
+            enum: [primary_document, metadata, attachment, structured_payload, headers]
+        ocr_expected:
+          type: boolean
+        attachment_policy:
+          type: string
+          enum: [ignore, ingest_selected, ingest_all]
+      additionalProperties: false
+
+    SyncStrategy:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum: [full_sync, cursor, watermark, partitioned_backfill]
+        cursor_field:
+          type: string
+        watermark_field:
+          type: string
+        page_size:
+          type: integer
+        order_field:
+          type: string
+      additionalProperties: false
+
+    AcquisitionPolicy:
+      type: object
+      properties:
+        rate_limit_per_minute:
+          type: integer
+        timeout_seconds:
+          type: integer
+        max_retries:
+          type: integer
+        concurrency_cap:
+          type: integer
+      additionalProperties: false
+
+    DiOverrides:
+      type: object
+      properties:
+        source_profile_ref:
+          type: string
+        jurisdiction_profile_ref:
+          type: string
+        resolution_policy_ref:
+          type: string
+        normalization_profile_ref:
+          type: string
+      additionalProperties: false
+
+    ReferenceContext:
+      type: object
+      required:
+        - reference_snapshot_policy
+      properties:
+        reference_snapshot_policy:
+          type: string
+          enum: [latest_approved, pin_snapshot_set]
+        reference_snapshot_set_ref:
+          type:
+            - string
+            - "null"
+      additionalProperties: false
