@@ -1,5 +1,7 @@
-# Python dev dependencies for documentation validation tooling
+# Python dev dependencies for documentation validation and site generation
 pre-commit==3.8.0
 PyYAML==6.0.2
 openapi-spec-validator==0.7.1
 jsonschema==4.23.0
+mkdocs-material==9.6.12
+mkdocs-swagger-ui-tag==0.6.11

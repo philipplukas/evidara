@@ -57,3 +57,7 @@ jobs:
       - name: Check doc links
         run: |
           python scripts/check_doc_links.py
+
+      - name: Build docs site (strict)
+        run: |
+          mkdocs build --strict --quiet
