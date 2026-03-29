@@ -37,6 +37,16 @@ interface SearchConstraintsContextValue {
 const SearchConstraintsContext =
   createContext<SearchConstraintsContextValue | null>(null);
 
+/**
+ * Parse a URL-serialized refinements string into a validated array of search refinements.
+ *
+ * Parses the JSON `serialized` value and returns only elements that are objects with a string
+ * `field`, a string `type`, and an array `values`. If `serialized` is falsy, is not valid JSON,
+ * is not an array, or contains no valid refinement objects, an empty array is returned.
+ *
+ * @param serialized - A JSON string from the URL representing refinements, or `null`
+ * @returns An array of validated `SearchRefinement` objects; empty if the input is missing or invalid
+ */
 function parseRefinements(serialized: string | null): SearchRefinement[] {
   if (!serialized) return [];
 
@@ -58,16 +68,35 @@ function parseRefinements(serialized: string | null): SearchRefinement[] {
   }
 }
 
+/**
+ * Serialize an array of search refinements into a JSON string.
+ *
+ * @param refinements - The refinements to serialize
+ * @returns The JSON string representation of `refinements`
+ */
 function serializeRefinements(refinements: SearchRefinement[]): string {
   return JSON.stringify(refinements);
 }
 
+/**
+ * Toggle the presence of a string in an array of strings.
+ *
+ * @param values - The source array of strings
+ * @param value - The string to add or remove
+ * @returns A new array with `value` removed if it was present, or appended if it was absent
+ */
 function toggleValue(values: string[], value: string): string[] {
   return values.includes(value)
     ? values.filter((v) => v !== value)
     : [...values, value];
 }
 
+/**
+ * Accesses the current search constraints context.
+ *
+ * @returns The `SearchConstraintsContextValue` containing the current `state` and `dispatch`.
+ * @throws Error if the hook is used outside a `SearchConstraintsProvider`.
+ */
 export function useSearchConstraints(): SearchConstraintsContextValue {
   const ctx = useContext(SearchConstraintsContext);
   if (!ctx) {
@@ -82,6 +111,15 @@ interface SearchConstraintsProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Provides URL-synchronized search constraints state and a dispatcher to update it to descendant components.
+ *
+ * The provider keeps jurisdictions, languages, sourceType, officialOnly, and refinements synchronized with the URL
+ * query state and exposes a `state` and `dispatch` pair via SearchConstraintsContext.
+ *
+ * @param children - React nodes to render within the provider
+ * @returns A React context provider element that supplies the current search constraints state and a dispatch function
+ */
 export function SearchConstraintsProvider({
   children,
 }: SearchConstraintsProviderProps) {
