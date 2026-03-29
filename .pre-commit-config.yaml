@@ -18,7 +18,21 @@ repos:
     hooks:
       - id: markdownlint
         args: ["--config", ".markdownlint.json"]
-        files: ^(README\.md|docs/.*\.md|CONTRIBUTING\.md|SECURITY\.md|\.github/pull_request_template\.md)$
+        files: ^(README\.md|AGENTS\.md|docs/.*\.md|CONTRIBUTING\.md|SECURITY\.md|\.github/pull_request_template\.md)$
+
+  - repo: https://github.com/lycheeverse/lychee
+    rev: lychee-v0.18.0
+    hooks:
+      - id: lychee
+        args: ["--no-progress", "--exclude-file", ".lycheeignore"]
+        types: [markdown]
+
+  - repo: https://github.com/errata-ai/vale
+    rev: v3.9.5
+    hooks:
+      - id: vale
+        args: ["--no-exit"]
+        types: [markdown]
 
   - repo: local
     hooks:
@@ -53,6 +67,13 @@ repos:
       - id: check-doc-links
         name: Check documentation index links
         entry: python scripts/check_doc_links.py
+        language: system
+        pass_filenames: false
+        files: ^docs/.*\.md$
+
+      - id: check-diagram-format
+        name: Check diagram format (Mermaid required)
+        entry: python scripts/check_diagram_format.py
         language: system
         pass_filenames: false
         files: ^docs/.*\.md$

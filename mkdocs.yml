@@ -1,0 +1,110 @@
+site_name: Evidara — Document Intelligence Platform
+site_description: Architecture, ADRs, contracts, testing, and operational documentation for the Evidara platform.
+site_url: https://philipplukas.github.io/evidara/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - tables
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
+  - swagger-ui-tag
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - System Context: architecture/system-context.md
+      - Repository Structure: architecture/repository-structure.md
+      - Communication Model: architecture/communication-model.md
+      - Boundary Contracts: architecture/boundary-contracts.md
+      - Storage Model: architecture/storage-model.md
+      - Implementation Principles: architecture/implementation-principles.md
+      - Clean-Room Principles: architecture/clean-room-principles.md
+  - ADRs:
+      - "0001: Monorepo Structure": adr/0001-monorepo-structure.md
+      - "0002: Component Boundaries": adr/0002-top-level-component-boundaries.md
+      - "0003: Storage Strategy": adr/0003-storage-strategy.md
+      - "0004: Contract Strategy": adr/0004-contract-strategy.md
+      - "0005: Search Strategy": adr/0005-search-strategy.md
+      - "0006: Internal Ops UI": adr/0006-internal-ops-ui-strategy.md
+      - "0007: OpenAPI Client Strategy": adr/0007-openapi-client-strategy-legal-search.md
+  - Components:
+      - Platform Control: components/platform-control.md
+      - Document Intelligence: components/document-intelligence.md
+      - Legal Search: components/legal-search.md
+      - Contracts: components/contracts.md
+      - Infrastructure: components/infra.md
+      - First Vertical Slice: components/first-vertical-slice.md
+  - Testing:
+      - Overview: testing/README.md
+      - Principles: testing/testing-principles.md
+      - Levels: testing/testing-levels.md
+      - CI Strategy: testing/ci-testing-strategy.md
+      - Drift Detection: testing/drift-detection.md
+      - Golden Datasets: testing/golden-datasets.md
+      - Minimal Test Matrix: testing/minimal-test-matrix.md
+      - First E2E Slice: testing/first-end-to-end-slice.md
+      - Component Testing:
+          - Platform Control: components/testing/platform-control-testing.md
+          - Document Intelligence: components/testing/document-intelligence-testing.md
+          - Legal Search: components/testing/legal-search-testing.md
+          - Contracts: components/testing/contracts-testing.md
+          - Infrastructure: components/testing/infra-testing.md
+  - Setup:
+      - Environment Strategy: setup/environment-strategy.md
+      - Infrastructure Overview: setup/infrastructure-overview.md
+      - Branch Rules: setup/branch-rules.md
+  - Documentation:
+      - Overview: documentation/README.md
+      - Update Rules: documentation/update-rules.md
+      - Anti-Drift Strategy: documentation/anti-drift-strategy.md
+      - Stale Doc Policy: documentation/stale-doc-policy.md
+      - Review Checklist: documentation/review-checklist.md
+      - AI PR Review Prompt: documentation/ai-pr-review-prompt.md
+      - Doc Types: documentation/doc-types-and-authority.md
+      - Mermaid Style Guide: documentation/mermaid-style-guide.md
+  - API Reference:
+      - Legal Search API: api/legal-search.md
+      - Platform Control API: api/platform-control.md
