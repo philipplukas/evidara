@@ -59,6 +59,10 @@ IDs are designed to be:
 - Represent lifecycle or workflow state with `*_status`.
 - Use `snake_case` for field names and `dot.separated` `event_type` names.
 
+### Exception: `reference_snapshot_set_ref`
+
+`reference_snapshot_set_ref` is an exception to the `*_ref` naming convention. Despite the `_ref` suffix, it is a scalar ID field (following the `rss_{ulid}` pattern), not a typed indirection object. This name was chosen to emphasize that it references an external reference-data snapshot set owned by platform-control, rather than being a direct identity field within the consuming schema. The `_ref` suffix here indicates cross-boundary reference semantics, not object structure.
+
 ## Uniqueness And Stability
 
 - IDs are unique within their family.

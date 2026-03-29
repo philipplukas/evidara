@@ -72,7 +72,7 @@ For canonical field-level truth, use the contract files directly:
 |-----------|---------|-----------|
 | document-intelligence → legal-search | `document.processed` event | Async (Pub/Sub) |
 | document-intelligence → legal-search | `document.withdrawn` event | Async (Pub/Sub) |
-| legal-search | reads published canonical surfaces referenced by the event | Sync (read) |
+| legal-search | reads published canonical surfaces referenced by `published_document_ref`, `published_sections_ref`, and `processing_manifest_ref` in `document.processed` | Sync (read) |
 
 ### Core contract objects
 
@@ -108,7 +108,7 @@ The event does **not** embed the full document body and does **not** expose arbi
 - `published_sections`
 - `processing_manifests`
 
-The event points at those surfaces through `dataset_ref` and `manifest_ref`, which keeps internal DI modeling evolvable without breaking `legal-search`.
+The `document.processed` event points at those surfaces through `published_document_ref`, `published_sections_ref`, and `processing_manifest_ref`, which keeps internal DI modeling evolvable without breaking `legal-search`. The `document.withdrawn` event does not expose published-surface refs; it carries only the identity fields needed for deindexing.
 
 ### Boundary principles
 

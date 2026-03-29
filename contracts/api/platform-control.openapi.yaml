@@ -33,6 +33,7 @@ paths:
                 properties:
                   data:
                     type: array
+                    maxItems: 1000
                     items:
                       $ref: "#/components/schemas/Corpus"
     post:
@@ -101,6 +102,7 @@ paths:
                 properties:
                   data:
                     type: array
+                    maxItems: 1000
                     items:
                       $ref: "#/components/schemas/Source"
     post:
@@ -175,6 +177,7 @@ paths:
                 properties:
                   data:
                     type: array
+                    maxItems: 100
                     items:
                       $ref: "#/components/schemas/SourceVersion"
     post:

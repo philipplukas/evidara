@@ -67,9 +67,10 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         pubSub -> docIntelligence "Delivers artifact bundle events"
         docIntelligence -> objectStorage "Reads raw artifacts and bundle manifests"
         docIntelligence -> deltaLake "Writes canonical documents, sections, processing manifests, and published surfaces"
-        docIntelligence -> pubSub "Publishes processing status and document publication events"
+        docIntelligence -> pubSub "Publishes processing status, document publication, and document withdrawal events"
+        platformControl -> pubSub "Publishes artifact bundle and index update events"
         pubSub -> platformControl "Delivers processing status events"
-        pubSub -> legalSearch "Delivers publication, withdrawal, and reindex events"
+        pubSub -> legalSearch "Delivers document publication, withdrawal, and index update events"
 
         legalSearch -> openSearch "Writes and queries search projections"
         legalSearch -> deltaLake "Reads published canonical surfaces only"

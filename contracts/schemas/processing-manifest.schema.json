@@ -56,7 +56,21 @@
       "$ref": "https://evidara.dev/common/provenance"
     },
     "input_bundle_manifest_ref": {
-      "$ref": "https://evidara.dev/common/manifest-ref"
+      "allOf": [
+        {
+          "$ref": "https://evidara.dev/common/manifest-ref"
+        },
+        {
+          "properties": {
+            "manifest_id": {
+              "pattern": "^abm_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "manifest_type": {
+              "const": "artifact_bundle_manifest"
+            }
+          }
+        }
+      ]
     },
     "selected_profiles": {
       "type": "object",
@@ -90,10 +104,62 @@
       "description": "Reference snapshot set actually used by processing."
     },
     "published_document_ref": {
-      "$ref": "https://evidara.dev/common/dataset-ref"
+      "allOf": [
+        {
+          "$ref": "https://evidara.dev/common/dataset-ref"
+        },
+        {
+          "properties": {
+            "surface_name": {
+              "const": "published_documents"
+            },
+            "record_key": {
+              "type": "object",
+              "required": ["document_id", "processing_manifest_id"],
+              "properties": {
+                "document_id": {
+                  "type": "string",
+                  "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+                },
+                "processing_manifest_id": {
+                  "type": "string",
+                  "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+                }
+              }
+            }
+          },
+          "required": ["record_key"]
+        }
+      ]
     },
     "published_sections_ref": {
-      "$ref": "https://evidara.dev/common/dataset-ref"
+      "allOf": [
+        {
+          "$ref": "https://evidara.dev/common/dataset-ref"
+        },
+        {
+          "properties": {
+            "surface_name": {
+              "const": "published_sections"
+            },
+            "record_filter": {
+              "type": "object",
+              "required": ["document_id", "processing_manifest_id"],
+              "properties": {
+                "document_id": {
+                  "type": "string",
+                  "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+                },
+                "processing_manifest_id": {
+                  "type": "string",
+                  "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+                }
+              }
+            }
+          },
+          "required": ["record_filter"]
+        }
+      ]
     },
     "canonical_ready_at": {
       "type": "string",

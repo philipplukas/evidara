@@ -56,6 +56,7 @@ The `.github/workflows/docs-and-contracts.yml` workflow is the contract-validati
 
 - a schema is syntactically invalid
 - an example payload no longer matches its schema
+- a required example payload file is missing
 - an OpenAPI spec fails validation
 
 ## Change Management Guidance

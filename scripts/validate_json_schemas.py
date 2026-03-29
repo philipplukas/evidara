@@ -3,10 +3,12 @@ import json
 import sys
 
 try:
-    from jsonschema import Draft202012Validator, RefResolver
+    from jsonschema import Draft202012Validator
+    from referencing import Registry
+    from referencing.jsonschema import DRAFT202012
 except ImportError:
-    print("Missing dependency: jsonschema")
-    print("Install with: pip install jsonschema")
+    print("Missing dependency: jsonschema or referencing")
+    print("Install with: pip install jsonschema referencing")
     sys.exit(1)
 
 
@@ -22,6 +24,7 @@ EXAMPLE_TO_SCHEMA = {
     "document.json": "contracts/schemas/document.schema.json",
     "section.json": "contracts/schemas/section.schema.json",
     "citation.json": "contracts/schemas/citation.schema.json",
+    "evidence-ref.json": "contracts/schemas/evidence-ref.schema.json",
     "artifact-bundle-available.json": "contracts/events/artifact-bundle-available.schema.json",
     "document-processing-status-updated.json": "contracts/events/document-processing-status-updated.schema.json",
     "document-processed.json": "contracts/events/document-processed.schema.json",
@@ -43,14 +46,17 @@ if not schema_paths:
     sys.exit(0)
 
 failed = False
-schema_store = {}
+registry = Registry()
 schemas_by_path = {}
 
 for path in schema_paths:
     try:
         schema = load_json(path)
         Draft202012Validator.check_schema(schema)
-        schema_store[schema["$id"]] = schema
+        if "$id" not in schema or not schema.get("$id"):
+            raise ValueError(f"Schema missing required $id field: {path}")
+        schema_id = schema["$id"]
+        registry = registry.with_resource(schema_id, DRAFT202012.create_resource(schema))
         schemas_by_path[str(path)] = schema
         print(f"OK schema: {path}")
     except Exception as exc:
@@ -75,8 +81,8 @@ for example_name, schema_path_str in EXAMPLE_TO_SCHEMA.items():
     try:
         example = load_json(example_path)
         schema = schemas_by_path[str(schema_path)]
-        resolver = RefResolver.from_schema(schema, store=schema_store)
-        Draft202012Validator(schema, resolver=resolver).validate(example)
+        validator = Draft202012Validator(schema, registry=registry)
+        validator.validate(example)
         print(f"OK example: {example_path} -> {schema_path}")
     except Exception as exc:
         failed = True

@@ -30,6 +30,7 @@ The smallest end-to-end flow that proves the architecture works: a single source
 - [ ] Run lifecycle API
 - [ ] Snapshot, artifact, and bundle-manifest registration
 - [ ] `artifact_bundle.available` event emission
+- [ ] `document.processing_status.updated` consumer and read-model persistence
 
 ### document-intelligence
 
