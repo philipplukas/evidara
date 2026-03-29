@@ -19,14 +19,14 @@ Testing strategy for the document-intelligence component, which owns:
 
 ### Unit Tests
 
-**Parsing helpers**
+#### Parsing helpers
 
 - HTML tag stripping / normalization
 - Section title extraction from headings
 - Citation pattern matching (e.g., "Art. 123 OR", "§ 42 BGB")
 - Content type detection
 
-**Section construction logic**
+#### Section construction logic
 
 - Sections are created in correct order
 - Section parent-child relationships are valid

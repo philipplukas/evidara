@@ -11,6 +11,7 @@ Define each testing level used in Evidara, what it catches, how often it runs, a
 **Purpose:** Verify individual functions and logic in isolation.
 
 **What it catches:**
+
 - Logic errors in parsing, transformation, and validation helpers
 - Off-by-one errors, null handling, edge cases
 - Incorrect state transitions
@@ -26,6 +27,7 @@ Define each testing level used in Evidara, what it catches, how often it runs, a
 **Purpose:** Verify that a component works correctly with its direct dependencies (database, file system, message queue).
 
 **What it catches:**
+
 - Incorrect database queries or migrations
 - Misconfigured connections
 - Serialization/deserialization issues at component boundaries
@@ -41,6 +43,7 @@ Define each testing level used in Evidara, what it catches, how often it runs, a
 **Purpose:** Validate that data payloads conform to agreed schemas.
 
 **What it catches:**
+
 - Schema violations in API payloads, events, and stored data
 - Breaking contract changes between components
 - Missing required fields, wrong types, invalid enum values
@@ -56,6 +59,7 @@ Define each testing level used in Evidara, what it catches, how often it runs, a
 **Purpose:** Verify processing output against known-good expected results for representative inputs.
 
 **What it catches:**
+
 - Parsing regressions when processing logic changes
 - Semantic drift when source formats evolve
 - Silent quality degradation
@@ -71,6 +75,7 @@ Define each testing level used in Evidara, what it catches, how often it runs, a
 **Purpose:** Verify a full workflow across all components — from source creation to searchable result.
 
 **What it catches:**
+
 - Integration failures between components
 - Missing handoffs or broken event chains
 - ID propagation errors across boundaries
@@ -86,6 +91,7 @@ Define each testing level used in Evidara, what it catches, how often it runs, a
 **Purpose:** Verify that deployed services are running and responding correctly.
 
 **What it catches:**
+
 - Deployment failures
 - Misconfigured environments
 - Infrastructure issues (database unreachable, index missing)
@@ -101,6 +107,7 @@ Define each testing level used in Evidara, what it catches, how often it runs, a
 **Purpose:** Compare current system behavior against known baselines to detect gradual changes.
 
 **What it catches:**
+
 - Source format changes (layout drift)
 - Schema evolution that affects downstream consumers
 - Semantic degradation (fewer sections, missing citations)

@@ -13,6 +13,7 @@ Evidara uses four storage technologies, each chosen for a specific access and ch
 **Purpose:** Operational control-plane data with transactional consistency.
 
 **Stores:**
+
 - Jurisdictions and authorities
 - Source registry and source versions
 - Run records
@@ -20,6 +21,7 @@ Evidara uses four storage technologies, each chosen for a specific access and ch
 - Reference data
 
 **Why Postgres:**
+
 - Strong transactional guarantees for operational workflows
 - Rich query capabilities for administrative and ops UIs
 - Well-suited for entities with frequent reads and writes
@@ -34,11 +36,13 @@ Evidara uses four storage technologies, each chosen for a specific access and ch
 **Purpose:** Raw artifacts and large immutable blobs.
 
 **Stores:**
+
 - Raw documents (PDFs, HTML snapshots, etc.)
 - Downloaded source artifacts
 - Processing intermediaries (if persisted)
 
 **Why Object Storage:**
+
 - Cost-effective for large, immutable files
 - No size limits for individual objects
 - Durable and highly available
@@ -53,6 +57,7 @@ Evidara uses four storage technologies, each chosen for a specific access and ch
 **Purpose:** Canonical structured truth for all processed documents.
 
 **Stores:**
+
 - Canonical documents
 - Sections
 - Citations
@@ -60,6 +65,7 @@ Evidara uses four storage technologies, each chosen for a specific access and ch
 - Processing lineage and metadata
 
 **Why Delta:**
+
 - ACID transactions on data lake storage
 - Schema evolution support
 - Time travel and versioning for auditability
@@ -75,12 +81,14 @@ Evidara uses four storage technologies, each chosen for a specific access and ch
 **Purpose:** Serving projections optimized for search and retrieval.
 
 **Stores:**
+
 - Document search projections
 - Section-level search documents
 - Facet and filter metadata
 - Pre-computed search-optimized representations
 
 **Why OpenSearch:**
+
 - Full-text search with relevance ranking
 - Faceted search and filtering
 - Low-latency queries for user-facing search UIs

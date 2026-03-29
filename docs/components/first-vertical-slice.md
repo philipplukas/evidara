@@ -6,7 +6,8 @@ The smallest end-to-end flow that proves the architecture works: a single source
 
 ## End-to-End Steps
 
-```
+```text
+
 1. Create source             →  platform-control
 2. Create source version     →  platform-control
 3. Trigger run               →  platform-control
@@ -17,6 +18,7 @@ The smallest end-to-end flow that proves the architecture works: a single source
 8. Emit document.processed   →  Pub/Sub
 9. Index into OpenSearch     →  legal-search
 10. Search and view document →  legal-search UI/API
+
 ```
 
 ## What Must Exist

@@ -95,7 +95,7 @@ Add these as the platform matures and the team has infrastructure for them.
 
 ## CI Pipeline Structure (Target)
 
-```
+```text
 push / PR
   ├── lint + format (all components)
   ├── schema validation (contracts)

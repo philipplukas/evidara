@@ -19,7 +19,7 @@ Components need a shared language to communicate. We need to decide how to defin
 
 All contracts live in the `contracts/` folder:
 
-```
+```text
 contracts/
   api/           # OpenAPI specs
   schemas/       # JSON Schemas for domain objects

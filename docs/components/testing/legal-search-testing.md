@@ -18,13 +18,13 @@ Testing strategy for the legal-search component, which owns:
 
 ### Unit Tests
 
-**Projection builder**
+#### Projection builder
 
 - Canonical document → search projection produces expected fields
 - Missing optional fields are handled gracefully (null, default)
 - Projection includes required fields: `document_id`, `title`, `jurisdiction`, `document_type`, `sections`
 
-**Query builder**
+#### Query builder
 
 - Search query string → OpenSearch query DSL is correct
 - Jurisdiction filter → proper filter clause

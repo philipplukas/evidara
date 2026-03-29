@@ -13,6 +13,7 @@ Accepted
 Evidara consists of multiple components (platform-control, document-intelligence, legal-search) that share contracts, infrastructure definitions, and documentation. We need to decide how to organize the source code.
 
 Options considered:
+
 1. **Monorepo** — all components in one repository with top-level domain folders.
 2. **Multi-repo** — separate repositories per component.
 3. **Hybrid** — core in one repo, some components separate.
@@ -21,7 +22,7 @@ Options considered:
 
 Use a **monorepo** with top-level domain folders.
 
-```
+```text
 evidara/
   platform-control/
   document-intelligence/

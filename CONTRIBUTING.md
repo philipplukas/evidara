@@ -18,7 +18,7 @@ Use short-lived branches from `main` with these prefixes:
 
 **Examples:**
 
-```
+```text
 feat/platform-control-source-registry
 fix/legal-search-pagination
 docs/repository-bootstrap
@@ -52,7 +52,7 @@ Changes to files in `contracts/` require additional scrutiny:
 
 Use clear, descriptive commit messages. Prefer conventional-style prefixes:
 
-```
+```text
 feat: add source registry schema
 fix: correct OpenSearch index mapping
 docs: update storage model architecture doc

@@ -16,7 +16,7 @@ Repository structure exists with Terraform directory layout. No Terraform module
 
 ## Structure
 
-```
+```text
 infra/
   terraform/
     gcp/         # Google Cloud resources

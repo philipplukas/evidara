@@ -24,7 +24,7 @@ Evidara is a monorepo containing all components of a document intelligence platf
 
 ## Main Interaction Flow
 
-```
+```text
 platform-control → document-intelligence → legal-search
 ```
 

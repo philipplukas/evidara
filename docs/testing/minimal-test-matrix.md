@@ -9,7 +9,7 @@ Show the smallest credible test set for the entire Evidara platform. This matrix
 ## Test Matrix
 
 | Component | Test Type | Minimal MVP Requirement | Confidence Provided | Later Expansion |
-|-----------|-----------|------------------------|--------------------|-----------------| 
+|-----------|-----------|------------------------|--------------------|-----------------|
 | **platform-control** | Unit tests | State transition tests for runs and approvals | Run lifecycle is correct | Full CRUD coverage |
 | **platform-control** | Contract tests | `RawArtifactEnvelope` schema validation | Boundary payloads are valid | All API schemas |
 | **platform-control** | Smoke tests | One source family: create source → trigger run → record artifact | Source lifecycle works end-to-end | Multiple source families |

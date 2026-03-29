@@ -29,7 +29,7 @@ cd evidara
 
 Create or edit the following file:
 
-```
+```text
 # config content
 ```
 
@@ -41,7 +41,7 @@ Create or edit the following file:
 
 **Expected output:**
 
-```
+```text
 # What you should see
 ```
 

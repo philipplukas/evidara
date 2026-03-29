@@ -18,6 +18,7 @@ Evidara has two major handoff boundaries between its runtime domains. These boun
 When platform-control completes a run and stores a raw artifact in object storage, it emits a `raw_artifact.available` event.
 
 **The event must include:**
+
 - `source_id` — the source that produced the artifact
 - `source_version_id` — the specific version
 - `run_id` — the run that produced the artifact
@@ -27,6 +28,7 @@ When platform-control completes a run and stores a raw artifact in object storag
 - `metadata` — any additional metadata from the run
 
 **Ownership of IDs at this boundary:**
+
 - `source_id`, `source_version_id`, `run_id`: owned by platform-control
 - `artifact_id`: assigned by platform-control, carried through to document-intelligence
 - `document_id`: assigned by document-intelligence upon processing
@@ -54,6 +56,7 @@ When platform-control completes a run and stores a raw artifact in object storag
 When document-intelligence produces a canonical document (and optionally sections, citations), it emits a `document.processed` event.
 
 **The event must include:**
+
 - `document_id` — the canonical document ID
 - `source_id` — traceability back to source
 - `run_id` — traceability back to run
@@ -62,6 +65,7 @@ When document-intelligence produces a canonical document (and optionally section
 - `canonical_path` — Delta table path or location of canonical record
 
 **Ownership of IDs at this boundary:**
+
 - `document_id`, `section_id`, `citation_id`: owned by document-intelligence
 - `source_id`, `run_id`, `artifact_id`: passed through from platform-control
 

@@ -19,6 +19,7 @@ Sources change format. Parsing logic evolves. Search indexes get rebuilt. Each o
 **What:** The format, structure, or layout of a legal source changes without warning.
 
 **Examples:**
+
 - A government website redesigns its document pages
 - HTML class names change, breaking scrapers
 - A new document type appears that the parser does not handle
@@ -30,6 +31,7 @@ Sources change format. Parsing logic evolves. Search indexes get rebuilt. Each o
 **What:** The shape of data exchanged between components changes in ways that break consumers.
 
 **Examples:**
+
 - A required field is removed from `RawArtifactEnvelope`
 - An event payload gains a new field that a consumer does not expect
 - A JSON Schema is updated but example payloads are not
@@ -41,6 +43,7 @@ Sources change format. Parsing logic evolves. Search indexes get rebuilt. Each o
 **What:** Processing output changes meaning even though the pipeline still runs.
 
 **Examples:**
+
 - A parsing update causes sections to be split differently
 - Citation extraction misses a class of citations
 - Jurisdiction assignment defaults to the wrong value
@@ -52,6 +55,7 @@ Sources change format. Parsing logic evolves. Search indexes get rebuilt. Each o
 **What:** The search index diverges from canonical truth.
 
 **Examples:**
+
 - A reindex skips documents due to a filter bug
 - Projection logic strips fields that the frontend expects
 - Index mapping changes cause fields to be analyzed differently

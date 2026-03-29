@@ -18,13 +18,13 @@ Testing strategy for the platform-control component, which owns:
 
 ### Unit Tests
 
-**State transition tests**
+#### State transition tests
 
 - Run lifecycle: `pending` → `running` → `completed` / `failed`
 - Approval workflow: `pending` → `approved` / `rejected`
 - Invalid transitions are rejected (e.g., `completed` → `pending`)
 
-**Validation tests**
+#### Validation tests
 
 - Source config schemas: valid configs pass, invalid configs are rejected
 - Required fields for source creation: name, jurisdiction, authority

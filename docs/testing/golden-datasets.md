@@ -62,7 +62,7 @@ Select documents that cover:
 
 ## Where to Store Golden Samples
 
-```
+```text
 tests/
   golden/
     inputs/

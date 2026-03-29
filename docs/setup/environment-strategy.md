@@ -33,12 +33,14 @@ Evidara uses three environments: **dev**, **staging**, and **prod**. All environ
 ## Environment Parity
 
 All environments use:
+
 - Same Terraform modules (different `tfvars`)
 - Same container images (different tags/versions)
 - Same Databricks job definitions (different clusters/sizing)
 - Same OpenSearch index mappings
 
 Differences between environments are limited to:
+
 - Resource sizing (CPU, memory, replicas)
 - Database instance tier
 - Storage bucket names (suffixed with environment)
@@ -55,7 +57,7 @@ Differences between environments are limited to:
 
 ## Folder Structure
 
-```
+```text
 infra/
   terraform/
     gcp/          # GCP resources (modules)
@@ -71,18 +73,19 @@ infra/
 
 Resources follow this pattern:
 
-```
+```text
 evidara-{component}-{resource}-{env}
 ```
 
 Examples:
+
 - `evidara-control-db-dev` — dev Postgres instance
 - `evidara-raw-artifacts-staging` — staging GCS bucket
 - `evidara-search-prod` — production OpenSearch cluster
 
 ## Deployment Flow
 
-```
+```text
 dev → staging → prod
 ```
 

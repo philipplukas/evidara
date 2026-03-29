@@ -10,7 +10,7 @@ Define the minimal first end-to-end test that proves the entire Evidara pipeline
 
 This test verifies the full lifecycle of a single document:
 
-```
+```text
 platform-control          document-intelligence          legal-search
       │                          │                            │
       ├─ source exists           │                            │

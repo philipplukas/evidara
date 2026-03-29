@@ -62,7 +62,7 @@ Evidara uses two primary communication patterns: synchronous REST APIs and async
 
 ### Who may call whom
 
-```
+```text
 ┌─────────────────────┐
 │  platform-control   │
 │                     │

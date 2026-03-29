@@ -16,7 +16,7 @@ Repository structure exists. ID conventions are defined. Core schemas (`RawArtif
 
 ## Structure
 
-```
+```text
 contracts/
   api/           # OpenAPI specs for synchronous REST APIs
   schemas/       # JSON Schemas for shared domain objects

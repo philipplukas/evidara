@@ -11,6 +11,7 @@ Evidara is a document intelligence platform organized around three main runtime 
 The operational control plane. Manages the lifecycle of sources, versions, runs, approvals, and reference data. It is the entry point for all new data entering the system.
 
 **Owns:**
+
 - Reference data (jurisdictions, authorities)
 - Seed sources and source registry
 - Source versions and approvals
@@ -25,6 +26,7 @@ The operational control plane. Manages the lifecycle of sources, versions, runs,
 The processing engine. Receives raw artifacts and transforms them into canonical structured document intelligence.
 
 **Owns:**
+
 - Raw-to-canonical processing
 - Parsing and segmentation
 - Jurisdiction assignment
@@ -39,6 +41,7 @@ The processing engine. Receives raw artifacts and transforms them into canonical
 The user-facing serving layer. Consumes canonical truth and presents it to users through search and document detail experiences.
 
 **Owns:**
+
 - Frontend (Next.js)
 - BFF (NestJS)
 - OpenSearch serving projections
@@ -63,7 +66,7 @@ Central documentation including architecture, ADRs, onboarding, runbooks, and co
 
 ## Main Interaction Flow
 
-```
+```text
 ┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────┐
 │   platform-control  │────▶│  document-intelligence   │────▶│  legal-search   │
 │                     │     │                          │     │                 │
