@@ -71,6 +71,13 @@ repos:
         pass_filenames: false
         files: ^docs/.*\.md$
 
+      - id: check-diagram-format
+        name: Check diagram format (Mermaid required)
+        entry: python scripts/check_diagram_format.py
+        language: system
+        pass_filenames: false
+        files: ^docs/.*\.md$
+
       - id: legal-search-check
         name: Legal Search checks (typecheck + lint + test)
         entry: bash -c 'cd legal-search && npm run check'

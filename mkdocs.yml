@@ -104,6 +104,7 @@ nav:
       - Review Checklist: documentation/review-checklist.md
       - AI PR Review Prompt: documentation/ai-pr-review-prompt.md
       - Doc Types: documentation/doc-types-and-authority.md
+      - Mermaid Style Guide: documentation/mermaid-style-guide.md
   - API Reference:
       - Legal Search API: api/legal-search.md
       - Platform Control API: api/platform-control.md
