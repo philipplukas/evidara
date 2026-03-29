@@ -2,14 +2,17 @@
 
 ## Overview
 
-Evidara uses two primary communication patterns: synchronous REST APIs and asynchronous events. Each pattern serves a distinct purpose and is used at specific interaction points.
+Evidara uses two primary communication patterns:
+
+- synchronous APIs for control and query interactions
+- asynchronous events for pipeline progression and operational status
 
 ## Synchronous Communication (REST / OpenAPI)
 
 ### When to use
 
 - A caller needs an immediate response.
-- The interaction is a query (read) or a command that must confirm success/failure.
+- The interaction is a query or a control-plane command.
 - The caller and callee are in a request-response relationship.
 
 ### Examples
@@ -17,94 +20,91 @@ Evidara uses two primary communication patterns: synchronous REST APIs and async
 | Interaction | Caller | Callee | Why sync? |
 |-------------|--------|--------|-----------|
 | Create a source | User / ops UI | platform-control API | User needs confirmation |
+| Approve a source version | User / ops UI | platform-control API | Approval is a control-plane action |
 | Get run status | User / ops UI | platform-control API | User needs current state |
-| Search documents | User / frontend | legal-search API | User needs search results now |
+| Search documents | User / frontend | legal-search API | User needs results now |
 | Get document detail | User / frontend | legal-search API | User needs document content now |
-| Get source versions | Internal workflow | platform-control API | Workflow needs data to proceed |
 
 ### Conventions
 
-- All sync APIs are defined in OpenAPI specs in `contracts/api/`.
+- All sync APIs are defined in `contracts/api/`.
 - APIs use JSON over HTTPS.
-- Standard HTTP status codes are used for success, validation errors, and server errors.
-- Pagination follows a consistent pattern across all APIs.
-
----
+- IDs and field names use `snake_case`.
+- Corpora and tenants are part of control-plane data, not hidden side channels.
 
 ## Asynchronous Communication (Events / Pub/Sub)
 
 ### When to use
 
-- A producer completes work and one or more consumers may need to react.
-- The producer does not need to know about or wait for consumer processing.
-- The interaction is a pipeline progression (one stage completing triggers the next).
-- Decoupling is important for independent scaling and failure isolation.
+- A producer has completed a stage and downstream work may begin.
+- The producer should not block on downstream processing.
+- The interaction is long-running or replayable.
+- Failure isolation and idempotency matter.
 
 ### Examples
 
 | Event | Producer | Consumer(s) | Why async? |
 |-------|----------|-------------|-----------|
-| `raw_artifact.available` | platform-control | document-intelligence | Processing takes time; producer doesn't wait |
-| `document.processed` | document-intelligence | legal-search | Indexing is independent of processing |
-| `index_update.requested` | document-intelligence or ops | legal-search | Reindex can happen independently |
+| `artifact_bundle.available` | platform-control | document-intelligence | Processing starts after immutable acquisition handoff |
+| `document.processing_status.updated` | document-intelligence | platform-control | Ops needs visibility without coupling to DI internals |
+| `document.processed` | document-intelligence | legal-search | Indexing is downstream of canonical publication |
+| `document.withdrawn` | document-intelligence | legal-search | Search removal is separate from canonical publication |
+| `index_update.requested` | ops or legal-search | legal-search | Rebuilds and targeted replay should be decoupled |
 
 ### Conventions
 
-- All event schemas are defined in `contracts/events/`.
-- Events are published to Google Cloud Pub/Sub topics.
-- Event payloads are JSON.
-- Events include traceability IDs (source_id, run_id, artifact_id, document_id) for lineage.
-- Consumers must be idempotent — receiving the same event twice should produce the same result.
+- All event schemas live in `contracts/events/`.
+- All events use the shared envelope in `contracts/common/event-envelope.schema.json`.
+- The envelope should remain CloudEvents-aligned so producers and consumers can adopt standard tooling later without rewriting business payloads.
+- Event names are versionless; `event_version` carries the contract version.
+- Consumers must be idempotent.
+- Events carry enough provenance to trace tenant, corpus, source, source version, run, and document lineage.
 
----
+## Standards And Platform Capabilities
+
+Different layers should solve different problems:
+
+- `contracts/` owns business payloads, typed refs, identities, and lifecycle semantics.
+- Pub/Sub is the transport, not the business contract.
+- CloudEvents-aligned metadata is the event-envelope standard.
+- Databricks / Unity Catalog should handle DI-internal lineage for tables, jobs, and published views.
+- OpenLineage is optional later if Evidara needs lineage that spans Databricks, Cloud Run, and search operations in one model.
+- OpenSearch aliases and versioned indices handle search cutover and rebuild lifecycle inside `legal-search`.
+
+This keeps business contracts small while still allowing strong operational traceability.
 
 ## Component Interaction Rules
 
 ### Who may call whom
 
 ```text
-┌─────────────────────┐
-│  platform-control   │
-│                     │
-│  sync API: yes      │──── event ────▶ document-intelligence
-│  called by: ops UI  │
-└─────────────────────┘
-
-┌──────────────────────────┐
-│  document-intelligence   │
-│                          │
-│  sync API: internal only │──── event ────▶ legal-search
-│  called by: Databricks   │
-└──────────────────────────┘
-
-┌─────────────────┐
-│  legal-search   │
-│                 │
-│  sync API: yes  │
-│  called by: UI  │
-└─────────────────┘
+platform-control --event--> document-intelligence --event--> legal-search
+        ^                           |
+        |                           |
+        +---- processing status ----+
 ```
 
 ### Strict rules
 
-1. **legal-search does NOT call document-intelligence.** It reads from Delta (or a sync from Delta) to build projections.
-2. **legal-search does NOT call platform-control in the request path.** It may read reference data that has been projected/synced.
-3. **document-intelligence does NOT manage sources or approvals.** That is platform-control's responsibility.
-4. **platform-control does NOT process documents.** It triggers processing via events.
-5. **No component reads another component's database directly.** All cross-component data flows through contracts (APIs or events).
+1. **legal-search does NOT call document-intelligence in the request path.**
+2. **legal-search reads only published DI surfaces referenced by contracts.**
+3. **document-intelligence does NOT manage sources, approvals, or acquisition checkpoints.**
+4. **platform-control does NOT parse or canonicalize documents.**
+5. **No component reads another component's operational database directly.**
 
 ### What interactions MUST be events
 
 | Interaction | Why |
 |-------------|-----|
-| Raw artifact available → process it | Processing is long-running, async by nature |
-| Document processed → index it | Indexing is decoupled from processing |
-| Reindex requested → rebuild projections | Bulk operation, should not block anything |
+| Immutable bundle available → process it | Long-running pipeline step |
+| Processing status update → expose run progress | Ops visibility without table coupling |
+| Document canonical-ready → index it | Search projection is downstream of DI |
+| Document withdrawn → remove or hide it in search | Search removal is asynchronous and replayable |
 
 ### What interactions use APIs
 
 | Interaction | Why |
 |-------------|-----|
-| CRUD on sources, versions, runs | Operational, needs immediate feedback |
-| Search queries | User-facing, needs low-latency response |
-| Document detail retrieval | User-facing, needs immediate content |
+| CRUD on sources, versions, runs, corpora | Operational workflow needs immediate feedback |
+| Search queries | User-facing and latency-sensitive |
+| Document detail retrieval | User-facing and latency-sensitive |

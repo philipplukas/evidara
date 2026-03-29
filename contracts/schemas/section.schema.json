@@ -2,51 +2,77 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://evidara.dev/schemas/section",
   "title": "Section",
-  "description": "A section within a canonical document. Represents a structural subdivision such as an article, paragraph, or chapter.",
+  "description": "Canonical published section entity for a document revision.",
   "type": "object",
   "required": [
     "section_id",
     "document_id",
-    "title",
-    "ordinal"
+    "document_revision",
+    "processing_manifest_id",
+    "provenance",
+    "ordinal",
+    "depth",
+    "content"
   ],
   "properties": {
     "section_id": {
       "type": "string",
-      "description": "Unique identifier for the section. Format: sec_{ulid}",
-      "pattern": "^sec_[a-z0-9]+$"
+      "pattern": "^sec_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Section identifier."
     },
     "document_id": {
       "type": "string",
-      "description": "ID of the parent document.",
-      "pattern": "^doc_[a-z0-9]+$"
+      "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Parent logical document identifier."
+    },
+    "document_revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Document revision this section belongs to."
+    },
+    "processing_manifest_id": {
+      "type": "string",
+      "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Immutable processing result that produced this section."
+    },
+    "provenance": {
+      "$ref": "https://evidara.dev/common/provenance"
     },
     "parent_section_id": {
-      "type": ["string", "null"],
-      "description": "ID of the parent section, if this is a nested section. Null for top-level sections.",
-      "pattern": "^sec_[a-z0-9]+$"
-    },
-    "title": {
-      "type": "string",
-      "description": "Title or heading of the section."
-    },
-    "content": {
-      "type": "string",
-      "description": "Text content of the section."
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sec_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Parent section when the hierarchy is nested."
     },
     "ordinal": {
       "type": "integer",
-      "description": "Position of this section within its parent (0-indexed).",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Position within the parent scope."
     },
     "depth": {
       "type": "integer",
-      "description": "Nesting depth of the section (0 = top-level).",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Hierarchy depth where 0 is top-level."
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Section heading if one exists."
+    },
+    "content": {
+      "type": "string",
+      "description": "Canonical section text."
     },
     "section_type": {
-      "type": "string",
-      "description": "Classification of the section type (e.g., article, paragraph, chapter)."
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Structural section type such as chapter, article, paragraph, or appendix."
     },
     "metadata": {
       "type": "object",

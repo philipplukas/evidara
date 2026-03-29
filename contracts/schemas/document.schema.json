@@ -2,79 +2,115 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://evidara.dev/schemas/document",
   "title": "Document",
-  "description": "Canonical document entity produced by document-intelligence. Represents a single legal or regulatory document.",
+  "description": "Canonical published document entity produced by document-intelligence. Represents one logical document revision within a corpus.",
   "type": "object",
   "required": [
     "document_id",
-    "artifact_id",
-    "source_id",
-    "run_id",
+    "document_revision",
+    "processing_manifest_id",
+    "provenance",
+    "primary_artifact_id",
     "title",
-    "processed_at"
+    "processed_at",
+    "processing_version",
+    "lifecycle_status",
+    "full_text",
+    "body_text"
   ],
   "properties": {
     "document_id": {
       "type": "string",
-      "description": "Unique identifier for the canonical document. Format: doc_{ulid}",
-      "pattern": "^doc_[a-zA-Z0-9]+$"
+      "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Stable logical document identifier."
     },
-    "artifact_id": {
-      "type": "string",
-      "description": "ID of the raw artifact this document was derived from.",
-      "pattern": "^art_[a-zA-Z0-9]+$"
+    "document_revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic canonical revision number for this document within the corpus."
     },
-    "source_id": {
+    "processing_manifest_id": {
       "type": "string",
-      "description": "ID of the source. Carried through for lineage.",
-      "pattern": "^src_[a-zA-Z0-9]+$"
+      "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Immutable processing result that produced this canonical revision."
     },
-    "source_version_id": {
-      "type": "string",
-      "description": "ID of the source version. Carried through for lineage.",
-      "pattern": "^sv_[a-zA-Z0-9]+$"
+    "provenance": {
+      "$ref": "https://evidara.dev/common/provenance"
     },
-    "run_id": {
+    "primary_artifact_id": {
       "type": "string",
-      "description": "ID of the run that produced the raw artifact.",
-      "pattern": "^run_[a-zA-Z0-9]+$"
+      "pattern": "^art_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Primary artifact chosen as the anchor for this document revision."
+    },
+    "jurisdiction_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^jur_[a-z0-9_]+$",
+      "description": "Resolved canonical jurisdiction reference."
+    },
+    "authority_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^auth_[a-z0-9_]+$",
+      "description": "Resolved canonical issuing authority reference."
     },
     "title": {
       "type": "string",
-      "description": "Title of the document."
-    },
-    "content": {
-      "type": "string",
-      "description": "Full text content of the document, if extracted."
-    },
-    "content_type": {
-      "type": "string",
-      "description": "Original content type of the source artifact."
-    },
-    "jurisdiction": {
-      "type": "string",
-      "description": "Jurisdiction the document belongs to, if assigned."
+      "description": "Resolved canonical title."
     },
     "document_type": {
-      "type": "string",
-      "description": "Classification of the document type (e.g., statute, regulation, decision)."
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Resolved document type."
     },
     "effective_date": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "date",
-      "description": "Date the document became effective, if applicable."
+      "description": "Resolved effective date when known."
     },
     "processed_at": {
       "type": "string",
       "format": "date-time",
-      "description": "ISO 8601 timestamp of when the document was processed."
+      "description": "Timestamp when this canonical revision became available."
     },
     "processing_version": {
       "type": "string",
-      "description": "Version of the processing pipeline that produced this document."
+      "description": "Version of the DI pipeline that produced the revision."
+    },
+    "lifecycle_status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "superseded",
+        "repealed",
+        "withdrawn"
+      ],
+      "description": "Document lifecycle state as exposed to downstream consumers."
+    },
+    "full_text": {
+      "type": "string",
+      "description": "Normalized full-document text, preserving material outside the main body where relevant."
+    },
+    "body_text": {
+      "type": "string",
+      "description": "Normalized body-only text intended for most retrieval and sectionization workflows."
     },
     "metadata": {
       "type": "object",
-      "description": "Additional processing metadata.",
+      "description": "Resolved canonical metadata and traceable low-risk metadata fields.",
+      "additionalProperties": true
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Non-canonical extension area for narrowly scoped downstream-compatible additions.",
       "additionalProperties": true
     }
   },

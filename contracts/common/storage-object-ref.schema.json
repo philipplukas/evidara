@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/common/storage-object-ref",
+  "title": "StorageObjectRef",
+  "description": "Reference to an immutable object in blob storage.",
+  "type": "object",
+  "required": [
+    "uri",
+    "content_type",
+    "byte_size",
+    "checksum",
+    "checksum_algorithm"
+  ],
+  "properties": {
+    "uri": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9+.-]*://.+$",
+      "description": "Provider-qualified object URI such as gs://bucket/path/file.pdf."
+    },
+    "content_type": {
+      "type": "string",
+      "description": "MIME type or best-known content type for the object."
+    },
+    "byte_size": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Object size in bytes."
+    },
+    "checksum": {
+      "type": "string",
+      "description": "Checksum value of the stored object."
+    },
+    "checksum_algorithm": {
+      "type": "string",
+      "enum": [
+        "sha256"
+      ],
+      "description": "Checksum algorithm used for checksum."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional object creation timestamp."
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,43 +1,45 @@
 # Implementation Principles
 
+Use these principles when adding or changing Evidara contracts, handoff surfaces, and cross-component interactions.
+
 ## Core Principles
 
-### 1. Canonical truth is separate from serving projections
+1. Start from business transitions, not service boundaries.
+2. Define ownership before schema shape.
+3. Design replay and failure handling before optimizing the happy path.
+4. Use synchronous APIs for control-plane and query interactions.
+5. Use events for long-running, replayable workflow progression.
+6. Keep canonical truth separate from serving projections.
+7. Prefer exact immutable refs over oversized payload events.
 
-Delta tables hold the canonical, authoritative representation of all processed document intelligence. OpenSearch holds derived, search-optimized projections. Serving projections can be fully rebuilt from canonical truth. Canonical truth is never rebuilt from serving projections.
+## Standards Before Reinvention
 
-### 2. Elasticsearch/OpenSearch is not source of truth
+Reuse standards and platform capabilities where they reduce bespoke infrastructure:
 
-OpenSearch is a serving layer. It is optimized for fast, user-facing queries. It is not durable storage and it is not the system of record. If OpenSearch data is lost, it is rebuilt from Delta. No business logic should depend on OpenSearch being the only place data exists.
+- Use JSON Schema and OpenAPI as the contract-definition formats.
+- Keep the event envelope CloudEvents-aligned instead of inventing custom metadata rules per event.
+- Use Databricks / Unity Catalog lineage for table and job lineage inside document-intelligence.
+- Add OpenLineage only if cross-platform lineage becomes a real requirement that Unity Catalog cannot cover alone.
+- Use OpenSearch versioned indices and aliases for rebuild and cutover workflows.
 
-### 3. AI may propose changes but not silently mutate production state
+Do not try to push all of that metadata into business payloads. Contracts should capture:
 
-Any AI-driven process (e.g., AI-assisted classification, jurisdiction assignment, or content enrichment) may propose changes, but those changes must be reviewed and approved before becoming production truth. AI proposals are tracked as proposals until explicitly accepted.
+- ownership
+- lifecycle transitions
+- lineage that crosses component boundaries
+- stable identities
+- published-surface refs needed for replay
 
-### 4. Contracts must be explicit
+## Manifest And Published-Surface Principles
 
-All inter-component communication happens through contracts defined in `contracts/`. No component may depend on the internal implementation details of another component. If a dependency is not in a contract, it does not exist.
+- Store manifests as immutable JSON objects.
+- Mirror searchable manifest metadata into component-owned query surfaces instead of encoding semantics into folder paths.
+- Publish stable downstream dataset surfaces such as `published_documents`, `published_sections`, and `processing_manifests`.
+- Events should point to exact immutable published refs, not arbitrary internal table names.
 
-### 5. Events are used for async pipeline progression
+## Evolution Principles
 
-When one component's output triggers another component's processing, the mechanism is an event (e.g., `raw_artifact.available`, `document.processed`). Events decouple the producer from the consumer and allow independent scaling and failure handling.
-
-### 6. APIs are used for control and query interactions
-
-Synchronous interactions — such as creating a source, querying run status, or searching documents — use REST APIs defined in OpenAPI specs. APIs are the mechanism for request-response interactions where the caller needs an immediate answer.
-
-### 7. Storage is chosen by access and change pattern
-
-Each storage technology is selected based on the data's access pattern, change frequency, and query requirements. See [Storage Model](storage-model.md) for details. No single database is forced to serve all use cases.
-
-### 8. Boundaries are enforced at the folder level
-
-Each top-level folder in the monorepo represents a component with clear ownership. Components do not reach into each other's internal code. Cross-component interactions go through contracts.
-
-### 9. Document everything that is not obvious
-
-Architecture decisions are captured in ADRs. Component responsibilities are documented in component docs. Contracts are explicit schemas. If a design choice could surprise a new contributor, it should be documented.
-
-### 10. Start minimal, expand deliberately
-
-Every new feature, schema, and API starts with the smallest viable version. Expansion is driven by concrete needs, not speculative completeness. Each expansion step is deliberate, documented, and reviewed.
+- Make additive changes within a version whenever possible.
+- Use a new major version for breaking changes.
+- Keep override mechanisms explicit and rare.
+- Favor one real boundary pattern over temporary shortcuts.

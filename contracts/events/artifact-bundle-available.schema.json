@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/events/artifact-bundle-available",
+  "title": "ArtifactBundleAvailable",
+  "description": "Event emitted by platform-control when an artifact bundle manifest is durably stored and ready for processing by document-intelligence.",
+  "allOf": [
+    {
+      "$ref": "https://evidara.dev/common/event-envelope"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "artifact_bundle.available"
+        },
+        "event_version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "platform-control"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "bundle_manifest_id",
+            "source_snapshot_id",
+            "provenance",
+            "source_origin_kind",
+            "trust_tier",
+            "bundle_manifest_ref"
+          ],
+          "properties": {
+            "bundle_manifest_id": {
+              "type": "string",
+              "pattern": "^abm_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "source_snapshot_id": {
+              "type": "string",
+              "pattern": "^snap_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "provenance": {
+              "$ref": "https://evidara.dev/common/provenance"
+            },
+            "source_origin_kind": {
+              "type": "string",
+              "enum": [
+                "official_primary",
+                "official_mirror",
+                "licensed_provider",
+                "community_curated",
+                "tenant_internal"
+              ]
+            },
+            "trust_tier": {
+              "type": "string",
+              "enum": [
+                "authoritative",
+                "preferred",
+                "supplemental",
+                "untrusted"
+              ]
+            },
+            "bundle_manifest_ref": {
+              "$ref": "https://evidara.dev/common/manifest-ref"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

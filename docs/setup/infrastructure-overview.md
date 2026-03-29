@@ -2,11 +2,11 @@
 
 ## Overview
 
-Evidara uses three cloud/platform providers for its infrastructure:
+Evidara uses three cloud/platform providers:
 
 - **Google Cloud Platform (GCP)** — primary cloud provider
-- **Databricks** — document intelligence processing
-- **GitHub** — source control, CI/CD, governance
+- **Databricks** — document-intelligence processing and published canonical surfaces
+- **GitHub** — source control and CI/CD
 
 ## GCP Services
 
@@ -14,7 +14,7 @@ Evidara uses three cloud/platform providers for its infrastructure:
 |---------|---------|---------|
 | **Cloud Run** | Application runtime | platform-control, legal-search BFF |
 | **Cloud SQL (Postgres)** | Relational database | platform-control |
-| **Cloud Storage (GCS)** | Object storage for raw artifacts | platform-control, document-intelligence |
+| **Cloud Storage (GCS)** | Raw artifacts and manifests | platform-control, document-intelligence |
 | **Pub/Sub** | Asynchronous event messaging | All components |
 | **Secret Manager** | Credential and secret storage | All components |
 | **Cloud DNS** | DNS management | All components |
@@ -24,18 +24,24 @@ Evidara uses three cloud/platform providers for its infrastructure:
 
 | Topic | Producer | Consumer |
 |-------|----------|----------|
-| `raw-artifact-available` | platform-control | document-intelligence |
+| `artifact-bundle-available` | platform-control | document-intelligence |
+| `document-processing-status-updated` | document-intelligence | platform-control |
 | `document-processed` | document-intelligence | legal-search |
-| `index-update-requested` | ops / document-intelligence | legal-search |
+| `document-withdrawn` | document-intelligence | legal-search |
+| `index-update-requested` | ops / legal-search | legal-search |
 
-> **Naming convention:** Pub/Sub topic names use **kebab-case** (e.g., `raw-artifact-available`) because they are GCP infrastructure resource identifiers. The corresponding internal `event_type` constants use **snake_case with dot-separated namespaces** (e.g., `raw_artifact.available`, `document.processed`, `index_update.requested`) for schema versioning and programmatic routing. The mapping is: topic `raw-artifact-available` → event type `raw_artifact.available`, topic `document-processed` → `document.processed`, topic `index-update-requested` → `index_update.requested`.
+> Topic names use kebab-case infrastructure identifiers. Internal `event_type` values use dotted snake_case. Example: topic `artifact-bundle-available` maps to event type `artifact_bundle.available`.
+>
+> Event payloads should continue to use the shared CloudEvents-aligned envelope defined in `contracts/common/event-envelope.schema.json`.
 
 ### Cloud Storage Buckets
 
 | Bucket | Purpose |
 |--------|---------|
-| `evidara-raw-artifacts-{env}` | Raw artifacts from runs |
-| `evidara-processed-{env}` | Processing intermediaries (if needed) |
+| `evidara-raw-artifacts-{env}` | Raw artifacts from connector runs |
+| `evidara-manifests-{env}` | Bundle manifests and related immutable manifest objects |
+
+Manifests should be stored as immutable JSON objects. Search and filtering over manifest metadata should come from mirrored query surfaces, not from Hive-style path semantics.
 
 ### Cloud SQL
 
@@ -48,17 +54,18 @@ Evidara uses three cloud/platform providers for its infrastructure:
 | Resource | Purpose |
 |----------|---------|
 | Workspace | Document intelligence processing |
-| Delta tables | Canonical document truth storage |
+| Delta tables | Canonical truth and processing manifests |
+| Published views or tables | Stable downstream surfaces for legal-search |
+| Unity Catalog lineage | Table, job, and published-surface lineage inside DI |
 | Workflows / Jobs | Processing pipeline orchestration |
-| Unity Catalog | Data governance (future) |
 
-### Delta Table Paths
+### Published Surfaces
 
-| Table | Purpose |
-|-------|---------|
-| `evidara.canonical.documents` | Canonical document entities |
-| `evidara.canonical.sections` | Document sections |
-| `evidara.canonical.citations` | Extracted citations (future) |
+| Surface | Purpose |
+|---------|---------|
+| `published_documents` | Canonical document revisions |
+| `published_sections` | Canonical sections |
+| `processing_manifests` | Exact immutable DI processing results |
 
 ## OpenSearch
 
@@ -66,24 +73,27 @@ Evidara uses three cloud/platform providers for its infrastructure:
 |---------|---------|
 | `evidara-search-{env}` | Search serving for legal-search |
 
-Provider TBD: managed OpenSearch (AWS, Aiven, or self-managed).
+Provider remains TBD. OpenSearch stays a serving layer only and must be rebuildable from published DI surfaces.
 
-### Indexes
+Recommended lifecycle pattern:
 
-| Index | Purpose |
-|-------|---------|
-| `documents` | Document search projections |
-| `sections` | Section-level search (future) |
+- versioned physical indices
+- stable read/write aliases
+- bulk replay for rebuilds
+- projection manifest/history inside `legal-search`
+
+## Optional Later Additions
+
+| Capability | When to add it |
+|-----------|----------------|
+| OpenLineage | If DI, control-plane, and search lineage need one cross-platform model |
+| External metadata/catalog tool | If contract discovery and lineage UX outgrow docs + code review |
 
 ## Deployment Model
 
 | Component | Deployment Target | Notes |
 |-----------|-------------------|-------|
 | platform-control | Cloud Run | Connects to Cloud SQL, GCS, Pub/Sub |
-| document-intelligence | Databricks | Triggered by Pub/Sub → Cloud Function bridge or Databricks webhook |
+| document-intelligence | Databricks | Triggered by Pub/Sub and reads bundle manifests + artifacts |
 | legal-search (BFF) | Cloud Run | Connects to OpenSearch |
 | legal-search (frontend) | Cloud Run or CDN | Static assets + server components |
-
-## No Secrets in Git
-
-All credentials are stored in **Google Secret Manager** and injected at runtime. See [SECURITY.md](../../SECURITY.md) for details.

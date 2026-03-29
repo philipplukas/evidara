@@ -95,7 +95,7 @@ graph LR
         LS[Search API]
     end
 
-    PC -.->|raw artifact event| DI
+    PC -.->|bundle available event| DI
     DI ==>|canonical docs| DB[(Delta Lake)]
     DB ==>|projection| LS
     LS --> OS[(OpenSearch)]

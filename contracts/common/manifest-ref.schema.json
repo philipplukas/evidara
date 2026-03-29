@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/common/manifest-ref",
+  "title": "ManifestRef",
+  "description": "Typed reference to an immutable manifest. Manifests may be stored either as blob objects or published dataset records.",
+  "type": "object",
+  "required": [
+    "manifest_id",
+    "manifest_type",
+    "manifest_version"
+  ],
+  "properties": {
+    "manifest_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]+$",
+      "description": "Stable manifest identifier."
+    },
+    "manifest_type": {
+      "type": "string",
+      "enum": [
+        "artifact_bundle_manifest",
+        "processing_manifest",
+        "projection_manifest",
+        "reference_snapshot_set"
+      ],
+      "description": "Manifest contract family."
+    },
+    "manifest_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Major version of the manifest contract."
+    },
+    "storage_ref": {
+      "$ref": "https://evidara.dev/common/storage-object-ref",
+      "description": "Reference to a manifest stored as an object."
+    },
+    "dataset_ref": {
+      "$ref": "https://evidara.dev/common/dataset-ref",
+      "description": "Reference to a manifest exposed through a published dataset surface."
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "storage_ref"
+      ]
+    },
+    {
+      "required": [
+        "dataset_ref"
+      ]
+    }
+  ],
+  "additionalProperties": false
+}

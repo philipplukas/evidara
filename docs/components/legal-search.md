@@ -2,40 +2,40 @@
 
 ## Purpose
 
-Serve legal and document search and detail experiences to users. Legal-search is the user-facing serving layer that consumes canonical truth from document-intelligence and presents it through search, browse, and document exploration interfaces.
+Serve legal and document search and detail experiences to users. Legal-search is the user-facing serving layer that consumes published canonical surfaces from document-intelligence and turns them into OpenSearch projections and UI/API responses.
 
 ## Current state
 
-The `legal-search/` folder contains the Next.js frontend application, migrated from the earlier `omnilex-search` project. See the [legal-search README](../../legal-search/README.md) for development setup. The backend BFF (NestJS) and OpenSearch integration are not yet implemented.
+The `legal-search/` folder contains the migrated frontend application. The BFF, projection worker, and OpenSearch integration are not yet implemented.
 
 ## Source of truth
 
-- Delta tables (read-only) for canonical documents — legal-search never writes to Delta
-- OpenSearch for the serving projection index — this is a projection, not the source of truth
-- `contracts/api/legal-search.openapi.yaml` for API definition
+- Published canonical surfaces from document-intelligence are read-only inputs
+- OpenSearch holds serving projections only
+- `contracts/api/legal-search.openapi.yaml` defines the user-facing API
 
 ## Responsibilities
 
 ### Minimal v1
 
-- Index canonical document projections into OpenSearch
-- Expose search API
-- Expose document detail API
-- Serve minimal frontend search experience
+- Build search projections from published DI surfaces
+- Maintain OpenSearch indices and aliases
+- Maintain projection manifest/history for replay and audit
+- Expose search and detail APIs
+- Serve a minimal frontend search experience
 
 ### Boundary
 
-- **Does own:** frontend (Next.js), BFF (NestJS), OpenSearch index management, search and detail APIs
-- **Does NOT own:** canonical document truth, source management, document processing
+- **Does own:** frontend, BFF, projection logic, OpenSearch mappings and aliases, indexing workflows
+- **Does NOT own:** canonical truth, source management, parsing, reference data governance
 
 ## Minimal next tasks
 
-- [ ] Define search projection schema (what gets indexed)
-- [ ] Define initial OpenSearch index mapping
+- [ ] Define search projection schema
+- [ ] Define initial OpenSearch mapping and alias strategy
+- [ ] Define projection manifest/history model
 - [ ] Define minimal NestJS BFF endpoints
-- [ ] Define minimal Next.js UI pages (search, document detail)
 - [ ] Define reindex workflow
-- [ ] Define sync mechanism from canonical entities to search documents
 
 ## Minimal v1 Outcome
 
@@ -53,32 +53,31 @@ A user can:
 | Next | Citation-aware search |
 | Later | Facets and ranking improvements |
 | Later | Semantic search |
-| Later | Richer document exploration (relationships, cross-references) |
+| Later | Richer document exploration |
 
 ## Dependencies
 
 | Dependency | Purpose |
 |-----------|---------|
 | OpenSearch | Search index and query engine |
-| Delta tables | Read canonical documents for projection building |
-| Pub/Sub | Consume `document.processed` and `index_update.requested` events |
+| Published DI surfaces | Projection input |
+| Pub/Sub | Consume `document.processed`, `document.withdrawn`, and `index_update.requested` |
 | Cloud Run | Runtime for BFF and frontend |
 
-## Technology
+## Platform Capabilities We Reuse
 
-| Concern | Technology |
-|---------|-----------|
-| Frontend | Next.js |
-| BFF | NestJS |
-| Search Engine | OpenSearch |
-| Runtime | Cloud Run (GCP) |
+- Versioned physical indices plus aliases for zero-downtime cutover
+- Bulk indexing APIs for replay and rebuild
+
+These replace the need for custom index-lifecycle semantics in shared contracts. The shared contracts only need to carry projection inputs, ordering, and withdrawal signals.
 
 ## Key Contracts
 
-- **Consumes:** `document.processed` event from document-intelligence
-- **Consumes:** `index_update.requested` event
+- **Consumes:** `document.processed`
+- **Consumes:** `document.withdrawn`
+- **Consumes:** `index_update.requested`
 - **API:** `contracts/api/legal-search.openapi.yaml`
-- **Reads:** canonical truth from Delta (for projection building)
+- **Reads:** published DI surfaces referenced by event refs
 
 ## Testing
 
@@ -88,17 +87,15 @@ Key tests:
 
 - Projection builder unit tests
 - Search and detail API contract tests
-- Indexing smoke test with 3–5 sample docs
-- 3–5 fixed search smoke queries
-- Minimal frontend tests: search page render, detail page render, one user flow
-- Indexing parity check: canonical docs vs indexed docs
+- Indexing smoke test with sample docs
+- Fixed search smoke queries
+- Parity checks between published DI surfaces and indexed documents
 
 ## Drift risks
 
 | Risk | Mitigation |
 |------|-----------|
-| Search index diverges from canonical data | Indexing parity checks |
+| Search index diverges from canonical data | Projection manifest/history and parity checks |
 | Projection logic drops fields | Projection builder unit tests |
-| Search results empty when docs exist | Search smoke queries after every reindex |
-| Detail page missing expected fields | API contract tests |
-| Source format changes affect search quality | Golden queries with expected results |
+| Search serves a withdrawn document | Withdrawal event tests and alias-safe replay |
+| Out-of-order events overwrite fresh data | `document_revision` ordering checks |
