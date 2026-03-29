@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "openapi:generate": "npx orval --config orval.config.js",
     "openapi:lint": "npx @redocly/cli lint contracts/openapi.yaml",
-    "check": "npm run lint && npm run typecheck && npm run openapi:lint"
+    "check": "npm run lint && npm run typecheck && npm run openapi:lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.95.2",
@@ -36,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.2"
   }
 }
