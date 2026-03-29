@@ -2,6 +2,18 @@
 
 <!-- Describe what this PR does and why. -->
 
+## Change Classification
+
+<!-- Check all that apply. -->
+
+- [ ] `internal-refactor`
+- [ ] `user-visible-behavior`
+- [ ] `contract-change`
+- [ ] `infra-change`
+- [ ] `pipeline-change`
+- [ ] `architecture-change`
+- [ ] `docs-only`
+
 ## Affected Components
 
 <!-- Check all that apply. -->
@@ -14,19 +26,28 @@
 - [ ] `docs`
 - [ ] `scripts`
 
-## Checklist
+## Sync Impact
 
-- [ ] Contracts changed? If yes, tag affected component owners.
-- [ ] Documentation updated? If architecture, boundaries, or storage changed, update `docs/`.
-- [ ] ADR added or updated? Required for significant architecture decisions.
-- [ ] Tests added or updated? If applicable.
-- [ ] Backwards compatible? If not, document breaking changes below.
+<!-- Updated where applicable: -->
 
-## Contracts Changes
+- [ ] Tests
+- [ ] Docs
+- [ ] Contracts (OpenAPI / JSON Schema)
+- [ ] Architecture (`structurizr/workspace.dsl`, ADRs)
+- [ ] Infra docs
 
-<!-- If contracts changed, describe what changed, why, and whether it is backwards compatible. -->
+## Why No Updates Were Needed
+
+<!-- If any applicable sync item was NOT updated, explain why here. Delete this section if all relevant items were updated. -->
 
 N/A
+
+## Checklist
+
+- [ ] PR title follows conventional commit format (`feat:`, `fix:`, etc.)
+- [ ] `pre-commit run --all-files` passes
+- [ ] CI should pass
+- [ ] Backwards compatible (or breaking changes documented above)
 
 ## Reviewer Notes
 
