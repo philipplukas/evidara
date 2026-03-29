@@ -8,15 +8,15 @@ import { searchContext, filters, searchResults } from "@/lib/mock-data";
 
 export default function Home() {
   return (
-    <SearchConstraintsProvider>
-      <WorkspaceProvider
-        initialResults={searchResults}
-        initialQuery="Art. 754 OR Verantwortlichkeit"
-      >
-        <Suspense>
+    <Suspense>
+      <SearchConstraintsProvider>
+        <WorkspaceProvider
+          initialResults={searchResults}
+          initialQuery="Art. 754 OR Verantwortlichkeit"
+        >
           <WorkspaceClient searchContext={searchContext} filters={filters} />
-        </Suspense>
-      </WorkspaceProvider>
-    </SearchConstraintsProvider>
+        </WorkspaceProvider>
+      </SearchConstraintsProvider>
+    </Suspense>
   );
 }
