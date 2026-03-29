@@ -18,7 +18,14 @@ repos:
     hooks:
       - id: markdownlint
         args: ["--config", ".markdownlint.json"]
-        files: ^(README\.md|docs/.*\.md|CONTRIBUTING\.md|SECURITY\.md|\.github/pull_request_template\.md)$
+        files: ^(README\.md|AGENTS\.md|docs/.*\.md|CONTRIBUTING\.md|SECURITY\.md|\.github/pull_request_template\.md)$
+
+  - repo: https://github.com/lycheeverse/lychee
+    rev: lychee-v0.18.0
+    hooks:
+      - id: lychee
+        args: ["--no-progress", "--exclude-file", ".lycheeignore"]
+        types: [markdown]
 
   - repo: local
     hooks:
