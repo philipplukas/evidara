@@ -11,10 +11,12 @@ on:
   pull_request:
     paths:
       - 'legal-search/**'
+      - 'contracts/api/legal-search.openapi.yaml'
   push:
     branches: [main]
     paths:
       - 'legal-search/**'
+      - 'contracts/api/legal-search.openapi.yaml'
 
 jobs:
   check:
@@ -46,3 +48,15 @@ jobs:
       # Not in `check` because it's slower and not needed pre-commit.
       - name: Build
         run: npm run build
+
+      # Contract lint — validates the OpenAPI spec.
+      # Runs separately from `check` because it touches a file outside
+      # the legal-search/ directory (contracts/api/).
+      - name: Contract lint
+        run: npm run openapi:lint
+
+      # Drift check — re-generates the typed client from the spec and
+      # fails if the committed output differs. Catches "spec changed but
+      # client not regenerated" before it reaches main.
+      - name: Contract drift check
+        run: npm run openapi:check

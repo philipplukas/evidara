@@ -11,7 +11,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "openapi:lint": "redocly lint ../contracts/api/legal-search.openapi.yaml",
+    "openapi:generate": "orval --config orval.config.ts",
+    "openapi:check": "npm run openapi:generate && git diff --exit-code src/lib/api/generated/"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.95.2",
@@ -31,6 +34,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.9",
+    "@redocly/cli": "^1.25.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -39,6 +43,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
     "jsdom": "^29.0.1",
+    "orval": "^7.3.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.2"
