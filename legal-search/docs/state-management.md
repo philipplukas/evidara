@@ -11,22 +11,22 @@ The application separates state into **five distinct concerns**, each with its o
 | Concept | Owner | Mechanism | What It Holds |
 |---------|-------|-----------|---------------|
 | **Search Constraints** | `SearchConstraintsProvider` | `nuqs` URL query state + context façade | Jurisdictions, languages, source type, refinement filters |
-| **Workspace Navigation** | `WorkspaceProvider` | `nuqs` URL query state + context façade | Result sets, pivot stack, trail, pins |
-| **Selection** | URL `?item=` | `useSearchParams` | Which item is focused (shareable, deep-linkable) |
-| **Detail Tab** | URL `?tab=` | `useSearchParams` | Active detail panel tab |
+| **Workspace Navigation** | `WorkspaceProvider` | `useReducer` (local) + context façade | Result sets, pivot stack, trail, pins |
+| **Selection** | URL `?item=` | `useSearchParams` + router updates | Which item is focused (shareable, deep-linkable) |
+| **Detail Tab** | URL `?tab=` | `useSearchParams` + router updates | Active detail panel tab |
 | **Server Data** | React Query | `useQuery` via `useDetail()` | Detail view models (cached, deduped) |
 
 ### Provider Hierarchy
 
 ```
 <Providers>                          ← Query client + NuqsAdapter
-  <SearchConstraintsProvider>        ← URL-synced search constraints
-    <WorkspaceProvider>              ← manages result sets + navigation
-      <Suspense>
+  <Suspense>
+    <SearchConstraintsProvider>      ← URL-synced search constraints (nuqs)
+      <WorkspaceProvider>            ← manages result sets + navigation (local)
         <WorkspaceClient />          ← orchestrates URL + providers + layout
-      </Suspense>
-    </WorkspaceProvider>
-  </SearchConstraintsProvider>
+      </WorkspaceProvider>
+    </SearchConstraintsProvider>
+  </Suspense>
 </Providers>
 ```
 
@@ -95,7 +95,7 @@ type ResultSetSource =
   | { type: "pivot"; label: string; parentSource: ResultSetSource };
 ```
 
-### Actions (URL-backed)
+### Actions (local)
 
 | Action | Trigger | Effect |
 |--------|---------|--------|
