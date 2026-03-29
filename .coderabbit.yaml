@@ -7,6 +7,10 @@ reviews:
   profile: assertive
   # High-level summary on every PR
   request_changes_workflow: true
+  # Ignore generated files and lockfiles
+  path_filters:
+    - "!legal-search/package-lock.json"
+    - "!legal-search/src/lib/api/generated/**"
   # Review instructions — points CodeRabbit to our AI review guidance
   path_instructions:
     - path: "**/*"
@@ -42,8 +46,3 @@ reviews:
 
 chat:
   auto_reply: true
-
-# Ignore generated files and lockfiles
-path_filters:
-  - "!legal-search/package-lock.json"
-  - "!legal-search/src/lib/api/generated/**"
