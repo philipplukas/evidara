@@ -63,6 +63,10 @@
 
   /* ─── Focus ─── */
   --color-focus-ring: var(--focus-ring);
+
+  /* ─── Typography ─── */
+  --font-size-micro: 0.6875rem;  /* 11px */
+  --font-size-tiny: 0.625rem;    /* 10px */
 }
 
 :root {
@@ -165,5 +169,5 @@
 
 /* ─── Document font utility ─── */
 .font-document {
-  font-family: var(--font-serif), 'Georgia', serif;
+  font-family: var(--font-serif), "Georgia", serif;
 }

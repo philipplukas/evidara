@@ -1,17 +1,7 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useReducer,
-  type ReactNode,
-  type Dispatch,
-} from "react";
-import type {
-  ContextConstraints,
-  SearchRefinement,
-  SearchConstraintsState,
-} from "./types";
+import { createContext, type Dispatch, type ReactNode, useContext, useReducer } from "react";
+import type { ContextConstraints, SearchConstraintsState, SearchRefinement } from "./types";
 
 // ─── Actions ───
 
@@ -47,7 +37,7 @@ function createInitialState(): SearchConstraintsState {
 
 function searchConstraintsReducer(
   state: SearchConstraintsState,
-  action: SearchConstraintsAction
+  action: SearchConstraintsAction,
 ): SearchConstraintsState {
   switch (action.type) {
     case "TOGGLE_JURISDICTION": {
@@ -85,9 +75,7 @@ function searchConstraintsReducer(
       };
 
     case "SET_REFINEMENT": {
-      const existing = state.refinements.filter(
-        (r) => r.field !== action.field
-      );
+      const existing = state.refinements.filter((r) => r.field !== action.field);
       return {
         ...state,
         refinements: [...existing, action.refinement],
@@ -97,9 +85,7 @@ function searchConstraintsReducer(
     case "CLEAR_REFINEMENT":
       return {
         ...state,
-        refinements: state.refinements.filter(
-          (r) => r.field !== action.field
-        ),
+        refinements: state.refinements.filter((r) => r.field !== action.field),
       };
 
     case "CLEAR_ALL_REFINEMENTS":
@@ -123,15 +109,11 @@ interface SearchConstraintsContextValue {
   dispatch: Dispatch<SearchConstraintsAction>;
 }
 
-const SearchConstraintsContext =
-  createContext<SearchConstraintsContextValue | null>(null);
+const SearchConstraintsContext = createContext<SearchConstraintsContextValue | null>(null);
 
 export function useSearchConstraints(): SearchConstraintsContextValue {
   const ctx = useContext(SearchConstraintsContext);
-  if (!ctx)
-    throw new Error(
-      "useSearchConstraints must be used within a SearchConstraintsProvider"
-    );
+  if (!ctx) throw new Error("useSearchConstraints must be used within a SearchConstraintsProvider");
   return ctx;
 }
 
@@ -141,14 +123,8 @@ interface SearchConstraintsProviderProps {
   children: ReactNode;
 }
 
-export function SearchConstraintsProvider({
-  children,
-}: SearchConstraintsProviderProps) {
-  const [state, dispatch] = useReducer(
-    searchConstraintsReducer,
-    undefined,
-    createInitialState
-  );
+export function SearchConstraintsProvider({ children }: SearchConstraintsProviderProps) {
+  const [state, dispatch] = useReducer(searchConstraintsReducer, undefined, createInitialState);
 
   return (
     <SearchConstraintsContext.Provider value={{ state, dispatch }}>

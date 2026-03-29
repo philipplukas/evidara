@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/events/document-processed",
+  "title": "DocumentProcessed",
+  "description": "Event emitted by document-intelligence when a raw artifact has been processed into a canonical document.",
+  "type": "object",
+  "required": [
+    "event_type",
+    "event_id",
+    "timestamp",
+    "payload"
+  ],
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "const": "document.processed",
+      "description": "Event type identifier."
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Unique identifier for this event instance."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the event was emitted."
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "document_id",
+        "source_id",
+        "source_version_id",
+        "run_id",
+        "artifact_id",
+        "version",
+        "canonical_path"
+      ],
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "description": "ID of the canonical document that was produced.",
+          "pattern": "^doc_[a-z0-9]+$"
+        },
+        "source_id": {
+          "type": "string",
+          "description": "ID of the source for lineage traceability.",
+          "pattern": "^src_[a-z0-9]+$"
+        },
+        "source_version_id": {
+          "type": "string",
+          "description": "ID of the source version.",
+          "pattern": "^sv_[a-z0-9]+$"
+        },
+        "run_id": {
+          "type": "string",
+          "description": "ID of the run for lineage traceability.",
+          "pattern": "^run_[a-z0-9]+$"
+        },
+        "artifact_id": {
+          "type": "string",
+          "description": "ID of the raw artifact that was processed.",
+          "pattern": "^art_[a-z0-9]+$"
+        },
+        "version": {
+          "type": "string",
+          "description": "Processing pipeline version or schema version."
+        },
+        "canonical_path": {
+          "type": "string",
+          "description": "Delta table path or location of the canonical document record."
+        },
+        "sections_produced": {
+          "type": "integer",
+          "description": "Number of sections produced, if any.",
+          "minimum": 0
+        },
+        "citations_produced": {
+          "type": "integer",
+          "description": "Number of citations extracted, if any.",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

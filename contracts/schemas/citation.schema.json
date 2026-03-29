@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/citation",
+  "title": "Citation",
+  "description": "A citation extracted from a document or section. Represents a reference from one legal entity to another.",
+  "type": "object",
+  "required": [
+    "citation_id",
+    "source_document_id",
+    "citation_text"
+  ],
+  "properties": {
+    "citation_id": {
+      "type": "string",
+      "description": "Unique identifier for the citation. Format: cit_{ulid}",
+      "pattern": "^cit_[a-z0-9]+$"
+    },
+    "source_document_id": {
+      "type": "string",
+      "description": "ID of the document containing the citation.",
+      "pattern": "^doc_[a-z0-9]+$"
+    },
+    "source_section_id": {
+      "type": ["string", "null"],
+      "description": "ID of the section containing the citation, if applicable.",
+      "pattern": "^sec_[a-z0-9]+$"
+    },
+    "target_document_id": {
+      "description": "ID of the referenced document, if resolved.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^doc_[a-z0-9]+$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "citation_text": {
+      "type": "string",
+      "description": "The raw citation text as it appears in the source."
+    },
+    "normalized_reference": {
+      "type": "string",
+      "description": "Normalized form of the citation reference."
+    },
+    "citation_type": {
+      "type": "string",
+      "description": "Type of citation (e.g., statute_reference, case_reference, regulation_reference)."
+    },
+    "resolved": {
+      "type": "boolean",
+      "description": "Whether the citation has been resolved to a target document.",
+      "default": false
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional citation metadata.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

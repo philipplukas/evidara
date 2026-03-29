@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/evidence-ref",
+  "title": "EvidenceRef",
+  "description": "A reference to a specific piece of evidence within the Evidara system. Used to link assertions, claims, or decisions back to their supporting source material.",
+  "type": "object",
+  "required": [
+    "document_id",
+    "ref_type"
+  ],
+  "properties": {
+    "document_id": {
+      "type": "string",
+      "description": "ID of the document that contains the evidence.",
+      "pattern": "^doc_[a-z0-9]+$"
+    },
+    "section_id": {
+      "type": ["string", "null"],
+      "description": "ID of the specific section, if the evidence is localized.",
+      "pattern": "^sec_[a-z0-9]+$"
+    },
+    "citation_id": {
+      "type": ["string", "null"],
+      "description": "ID of a specific citation, if the evidence is a citation.",
+      "pattern": "^cit_[a-z0-9]+$"
+    },
+    "ref_type": {
+      "type": "string",
+      "description": "Type of evidence reference.",
+      "enum": ["document", "section", "citation", "passage"]
+    },
+    "passage": {
+      "type": "string",
+      "description": "Specific text passage that constitutes the evidence, if applicable."
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Confidence score for AI-generated evidence references (0.0 to 1.0).",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional reference metadata.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

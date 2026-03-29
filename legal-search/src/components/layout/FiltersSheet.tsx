@@ -1,13 +1,13 @@
 "use client";
 
+import { FilterPanel } from "@/components/filters/FilterPanel";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet";
-import { FilterPanel } from "@/components/filters/FilterPanel";
 import type { FilterViewModel } from "@/lib/types";
 
 interface FiltersSheetProps {
@@ -16,11 +16,7 @@ interface FiltersSheetProps {
   filters: FilterViewModel[];
 }
 
-export function FiltersSheet({
-  open,
-  onOpenChange,
-  filters,
-}: FiltersSheetProps) {
+export function FiltersSheet({ open, onOpenChange, filters }: FiltersSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-[320px] sm:w-[360px] p-0">

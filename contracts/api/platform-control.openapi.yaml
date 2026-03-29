@@ -1,0 +1,263 @@
+openapi: 3.1.0
+info:
+  title: Platform Control API
+  description: |
+    API for managing sources, source versions, runs, approvals, and reference data
+    in the Evidara platform control plane.
+  version: 0.1.0
+  contact:
+    name: Evidara Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://platform-control.evidara.dev
+    description: Production
+
+security:
+  - bearerAuth: []
+
+paths:
+  /v1/sources:
+    get:
+      operationId: listSources
+      summary: List all sources
+      tags: [sources]
+      responses:
+        "200":
+          description: List of sources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Source"
+    post:
+      operationId: createSource
+      summary: Create a new source
+      tags: [sources]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSourceRequest"
+      responses:
+        "201":
+          description: Source created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Source"
+
+  /v1/sources/{source_id}:
+    get:
+      operationId: getSource
+      summary: Get a source by ID
+      tags: [sources]
+      parameters:
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Source details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Source"
+        "404":
+          description: Source not found
+
+  /v1/sources/{source_id}/versions:
+    get:
+      operationId: listSourceVersions
+      summary: List versions of a source
+      tags: [source-versions]
+      parameters:
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of source versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SourceVersion"
+    post:
+      operationId: createSourceVersion
+      summary: Create a new source version
+      tags: [source-versions]
+      parameters:
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSourceVersionRequest"
+      responses:
+        "201":
+          description: Source version created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceVersion"
+
+  /v1/runs:
+    post:
+      operationId: createRun
+      summary: Trigger a new run
+      tags: [runs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRunRequest"
+      responses:
+        "201":
+          description: Run created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+
+  /v1/runs/{run_id}:
+    get:
+      operationId: getRun
+      summary: Get run status
+      tags: [runs]
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "404":
+          description: Run not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from the identity provider.
+
+  schemas:
+    Source:
+      type: object
+      properties:
+        source_id:
+          type: string
+          example: src_01hzxk7v3qmjy4t5n2p8r6w9
+        name:
+          type: string
+        description:
+          type: string
+        jurisdiction:
+          type: string
+        authority:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, archived]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateSourceRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        jurisdiction:
+          type: string
+        authority:
+          type: string
+
+    SourceVersion:
+      type: object
+      properties:
+        source_version_id:
+          type: string
+          example: sv_01hzxk8a2bmne6g4r7j3k9l5
+        source_id:
+          type: string
+        version_label:
+          type: string
+        status:
+          type: string
+          enum: [draft, pending_approval, approved, rejected, superseded]
+        created_at:
+          type: string
+          format: date-time
+
+    CreateSourceVersionRequest:
+      type: object
+      required: [version_label]
+      properties:
+        version_label:
+          type: string
+
+    Run:
+      type: object
+      properties:
+        run_id:
+          type: string
+          example: run_01hzxk9c4dnpf8h6t2m5q7w3
+        source_id:
+          type: string
+        source_version_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        artifacts_count:
+          type: integer
+
+    CreateRunRequest:
+      type: object
+      required: [source_id, source_version_id]
+      properties:
+        source_id:
+          type: string
+        source_version_id:
+          type: string

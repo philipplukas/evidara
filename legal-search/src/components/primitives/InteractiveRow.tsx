@@ -14,11 +14,7 @@ interface InteractiveRowProps {
  *   flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/50
  *   cursor-pointer transition-colors
  */
-export function InteractiveRow({
-  children,
-  onClick,
-  className = "",
-}: InteractiveRowProps) {
+export function InteractiveRow({ children, onClick, className = "" }: InteractiveRowProps) {
   return (
     <div
       onClick={onClick}

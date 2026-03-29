@@ -1,0 +1,53 @@
+name: Architecture Decision
+description: Propose or record an architecture decision
+title: "[ADR]: "
+labels: ["architecture"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to propose or discuss an architecture decision. If approved, it should be recorded as an ADR in `docs/adr/`.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What is the situation that requires a decision?
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Proposed Decision
+      description: What do you propose?
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: Why is this the right approach?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches were considered and why were they rejected?
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: What are the implications of this decision?
+  - type: dropdown
+    id: components
+    attributes:
+      label: Affected Components
+      description: Which components are affected?
+      multiple: true
+      options:
+        - platform-control
+        - document-intelligence
+        - legal-search
+        - contracts
+        - infra
+        - docs
