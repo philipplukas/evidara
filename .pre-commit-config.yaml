@@ -1,0 +1,19 @@
+repos:
+  - repo: local
+    hooks:
+      - id: legal-search-lint
+        name: legal-search lint
+        entry: bash -lc 'cd legal-search && npm run lint'
+        language: system
+        pass_filenames: false
+      - id: legal-search-typecheck
+        name: legal-search typecheck
+        entry: bash -lc 'cd legal-search && npm run typecheck'
+        language: system
+        pass_filenames: false
+      - id: legal-search-openapi-lint
+        name: legal-search openapi lint
+        entry: bash -lc 'cd legal-search && npm run openapi:lint'
+        language: system
+        files: ^legal-search/contracts/openapi\.yaml$
+        pass_filenames: false

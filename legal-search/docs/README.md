@@ -9,6 +9,8 @@
 | [Design System](./design-system.md) | Colors, typography, spacing, interactive patterns, icon system |
 | [Data Contracts](./data-contracts.md) | View model types, domain→view model mapping, API endpoints, mock→BFF migration |
 | [State Management](./state-management.md) | Reducer architecture, state machine, context API, URL-driven migration plan |
+| [Backend/BFF + OpenAPI](./backend-bff-openapi.md) | Naming, BFF boundary, OpenAPI contract workflow, TanStack integration |
+| [Testing Strategy](./testing.md) | Small-team test pyramid, coverage policy, CI/pre-commit alignment |
 
 ## Will Evolve Naturally
 

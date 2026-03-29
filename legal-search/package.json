@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "openapi:generate": "npx orval --config orval.config.js",
+    "openapi:lint": "npx @redocly/cli lint contracts/openapi.yaml",
+    "check": "npm run lint && npm run typecheck && npm run openapi:lint"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.95.2",

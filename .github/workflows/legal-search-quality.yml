@@ -1,0 +1,42 @@
+name: legal-search-quality
+
+on:
+  pull_request:
+    paths:
+      - 'legal-search/**'
+      - '.github/workflows/legal-search-quality.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'legal-search/**'
+      - '.github/workflows/legal-search-quality.yml'
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legal-search
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: legal-search/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Contract lint
+        run: npm run openapi:lint

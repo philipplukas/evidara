@@ -1,0 +1,168 @@
+openapi: 3.0.3
+info:
+  title: Legal Search BFF API
+  version: 0.1.0
+  description: Contract between Next.js web app and NestJS BFF.
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.legal-search.internal
+security:
+  - bearerAuth: []
+paths:
+  /v1/search:
+    post:
+      operationId: postV1Search
+      summary: Search legal documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchResultViewModel'
+        '400':
+          description: Invalid request
+  /bff/articles/{id}:
+    get:
+      operationId: getBffArticlesId
+      summary: Get article detail view model
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detail response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailViewModel'
+        '404':
+          description: Not found
+  /bff/documents/{id}/summary:
+    get:
+      operationId: getBffDocumentsIdSummary
+      summary: Get summary for result card badges and counts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Summary response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSummary'
+        '404':
+          description: Not found
+  /bff/documents/{id}/related:
+    get:
+      operationId: getBffDocumentsIdRelated
+      summary: Get citations and related documents
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Related response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatedResponse'
+        '404':
+          description: Not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    SearchRequest:
+      type: object
+      properties:
+        query:
+          type: string
+        cursor:
+          type: string
+          nullable: true
+      required:
+        - query
+    SearchResultViewModel:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        snippet:
+          type: string
+      required:
+        - id
+        - type
+        - title
+        - subtitle
+        - snippet
+    DetailViewModel:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+      required:
+        - id
+        - type
+        - title
+        - subtitle
+    DocumentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        badges:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - badges
+    RelatedResponse:
+      type: object
+      properties:
+        cites:
+          type: array
+          items:
+            type: string
+        cited_by:
+          type: array
+          items:
+            type: string
+      required:
+        - cites
+        - cited_by
