@@ -1,3 +1,5 @@
+import type { DoclingDocument } from "@/lib/docling";
+
 // ─── BFF ViewModel Contracts ───
 // The frontend renders these; the BFF decides what goes in them.
 
@@ -98,7 +100,10 @@ export interface DetailViewModel {
   subtitle: string;
   breadcrumbs: string[];
   metadata: MetadataRow[];
+  /** @deprecated Use `content` (DoclingDocument) instead */
   contentHtml?: string;
+  /** Structured content as DoclingDocument JSON */
+  content?: DoclingDocument;
   contentLanguage?: ContentLanguage;
   tabs: TabViewModel[];
   relatedGroups: RelatedGroup[];

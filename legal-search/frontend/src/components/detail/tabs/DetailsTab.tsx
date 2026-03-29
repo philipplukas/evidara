@@ -1,13 +1,15 @@
 "use client";
 
+import { DoclingRenderer } from "@/components/content/DoclingRenderer";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 
 interface DetailsTabProps {
   detail: DetailViewModel;
+  onRefClick?: (targetId: string) => void;
 }
 
-export function DetailsTab({ detail }: DetailsTabProps) {
+export function DetailsTab({ detail, onRefClick }: DetailsTabProps) {
   return (
     <div className="p-5 space-y-5">
       {/* Metadata */}
@@ -25,12 +27,16 @@ export function DetailsTab({ detail }: DetailsTabProps) {
         </div>
       )}
 
-      {/* Content */}
-      {detail.contentHtml && (
+      {/* Content — prefer DoclingDocument, fallback to raw HTML */}
+      {detail.content ? (
         <div className="space-y-2">
           <SectionLabel>Content</SectionLabel>
-          {/* TODO: sanitize with DOMPurify before production.
-              Safe now because contentHtml comes from our own mock data / BFF. */}
+          <DoclingRenderer doc={detail.content} onRefClick={onRefClick} />
+        </div>
+      ) : detail.contentHtml ? (
+        <div className="space-y-2">
+          <SectionLabel>Content</SectionLabel>
+          {/* @deprecated — will be removed once all data uses DoclingDocument */}
           <div
             className="text-sm leading-relaxed text-foreground/85 prose-sm font-document
               [&_.article-marginal]:text-micro [&_.article-marginal]:font-semibold [&_.article-marginal]:text-muted-foreground
@@ -41,7 +47,7 @@ export function DetailsTab({ detail }: DetailsTabProps) {
             dangerouslySetInnerHTML={{ __html: detail.contentHtml }}
           />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

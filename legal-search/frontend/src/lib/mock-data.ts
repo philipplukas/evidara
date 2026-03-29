@@ -1,3 +1,4 @@
+import type { DoclingDocument } from "@/lib/docling";
 import type {
   DetailViewModel,
   FilterViewModel,
@@ -332,6 +333,56 @@ export const articleDetail: DetailViewModel = {
 <p class="article-marginal">2</p>
 <p>Wer die Erfüllung einer Aufgabe befugterweise einem anderen Organ überträgt, haftet für den von diesem verursachten Schaden, sofern er nicht nachweist, dass er bei der Auswahl, Unterrichtung und Überwachung die nach den Umständen gebotene Sorgfalt angewendet hat.</p>
 </div>`,
+  content: {
+    schema_name: "DoclingDocument",
+    version: "1.0.0",
+    name: "Art. 754 OR",
+    body: {
+      self_ref: "#/body",
+      children: [
+        { $ref: "#/texts/0" },
+        { $ref: "#/texts/1" },
+        { $ref: "#/texts/2" },
+        { $ref: "#/texts/3" },
+      ],
+    },
+    texts: [
+      {
+        self_ref: "#/texts/0",
+        parent: { $ref: "#/body" },
+        label: "section_header" as const,
+        orig: "Achter Abschnitt: Verantwortlichkeit",
+        text: "Achter Abschnitt: Verantwortlichkeit",
+        level: 1,
+      },
+      {
+        self_ref: "#/texts/1",
+        parent: { $ref: "#/body" },
+        label: "paragraph" as const,
+        orig: "Die Mitglieder des Verwaltungsrates und alle mit der Geschäftsführung oder mit der Liquidation befassten Personen sind sowohl der Gesellschaft als den einzelnen Aktionären und Gesellschaftsgläubigern für den Schaden verantwortlich, den sie durch absichtliche oder fahrlässige Verletzung ihrer Pflichten verursachen.",
+        text: "Die Mitglieder des Verwaltungsrates und alle mit der Geschäftsführung oder mit der Liquidation befassten Personen sind sowohl der Gesellschaft als den einzelnen Aktionären und Gesellschaftsgläubigern für den Schaden verantwortlich, den sie durch absichtliche oder fahrlässige Verletzung ihrer Pflichten verursachen.",
+        legalMetadata: { marginal: "1" },
+      },
+      {
+        self_ref: "#/texts/2",
+        parent: { $ref: "#/body" },
+        label: "paragraph" as const,
+        orig: "Wer die Erfüllung einer Aufgabe befugterweise einem anderen Organ überträgt, haftet für den von diesem verursachten Schaden, sofern er nicht nachweist, dass er bei der Auswahl, Unterrichtung und Überwachung die nach den Umständen gebotene Sorgfalt angewendet hat.",
+        text: "Wer die Erfüllung einer Aufgabe befugterweise einem anderen Organ überträgt, haftet für den von diesem verursachten Schaden, sofern er nicht nachweist, dass er bei der Auswahl, Unterrichtung und Überwachung die nach den Umständen gebotene Sorgfalt angewendet hat.",
+        legalMetadata: { marginal: "2" },
+      },
+      {
+        self_ref: "#/texts/3",
+        parent: { $ref: "#/body" },
+        label: "paragraph" as const,
+        orig: "Die Verantwortlichkeit richtet sich im Übrigen nach den Vorschriften des Auftragsrechts über die Sorgfalts- und Treuepflicht.",
+        text: "Die Verantwortlichkeit richtet sich im Übrigen nach den Vorschriften des Auftragsrechts über die Sorgfalts- und Treuepflicht.",
+        legalMetadata: { marginal: "3" },
+      },
+    ] as unknown as DoclingDocument["texts"],
+    tables: [],
+    pictures: [],
+  } satisfies DoclingDocument,
   tabs: [
     { key: "details", label: "Details" },
     { key: "related", label: "Related", count: 154 },
