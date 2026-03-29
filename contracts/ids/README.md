@@ -53,10 +53,10 @@ IDs are designed to be:
 ## Field Naming Best Practices
 
 - Use `*_id` for stable identity fields.
-- Use `*_ref` for typed indirection to a storage object, dataset surface, or manifest.
-- Use `*_at` for timestamps in ISO 8601 UTC.
-- Use `*_version` for major contract versions or pipeline/projection versions.
-- Use `*_status` for lifecycle or workflow state.
+- Prefer `*_ref` for typed indirection to a storage object, dataset surface, or manifest.
+- Record timestamps as `*_at` in ISO 8601 UTC.
+- Reserve `*_version` for major contract versions or pipeline/projection versions.
+- Represent lifecycle or workflow state with `*_status`.
 - Use `snake_case` for field names and `dot.separated` `event_type` names.
 
 ## Uniqueness And Stability

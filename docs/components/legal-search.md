@@ -34,6 +34,7 @@ The `legal-search/` folder contains the migrated frontend application. The BFF, 
 - [ ] Define search projection schema
 - [ ] Define initial OpenSearch mapping and alias strategy
 - [ ] Define projection manifest/history model
+- [ ] Implement `document.withdrawn` ingestion and deindex/tombstone behavior, including replay ordering tests
 - [ ] Define minimal NestJS BFF endpoints
 - [ ] Define reindex workflow
 

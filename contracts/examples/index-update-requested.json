@@ -1,6 +1,6 @@
 {
   "event_type": "index_update.requested",
-  "event_version": 1,
+  "event_version": 2,
   "event_id": "evt_01jq7cftrgv27rjfk1scb4h2ff",
   "occurred_at": "2026-03-29T10:15:00Z",
   "producer": "legal-search",

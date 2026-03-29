@@ -47,7 +47,8 @@
         "processing",
         "canonical_ready",
         "failed",
-        "withdrawn"
+        "withdrawn",
+        "skipped_duplicate"
       ],
       "description": "Processing status for the result."
     },
@@ -152,7 +153,12 @@
           "published_document_ref",
           "published_sections_ref",
           "canonical_ready_at"
-        ]
+        ],
+        "not": {
+          "required": [
+            "failure"
+          ]
+        }
       }
     },
     {
@@ -169,7 +175,69 @@
       "then": {
         "required": [
           "failure"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "published_document_ref"
+              ]
+            },
+            {
+              "required": [
+                "published_sections_ref"
+              ]
+            },
+            {
+              "required": [
+                "canonical_ready_at"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "accepted",
+              "processing",
+              "withdrawn",
+              "skipped_duplicate"
+            ]
+          }
+        },
+        "required": [
+          "status"
         ]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "published_document_ref"
+              ]
+            },
+            {
+              "required": [
+                "published_sections_ref"
+              ]
+            },
+            {
+              "required": [
+                "canonical_ready_at"
+              ]
+            },
+            {
+              "required": [
+                "failure"
+              ]
+            }
+          ]
+        }
       }
     }
   ],

@@ -58,7 +58,9 @@ Contracts intentionally do not try to replace every platform capability. We stil
 - [x] Define core event schemas
 - [x] Define minimal platform-control OpenAPI spec
 - [x] Define minimal legal-search OpenAPI spec
-- [ ] Add automated schema/example validation in CI
+- [x] Add automated schema/example validation in CI
+
+The repo's `Docs and Contracts Checks` workflow now acts as the narrow contract-validation gate by validating OpenAPI specs plus JSON schemas and their example payloads.
 
 ## Minimal v1 Outcome
 

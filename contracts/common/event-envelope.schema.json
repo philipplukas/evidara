@@ -51,6 +51,7 @@
       "description": "Optional event or command ID that directly caused this event."
     },
     "payload": {
+      "type": "object",
       "description": "Event-specific payload."
     }
   },

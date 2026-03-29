@@ -32,21 +32,18 @@ Each boundary has a different purpose:
 
 When `platform-control` has durably stored one upstream snapshot and its sibling artifacts, it emits `artifact_bundle.available`.
 
-The event carries:
+The boundary contract is intentionally split:
 
-- stable lineage via `provenance`
-- `bundle_manifest_id`
-- `source_snapshot_id`
-- source-origin and trust facts
-- a typed `bundle_manifest_ref`
+- the event is the progression signal
+- the bundle manifest is the immutable handoff object
+- reference snapshot exports are the governed reference-data input
 
-The referenced `ArtifactBundleManifest` carries the frozen processing inputs:
+For canonical field-level truth, use the contract files directly:
 
-- `source_defaults`
-- `parser_hints`
-- optional `di_overrides`
-- `reference_context`
-- artifact inventory and storage refs
+- `contracts/events/artifact-bundle-available.schema.json`
+- `contracts/schemas/artifact-bundle-manifest.schema.json`
+- `contracts/common/provenance.schema.json`
+- `contracts/common/manifest-ref.schema.json`
 
 ### Boundary principles
 
@@ -89,16 +86,19 @@ The referenced `ArtifactBundleManifest` carries the frozen processing inputs:
 
 `document.processed` is emitted once one logical document revision becomes canonical-ready.
 
-The event carries:
+At this boundary:
 
-- stable `document_id`
-- monotonic `document_revision`
-- immutable `processing_manifest_id`
-- `provenance`
-- lifecycle state
-- exact immutable refs to `published_documents`, `published_sections`, and the `ProcessingManifest`
+- the event is the publication signal
+- the processing manifest is the immutable record of one DI result
+- the published dataset refs identify the exact downstream-consumable canonical rows
 
-The event does **not** embed the full document body and does **not** expose arbitrary internal Delta table names or paths.
+The event does **not** embed the full document body and does **not** expose arbitrary internal Delta table names or paths. For canonical field-level truth, use:
+
+- `contracts/events/document-processed.schema.json`
+- `contracts/events/document-withdrawn.schema.json`
+- `contracts/schemas/processing-manifest.schema.json`
+- `contracts/common/dataset-ref.schema.json`
+- `contracts/common/manifest-ref.schema.json`
 
 ### Published surfaces
 
@@ -123,6 +123,22 @@ The event points at those surfaces through `dataset_ref` and `manifest_ref`, whi
 - Processing supersession flows through `document.processed` with a higher `document_revision`.
 - Legal lifecycle changes such as `superseded` or `repealed` also flow through `document.processed`.
 - True public-search removal flows through `document.withdrawn`.
+
+## Scope Model
+
+`scope_type` defines the visibility boundary for a corpus and every document lineage record inside it.
+
+| `scope_type` | Use it for | Access semantics |
+|--------------|------------|------------------|
+| `global_public` | Shared public legal corpora such as official laws and regulations | Visible to all authorized product users for public content. Uses the reserved tenant such as `tenant_public`. |
+| `tenant_private` | One client's internal or licensed corpus | Visible only inside that tenant boundary. Identity resolution and search routing must stay inside the tenant corpus. |
+| `tenant_shared` | Controlled multi-tenant shared corpora such as curated partner libraries | Shared only across an explicitly governed set of tenants or operators; never treat as globally public by default. |
+
+Enforcement implications:
+
+- tenant and corpus filters are mandatory on every control-plane and search-facing boundary
+- canonical identity resolution happens within a corpus boundary by default
+- shared/private scope decisions must flow into indexing and access-control rules, not just source metadata
 
 ## Standards Vs Domain Contracts
 

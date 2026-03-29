@@ -43,5 +43,27 @@
       "description": "Optional object creation timestamp."
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "checksum_algorithm": {
+            "const": "sha256"
+          }
+        },
+        "required": [
+          "checksum_algorithm"
+        ]
+      },
+      "then": {
+        "properties": {
+          "checksum": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }

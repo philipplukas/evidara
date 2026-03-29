@@ -12,17 +12,17 @@
     "document_id": {
       "type": "string",
       "description": "ID of the document that contains the evidence.",
-      "pattern": "^doc_[a-z0-9]+$"
+      "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
     },
     "section_id": {
       "type": ["string", "null"],
       "description": "ID of the specific section, if the evidence is localized.",
-      "pattern": "^sec_[a-z0-9]+$"
+      "pattern": "^sec_[0-9a-hjkmnp-tv-z]{26}$"
     },
     "citation_id": {
       "type": ["string", "null"],
       "description": "ID of a specific citation, if the evidence is a citation.",
-      "pattern": "^cit_[a-z0-9]+$"
+      "pattern": "^cit_[0-9a-hjkmnp-tv-z]{26}$"
     },
     "ref_type": {
       "type": "string",

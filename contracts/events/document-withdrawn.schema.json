@@ -62,7 +62,8 @@
               "enum": [
                 "remove",
                 "hide"
-              ]
+              ],
+              "description": "`remove` deletes the document from search indexes and search-facing caches. `hide` keeps the record available for audit/history but filters it out of normal user-facing retrieval."
             }
           },
           "additionalProperties": false

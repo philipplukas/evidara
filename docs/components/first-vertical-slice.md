@@ -15,9 +15,10 @@ The smallest end-to-end flow that proves the architecture works: a single source
 6. Emit artifact_bundle.available  → Pub/Sub
 7. Process bundle                  → document-intelligence
 8. Publish documents, sections, processing manifest → DI published surfaces
-9. Emit document.processed         → Pub/Sub
-10. Index into OpenSearch          → legal-search
-11. Search and view document       → legal-search UI/API
+9. Emit document.processing_status.updated → Pub/Sub
+10. Emit document.processed        → Pub/Sub
+11. Index into OpenSearch          → legal-search
+12. Search and view document       → legal-search UI/API
 ```
 
 ## What Must Exist
@@ -70,6 +71,7 @@ The smallest end-to-end flow that proves the architecture works: a single source
 1. An approved source version can be run.
 2. A bundle manifest is written with at least one primary artifact.
 3. `artifact_bundle.available` is emitted and consumed.
-4. DI publishes one canonical document revision and sections.
-5. `document.processed` is emitted with exact published refs.
-6. `legal-search` indexes the document through an alias-backed index and returns it in search.
+4. DI emits `document.processing_status.updated` and platform-control can observe it.
+5. DI publishes one canonical document revision and sections.
+6. `document.processed` is emitted with exact published refs.
+7. `legal-search` indexes the document through an alias-backed index and returns it in search.

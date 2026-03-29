@@ -25,7 +25,7 @@ Testing strategy for the document-intelligence component, which owns:
 - `Document` output conforms to JSON Schema
 - `Section` output conforms to JSON Schema
 - `ProcessingManifest` output conforms to JSON Schema
-- `document.processed` and `document.processing_status.updated` conform to event schemas
+- `document.processed`, `document.processing_status.updated`, and `document.withdrawn` conform to event schemas
 
 ### Golden bundle tests
 
@@ -55,5 +55,5 @@ For each golden bundle, assert:
 1. Place a golden bundle in a test storage location
 2. Trigger processing
 3. Verify `Document`, `Section`, and `ProcessingManifest` rows are written
-4. Verify `document.processing_status.updated` and `document.processed` events are emitted
+4. Verify `document.processing_status.updated`, `document.processed`, and `document.withdrawn` behaviors are validated for the relevant lifecycle path
 5. Verify lineage is traceable

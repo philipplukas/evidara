@@ -28,7 +28,7 @@ contracts/
 - JSON payloads use JSON Schema Draft 2020-12.
 - Synchronous APIs use OpenAPI 3.1.
 - Async events use a CloudEvents-aligned envelope shape, even when the business payload remains Evidara-specific.
-- Object payload indirection should use typed refs such as `storage_object_ref`, `dataset_ref`, and `manifest_ref`.
+- Object payload indirection should use typed refs such as `storage_object_ref`, `dataset_ref`, and `manifest_ref` defined in `contracts/common/storage-object-ref.schema.json`, `contracts/common/dataset-ref.schema.json`, and `contracts/common/manifest-ref.schema.json`.
 - Prefer platform-native lineage and lifecycle features where they fit:
   - Databricks / Unity Catalog for table and job lineage inside document-intelligence
   - OpenSearch versioned indices and aliases for search cutovers and rebuilds

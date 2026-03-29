@@ -95,6 +95,7 @@ Key tests:
 - Unit tests for run and approval state transitions
 - Contract tests for `ArtifactBundleManifest`
 - Contract tests for `artifact_bundle.available`
+- Contract tests for consumed `document.processing_status.updated` values, including invalid-status handling
 - Smoke test for one source family lifecycle
 
 ## Drift risks

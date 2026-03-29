@@ -29,6 +29,7 @@ Maintain example payloads for core contracts and validate them against schemas:
 | Contract | Example Payload | Schema |
 |----------|----------------|--------|
 | `ArtifactBundleManifest` | `contracts/examples/artifact-bundle-manifest.json` | `contracts/schemas/artifact-bundle-manifest.schema.json` |
+| `ProcessingManifest` | `contracts/examples/processing-manifest.json` | `contracts/schemas/processing-manifest.schema.json` |
 | `Document` | `contracts/examples/document.json` | `contracts/schemas/document.schema.json` |
 | `Section` | `contracts/examples/section.json` | `contracts/schemas/section.schema.json` |
 | `Citation` | `contracts/examples/citation.json` | `contracts/schemas/citation.schema.json` |
@@ -44,10 +45,18 @@ Each example must:
 - include all required fields
 - use realistic values
 
-### OpenAPI lint and validation
+### OpenAPI validation
 
-- Run an OpenAPI linter on all OpenAPI specs
+- Run OpenAPI validation on all OpenAPI specs
 - Check for common issues like missing descriptions and undocumented error responses
+
+### CI enforcement
+
+The `.github/workflows/docs-and-contracts.yml` workflow is the contract-validation gate. It must fail if:
+
+- a schema is syntactically invalid
+- an example payload no longer matches its schema
+- an OpenAPI spec fails validation
 
 ## Change Management Guidance
 

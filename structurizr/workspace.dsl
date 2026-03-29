@@ -77,7 +77,9 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         # --- Internal component relationships ---
         frontend -> bff "API calls" "HTTPS / OpenAPI"
         bff -> openSearch "Search queries"
-        bff -> searchProjection "Builds projections"
+        pubSub -> searchProjection "Delivers publication and reindex events"
+        searchProjection -> deltaLake "Reads published canonical surfaces"
+        searchProjection -> openSearch "Writes projections and alias updates"
 
         sourceRegistry -> postgres "CRUD"
         runOrchestrator -> postgres "CRUD"

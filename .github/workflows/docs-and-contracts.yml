@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  validate-docs-and-contracts:
+  contract-validation:
     runs-on: ubuntu-latest
 
     steps:
@@ -42,7 +42,7 @@ jobs:
         run: |
           python scripts/validate_openapi.py
 
-      - name: Validate JSON Schemas
+      - name: Validate JSON Schemas and examples
         run: |
           python scripts/validate_json_schemas.py
 

@@ -76,6 +76,46 @@
               ]
             }
           },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "failed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "error_code",
+                  "error_summary"
+                ],
+                "properties": {
+                  "error_code": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "error_summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "error_code": {
+                    "type": "null"
+                  },
+                  "error_summary": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ],
           "additionalProperties": false
         }
       }

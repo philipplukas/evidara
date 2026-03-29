@@ -222,6 +222,13 @@
             "required": [
               "reference_snapshot_set_ref"
             ]
+          },
+          "else": {
+            "properties": {
+              "reference_snapshot_set_ref": {
+                "type": "null"
+              }
+            }
           }
         }
       ],

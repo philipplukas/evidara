@@ -2,11 +2,13 @@
 
 ## Overview
 
-Evidara uses three cloud/platform providers:
+This page describes the target-state infrastructure plan for Evidara. The repo is still pre-runtime, so these entries should be read as intended deployment architecture unless a component explicitly says otherwise.
 
-- **Google Cloud Platform (GCP)** — primary cloud provider
-- **Databricks** — document-intelligence processing and published canonical surfaces
-- **GitHub** — source control and CI/CD
+Evidara targets three cloud/platform providers:
+
+- **Google Cloud Platform (GCP)** — target primary cloud provider for runtime services
+- **Databricks** — target document-intelligence processing and published canonical surfaces
+- **GitHub** — current source control and CI/CD system
 
 ## GCP Services
 
