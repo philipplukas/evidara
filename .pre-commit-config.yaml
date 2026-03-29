@@ -27,6 +27,13 @@ repos:
         args: ["--no-progress", "--exclude-file", ".lycheeignore"]
         types: [markdown]
 
+  - repo: https://github.com/errata-ai/vale
+    rev: v3.9.5
+    hooks:
+      - id: vale
+        args: ["--no-exit"]
+        types: [markdown]
+
   - repo: local
     hooks:
       - id: validate-openapi-contracts
