@@ -184,6 +184,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
             <select
               value={selected[0] || ""}
               onChange={(e) => setSelected([e.target.value])}
+              aria-label={filter.label}
               className="w-full h-8 px-2 text-xs rounded border border-border bg-surface-panel
                 focus:outline-none focus:ring-1 focus:ring-focus-ring"
             >

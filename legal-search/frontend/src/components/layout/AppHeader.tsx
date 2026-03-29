@@ -99,6 +99,7 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
         <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-border">
           <button
             type="button"
+            aria-label="User menu"
             className="w-8 h-8 rounded-full bg-interactive-accent-muted flex items-center justify-center
             hover:bg-brand/20 transition-colors"
           >
