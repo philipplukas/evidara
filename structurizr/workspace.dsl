@@ -21,7 +21,7 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         evidara = softwareSystem "Evidara" "Document intelligence platform" {
 
             # --- platform-control ---
-            platformControl = container "platform-control" "Source lifecycle, runs, approvals, reference data" "Cloud Run / NestJS" {
+            platformControl = container "platform-control" "Source lifecycle, runs, approvals, reference data" "Cloud Run / FastAPI" {
                 sourceRegistry = component "Source Registry" "Manages seed sources and source versions"
                 runOrchestrator = component "Run Orchestrator" "Creates and tracks processing runs"
                 approvalWorkflow = component "Approval Workflow" "Manages approval state for source versions"
@@ -39,7 +39,7 @@ workspace "Evidara" "Document intelligence platform for legal research" {
             # --- legal-search ---
             legalSearch = container "legal-search" "Search and document detail experience" "Cloud Run" {
                 frontend = component "Frontend" "Search UI, document detail, workspace" "Next.js"
-                bff = component "BFF" "Backend-for-frontend, shapes data for UI" "NestJS"
+                api = component "API" "Search and document endpoints, OpenSearch adapter" "NestJS"
                 searchProjection = component "Search Projection" "Builds search-ready projections from canonical"
             }
 
@@ -71,9 +71,9 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         legalSearch -> deltaLake "Reads canonical data (projection building)"
 
         # --- Internal component relationships ---
-        frontend -> bff "API calls" "HTTPS / OpenAPI"
-        bff -> openSearch "Search queries"
-        bff -> searchProjection "Builds projections"
+        frontend -> api "API calls" "HTTPS / OpenAPI"
+        api -> openSearch "Search queries"
+        api -> searchProjection "Builds projections"
 
         sourceRegistry -> postgres "CRUD"
         runOrchestrator -> postgres "CRUD"

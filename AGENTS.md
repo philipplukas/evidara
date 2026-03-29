@@ -83,6 +83,13 @@ All shared contracts live at `contracts/` (monorepo root). Never inside a compon
 
 ### legal-search stack
 
+`legal-search/` is an npm workspace with two packages:
+
+- `frontend/` — Next.js application (user-facing search and document detail)
+- `api/` — NestJS application (search and document endpoints, OpenSearch adapter)
+
+**frontend:**
+
 - **Design tokens** live in `globals.css` as CSS custom properties. Use `var(--token)` everywhere, never hardcoded colors.
 - **Biome** for linting and formatting (not ESLint). Config in `legal-search/biome.json`.
 - **Vitest** for tests. Config in `legal-search/vitest.config.ts`.
@@ -90,7 +97,36 @@ All shared contracts live at `contracts/` (monorepo root). Never inside a compon
 - **`npm run check`** is the pre-commit quality gate (typecheck + lint + test).
 - **`npm run openapi:check`** is the CI drift gate (generate + git diff).
 
-### Pre-commit / CI alignment
+**api:**
+
+- **NestJS** with TypeScript. See ADR-0008 for full conventions.
+- **Repository interface pattern** — OpenSearch logic only in adapters, never in controllers or services.
+- **Spec-first** — `contracts/api/legal-search.openapi.yaml` is canonical. Swagger decorators are additive for dev UI only.
+- **Global pipes/filters** — ValidationPipe (whitelist, transform), AllExceptionsFilter, CorrelationIdMiddleware.
+- Test layers: unit (fast, mocked), integration (Testcontainers OpenSearch), smoke (HTTP-level).
+
+### platform-control stack
+
+- **FastAPI** with Python 3.12+. See ADR-0009 for full conventions.
+- **Pydantic v2** for request/response validation.
+- **SQLAlchemy + Alembic** for ORM and migrations.
+- **uv** for dependency management.
+- **Retool** is the ops UI — connects via direct Postgres (reads) and platform-control API (business actions). See ADR-0006.
+- **Action-focused API** — API endpoints handle state transitions and webhooks; Retool reads directly from Postgres.
+- Test layers: unit (state machines, service logic), integration (Testcontainers Postgres), smoke (HTTP-level).
+- **`ruff check` + `ruff format`** for linting and formatting (not flake8/black).
+- **`pytest`** for all tests.
+- **`pyproject.toml`** is the single config file — no `setup.py`, no `requirements.txt`.
+
+### Language split
+
+| Component | Language | Why |
+|-----------|----------|-----|
+| `legal-search/frontend` | TypeScript / Next.js | User-facing UI |
+| `legal-search/api` | TypeScript / NestJS | Search and document API |
+| `platform-control` | Python / FastAPI | Consistent with data infrastructure |
+| `document-intelligence` | Python / Databricks | Data processing pipelines |
+| `infra` | HCL / Terraform | Infrastructure as code |
 
 The pre-commit hooks and CI workflows must run the same checks. If you add a check to one, add it to the other. `scripts/` is the shared entry point.
 

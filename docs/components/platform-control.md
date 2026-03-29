@@ -75,11 +75,13 @@ A user can:
 
 | Concern | Technology |
 |---------|-----------|
+| API framework | FastAPI (Python) |
 | Runtime | Cloud Run (GCP) |
 | Database | Cloud SQL (Postgres) |
+| ORM / migrations | SQLAlchemy + Alembic |
 | Object Storage | GCS (for raw artifacts) |
 | Events | Pub/Sub |
-| Admin UI | Retool (future) |
+| Ops UI | Retool — connects to PostgreSQL (reads) and FastAPI (business actions) |
 
 ## Key Contracts
 

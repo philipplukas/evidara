@@ -16,14 +16,14 @@ The platform needs clear boundaries between its major functional areas to ensure
 
 Define six top-level components:
 
-| Component | Responsibility |
-|-----------|---------------|
-| `platform-control` | Source lifecycle, reference data, runs, approvals, orchestration |
-| `document-intelligence` | Raw-to-canonical processing, Delta truth |
-| `legal-search` | User-facing search, OpenSearch projections, frontend, BFF |
-| `contracts` | Shared schemas, APIs, events, IDs |
-| `infra` | Terraform, deployment, environments |
-| `docs` | Architecture, ADRs, runbooks, component plans |
+| Component | Responsibility | Primary Technology |
+|-----------|---------------|-------------------|
+| `platform-control` | Source lifecycle, reference data, runs, approvals, orchestration | Python / FastAPI |
+| `document-intelligence` | Raw-to-canonical processing, Delta truth | Python / Databricks |
+| `legal-search` | User-facing search, OpenSearch projections, frontend and API | TypeScript / Next.js + NestJS |
+| `contracts` | Shared schemas, APIs, events, IDs | YAML / JSON |
+| `infra` | Terraform, deployment, environments | HCL |
+| `docs` | Architecture, ADRs, runbooks, component plans | Markdown |
 
 ## Rationale
 

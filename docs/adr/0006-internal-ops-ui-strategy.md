@@ -14,9 +14,12 @@ The platform needs internal administrative interfaces for managing sources, appr
 
 ## Decision
 
-- Internal ops/admin UI is handled **separately from legal-search**.
-- **Retool** (or similar low-code/internal tool platform) may be used for internal control workflows.
+- Internal ops/admin UI for v1 is **Retool**.
 - legal-search is exclusively for external/user-facing search experiences.
+- Retool uses a **hybrid connection model**:
+  - **Direct Postgres connection** for read views (list sources, view runs, filter, sort). No API layer needed for these.
+  - **REST API calls to platform-control** for business actions with logic (approve version, trigger run, reject, state transitions).
+- Platform-control APIs must be designed with this in mind: reads can go directly to Postgres via Retool; the API surface is focused on business actions and webhooks.
 
 ## Rationale
 
@@ -27,7 +30,8 @@ The platform needs internal administrative interfaces for managing sources, appr
 
 ## Consequences
 
-- platform-control APIs must be designed to support both programmatic access and Retool/admin UI consumption.
+- platform-control's FastAPI surface is focused on **business actions**, not full CRUD. Retool handles reads via direct Postgres.
+- Retool connects to the platform-control API (not directly to the service's internal code).
 - Internal ops UI is not part of the legal-search deployment.
-- Retool (if used) connects to platform-control APIs, not directly to databases.
-- A future dedicated admin frontend may replace Retool as complexity grows.
+- A future dedicated admin frontend may replace Retool as complexity grows, consuming the same platform-control API.
+- Retool resource configurations (queries, apps) should be treated as configuration artefacts; document any non-trivial Retool logic in `docs/runbooks/`.
