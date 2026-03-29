@@ -1,0 +1,49 @@
+# CodeRabbit Configuration
+# See: https://docs.coderabbit.ai/guides/configuration
+
+language: en
+reviews:
+  # Focus reviews on substance, not style
+  profile: assertive
+  # High-level summary on every PR
+  request_changes_workflow: true
+  # Review instructions — points CodeRabbit to our AI review guidance
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Review this PR against the rules in AGENTS.md (root of repo).
+        Focus on:
+        1. Missing sync: behavior changed but tests/docs/contracts/architecture not updated
+        2. Contract drift: API or schema changed but spec not updated
+        3. Architecture drift: boundary changed but Structurizr DSL not updated
+        4. Manual duplication: docs hand-maintain what should be generated
+        5. Pattern violations: new code conflicts with established repo conventions
+        6. Design token misuse: hardcoded values instead of CSS custom properties in legal-search
+
+        For each concern, state: affected area, why it matters, must-fix vs should-fix, recommendation.
+
+    - path: "contracts/**"
+      instructions: |
+        Contract files are the shared language between components.
+        Check: backwards compatibility, field naming consistency, schema completeness.
+        Flag any breaking change that is not explicitly documented in the PR description.
+
+    - path: "legal-search/**"
+      instructions: |
+        Check: design token usage (CSS custom properties, not hardcoded),
+        Biome config compliance, test coverage for behavior changes,
+        and that generated OpenAPI clients are not manually edited.
+
+    - path: "docs/**"
+      instructions: |
+        Check: accuracy against current code (not future-state),
+        no duplicated contract/schema truth that should reference source files,
+        and that ADR format is followed for architecture decisions.
+
+chat:
+  auto_reply: true
+
+# Ignore generated files and lockfiles
+path_filters:
+  - "!legal-search/package-lock.json"
+  - "!legal-search/src/lib/api/generated/**"
