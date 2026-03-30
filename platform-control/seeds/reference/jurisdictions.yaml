@@ -1,0 +1,5 @@
+version: 1
+items:
+  - jurisdiction_id: jur_ch
+    slug: ch
+    name: Switzerland

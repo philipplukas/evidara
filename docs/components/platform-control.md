@@ -13,6 +13,7 @@ Initial service scaffolding now exists under `platform-control/`:
 - Firecrawl provider and webhook service skeletons
 - Configurable local-or-GCS artifact storage adapter
 - Configurable noop-or-Pub/Sub raw artifact event publisher
+- YAML-backed reference-data seed loader with dry-run support
 - Narrow unit and smoke tests for source, run, and webhook flows
 
 Repository scaffolding, component documentation, ADRs, and minimal contracts also exist:
@@ -59,6 +60,7 @@ The planned v0 implementation for Firecrawl-backed source setup and preview runs
 - [x] Define approval states and transitions
 - [x] Add provider job and captured resource entities
 - [x] Implement Firecrawl provider adapter and webhook handling
+- [x] Add YAML-backed seed data loader for jurisdictions, authorities, and extractor profiles
 - [ ] Implement Retool source setup, preview review, and approval flow
 - [ ] Add AI-assisted draft source setup workflow with human approval gates
 - [ ] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
@@ -108,6 +110,7 @@ A user can:
 | ORM / migrations | SQLAlchemy + Alembic |
 | Object Storage | Local filesystem in dev, GCS in cloud environments |
 | Events | Noop in local dev, Pub/Sub in cloud environments |
+| Reference data seeds | YAML files validated with Pydantic |
 | Ops UI | Retool — connects to PostgreSQL (reads) and FastAPI (business actions) |
 | Acquisition provider | Firecrawl (planned v0) |
 | Operator assistance | Retool Workflows + Agents (planned v0) |
