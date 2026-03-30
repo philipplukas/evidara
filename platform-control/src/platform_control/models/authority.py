@@ -1,0 +1,27 @@
+from __future__ import annotations
+
+from sqlalchemy.orm import Mapped, mapped_column
+
+from platform_control.ids import generate_prefixed_id
+from platform_control.models.base import Base, TimestampMixin
+
+
+class Jurisdiction(TimestampMixin, Base):
+    __tablename__ = "jurisdictions"
+
+    jurisdiction_id: Mapped[str] = mapped_column(
+        primary_key=True, default=lambda: generate_prefixed_id("jur")
+    )
+    name: Mapped[str] = mapped_column(unique=True)
+    slug: Mapped[str] = mapped_column(unique=True)
+
+
+class Authority(TimestampMixin, Base):
+    __tablename__ = "authorities"
+
+    authority_id: Mapped[str] = mapped_column(
+        primary_key=True, default=lambda: generate_prefixed_id("auth")
+    )
+    jurisdiction_id: Mapped[str | None] = mapped_column(nullable=True)
+    name: Mapped[str] = mapped_column(unique=True)
+    slug: Mapped[str] = mapped_column(unique=True)

@@ -84,3 +84,10 @@ repos:
         language: system
         pass_filenames: false
         files: ^legal-search/src/
+
+      - id: platform-control-check
+        name: Platform Control checks (ruff + pytest)
+        entry: bash scripts/check-platform-control.sh
+        language: system
+        pass_filenames: false
+        files: ^platform-control/
