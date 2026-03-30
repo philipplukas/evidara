@@ -21,6 +21,7 @@ class GoldenBundleTests(unittest.TestCase):
             "messy_html",
             "nested_headings",
             "no_heading_fallback",
+            "ris_xml",
         ]
         for fixture_name in fixture_names:
             with self.subTest(fixture=fixture_name):
@@ -92,7 +93,7 @@ def materialize_golden_fixture(fixture_name):
 
 
 def _discover_artifact_source(fixture_root: str) -> str:
-    for candidate in ["document.html", "document.json"]:
+    for candidate in ["document.html", "document.xml", "document.json"]:
         path = os.path.join(fixture_root, candidate)
         if os.path.exists(path):
             return path

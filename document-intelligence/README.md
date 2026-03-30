@@ -6,7 +6,7 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 
 - Tolerant parsing of `artifact_bundle.available` events
 - Bundle-manifest and artifact loading for `file://`, plain filesystem paths, and `gs://`
-- Minimal HTML normalization into a shared IR and section extraction from that IR
+- Minimal HTML and XML normalization into a shared IR and section extraction from that IR
 - Contract-shaped `Document`, `Section`, and `ProcessingManifest` models
 - Contract-shaped `document.processing_status.updated` and `document.processed` event builders
 - In-memory published-surface sink for fast tests
@@ -27,7 +27,7 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 - Terraform apply/deploy integration in CI/CD
 - Citation extraction
 - Canonical jurisdiction assignment
-- XML-specific normalization and parsing
+- RIS-specific XML schema tuning beyond the current heuristic path
 
 ## Local test run
 
