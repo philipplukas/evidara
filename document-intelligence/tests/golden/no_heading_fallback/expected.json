@@ -1,0 +1,6 @@
+{
+  "title": "Fallback Order",
+  "section_count": 1,
+  "key_headings": [],
+  "status_flow": ["accepted", "processing", "canonical_ready"]
+}

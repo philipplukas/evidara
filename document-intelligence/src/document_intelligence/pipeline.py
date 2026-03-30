@@ -1,0 +1,350 @@
+"""HTML-first bundle-based processing pipeline."""
+
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from document_intelligence.canonical.ids import random_prefixed_id, stable_prefixed_id
+from document_intelligence.canonical.models import (
+    Document,
+    ProcessingManifest,
+    ProcessingResult,
+    Section,
+)
+from document_intelligence.contracts.envelope import (
+    ArtifactBundleAvailableEvent,
+    ArtifactBundleManifest,
+    ArtifactBundleManifestArtifact,
+    Provenance,
+)
+from document_intelligence.errors import ProcessingError
+from document_intelligence.events.document_processed import build_document_processed_event
+from document_intelligence.events.status_updated import build_processing_status_event
+from document_intelligence.ingest.loaders import BundleLoader, DispatchingBundleLoader
+from document_intelligence.normalize.html import (
+    normalize_html_document,
+    normalize_plain_text_document,
+)
+from document_intelligence.normalize.ir import NormalizedDocumentIR
+from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
+from document_intelligence.quality.invariants import validate_document_and_sections
+from document_intelligence.sectionize.html import SectionCandidate, build_sections_from_ir
+from document_intelligence.validate.validator import (
+    validate_document,
+    validate_event,
+    validate_processing_manifest,
+    validate_sections,
+)
+
+
+class ProcessingPipeline:
+    """Minimal contract-aligned processing pipeline for the first bundle path."""
+
+    def __init__(
+        self,
+        bundle_loader: Optional[BundleLoader] = None,
+        sink: Optional[CanonicalSink] = None,
+        processing_version: str = "0.1.0-dev",
+    ) -> None:
+        self._bundle_loader = bundle_loader or DispatchingBundleLoader()
+        self._sink = sink or InMemoryCanonicalSink()
+        self._processing_version = processing_version
+
+    def process_event(self, event_data: Dict[str, Any]) -> ProcessingResult:
+        event = ArtifactBundleAvailableEvent.from_dict(event_data)
+        selected_bundle = self._bundle_loader.load_bundle(event.payload.bundle_manifest_ref)
+        primary_artifact = selected_bundle.primary_artifact
+        artifact_text = self._bundle_loader.read_artifact_text(primary_artifact)
+
+        document_id = stable_prefixed_id(
+            "doc",
+            selected_bundle.manifest.provenance.tenant_id,
+            selected_bundle.manifest.provenance.corpus_id,
+            selected_bundle.manifest.provenance.source_id,
+            primary_artifact.artifact_id,
+        )
+        document_revision = 1
+        processing_manifest_id = random_prefixed_id("pm")
+        provenance = _build_canonical_provenance(
+            selected_bundle.manifest.provenance,
+            artifact_id=primary_artifact.artifact_id,
+            document_id=document_id,
+            document_revision=document_revision,
+            processing_manifest_id=processing_manifest_id,
+        )
+
+        status_events = [
+            build_processing_status_event(
+                processing_manifest_id=processing_manifest_id,
+                provenance=provenance,
+                processing_version=self._processing_version,
+                status="accepted",
+                document_id=document_id,
+                document_revision=document_revision,
+                correlation_id=event.correlation_id or provenance.run_id,
+                causation_id=event.event_id,
+            ),
+            build_processing_status_event(
+                processing_manifest_id=processing_manifest_id,
+                provenance=provenance,
+                processing_version=self._processing_version,
+                status="processing",
+                document_id=document_id,
+                document_revision=document_revision,
+                correlation_id=event.correlation_id or provenance.run_id,
+                causation_id=event.event_id,
+            ),
+        ]
+
+        normalized_document = self._normalize_artifact(primary_artifact, artifact_text)
+        sections = _build_sections(
+            document_id=document_id,
+            document_revision=document_revision,
+            processing_manifest_id=processing_manifest_id,
+            provenance=provenance,
+            section_candidates=build_sections_from_ir(normalized_document),
+        )
+
+        document = _build_document(
+            normalized_document=normalized_document,
+            manifest=selected_bundle.manifest,
+            primary_artifact=primary_artifact,
+            provenance=provenance,
+            document_id=document_id,
+            document_revision=document_revision,
+            processing_manifest_id=processing_manifest_id,
+            processing_version=self._processing_version,
+        )
+
+        manifest = _build_processing_manifest(
+            manifest=selected_bundle.manifest,
+            provenance=provenance,
+            document=document,
+            sections=sections,
+            processing_manifest_id=processing_manifest_id,
+            processing_version=self._processing_version,
+            input_bundle_manifest_id=event.payload.bundle_manifest_id,
+            input_bundle_manifest_ref=event.payload.bundle_manifest_ref.to_dict(),
+        )
+
+        canonical_ready_event = build_processing_status_event(
+            processing_manifest_id=processing_manifest_id,
+            provenance=provenance,
+            processing_version=self._processing_version,
+            status="canonical_ready",
+            document_id=document_id,
+            document_revision=document_revision,
+            correlation_id=event.correlation_id or provenance.run_id,
+            causation_id=event.event_id,
+        )
+        status_events.append(canonical_ready_event)
+
+        document_processed_event = build_document_processed_event(
+            document=document,
+            manifest=manifest,
+            correlation_id=event.correlation_id or provenance.run_id,
+            causation_id=event.event_id,
+        )
+
+        validate_document_and_sections(document, sections)
+        validate_document(document)
+        validate_sections(sections)
+        validate_processing_manifest(manifest)
+        for status_event in status_events:
+            validate_event(status_event)
+        validate_event(document_processed_event)
+
+        self._sink.persist(document, sections, manifest)
+        self._sink.record_status_events(status_events)
+        self._sink.record_document_processed_event(document_processed_event)
+
+        return ProcessingResult(
+            document=document,
+            sections=sections,
+            manifest=manifest,
+            status_events=status_events,
+            document_processed_event=document_processed_event,
+        )
+
+    def _normalize_artifact(
+        self,
+        artifact: ArtifactBundleManifestArtifact,
+        artifact_text: str,
+    ) -> NormalizedDocumentIR:
+        content_type = (artifact.storage_ref.content_type or "").lower()
+        if content_type in {"text/html", "application/xhtml+xml"}:
+            return normalize_html_document(artifact_text, artifact.artifact_id)
+        if content_type.startswith("text/plain"):
+            return normalize_plain_text_document(artifact_text, artifact.artifact_id)
+        raise ProcessingError(
+            "unsupported_primary_artifact",
+            "unsupported primary artifact content type: {content_type}".format(
+                content_type=artifact.storage_ref.content_type
+            ),
+        )
+
+
+def _build_document(
+    *,
+    normalized_document: NormalizedDocumentIR,
+    manifest: ArtifactBundleManifest,
+    primary_artifact: ArtifactBundleManifestArtifact,
+    provenance: Provenance,
+    document_id: str,
+    document_revision: int,
+    processing_manifest_id: str,
+    processing_version: str,
+) -> Document:
+    now = _utc_now()
+    return Document(
+        document_id=document_id,
+        document_revision=document_revision,
+        processing_manifest_id=processing_manifest_id,
+        provenance=provenance,
+        primary_artifact_id=primary_artifact.artifact_id,
+        title=_choose_document_title(normalized_document),
+        processed_at=now,
+        processing_version=processing_version,
+        lifecycle_status="active",
+        full_text=normalized_document.full_text,
+        body_text=normalized_document.body_text,
+        document_type=manifest.source_defaults.get("document_type_hint"),
+        metadata={
+            "normalizer": normalized_document.metadata.get("normalizer"),
+            "source_origin_kind": manifest.source_origin_kind,
+            "trust_tier": manifest.trust_tier,
+            "source_defaults": dict(manifest.source_defaults),
+        },
+        extensions={},
+    )
+
+
+def _build_sections(
+    *,
+    document_id: str,
+    document_revision: int,
+    processing_manifest_id: str,
+    provenance: Provenance,
+    section_candidates: List[SectionCandidate],
+) -> List[Section]:
+    sections: List[Section] = []
+    for ordinal, candidate in enumerate(section_candidates):
+        sections.append(
+            Section(
+                section_id=stable_prefixed_id(
+                    "sec", document_id, str(document_revision), str(ordinal)
+                ),
+                document_id=document_id,
+                document_revision=document_revision,
+                processing_manifest_id=processing_manifest_id,
+                provenance=provenance,
+                parent_section_id=None,
+                ordinal=ordinal,
+                depth=candidate.depth,
+                title=candidate.title,
+                content=candidate.content,
+                section_type=candidate.section_type,
+                metadata=dict(candidate.metadata),
+            )
+        )
+    return sections
+
+
+def _build_processing_manifest(
+    *,
+    manifest: ArtifactBundleManifest,
+    provenance: Provenance,
+    document: Document,
+    sections: List[Section],
+    processing_manifest_id: str,
+    processing_version: str,
+    input_bundle_manifest_id: str,
+    input_bundle_manifest_ref: Dict[str, Any],
+) -> ProcessingManifest:
+    published_document_ref = {
+        "surface_name": "published_documents",
+        "surface_version": 1,
+        "record_key": {
+            "document_id": document.document_id,
+            "processing_manifest_id": processing_manifest_id,
+        },
+    }
+    published_sections_ref = {
+        "surface_name": "published_sections",
+        "surface_version": 1,
+        "record_filter": {
+            "document_id": document.document_id,
+            "processing_manifest_id": processing_manifest_id,
+        },
+    }
+    selected_profiles = {
+        "source_profile_ref": manifest.di_overrides.get(
+            "source_profile_ref", "default_html_v1"
+        ),
+        "jurisdiction_profile_ref": manifest.di_overrides.get(
+            "jurisdiction_profile_ref", "default_jurisdiction_v1"
+        ),
+        "resolution_policy_ref": manifest.di_overrides.get(
+            "resolution_policy_ref", "default_resolution_v1"
+        ),
+    }
+    normalization_profile_ref = manifest.di_overrides.get("normalization_profile_ref")
+    if normalization_profile_ref:
+        selected_profiles["normalization_profile_ref"] = normalization_profile_ref
+
+    return ProcessingManifest(
+        processing_manifest_id=processing_manifest_id,
+        manifest_version=1,
+        document_id=document.document_id,
+        document_revision=document.document_revision,
+        processing_version=processing_version,
+        status="canonical_ready",
+        provenance=provenance,
+        input_bundle_manifest_ref=_manifest_ref_from_dict(input_bundle_manifest_ref),
+        selected_profiles=selected_profiles,
+        reference_snapshot_set_ref=manifest.reference_context.get(
+            "reference_snapshot_set_ref"
+        ),
+        published_document_ref=published_document_ref,
+        published_sections_ref=published_sections_ref,
+        canonical_ready_at=_utc_now(),
+        supersedes_processing_manifest_id=None,
+        document_count=1,
+        section_count=len(sections),
+        citation_count=0,
+        failure=None,
+    )
+
+
+def _manifest_ref_from_dict(data: Dict[str, Any]):
+    from document_intelligence.contracts.envelope import ManifestRef
+
+    return ManifestRef.from_dict(data)
+
+
+def _build_canonical_provenance(
+    provenance: Provenance,
+    *,
+    artifact_id: str,
+    document_id: str,
+    document_revision: int,
+    processing_manifest_id: str,
+) -> Provenance:
+    return provenance.with_updates(
+        artifact_id=artifact_id,
+        document_id=document_id,
+        document_revision=document_revision,
+        processing_manifest_id=processing_manifest_id,
+    )
+
+
+def _choose_document_title(normalized_document: NormalizedDocumentIR) -> str:
+    if normalized_document.title:
+        return normalized_document.title
+    for block in normalized_document.blocks:
+        if block.type == "heading":
+            return block.text
+    return "Untitled document"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
