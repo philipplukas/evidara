@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from platform_control.ids import generate_prefixed_id
@@ -22,6 +23,8 @@ class Authority(TimestampMixin, Base):
     authority_id: Mapped[str] = mapped_column(
         primary_key=True, default=lambda: generate_prefixed_id("auth")
     )
-    jurisdiction_id: Mapped[str | None] = mapped_column(nullable=True)
+    jurisdiction_id: Mapped[str | None] = mapped_column(
+        ForeignKey("jurisdictions.jurisdiction_id"), nullable=True
+    )
     name: Mapped[str] = mapped_column(unique=True)
     slug: Mapped[str] = mapped_column(unique=True)

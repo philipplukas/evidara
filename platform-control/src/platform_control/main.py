@@ -51,4 +51,10 @@ app = create_app()
 
 
 def run() -> None:
-    uvicorn.run("platform_control.main:app", host="0.0.0.0", port=8080, reload=True)
+    settings = get_settings()
+    uvicorn.run(
+        "platform_control.main:app",
+        host="0.0.0.0",
+        port=8080,
+        reload=settings.environment == "development",
+    )

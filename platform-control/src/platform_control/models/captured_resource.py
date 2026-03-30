@@ -15,12 +15,12 @@ class CapturedResource(TimestampMixin, Base):
     captured_resource_id: Mapped[str] = mapped_column(
         primary_key=True, default=lambda: generate_prefixed_id("cap")
     )
-    artifact_id: Mapped[str] = mapped_column(ForeignKey("raw_artifacts.artifact_id"))
-    run_id: Mapped[str] = mapped_column(ForeignKey("runs.run_id"))
+    artifact_id: Mapped[str] = mapped_column(ForeignKey("raw_artifacts.artifact_id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.run_id"), index=True)
     source_id: Mapped[str] = mapped_column(ForeignKey("sources.source_id"))
     source_version_id: Mapped[str] = mapped_column(ForeignKey("source_versions.source_version_id"))
     provider_job_id: Mapped[str | None] = mapped_column(
-        ForeignKey("provider_jobs.provider_job_id"), nullable=True
+        ForeignKey("provider_jobs.provider_job_id"), nullable=True, index=True
     )
     provider: Mapped[str] = mapped_column(default="firecrawl")
     source_url: Mapped[str] = mapped_column()

@@ -15,8 +15,10 @@ def build_raw_artifact_event(
     event_timestamp = timestamp or artifact.created_at
     return {
         "event_type": "raw_artifact.available",
+        "event_version": 1,
         "event_id": generate_prefixed_id("evt"),
-        "timestamp": event_timestamp.isoformat(),
+        "occurred_at": event_timestamp.isoformat(),
+        "producer": "platform-control",
         "payload": {
             "artifact_id": artifact.artifact_id,
             "source_id": artifact.source_id,

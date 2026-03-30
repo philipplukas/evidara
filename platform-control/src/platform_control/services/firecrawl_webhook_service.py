@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from platform_control.domain import ProviderJobStatus, RunStatus
 from platform_control.errors import SignatureVerificationError
 from platform_control.events.publisher import RawArtifactPublisher
+from platform_control.ids import generate_prefixed_id
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
@@ -41,23 +42,33 @@ class FirecrawlWebhookService:
         self._verify_signature(raw_body, signature)
         payload_sha256 = hashlib.sha256(raw_body).hexdigest()
 
-        existing_receipt = await self.session.scalar(
-            select(WebhookReceipt).where(
-                WebhookReceipt.provider == "firecrawl",
-                WebhookReceipt.payload_sha256 == payload_sha256,
+        # Atomic dedupe: attempt insert and skip if the (provider, payload_sha256)
+        # unique constraint already exists.  This avoids a TOCTOU race that the
+        # previous read-then-insert pattern was susceptible to.
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+        stmt = (
+            sqlite_insert(WebhookReceipt)
+            .values(
+                webhook_receipt_id=generate_prefixed_id("whr"),
+                provider="firecrawl",
+                payload_sha256=payload_sha256,
+                signature=signature,
+                payload=payload,
+                received_at=datetime.now(UTC),
+                processed_at=datetime.now(UTC),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+            .on_conflict_do_nothing(
+                index_elements=["provider", "payload_sha256"],
             )
         )
-        if existing_receipt is not None:
-            return
+        result = await self.session.execute(stmt)
 
-        receipt = WebhookReceipt(
-            provider="firecrawl",
-            payload_sha256=payload_sha256,
-            signature=signature,
-            payload=payload,
-            processed_at=datetime.now(UTC),
-        )
-        self.session.add(receipt)
+        # If no row was inserted the webhook was already processed — skip.
+        if result.rowcount == 0:
+            return
 
         external_job_id = str(payload.get("id", ""))
         event_type = str(payload.get("type", ""))

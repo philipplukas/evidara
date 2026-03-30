@@ -106,7 +106,7 @@ class FirecrawlProvider:
                 payload["excludePaths"] = acquisition_spec["exclude_paths"]
             if webhook_config:
                 payload["webhook"] = webhook_config
-            return payload, "/crawl"
+            return payload, "crawl"
 
         seed_urls = acquisition_spec.get("seed_urls") or []
         if not seed_urls:
@@ -121,4 +121,4 @@ class FirecrawlProvider:
         }
         if webhook_config:
             payload["webhook"] = webhook_config
-        return payload, "/batch/scrape"
+        return payload, "batch/scrape"

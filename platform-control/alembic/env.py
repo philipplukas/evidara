@@ -30,9 +30,14 @@ target_metadata = Base.metadata
 
 
 def _make_sync_url(database_url: str) -> str:
-    if database_url.startswith("sqlite+aiosqlite:///"):
-        return database_url.replace("sqlite+aiosqlite:///", "sqlite:///")
-    return database_url.replace("+asyncpg", "")
+    """Strip async driver tokens so Alembic's offline mode can use a sync driver.
+
+    Handles ``sqlite+aiosqlite``, ``postgresql+asyncpg``, ``mysql+aiomysql``
+    and any other ``scheme+async_driver`` pattern.
+    """
+    import re
+
+    return re.sub(r"^(\w+)\+\w+://", r"\1://", database_url)
 
 
 def run_migrations_offline() -> None:

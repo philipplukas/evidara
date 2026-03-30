@@ -30,7 +30,12 @@ def upgrade() -> None:
     op.create_table(
         "authorities",
         sa.Column("authority_id", sa.String(), primary_key=True),
-        sa.Column("jurisdiction_id", sa.String(), nullable=True),
+        sa.Column(
+            "jurisdiction_id",
+            sa.String(),
+            sa.ForeignKey("jurisdictions.jurisdiction_id"),
+            nullable=True,
+        ),
         sa.Column("name", sa.String(), nullable=False, unique=True),
         sa.Column("slug", sa.String(), nullable=False, unique=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -53,8 +58,18 @@ def upgrade() -> None:
         sa.Column("source_id", sa.String(), primary_key=True),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("description", sa.String(), nullable=True),
-        sa.Column("jurisdiction_id", sa.String(), nullable=False),
-        sa.Column("authority_id", sa.String(), nullable=False),
+        sa.Column(
+            "jurisdiction_id",
+            sa.String(),
+            sa.ForeignKey("jurisdictions.jurisdiction_id"),
+            nullable=False,
+        ),
+        sa.Column(
+            "authority_id",
+            sa.String(),
+            sa.ForeignKey("authorities.authority_id"),
+            nullable=False,
+        ),
         sa.Column("source_type", sa.String(), nullable=False),
         sa.Column("document_family", sa.String(), nullable=True),
         sa.Column(
@@ -214,8 +229,30 @@ def upgrade() -> None:
         sa.UniqueConstraint("provider", "payload_sha256"),
     )
 
+    # Indexes on FK columns for efficient JOIN / filter queries.
+    op.create_index("ix_runs_source_id", "runs", ["source_id"])
+    op.create_index("ix_runs_source_version_id", "runs", ["source_version_id"])
+    op.create_index("ix_raw_artifacts_run_id", "raw_artifacts", ["run_id"])
+    op.create_index("ix_raw_artifacts_source_id", "raw_artifacts", ["source_id"])
+    op.create_index("ix_captured_resources_artifact_id", "captured_resources", ["artifact_id"])
+    op.create_index("ix_captured_resources_run_id", "captured_resources", ["run_id"])
+    op.create_index(
+        "ix_captured_resources_provider_job_id",
+        "captured_resources",
+        ["provider_job_id"],
+    )
+    op.create_index("ix_provider_jobs_run_id", "provider_jobs", ["run_id"])
+
 
 def downgrade() -> None:
+    op.drop_index("ix_provider_jobs_run_id", table_name="provider_jobs")
+    op.drop_index("ix_captured_resources_provider_job_id", table_name="captured_resources")
+    op.drop_index("ix_captured_resources_run_id", table_name="captured_resources")
+    op.drop_index("ix_captured_resources_artifact_id", table_name="captured_resources")
+    op.drop_index("ix_raw_artifacts_source_id", table_name="raw_artifacts")
+    op.drop_index("ix_raw_artifacts_run_id", table_name="raw_artifacts")
+    op.drop_index("ix_runs_source_version_id", table_name="runs")
+    op.drop_index("ix_runs_source_id", table_name="runs")
     op.drop_table("webhook_receipts")
     op.drop_table("captured_resources")
     op.drop_table("raw_artifacts")

@@ -5,11 +5,13 @@ on:
     paths:
       - "platform-control/**"
       - "contracts/api/platform-control.openapi.yaml"
+      - "scripts/check-platform-control.sh"
   push:
     branches: [main]
     paths:
       - "platform-control/**"
       - "contracts/api/platform-control.openapi.yaml"
+      - "scripts/check-platform-control.sh"
 
 jobs:
   check:

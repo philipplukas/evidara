@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Enum
+from sqlalchemy import Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from platform_control.domain import SourceStatus
@@ -16,8 +16,8 @@ class Source(TimestampMixin, Base):
     )
     name: Mapped[str] = mapped_column()
     description: Mapped[str | None] = mapped_column(nullable=True)
-    jurisdiction_id: Mapped[str] = mapped_column()
-    authority_id: Mapped[str] = mapped_column()
+    jurisdiction_id: Mapped[str] = mapped_column(ForeignKey("jurisdictions.jurisdiction_id"))
+    authority_id: Mapped[str] = mapped_column(ForeignKey("authorities.authority_id"))
     source_type: Mapped[str] = mapped_column(default="website")
     document_family: Mapped[str | None] = mapped_column(nullable=True)
     status: Mapped[SourceStatus] = mapped_column(

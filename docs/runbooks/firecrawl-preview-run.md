@@ -7,7 +7,7 @@ Applies to: dev, staging
 
 ## Purpose
 
-Run and troubleshoot a Firecrawl-backed preview for a source version. This runbook is intended for the planned v0 source setup flow in platform-control and Retool.
+Run and troubleshoot a Firecrawl-backed preview for a source version. This runbook covers the v0 source setup flow in platform-control and Retool.
 
 ## Prerequisites
 
@@ -101,6 +101,6 @@ If something goes wrong:
 
 ## Related
 
-- [Platform Control](/Users/philipp/.codex/worktrees/07a6/evidara/docs/components/platform-control.md)
-- [Platform-Control Firecrawl V0 Plan](/Users/philipp/.codex/worktrees/07a6/evidara/docs/architecture/platform-control-firecrawl-v0-plan.md)
-- [Platform Control Testing](/Users/philipp/.codex/worktrees/07a6/evidara/docs/components/testing/platform-control-testing.md)
+- [Platform Control](../components/platform-control.md)
+- [Platform-Control Firecrawl V0 Plan](../architecture/platform-control-firecrawl-v0-plan.md)
+- [Platform Control Testing](../components/testing/platform-control-testing.md)

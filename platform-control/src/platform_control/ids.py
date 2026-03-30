@@ -21,5 +21,31 @@ def generate_ulid() -> str:
     return _encode_base32(combined, 26)
 
 
+_ALLOWED_PREFIXES = frozenset(
+    {
+        "art",
+        "auth",
+        "cap",
+        "evt",
+        "exp",
+        "jur",
+        "pjob",
+        "run",
+        "src",
+        "sv",
+        "whr",
+    }
+)
+
+
 def generate_prefixed_id(prefix: str) -> str:
+    """Generate a ULID-based ID with a domain prefix (e.g. ``src_…``).
+
+    Allowed prefixes: ``art``, ``auth``, ``cap``, ``evt``, ``exp``,
+    ``jur``, ``pjob``, ``run``, ``src``, ``sv``, ``whr``.
+    """
+    if prefix not in _ALLOWED_PREFIXES:
+        raise ValueError(
+            f"Unknown ID prefix {prefix!r}. Allowed: {', '.join(sorted(_ALLOWED_PREFIXES))}."
+        )
     return f"{prefix}_{generate_ulid()}"
