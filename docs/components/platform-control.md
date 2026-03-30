@@ -6,7 +6,9 @@ Own source lifecycle and operational control. Platform-control is the entry poin
 
 ## Current state
 
-Contracts and API shape are defined, but the service itself is not yet implemented.
+Contracts and API shape are defined, but the service itself is not yet implemented. Repository scaffolding and component documentation exist, yet the runtime service, worker processes, and database schema are not built yet.
+
+See [Platform Control Implementation Plan](platform-control-implementation-plan.md) for the planned repo structure, worker layout, and phased delivery approach.
 
 ## Source of truth
 
@@ -38,6 +40,8 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 - [ ] Define Postgres entities for sources, corpora, versions, runs, and approvals
 - [x] Define OpenAPI spec (`contracts/api/platform-control.openapi.yaml`)
 - [x] Define `ArtifactBundleManifest` schema
+- [ ] Create the initial `platform-control/` API scaffold
+- [ ] Create the connector-worker scaffold under `platform-control/`
 - [ ] Define run lifecycle and replay modes
 - [ ] Define approval states and transitions
 - [ ] Define reference snapshot export mechanics for DI
