@@ -1,5 +1,5 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
-import type { Request, Response, NextFunction } from 'express';
+import { Injectable, type NestMiddleware } from '@nestjs/common';
+import type { NextFunction, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -10,7 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class CorrelationIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    const requestId = (req.headers['x-request-id'] as string) ?? uuidv4();
+    const raw = req.headers['x-request-id'];
+    const requestId = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : uuidv4();
     req.headers['x-request-id'] = requestId;
     res.setHeader('X-Request-ID', requestId);
     next();

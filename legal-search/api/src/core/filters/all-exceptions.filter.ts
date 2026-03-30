@@ -1,7 +1,7 @@
 import {
-  ExceptionFilter,
+  type ArgumentsHost,
   Catch,
-  ArgumentsHost,
+  type ExceptionFilter,
   HttpException,
   HttpStatus,
   Logger,
@@ -34,7 +34,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const res = exception.getResponse();
-      message = typeof res === 'string' ? res : (res as { message?: string }).message ?? message;
+      message = typeof res === 'string' ? res : ((res as { message?: string }).message ?? message);
     } else if (exception instanceof Error) {
       // Map known domain exceptions here as the system grows, e.g.:
       // if (exception instanceof DocumentNotFoundError) statusCode = 404;

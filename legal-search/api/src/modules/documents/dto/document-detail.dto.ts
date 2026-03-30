@@ -24,4 +24,5 @@ export class SectionSummaryDto {
 
 export class SectionsResponseDto {
   @ApiProperty({ type: [SectionSummaryDto] }) data!: SectionSummaryDto[];
+  @ApiProperty({ description: 'Total number of sections for this document' }) total_count!: number;
 }

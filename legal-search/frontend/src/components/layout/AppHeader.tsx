@@ -23,15 +23,14 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
     setInputValue(storeQuery);
   }, [storeQuery]);
 
-  // On mount, if URL has ?q= but store doesn't match, run the search
+  // On mount or when the URL ?q= param changes (e.g. browser back/forward),
+  // resync the store search state if needed.
   useEffect(() => {
     if (urlQuery && urlQuery !== storeQuery) {
       const results = searchMockResults(urlQuery);
       dispatch({ type: "SEARCH", query: urlQuery, results });
     }
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [urlQuery, storeQuery, dispatch]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

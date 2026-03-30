@@ -1,11 +1,11 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DOCUMENTS_REPOSITORY, type DocumentsRepository } from './documents.repository';
 import type { DocumentDetailDto, SectionsResponseDto } from './dto/document-detail.dto';
 
 @Injectable()
 export class DocumentsService {
   constructor(
-    @Inject(DOCUMENTS_REPOSITORY) private readonly documentsRepository: DocumentsRepository,
+    @Inject(DOCUMENTS_REPOSITORY) private readonly _documentsRepository: DocumentsRepository,
   ) {}
 
   async getById(documentId: string): Promise<DocumentDetailDto> {
@@ -19,6 +19,8 @@ export class DocumentsService {
   }
 
   async getSections(documentId: string): Promise<SectionsResponseDto> {
+    // Ensure the document exists before querying for its sections.
+    await this.getById(documentId);
     return this.documentsRepository.getSections(documentId);
   }
 }

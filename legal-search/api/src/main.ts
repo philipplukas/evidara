@@ -1,16 +1,22 @@
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './core/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './core/interceptors/logging.interceptor';
-import { ConfigService } from '@nestjs/config';
+
+const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const config = app.get(ConfigService);
-  const port = config.get<number>('PORT', 3001);
+  const rawPort = config.get<string>('PORT', '3001');
+  const port = Number(rawPort);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid PORT value: '${rawPort}'. Must be an integer between 1 and 65535.`);
+  }
 
   // Global validation — whitelist strips unknown fields, transform coerces types
   app.useGlobalPipes(
@@ -46,7 +52,7 @@ async function bootstrap() {
   }
 
   await app.listen(port);
-  console.log(`legal-search api running on port ${port}`);
+  logger.log(`legal-search api running on port ${port}`);
 }
 
 bootstrap();
