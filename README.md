@@ -29,7 +29,7 @@ platform-control → document-intelligence → legal-search
 ```
 
 - **platform-control** manages sources, versions, runs, and approvals. It triggers document processing.
-- **document-intelligence** receives raw artifacts and produces canonical structured truth in Delta tables.
+- **document-intelligence** receives immutable artifact bundles and produces canonical structured truth in Delta tables.
 - **legal-search** consumes canonical truth, projects it into OpenSearch, and serves the user-facing search experience.
 
 Boundaries and contracts between these components are documented in [docs/architecture/boundary-contracts.md](docs/architecture/boundary-contracts.md).
@@ -41,6 +41,7 @@ Boundaries and contracts between these components are documented in [docs/archit
 - [Boundary Contracts](docs/architecture/boundary-contracts.md) — handoff boundaries between components
 - [Storage Model](docs/architecture/storage-model.md) — storage technology choices and rationale
 - [Implementation Principles](docs/architecture/implementation-principles.md) — guiding design principles
+- [Technology Stack And Implementation Plan](docs/architecture/technology-stack-and-implementation-plan.md) — recommended languages, runtimes, tools, and phased delivery choices
 - [Communication Model](docs/architecture/communication-model.md) — sync, async, and event-driven patterns
 - [ADRs](docs/adr/) — architecture decision records
 

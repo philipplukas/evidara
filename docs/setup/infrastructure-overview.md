@@ -61,6 +61,13 @@ Manifests should be stored as immutable JSON objects. Search and filtering over 
 | Unity Catalog lineage | Table, job, and published-surface lineage inside DI |
 | Workflows / Jobs | Processing pipeline orchestration |
 
+Current repo scaffolding splits ownership this way:
+
+- Terraform under [`../../infra/terraform/databricks/document_intelligence_stack`](../../infra/terraform/databricks/document_intelligence_stack) wires the top-level Databricks workspace/environment layer and invokes the reusable module under [`../../infra/terraform/databricks/document_intelligence`](../../infra/terraform/databricks/document_intelligence)
+- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for the DI Databricks stack
+- Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job
+- SQL/bootstrap assets under [`../../document-intelligence/databricks/sql`](../../document-intelligence/databricks/sql) register the published Delta surfaces after the first successful write
+
 ### Published Surfaces
 
 | Surface | Purpose |

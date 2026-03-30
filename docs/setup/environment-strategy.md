@@ -4,6 +4,8 @@
 
 Evidara uses three environments: **dev**, **staging**, and **prod**. All environments are provisioned from the same Terraform modules with environment-specific variable files.
 
+Initial environment scaffolding now exists for the `document-intelligence` Databricks stack under [`../../infra/env/`](../../infra/env/).
+
 ## Environments
 
 ### dev
@@ -68,6 +70,12 @@ infra/
     staging/      # staging.tfvars, staging-specific overrides
     prod/         # prod.tfvars, prod-specific overrides
 ```
+
+Current example files:
+
+- [`../../infra/env/dev/document_intelligence.databricks.tfvars`](../../infra/env/dev/document_intelligence.databricks.tfvars)
+- [`../../infra/env/staging/document_intelligence.databricks.tfvars`](../../infra/env/staging/document_intelligence.databricks.tfvars)
+- [`../../infra/env/prod/document_intelligence.databricks.tfvars`](../../infra/env/prod/document_intelligence.databricks.tfvars)
 
 ## Naming Conventions
 
