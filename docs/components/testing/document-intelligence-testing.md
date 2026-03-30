@@ -20,7 +20,7 @@ The MVP test plan assumes bundle ingestion, canonical `Document`, `Section`, and
 
 ### Unit tests
 
-- HTML/PDF normalization helpers
+- HTML/XML normalization helpers
 - section title extraction and ordering
 - source/jurisdiction profile dispatch
 - content-type and artifact-role selection
@@ -54,6 +54,7 @@ Current golden matrix:
 - `messy_html`
 - `nested_headings`
 - `no_heading_fallback`
+- `ris_xml`
 - `invalid_no_primary`
 
 For each golden bundle, assert:
@@ -96,6 +97,7 @@ Add citation count and canonical jurisdiction assertions once those capabilities
 - Databricks runtime tests validate the wrapper configuration plus a local Delta-backed bundle run using the Databricks-style entrypoint
 - Bootstrap asset tests verify the published-surface SQL renderer and Terraform module shape for the Unity Catalog scaffolding path
 - Bootstrap asset tests also verify the top-level Databricks stack wiring and the presence of `dev` / `staging` / `prod` tfvars for the DI Terraform path
+- XML bundle tests verify RIS-style section labels and extracted metadata survive canonicalization
 
 ---
 

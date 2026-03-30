@@ -28,6 +28,30 @@ SAMPLE_HTML = """
 </html>
 """
 
+SAMPLE_RIS_XML = """
+<dokument xml:lang="de">
+  <metadaten>
+    <langtitel>Bundesgesetz über digitale Register</langtitel>
+    <kurztitel>Digitalregistergesetz</kurztitel>
+    <dokumentnummer>RIS-BUND-2026-0001</dokumentnummer>
+    <gesetzesnummer>20012345</gesetzesnummer>
+    <kundmachungsorgan>BGBl. I Nr. 12/2026</kundmachungsorgan>
+  </metadaten>
+  <text>
+    <praeambel>Der Bund erlässt folgendes Bundesgesetz.</praeambel>
+    <paragraf nummer="1">
+      <ueberschrift>Geltungsbereich</ueberschrift>
+      <absatz>(1) Dieses Bundesgesetz regelt digitale Register.</absatz>
+    </paragraf>
+    <paragraf nummer="2">
+      <ueberschrift>Begriffsbestimmungen</ueberschrift>
+      <ziffer nummer="1">Register ist eine strukturierte Datensammlung.</ziffer>
+      <ziffer nummer="2">Behörde ist eine zuständige Bundesstelle.</ziffer>
+    </paragraf>
+  </text>
+</dokument>
+"""
+
 
 class ProcessingPipelineTests(unittest.TestCase):
     def test_processes_local_html_bundle_into_contract_valid_outputs(self) -> None:
@@ -138,6 +162,87 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertNotEqual(
                 first.manifest.processing_manifest_id,
                 second.manifest.processing_manifest_id,
+            )
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_processes_ris_style_xml_bundle(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as xml_handle:
+            xml_handle.write(SAMPLE_RIS_XML)
+            artifact_path = xml_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(
+                build_manifest_payload(
+                    artifact_path,
+                    artifact_role="primary_document",
+                    content_type="application/xml",
+                    parser_hints={
+                        "expected_modalities": ["xml"],
+                        "expected_content_types": ["application/xml"],
+                        "preferred_primary_artifact_roles": ["primary_document"],
+                        "ocr_expected": False,
+                        "attachment_policy": "ignore",
+                    },
+                ),
+                manifest_handle,
+            )
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(
+                processing_version="di_2026_03_30"
+            ).process_event(build_bundle_event(manifest_path))
+
+            self.assertEqual(
+                result.document.title, "Bundesgesetz über digitale Register"
+            )
+            self.assertEqual(result.document.document_type, "statute")
+            self.assertEqual(len(result.sections), 2)
+            self.assertEqual(result.sections[0].title, "§ 1 Geltungsbereich")
+            self.assertIn(
+                "Der Bund erlässt folgendes Bundesgesetz.",
+                result.sections[0].content,
+            )
+            self.assertEqual(result.sections[1].title, "§ 2 Begriffsbestimmungen")
+            self.assertEqual(
+                result.manifest.selected_profiles["source_profile_ref"],
+                "default_xml_v1",
+            )
+            self.assertEqual(
+                result.manifest.selected_profiles["normalization_profile_ref"],
+                "xml_v1",
+            )
+            self.assertEqual(
+                result.document.metadata["source_flavor"],
+                "ris_like",
+            )
+            self.assertEqual(
+                result.document.metadata["extracted_metadata"]["dokumentnummer"],
+                "RIS-BUND-2026-0001",
+            )
+            self.assertEqual(
+                result.document.metadata["extracted_metadata"]["gesetzesnummer"],
+                "20012345",
+            )
+            self.assertEqual(
+                result.sections[0].metadata["official_label"],
+                "§ 1",
+            )
+
+            validate_instance_against_contract(
+                result.document.to_dict(),
+                "schemas/document.schema.json",
+            )
+            for section in result.sections:
+                validate_instance_against_contract(
+                    section.to_dict(),
+                    "schemas/section.schema.json",
+                )
+            validate_instance_against_contract(
+                result.manifest.to_dict(),
+                "schemas/processing-manifest.schema.json",
             )
         finally:
             os.unlink(artifact_path)
