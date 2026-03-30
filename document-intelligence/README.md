@@ -15,16 +15,12 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 - Offline JSON Schema validation helpers against repo `contracts/`
 - Golden bundle fixtures plus GCS, Delta, CLI, and contract tests
 - A simple processing job entrypoint with env-driven sink selection
-- A Databricks-oriented runtime entrypoint plus Databricks Asset Bundle scaffolding under [`databricks/`](databricks/)
-- Terraform stubs for Unity Catalog scaffolding under [`../infra/terraform/databricks/document_intelligence/`](../infra/terraform/databricks/document_intelligence/)
-- A top-level Databricks Terraform stack plus `dev` / `staging` / `prod` tfvars under [`../infra/terraform/databricks/document_intelligence_stack/`](../infra/terraform/databricks/document_intelligence_stack/) and [`../infra/env/`](../infra/env/)
-- SQL/bootstrap assets for published surface registration under [`databricks/sql/`](databricks/sql/)
+- A Databricks-oriented runtime entrypoint for the same pipeline surface
 
 ## What does not exist yet
 
-- Databricks workflow wiring
-- Spark-native Delta writes and Unity Catalog table/view creation automation
-- Terraform apply/deploy integration in CI/CD
+- Databricks Asset Bundle and Terraform scaffolding
+- Unity Catalog table/view registration automation
 - Citation extraction
 - Canonical jurisdiction assignment
 - XML-specific normalization and parsing
