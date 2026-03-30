@@ -1,0 +1,10 @@
+version: 1
+items:
+  - authority_id: auth_ch_fedlex
+    jurisdiction_id: jur_ch
+    slug: ch-fedlex
+    name: Fedlex
+  - authority_id: auth_zh_admin
+    jurisdiction_id: jur_ch
+    slug: zh-admin-court
+    name: Zurich Administrative Court

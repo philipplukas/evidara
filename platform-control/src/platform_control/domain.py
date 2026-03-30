@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class SourceStatus(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    ARCHIVED = "archived"
+
+
+class SourceVersionStatus(StrEnum):
+    DRAFT = "draft"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SUPERSEDED = "superseded"
+
+
+class RunStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class RunMode(StrEnum):
+    PREVIEW = "preview"
+    PRODUCTION = "production"
+
+
+class ProviderJobStatus(StrEnum):
+    ACCEPTED = "accepted"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class FirecrawlMode(StrEnum):
+    CRAWL = "crawl"
+    BATCH_SCRAPE = "batch_scrape"

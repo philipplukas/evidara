@@ -6,7 +6,7 @@ Serve legal and document search and detail experiences to users. Legal-search is
 
 ## Current state
 
-The `legal-search/` folder contains the Next.js frontend application, migrated from the earlier `omnilex-search` project. See the [legal-search README](../../legal-search/README.md) for development setup. The backend BFF (NestJS) and OpenSearch integration are not yet implemented.
+The `legal-search/` folder contains the Next.js frontend application, migrated from the earlier `omnilex-search` project. See the [legal-search workspace manifest](../../legal-search/package.json) for the workspace entry point. The backend BFF (NestJS) and OpenSearch integration are not yet implemented.
 
 ## Source of truth
 
