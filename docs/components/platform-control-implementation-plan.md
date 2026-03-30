@@ -428,6 +428,8 @@ Create:
 
 ## Phase 1: Core control-plane API
 
+> **Contract-first gate:** Before implementing new API modules (`artifacts`, `connector_runs`, `processing_feedback`), their paths and schemas must be added to `contracts/api/platform-control.openapi.yaml` first. Implementation follows the contract, not the other way around. This ensures the downstream `document-intelligence` contract boundary remains stable.
+
 Implement:
 
 - `sources`

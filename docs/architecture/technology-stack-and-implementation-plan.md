@@ -4,6 +4,8 @@
 
 Planned. This document defines the recommended technology choices, language boundaries, tooling, and phased implementation approach for Evidara.
 
+The stack and language-boundary decisions in this document are formalized in [ADR-0009: Technology Stack and Language Boundaries](../adr/0009-technology-stack-and-language-boundaries.md).
+
 ## Purpose
 
 Provide one architecture-level reference for which languages, runtimes, tools, and deployment patterns should be used in each part of the platform.
