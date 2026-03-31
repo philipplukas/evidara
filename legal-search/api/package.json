@@ -11,7 +11,9 @@
     "format": "biome check --write src/",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "seed": "npx -y tsx scripts/seed-from-opencaselaw.ts",
+    "seed:index": "npx -y tsx scripts/seed-from-opencaselaw.ts --index"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.3",
