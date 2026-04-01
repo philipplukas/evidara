@@ -116,6 +116,7 @@ const DEFAULT_TYPE_CONFIG: DocumentTypeConfig = {
 
 // ─── Composition Functions ───
 
+/** Compose badge views from document type and jurisdiction. Warns on unknown values. */
 export function composeBadges(hit: SearchHitEntity, warn?: WarnFn): BadgeView[] {
   const docType = hit.document_type ?? '';
   const config = DOCUMENT_TYPE_CONFIG[docType];
@@ -146,6 +147,7 @@ export function composeBadges(hit: SearchHitEntity, warn?: WarnFn): BadgeView[] 
   ];
 }
 
+/** Compose subtitle from jurisdiction label and document type label. */
 export function composeSubtitle(hit: SearchHitEntity, warn?: WarnFn): string {
   const parts: string[] = [];
   const jurisdiction = JURISDICTION_META[hit.jurisdiction ?? ''];
@@ -167,6 +169,7 @@ export function composeSubtitle(hit: SearchHitEntity, warn?: WarnFn): string {
   return parts.join(' · ') || (hit.document_type ?? 'Document');
 }
 
+/** Compose metadata rows (date label varies by document type). */
 export function composeMetadata(hit: SearchHitEntity): MetadataRowView[] {
   const rows: MetadataRowView[] = [];
 
@@ -178,6 +181,7 @@ export function composeMetadata(hit: SearchHitEntity): MetadataRowView[] {
   return rows;
 }
 
+/** Compose related-count chips from hit entity counts. */
 export function composeRelatedCounts(hit: SearchHitEntity): RelatedCountView[] {
   const counts: RelatedCountView[] = [];
 
@@ -200,6 +204,7 @@ export function composeRelatedCounts(hit: SearchHitEntity): RelatedCountView[] {
   return counts;
 }
 
+/** Compose action buttons from document type config. Warns on unknown types. */
 export function composeActions(hit: SearchHitEntity, warn?: WarnFn): ActionView[] {
   const docType = hit.document_type ?? '';
   const config = DOCUMENT_TYPE_CONFIG[docType];
@@ -214,6 +219,7 @@ export function composeActions(hit: SearchHitEntity, warn?: WarnFn): ActionView[
   return [...(config ?? DEFAULT_TYPE_CONFIG).actions];
 }
 
+/** Compose content-language view from hit language field. */
 export function composeLanguage(hit: { language?: string }): ContentLanguageView | undefined {
   if (!hit.language) return undefined;
   return {
@@ -225,6 +231,7 @@ export function composeLanguage(hit: { language?: string }): ContentLanguageView
 
 // ─── Main Mapper ───
 
+/** Map a single SearchHitEntity to a complete SearchResultView. Threads WarnFn to all sub-composers. */
 export function mapSearchHitToView(hit: SearchHitEntity, warn?: WarnFn): SearchResultView {
   return {
     id: hit.document_id,

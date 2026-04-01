@@ -33,6 +33,7 @@ const LANGUAGE_LABELS: Record<string, string> = {
 
 // ─── Mapper ───
 
+/** Map raw OpenSearch aggregation buckets to the SearchContextView ViewModel. */
 export function mapContextAggregations(aggs: ContextAggregations): SearchContextView {
   return {
     jurisdictions: aggs.jurisdictions.map((bucket) => {

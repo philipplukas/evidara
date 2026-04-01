@@ -166,6 +166,7 @@ function composeLocalStructure(
 
 // ─── Main Mapper ───
 
+/** Map a DocumentEntity with its sections and citations to a complete DetailView. */
 export function mapDocumentToDetailView(
   doc: DocumentEntity,
   sections: SectionEntity[],
