@@ -2,10 +2,13 @@
  * Search facet mapper.
  *
  * Maps OpenSearch aggregation buckets to FilterFacetView DTOs.
- * Uses vocabulary-loaded labels where available.
+ * Uses locale-aware vocabulary labels and t() for group labels (ADR-0013).
  */
 
-import { DOCUMENT_TYPE_LABELS, JURISDICTION_META } from '../../../core/vocabularies';
+import { t } from '../../../core/i18n';
+import type { SupportedLocale } from '../../../core/i18n';
+import { DEFAULT_LOCALE } from '../../../core/i18n';
+import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { AggregationBucket, SearchAggregations } from '../entities/search.entities';
 
 export interface FilterOptionView {
@@ -26,59 +29,50 @@ export interface FilterFacetView {
 
 interface FacetConfig {
   key: string;
-  label: string;
+  labelKey: string;
   type: FilterFacetView['type'];
-  labelMap?: Record<string, { label: string; iconKey?: string }>;
+  resolveOption?: (bucketKey: string, locale: SupportedLocale) => { label: string; iconKey?: string } | undefined;
 }
 
 const FACET_CONFIGS: FacetConfig[] = [
   {
     key: 'jurisdiction',
-    label: 'Zuständigkeit',
+    labelKey: 'facets.jurisdiction',
     type: 'chip',
-    labelMap: Object.fromEntries(
-      Object.entries(JURISDICTION_META).map(([k, v]) => [
-        k,
-        { label: v.label, iconKey: v.iconKey },
-      ]),
-    ),
+    resolveOption: (bucketKey, locale) => {
+      const meta = getJurisdictionMeta(bucketKey, locale);
+      return meta ? { label: meta.label, iconKey: meta.iconKey } : undefined;
+    },
   },
   {
     key: 'document_type',
-    label: 'Dokumenttyp',
+    labelKey: 'facets.documentType',
     type: 'chip',
-    labelMap: Object.fromEntries(
-      Object.entries(DOCUMENT_TYPE_LABELS).map(([k, v]) => {
-        // German plurals are irregular — explicit mapping required
-        const GERMAN_PLURALS: Record<string, string> = {
-          Gesetz: 'Gesetze',
-          Gerichtsentscheid: 'Gerichtsentscheide',
-          Kommentar: 'Kommentare',
-          Rechtssatz: 'Rechtssätze',
-        };
-        return [k, { label: GERMAN_PLURALS[v] ?? v }];
-      }),
-    ),
+    resolveOption: (bucketKey, locale) => {
+      const label = getDocumentTypeLabel(bucketKey, locale);
+      // Use plural forms from translation file
+      const pluralKey = `plurals.${bucketKey}`;
+      const pluralLabel = t(pluralKey, locale);
+      return { label: pluralLabel !== pluralKey ? pluralLabel : label };
+    },
   },
   {
     key: 'language',
-    label: 'Sprache',
+    labelKey: 'facets.language',
     type: 'chip',
-    labelMap: {
-      de: { label: 'DE' },
-      fr: { label: 'FR' },
-      it: { label: 'IT' },
-      en: { label: 'EN' },
+    resolveOption: (bucketKey) => {
+      const labels: Record<string, string> = { de: 'DE', fr: 'FR', it: 'IT', en: 'EN' };
+      return labels[bucketKey] ? { label: labels[bucketKey] } : undefined;
     },
   },
   {
     key: 'court_level',
-    label: 'Instanz',
+    labelKey: 'facets.courtLevel',
     type: 'checkbox',
   },
   {
     key: 'legal_area',
-    label: 'Rechtsgebiet',
+    labelKey: 'facets.legalArea',
     type: 'checkbox',
   },
 ];
@@ -87,20 +81,24 @@ const FACET_CONFIGS: FacetConfig[] = [
 
 function mapBucketsToOptions(
   buckets: AggregationBucket[],
-  labelMap?: Record<string, { label: string; iconKey?: string }>,
+  resolveOption?: (key: string, locale: SupportedLocale) => { label: string; iconKey?: string } | undefined,
+  locale: SupportedLocale = DEFAULT_LOCALE,
 ): FilterOptionView[] {
   return buckets.map((bucket) => {
-    const mapped = labelMap?.[bucket.key];
+    const resolved = resolveOption?.(bucket.key, locale);
     return {
       value: bucket.key,
-      label: mapped?.label ?? bucket.key,
+      label: resolved?.label ?? bucket.key,
       count: bucket.doc_count,
-      ...(mapped?.iconKey && { iconKey: mapped.iconKey }),
+      ...(resolved?.iconKey && { iconKey: resolved.iconKey }),
     };
   });
 }
 
-export function mapAggregationsToFacets(aggregations: SearchAggregations): FilterFacetView[] {
+export function mapAggregationsToFacets(
+  aggregations: SearchAggregations,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): FilterFacetView[] {
   const facets: FilterFacetView[] = [];
 
   for (const config of FACET_CONFIGS) {
@@ -109,9 +107,9 @@ export function mapAggregationsToFacets(aggregations: SearchAggregations): Filte
 
     facets.push({
       key: config.key,
-      label: config.label,
+      label: t(config.labelKey, locale),
       type: config.type,
-      options: mapBucketsToOptions(buckets, config.labelMap),
+      options: mapBucketsToOptions(buckets, config.resolveOption, locale),
     });
   }
 

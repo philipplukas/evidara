@@ -13,6 +13,13 @@
           "type": "object",
           "properties": {
             "label": { "const": "Schweiz" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Schweiz" },
+                "fr": { "const": "Suisse" }
+              }
+            },
             "iconKey": { "const": "ch" },
             "standard": { "const": "ISO 3166-1 alpha-2" }
           }
@@ -21,6 +28,13 @@
           "type": "object",
           "properties": {
             "label": { "const": "Österreich" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Österreich" },
+                "fr": { "const": "Autriche" }
+              }
+            },
             "iconKey": { "const": "at" },
             "standard": { "const": "ISO 3166-1 alpha-2" }
           }
@@ -29,6 +43,13 @@
           "type": "object",
           "properties": {
             "label": { "const": "Deutschland" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Deutschland" },
+                "fr": { "const": "Allemagne" }
+              }
+            },
             "iconKey": { "const": "de" },
             "standard": { "const": "ISO 3166-1 alpha-2" }
           }
@@ -37,6 +58,13 @@
           "type": "object",
           "properties": {
             "label": { "const": "Liechtenstein" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Liechtenstein" },
+                "fr": { "const": "Liechtenstein" }
+              }
+            },
             "iconKey": { "const": "li" },
             "standard": { "const": "ISO 3166-1 alpha-2" }
           }

@@ -1,4 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { SupportedLocale } from '../../core/i18n';
+import { DEFAULT_LOCALE } from '../../core/i18n';
 import type { WarnFn } from '../../core/types/warn';
 import { DOCUMENTS_REPOSITORY, type DocumentsRepository } from './documents.repository';
 import { mapDocumentToDetailView } from './mappers/document-detail.mapper';
@@ -15,7 +17,7 @@ export class DocumentsService {
     this.warn = (event, meta) => this.logger.warn(`[contract] ${event}`, meta);
   }
 
-  async getDetail(id: string) {
+  async getDetail(id: string, locale: SupportedLocale = DEFAULT_LOCALE) {
     const doc = await this.repository.getById(id);
     if (!doc) throw new NotFoundException(`Document ${id} not found`);
 
@@ -24,7 +26,7 @@ export class DocumentsService {
       this.repository.getCitations(id),
     ]);
 
-    return mapDocumentToDetailView(doc, sections, citations, this.warn);
+    return mapDocumentToDetailView(doc, sections, citations, locale, this.warn);
   }
 
   async getSections(documentId: string) {

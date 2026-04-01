@@ -1,4 +1,5 @@
-import { Controller, Get, Inject, Param } from '@nestjs/common';
+import { Controller, Get, Headers, Inject, Param } from '@nestjs/common';
+import { resolveLocale } from '../../core/i18n';
 import { DocumentsService } from './documents.service';
 
 @Controller('v1/documents')
@@ -9,8 +10,12 @@ export class DocumentsController {
   ) {}
 
   @Get(':document_id')
-  async getDocument(@Param('document_id') id: string) {
-    return this.documentsService.getDetail(id);
+  async getDocument(
+    @Param('document_id') id: string,
+    @Headers('accept-language') acceptLanguage?: string,
+  ) {
+    const locale = resolveLocale(acceptLanguage);
+    return this.documentsService.getDetail(id, locale);
   }
 
   @Get(':document_id/sections')

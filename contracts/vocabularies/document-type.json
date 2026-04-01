@@ -13,6 +13,13 @@
           "type": "object",
           "properties": {
             "label": { "const": "Gesetz" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Gesetz" },
+                "fr": { "const": "Loi" }
+              }
+            },
             "aliases": {
               "type": "array",
               "items": { "type": "string" },
@@ -25,6 +32,13 @@
           "type": "object",
           "properties": {
             "label": { "const": "Gerichtsentscheid" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Gerichtsentscheid" },
+                "fr": { "const": "Décision judiciaire" }
+              }
+            },
             "aliases": {
               "type": "array",
               "items": { "type": "string" },
@@ -37,6 +51,13 @@
           "type": "object",
           "properties": {
             "label": { "const": "Kommentar" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Kommentar" },
+                "fr": { "const": "Commentaire" }
+              }
+            },
             "aliases": {
               "type": "array",
               "items": { "type": "string" },
@@ -49,6 +70,13 @@
           "type": "object",
           "properties": {
             "label": { "const": "Rechtssatz" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Rechtssatz" },
+                "fr": { "const": "Principe juridique" }
+              }
+            },
             "aliases": {
               "type": "array",
               "items": { "type": "string" },
