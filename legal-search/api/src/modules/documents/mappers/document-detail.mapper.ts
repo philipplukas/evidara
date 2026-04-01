@@ -76,7 +76,7 @@ function composeSubtitle(doc: DocumentEntity, warn?: WarnFn): string {
   }
   if (typeLabel) parts.push(typeLabel);
 
-  return parts.join(' · ') || (doc.document_type ?? 'Document');
+  return parts.join(' · ') || (doc.document_type ?? 'Dokument');
 }
 
 function composeMetadata(
@@ -85,13 +85,13 @@ function composeMetadata(
   const rows: { label: string; value: string; iconKey?: string }[] = [];
 
   if (doc.effective_date) {
-    const label = doc.document_type === 'decision' ? 'Date' : 'In force';
+    const label = doc.document_type === 'decision' ? 'Datum' : 'In Kraft';
     rows.push({ label, value: doc.effective_date });
   }
   if (doc.jurisdiction) {
     const meta = JURISDICTION_META[doc.jurisdiction];
     rows.push({
-      label: 'Jurisdiction',
+      label: 'Zuständigkeit',
       value: meta?.label ?? doc.jurisdiction,
       ...(meta?.iconKey && { iconKey: meta.iconKey }),
     });
@@ -106,16 +106,16 @@ function composeTabs(
   citationsCount: number,
 ): { key: string; label: string; count?: number }[] {
   const tabs: { key: string; label: string; count?: number }[] = [
-    { key: 'content', label: 'Content' },
+    { key: 'content', label: 'Inhalt' },
   ];
 
   if (sectionsCount > 0) {
-    tabs.push({ key: 'sections', label: 'Sections', count: sectionsCount });
+    tabs.push({ key: 'sections', label: 'Abschnitte', count: sectionsCount });
   }
   if (citationsCount > 0) {
     tabs.push({
       key: 'citations',
-      label: 'Citations',
+      label: 'Zitationen',
       count: citationsCount,
     });
   }
@@ -131,7 +131,7 @@ function composeReferences(citations: CitationEntity[]): DetailView['references'
   // Group by citation type
   const groups = new Map<string, DetailView['references'][0]>();
   for (const cit of citations) {
-    const groupLabel = cit.citation_type ?? 'References';
+    const groupLabel = cit.citation_type ?? 'Referenzen';
     if (!groups.has(groupLabel)) {
       groups.set(groupLabel, { label: groupLabel, items: [] });
     }
@@ -158,7 +158,7 @@ function composeLocalStructure(
       .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
       .map((s) => ({
         id: s.section_id,
-        label: s.title ?? `Section ${s.ordinal ?? 0}`,
+        label: s.title ?? `Abschnitt ${s.ordinal ?? 0}`,
         depth: s.depth,
       })),
   };

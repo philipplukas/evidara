@@ -49,7 +49,7 @@ describe('DocumentsService', () => {
 
     expect(detail.id).toBe('doc_001');
     expect(detail.type).toBe('law');
-    expect(detail.subtitle).toContain('Switzerland');
+    expect(detail.subtitle).toContain('Schweiz');
     expect(detail.tabs.length).toBeGreaterThan(0);
     expect(detail.references).toHaveLength(1);
     expect(detail.localStructure?.items).toHaveLength(1);

@@ -44,7 +44,7 @@ describe('SearchService', () => {
     expect(result.results).toHaveLength(1);
     expect(result.results[0].id).toBe('doc_001');
     expect(result.results[0].badges).toHaveLength(1);
-    expect(result.results[0].badges[0].label).toBe('Law');
+    expect(result.results[0].badges[0].label).toBe('Gesetz');
     expect(result.facets.length).toBeGreaterThan(0);
   });
 
@@ -74,7 +74,7 @@ describe('SearchService', () => {
     const ctx = await service.getContext();
 
     expect(ctx.jurisdictions).toHaveLength(1);
-    expect(ctx.jurisdictions[0].label).toBe('Switzerland');
+    expect(ctx.jurisdictions[0].label).toBe('Schweiz');
     expect(ctx.languages).toHaveLength(1);
     expect(ctx.sourceTypes.length).toBeGreaterThan(0);
   });

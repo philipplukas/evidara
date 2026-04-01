@@ -75,43 +75,43 @@ interface DocumentTypeConfig {
 
 const DOCUMENT_TYPE_CONFIG: Record<string, DocumentTypeConfig> = {
   law: {
-    badgeLabel: DOCUMENT_TYPE_LABELS['law'] ?? 'Law',
+    badgeLabel: DOCUMENT_TYPE_LABELS['law'] ?? 'Gesetz',
     badgeColorKey: 'blue',
     actions: [
-      { label: 'Open article', icon: 'file-text' },
-      { label: 'Related', icon: 'link' },
+      { label: 'Artikel öffnen', icon: 'file-text' },
+      { label: 'Verwandt', icon: 'link' },
     ],
   },
   decision: {
-    badgeLabel: DOCUMENT_TYPE_LABELS['decision'] ?? 'Court decision',
+    badgeLabel: DOCUMENT_TYPE_LABELS['decision'] ?? 'Gerichtsentscheid',
     badgeColorKey: 'pink',
     actions: [
-      { label: 'Open decision', icon: 'scale' },
-      { label: 'Related', icon: 'link' },
+      { label: 'Entscheid öffnen', icon: 'scale' },
+      { label: 'Verwandt', icon: 'link' },
     ],
   },
   commentary: {
-    badgeLabel: DOCUMENT_TYPE_LABELS['commentary'] ?? 'Commentary',
+    badgeLabel: DOCUMENT_TYPE_LABELS['commentary'] ?? 'Kommentar',
     badgeColorKey: 'green',
     actions: [
-      { label: 'Open commentary', icon: 'book-open' },
-      { label: 'View article', icon: 'file-text' },
+      { label: 'Kommentar öffnen', icon: 'book-open' },
+      { label: 'Artikel anzeigen', icon: 'file-text' },
     ],
   },
   rechtssatz: {
     badgeLabel: DOCUMENT_TYPE_LABELS['rechtssatz'] ?? 'Rechtssatz',
     badgeColorKey: 'indigo',
     actions: [
-      { label: 'Open', icon: 'bookmark' },
-      { label: 'Related decision', icon: 'scale' },
+      { label: 'Öffnen', icon: 'bookmark' },
+      { label: 'Verwandter Entscheid', icon: 'scale' },
     ],
   },
 };
 
 const DEFAULT_TYPE_CONFIG: DocumentTypeConfig = {
-  badgeLabel: 'Document',
+  badgeLabel: 'Dokument',
   badgeColorKey: 'slate',
-  actions: [{ label: 'Open', icon: 'file-text' }],
+  actions: [{ label: 'Öffnen', icon: 'file-text' }],
 };
 
 // ─── Composition Functions ───
@@ -166,7 +166,7 @@ export function composeSubtitle(hit: SearchHitEntity, warn?: WarnFn): string {
     parts.push(config.badgeLabel);
   }
 
-  return parts.join(' · ') || (hit.document_type ?? 'Document');
+  return parts.join(' · ') || (hit.document_type ?? 'Dokument');
 }
 
 /** Compose metadata rows (date label varies by document type). */
@@ -174,7 +174,7 @@ export function composeMetadata(hit: SearchHitEntity): MetadataRowView[] {
   const rows: MetadataRowView[] = [];
 
   if (hit.effective_date) {
-    const label = hit.document_type === 'decision' ? 'Date' : 'In force';
+    const label = hit.document_type === 'decision' ? 'Datum' : 'In Kraft';
     rows.push({ label, value: hit.effective_date });
   }
 
@@ -187,18 +187,18 @@ export function composeRelatedCounts(hit: SearchHitEntity): RelatedCountView[] {
 
   if (hit.related_commentary_count && hit.related_commentary_count > 0) {
     counts.push({
-      label: 'Commentary',
+      label: 'Kommentare',
       count: hit.related_commentary_count,
     });
   }
   if (hit.related_decisions_count && hit.related_decisions_count > 0) {
     counts.push({
-      label: 'Court decisions',
+      label: 'Gerichtsentscheide',
       count: hit.related_decisions_count,
     });
   }
   if (hit.citations_count && hit.citations_count > 0) {
-    counts.push({ label: 'Citations', count: hit.citations_count });
+    counts.push({ label: 'Zitationen', count: hit.citations_count });
   }
 
   return counts;

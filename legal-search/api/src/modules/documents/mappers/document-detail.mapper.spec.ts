@@ -61,7 +61,7 @@ describe('mapDocumentToDetailView', () => {
     expect(view.id).toBe('doc_001');
     expect(view.type).toBe('law');
     expect(view.title).toBe('Bundesgesetz über das Obligationenrecht');
-    expect(view.subtitle).toContain('Switzerland');
+    expect(view.subtitle).toContain('Schweiz');
     expect(view.breadcrumbs).toEqual(['OR', 'Gesellschaftsrecht', 'Verantwortlichkeit']);
     expect(view.content).toEqual({ version: '1.0', body: [] });
     expect(view.contentLanguage?.display).toBe('de');
@@ -71,7 +71,7 @@ describe('mapDocumentToDetailView', () => {
     const view = mapDocumentToDetailView(lawDoc, sections, citations);
     expect(view.metadata.length).toBeGreaterThan(0);
     expect(view.metadata).toContainEqual({
-      label: 'In force',
+      label: 'In Kraft',
       value: '2024-01-01',
     });
   });

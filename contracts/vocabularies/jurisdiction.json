@@ -12,7 +12,7 @@
         "CH": {
           "type": "object",
           "properties": {
-            "label": { "const": "Switzerland" },
+            "label": { "const": "Schweiz" },
             "iconKey": { "const": "ch" },
             "standard": { "const": "ISO 3166-1 alpha-2" }
           }
@@ -20,7 +20,7 @@
         "AT": {
           "type": "object",
           "properties": {
-            "label": { "const": "Austria" },
+            "label": { "const": "Österreich" },
             "iconKey": { "const": "at" },
             "standard": { "const": "ISO 3166-1 alpha-2" }
           }
@@ -28,7 +28,7 @@
         "DE": {
           "type": "object",
           "properties": {
-            "label": { "const": "Germany" },
+            "label": { "const": "Deutschland" },
             "iconKey": { "const": "de" },
             "standard": { "const": "ISO 3166-1 alpha-2" }
           }

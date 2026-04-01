@@ -34,7 +34,7 @@ interface FacetConfig {
 const FACET_CONFIGS: FacetConfig[] = [
   {
     key: 'jurisdiction',
-    label: 'Jurisdiction',
+    label: 'Zuständigkeit',
     type: 'chip',
     labelMap: Object.fromEntries(
       Object.entries(JURISDICTION_META).map(([k, v]) => [
@@ -45,7 +45,7 @@ const FACET_CONFIGS: FacetConfig[] = [
   },
   {
     key: 'document_type',
-    label: 'Document type',
+    label: 'Dokumenttyp',
     type: 'chip',
     labelMap: Object.fromEntries(
       Object.entries(DOCUMENT_TYPE_LABELS).map(([k, v]) => [
@@ -56,7 +56,7 @@ const FACET_CONFIGS: FacetConfig[] = [
   },
   {
     key: 'language',
-    label: 'Language',
+    label: 'Sprache',
     type: 'chip',
     labelMap: {
       de: { label: 'DE' },
@@ -67,12 +67,12 @@ const FACET_CONFIGS: FacetConfig[] = [
   },
   {
     key: 'court_level',
-    label: 'Court level',
+    label: 'Instanz',
     type: 'checkbox',
   },
   {
     key: 'legal_area',
-    label: 'Legal area',
+    label: 'Rechtsgebiet',
     type: 'checkbox',
   },
 ];

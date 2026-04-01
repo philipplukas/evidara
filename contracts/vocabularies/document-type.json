@@ -12,7 +12,7 @@
         "law": {
           "type": "object",
           "properties": {
-            "label": { "const": "Law" },
+            "label": { "const": "Gesetz" },
             "aliases": {
               "type": "array",
               "items": { "type": "string" },
@@ -24,7 +24,7 @@
         "decision": {
           "type": "object",
           "properties": {
-            "label": { "const": "Court decision" },
+            "label": { "const": "Gerichtsentscheid" },
             "aliases": {
               "type": "array",
               "items": { "type": "string" },
@@ -36,7 +36,7 @@
         "commentary": {
           "type": "object",
           "properties": {
-            "label": { "const": "Commentary" },
+            "label": { "const": "Kommentar" },
             "aliases": {
               "type": "array",
               "items": { "type": "string" },

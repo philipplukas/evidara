@@ -62,7 +62,7 @@ describe('search response contract (ADR-0011)', () => {
 
     const lawResult = res.body.results.find((r: { type: string }) => r.type === 'law');
 
-    expect(lawResult.badges[0].label).toBe('Law');
+    expect(lawResult.badges[0].label).toBe('Gesetz');
     expect(lawResult.badges[0].colorKey).toBe('blue');
     expect(lawResult.badges[0].iconKey).toBe('ch');
   });
@@ -72,7 +72,7 @@ describe('search response contract (ADR-0011)', () => {
 
     const decisionResult = res.body.results.find((r: { type: string }) => r.type === 'decision');
 
-    expect(decisionResult.badges[0].label).toBe('Court decision');
+    expect(decisionResult.badges[0].label).toBe('Gerichtsentscheid');
     expect(decisionResult.badges[0].colorKey).toBe('pink');
   });
 
@@ -133,7 +133,7 @@ describe('search context contract', () => {
 
     const ch = res.body.jurisdictions[0];
     expect(ch.key).toBe('ch');
-    expect(ch.label).toBe('Switzerland');
+    expect(ch.label).toBe('Schweiz');
     expect(ch.active).toBe(true);
     expect(ch.iconKey).toBe('ch');
   });
@@ -148,12 +148,12 @@ describe('search context contract', () => {
     expect(fr.active).toBe(false);
   });
 
-  it('sourceTypes start with "All" as active', async () => {
+  it('sourceTypes start with "Alle" as active', async () => {
     const res = await supertest(app.getHttpServer()).get('/v1/search/context').expect(200);
 
     expect(res.body.sourceTypes[0]).toEqual({
       key: 'all',
-      label: 'All',
+      label: 'Alle',
       active: true,
     });
   });
@@ -229,7 +229,7 @@ describe('unknown vocabulary handling (ADR-0012)', () => {
 
     const result = res.body.results[0];
     // Falls back to generic — but still valid
-    expect(result.badges[0].label).toBe('Document');
+    expect(result.badges[0].label).toBe('Dokument');
     expect(result.badges[0].colorKey).toBe('slate');
     expect(result.actions.length).toBeGreaterThan(0);
     // arrays are still arrays
