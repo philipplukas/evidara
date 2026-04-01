@@ -93,8 +93,8 @@ describe('composeBadges', () => {
 // ─── composeSubtitle ───
 
 describe('composeSubtitle', () => {
-  it('should compose "Switzerland · Federal law" for CH + law', () => {
-    expect(composeSubtitle(lawHit)).toBe('Switzerland · Federal law');
+  it('should compose "Switzerland · Law" for CH + law', () => {
+    expect(composeSubtitle(lawHit)).toBe('Switzerland · Law');
   });
 
   it('should compose "Switzerland · Court decision" for CH + decision', () => {
@@ -103,7 +103,7 @@ describe('composeSubtitle', () => {
 
   it('should fall back to document_type for unknown jurisdiction', () => {
     const hit = { ...minimalHit, document_type: 'law' };
-    expect(composeSubtitle(hit)).toBe('Federal law');
+    expect(composeSubtitle(hit)).toBe('Law');
   });
 
   it('should fall back to "Document" for fully unknown hit', () => {

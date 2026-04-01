@@ -161,7 +161,7 @@ export function composeSubtitle(hit: SearchHitEntity, warn?: WarnFn): string {
 
   const config = DOCUMENT_TYPE_CONFIG[hit.document_type ?? ''];
   if (config) {
-    parts.push(config.badgeLabel === 'Court decision' ? 'Court decision' : 'Federal law');
+    parts.push(config.badgeLabel);
   }
 
   return parts.join(' · ') || (hit.document_type ?? 'Document');
