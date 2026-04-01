@@ -75,9 +75,9 @@ describe('jurisdiction facet', () => {
 
   it('should apply human-readable labels', () => {
     const labels = jurisdictionFacet.options.map((o) => o.label);
-    expect(labels).toContain('Switzerland');
-    expect(labels).toContain('Austria');
-    expect(labels).toContain('Germany');
+    expect(labels).toContain('Schweiz');
+    expect(labels).toContain('Österreich');
+    expect(labels).toContain('Deutschland');
   });
 
   it('should include iconKey for known jurisdictions', () => {
@@ -99,9 +99,9 @@ describe('document_type facet', () => {
     const typeFacet = facets.find((f) => f.key === 'document_type')!;
     const labels = typeFacet.options.map((o) => o.label);
 
-    expect(labels).toContain('Laws');
-    expect(labels).toContain('Court decisions');
-    expect(labels).toContain('Commentarys');
+    expect(labels).toContain('Gesetze');
+    expect(labels).toContain('Gerichtsentscheide');
+    expect(labels).toContain('Kommentare');
   });
 
   it('should fall back to raw key for unknown document types', () => {

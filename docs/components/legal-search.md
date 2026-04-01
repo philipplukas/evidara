@@ -6,7 +6,15 @@ Serve legal and document search and detail experiences to users. Legal-search is
 
 ## Current state
 
-The `legal-search/` folder contains the migrated frontend application. The BFF, projection worker, and OpenSearch integration are not yet implemented.
+The `legal-search/` folder contains:
+
+- **Frontend (Next.js 16):** Full workspace UI with resizable panels, filter panel, result list, detail panel with tabs, mobile layout. 43 components using shadcn/radix primitives and a custom design system. Currently rendering mock data.
+- **BFF (NestJS):** Search and document detail endpoints wired to OpenSearch. Contract-first ViewModel mappers (ADR-0011, ADR-0012) with vocabulary-driven labels and observable fallbacks. 104 tests passing. Labels are in German (ADR-0013).
+- **OpenSearch adapters:** Search with multi_match, faceted aggregations (jurisdiction, document type, language), highlight-based snippets. Document detail with sections and citations.
+- **Seed pipeline:** Script to ingest Swiss court decisions from opencaselaw.ch into a local OpenSearch index.
+- **Contracts:** OpenAPI spec, search projection schema with provenance, controlled vocabularies for jurisdiction and document type.
+
+The frontend is not yet connected to the live BFF — it uses mock data. The projection builder and event-driven ingestion pipeline are not yet implemented.
 
 ## Source of truth
 
@@ -31,13 +39,15 @@ The `legal-search/` folder contains the migrated frontend application. The BFF, 
 
 ## Minimal next tasks
 
-- [ ] Define search projection schema
+- [x] Define search projection schema
+- [x] Define minimal NestJS BFF endpoints
+- [ ] Connect frontend to live BFF (replace mock data with Orval-generated client)
 - [ ] Define initial OpenSearch mapping and alias strategy
 - [ ] Define projection manifest/history model
 - [ ] Implement `document.processed` ingestion and projection writer (consume events, read published refs, transform to projection schema, upsert to OpenSearch)
 - [ ] Implement `document.withdrawn` ingestion and deindex/tombstone behavior, including replay ordering tests
-- [ ] Define minimal NestJS BFF endpoints
 - [ ] Define reindex workflow
+- [ ] Internationalization: BFF locale-awareness and frontend `next-intl` (ADR-0013, Phases 1–2)
 
 ## Minimal v1 Outcome
 
@@ -51,9 +61,12 @@ A user can:
 
 | Phase | Capability |
 |-------|-----------|
+| Next | Connect frontend to live BFF |
 | Next | Section-level search |
 | Next | Citation-aware search |
+| Next | i18n: French and Italian UI (ADR-0013) |
 | Later | Facets and ranking improvements |
+| Later | Per-language OpenSearch analyzers |
 | Later | Semantic search |
 | Later | Richer document exploration |
 

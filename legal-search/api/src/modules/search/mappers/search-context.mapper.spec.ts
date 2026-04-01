@@ -41,7 +41,7 @@ describe('mapContextAggregations', () => {
     const ctx = mapContextAggregations(emptyContext);
     expect(ctx.jurisdictions).toEqual([]);
     expect(ctx.languages).toEqual([]);
-    expect(ctx.sourceTypes).toEqual([{ key: 'all', label: 'All', active: true }]);
+    expect(ctx.sourceTypes).toEqual([{ key: 'all', label: 'Alle', active: true }]);
     expect(ctx.exactMatches).toEqual([]);
   });
 });
@@ -52,13 +52,13 @@ describe('jurisdiction chips', () => {
   it('should produce chips with human-readable labels', () => {
     const ctx = mapContextAggregations(fullContext);
     const labels = ctx.jurisdictions.map((j) => j.label);
-    expect(labels).toContain('Switzerland');
-    expect(labels).toContain('Austria');
+    expect(labels).toContain('Schweiz');
+    expect(labels).toContain('Österreich');
   });
 
   it('should include iconKey for known jurisdictions', () => {
     const ctx = mapContextAggregations(fullContext);
-    const ch = ctx.jurisdictions.find((j) => j.label === 'Switzerland');
+    const ch = ctx.jurisdictions.find((j) => j.label === 'Schweiz');
     expect(ch?.iconKey).toBe('ch');
   });
 
@@ -71,7 +71,7 @@ describe('jurisdiction chips', () => {
 
   it('should lowercase the key', () => {
     const ctx = mapContextAggregations(fullContext);
-    const ch = ctx.jurisdictions.find((j) => j.label === 'Switzerland');
+    const ch = ctx.jurisdictions.find((j) => j.label === 'Schweiz');
     expect(ch?.key).toBe('ch');
   });
 
@@ -117,11 +117,11 @@ describe('language chips', () => {
 // ─── Source Types ───
 
 describe('source type chips', () => {
-  it('should prepend "All" option as active', () => {
+  it('should prepend "Alle" option as active', () => {
     const ctx = mapContextAggregations(fullContext);
     expect(ctx.sourceTypes[0]).toEqual({
       key: 'all',
-      label: 'All',
+      label: 'Alle',
       active: true,
     });
   });
@@ -129,8 +129,8 @@ describe('source type chips', () => {
   it('should apply human-readable labels for known types', () => {
     const ctx = mapContextAggregations(fullContext);
     const labels = ctx.sourceTypes.map((s) => s.label);
-    expect(labels).toContain('Law');
-    expect(labels).toContain('Court decision');
+    expect(labels).toContain('Gesetz');
+    expect(labels).toContain('Gerichtsentscheid');
   });
 
   it('should mark all non-"All" source types as inactive', () => {

@@ -47,7 +47,7 @@ describe('composeBadges', () => {
   it('should produce a badge with correct label and color for known type', () => {
     const badges = composeBadges(lawHit);
     expect(badges).toHaveLength(1);
-    expect(badges[0].label).toBe('Law');
+    expect(badges[0].label).toBe('Gesetz');
     expect(badges[0].colorKey).toBe('blue');
   });
 
@@ -59,7 +59,7 @@ describe('composeBadges', () => {
   it('should fall back to generic badge for unknown type', () => {
     const hit = { ...minimalHit, document_type: 'regulation' };
     const badges = composeBadges(hit);
-    expect(badges[0].label).toBe('Document');
+    expect(badges[0].label).toBe('Dokument');
     expect(badges[0].colorKey).toBe('slate');
   });
 
@@ -93,39 +93,39 @@ describe('composeBadges', () => {
 // ─── composeSubtitle ───
 
 describe('composeSubtitle', () => {
-  it('should compose "Switzerland · Law" for CH + law', () => {
-    expect(composeSubtitle(lawHit)).toBe('Switzerland · Law');
+  it('should compose "Schweiz · Gesetz" for CH + law', () => {
+    expect(composeSubtitle(lawHit)).toBe('Schweiz · Gesetz');
   });
 
-  it('should compose "Switzerland · Court decision" for CH + decision', () => {
-    expect(composeSubtitle(decisionHit)).toBe('Switzerland · Court decision');
+  it('should compose "Schweiz · Gerichtsentscheid" for CH + decision', () => {
+    expect(composeSubtitle(decisionHit)).toBe('Schweiz · Gerichtsentscheid');
   });
 
-  it('should fall back to document_type for unknown jurisdiction', () => {
+  it('should fall back to document_type label for unknown jurisdiction', () => {
     const hit = { ...minimalHit, document_type: 'law' };
-    expect(composeSubtitle(hit)).toBe('Law');
+    expect(composeSubtitle(hit)).toBe('Gesetz');
   });
 
-  it('should fall back to "Document" for fully unknown hit', () => {
-    expect(composeSubtitle(minimalHit)).toBe('Document');
+  it('should fall back to "Dokument" for fully unknown hit', () => {
+    expect(composeSubtitle(minimalHit)).toBe('Dokument');
   });
 });
 
 // ─── composeMetadata ───
 
 describe('composeMetadata', () => {
-  it('should produce "In force" row for law with effective_date', () => {
+  it('should produce "In Kraft" row for law with effective_date', () => {
     const rows = composeMetadata(lawHit);
     expect(rows).toContainEqual({
-      label: 'In force',
+      label: 'In Kraft',
       value: '2024-01-01',
     });
   });
 
-  it('should produce "Date" row for decision', () => {
+  it('should produce "Datum" row for decision', () => {
     const rows = composeMetadata(decisionHit);
     expect(rows).toContainEqual({
-      label: 'Date',
+      label: 'Datum',
       value: '2018-06-15',
     });
   });
@@ -141,9 +141,9 @@ describe('composeRelatedCounts', () => {
   it('should produce counts for law hit', () => {
     const counts = composeRelatedCounts(lawHit);
     expect(counts).toHaveLength(3);
-    expect(counts.find((c) => c.label === 'Commentary')?.count).toBe(8);
-    expect(counts.find((c) => c.label === 'Court decisions')?.count).toBe(23);
-    expect(counts.find((c) => c.label === 'Citations')?.count).toBe(15);
+    expect(counts.find((c) => c.label === 'Kommentare')?.count).toBe(8);
+    expect(counts.find((c) => c.label === 'Gerichtsentscheide')?.count).toBe(23);
+    expect(counts.find((c) => c.label === 'Zitationen')?.count).toBe(15);
   });
 
   it('should return empty array when no counts', () => {
@@ -162,14 +162,14 @@ describe('composeActions', () => {
   it('should produce law-specific actions for law type', () => {
     const actions = composeActions(lawHit);
     expect(actions).toHaveLength(2);
-    expect(actions[0].label).toBe('Open article');
+    expect(actions[0].label).toBe('Artikel \u00f6ffnen');
   });
 
   it('should produce generic action for unknown type', () => {
     const hit = { ...minimalHit, document_type: 'regulation' };
     const actions = composeActions(hit);
     expect(actions).toHaveLength(1);
-    expect(actions[0].label).toBe('Open');
+    expect(actions[0].label).toBe('\u00d6ffnen');
   });
 
   it('should warn on unknown document_type', () => {

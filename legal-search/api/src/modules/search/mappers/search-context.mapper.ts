@@ -51,7 +51,7 @@ export function mapContextAggregations(aggs: ContextAggregations): SearchContext
       active: bucket.key === 'de', // default: DE active
     })),
     sourceTypes: [
-      { key: 'all', label: 'All', active: true },
+      { key: 'all', label: 'Alle', active: true },
       ...aggs.source_types.map((bucket) => ({
         key: bucket.key,
         label: DOCUMENT_TYPE_LABELS[bucket.key] ?? bucket.key,
