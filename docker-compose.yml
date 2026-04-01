@@ -1,0 +1,48 @@
+# Local development services for legal-search.
+#
+# Usage:
+#   docker compose up -d          # Start OpenSearch
+#   docker compose down           # Stop
+#   docker compose down -v        # Stop + delete data
+#
+# After starting:
+#   cd legal-search/api
+#   npm run seed:index            # Seed data from OpenCaseLaw
+#   npm run dev                   # Start the API
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.17.1
+    container_name: evidara-opensearch
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=admin
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 | grep -q 'cluster_name'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Optional: OpenSearch Dashboards for browsing data
+  # Uncomment if you want a web UI at http://localhost:5601
+  # dashboards:
+  #   image: opensearchproject/opensearch-dashboards:2.17.1
+  #   container_name: evidara-dashboards
+  #   environment:
+  #     - OPENSEARCH_HOSTS=["http://opensearch:9200"]
+  #     - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+  #   ports:
+  #     - "5601:5601"
+  #   depends_on:
+  #     opensearch:
+  #       condition: service_healthy
+
+volumes:
+  opensearch-data:

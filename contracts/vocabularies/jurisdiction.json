@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/vocabularies/jurisdiction",
+  "title": "Jurisdiction Vocabulary",
+  "description": "Controlled vocabulary for jurisdiction codes. MUST use ISO 3166-1 alpha-2. Canonical output MUST emit normalized values only.",
+  "type": "object",
+  "properties": {
+    "vocabulary": { "const": "jurisdiction" },
+    "values": {
+      "type": "object",
+      "properties": {
+        "CH": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Switzerland" },
+            "iconKey": { "const": "ch" },
+            "standard": { "const": "ISO 3166-1 alpha-2" }
+          }
+        },
+        "AT": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Austria" },
+            "iconKey": { "const": "at" },
+            "standard": { "const": "ISO 3166-1 alpha-2" }
+          }
+        },
+        "DE": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Germany" },
+            "iconKey": { "const": "de" },
+            "standard": { "const": "ISO 3166-1 alpha-2" }
+          }
+        },
+        "LI": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Liechtenstein" },
+            "iconKey": { "const": "li" },
+            "standard": { "const": "ISO 3166-1 alpha-2" }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

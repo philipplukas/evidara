@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/vocabularies/document-type",
+  "title": "Document Type Vocabulary",
+  "description": "Controlled vocabulary for document_type. Canonical output MUST emit normalized values only. Aliases are for upstream normalization mapping — they are NOT valid canonical values.",
+  "type": "object",
+  "properties": {
+    "vocabulary": { "const": "document_type" },
+    "values": {
+      "type": "object",
+      "properties": {
+        "law": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Law" },
+            "aliases": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": ["statute", "act", "gesetz", "loi", "legge", "bundesgesetz"]
+            },
+            "sortOrder": { "const": 10 }
+          }
+        },
+        "decision": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Court decision" },
+            "aliases": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": ["judgment", "ruling", "urteil", "arrêt", "sentenza", "entscheid", "beschluss"]
+            },
+            "sortOrder": { "const": 20 }
+          }
+        },
+        "commentary": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Commentary" },
+            "aliases": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": ["kommentar", "commentaire", "commento"]
+            },
+            "sortOrder": { "const": 30 }
+          }
+        },
+        "rechtssatz": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Rechtssatz" },
+            "aliases": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": ["headnote", "legal principle", "leitsatz"]
+            },
+            "sortOrder": { "const": 40 }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

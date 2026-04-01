@@ -2,9 +2,15 @@ openapi: 3.1.0
 info:
   title: Legal Search API
   description: |
-    API for searching and retrieving legal and regulatory documents
-    in the Evidara legal search experience.
-  version: 0.1.0
+    BFF API for the Evidara legal search experience.
+
+    This API returns ViewModel shapes ready for frontend rendering.
+    The frontend is a pure rendering layer — all composition logic
+    (badges, actions, metadata, facets) lives in this API.
+
+    See ADR-0011 for contract conventions.
+    See ADR-0012 for layered contract governance.
+  version: 0.2.0
   contact:
     name: Evidara Team
 
@@ -14,14 +20,14 @@ servers:
   - url: https://legal-search.evidara.dev
     description: Production
 
-security:
-  - bearerAuth: []
-
 paths:
   /v1/search:
     get:
       operationId: searchDocuments
       summary: Search documents
+      description: |
+        Returns search results as composed ViewModels with embedded facets.
+        Facet counts are live (computed from the same query via OpenSearch aggs).
       tags: [search]
       parameters:
         - name: q
@@ -34,7 +40,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Filter by jurisdiction
+          description: Filter by jurisdiction (ISO 3166-1 alpha-2)
         - name: document_type
           in: query
           schema:
@@ -46,7 +52,6 @@ paths:
             type: integer
             default: 1
             minimum: 1
-          description: Page number
         - name: page_size
           in: query
           schema:
@@ -54,14 +59,29 @@ paths:
             default: 20
             minimum: 1
             maximum: 100
-          description: Results per page
       responses:
         "200":
-          description: Search results
+          description: Search results with embedded facets
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SearchResponse"
+                $ref: "#/components/schemas/SearchResponseView"
+
+  /v1/search/context:
+    get:
+      operationId: getSearchContext
+      summary: Get search context
+      description: |
+        Returns global search context (jurisdictions, languages, source types).
+        Query-independent and cacheable. Changes rarely.
+      tags: [search]
+      responses:
+        "200":
+          description: Search context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchContextView"
 
   /v1/documents/{document_id}:
     get:
@@ -76,11 +96,11 @@ paths:
             type: string
       responses:
         "200":
-          description: Document detail
+          description: Document detail as composed ViewModel
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DocumentDetail"
+                $ref: "#/components/schemas/DetailView"
         "404":
           description: Document not found
 
@@ -114,70 +134,342 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT token obtained from the identity provider.
 
   schemas:
-    SearchResponse:
+    # ─── Search Response ───
+    SearchResponseView:
       type: object
+      required: [results, facets, totalResults]
       properties:
-        query:
-          type: string
-        total_results:
-          type: integer
-        page:
-          type: integer
-        page_size:
-          type: integer
         results:
           type: array
           items:
-            $ref: "#/components/schemas/SearchResult"
+            $ref: "#/components/schemas/SearchResultView"
+          default: []
+        facets:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilterFacetView"
+          default: []
+        totalResults:
+          type: integer
 
-    SearchResult:
+    SearchResultView:
       type: object
+      required: [id, type, title, subtitle, snippet, badges, metadataRows, relatedCounts, actions]
       properties:
-        document_id:
+        id:
           type: string
+        type:
+          type: string
+          description: "Document type (law, decision, commentary, rechtssatz)"
         title:
           type: string
+        subtitle:
+          type: string
+          description: "Composed subtitle (e.g. 'Switzerland · Federal law')"
         snippet:
           type: string
           description: Highlighted text snippet matching the query
-        jurisdiction:
+        structuralContext:
           type: string
-        document_type:
-          type: string
-        effective_date:
-          type: string
-          format: date
-        relevance_score:
-          type: number
+          description: "Breadcrumb-style structural path (e.g. 'OR › Gesellschaftsrecht › Verantwortlichkeit')"
+        badges:
+          type: array
+          items:
+            $ref: "#/components/schemas/Badge"
+          default: []
+        metadataRows:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetadataRow"
+          default: []
+        relatedCounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelatedCount"
+          default: []
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Action"
+          default: []
+        contentLanguage:
+          $ref: "#/components/schemas/ContentLanguage"
 
-    DocumentDetail:
+    # ─── Shared ViewModel Components ───
+    Badge:
       type: object
+      required: [label, colorKey]
       properties:
-        document_id:
+        label:
+          type: string
+        colorKey:
+          type: string
+        iconKey:
+          type: string
+
+    MetadataRow:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        iconKey:
+          type: string
+
+    RelatedCount:
+      type: object
+      required: [label, count]
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+        href:
+          type: string
+
+    Action:
+      type: object
+      required: [label, icon]
+      properties:
+        label:
+          type: string
+        icon:
+          type: string
+        href:
+          type: string
+
+    ContentLanguage:
+      type: object
+      required: [display, original, isTranslation]
+      properties:
+        display:
+          type: string
+        original:
+          type: string
+        isTranslation:
+          type: boolean
+        label:
+          type: string
+
+    # ─── Filter Facets ───
+    FilterFacetView:
+      type: object
+      required: [key, label, type, options]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+          enum: [checkbox, chip, dropdown, date, toggle]
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilterOption"
+          default: []
+
+    FilterOption:
+      type: object
+      required: [value, label]
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+        count:
+          type: integer
+        iconKey:
+          type: string
+
+    # ─── Search Context ───
+    SearchContextView:
+      type: object
+      required: [jurisdictions, languages, sourceTypes]
+      properties:
+        jurisdictions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextChip"
+          default: []
+        languages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextChip"
+          default: []
+        sourceTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextChip"
+          default: []
+        exactMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResultView"
+          default: []
+
+    ContextChip:
+      type: object
+      required: [key, label, active]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        active:
+          type: boolean
+        iconKey:
+          type: string
+
+    # ─── Detail View ───
+    DetailView:
+      type: object
+      required: [id, type, title, subtitle, metadata, tabs, relatedGroups, references, annotations]
+      properties:
+        id:
+          type: string
+        type:
           type: string
         title:
           type: string
+        subtitle:
+          type: string
+        breadcrumbs:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetadataRow"
+          default: []
         content:
+          type: object
+          description: |
+            Structured DoclingDocument JSON produced by document-intelligence.
+            Passed through unchanged by the BFF. See ADR-0010.
+        contentLanguage:
+          $ref: "#/components/schemas/ContentLanguage"
+        tabs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TabView"
+          default: []
+        relatedGroups:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelatedGroup"
+          default: []
+        references:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReferenceGroup"
+          default: []
+        annotations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Annotation"
+          default: []
+        localStructure:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/LocalStructureItem"
+
+    TabView:
+      type: object
+      required: [key, label]
+      properties:
+        key:
           type: string
-        jurisdiction:
+        label:
           type: string
-        document_type:
-          type: string
-        effective_date:
-          type: string
-          format: date
-        source_id:
-          type: string
-        processed_at:
-          type: string
-          format: date-time
-        sections_count:
+        count:
           type: integer
-        citations_count:
+
+    RelatedGroup:
+      type: object
+      required: [label, items]
+      properties:
+        label:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelatedItem"
+          default: []
+
+    RelatedItem:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        badge:
+          $ref: "#/components/schemas/Badge"
+        href:
+          type: string
+
+    ReferenceGroup:
+      type: object
+      required: [label, items]
+      properties:
+        label:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReferenceItem"
+          default: []
+
+    ReferenceItem:
+      type: object
+      required: [id, title, citation]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        citation:
+          type: string
+        href:
+          type: string
+
+    Annotation:
+      type: object
+      required: [id, label, text]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        text:
+          type: string
+        type:
+          type: string
+
+    LocalStructureItem:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        depth:
           type: integer
+        active:
+          type: boolean
 
     SectionSummary:
       type: object
