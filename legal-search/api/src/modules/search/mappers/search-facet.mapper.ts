@@ -48,10 +48,16 @@ const FACET_CONFIGS: FacetConfig[] = [
     label: 'Dokumenttyp',
     type: 'chip',
     labelMap: Object.fromEntries(
-      Object.entries(DOCUMENT_TYPE_LABELS).map(([k, v]) => [
-        k,
-        { label: `${v}s` }, // pluralize for facet labels
-      ]),
+      Object.entries(DOCUMENT_TYPE_LABELS).map(([k, v]) => {
+        // German plurals are irregular — explicit mapping required
+        const GERMAN_PLURALS: Record<string, string> = {
+          Gesetz: 'Gesetze',
+          Gerichtsentscheid: 'Gerichtsentscheide',
+          Kommentar: 'Kommentare',
+          Rechtssatz: 'Rechtssätze',
+        };
+        return [k, { label: GERMAN_PLURALS[v] ?? v }];
+      }),
     ),
   },
   {
