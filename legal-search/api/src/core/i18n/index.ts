@@ -7,11 +7,11 @@
  * ADR-0013: BFF owns locale-aware composition for all API-delivered
  * display labels (badges, facets, tabs, actions, metadata).
  */
-import type { SupportedLocale } from './locale';
-import { DEFAULT_LOCALE } from './locale';
 
 import deMessages from './de.json';
 import frMessages from './fr.json';
+import type { SupportedLocale } from './locale';
+import { DEFAULT_LOCALE } from './locale';
 
 type TranslationMessages = Record<string, string>;
 
@@ -30,5 +30,4 @@ export function t(key: string, locale: SupportedLocale = DEFAULT_LOCALE): string
   return MESSAGES[locale]?.[key] ?? MESSAGES[DEFAULT_LOCALE]?.[key] ?? key;
 }
 
-export { DEFAULT_LOCALE, type SupportedLocale } from './locale';
-export { resolveLocale } from './locale';
+export { DEFAULT_LOCALE, resolveLocale, type SupportedLocale } from './locale';

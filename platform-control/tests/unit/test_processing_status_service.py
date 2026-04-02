@@ -7,12 +7,18 @@ import pytest
 from platform_control.domain import ProcessingStatus, RunMode, RunStatus, SourceVersionStatus
 from platform_control.errors import NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
 from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
+from platform_control.schemas.document_events import DocumentProcessedEvent, DocumentWithdrawnEvent
 from platform_control.schemas.processing_status import DocumentProcessingStatusUpdatedEvent
 from platform_control.services.processing_status_service import ProcessingStatusService
+
+RUN_ID = "run_01jq7a3s9b7j4dndd9sgv6pb9d"
+SOURCE_ID = "src_01jq79xv3wdd6yr8q5bn0m3zfk"
+SOURCE_VERSION_ID = "sv_01jq79zcskf4m3m4gm3t5s59xq"
 
 
 async def _seed_run(session) -> Run:
@@ -26,22 +32,22 @@ async def _seed_run(session) -> Run:
         )
     )
     source = Source(
-        source_id="src_seed",
+        source_id=SOURCE_ID,
         name="Zurich decisions",
         jurisdiction_id="jur_ch",
         authority_id="auth_zh_admin",
     )
     source_version = SourceVersion(
-        source_version_id="sv_seed",
-        source_id="src_seed",
+        source_version_id=SOURCE_VERSION_ID,
+        source_id=SOURCE_ID,
         version_label="v1",
         status=SourceVersionStatus.APPROVED,
         acquisition_spec={"seed_url": "https://example.com/decisions", "mode": "crawl"},
     )
     run = Run(
-        run_id="run_seed",
-        source_id="src_seed",
-        source_version_id="sv_seed",
+        run_id=RUN_ID,
+        source_id=SOURCE_ID,
+        source_version_id=SOURCE_VERSION_ID,
         mode=RunMode.PRODUCTION,
         status=RunStatus.RUNNING,
     )
@@ -60,7 +66,7 @@ def _build_status_event(
         event_id=event_id,
         occurred_at=datetime(2026, 4, 2, 12, 0, tzinfo=UTC),
         producer="document-intelligence",
-        correlation_id="run_seed",
+        correlation_id=RUN_ID,
         payload={
             "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
             "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
@@ -69,9 +75,9 @@ def _build_status_event(
                 "tenant_id": "tenant_public",
                 "corpus_id": "corpus_public_ch_federal_law",
                 "scope_type": "global_public",
-                "source_id": "src_seed",
-                "source_version_id": "sv_seed",
-                "run_id": "run_seed",
+                "source_id": SOURCE_ID,
+                "source_version_id": SOURCE_VERSION_ID,
+                "run_id": RUN_ID,
                 "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
                 "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
             },
@@ -79,6 +85,72 @@ def _build_status_event(
             "status": status,
             "error_code": None,
             "error_summary": None,
+        },
+    )
+
+
+def _build_document_processed_event(event_id: str) -> DocumentProcessedEvent:
+    return DocumentProcessedEvent(
+        event_type="document.processed",
+        event_version=1,
+        event_id=event_id,
+        occurred_at=datetime(2026, 4, 2, 12, 2, tzinfo=UTC),
+        producer="document-intelligence",
+        correlation_id=RUN_ID,
+        payload={
+            "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+            "document_revision": 3,
+            "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+            "processing_version": "di_2026_03_29",
+            "provenance": {
+                "tenant_id": "tenant_public",
+                "corpus_id": "corpus_public_ch_federal_law",
+                "scope_type": "global_public",
+                "source_id": SOURCE_ID,
+                "source_version_id": SOURCE_VERSION_ID,
+                "run_id": RUN_ID,
+                "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+                "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+            },
+            "lifecycle_status": "active",
+            "published_document_ref": {"surface_name": "published_documents", "surface_version": 1},
+            "published_sections_ref": {"surface_name": "published_sections", "surface_version": 1},
+            "processing_manifest_ref": {
+                "manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+                "manifest_type": "processing_manifest",
+                "manifest_version": 1,
+                "dataset_ref": {"surface_name": "processing_manifests", "surface_version": 1},
+            },
+            "supersedes_processing_manifest_id": None,
+        },
+    )
+
+
+def _build_document_withdrawn_event(event_id: str) -> DocumentWithdrawnEvent:
+    return DocumentWithdrawnEvent(
+        event_type="document.withdrawn",
+        event_version=1,
+        event_id=event_id,
+        occurred_at=datetime(2026, 4, 2, 12, 3, tzinfo=UTC),
+        producer="document-intelligence",
+        correlation_id=RUN_ID,
+        payload={
+            "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+            "document_revision": 4,
+            "processing_manifest_id": "pm_01jq7cacd0zdw8r9nm7j7n6cnp",
+            "provenance": {
+                "tenant_id": "tenant_public",
+                "corpus_id": "corpus_public_ch_federal_law",
+                "scope_type": "global_public",
+                "source_id": SOURCE_ID,
+                "source_version_id": SOURCE_VERSION_ID,
+                "run_id": RUN_ID,
+                "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+                "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+            },
+            "reason_code": "operator_withdrawn",
+            "reason_summary": "Operator withdrew this revision.",
+            "search_disposition": "remove",
         },
     )
 
@@ -92,7 +164,7 @@ async def test_record_status_update_is_idempotent(session) -> None:
     await service.record_document_processing_status(event)
     await service.record_document_processing_status(event)
 
-    updates = await service.list_run_processing_status("run_seed")
+    updates = await service.list_run_processing_status(RUN_ID)
     assert len(updates) == 1
     assert updates[0].event_id == "evt_status_1"
     assert updates[0].status is ProcessingStatus.CANONICAL_READY
@@ -116,6 +188,33 @@ async def test_list_run_processing_status_orders_by_latest_first(session) -> Non
     await service.record_document_processing_status(older)
     await service.record_document_processing_status(newer)
 
-    updates = await service.list_run_processing_status("run_seed")
+    updates = await service.list_run_processing_status(RUN_ID)
     assert [update.event_id for update in updates] == ["evt_status_new", "evt_status_old"]
     assert all(isinstance(update, ProcessingStatusUpdate) for update in updates)
+
+
+@pytest.mark.asyncio
+async def test_record_document_lifecycle_events_and_list(session) -> None:
+    await _seed_run(session)
+    service = ProcessingStatusService(session)
+
+    await service.record_document_processed(_build_document_processed_event("evt_processed_1"))
+    await service.record_document_withdrawn(_build_document_withdrawn_event("evt_withdrawn_1"))
+
+    events = await service.list_run_document_lifecycle(RUN_ID)
+    assert [event.event_id for event in events] == ["evt_withdrawn_1", "evt_processed_1"]
+    assert all(isinstance(event, DocumentLifecycleEvent) for event in events)
+
+
+@pytest.mark.asyncio
+async def test_record_document_lifecycle_events_is_idempotent(session) -> None:
+    await _seed_run(session)
+    service = ProcessingStatusService(session)
+    processed_event = _build_document_processed_event("evt_processed_dedup")
+
+    await service.record_document_processed(processed_event)
+    await service.record_document_processed(processed_event)
+
+    events = await service.list_run_document_lifecycle(RUN_ID)
+    assert len(events) == 1
+    assert events[0].event_id == "evt_processed_dedup"

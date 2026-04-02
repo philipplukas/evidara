@@ -208,6 +208,23 @@ paths:
         "404":
           description: Run not found
 
+  /v1/runs/{run_id}/document-lifecycle:
+    get:
+      operationId: listRunDocumentLifecycle
+      summary: List document processed/withdrawn lifecycle events for a run
+      tags: [runs]
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Document lifecycle events for the run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentLifecycleEventListResponse"
+        "404":
+          description: Run not found
+
   /v1/di/events/document-processing-status-updated:
     post:
       operationId: receiveDocumentProcessingStatusUpdated
@@ -220,6 +237,50 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/DocumentProcessingStatusUpdatedEvent"
+      responses:
+        "202":
+          description: Event accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventAcceptedResponse"
+        "422":
+          description: Event validation failed
+
+  /v1/di/events/document-processed:
+    post:
+      operationId: receiveDocumentProcessed
+      summary: Ingest canonical-ready document publication events from document-intelligence
+      tags: [di-events]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentProcessedEvent"
+      responses:
+        "202":
+          description: Event accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventAcceptedResponse"
+        "422":
+          description: Event validation failed
+
+  /v1/di/events/document-withdrawn:
+    post:
+      operationId: receiveDocumentWithdrawn
+      summary: Ingest document withdrawal events from document-intelligence
+      tags: [di-events]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentWithdrawnEvent"
       responses:
         "202":
           description: Event accepted
@@ -569,17 +630,25 @@ components:
           type: string
           format: date-time
         source_snapshot_id:
-          type: string
-          pattern: "^snap_[0-9a-hjkmnp-tv-z]{26}$"
+          oneOf:
+            - type: string
+              pattern: "^snap_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
         bundle_manifest_id:
-          type: string
-          pattern: "^abm_[0-9a-hjkmnp-tv-z]{26}$"
+          oneOf:
+            - type: string
+              pattern: "^abm_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
         document_id:
-          type: string
-          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+          oneOf:
+            - type: string
+              pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
         document_revision:
-          type: integer
-          minimum: 1
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: "null"
         error_code:
           oneOf:
             - type: string
@@ -633,23 +702,35 @@ components:
           type: string
           pattern: "^run_[0-9a-hjkmnp-tv-z]{26}$"
         source_snapshot_id:
-          type: string
-          pattern: "^snap_[0-9a-hjkmnp-tv-z]{26}$"
+          oneOf:
+            - type: string
+              pattern: "^snap_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
         bundle_manifest_id:
-          type: string
-          pattern: "^abm_[0-9a-hjkmnp-tv-z]{26}$"
+          oneOf:
+            - type: string
+              pattern: "^abm_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
         artifact_id:
-          type: string
-          pattern: "^art_[0-9a-hjkmnp-tv-z]{26}$"
+          oneOf:
+            - type: string
+              pattern: "^art_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
         document_id:
-          type: string
-          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+          oneOf:
+            - type: string
+              pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
         document_revision:
-          type: integer
-          minimum: 1
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: "null"
         processing_manifest_id:
-          type: string
-          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+          oneOf:
+            - type: string
+              pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
       additionalProperties: false
 
     DocumentProcessingStatusPayload:
@@ -744,6 +825,252 @@ components:
         payload:
           $ref: "#/components/schemas/DocumentProcessingStatusPayload"
       additionalProperties: false
+
+    DatasetRef:
+      type: object
+      required: [surface_name, surface_version]
+      properties:
+        surface_name:
+          type: string
+        surface_version:
+          type: integer
+          minimum: 1
+        record_key:
+          type: object
+          additionalProperties: true
+        record_filter:
+          type: object
+          additionalProperties: true
+      additionalProperties: false
+
+    ManifestRef:
+      type: object
+      required: [manifest_id, manifest_type, manifest_version, dataset_ref]
+      properties:
+        manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+        manifest_type:
+          type: string
+        manifest_version:
+          type: integer
+          minimum: 1
+        dataset_ref:
+          $ref: "#/components/schemas/DatasetRef"
+      additionalProperties: false
+
+    DocumentProcessedPayload:
+      type: object
+      required:
+        - document_id
+        - document_revision
+        - processing_manifest_id
+        - processing_version
+        - provenance
+        - lifecycle_status
+        - published_document_ref
+        - published_sections_ref
+        - processing_manifest_ref
+      properties:
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        processing_manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+        processing_version:
+          type: string
+        provenance:
+          $ref: "#/components/schemas/ProcessingStatusProvenance"
+        lifecycle_status:
+          type: string
+          enum: [active, superseded, repealed, withdrawn]
+        published_document_ref:
+          $ref: "#/components/schemas/DatasetRef"
+        published_sections_ref:
+          $ref: "#/components/schemas/DatasetRef"
+        processing_manifest_ref:
+          $ref: "#/components/schemas/ManifestRef"
+        supersedes_processing_manifest_id:
+          oneOf:
+            - type: string
+              pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
+      additionalProperties: false
+
+    DocumentProcessedEvent:
+      type: object
+      required:
+        - event_type
+        - event_version
+        - event_id
+        - occurred_at
+        - producer
+        - payload
+      properties:
+        event_type:
+          type: string
+          const: document.processed
+        event_version:
+          type: integer
+          const: 1
+        event_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        producer:
+          type: string
+          const: document-intelligence
+        correlation_id:
+          type: string
+          pattern: "^run_[0-9a-hjkmnp-tv-z]{26}$"
+        causation_id:
+          type: string
+        payload:
+          $ref: "#/components/schemas/DocumentProcessedPayload"
+      additionalProperties: false
+
+    DocumentWithdrawnPayload:
+      type: object
+      required:
+        - document_id
+        - document_revision
+        - processing_manifest_id
+        - provenance
+        - reason_code
+        - search_disposition
+      properties:
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        processing_manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+        provenance:
+          $ref: "#/components/schemas/ProcessingStatusProvenance"
+        reason_code:
+          type: string
+          enum: [duplicate, invalid_source, rights_restricted, operator_withdrawn]
+        reason_summary:
+          oneOf:
+            - type: string
+            - type: "null"
+        search_disposition:
+          type: string
+          enum: [remove, hide]
+      additionalProperties: false
+
+    DocumentWithdrawnEvent:
+      type: object
+      required:
+        - event_type
+        - event_version
+        - event_id
+        - occurred_at
+        - producer
+        - payload
+      properties:
+        event_type:
+          type: string
+          const: document.withdrawn
+        event_version:
+          type: integer
+          const: 1
+        event_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        producer:
+          type: string
+          const: document-intelligence
+        correlation_id:
+          type: string
+          pattern: "^run_[0-9a-hjkmnp-tv-z]{26}$"
+        causation_id:
+          type: string
+        payload:
+          $ref: "#/components/schemas/DocumentWithdrawnPayload"
+      additionalProperties: false
+
+    DocumentLifecycleEvent:
+      type: object
+      required:
+        - event_id
+        - event_type
+        - run_id
+        - document_id
+        - document_revision
+        - processing_manifest_id
+        - occurred_at
+        - created_at
+        - updated_at
+      properties:
+        event_id:
+          type: string
+        event_type:
+          type: string
+          enum: [document.processed, document.withdrawn]
+        run_id:
+          type: string
+          pattern: "^run_[0-9a-hjkmnp-tv-z]{26}$"
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        processing_manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+        processing_version:
+          oneOf:
+            - type: string
+            - type: "null"
+        lifecycle_status:
+          oneOf:
+            - type: string
+              enum: [active, superseded, repealed, withdrawn]
+            - type: "null"
+        reason_code:
+          oneOf:
+            - type: string
+              enum: [duplicate, invalid_source, rights_restricted, operator_withdrawn]
+            - type: "null"
+        reason_summary:
+          oneOf:
+            - type: string
+            - type: "null"
+        search_disposition:
+          oneOf:
+            - type: string
+              enum: [remove, hide]
+            - type: "null"
+        occurred_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DocumentLifecycleEventListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentLifecycleEvent"
 
     EventAcceptedResponse:
       type: object

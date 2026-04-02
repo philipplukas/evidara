@@ -6,7 +6,7 @@ Own source lifecycle and operational control. Platform-control is the entry poin
 
 ## Current state
 
-Contracts and API shape are defined, but the service itself is not yet implemented. Repository scaffolding and component documentation exist, yet the runtime service, worker processes, and database schema are not built yet.
+Platform-control now has a running FastAPI service with persisted entities and migration-backed schemas for source lifecycle, runs, webhook receipts, raw artifacts, bundle manifests, and DI status/lifecycle event consumption. Core API endpoints are implemented for sources, versions, runs, Firecrawl callbacks, and DI event ingest (`document.processing_status.updated`, `document.processed`, `document.withdrawn`) with run-scoped read surfaces.
 
 See [Platform Control Implementation Plan](platform-control-implementation-plan.md) for the planned repo structure, worker layout, and phased delivery approach.
 
@@ -37,14 +37,14 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 
 ## Minimal next tasks
 
-- [ ] Define Postgres entities for sources, corpora, versions, runs, and approvals
+- [x] Define Postgres entities for sources, versions, runs, provider jobs, artifacts, and DI event tracking
 - [x] Define OpenAPI spec (`contracts/api/platform-control.openapi.yaml`)
 - [x] Define `ArtifactBundleManifest` schema
-- [ ] Create the initial `platform-control/` API scaffold
+- [x] Create the initial `platform-control/` API scaffold
 - [ ] Create the connector-worker scaffold under `platform-control/`
-- [ ] Define run lifecycle and replay modes
+- [~] Define run lifecycle and replay modes
 - [ ] Define approval states and transitions
-- [ ] Define reference snapshot export mechanics for DI
+- [~] Define reference snapshot export mechanics for DI
 - [ ] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
 
 ## Minimal v1 Outcome
@@ -86,9 +86,15 @@ Lineage and document semantics that cross boundaries still remain Evidara-owned 
 ## Key Contracts
 
 - **Produces:** `artifact_bundle.available`
-- **Consumes:** `document.processing_status.updated`
+- **Consumes:** `document.processing_status.updated`, `document.processed`, `document.withdrawn`
 - **API:** `contracts/api/platform-control.openapi.yaml`
 - **Schemas:** `ArtifactBundleManifest`
+
+## Developer workflow
+
+- Service check: `bash scripts/check-platform-control.sh`
+- Docs/contracts checks: `bash scripts/check_docs.sh`
+- Legal-search checks (cross-component CI parity): `bash scripts/check-legal-search.sh`
 
 ## Testing
 

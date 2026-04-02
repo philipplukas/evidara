@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.config import get_settings
 from platform_control.database import get_session
+from platform_control.schemas.document_events import DocumentLifecycleEventListResponse
 from platform_control.schemas.processing_status import ProcessingStatusUpdateListResponse
 from platform_control.schemas.run import CreateRunRequest, RunResponse
 from platform_control.services.firecrawl_provider import FirecrawlProvider
@@ -50,3 +51,13 @@ async def list_run_processing_status(
     service = ProcessingStatusService(session)
     updates = await service.list_run_processing_status(run_id)
     return ProcessingStatusUpdateListResponse(data=updates)
+
+
+@router.get("/{run_id}/document-lifecycle", response_model=DocumentLifecycleEventListResponse)
+async def list_run_document_lifecycle(
+    run_id: str,
+    session: SessionDep,
+) -> DocumentLifecycleEventListResponse:
+    service = ProcessingStatusService(session)
+    events = await service.list_run_document_lifecycle(run_id)
+    return DocumentLifecycleEventListResponse(data=events)

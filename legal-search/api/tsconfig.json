@@ -19,6 +19,7 @@
     "noImplicitReturns": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
+    "types": ["node", "vitest/globals"],
     "paths": {
       "@vocabularies/*": ["../../contracts/vocabularies/*"]
     }

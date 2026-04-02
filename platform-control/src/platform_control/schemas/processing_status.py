@@ -3,32 +3,32 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from platform_control.domain import ProcessingStatus
 
 
 class ProcessingStatusProvenance(BaseModel):
-    tenant_id: str
-    corpus_id: str
-    scope_type: str
-    source_id: str
-    source_version_id: str
-    run_id: str
-    source_snapshot_id: str | None = None
-    bundle_manifest_id: str | None = None
-    artifact_id: str | None = None
-    document_id: str | None = None
-    document_revision: int | None = None
-    processing_manifest_id: str | None = None
+    tenant_id: str = Field(pattern=r"^tenant_[a-z0-9_]+$")
+    corpus_id: str = Field(pattern=r"^corpus_[a-z0-9_]+$")
+    scope_type: Literal["global_public", "tenant_private", "tenant_shared"]
+    source_id: str = Field(pattern=r"^src_[0-9a-hjkmnp-tv-z]{26}$")
+    source_version_id: str = Field(pattern=r"^sv_[0-9a-hjkmnp-tv-z]{26}$")
+    run_id: str = Field(pattern=r"^run_[0-9a-hjkmnp-tv-z]{26}$")
+    source_snapshot_id: str | None = Field(default=None, pattern=r"^snap_[0-9a-hjkmnp-tv-z]{26}$")
+    bundle_manifest_id: str | None = Field(default=None, pattern=r"^abm_[0-9a-hjkmnp-tv-z]{26}$")
+    artifact_id: str | None = Field(default=None, pattern=r"^art_[0-9a-hjkmnp-tv-z]{26}$")
+    document_id: str | None = Field(default=None, pattern=r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
+    document_revision: int | None = Field(default=None, ge=1)
+    processing_manifest_id: str | None = Field(default=None, pattern=r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
 
     model_config = ConfigDict(extra="forbid")
 
 
 class ProcessingStatusPayload(BaseModel):
-    processing_manifest_id: str
-    document_id: str | None = None
-    document_revision: int | None = None
+    processing_manifest_id: str = Field(pattern=r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
+    document_id: str | None = Field(default=None, pattern=r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
+    document_revision: int | None = Field(default=None, ge=1)
     provenance: ProcessingStatusProvenance
     processing_version: str
     status: ProcessingStatus
@@ -53,7 +53,7 @@ class DocumentProcessingStatusUpdatedEvent(BaseModel):
     event_id: str
     occurred_at: datetime
     producer: Literal["document-intelligence"]
-    correlation_id: str | None = None
+    correlation_id: str | None = Field(default=None, pattern=r"^run_[0-9a-hjkmnp-tv-z]{26}$")
     causation_id: str | None = None
     payload: ProcessingStatusPayload
 

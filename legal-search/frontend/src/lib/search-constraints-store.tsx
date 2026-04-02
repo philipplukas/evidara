@@ -1,23 +1,8 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useMemo,
-  type ReactNode,
-  type Dispatch,
-} from "react";
-import {
-  parseAsBoolean,
-  parseAsString,
-  parseAsArrayOf,
-  useQueryStates,
-} from "nuqs";
-import type {
-  ContextConstraints,
-  SearchRefinement,
-  SearchConstraintsState,
-} from "./types";
+import { parseAsArrayOf, parseAsBoolean, parseAsString, useQueryStates } from "nuqs";
+import { createContext, type Dispatch, type ReactNode, useContext, useMemo } from "react";
+import type { ContextConstraints, SearchConstraintsState, SearchRefinement } from "./types";
 
 export type SearchConstraintsAction =
   | { type: "TOGGLE_JURISDICTION"; jurisdiction: string }
@@ -34,8 +19,7 @@ interface SearchConstraintsContextValue {
   dispatch: Dispatch<SearchConstraintsAction>;
 }
 
-const SearchConstraintsContext =
-  createContext<SearchConstraintsContextValue | null>(null);
+const SearchConstraintsContext = createContext<SearchConstraintsContextValue | null>(null);
 
 // Supported filter keys and their valid values
 const SUPPORTED_FILTERS = {
@@ -140,17 +124,13 @@ function serializeRefinements(refinements: SearchRefinement[]): string {
 }
 
 function toggleValue(values: string[], value: string): string[] {
-  return values.includes(value)
-    ? values.filter((v) => v !== value)
-    : [...values, value];
+  return values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
 }
 
 export function useSearchConstraints(): SearchConstraintsContextValue {
   const ctx = useContext(SearchConstraintsContext);
   if (!ctx) {
-    throw new Error(
-      "useSearchConstraints must be used within a SearchConstraintsProvider"
-    );
+    throw new Error("useSearchConstraints must be used within a SearchConstraintsProvider");
   }
   return ctx;
 }
@@ -159,9 +139,7 @@ interface SearchConstraintsProviderProps {
   children: ReactNode;
 }
 
-export function SearchConstraintsProvider({
-  children,
-}: SearchConstraintsProviderProps) {
+export function SearchConstraintsProvider({ children }: SearchConstraintsProviderProps) {
   const [urlState, setUrlState] = useQueryStates({
     jurisdictions: parseAsArrayOf(parseAsString).withDefault(["CH"]),
     languages: parseAsArrayOf(parseAsString).withDefault(["de"]),
@@ -170,24 +148,21 @@ export function SearchConstraintsProvider({
     refinements: parseAsString,
   });
 
-  const refinements = useMemo(
-    () => parseRefinements(urlState.refinements),
-    [urlState.refinements]
-  );
+  const refinements = useMemo(() => parseRefinements(urlState.refinements), [urlState.refinements]);
 
   const normalizedJurisdictions = useMemo(
     () => normalizeJurisdictions(urlState.jurisdictions),
-    [urlState.jurisdictions]
+    [urlState.jurisdictions],
   );
 
   const normalizedLanguages = useMemo(
     () => normalizeLanguages(urlState.languages),
-    [urlState.languages]
+    [urlState.languages],
   );
 
   const normalizedSourceType = useMemo(
     () => normalizeSourceType(urlState.sourceType),
-    [urlState.sourceType]
+    [urlState.sourceType],
   );
 
   const state: SearchConstraintsState = useMemo(
@@ -206,7 +181,7 @@ export function SearchConstraintsProvider({
       normalizedSourceType,
       urlState.officialOnly,
       refinements,
-    ]
+    ],
   );
 
   const dispatch = useMemo<Dispatch<SearchConstraintsAction>>(
@@ -214,10 +189,7 @@ export function SearchConstraintsProvider({
       switch (action.type) {
         case "TOGGLE_JURISDICTION":
           void setUrlState({
-            jurisdictions: toggleValue(
-              state.context.jurisdictions,
-              action.jurisdiction
-            ),
+            jurisdictions: toggleValue(state.context.jurisdictions, action.jurisdiction),
           });
           break;
 
@@ -236,9 +208,7 @@ export function SearchConstraintsProvider({
           break;
 
         case "SET_REFINEMENT": {
-          const existing = state.refinements.filter(
-            (r) => r.field !== action.field
-          );
+          const existing = state.refinements.filter((r) => r.field !== action.field);
           void setUrlState({
             refinements: serializeRefinements([...existing, action.refinement]),
           });
@@ -271,7 +241,7 @@ export function SearchConstraintsProvider({
           break;
       }
     },
-    [setUrlState, state.context.jurisdictions, state.context.languages, state.refinements]
+    [setUrlState, state.context.jurisdictions, state.context.languages, state.refinements],
   );
 
   return (
