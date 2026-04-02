@@ -4,6 +4,8 @@
 
 Planned. This document defines the recommended technology choices, language boundaries, tooling, and phased implementation approach for Evidara.
 
+The stack and language-boundary decisions in this document are formalized in [ADR-0009: Technology Stack and Language Boundaries](../adr/0009-technology-stack-and-language-boundaries.md).
+
 ## Purpose
 
 Provide one architecture-level reference for which languages, runtimes, tools, and deployment patterns should be used in each part of the platform.
@@ -32,7 +34,7 @@ This means the platform is intentionally polyglot, but only in a controlled way:
 - SQL for data modeling
 - HCL for infrastructure
 
-Do not add Scala, Java, Go, or another backend language in MVP unless a later ADR justifies it.
+Do not add Scala, Java, Go, Rust, or another backend language in MVP unless a later ADR justifies it.
 
 ## Architecture Principles
 

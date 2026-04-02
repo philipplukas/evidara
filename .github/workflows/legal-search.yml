@@ -1,4 +1,4 @@
-# CI for legal-search frontend.
+# CI for legal-search (frontend + API).
 #
 # KEY DESIGN DECISION: CI runs `npm run check` — the SAME script
 # that pre-commit runs locally. This ensures CI and pre-commit
@@ -11,15 +11,41 @@ on:
   pull_request:
     paths:
       - 'legal-search/**'
-      - 'contracts/api/legal-search.openapi.yaml'
+      - 'contracts/**'
   push:
     branches: [main]
     paths:
       - 'legal-search/**'
-      - 'contracts/api/legal-search.openapi.yaml'
+      - 'contracts/**'
 
 jobs:
-  check:
+  # ─── API quality gate ───
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legal-search/api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: legal-search/api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # typecheck → lint → test (unit + smoke + integration)
+      - name: Check (typecheck + lint + test)
+        run: npm run check
+
+  # ─── Frontend quality gate ───
+  frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,24 +65,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Single command — same as pre-commit hook.
       # typecheck → lint → test
       - name: Check (typecheck + lint + test)
         run: npm run check
 
       # Build separately — catches SSR issues tsc misses.
-      # Not in `check` because it's slower and not needed pre-commit.
       - name: Build
         run: npm run build
 
       # Contract lint — validates the OpenAPI spec.
-      # Runs separately from `check` because it touches a file outside
-      # the legal-search/ directory (contracts/api/).
       - name: Contract lint
         run: npm run openapi:lint
 
       # Drift check — re-generates the typed client from the spec and
-      # fails if the committed output differs. Catches "spec changed but
-      # client not regenerated" before it reaches main.
+      # fails if the committed output differs.
       - name: Contract drift check
         run: npm run openapi:check

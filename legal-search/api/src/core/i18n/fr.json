@@ -1,0 +1,38 @@
+{
+  "actions.openArticle": "Ouvrir l'article",
+  "actions.related": "Connexe",
+  "actions.openDecision": "Ouvrir la décision",
+  "actions.openCommentary": "Ouvrir le commentaire",
+  "actions.viewArticle": "Voir l'article",
+  "actions.open": "Ouvrir",
+  "actions.relatedDecision": "Décision connexe",
+
+  "counts.commentary": "Commentaires",
+  "counts.courtDecisions": "Décisions judiciaires",
+  "counts.citations": "Citations",
+
+  "metadata.date": "Date",
+  "metadata.inForce": "En vigueur",
+  "metadata.jurisdiction": "Juridiction",
+
+  "tabs.content": "Contenu",
+  "tabs.sections": "Sections",
+  "tabs.citations": "Citations",
+  "tabs.details": "Détails",
+
+  "facets.jurisdiction": "Juridiction",
+  "facets.documentType": "Type de document",
+  "facets.language": "Langue",
+  "facets.courtLevel": "Instance",
+  "facets.legalArea": "Domaine juridique",
+
+  "labels.all": "Tous",
+  "labels.document": "Document",
+  "labels.references": "Références",
+  "labels.section": "Section",
+
+  "plurals.law": "Lois",
+  "plurals.decision": "Décisions judiciaires",
+  "plurals.commentary": "Commentaires",
+  "plurals.rechtssatz": "Principes juridiques"
+}
