@@ -1,0 +1,40 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="PLATFORM_CONTROL_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    app_name: str = "platform-control"
+    environment: str = "development"
+    database_url: str = "sqlite+aiosqlite:///./platform_control.db"
+    sql_echo: bool = False
+
+    firecrawl_api_key: str | None = None
+    firecrawl_base_url: str = "https://api.firecrawl.dev/v2"
+    firecrawl_webhook_secret: str | None = None
+    firecrawl_webhook_url: str | None = None
+
+    gcp_project_id: str | None = None
+    artifact_store_backend: Literal["local", "gcs"] = "local"
+    raw_artifact_bucket: str = "evidara-raw-artifacts-dev"
+    raw_artifact_prefix: str = "runs"
+    raw_artifact_local_dir: Path = Field(default=Path(".data/raw-artifacts"))
+    event_publisher_backend: Literal["noop", "pubsub"] = "noop"
+    raw_artifact_pubsub_topic: str = "raw-artifact-available"
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

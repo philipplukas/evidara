@@ -82,4 +82,4 @@ This enables deduplication, version tracking, and skipping re-processing when co
 - [ADR-0002: Top-Level Component Boundaries](0002-top-level-component-boundaries.md)
 - [ADR-0009: Technology Stack and Language Boundaries](0009-technology-stack-and-language-boundaries.md)
 - [ADR-0012: Layered Contract Governance](0012-layered-contract-governance.md)
-- [Playground Analysis](../../document_intelligence_playground/README.md)
+- [First Vertical Slice](../components/first-vertical-slice.md)

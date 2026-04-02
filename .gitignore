@@ -21,6 +21,8 @@ env/
 htmlcov/
 .coverage
 coverage.xml
+platform-control/.data/
+platform-control/*.db
 
 # --- Node / JavaScript / TypeScript ---
 node_modules/

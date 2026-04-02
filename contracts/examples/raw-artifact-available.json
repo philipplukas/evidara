@@ -1,0 +1,22 @@
+{
+  "event_type": "raw_artifact.available",
+  "event_version": 1,
+  "event_id": "evt_01jq7d5k3m2w8n6f4xvb1hcr9p",
+  "occurred_at": "2026-03-29T09:32:15Z",
+  "producer": "platform-control",
+  "correlation_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+  "payload": {
+    "artifact_id": "art_01jq7d4r8h6gp2b9s0wq3e7ynm",
+    "source_id": "src_01jq79xv3wdd6yr8q5bn0m3zfk",
+    "source_version_id": "sv_01jh79zcsef4m3m4gm3t5s590a",
+    "run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+    "storage_path": "gs://evidara-raw-artifacts-dev/runs/run_01jq7a3s9b7j4dndd9sgv6pb9d/art_01jq7d4r8h6gp2b9s0wq3e7ynm.json",
+    "content_type": "text/html",
+    "created_at": "2026-03-29T09:32:14Z",
+    "metadata": {
+      "sourceURL": "https://www.fedlex.admin.ch/eli/cc/24/233_245_233/de",
+      "statusCode": 200,
+      "title": "Schweizerisches Zivilgesetzbuch"
+    }
+  }
+}
