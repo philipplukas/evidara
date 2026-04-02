@@ -1,5 +1,6 @@
 import { Controller, Get, Headers, Inject, Query } from '@nestjs/common';
 import { resolveLocale } from '../../core/i18n';
+// biome-ignore lint/style/useImportType: value import so ValidationPipe sees class-validator metadata on SearchQueryDto
 import { SearchQueryDto } from './dto/search-query.dto';
 import { SearchService } from './search.service';
 
