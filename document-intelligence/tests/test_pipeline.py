@@ -198,7 +198,7 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(
                 result.document.title, "Bundesgesetz über digitale Register"
             )
-            self.assertEqual(result.document.document_type, "statute")
+            self.assertEqual(result.document.document_type, "law")
             self.assertEqual(len(result.sections), 2)
             self.assertEqual(result.sections[0].title, "§ 1 Geltungsbereich")
             self.assertIn(

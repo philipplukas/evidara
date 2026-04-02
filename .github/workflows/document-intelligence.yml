@@ -5,6 +5,8 @@ on:
     paths:
       - "document-intelligence/**"
       - "contracts/api/document-intelligence.openapi.yaml"
+      - "contracts/schemas/document.schema.json"
+      - "contracts/common/provenance.schema.json"
       - "scripts/check-document-intelligence.sh"
       - ".github/workflows/document-intelligence.yml"
   push:
@@ -12,6 +14,8 @@ on:
     paths:
       - "document-intelligence/**"
       - "contracts/api/document-intelligence.openapi.yaml"
+      - "contracts/schemas/document.schema.json"
+      - "contracts/common/provenance.schema.json"
       - "scripts/check-document-intelligence.sh"
       - ".github/workflows/document-intelligence.yml"
 
