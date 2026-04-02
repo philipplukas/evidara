@@ -1,18 +1,9 @@
 "use client";
 
-import {
-  FileText,
-  Scale,
-  BookOpen,
-  Bookmark,
-  ArrowRight,
-  Link,
-  Globe,
-  MapPin,
-} from "lucide-react";
-import type { SearchResultViewModel } from "@/lib/types";
+import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
 import { getIcon } from "@/lib/icons";
-import { Badge, AccentButton } from "../primitives";
+import type { SearchResultViewModel } from "@/lib/types";
+import { AccentButton, Badge } from "../primitives";
 
 const iconComponents: Record<string, React.ComponentType<{ className?: string }>> = {
   "file-text": FileText,
@@ -73,7 +64,7 @@ export function ResultCard({
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
         <span>{result.subtitle}</span>
         {result.contentLanguage?.isTranslation && (
-          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-medium">
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-tiny font-medium">
             <Globe className="w-2.5 h-2.5" />
             {result.contentLanguage.label}
           </span>
@@ -82,7 +73,7 @@ export function ResultCard({
 
       {/* Structural context */}
       {result.structuralContext && (
-        <div className="text-[11px] text-muted-foreground/70 mb-2 font-medium">
+        <div className="text-micro text-muted-foreground/70 mb-2 font-medium">
           {result.structuralContext}
         </div>
       )}
@@ -98,10 +89,9 @@ export function ResultCard({
           {result.metadataRows.map((row, i) => {
             const icon = getIcon(row.iconKey);
             return (
-              <span key={i} className="text-[11px] text-muted-foreground">
+              <span key={i} className="text-micro text-muted-foreground">
                 <span className="font-medium text-foreground/60">{row.label}:</span>{" "}
-                {icon && <span className="text-xs">{icon}</span>}{" "}
-                {row.value}
+                {icon && <span className="text-xs">{icon}</span>} {row.value}
               </span>
             );
           })}
@@ -113,12 +103,13 @@ export function ResultCard({
         <div className="flex flex-wrap gap-2">
           {result.relatedCounts.map((rc, i) => (
             <button
+              type="button"
               key={i}
               onClick={(e) => {
                 e.stopPropagation();
                 onPivot?.(rc.label, result.id);
               }}
-              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground
+              className="inline-flex items-center gap-1 text-micro text-muted-foreground
                 hover:text-brand transition-colors cursor-pointer"
             >
               <span className="font-semibold text-foreground/60">{rc.count}</span>
@@ -142,10 +133,7 @@ export function ResultCard({
           {result.actions.map((action, i) => {
             const IconComp = iconComponents[action.icon] || ArrowRight;
             return (
-              <AccentButton
-                key={i}
-                onClick={(e) => e.stopPropagation()}
-              >
+              <AccentButton key={i} onClick={(e) => e.stopPropagation()}>
                 <IconComp className="w-3 h-3" />
                 {action.label}
               </AccentButton>

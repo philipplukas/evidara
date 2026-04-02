@@ -10,12 +10,12 @@
  */
 
 const palette: Record<string, { bg: string; text: string }> = {
-  blue:   { bg: "#dbeafe", text: "#1e40af" },
-  pink:   { bg: "#fce7f3", text: "#9d174d" },
+  blue: { bg: "#dbeafe", text: "#1e40af" },
+  pink: { bg: "#fce7f3", text: "#9d174d" },
   indigo: { bg: "#e0e7ff", text: "#3730a3" },
-  green:  { bg: "#d1fae5", text: "#065f46" },
-  amber:  { bg: "#fef3c7", text: "#92400e" },
-  slate:  { bg: "#f1f5f9", text: "#334155" },
+  green: { bg: "#d1fae5", text: "#065f46" },
+  amber: { bg: "#fef3c7", text: "#92400e" },
+  slate: { bg: "#f1f5f9", text: "#334155" },
 };
 
 const fallback = { bg: "#f3f4f6", text: "#374151" };

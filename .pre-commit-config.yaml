@@ -1,0 +1,93 @@
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        exclude: ^infra/terraform/
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.48.0
+    hooks:
+      - id: markdownlint
+        args: ["--config", ".markdownlint.json"]
+        files: ^(README\.md|AGENTS\.md|docs/.*\.md|CONTRIBUTING\.md|SECURITY\.md|\.github/pull_request_template\.md)$
+
+  - repo: https://github.com/lycheeverse/lychee
+    rev: lychee-v0.18.0
+    hooks:
+      - id: lychee
+        args: ["--no-progress", "--exclude-file", ".lycheeignore"]
+        types: [markdown]
+
+  - repo: https://github.com/errata-ai/vale
+    rev: v3.9.5
+    hooks:
+      - id: vale
+        args: ["--no-exit"]
+        types: [markdown]
+
+  - repo: local
+    hooks:
+      - id: validate-openapi-contracts
+        name: Validate OpenAPI contracts
+        entry: python scripts/validate_openapi.py
+        language: system
+        pass_filenames: false
+        files: ^contracts/api/.*\.(yaml|yml)$
+
+      - id: validate-json-schemas
+        name: Validate JSON Schemas
+        entry: python scripts/validate_json_schemas.py
+        language: system
+        pass_filenames: false
+        files: ^contracts/(schemas|events)/.*\.json$
+
+      - id: check-component-doc-headings
+        name: Check component doc headings
+        entry: python scripts/check_component_docs.py
+        language: system
+        pass_filenames: false
+        files: ^docs/components/.*\.md$
+
+      - id: check-runbook-metadata
+        name: Check runbook metadata
+        entry: python scripts/check_runbooks.py
+        language: system
+        pass_filenames: false
+        files: ^docs/runbooks/.*\.md$
+
+      - id: check-doc-links
+        name: Check documentation index links
+        entry: python scripts/check_doc_links.py
+        language: system
+        pass_filenames: false
+        files: ^docs/.*\.md$
+
+      - id: check-diagram-format
+        name: Check diagram format (Mermaid required)
+        entry: python scripts/check_diagram_format.py
+        language: system
+        pass_filenames: false
+        files: ^docs/.*\.md$
+
+      - id: legal-search-check
+        name: Legal Search checks (typecheck + lint + test)
+        entry: bash -c 'cd legal-search && npm run check'
+        language: system
+        pass_filenames: false
+        files: ^legal-search/src/
+
+      - id: platform-control-check
+        name: Platform Control checks (ruff + pytest)
+        entry: bash scripts/check-platform-control.sh
+        language: system
+        pass_filenames: false
+        files: ^platform-control/

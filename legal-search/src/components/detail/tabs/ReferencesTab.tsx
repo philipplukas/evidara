@@ -1,11 +1,7 @@
 "use client";
 
 import type { ReferenceGroup } from "@/lib/types";
-import {
-  SectionLabel,
-  ActionTextLink,
-  InteractiveRow,
-} from "../../primitives";
+import { ActionTextLink, InteractiveRow, SectionLabel } from "../../primitives";
 import { EmptySection } from "../EmptySection";
 
 interface ReferencesTabProps {
@@ -34,7 +30,7 @@ export function ReferencesTab({
           <div className="flex items-center justify-between mb-3">
             <SectionLabel>
               {group.direction}
-              <span className="text-[10px] font-normal text-muted-foreground/60 ml-1">
+              <span className="text-tiny font-normal text-muted-foreground/60 ml-1">
                 ({group.items.length})
               </span>
             </SectionLabel>
@@ -49,18 +45,11 @@ export function ReferencesTab({
           </div>
           <div className="space-y-1">
             {group.items.map((item) => (
-              <InteractiveRow
-                key={item.id}
-                onClick={() => onFocus?.(item.id)}
-              >
+              <InteractiveRow key={item.id} onClick={() => onFocus?.(item.id)}>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-foreground truncate">
-                    {item.title}
-                  </div>
+                  <div className="text-xs font-medium text-foreground truncate">{item.title}</div>
                   {item.subtitle && (
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {item.subtitle}
-                    </div>
+                    <div className="text-micro text-muted-foreground truncate">{item.subtitle}</div>
                   )}
                 </div>
               </InteractiveRow>
@@ -68,9 +57,7 @@ export function ReferencesTab({
           </div>
         </div>
       ))}
-      {references.length === 0 && (
-        <EmptySection label="No references" />
-      )}
+      {references.length === 0 && <EmptySection label="No references" />}
     </div>
   );
 }

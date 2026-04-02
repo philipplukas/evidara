@@ -1,9 +1,9 @@
 "use client";
 
 import { Shield } from "lucide-react";
+import { getIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
-import { getIcon } from "@/lib/icons";
 
 interface ContextBarProps {
   context: SearchContextViewModel;
@@ -24,9 +24,7 @@ export function ContextBar({ context }: ContextBarProps) {
           ...j,
           active: constraints.context.jurisdictions.includes(j.key),
         }))}
-        onToggle={(key) =>
-          dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: key })
-        }
+        onToggle={(key) => dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: key })}
       />
 
       <div className="w-px h-5 bg-border" />
@@ -37,9 +35,7 @@ export function ContextBar({ context }: ContextBarProps) {
           ...l,
           active: constraints.context.languages.includes(l.key),
         }))}
-        onToggle={(key) =>
-          dispatch({ type: "TOGGLE_LANGUAGE", language: key })
-        }
+        onToggle={(key) => dispatch({ type: "TOGGLE_LANGUAGE", language: key })}
       />
 
       <div className="w-px h-5 bg-border" />
@@ -48,7 +44,9 @@ export function ContextBar({ context }: ContextBarProps) {
       <TabGroup
         items={context.sourceTypes.map((t) => ({
           ...t,
-          active: constraints.context.sourceType === t.key || (constraints.context.sourceType === null && t.key === "all"),
+          active:
+            constraints.context.sourceType === t.key ||
+            (constraints.context.sourceType === null && t.key === "all"),
         }))}
         onSelect={(key) =>
           dispatch({
@@ -62,6 +60,7 @@ export function ContextBar({ context }: ContextBarProps) {
 
       {/* Official sources toggle */}
       <button
+        type="button"
         onClick={() =>
           dispatch({
             type: "SET_OFFICIAL_ONLY",
@@ -95,6 +94,7 @@ function ChipGroup({
         const icon = getIcon(item.iconKey);
         return (
           <button
+            type="button"
             key={item.key}
             onClick={() => onToggle(item.key)}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all
@@ -124,6 +124,7 @@ function TabGroup({
     <div className="flex items-center gap-0.5">
       {items.map((item) => (
         <button
+          type="button"
           key={item.key}
           onClick={() => onSelect(item.key)}
           className={`px-3 py-1 rounded-md text-xs font-medium transition-all

@@ -20,18 +20,10 @@ interface BadgeProps {
  * - "sm" (default): standard badges in result cards and exact match strips
  * - "xs": smaller badges in preview surfaces (related/reference tabs)
  */
-export function Badge({
-  label,
-  colorKey,
-  size = "sm",
-  className = "",
-}: BadgeProps) {
+export function Badge({ label, colorKey, size = "sm", className = "" }: BadgeProps) {
   const colors = getBadgeColor(colorKey);
 
-  const sizeClasses =
-    size === "xs"
-      ? "px-1 py-0.5 text-[9px]"
-      : "px-1.5 py-0.5 text-[10px]";
+  const sizeClasses = size === "xs" ? "px-1 py-0.5 text-tiny" : "px-1.5 py-0.5 text-tiny";
 
   return (
     <span

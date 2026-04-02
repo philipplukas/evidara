@@ -1,0 +1,37 @@
+{
+  "event_type": "artifact_bundle.available",
+  "event_version": 1,
+  "event_id": "evt_01jq7bz6b7npge5hr2eb9n74ba",
+  "occurred_at": "2026-03-29T09:30:06Z",
+  "producer": "platform-control",
+  "correlation_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+  "payload": {
+    "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+    "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+    "provenance": {
+      "tenant_id": "tenant_public",
+      "corpus_id": "corpus_public_ch_federal_law",
+      "scope_type": "global_public",
+      "source_id": "src_01jq79xv3wdd6yr8q5bn0m3zfk",
+      "source_version_id": "sv_01jq79zcskf4m3m4gm3t5s59xq",
+      "run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+      "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+      "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk"
+    },
+    "source_origin_kind": "official_primary",
+    "trust_tier": "authoritative",
+    "bundle_manifest_ref": {
+      "manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+      "manifest_type": "artifact_bundle_manifest",
+      "manifest_version": 1,
+      "storage_ref": {
+        "uri": "gs://evidara-raw-artifacts-dev/fedlex/run_01jq7a3s9b7j4dndd9sgv6pb9d/bundle-manifest.json",
+        "content_type": "application/json",
+        "byte_size": 2945,
+        "checksum": "dfe0f4da4eaed4f9f96a53e7e030c95ed75467c4d919e595fa91198b889847f8",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-03-29T09:30:05Z"
+      }
+    }
+  }
+}

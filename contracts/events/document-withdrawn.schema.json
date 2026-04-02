@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/events/document-withdrawn",
+  "title": "DocumentWithdrawn",
+  "description": "Event emitted when a document revision should be removed or hidden from public retrieval surfaces such as OpenSearch.",
+  "allOf": [
+    {
+      "$ref": "https://evidara.dev/common/event-envelope"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "document.withdrawn"
+        },
+        "event_version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "document-intelligence"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "document_id",
+            "document_revision",
+            "processing_manifest_id",
+            "provenance",
+            "reason_code",
+            "search_disposition"
+          ],
+          "properties": {
+            "document_id": {
+              "type": "string",
+              "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "document_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "processing_manifest_id": {
+              "type": "string",
+              "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "provenance": {
+              "$ref": "https://evidara.dev/common/provenance"
+            },
+            "reason_code": {
+              "type": "string",
+              "enum": [
+                "duplicate",
+                "invalid_source",
+                "rights_restricted",
+                "operator_withdrawn"
+              ]
+            },
+            "reason_summary": {
+              "type": "string"
+            },
+            "search_disposition": {
+              "type": "string",
+              "enum": [
+                "remove",
+                "hide"
+              ],
+              "description": "`remove` deletes the document from search indexes and search-facing caches. `hide` keeps the record available for audit/history but filters it out of normal user-facing retrieval."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

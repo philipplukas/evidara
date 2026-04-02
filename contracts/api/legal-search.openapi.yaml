@@ -1,0 +1,507 @@
+openapi: 3.1.0
+info:
+  title: Legal Search API
+  description: |
+    BFF API for the Evidara legal search experience.
+
+    This API returns ViewModel shapes ready for frontend rendering.
+    The frontend is a pure rendering layer — all composition logic
+    (badges, actions, metadata, facets) lives in this API.
+
+    See ADR-0011 for contract conventions.
+    See ADR-0012 for layered contract governance.
+    See ADR-0013 for internationalization strategy.
+  version: 0.3.0
+  contact:
+    name: Evidara Team
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+  - url: https://legal-search.evidara.dev
+    description: Production
+
+paths:
+  /v1/search:
+    get:
+      operationId: searchDocuments
+      summary: Search documents
+      description: |
+        Returns search results as composed ViewModels with embedded facets.
+        Facet counts are live (computed from the same query via OpenSearch aggs).
+      tags: [search]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query text
+        - name: jurisdiction
+          in: query
+          schema:
+            type: string
+          description: Filter by jurisdiction (ISO 3166-1 alpha-2)
+        - name: document_type
+          in: query
+          schema:
+            type: string
+          description: Filter by document type
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Search results with embedded facets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponseView"
+
+  /v1/search/context:
+    get:
+      operationId: getSearchContext
+      summary: Get search context
+      description: |
+        Returns global search context (jurisdictions, languages, source types).
+        Query-independent and cacheable. Changes rarely.
+      tags: [search]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        "200":
+          description: Search context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchContextView"
+
+  /v1/documents/{document_id}:
+    get:
+      operationId: getDocument
+      summary: Get document detail
+      tags: [documents]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document detail as composed ViewModel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetailView"
+        "404":
+          description: Document not found
+
+  /v1/documents/{document_id}/sections:
+    get:
+      operationId: getDocumentSections
+      summary: Get sections of a document
+      tags: [documents]
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Document sections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SectionSummary"
+
+components:
+  parameters:
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      schema:
+        type: string
+        default: de
+        example: fr-CH
+      description: |
+        Preferred UI locale for composed display labels (badges, facets, tabs,
+        metadata). Accepts standard HTTP language tags (e.g. "de", "fr", "fr-CH").
+        Falls back to "de" (German) when omitted or unsupported.
+        See ADR-0013 for locale resolution rules.
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ─── Search Response ───
+    SearchResponseView:
+      type: object
+      required: [results, facets, totalResults]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResultView"
+          default: []
+        facets:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilterFacetView"
+          default: []
+        totalResults:
+          type: integer
+
+    SearchResultView:
+      type: object
+      required: [id, type, title, subtitle, snippet, badges, metadataRows, relatedCounts, actions]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          description: "Document type (law, decision, commentary, rechtssatz)"
+        title:
+          type: string
+        subtitle:
+          type: string
+          description: "Composed subtitle (e.g. 'Switzerland · Federal law')"
+        snippet:
+          type: string
+          description: Highlighted text snippet matching the query
+        structuralContext:
+          type: string
+          description: "Breadcrumb-style structural path (e.g. 'OR › Gesellschaftsrecht › Verantwortlichkeit')"
+        badges:
+          type: array
+          items:
+            $ref: "#/components/schemas/Badge"
+          default: []
+        metadataRows:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetadataRow"
+          default: []
+        relatedCounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelatedCount"
+          default: []
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Action"
+          default: []
+        contentLanguage:
+          $ref: "#/components/schemas/ContentLanguage"
+
+    # ─── Shared ViewModel Components ───
+    Badge:
+      type: object
+      required: [label, colorKey]
+      properties:
+        label:
+          type: string
+        colorKey:
+          type: string
+        iconKey:
+          type: string
+
+    MetadataRow:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        iconKey:
+          type: string
+
+    RelatedCount:
+      type: object
+      required: [label, count]
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+        href:
+          type: string
+
+    Action:
+      type: object
+      required: [label, icon]
+      properties:
+        label:
+          type: string
+        icon:
+          type: string
+        href:
+          type: string
+
+    ContentLanguage:
+      type: object
+      required: [display, original, isTranslation]
+      properties:
+        display:
+          type: string
+        original:
+          type: string
+        isTranslation:
+          type: boolean
+        label:
+          type: string
+
+    # ─── Filter Facets ───
+    FilterFacetView:
+      type: object
+      required: [key, label, type, options]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+          enum: [checkbox, chip, dropdown, date, toggle]
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilterOption"
+          default: []
+
+    FilterOption:
+      type: object
+      required: [value, label]
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+        count:
+          type: integer
+        iconKey:
+          type: string
+
+    # ─── Search Context ───
+    SearchContextView:
+      type: object
+      required: [jurisdictions, languages, sourceTypes]
+      properties:
+        jurisdictions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextChip"
+          default: []
+        languages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextChip"
+          default: []
+        sourceTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextChip"
+          default: []
+        exactMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResultView"
+          default: []
+
+    ContextChip:
+      type: object
+      required: [key, label, active]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        active:
+          type: boolean
+        iconKey:
+          type: string
+
+    # ─── Detail View ───
+    DetailView:
+      type: object
+      required: [id, type, title, subtitle, metadata, tabs, relatedGroups, references, annotations]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        breadcrumbs:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetadataRow"
+          default: []
+        content:
+          type: object
+          description: |
+            Structured DoclingDocument JSON produced by document-intelligence.
+            Passed through unchanged by the BFF. See ADR-0010.
+        contentLanguage:
+          $ref: "#/components/schemas/ContentLanguage"
+        tabs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TabView"
+          default: []
+        relatedGroups:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelatedGroup"
+          default: []
+        references:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReferenceGroup"
+          default: []
+        annotations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Annotation"
+          default: []
+        localStructure:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/LocalStructureItem"
+
+    TabView:
+      type: object
+      required: [key, label]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        count:
+          type: integer
+
+    RelatedGroup:
+      type: object
+      required: [label, items]
+      properties:
+        label:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelatedItem"
+          default: []
+
+    RelatedItem:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        badge:
+          $ref: "#/components/schemas/Badge"
+        href:
+          type: string
+
+    ReferenceGroup:
+      type: object
+      required: [label, items]
+      properties:
+        label:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReferenceItem"
+          default: []
+
+    ReferenceItem:
+      type: object
+      required: [id, title, citation]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        citation:
+          type: string
+        href:
+          type: string
+
+    Annotation:
+      type: object
+      required: [id, label, text]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        text:
+          type: string
+        type:
+          type: string
+
+    LocalStructureItem:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        depth:
+          type: integer
+        active:
+          type: boolean
+
+    SectionSummary:
+      type: object
+      properties:
+        section_id:
+          type: string
+        title:
+          type: string
+        ordinal:
+          type: integer
+        depth:
+          type: integer
+        content_preview:
+          type: string
+          description: First 200 characters of section content

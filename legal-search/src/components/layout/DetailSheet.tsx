@@ -1,13 +1,13 @@
 "use client";
 
+import { DetailPanel } from "@/components/detail/DetailPanel";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet";
-import { DetailPanel } from "@/components/detail/DetailPanel";
 import type { DetailViewModel } from "@/lib/types";
 
 interface DetailSheetProps {
@@ -31,17 +31,10 @@ export function DetailSheet({
 }: DetailSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-[90vw] sm:w-[480px] p-0"
-      >
+      <SheetContent side="right" className="w-[90vw] sm:w-[480px] p-0">
         <SheetHeader className="sr-only">
-          <SheetTitle>
-            {detail?.title ?? "Detail"}
-          </SheetTitle>
-          <SheetDescription>
-            Detailed view of the selected search result.
-          </SheetDescription>
+          <SheetTitle>{detail?.title ?? "Detail"}</SheetTitle>
+          <SheetDescription>Detailed view of the selected search result.</SheetDescription>
         </SheetHeader>
         <div className="overflow-y-auto h-full">
           <DetailPanel

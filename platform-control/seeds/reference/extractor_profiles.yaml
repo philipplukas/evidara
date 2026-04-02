@@ -1,0 +1,17 @@
+version: 1
+items:
+  - extractor_profile_id: exp_court_decision_v1
+    name: Court Decision v1
+    source_family: court_decision
+    version: v1
+    definition:
+      format: court_decision
+      extraction_mode: exhaustive
+      required_fields:
+        - title
+        - decision_date
+        - docket_number
+        - body
+      sections:
+        - heading
+        - body

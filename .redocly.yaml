@@ -1,0 +1,24 @@
+# Redocly CLI configuration
+# Used by legal-search/package.json openapi:lint script
+# See: https://redocly.com/docs/cli/configuration/
+
+extends:
+  - recommended
+
+rules:
+  # Require operation IDs on all endpoints
+  operation-operationId: error
+  # Require descriptions on operations
+  operation-description: warn
+  # Require tags on operations
+  operation-tag-defined: error
+  # Ensure all schemas have descriptions
+  component-description: warn
+  # No unused components
+  no-unused-components: warn
+
+apis:
+  legal-search:
+    root: contracts/api/legal-search.openapi.yaml
+  platform-control:
+    root: contracts/api/platform-control.openapi.yaml

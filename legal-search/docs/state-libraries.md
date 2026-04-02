@@ -2,7 +2,8 @@
 
 This project now uses a **hybrid state model**:
 
-- **`nuqs`** for URL-driven state (selection, tabs, search context, facet refinements)
+- **`nuqs`** for URL-driven state (search context, facet refinements)
+- **`useSearchParams` + router updates** for URL-driven selection (`?item=`) and tabs (`?tab=`)
 - **React Context + reducer-style actions** for local workspace interaction flows
 - **React Query** for server-backed detail data
 

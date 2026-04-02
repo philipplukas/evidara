@@ -1,7 +1,7 @@
 "use client";
 
-import type { MetadataRow } from "@/lib/types";
 import { getIcon } from "@/lib/icons";
+import type { MetadataRow } from "@/lib/types";
 
 interface MetadataSectionProps {
   rows: MetadataRow[];
@@ -19,9 +19,7 @@ export function MetadataSection({ rows }: MetadataSectionProps) {
           const icon = getIcon(row.iconKey);
           return (
             <div key={i} className="flex items-baseline gap-2 text-xs">
-              <span className="text-muted-foreground w-28 shrink-0 font-medium">
-                {row.label}
-              </span>
+              <span className="text-muted-foreground w-28 shrink-0 font-medium">{row.label}</span>
               <span className="text-foreground/80 flex items-center gap-1">
                 {icon && <span className="text-sm">{icon}</span>}
                 {row.value}

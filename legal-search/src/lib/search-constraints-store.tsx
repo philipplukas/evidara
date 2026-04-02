@@ -37,16 +37,62 @@ interface SearchConstraintsContextValue {
 const SearchConstraintsContext =
   createContext<SearchConstraintsContextValue | null>(null);
 
-/**
- * Parse a URL-serialized refinements string into a validated array of search refinements.
- *
- * Parses the JSON `serialized` value and returns only elements that are objects with a string
- * `field`, a string `type`, and an array `values`. If `serialized` is falsy, is not valid JSON,
- * is not an array, or contains no valid refinement objects, an empty array is returned.
- *
- * @param serialized - A JSON string from the URL representing refinements, or `null`
- * @returns An array of validated `SearchRefinement` objects; empty if the input is missing or invalid
- */
+// Supported filter keys and their valid values
+const SUPPORTED_FILTERS = {
+  jurisdiction: ["ch", "at"],
+  language: ["de", "fr", "it", "en"],
+  court_level: ["supreme", "appellate", "cantonal", "district"],
+  legal_area: ["civil", "commercial", "corporate", "administrative", "criminal", "constitutional"],
+  date: ["any", "1y", "5y", "10y"],
+  has_commentary: ["true"],
+  has_decisions: ["true"],
+} as const;
+
+const SUPPORTED_REFINEMENT_TYPES = ["terms", "date_range", "range", "toggle", "text"] as const;
+
+type SupportedFilterKey = keyof typeof SUPPORTED_FILTERS;
+
+function isSupportedFilterKey(key: string): key is SupportedFilterKey {
+  return key in SUPPORTED_FILTERS;
+}
+
+function normalizeAndValidateValues(field: string, values: string[]): string[] {
+  if (!isSupportedFilterKey(field)) return [];
+
+  const supportedValues = SUPPORTED_FILTERS[field];
+  const normalizedValues: string[] = [];
+
+  for (const value of values) {
+    const normalized = value.toLowerCase().trim();
+    if (supportedValues.includes(normalized as never)) {
+      normalizedValues.push(normalized);
+    }
+  }
+
+  return normalizedValues;
+}
+
+// Supported source types
+const SUPPORTED_SOURCE_TYPES = ["all", "law", "decision", "rechtssatz", "commentary"] as const;
+
+function normalizeJurisdictions(jurisdictions: string[]): string[] {
+  const validated = normalizeAndValidateValues("jurisdiction", jurisdictions);
+  // Ensure at least one jurisdiction is selected, default to CH
+  return validated.length > 0 ? validated : ["ch"];
+}
+
+function normalizeLanguages(languages: string[]): string[] {
+  const validated = normalizeAndValidateValues("language", languages);
+  // Ensure at least one language is selected, default to de
+  return validated.length > 0 ? validated : ["de"];
+}
+
+function normalizeSourceType(sourceType: string | null): string | null {
+  if (!sourceType) return null;
+  const normalized = sourceType.toLowerCase().trim();
+  return SUPPORTED_SOURCE_TYPES.includes(normalized as never) ? normalized : null;
+}
+
 function parseRefinements(serialized: string | null): SearchRefinement[] {
   if (!serialized) return [];
 
@@ -54,49 +100,51 @@ function parseRefinements(serialized: string | null): SearchRefinement[] {
     const parsed = JSON.parse(serialized);
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.filter((refinement): refinement is SearchRefinement => {
-      if (typeof refinement !== "object" || refinement === null) return false;
-      const candidate = refinement as Partial<SearchRefinement>;
-      return (
-        typeof candidate.field === "string" &&
-        typeof candidate.type === "string" &&
-        Array.isArray(candidate.values)
-      );
-    });
+    return parsed
+      .filter((refinement): refinement is SearchRefinement => {
+        if (typeof refinement !== "object" || refinement === null) return false;
+        const candidate = refinement as Partial<SearchRefinement>;
+        return (
+          typeof candidate.field === "string" &&
+          typeof candidate.type === "string" &&
+          Array.isArray(candidate.values)
+        );
+      })
+      .map((refinement) => {
+        // Validate refinement type
+        if (!SUPPORTED_REFINEMENT_TYPES.includes(refinement.type as never)) {
+          return null;
+        }
+
+        // Validate field and normalize values
+        const normalizedValues = normalizeAndValidateValues(refinement.field, refinement.values);
+
+        // Drop refinements with no valid values
+        if (normalizedValues.length === 0) {
+          return null;
+        }
+
+        return {
+          ...refinement,
+          values: normalizedValues,
+        };
+      })
+      .filter((refinement): refinement is SearchRefinement => refinement !== null);
   } catch {
     return [];
   }
 }
 
-/**
- * Serialize an array of search refinements into a JSON string.
- *
- * @param refinements - The refinements to serialize
- * @returns The JSON string representation of `refinements`
- */
 function serializeRefinements(refinements: SearchRefinement[]): string {
   return JSON.stringify(refinements);
 }
 
-/**
- * Toggle the presence of a string in an array of strings.
- *
- * @param values - The source array of strings
- * @param value - The string to add or remove
- * @returns A new array with `value` removed if it was present, or appended if it was absent
- */
 function toggleValue(values: string[], value: string): string[] {
   return values.includes(value)
     ? values.filter((v) => v !== value)
     : [...values, value];
 }
 
-/**
- * Accesses the current search constraints context.
- *
- * @returns The `SearchConstraintsContextValue` containing the current `state` and `dispatch`.
- * @throws Error if the hook is used outside a `SearchConstraintsProvider`.
- */
 export function useSearchConstraints(): SearchConstraintsContextValue {
   const ctx = useContext(SearchConstraintsContext);
   if (!ctx) {
@@ -111,15 +159,6 @@ interface SearchConstraintsProviderProps {
   children: ReactNode;
 }
 
-/**
- * Provides URL-synchronized search constraints state and a dispatcher to update it to descendant components.
- *
- * The provider keeps jurisdictions, languages, sourceType, officialOnly, and refinements synchronized with the URL
- * query state and exposes a `state` and `dispatch` pair via SearchConstraintsContext.
- *
- * @param children - React nodes to render within the provider
- * @returns A React context provider element that supplies the current search constraints state and a dispatch function
- */
 export function SearchConstraintsProvider({
   children,
 }: SearchConstraintsProviderProps) {
@@ -136,20 +175,35 @@ export function SearchConstraintsProvider({
     [urlState.refinements]
   );
 
+  const normalizedJurisdictions = useMemo(
+    () => normalizeJurisdictions(urlState.jurisdictions),
+    [urlState.jurisdictions]
+  );
+
+  const normalizedLanguages = useMemo(
+    () => normalizeLanguages(urlState.languages),
+    [urlState.languages]
+  );
+
+  const normalizedSourceType = useMemo(
+    () => normalizeSourceType(urlState.sourceType),
+    [urlState.sourceType]
+  );
+
   const state: SearchConstraintsState = useMemo(
     () => ({
       context: {
-        jurisdictions: urlState.jurisdictions,
-        languages: urlState.languages,
-        sourceType: urlState.sourceType,
+        jurisdictions: normalizedJurisdictions,
+        languages: normalizedLanguages,
+        sourceType: normalizedSourceType,
         officialOnly: urlState.officialOnly,
       } satisfies ContextConstraints,
       refinements,
     }),
     [
-      urlState.jurisdictions,
-      urlState.languages,
-      urlState.sourceType,
+      normalizedJurisdictions,
+      normalizedLanguages,
+      normalizedSourceType,
       urlState.officialOnly,
       refinements,
     ]

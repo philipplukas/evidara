@@ -13,7 +13,7 @@ interface AccentButtonProps {
 /**
  * Small accent action button used for pin, copy, and result card actions.
  * Replaces the repeated pattern:
- *   px-2 py-1 rounded text-[11px] font-medium transition-all
+ *   px-2 py-1 rounded text-micro font-medium transition-all
  *   text-muted-foreground hover:text-brand hover:bg-interactive-accent-subtle
  */
 export function AccentButton({
@@ -25,9 +25,10 @@ export function AccentButton({
 }: AccentButtonProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
-      className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all
+      className={`flex items-center gap-1 px-2 py-1 rounded text-micro font-medium transition-all
         ${
           active
             ? "text-brand bg-interactive-accent-muted"
