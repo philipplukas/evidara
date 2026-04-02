@@ -1,0 +1,38 @@
+{
+  "actions.openArticle": "Artikel öffnen",
+  "actions.related": "Verwandt",
+  "actions.openDecision": "Entscheid öffnen",
+  "actions.openCommentary": "Kommentar öffnen",
+  "actions.viewArticle": "Artikel anzeigen",
+  "actions.open": "Öffnen",
+  "actions.relatedDecision": "Verwandter Entscheid",
+
+  "counts.commentary": "Kommentare",
+  "counts.courtDecisions": "Gerichtsentscheide",
+  "counts.citations": "Zitationen",
+
+  "metadata.date": "Datum",
+  "metadata.inForce": "In Kraft",
+  "metadata.jurisdiction": "Zuständigkeit",
+
+  "tabs.content": "Inhalt",
+  "tabs.sections": "Abschnitte",
+  "tabs.citations": "Zitationen",
+  "tabs.details": "Details",
+
+  "facets.jurisdiction": "Zuständigkeit",
+  "facets.documentType": "Dokumenttyp",
+  "facets.language": "Sprache",
+  "facets.courtLevel": "Instanz",
+  "facets.legalArea": "Rechtsgebiet",
+
+  "labels.all": "Alle",
+  "labels.document": "Dokument",
+  "labels.references": "Referenzen",
+  "labels.section": "Abschnitt",
+
+  "plurals.law": "Gesetze",
+  "plurals.decision": "Gerichtsentscheide",
+  "plurals.commentary": "Kommentare",
+  "plurals.rechtssatz": "Rechtssätze"
+}
