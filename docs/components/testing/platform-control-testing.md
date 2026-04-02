@@ -11,6 +11,8 @@ Testing strategy for the platform-control component, which owns:
 - Runs
 - Approvals
 - Raw artifact metadata handling
+- Bundle-manifest publication
+- DI status and lifecycle event ingest
 
 ---
 
@@ -40,27 +42,27 @@ Testing strategy for the platform-control component, which owns:
 - Webhook dedupe logic treats repeated deliveries as idempotent
 - Captured-resource normalization produces stable provider-neutral rows
 - GCS artifact storage writes deterministic object paths
-- Pub/Sub event publishing emits the expected `raw_artifact.available` envelope
+- Pub/Sub event publishing emits the expected `artifact_bundle.available` envelope after immutable handoff storage succeeds
 - Seed loading is idempotent and supports dry-run mode
 
 ### Contract Tests
 
-- `RawArtifactEnvelope` payloads conform to JSON Schema
-- `raw_artifact.available` event payload conforms to event schema
-- All required fields are present: `source_id`, `source_version_id`, `run_id`, `artifact_id`, `storage_path`, `content_type`
+- `ArtifactBundleManifest` payloads conform to JSON Schema
+- `artifact_bundle.available` event payload conforms to event schema
+- All required lineage fields are present for the DI handoff: `source_id`, `source_version_id`, `run_id`, `source_snapshot_id`, and `bundle_manifest_ref`
 - Fixture webhook payloads map to internal models without dropping required lineage fields
 
 ### Workflow Tests
 
 - Approval workflow: create source → create version → approve version
-- Run creation: approved source version → create run → run completes → artifact metadata recorded
+- Run creation: approved source version → create run → run completes → artifact metadata recorded → bundle manifest published
 - Run failure: run transitions to `failed` when processing errors occur
 - Preview workflow: create source → create version → preview run → captured resources recorded → operator can review summary
 - Webhook replay workflow: same Firecrawl callback delivered twice → one artifact set persisted
 
 ### Smoke Tests
 
-- One source family end-to-end: register source → create version → approve → trigger run → verify artifact metadata is recorded
+- One source family end-to-end: register source → create version → approve → trigger run → verify artifact metadata is recorded and `artifact_bundle.available` is emitted
 - Health check endpoint returns 200
 - Firecrawl-backed preview run using stubbed provider responses reaches a terminal state
 
@@ -82,7 +84,7 @@ Testing strategy for the platform-control component, which owns:
 
 These tests should answer:
 
-- **Can we trust source lifecycle and run tracking?** — State transitions are correct, IDs are stable, runs produce artifacts.
+- **Can we trust source lifecycle and run tracking?** — State transitions are correct, IDs are stable, and successful runs publish immutable handoffs.
 - **Can we detect when a source has started failing?** — Drift checks catch silent failures.
 - **Can we safely rely on provider webhooks?** — Signature verification and idempotency keep callbacks trustworthy.
 

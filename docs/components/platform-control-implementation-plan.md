@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned. This document defines the intended repo structure, deployment shape, implementation order, documentation updates, and testing strategy for `platform-control` and its connector workers.
+Partially superseded. This document still captures useful ownership and sequencing notes for `platform-control`, but its earlier TypeScript/NestJS API-service shape is no longer the current implementation direction.
 
 ## Purpose
 
@@ -10,7 +10,9 @@ Provide a concrete structure plan for building `platform-control` as the operati
 
 ## Current state
 
-`platform-control` is not implemented yet. The repository has component docs and the initial OpenAPI plus bundle-manifest/event contracts, but the API service, Postgres schema, worker processes, tests, and deployment units do not exist yet.
+`platform-control` now has a running FastAPI service, Alembic migrations, SQLAlchemy models, source/version/run APIs, Firecrawl webhook handling, raw artifact persistence, bundle-manifest publication, `artifact_bundle.available` emission, and DI status/lifecycle event ingest. Tests exist for core service, webhook, publication, and smoke-path behavior.
+
+Important: the repo has since standardized the control-plane API on Python/FastAPI. Treat [`docs/components/platform-control.md`](platform-control.md) and the code under [`platform-control/`](../../platform-control/) as authoritative for current runtime and language choices. The TypeScript-specific structure sketches later in this document are preserved as historical planning notes and should not be used as implementation guidance for new work.
 
 ## Goal
 
@@ -23,7 +25,7 @@ Deliver a minimal `platform-control` component that can:
 5. Publish immutable artifact bundle manifests and emit `artifact_bundle.available`
 6. Receive processing feedback from downstream systems
 
-The first implementation should also establish a repo structure that can support both the TypeScript control-plane API and Python connector workers without splitting them into separate top-level components.
+The next implementation phase should establish a cleaner separation between the current FastAPI control-plane service and any future connector-worker runtime without splitting them into separate top-level components.
 
 ## Planning assumptions
 
@@ -44,13 +46,13 @@ The first implementation should also establish a repo structure that can support
 
 ## Minimal next tasks
 
-- [ ] Create the `platform-control/` TypeScript service scaffold
-- [ ] Create the Python connector-worker scaffold under the same top-level component
-- [ ] Define Postgres tables and migrations for sources, corpora, source versions, runs, source snapshots, artifacts, approvals, and reference data
-- [ ] Implement the first source/version/run/artifact APIs
-- [ ] Implement bundle-manifest creation and `artifact_bundle.available` emission
-- [ ] Implement one connector worker with one source family
-- [ ] Add tests for run state, artifact registration, and connector execution flow
+- [x] Create the `platform-control/` API scaffold
+- [ ] Create the connector-worker scaffold under the same top-level component
+- [x] Define initial Postgres tables and migrations for sources, source versions, runs, raw artifacts, webhook receipts, DI event tracking, and reference data
+- [x] Implement the first source/version/run/artifact APIs
+- [x] Implement bundle-manifest creation and `artifact_bundle.available` emission
+- [~] Implement one connector path with one source family; the current Firecrawl-backed acquisition path exists, but dedicated worker separation is still pending
+- [x] Add tests for run state, artifact registration, webhook handling, and event publication flow
 
 ## Target architecture
 

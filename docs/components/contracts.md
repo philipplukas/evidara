@@ -16,6 +16,14 @@ Core v1 contract building blocks now exist:
 
 Implementation code is still evolving, so contracts are the main stabilizing mechanism at this stage.
 
+For the current M4 slice, freeze the cross-component event chain on:
+
+- `artifact_bundle.available` for the `platform-control` → `document-intelligence` handoff
+- `document.processing_status.updated` for DI → `platform-control` operational feedback
+- `document.processed` for DI → `legal-search` publication
+
+`raw_artifact.available` can remain a useful internal `platform-control` event for preview, observability, or capture workflows, but it is not the primary DI boundary contract.
+
 ## Source of truth
 
 - `contracts/` directory is the single source of truth for all interface definitions
@@ -70,12 +78,13 @@ All runtime domains can exchange a small, explicit set of payloads:
 - `document-intelligence` publishes exact immutable processing results via `document.processed`
 - `document-intelligence` reports status back via `document.processing_status.updated`
 - `legal-search` builds OpenSearch projections from published DI surfaces, not ad hoc internal tables
+- `document.withdrawn` is already part of the contract surface, even though end-to-end producer and consumer wiring is still follow-on work
 
 ## Later expansion
 
 | Phase | Capability |
 |-------|-----------|
-| Next | `document.withdrawn` consumers in legal-search |
+| Next | End-to-end `document.withdrawn` producer and consumer wiring |
 | Next | Projection manifest schema |
 | Later | AsyncAPI catalog for events |
 | Later | Generated clients from OpenAPI and JSON Schema |

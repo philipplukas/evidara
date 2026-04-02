@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned
+Partially implemented. The FastAPI service, initial schema, Firecrawl webhook path, raw artifact persistence, and bundle-manifest publication path now exist in-repo. Retool, dedicated worker separation, and broader operator tooling remain planned.
 
 ## Purpose
 
@@ -90,7 +90,9 @@ Retool reads list views directly from Postgres and uses the API only for busines
 - Store provider job IDs and request snapshots.
 - Verify webhook signatures and persist raw webhook payloads.
 - Write raw artifacts to GCS and normalized rows to `captured_resources`.
-- Emit `raw_artifact.available` for durable downstream processing.
+- Publish immutable bundle manifests and emit `artifact_bundle.available` for durable downstream processing.
+
+`raw_artifact.available` can still exist as an internal preview or observability event, but it is not the primary DI handoff contract for M4.
 
 ### Workstream 3: Retool operator workflow
 
@@ -132,7 +134,7 @@ Retool reads list views directly from Postgres and uses the API only for busines
 | PC-009 | Add webhook signature verification and dedupe | Verified webhook receipts with idempotency | API |
 | PC-010 | Add artifact store and GCS write path | Raw Firecrawl payloads stored in object storage | Data |
 | PC-011 | Add captured-resource normalization | Provider-neutral fetched resource inventory | Data |
-| PC-012 | Emit `raw_artifact.available` | Pub/Sub event emission from stored artifacts | API/data |
+| PC-012 | Publish bundle manifest + emit `artifact_bundle.available` | Immutable DI handoff plus Pub/Sub progression signal | API/data |
 | PC-013 | Build Retool read views | Reference data, sources, versions, runs tables | Ops |
 | PC-014 | Build Retool action screens | Draft, approve, reject, preview, rerun flows | Ops |
 | PC-015 | Build preview summary screen | Captured-resource review and operator feedback loop | Ops |
@@ -181,8 +183,8 @@ Done when:
 
 ### Contract tests
 
-- `RawArtifactEnvelope` schema validation
-- `raw_artifact.available` event validation
+- `ArtifactBundleManifest` schema validation
+- `artifact_bundle.available` event validation
 - Example webhook payload mapping to internal models
 
 ### Smoke tests
@@ -243,4 +245,4 @@ Update these docs in the same PRs as implementation:
 
 ## Exit Criteria
 
-V0 is complete when an operator can define a source, generate a draft acquisition spec, run a preview, inspect normalized results, approve the version, and produce durable raw artifacts that a later extractor can consume without depending on Firecrawl internals.
+V0 is complete when an operator can define a source, generate a draft acquisition spec, run a preview, inspect normalized results, approve the version, and produce durable raw artifacts plus an immutable bundle handoff that `document-intelligence` can consume without depending on Firecrawl internals.

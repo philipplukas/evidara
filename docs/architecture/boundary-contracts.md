@@ -32,6 +32,8 @@ Each boundary has a different purpose:
 
 When `platform-control` has durably stored one upstream snapshot and its sibling artifacts, it emits `artifact_bundle.available`.
 
+`raw_artifact.available` may still be emitted inside `platform-control` for preview, observability, or capture workflows, but it is not the primary `document-intelligence` handoff contract.
+
 The boundary contract is intentionally split:
 
 - the event is the progression signal
@@ -113,6 +115,8 @@ The `document.processed` event points at those surfaces through `published_docum
 
 User-facing **document detail** in the request path goes through the **Document Service** (see [ADR-0010](../adr/0010-document-content-format.md)): the BFF calls a DI-owned read API that returns only contract-shaped content from those published surfaces, not ad hoc Delta paths.
 
+For the current M4 slice, this read path is still planned. The in-repo `legal-search` BFF currently serves detail from OpenSearch while the projection and indexing path is being built out.
+
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
 flowchart LR
@@ -161,6 +165,8 @@ Enforcement implications:
 - tenant and corpus filters are mandatory on every control-plane and search-facing boundary
 - canonical identity resolution happens within a corpus boundary by default
 - shared/private scope decisions must flow into indexing and access-control rules, not just source metadata
+
+For the current M4 slice, those scope values are frozen in source-version acquisition config and copied into manifests and lifecycle events. Dedicated corpus CRUD and broader access-control surfaces remain follow-on work.
 
 ## Standards Vs Domain Contracts
 

@@ -2,17 +2,19 @@
 
 ## Purpose
 
-Own source lifecycle and operational control. Platform-control is the entry point for all new data entering Evidara and the control plane for tenant, corpus, acquisition, and approval workflows.
+Own source lifecycle and operational control. Platform-control is the entry point for all new data entering Evidara and the control plane for acquisition, governance, approval, and scope metadata.
 
 ## Current state
 
 Platform-control now has a running FastAPI service with persisted entities and migration-backed schemas for source lifecycle, runs, webhook receipts, raw artifacts, bundle manifests, and DI status/lifecycle event consumption. Core API endpoints are implemented for sources, versions, runs, Firecrawl callbacks, and DI event ingest (`document.processing_status.updated`, `document.processed`, `document.withdrawn`) with run-scoped read surfaces.
 
+For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope_type` are frozen through source-version acquisition config and copied into bundle/event provenance. First-class corpus CRUD is still follow-on work.
+
 See [Platform Control Implementation Plan](platform-control-implementation-plan.md) for the planned repo structure, worker layout, and phased delivery approach.
 
 ## Source of truth
 
-- Postgres (Cloud SQL) for sources, corpora, versions, runs, approvals, and reference data
+- Postgres (Cloud SQL) for sources, versions, runs, approvals, and reference data
 - GCS for raw artifacts and immutable artifact bundle manifest objects
 - `contracts/api/platform-control.openapi.yaml` for API definition
 - `contracts/schemas/artifact-bundle-manifest.schema.json` for immutable DI handoff manifests
@@ -21,7 +23,7 @@ See [Platform Control Implementation Plan](platform-control-implementation-plan.
 
 ### Minimal v1
 
-- Tenants and corpora
+- Scope metadata (`tenant_id`, `corpus_id`, `scope_type`) frozen for the run and handoff path
 - Jurisdictions and authorities (reference data)
 - Source registry
 - Source versions as frozen governed acquisition config
@@ -32,7 +34,7 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 
 ### Boundary
 
-- **Does own:** source lifecycle, corpora, reference data, runs, approvals, connector execution, provenance registration
+- **Does own:** source lifecycle, scope governance, reference data, runs, approvals, connector execution, provenance registration
 - **Does NOT own:** canonical document truth, search projections, parsing, canonical resolution
 
 ## Minimal next tasks
@@ -43,7 +45,7 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 - [x] Create the initial `platform-control/` API scaffold
 - [ ] Create the connector-worker scaffold under `platform-control/`
 - [~] Define run lifecycle and replay modes
-- [ ] Define approval states and transitions
+- [x] Define approval states and transitions
 - [~] Define reference snapshot export mechanics for DI
 - [ ] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
 
@@ -51,7 +53,7 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 
 A user can:
 
-1. Create a source in a corpus
+1. Create a source and freeze scope metadata for the run path
 2. Create and approve a source version
 3. Trigger a run with replay/backfill scope
 4. Register a source snapshot and one or more artifacts
@@ -115,4 +117,4 @@ Key tests:
 | Source format changes silently | Artifact count and content-type drift checks |
 | Run state becomes inconsistent | Unit tests for valid and invalid transitions |
 | Bundle manifests drift from DI expectations | Schema validation and example payload tests |
-| Corpus assignment changes accidentally | Source/version approval workflow and audit trail |
+| Scope metadata changes accidentally | Source-version governance, manifest provenance, and audit trail |
