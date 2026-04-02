@@ -11,12 +11,12 @@ on:
   pull_request:
     paths:
       - 'legal-search/**'
-      - 'contracts/**'
+      - 'contracts/api/legal-search.openapi.yaml'
   push:
     branches: [main]
     paths:
       - 'legal-search/**'
-      - 'contracts/**'
+      - 'contracts/api/legal-search.openapi.yaml'
 
 jobs:
   # ─── API quality gate ───
