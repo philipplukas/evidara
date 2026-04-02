@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: legal-search
+        working-directory: legal-search/frontend
 
     steps:
       - name: Checkout
@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: legal-search/package-lock.json
+          cache-dependency-path: legal-search/frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci

@@ -9,8 +9,8 @@
  * - highlight on content for snippet generation
  */
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { Client } from '@opensearch-project/opensearch';
 import { ConfigService } from '@nestjs/config';
+import type { Client } from '@opensearch-project/opensearch';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type {
   AggregationBucket,
@@ -31,14 +31,10 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     @Inject(ConfigService)
     config: ConfigService,
   ) {
-    this.indexDocuments =
-      config.get<string>('opensearch.indexDocuments') ?? 'documents';
+    this.indexDocuments = config.get<string>('opensearch.indexDocuments') ?? 'documents';
   }
 
-  async search(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<SearchResultEntity> {
+  async search(query: string, options?: SearchOptions): Promise<SearchResultEntity> {
     const page = options?.page ?? 1;
     const pageSize = options?.pageSize ?? 20;
     const from = (page - 1) * pageSize;
@@ -103,9 +99,7 @@ export class SearchOpenSearchAdapter implements SearchRepository {
 
       const result = response.body;
       const total =
-        typeof result.hits.total === 'number'
-          ? result.hits.total
-          : result.hits.total?.value ?? 0;
+        typeof result.hits.total === 'number' ? result.hits.total : (result.hits.total?.value ?? 0);
 
       const hits: SearchHitEntity[] = (result.hits.hits as any[])
         .filter((hit) => hit._source != null)

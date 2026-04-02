@@ -25,13 +25,18 @@ import { describe, expect, it } from "vitest";
 // When the store exports the reducer, we can import it directly.
 
 import { act, renderHook } from "@testing-library/react";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
 // Import the actual provider to test through React hooks
 import { SearchConstraintsProvider, useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchRefinement } from "@/lib/types";
 
 function wrapper({ children }: { children: ReactNode }) {
-  return <SearchConstraintsProvider>{children}</SearchConstraintsProvider>;
+  return (
+    <NuqsTestingAdapter>
+      <SearchConstraintsProvider>{children}</SearchConstraintsProvider>
+    </NuqsTestingAdapter>
+  );
 }
 
 describe("SearchConstraintsProvider", () => {
@@ -43,7 +48,7 @@ describe("SearchConstraintsProvider", () => {
   it("provides correct initial state", () => {
     const { result } = renderHook(() => useSearchConstraints(), { wrapper });
 
-    expect(result.current.state.context.jurisdictions).toEqual(["CH"]);
+    expect(result.current.state.context.jurisdictions).toEqual(["ch"]);
     expect(result.current.state.context.languages).toEqual(["de"]);
     expect(result.current.state.context.sourceType).toBeNull();
     expect(result.current.state.context.officialOnly).toBe(false);
@@ -60,15 +65,15 @@ describe("SearchConstraintsProvider", () => {
 
     // Add AT
     act(() => {
-      result.current.dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: "AT" });
+      result.current.dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: "at" });
     });
-    expect(result.current.state.context.jurisdictions).toEqual(["CH", "AT"]);
+    expect(result.current.state.context.jurisdictions).toEqual(["ch", "at"]);
 
     // Remove CH
     act(() => {
-      result.current.dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: "CH" });
+      result.current.dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: "ch" });
     });
-    expect(result.current.state.context.jurisdictions).toEqual(["AT"]);
+    expect(result.current.state.context.jurisdictions).toEqual(["at"]);
   });
 
   /**
@@ -100,38 +105,38 @@ describe("SearchConstraintsProvider", () => {
     const { result } = renderHook(() => useSearchConstraints(), { wrapper });
 
     const refinement1: SearchRefinement = {
-      field: "court",
+      field: "legal_area",
       type: "terms",
-      values: ["BGer"],
+      values: ["civil"],
     };
 
     // Set first refinement
     act(() => {
       result.current.dispatch({
         type: "SET_REFINEMENT",
-        field: "court",
+        field: "legal_area",
         refinement: refinement1,
       });
     });
     expect(result.current.state.refinements).toHaveLength(1);
-    expect(result.current.state.refinements[0].values).toEqual(["BGer"]);
+    expect(result.current.state.refinements[0].values).toEqual(["civil"]);
 
     // Update same field — should replace, not append
     const refinement2: SearchRefinement = {
-      field: "court",
+      field: "legal_area",
       type: "terms",
-      values: ["BGer", "BVGer"],
+      values: ["civil", "criminal"],
     };
 
     act(() => {
       result.current.dispatch({
         type: "SET_REFINEMENT",
-        field: "court",
+        field: "legal_area",
         refinement: refinement2,
       });
     });
     expect(result.current.state.refinements).toHaveLength(1);
-    expect(result.current.state.refinements[0].values).toEqual(["BGer", "BVGer"]);
+    expect(result.current.state.refinements[0].values).toEqual(["civil", "criminal"]);
   });
 
   /**
@@ -144,22 +149,24 @@ describe("SearchConstraintsProvider", () => {
     act(() => {
       result.current.dispatch({
         type: "SET_REFINEMENT",
-        field: "court",
-        refinement: { field: "court", type: "terms", values: ["BGer"] },
+        field: "legal_area",
+        refinement: { field: "legal_area", type: "terms", values: ["civil"] },
       });
+    });
+    act(() => {
       result.current.dispatch({
         type: "SET_REFINEMENT",
-        field: "year",
-        refinement: { field: "year", type: "terms", values: ["2024"] },
+        field: "court_level",
+        refinement: { field: "court_level", type: "terms", values: ["supreme"] },
       });
     });
     expect(result.current.state.refinements).toHaveLength(2);
 
     act(() => {
-      result.current.dispatch({ type: "CLEAR_REFINEMENT", field: "court" });
+      result.current.dispatch({ type: "CLEAR_REFINEMENT", field: "legal_area" });
     });
     expect(result.current.state.refinements).toHaveLength(1);
-    expect(result.current.state.refinements[0].field).toBe("year");
+    expect(result.current.state.refinements[0].field).toBe("court_level");
   });
 
   /**
@@ -175,8 +182,8 @@ describe("SearchConstraintsProvider", () => {
       result.current.dispatch({ type: "SET_OFFICIAL_ONLY", value: true });
       result.current.dispatch({
         type: "SET_REFINEMENT",
-        field: "court",
-        refinement: { field: "court", type: "terms", values: ["BGer"] },
+        field: "legal_area",
+        refinement: { field: "legal_area", type: "terms", values: ["civil"] },
       });
     });
 
@@ -185,7 +192,7 @@ describe("SearchConstraintsProvider", () => {
       result.current.dispatch({ type: "RESET_ALL" });
     });
 
-    expect(result.current.state.context.jurisdictions).toEqual(["CH"]);
+    expect(result.current.state.context.jurisdictions).toEqual(["ch"]);
     expect(result.current.state.context.languages).toEqual(["de"]);
     expect(result.current.state.context.sourceType).toBeNull();
     expect(result.current.state.context.officialOnly).toBe(false);

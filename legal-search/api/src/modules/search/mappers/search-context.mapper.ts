@@ -5,9 +5,8 @@
  * Query-independent and cacheable. Accepts locale for label resolution (ADR-0013).
  */
 
-import { t } from '../../../core/i18n';
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE } from '../../../core/i18n';
+import { DEFAULT_LOCALE, t } from '../../../core/i18n';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { ContextAggregations } from '../entities/search.entities';
 

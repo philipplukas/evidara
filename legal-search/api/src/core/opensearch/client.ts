@@ -13,9 +13,7 @@ export const OPENSEARCH_CLIENT = Symbol('OPENSEARCH_CLIENT');
 export function createOpenSearchClient(nodeUrl: string): Client {
   return new Client({
     node: nodeUrl,
-    ssl: nodeUrl.startsWith('https')
-      ? { rejectUnauthorized: false }
-      : undefined,
+    ssl: nodeUrl.startsWith('https') ? { rejectUnauthorized: false } : undefined,
   });
 }
 
@@ -25,8 +23,7 @@ export function createOpenSearchClient(nodeUrl: string): Client {
     {
       provide: OPENSEARCH_CLIENT,
       useFactory: (config: ConfigService) => {
-        const node =
-          config.get<string>('opensearch.node') ?? 'http://localhost:9200';
+        const node = config.get<string>('opensearch.node') ?? 'http://localhost:9200';
         return createOpenSearchClient(node);
       },
       inject: [ConfigService],

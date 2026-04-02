@@ -1,6 +1,6 @@
 import { Controller, Get, Headers, Inject, Query } from '@nestjs/common';
 import { resolveLocale } from '../../core/i18n';
-import { SearchQueryDto } from './dto/search-query.dto';
+import type { SearchQueryDto } from './dto/search-query.dto';
 import { SearchService } from './search.service';
 
 @Controller('v1/search')

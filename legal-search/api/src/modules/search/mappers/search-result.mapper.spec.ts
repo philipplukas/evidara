@@ -270,10 +270,7 @@ describe('locale-aware label resolution', () => {
   });
 
   it('should render French related counts when locale is fr', () => {
-    const counts = composeRelatedCounts(
-      { ...lawHit, related_commentary_count: 3 },
-      'fr',
-    );
+    const counts = composeRelatedCounts({ ...lawHit, related_commentary_count: 3 }, 'fr');
     expect(counts[0].label).toBe('Commentaires');
   });
 

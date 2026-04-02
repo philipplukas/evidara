@@ -58,7 +58,9 @@ for (const [key, entry] of Object.entries(docTypeVocab.properties.values.propert
 /** Locale-keyed document type labels loaded from vocabulary. */
 const DOCUMENT_TYPE_LOCALE_LABELS: Record<string, Record<string, string>> = {};
 for (const [key, entry] of Object.entries(docTypeVocab.properties.values.properties)) {
-  const props = (entry as { properties?: { labels?: { properties?: Record<string, { const?: string }> } } }).properties;
+  const props = (
+    entry as { properties?: { labels?: { properties?: Record<string, { const?: string }> } } }
+  ).properties;
   const labels: Record<string, string> = {};
   if (props?.labels?.properties) {
     for (const [locale, localeEntry] of Object.entries(props.labels.properties)) {
@@ -72,9 +74,17 @@ for (const [key, entry] of Object.entries(docTypeVocab.properties.values.propert
  * Resolve a document type label for the given locale.
  * Falls back: labels[locale] → labels[DEFAULT_LOCALE] → label → code.
  */
-export function getDocumentTypeLabel(typeCode: string, locale: SupportedLocale = DEFAULT_LOCALE): string {
+export function getDocumentTypeLabel(
+  typeCode: string,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): string {
   const localeLabels = DOCUMENT_TYPE_LOCALE_LABELS[typeCode];
-  return localeLabels?.[locale] ?? localeLabels?.[DEFAULT_LOCALE] ?? DOCUMENT_TYPE_LABELS[typeCode] ?? typeCode;
+  return (
+    localeLabels?.[locale] ??
+    localeLabels?.[DEFAULT_LOCALE] ??
+    DOCUMENT_TYPE_LABELS[typeCode] ??
+    typeCode
+  );
 }
 
 // ─── Jurisdiction Vocabulary ───
@@ -110,7 +120,9 @@ for (const [key, entry] of Object.entries(jurisdictionVocab.properties.values.pr
 /** Locale-keyed jurisdiction labels loaded from vocabulary. */
 const JURISDICTION_LOCALE_LABELS: Record<string, Record<string, string>> = {};
 for (const [key, entry] of Object.entries(jurisdictionVocab.properties.values.properties)) {
-  const props = (entry as { properties?: { labels?: { properties?: Record<string, { const?: string }> } } }).properties;
+  const props = (
+    entry as { properties?: { labels?: { properties?: Record<string, { const?: string }> } } }
+  ).properties;
   const labels: Record<string, string> = {};
   if (props?.labels?.properties) {
     for (const [locale, localeEntry] of Object.entries(props.labels.properties)) {
@@ -124,9 +136,17 @@ for (const [key, entry] of Object.entries(jurisdictionVocab.properties.values.pr
  * Resolve a jurisdiction label for the given locale.
  * Falls back: labels[locale] → labels[DEFAULT_LOCALE] → label → code.
  */
-export function getJurisdictionLabel(code: string, locale: SupportedLocale = DEFAULT_LOCALE): string {
+export function getJurisdictionLabel(
+  code: string,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): string {
   const localeLabels = JURISDICTION_LOCALE_LABELS[code];
-  return localeLabels?.[locale] ?? localeLabels?.[DEFAULT_LOCALE] ?? JURISDICTION_META[code]?.label ?? code;
+  return (
+    localeLabels?.[locale] ??
+    localeLabels?.[DEFAULT_LOCALE] ??
+    JURISDICTION_META[code]?.label ??
+    code
+  );
 }
 
 /**

@@ -5,9 +5,8 @@
  * Uses locale-aware vocabulary labels and t() for group labels (ADR-0013).
  */
 
-import { t } from '../../../core/i18n';
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE } from '../../../core/i18n';
+import { DEFAULT_LOCALE, t } from '../../../core/i18n';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { AggregationBucket, SearchAggregations } from '../entities/search.entities';
 
@@ -31,7 +30,10 @@ interface FacetConfig {
   key: string;
   labelKey: string;
   type: FilterFacetView['type'];
-  resolveOption?: (bucketKey: string, locale: SupportedLocale) => { label: string; iconKey?: string } | undefined;
+  resolveOption?: (
+    bucketKey: string,
+    locale: SupportedLocale,
+  ) => { label: string; iconKey?: string } | undefined;
 }
 
 const FACET_CONFIGS: FacetConfig[] = [
@@ -81,7 +83,10 @@ const FACET_CONFIGS: FacetConfig[] = [
 
 function mapBucketsToOptions(
   buckets: AggregationBucket[],
-  resolveOption?: (key: string, locale: SupportedLocale) => { label: string; iconKey?: string } | undefined,
+  resolveOption?: (
+    key: string,
+    locale: SupportedLocale,
+  ) => { label: string; iconKey?: string } | undefined,
   locale: SupportedLocale = DEFAULT_LOCALE,
 ): FilterOptionView[] {
   return buckets.map((bucket) => {

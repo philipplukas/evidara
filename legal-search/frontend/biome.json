@@ -60,10 +60,20 @@
   "files": {
     "includes": [
       "src/**/*.ts",
-      "src/**/*.tsx"
+      "src/**/*.tsx",
+      "!src/lib/api/generated/**"
     ]
   },
   "overrides": [
+    {
+      "includes": ["src/lib/api/generated/**/*.ts"],
+      "linter": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      }
+    },
     {
       "includes": ["src/components/ui/**"],
       "linter": {

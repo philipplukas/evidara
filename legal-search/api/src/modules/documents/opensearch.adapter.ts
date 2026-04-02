@@ -8,15 +8,11 @@
  * - getCitations: search citations index by source_document_id
  */
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { Client } from '@opensearch-project/opensearch';
 import { ConfigService } from '@nestjs/config';
+import type { Client } from '@opensearch-project/opensearch';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type { DocumentsRepository } from './documents.repository';
-import type {
-  CitationEntity,
-  DocumentEntity,
-  SectionEntity,
-} from './entities/document.entities';
+import type { CitationEntity, DocumentEntity, SectionEntity } from './entities/document.entities';
 
 @Injectable()
 export class DocumentsOpenSearchAdapter implements DocumentsRepository {
@@ -31,12 +27,9 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
     @Inject(ConfigService)
     config: ConfigService,
   ) {
-    this.indexDocuments =
-      config.get<string>('opensearch.indexDocuments') ?? 'documents';
-    this.indexSections =
-      config.get<string>('opensearch.indexSections') ?? 'sections';
-    this.indexCitations =
-      config.get<string>('opensearch.indexCitations') ?? 'citations';
+    this.indexDocuments = config.get<string>('opensearch.indexDocuments') ?? 'documents';
+    this.indexSections = config.get<string>('opensearch.indexSections') ?? 'sections';
+    this.indexCitations = config.get<string>('opensearch.indexCitations') ?? 'citations';
   }
 
   async getById(id: string): Promise<DocumentEntity | null> {

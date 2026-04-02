@@ -13,9 +13,8 @@
  * - Optional scalar fields omitted when absent
  */
 
-import { t } from '../../../core/i18n';
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE } from '../../../core/i18n';
+import { DEFAULT_LOCALE, t } from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { SearchHitEntity } from '../entities/search.entities';
@@ -113,7 +112,11 @@ const DEFAULT_TYPE_CONFIG: DocumentTypeConfig = {
 // ─── Composition Functions ───
 
 /** Compose badge views from document type and jurisdiction. Warns on unknown values. */
-export function composeBadges(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE, warn?: WarnFn): BadgeView[] {
+export function composeBadges(
+  hit: SearchHitEntity,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+  warn?: WarnFn,
+): BadgeView[] {
   const docType = hit.document_type ?? '';
   const config = DOCUMENT_TYPE_CONFIG[docType];
 
@@ -134,9 +137,8 @@ export function composeBadges(hit: SearchHitEntity, locale: SupportedLocale = DE
     });
   }
 
-  const badgeLabel = docType && config
-    ? getDocumentTypeLabel(docType, locale)
-    : t('labels.document', locale);
+  const badgeLabel =
+    docType && config ? getDocumentTypeLabel(docType, locale) : t('labels.document', locale);
 
   return [
     {
@@ -148,7 +150,11 @@ export function composeBadges(hit: SearchHitEntity, locale: SupportedLocale = DE
 }
 
 /** Compose subtitle from jurisdiction label and document type label. */
-export function composeSubtitle(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE, warn?: WarnFn): string {
+export function composeSubtitle(
+  hit: SearchHitEntity,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+  warn?: WarnFn,
+): string {
   const parts: string[] = [];
   const jurisdictionMeta = getJurisdictionMeta(hit.jurisdiction ?? '', locale);
 
@@ -170,13 +176,15 @@ export function composeSubtitle(hit: SearchHitEntity, locale: SupportedLocale = 
 }
 
 /** Compose metadata rows (date label varies by document type). */
-export function composeMetadata(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE): MetadataRowView[] {
+export function composeMetadata(
+  hit: SearchHitEntity,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): MetadataRowView[] {
   const rows: MetadataRowView[] = [];
 
   if (hit.effective_date) {
-    const label = hit.document_type === 'decision'
-      ? t('metadata.date', locale)
-      : t('metadata.inForce', locale);
+    const label =
+      hit.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({ label, value: hit.effective_date });
   }
 
@@ -184,7 +192,10 @@ export function composeMetadata(hit: SearchHitEntity, locale: SupportedLocale = 
 }
 
 /** Compose related-count chips from hit entity counts. */
-export function composeRelatedCounts(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE): RelatedCountView[] {
+export function composeRelatedCounts(
+  hit: SearchHitEntity,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): RelatedCountView[] {
   const counts: RelatedCountView[] = [];
 
   if (hit.related_commentary_count && hit.related_commentary_count > 0) {
@@ -207,7 +218,11 @@ export function composeRelatedCounts(hit: SearchHitEntity, locale: SupportedLoca
 }
 
 /** Compose action buttons from document type config. Warns on unknown types. */
-export function composeActions(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE, warn?: WarnFn): ActionView[] {
+export function composeActions(
+  hit: SearchHitEntity,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+  warn?: WarnFn,
+): ActionView[] {
   const docType = hit.document_type ?? '';
   const config = DOCUMENT_TYPE_CONFIG[docType];
 

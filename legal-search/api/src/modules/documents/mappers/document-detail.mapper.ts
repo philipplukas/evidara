@@ -6,9 +6,8 @@
  * Observable fallbacks via WarnFn (ADR-0012).
  */
 
-import { t } from '../../../core/i18n';
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE } from '../../../core/i18n';
+import { DEFAULT_LOCALE, t } from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/document.entities';
@@ -92,9 +91,8 @@ function composeMetadata(
   const rows: { label: string; value: string; iconKey?: string }[] = [];
 
   if (doc.effective_date) {
-    const label = doc.document_type === 'decision'
-      ? t('metadata.date', locale)
-      : t('metadata.inForce', locale);
+    const label =
+      doc.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({ label, value: doc.effective_date });
   }
   if (doc.jurisdiction) {
@@ -135,7 +133,10 @@ function composeTabs(
   return tabs;
 }
 
-function composeReferences(citations: CitationEntity[], locale: SupportedLocale): DetailView['references'] {
+function composeReferences(
+  citations: CitationEntity[],
+  locale: SupportedLocale,
+): DetailView['references'] {
   if (citations.length === 0) return [];
 
   // Group by citation type

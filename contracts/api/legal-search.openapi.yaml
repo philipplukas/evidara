@@ -14,12 +14,18 @@ info:
   version: 0.3.0
   contact:
     name: Evidara Team
+  license:
+    name: Proprietary
+    identifier: UNLICENSED
 
 servers:
   - url: http://localhost:3001
     description: Local development
   - url: https://legal-search.evidara.dev
     description: Production
+
+security:
+  - bearerAuth: []
 
 paths:
   /v1/search:
@@ -68,6 +74,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SearchResponseView"
+        "400":
+          description: Invalid query parameters
 
   /v1/search/context:
     get:
@@ -86,6 +94,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SearchContextView"
+        "400":
+          description: Invalid request
 
   /v1/documents/{document_id}:
     get:
@@ -132,6 +142,8 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/SectionSummary"
+        "404":
+          description: Document not found
 
 components:
   parameters:
