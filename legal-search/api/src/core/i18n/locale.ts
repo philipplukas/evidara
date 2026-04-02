@@ -17,8 +17,9 @@ export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 /**
  * Resolve an Accept-Language header value to a supported locale.
  *
- * Handles formats like "fr", "fr-CH", "fr-CH, de;q=0.9", or "*".
- * Returns DEFAULT_LOCALE if the header is missing or no supported locale matches.
+ * Handles formats like "fr", "fr-CH", "fr-CH, de;q=0.9".
+ * Returns DEFAULT_LOCALE if the header is missing, contains only
+ * unsupported languages, or uses the wildcard "*".
  */
 export function resolveLocale(acceptLanguage?: string): SupportedLocale {
   if (!acceptLanguage) return DEFAULT_LOCALE;

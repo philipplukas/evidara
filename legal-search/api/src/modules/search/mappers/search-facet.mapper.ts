@@ -60,7 +60,7 @@ const FACET_CONFIGS: FacetConfig[] = [
     key: 'language',
     labelKey: 'facets.language',
     type: 'chip',
-    resolveOption: (bucketKey) => {
+    resolveOption: (bucketKey, _locale) => {
       const labels: Record<string, string> = { de: 'DE', fr: 'FR', it: 'IT', en: 'EN' };
       return labels[bucketKey] ? { label: labels[bucketKey] } : undefined;
     },

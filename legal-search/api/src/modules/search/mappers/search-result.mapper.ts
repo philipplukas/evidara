@@ -17,7 +17,7 @@ import { t } from '../../../core/i18n';
 import type { SupportedLocale } from '../../../core/i18n';
 import { DEFAULT_LOCALE } from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
-import { getDocumentTypeLabel, getJurisdictionMeta, JURISDICTION_META } from '../../../core/vocabularies';
+import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { SearchHitEntity } from '../entities/search.entities';
 
 // ─── Public Types (ViewModel shapes) ───
@@ -125,9 +125,9 @@ export function composeBadges(hit: SearchHitEntity, locale: SupportedLocale = DE
   }
 
   const resolvedConfig = config ?? DEFAULT_TYPE_CONFIG;
-  const jurisdiction = JURISDICTION_META[hit.jurisdiction ?? ''];
+  const jurisdictionMeta = getJurisdictionMeta(hit.jurisdiction ?? '', locale);
 
-  if (hit.jurisdiction && !jurisdiction) {
+  if (hit.jurisdiction && !jurisdictionMeta) {
     warn?.('unknown_jurisdiction', {
       document_id: hit.document_id,
       jurisdiction: hit.jurisdiction,
@@ -142,7 +142,7 @@ export function composeBadges(hit: SearchHitEntity, locale: SupportedLocale = DE
     {
       label: badgeLabel,
       colorKey: resolvedConfig.badgeColorKey,
-      ...(jurisdiction && { iconKey: jurisdiction.iconKey }),
+      ...(jurisdictionMeta && { iconKey: jurisdictionMeta.iconKey }),
     },
   ];
 }

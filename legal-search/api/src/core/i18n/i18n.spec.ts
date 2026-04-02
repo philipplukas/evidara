@@ -61,3 +61,15 @@ describe('t', () => {
     expect(t('nonexistent.key', 'fr')).toBe('nonexistent.key');
   });
 });
+
+// ─── Key Parity ───
+
+describe('translation key parity', () => {
+  it('should have identical keys in de.json and fr.json', async () => {
+    const de = await import('./de.json');
+    const fr = await import('./fr.json');
+    const deKeys = Object.keys(de).filter((k) => k !== 'default').sort();
+    const frKeys = Object.keys(fr).filter((k) => k !== 'default').sort();
+    expect(frKeys).toEqual(deKeys);
+  });
+});
