@@ -50,13 +50,28 @@
       "type": "string",
       "description": "Original content type of the source artifact."
     },
+    "content_docling": {
+      "type": "object",
+      "description": "Structured DoclingDocument JSON produced by the docling pipeline (ADR-0010). A first-class canonical artifact intended for downstream consumption."
+    },
     "jurisdiction": {
       "type": "string",
-      "description": "Jurisdiction the document belongs to, if assigned."
+      "description": "Jurisdiction the document belongs to. MUST use normalized values from contracts/vocabularies/jurisdiction.json (ISO 3166-1 alpha-2).",
+      "enum": ["CH", "AT", "DE", "LI"]
     },
     "document_type": {
       "type": "string",
-      "description": "Classification of the document type (e.g., statute, regulation, decision)."
+      "description": "Normalized document type classification. MUST use values from contracts/vocabularies/document-type.json. Upstream mapping of raw extraction labels to these values is required before canonical output.",
+      "enum": ["law", "decision", "commentary", "rechtssatz"]
+    },
+    "language": {
+      "type": "string",
+      "description": "Primary language of the document content. ISO 639-1 code.",
+      "pattern": "^[a-z]{2}$"
+    },
+    "structural_path": {
+      "type": "string",
+      "description": "Intrinsic document hierarchy as a delimited path (e.g., 'OR › Gesellschaftsrecht › Verantwortlichkeit'). Represents stable structural position derived from document analysis, not a UI artifact. May evolve to a structured array representation in the future."
     },
     "effective_date": {
       "type": "string",

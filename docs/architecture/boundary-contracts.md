@@ -2,45 +2,67 @@
 
 ## Overview
 
-Evidara has two major handoff boundaries between its runtime domains. These boundaries are defined by explicit contracts and enforced through schema validation and event-driven communication.
+Evidara has two major runtime handoff boundaries:
 
-## Boundary 1: platform-control → document-intelligence
+1. `platform-control` ↔ `document-intelligence`
+2. `document-intelligence` → `legal-search`
+
+Each boundary has a different purpose:
+
+- `platform-control` hands off immutable acquisition input and receives operational status back
+- `document-intelligence` publishes canonical-ready document revisions for downstream serving
+
+## Boundary 1: platform-control ↔ document-intelligence
 
 ### What crosses this boundary
 
 | Direction | Payload | Mechanism |
 |-----------|---------|-----------|
-| platform-control → document-intelligence | `raw_artifact.available` event | Async (Pub/Sub) |
-| document-intelligence → platform-control | Processing status updates | Async (Pub/Sub) or callback API |
+| platform-control → document-intelligence | `artifact_bundle.available` event | Async (Pub/Sub) |
+| platform-control → document-intelligence | reference snapshot sets | published file or dataset surface |
+| document-intelligence → platform-control | `document.processing_status.updated` event | Async (Pub/Sub) |
 
-### Contract: `raw_artifact.available`
+### Core contract objects
 
-When platform-control completes a run and stores a raw artifact in object storage, it emits a `raw_artifact.available` event.
+- `ArtifactBundleManifest`
+- `artifact_bundle.available`
+- `document.processing_status.updated`
 
-**The event must include:**
+### Meaning of the handoff
 
-- `source_id` — the source that produced the artifact
-- `source_version_id` — the specific version
-- `run_id` — the run that produced the artifact
-- `artifact_id` — unique ID of the raw artifact
-- `storage_path` — object storage location of the raw artifact
-- `content_type` — MIME type or format hint
-- `metadata` — any additional metadata from the run
+When `platform-control` has durably stored one upstream snapshot and its sibling artifacts, it emits `artifact_bundle.available`.
 
-**Ownership of IDs at this boundary:**
+The boundary contract is intentionally split:
 
-- `source_id`, `source_version_id`, `run_id`: owned by platform-control
-- `artifact_id`: assigned by platform-control, carried through to document-intelligence
-- `document_id`: assigned by document-intelligence upon processing
+- the event is the progression signal
+- the bundle manifest is the immutable handoff object
+- reference snapshot exports are the governed reference-data input
 
-### Principles
+For canonical field-level truth, use the contract files directly:
 
-- platform-control does not know or care about the internal processing steps of document-intelligence.
-- document-intelligence does not manage sources, versions, or approvals.
-- The raw artifact in object storage is the physical handoff point.
-- Lineage is maintained through IDs: every canonical document traces back to a run, source version, and source.
+- `contracts/events/artifact-bundle-available.schema.json`
+- `contracts/schemas/artifact-bundle-manifest.schema.json`
+- `contracts/common/provenance.schema.json`
+- `contracts/common/manifest-ref.schema.json`
 
----
+### Boundary principles
+
+- `platform-control` owns source lifecycle, corpora, approvals, runs, and acquisition state.
+- `document-intelligence` owns interpretation, normalization, and canonical truth.
+- `platform-control` may freeze DI hints and override refs, but it does not choose DI implementation classes.
+- `document-intelligence` must not read `platform-control`'s operational database directly.
+- `document-intelligence` reports progress via status events rather than by mutating `platform-control` state directly.
+
+### Clear ownership examples
+
+- A website changes pagination from `page=2` to cursor tokens:
+  This is `platform-control` work. Update connector config, sync strategy, checkpointing, and run behavior.
+- A Swiss canton PDF needs custom heading detection:
+  This is `document-intelligence` work. Update the jurisdiction or source profile logic in DI.
+- A source should now default into a different corpus:
+  This is `platform-control` work. Corpus assignment belongs to source governance.
+- Two artifacts from the same upstream snapshot should be combined before canonicalization:
+  This is `document-intelligence` work. Bundle interpretation belongs to DI once the immutable bundle exists.
 
 ## Boundary 2: document-intelligence → legal-search
 
@@ -49,38 +71,98 @@ When platform-control completes a run and stores a raw artifact in object storag
 | Direction | Payload | Mechanism |
 |-----------|---------|-----------|
 | document-intelligence → legal-search | `document.processed` event | Async (Pub/Sub) |
-| legal-search (internal) | Reads canonical truth from Delta | Sync (read) |
+| document-intelligence → legal-search | `document.withdrawn` event | Async (Pub/Sub) |
+| legal-search | reads published canonical surfaces referenced by `published_document_ref`, `published_sections_ref`, and `processing_manifest_ref` in `document.processed` | Sync (read) |
 
-### Contract: `document.processed`
+### Core contract objects
 
-When document-intelligence produces a canonical document (and optionally sections, citations), it emits a `document.processed` event.
+- `ProcessingManifest`
+- `Document`
+- `Section`
+- `document.processed`
+- `document.withdrawn`
 
-**The event must include:**
+### Meaning of `document.processed`
 
-- `document_id` — the canonical document ID
-- `source_id` — traceability back to source
-- `run_id` — traceability back to run
-- `artifact_id` — traceability back to raw artifact
-- `version` — processing version or schema version
-- `canonical_path` — Delta table path or location of canonical record
+`document.processed` is emitted once one logical document revision becomes canonical-ready.
 
-**Ownership of IDs at this boundary:**
+At this boundary:
 
-- `document_id`, `section_id`, `citation_id`: owned by document-intelligence
-- `source_id`, `run_id`, `artifact_id`: passed through from platform-control
+- the event is the publication signal
+- the processing manifest is the immutable record of one DI result
+- the published dataset refs identify the exact downstream-consumable canonical rows
 
-### Boundary Principles
+The event does **not** embed the full document body and does **not** expose arbitrary internal Delta table names or paths. For canonical field-level truth, use:
 
-- document-intelligence writes canonical truth to Delta. This is the source of truth.
-- legal-search reads from Delta to build OpenSearch serving projections. OpenSearch is never the source of truth.
-- The `document.processed` event triggers indexing, but legal-search can also perform full reindexes independently.
-- legal-search never writes back to Delta or modifies canonical truth.
+- `contracts/events/document-processed.schema.json`
+- `contracts/events/document-withdrawn.schema.json`
+- `contracts/schemas/processing-manifest.schema.json`
+- `contracts/common/dataset-ref.schema.json`
+- `contracts/common/manifest-ref.schema.json`
 
----
+### Published surfaces
+
+`document-intelligence` owns internal bronze/silver organization, but downstream consumers read only published contract surfaces such as:
+
+- `published_documents`
+- `published_sections`
+- `processing_manifests`
+
+The `document.processed` event points at those surfaces through `published_document_ref`, `published_sections_ref`, and `processing_manifest_ref`, which keeps internal DI modeling evolvable without breaking `legal-search`. The `document.withdrawn` event does not expose published-surface refs; it carries only the identity fields needed for deindexing.
+
+### Boundary principles
+
+- `document-intelligence` owns canonical truth and document revisioning.
+- `legal-search` owns all OpenSearch mappings, aliases, indexing jobs, and projection logic.
+- `legal-search` must not treat OpenSearch as a source of truth.
+- `legal-search` must not query arbitrary internal DI tables; it reads only published surfaces.
+- `document.processed` is emitted per document, not per bundle.
+
+### Supersession and withdrawal
+
+- Processing supersession flows through `document.processed` with a higher `document_revision`.
+- Legal lifecycle changes such as `superseded` or `repealed` also flow through `document.processed`.
+- True public-search removal flows through `document.withdrawn`.
+
+## Scope Model
+
+`scope_type` defines the visibility boundary for a corpus and every document lineage record inside it.
+
+| `scope_type` | Use it for | Access semantics |
+|--------------|------------|------------------|
+| `global_public` | Shared public legal corpora such as official laws and regulations | Visible to all authorized product users for public content. Uses the reserved tenant such as `tenant_public`. |
+| `tenant_private` | One client's internal or licensed corpus | Visible only inside that tenant boundary. Identity resolution and search routing must stay inside the tenant corpus. |
+| `tenant_shared` | Controlled multi-tenant shared corpora such as curated partner libraries | Shared only across an explicitly governed set of tenants or operators; never treat as globally public by default. |
+
+Enforcement implications:
+
+- tenant and corpus filters are mandatory on every control-plane and search-facing boundary
+- canonical identity resolution happens within a corpus boundary by default
+- shared/private scope decisions must flow into indexing and access-control rules, not just source metadata
+
+## Standards Vs Domain Contracts
+
+Use standards and managed capabilities where they fit, but keep business semantics explicit:
+
+- Event metadata should stay CloudEvents-aligned.
+- Bundle and processing manifests should be immutable JSON objects referenced through `manifest_ref`.
+- Searchable manifest metadata should be mirrored into component-owned query surfaces rather than encoded in Hive-style path semantics.
+- Databricks / Unity Catalog should provide DI-internal lineage for jobs, tables, and published views.
+- OpenSearch aliases and versioned physical indices should provide search cutover and rebuild mechanics.
+
+Evidara-specific contracts still need to own:
+
+- `tenant_id`, `corpus_id`, and scope boundaries
+- source/version/run/snapshot/artifact lineage across components
+- stable `document_id`
+- immutable `processing_manifest_id`
+- monotonic `document_revision`
+- resolution-policy and withdrawal semantics
 
 ## Contract Evolution
 
-- **Contracts are minimal and versioned.** Start with the smallest viable contract and expand incrementally.
-- **IDs and ownership are stabilized first.** ID formats and ownership rules are defined early and change rarely.
-- **Payload shapes may evolve.** Fields may be added to events and schemas over time, following backwards-compatible patterns (additive changes only).
-- **Breaking changes require an ADR.** Any change that breaks existing consumers must be documented and reviewed.
+- Contracts are additive within a version.
+- Event names stay stable; `event_version` carries the major version.
+- Breaking changes require a new version and an ADR.
+- New fields should be optional first unless every producer and consumer changes together.
+- Example payloads in `contracts/examples/` are part of the contract surface and should evolve with the schema.

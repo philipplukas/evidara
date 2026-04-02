@@ -1,0 +1,21 @@
+<dokument xml:lang="de">
+  <metadaten>
+    <langtitel>Bundesgesetz über digitale Register</langtitel>
+    <kurztitel>Digitalregistergesetz</kurztitel>
+    <dokumentnummer>RIS-BUND-2026-0001</dokumentnummer>
+    <gesetzesnummer>20012345</gesetzesnummer>
+    <kundmachungsorgan>BGBl. I Nr. 12/2026</kundmachungsorgan>
+  </metadaten>
+  <text>
+    <praeambel>Der Bund erlässt folgendes Bundesgesetz.</praeambel>
+    <paragraf nummer="1">
+      <ueberschrift>Geltungsbereich</ueberschrift>
+      <absatz>(1) Dieses Bundesgesetz regelt digitale Register.</absatz>
+    </paragraf>
+    <paragraf nummer="2">
+      <ueberschrift>Begriffsbestimmungen</ueberschrift>
+      <ziffer nummer="1">Register ist eine strukturierte Datensammlung.</ziffer>
+      <ziffer nummer="2">Behörde ist eine zuständige Bundesstelle.</ziffer>
+    </paragraf>
+  </text>
+</dokument>

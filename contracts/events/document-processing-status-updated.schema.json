@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/events/document-processing-status-updated",
+  "title": "DocumentProcessingStatusUpdated",
+  "description": "Operational event emitted by document-intelligence so platform-control can track processing progress and failures without reading DI tables directly.",
+  "allOf": [
+    {
+      "$ref": "https://evidara.dev/common/event-envelope"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "document.processing_status.updated"
+        },
+        "event_version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "document-intelligence"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "processing_manifest_id",
+            "provenance",
+            "processing_version",
+            "status"
+          ],
+          "properties": {
+            "processing_manifest_id": {
+              "type": "string",
+              "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "document_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "document_revision": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "provenance": {
+              "$ref": "https://evidara.dev/common/provenance"
+            },
+            "processing_version": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "accepted",
+                "processing",
+                "canonical_ready",
+                "failed",
+                "withdrawn",
+                "skipped_duplicate"
+              ]
+            },
+            "error_code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "error_summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "failed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "error_code",
+                  "error_summary"
+                ],
+                "properties": {
+                  "error_code": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "error_summary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "error_code": {
+                    "type": "null"
+                  },
+                  "error_summary": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

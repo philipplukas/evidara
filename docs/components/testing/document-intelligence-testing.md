@@ -4,79 +4,100 @@
 
 Testing strategy for the document-intelligence component, which owns:
 
-- Raw artifact ingestion
-- Parsing (HTML, PDF, etc.)
-- Segmentation (splitting into sections)
-- Canonical document creation
-- Section creation and ordering
-- Citation extraction
-- Jurisdiction assignment
-- Quality checks
+- artifact bundle ingestion
+- parsing and normalization
+- section construction
+- canonical document creation
+- processing manifests
+- publication events
+- quality checks
+
+The MVP test plan assumes bundle ingestion, canonical `Document`, `Section`, and `ProcessingManifest` outputs are implemented first. Citation extraction and canonical jurisdiction assignment are added once those capabilities are implemented.
 
 ---
 
 ## Minimal Tests for MVP
 
-### Unit Tests
+### Unit tests
 
-#### Parsing helpers
-
+- HTML/XML normalization helpers
+- section title extraction and ordering
+- source/jurisdiction profile dispatch
+- content-type and artifact-role selection
 - HTML tag stripping / normalization
 - Section title extraction from headings
-- Citation pattern matching (e.g., "Art. 123 OR", "§ 42 BGB")
 - Content type detection
 
 #### Section construction logic
 
 - Sections are created in correct order
-- Section parent-child relationships are valid
+- Section depth and parent references are valid if hierarchical sections are enabled
 - Empty sections are handled (skipped or flagged)
 
 ### Schema Validation
 
-- `Document` output conforms to JSON Schema
-- `Section` output conforms to JSON Schema
-- `Citation` output conforms to JSON Schema
-- `document.processed` event payload conforms to event schema
+- Pipeline-produced `Document` output conforms to JSON Schema
+- Pipeline-produced `Section` output conforms to JSON Schema
+- Pipeline-produced `ProcessingManifest` output conforms to JSON Schema
+- `artifact_bundle.available`, `document.processed`, and `document.processing_status.updated` conform to event schemas
+- Repo examples under `contracts/examples/` validate against locally resolved schemas without network access
+
+Add `Citation` schema validation once citation extraction is implemented.
 
 ### Golden Document Tests
 
-Use 10–20 representative documents from `tests/golden/`.
+Use representative bundles from `tests/golden/`.
 
-For each golden document, assert:
+Current golden matrix:
 
-- Document is created (not null, not empty)
-- Document type is correct
-- Section count is within expected range
-- Key sections are present (by title or position)
-- Citation count is within expected range
-- Jurisdiction is correctly assigned
-- Lineage fields are populated (`source_id`, `run_id`, `artifact_id`)
-- Required fields are non-null (`title`, `jurisdiction`, `document_type`)
+- `simple_html`
+- `messy_html`
+- `nested_headings`
+- `no_heading_fallback`
+- `ris_xml`
+- `invalid_no_primary`
 
-See [Golden Datasets](../../testing/golden-datasets.md) for sample selection and storage.
+For each golden bundle, assert:
 
-### Invariant Checks
+- at least one `Document` revision is created
+- section count is within expected range
+- key sections are present
+- provenance is populated
+- `document_revision` increments correctly
+- lifecycle status and required canonical timestamps are populated
+- published refs are present when status is `canonical_ready`
 
-These must hold for every processed document, regardless of input:
+Add citation count and canonical jurisdiction assertions once those capabilities are implemented.
+
+### Invariant checks
 
 | Invariant | Description |
 |-----------|-------------|
-| Lineage present | `document.source_id`, `document.run_id`, `document.artifact_id` are not null |
-| Sections ordered correctly | Section sequence numbers are monotonically increasing |
-| Required fields present | `title`, `jurisdiction`, `document_type` are populated |
-| Section/document relations valid | Every section references a valid `document_id` |
-| No orphaned sections | Every section belongs to exactly one document |
+| Provenance present | `document.provenance.source_id`, `run_id`, and `corpus_id` are populated |
+| Document revisions monotonic | newer canonical publications use higher `document_revision` |
+| Sections ordered correctly | section ordinals are monotonically increasing |
+| Section/document relations valid | every section references a valid `document_id` |
+| Canonical-ready has published refs | `ProcessingManifest` includes exact refs when ready |
+| Required fields present | `title`, `processed_at`, and `processing_manifest_id` are populated |
+| No orphaned sections | Every section belongs to exactly one document revision |
 
-### Minimal End-to-End Processing Path
+### Minimal end-to-end processing path
 
-One test that takes a raw artifact from object storage and produces a canonical document in Delta:
-
-1. Place a golden input in a test storage location
+1. Place a golden bundle in a test storage location
 2. Trigger processing
-3. Verify a Document, Sections, and Citations are written
-4. Verify a `document.processed` event is emitted
+3. Verify `Document`, `Section`, and `ProcessingManifest` rows are written
+4. Verify `document.processing_status.updated` and `document.processed` behaviors are validated for the relevant lifecycle path
 5. Verify lineage is traceable
+
+### Adapter coverage
+
+- GCS bundle loader tests use a stubbed storage client and verify manifest/artifact reads plus checksum enforcement
+- Delta sink tests write to temporary Delta tables and read them back to verify published rows and replay-safe appends
+- CLI smoke tests exercise the bundle-processing entrypoint with local fixtures
+- Databricks runtime tests validate the wrapper configuration plus a local Delta-backed bundle run using the Databricks-style entrypoint
+- Bootstrap asset tests verify the published-surface SQL renderer and Terraform module shape for the Unity Catalog scaffolding path
+- Bootstrap asset tests also verify the top-level Databricks stack wiring and the presence of `dev` / `staging` / `prod` tfvars for the DI Terraform path
+- XML bundle tests verify RIS-style section labels and extracted metadata survive canonicalization
 
 ---
 
@@ -85,9 +106,11 @@ One test that takes a raw artifact from object storage and produces a canonical 
 | Check | What it catches |
 |-------|----------------|
 | Average section count changes sharply | Source format changed or parser broke |
-| Citation count changes sharply | Citation extraction logic regressed |
-| Title/jurisdiction null rate spikes | Metadata extraction degraded |
-| Expected headings/citations disappear in golden docs | Parser no longer handles known patterns |
+| Title or lifecycle-status null rate spikes | Metadata extraction degraded |
+| Expected headings disappear in golden docs | Parser no longer handles known patterns |
+| Published-ref readiness mismatches | Manifest lifecycle drifted from publication behavior |
+
+Add citation-count and jurisdiction-quality drift checks once those capabilities are implemented.
 
 ---
 
@@ -114,6 +137,8 @@ These tests should answer:
 
 | Phase | Addition |
 |-------|---------|
+| Post-MVP | Citation schema tests and citation golden assertions |
+| Post-MVP | Jurisdiction assignment assertions and drift checks |
 | Post-MVP | Expanded golden set (per source family) |
 | Post-MVP | Processing performance benchmarks |
 | Later | Property-based tests for parser edge cases |

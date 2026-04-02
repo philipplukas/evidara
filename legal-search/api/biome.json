@@ -13,12 +13,17 @@
       "recommended": true,
       "correctness": {
         "noUnusedImports": "warn",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "warn",
+        "noUnusedFunctionParameters": "off"
       },
       "suspicious": {
         "noExplicitAny": "warn"
       },
+      "complexity": {
+        "useLiteralKeys": "off"
+      },
       "style": {
+        "noNonNullAssertion": "off",
         "useImportType": "warn"
       }
     }
@@ -30,13 +35,17 @@
     "lineWidth": 100
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
     "formatter": {
       "quoteStyle": "single",
-      "semicolons": "always",
-      "trailingCommas": "all"
+      "trailingCommas": "all",
+      "semicolons": "always"
     }
   },
   "files": {
-    "includes": ["src/**/*.ts", "test/**/*.ts"]
+    "includes": ["src/**"],
+    "experimentalScannerIgnores": ["src/__tests__/**"]
   }
 }

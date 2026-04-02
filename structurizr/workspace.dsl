@@ -21,7 +21,7 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         evidara = softwareSystem "Evidara" "Document intelligence platform" {
 
             # --- platform-control ---
-            platformControl = container "platform-control" "Source lifecycle, runs, approvals, reference data" "Cloud Run / FastAPI" {
+            platformControl = container "platform-control" "Source lifecycle, runs, approvals, reference data" "Cloud Run / NestJS" {
                 sourceRegistry = component "Source Registry" "Manages seed sources and source versions"
                 runOrchestrator = component "Run Orchestrator" "Creates and tracks processing runs"
                 approvalWorkflow = component "Approval Workflow" "Manages approval state for source versions"
@@ -39,15 +39,16 @@ workspace "Evidara" "Document intelligence platform for legal research" {
             # --- legal-search ---
             legalSearch = container "legal-search" "Search and document detail experience" "Cloud Run" {
                 frontend = component "Frontend" "Search UI, document detail, workspace" "Next.js"
-                api = component "API" "Search and document endpoints, OpenSearch adapter" "NestJS"
+                bff = component "BFF" "Backend-for-frontend, shapes data for UI" "NestJS"
                 searchProjection = component "Search Projection" "Builds search-ready projections from canonical"
             }
 
             # --- Data stores ---
             postgres = container "PostgreSQL" "Source registry, runs, approvals, reference data" "Cloud SQL" "Database"
-            deltaLake = container "Delta Lake" "Canonical document truth" "Databricks / Cloud Storage" "Database"
-            openSearch = container "OpenSearch" "Search index for legal documents" "OpenSearch Service" "Database"
-            objectStorage = container "Cloud Storage" "Raw artifact files" "GCS" "Database"
+            deltaLake = container "Delta Lake" "Canonical document truth and published downstream surfaces" "Databricks / Cloud Storage" "Database"
+            openSearch = container "OpenSearch" "Serving index and aliases for legal document projections" "OpenSearch Service" "Database"
+            objectStorage = container "Cloud Storage" "Raw artifact files and immutable manifest objects" "GCS" "Database"
+            pubSub = container "Pub/Sub" "Asynchronous event transport for bundle, processing-status, publication, and withdrawal events" "GCP Pub/Sub"
         }
 
         # --- External systems ---
@@ -59,21 +60,27 @@ workspace "Evidara" "Document intelligence platform for legal research" {
 
         # --- Relationships: Platform flow ---
         legalSources -> platformControl "Provides raw legal artifacts"
-        platformControl -> objectStorage "Stores raw artifacts"
-        platformControl -> docIntelligence "Triggers processing runs" "Event / API"
+        platformControl -> objectStorage "Stores raw artifacts and bundle manifests"
+        platformControl -> pubSub "Publishes artifact bundle events"
         platformControl -> postgres "Persists source, run, approval state"
 
-        docIntelligence -> objectStorage "Reads raw artifacts"
-        docIntelligence -> deltaLake "Writes canonical documents, sections, citations"
-        docIntelligence -> platformControl "Reports run results" "Event"
+        pubSub -> docIntelligence "Delivers artifact bundle events"
+        docIntelligence -> objectStorage "Reads raw artifacts and bundle manifests"
+        docIntelligence -> deltaLake "Writes canonical documents, sections, processing manifests, and published surfaces"
+        docIntelligence -> pubSub "Publishes processing status, document publication, and document withdrawal events"
+        platformControl -> pubSub "Publishes artifact bundle and index update events"
+        pubSub -> platformControl "Delivers processing status events"
+        pubSub -> legalSearch "Delivers document publication, withdrawal, and index update events"
 
-        legalSearch -> openSearch "Queries search index"
-        legalSearch -> deltaLake "Reads canonical data (projection building)"
+        legalSearch -> openSearch "Writes and queries search projections"
+        legalSearch -> deltaLake "Reads published canonical surfaces only"
 
         # --- Internal component relationships ---
-        frontend -> api "API calls" "HTTPS / OpenAPI"
-        api -> openSearch "Search queries"
-        api -> searchProjection "Builds projections"
+        frontend -> bff "API calls" "HTTPS / OpenAPI"
+        bff -> openSearch "Search queries"
+        pubSub -> searchProjection "Delivers publication and reindex events"
+        searchProjection -> deltaLake "Reads published canonical surfaces"
+        searchProjection -> openSearch "Writes projections and alias updates"
 
         sourceRegistry -> postgres "CRUD"
         runOrchestrator -> postgres "CRUD"

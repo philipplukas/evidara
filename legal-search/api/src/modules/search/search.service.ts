@@ -1,17 +1,51 @@
-import { Inject, Injectable } from '@nestjs/common';
-import type { SearchQueryDto } from './dto/search-query.dto';
-import type { SearchResponseDto } from './dto/search-response.dto';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { SupportedLocale } from '../../core/i18n';
+import { DEFAULT_LOCALE } from '../../core/i18n';
+import type { WarnFn } from '../../core/types/warn';
+import { mapContextAggregations } from './mappers/search-context.mapper';
+import { mapAggregationsToFacets } from './mappers/search-facet.mapper';
+import { mapSearchHitToView } from './mappers/search-result.mapper';
 import { SEARCH_REPOSITORY, type SearchRepository } from './search.repository';
 
 @Injectable()
 export class SearchService {
-  constructor(
-    @Inject(SEARCH_REPOSITORY) private readonly _searchRepository: SearchRepository,
-  ) {}
+  private readonly logger = new Logger(SearchService.name);
+  private readonly warn: WarnFn;
 
-  async search(query: SearchQueryDto): Promise<SearchResponseDto> {
-    // Orchestration layer — business logic and validation would live here,
-    // not in the controller and not in the adapter.
-    return this.searchRepository.search(query);
+  constructor(
+    @Inject(SEARCH_REPOSITORY)
+    private readonly repository: SearchRepository,
+  ) {
+    this.warn = (event, meta) => this.logger.warn(`[contract] ${event}`, meta);
+  }
+
+  async search(
+    query: string,
+    options?: {
+      jurisdiction?: string;
+      documentType?: string;
+      page?: number;
+      pageSize?: number;
+      locale?: SupportedLocale;
+    },
+  ) {
+    const locale = options?.locale ?? DEFAULT_LOCALE;
+    const result = await this.repository.search(query, {
+      jurisdiction: options?.jurisdiction,
+      documentType: options?.documentType,
+      page: options?.page,
+      pageSize: options?.pageSize,
+    });
+
+    return {
+      results: result.hits.map((hit) => mapSearchHitToView(hit, locale, this.warn)),
+      facets: mapAggregationsToFacets(result.aggregations, locale),
+      totalResults: result.total,
+    };
+  }
+
+  async getContext(locale: SupportedLocale = DEFAULT_LOCALE) {
+    const aggs = await this.repository.getContextAggregations();
+    return mapContextAggregations(aggs, locale);
   }
 }

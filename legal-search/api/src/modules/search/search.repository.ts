@@ -1,15 +1,19 @@
-import type { SearchQueryDto } from './dto/search-query.dto';
-import type { SearchResponseDto } from './dto/search-response.dto';
-
 /**
- * Repository interface for search operations.
- *
- * Services depend on this interface. The OpenSearch adapter implements it.
- * This keeps service logic decoupled from the search engine — testable with a mock,
- * and swappable if the underlying engine changes.
+ * Search repository interface.
+ * Adapters implement this to abstract the search backend.
  */
+import type { ContextAggregations, SearchResultEntity } from './entities/search.entities';
+
 export interface SearchRepository {
-  search(query: SearchQueryDto): Promise<SearchResponseDto>;
+  search(query: string, options?: SearchOptions): Promise<SearchResultEntity>;
+  getContextAggregations(): Promise<ContextAggregations>;
 }
 
-export const SEARCH_REPOSITORY = Symbol('SearchRepository');
+export interface SearchOptions {
+  jurisdiction?: string;
+  documentType?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export const SEARCH_REPOSITORY = Symbol('SEARCH_REPOSITORY');

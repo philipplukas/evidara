@@ -1,73 +1,22 @@
-# CodeRabbit Configuration
-# See: https://docs.coderabbit.ai/guides/configuration
-
-language: en
+language: "en-US"
+early_access: false
 reviews:
-  # Focus reviews on substance, not style
-  profile: assertive
-  # High-level summary on every PR
-  request_changes_workflow: true
-  # Ignore generated files and lockfiles
-  path_filters:
-    - "!legal-search/package-lock.json"
-    - "!legal-search/src/lib/api/generated/**"
-  # Review instructions — points CodeRabbit to our AI review guidance
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
   path_instructions:
-    - path: "**/*"
+    - path: "legal-search/src/**"
       instructions: |
-        Review this PR against the rules in AGENTS.md (root of repo).
-
-        ## Change-type sync checks (mirror of AGENTS.md)
-
-        ### user-visible-behavior
-        - Behavior changed but no test changed? Flag it.
-        - Feature docs in docs/components/ or legal-search/docs/ not updated? Flag it.
-        - Runbook not updated when operator flow changed? Flag it.
-
-        ### contract-change
-        - API payloads, event schemas, or entity shapes changed but contracts/api/, contracts/schemas/, or contracts/events/ not updated? Flag it.
-        - Generated clients (orval output in legal-search/src/lib/api/generated/) not regenerated after spec change? Flag it.
-        - Breaking change not documented in PR description? Flag it.
-
-        ### infra-change
-        - Terraform changed but terraform-docs not regenerated? Flag it.
-        - docs/setup/ guides not updated for deployment/environment changes? Flag it.
-        - Infra runbook not updated when recovery or deployment changed? Flag it.
-
-        ### pipeline-change
-        - Data quality checks not updated when pipeline logic changed? Flag it.
-        - Pipeline docs or failure-mode notes missing? Flag it.
-
-        ### architecture-change
-        - Component boundaries, storage choices, or communication patterns changed but structurizr/workspace.dsl not updated? Flag it.
-        - No ADR in docs/adr/ for a significant architecture decision? Flag it.
-        - docs/architecture/ narrative not updated? Flag it.
-
-        ## Quality checks
-        - Manual duplication: docs hand-maintain what should be generated (API tables, terraform module tables). Flag it.
-        - Pattern violations: new code conflicts with established repo conventions. Flag it.
-        - Design token misuse: hardcoded CSS color/spacing values in legal-search instead of CSS custom properties. Flag it.
-        - New patterns introduced without justification. Flag it.
-
-        For each concern, state: affected area, why it matters, must-fix vs should-fix, recommendation.
-
-    - path: "contracts/**"
+        Prioritize correctness for App Router + React 19 patterns.
+        Flag URL state synchronization bugs, hydration issues, and accessibility regressions.
+    - path: "legal-search/docs/**"
       instructions: |
-        Contract files are the shared language between components.
-        Check: backwards compatibility, field naming consistency, schema completeness.
-        Flag any breaking change that is not explicitly documented in the PR description.
-
-    - path: "legal-search/**"
-      instructions: |
-        Check: design token usage (CSS custom properties, not hardcoded),
-        Biome config compliance, test coverage for behavior changes,
-        and that generated OpenAPI clients are not manually edited.
-
-    - path: "docs/**"
-      instructions: |
-        Check: accuracy against current code (not future-state),
-        no duplicated contract/schema truth that should reference source files,
-        and that ADR format is followed for architecture decisions.
-
+        Check that docs stay aligned with implementation details in src/.
 chat:
   auto_reply: true

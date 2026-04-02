@@ -1,26 +1,33 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { SearchQueryDto } from './dto/search-query.dto';
-import type { SearchResponseDto } from './dto/search-response.dto';
-import type { SearchService } from './search.service';
+import { Controller, Get, Headers, Inject, Query } from '@nestjs/common';
+import { resolveLocale } from '../../core/i18n';
+import { SearchQueryDto } from './dto/search-query.dto';
+import { SearchService } from './search.service';
 
-/**
- * TODO: Wire a JWT AuthGuard once the auth provider is configured.
- * The @ApiBearerAuth decorator below is documentation-only and does NOT
- * enforce token validation at runtime.
- */
-@ApiTags('search')
-@ApiBearerAuth()
 @Controller('v1/search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(
+    @Inject(SearchService)
+    private readonly searchService: SearchService,
+  ) {}
 
   @Get()
-  @ApiOperation({
-    operationId: 'searchDocuments',
-    summary: 'Search documents',
-  })
-  async search(@Query() query: SearchQueryDto): Promise<SearchResponseDto> {
-    return this.searchService.search(query);
+  async search(
+    @Query() query: SearchQueryDto,
+    @Headers('accept-language') acceptLanguage?: string,
+  ) {
+    const locale = resolveLocale(acceptLanguage);
+    return this.searchService.search(query.q, {
+      jurisdiction: query.jurisdiction,
+      documentType: query.document_type,
+      page: query.page,
+      pageSize: query.page_size,
+      locale,
+    });
+  }
+
+  @Get('context')
+  async getContext(@Headers('accept-language') acceptLanguage?: string) {
+    const locale = resolveLocale(acceptLanguage);
+    return this.searchService.getContext(locale);
   }
 }

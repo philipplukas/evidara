@@ -1,18 +1,28 @@
 {
-  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "commonjs",
-    "moduleResolution": "node",
+    "declaration": true,
+    "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "noEmit": false,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2022",
+    "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "baseUrl": "./",
     "incremental": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
     "paths": {
-      "@/*": ["src/*"]
+      "@vocabularies/*": ["../../contracts/vocabularies/*"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "src/**/*.spec.ts", "src/**/*.smoke.spec.ts", "src/**/*.integration.spec.ts"]
+  "exclude": ["node_modules", "dist"]
 }

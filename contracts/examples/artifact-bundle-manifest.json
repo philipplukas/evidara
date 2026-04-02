@@ -1,0 +1,84 @@
+{
+  "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+  "manifest_version": 1,
+  "provenance": {
+    "tenant_id": "tenant_public",
+    "corpus_id": "corpus_public_ch_federal_law",
+    "scope_type": "global_public",
+    "source_id": "src_01jq79xv3wdd6yr8q5bn0m3zfk",
+    "source_version_id": "sv_01jq79zcskf4m3m4gm3t5s59xq",
+    "run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+    "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+    "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk"
+  },
+  "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+  "snapshot_external_id": "fedlex:2024-03-01:sr-101",
+  "upstream_locator": "https://www.fedlex.admin.ch/eli/cc/1999/404/de",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "snapshot_captured_at": "2026-03-29T09:30:00Z",
+  "source_defaults": {
+    "jurisdiction_id": "jur_ch_federal",
+    "authority_id": "auth_fedlex",
+    "language_codes": [
+      "de",
+      "fr",
+      "it"
+    ],
+    "document_type_hint": "statute"
+  },
+  "parser_hints": {
+    "expected_modalities": [
+      "html",
+      "pdf"
+    ],
+    "expected_content_types": [
+      "text/html",
+      "application/pdf"
+    ],
+    "preferred_primary_artifact_roles": [
+      "primary_document"
+    ],
+    "ocr_expected": false,
+    "attachment_policy": "ingest_selected"
+  },
+  "di_overrides": {
+    "source_profile_ref": "sp_fedlex_html_v1",
+    "jurisdiction_profile_ref": "jp_ch_federal_v1",
+    "resolution_policy_ref": "rp_official_first_v1"
+  },
+  "reference_context": {
+    "reference_snapshot_policy": "latest_approved",
+    "reference_snapshot_set_ref": null
+  },
+  "artifacts": [
+    {
+      "artifact_id": "art_01jq7af3f8qqc46zc6xvkf9y4x",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://evidara-raw-artifacts-dev/fedlex/run_01jq7a3s9b7j4dndd9sgv6pb9d/primary.html",
+        "content_type": "text/html",
+        "byte_size": 183245,
+        "checksum": "8cb5f9d87ad7a94f591f3d07aa4f44c3b1437ecf0186f4a4825ecb9ef80f05d9",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-03-29T09:30:04Z"
+      }
+    },
+    {
+      "artifact_id": "art_01jq7ag6v1v2tbvpw7afqt2qvk",
+      "artifact_role": "metadata",
+      "storage_ref": {
+        "uri": "gs://evidara-raw-artifacts-dev/fedlex/run_01jq7a3s9b7j4dndd9sgv6pb9d/metadata.json",
+        "content_type": "application/json",
+        "byte_size": 948,
+        "checksum": "c7c66f11e5cd6f74de7fe6ca9dfd47d11a2f4c15d19f76cb4a91fe5490ac5e44",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-03-29T09:30:04Z"
+      }
+    }
+  ],
+  "bundle_metadata": {
+    "http_status": 200,
+    "locale": "de-CH"
+  }
+}

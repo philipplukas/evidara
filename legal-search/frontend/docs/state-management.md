@@ -10,22 +10,24 @@ The application separates state into **five distinct concerns**, each with its o
 
 | Concept | Owner | Mechanism | What It Holds |
 |---------|-------|-----------|---------------|
-| **Search Constraints** | `SearchConstraintsProvider` | Context + `useReducer` | Jurisdictions, languages, source type, refinement filters |
-| **Workspace Navigation** | `WorkspaceProvider` | Context + `useReducer` | Result sets, pivot stack, trail, pins |
-| **Selection** | URL `?item=` | `useSearchParams` | Which item is focused (shareable, deep-linkable) |
-| **Detail Tab** | URL `?tab=` | `useSearchParams` | Active detail panel tab |
+| **Search Constraints** | `SearchConstraintsProvider` | `nuqs` URL query state + context façade | Jurisdictions, languages, source type, refinement filters |
+| **Workspace Navigation** | `WorkspaceProvider` | `useReducer` (local) + context façade | Result sets, pivot stack, trail, pins |
+| **Selection** | URL `?item=` | `useSearchParams` + router updates | Which item is focused (shareable, deep-linkable) |
+| **Detail Tab** | URL `?tab=` | `useSearchParams` + router updates | Active detail panel tab |
 | **Server Data** | React Query | `useQuery` via `useDetail()` | Detail view models (cached, deduped) |
 
 ### Provider Hierarchy
 
 ```
-<SearchConstraintsProvider>          ← constrains search parameters
-  <WorkspaceProvider>                ← manages result sets + navigation
-    <Suspense>
-      <WorkspaceClient />            ← orchestrates URL + providers + layout
-    </Suspense>
-  </WorkspaceProvider>
-</SearchConstraintsProvider>
+<Providers>                          ← Query client + NuqsAdapter
+  <Suspense>
+    <SearchConstraintsProvider>      ← URL-synced search constraints (nuqs)
+      <WorkspaceProvider>            ← manages result sets + navigation (local)
+        <WorkspaceClient />          ← orchestrates URL + providers + layout
+      </WorkspaceProvider>
+    </SearchConstraintsProvider>
+  </Suspense>
+</Providers>
 ```
 
 ---
@@ -34,7 +36,7 @@ The application separates state into **five distinct concerns**, each with its o
 
 > Source: [`search-constraints-store.tsx`](../src/lib/search-constraints-store.tsx)
 
-High-level search parameters that scope _what_ gets searched. Conceptually separate from
+High-level search parameters that scope _what_ gets searched. These are persisted in URL query parameters via `nuqs`, exposed behind a context facade so existing UI components keep a dispatch-style API. Conceptually separate from
 _how_ results are navigated (that's the workspace).
 
 ### State Shape
@@ -46,7 +48,7 @@ interface SearchConstraintsState {
 }
 ```
 
-### Actions
+### Actions (URL-backed)
 
 | Action | Trigger | Effect |
 |--------|---------|--------|
@@ -93,7 +95,7 @@ type ResultSetSource =
   | { type: "pivot"; label: string; parentSource: ResultSetSource };
 ```
 
-### Actions
+### Actions (local)
 
 | Action | Trigger | Effect |
 |--------|---------|--------|
@@ -134,9 +136,9 @@ stateDiagram-v2
 
 ---
 
-## 3. URL-Driven Selection
+## 3. URL-Driven Selection + Facet State
 
-Selection state lives in URL search parameters — not in any React store. This enables deep-linking, shareability, and browser back/forward.
+Selection state lives in URL search parameters — not in any React store. This enables deep-linking, shareability, and browser back/forward. Facet constraints now use the same URL-first approach with `nuqs`, so shared links reproduce both selected item and active facet filters.
 
 ### Parameters
 

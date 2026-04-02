@@ -2,87 +2,84 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://evidara.dev/events/document-processed",
   "title": "DocumentProcessed",
-  "description": "Event emitted by document-intelligence when a raw artifact has been processed into a canonical document.",
-  "type": "object",
-  "required": [
-    "event_type",
-    "event_id",
-    "timestamp",
-    "payload"
-  ],
-  "properties": {
-    "event_type": {
-      "type": "string",
-      "const": "document.processed",
-      "description": "Event type identifier."
+  "description": "Event emitted by document-intelligence when one logical document revision becomes canonical-ready and safe for downstream consumption.",
+  "allOf": [
+    {
+      "$ref": "https://evidara.dev/common/event-envelope"
     },
-    "event_id": {
-      "type": "string",
-      "description": "Unique identifier for this event instance."
-    },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 timestamp of when the event was emitted."
-    },
-    "payload": {
+    {
       "type": "object",
-      "required": [
-        "document_id",
-        "source_id",
-        "source_version_id",
-        "run_id",
-        "artifact_id",
-        "version",
-        "canonical_path"
-      ],
       "properties": {
-        "document_id": {
-          "type": "string",
-          "description": "ID of the canonical document that was produced.",
-          "pattern": "^doc_[a-z0-9]+$"
+        "event_type": {
+          "const": "document.processed"
         },
-        "source_id": {
-          "type": "string",
-          "description": "ID of the source for lineage traceability.",
-          "pattern": "^src_[a-z0-9]+$"
+        "event_version": {
+          "const": 1
         },
-        "source_version_id": {
-          "type": "string",
-          "description": "ID of the source version.",
-          "pattern": "^sv_[a-z0-9]+$"
+        "producer": {
+          "const": "document-intelligence"
         },
-        "run_id": {
-          "type": "string",
-          "description": "ID of the run for lineage traceability.",
-          "pattern": "^run_[a-z0-9]+$"
-        },
-        "artifact_id": {
-          "type": "string",
-          "description": "ID of the raw artifact that was processed.",
-          "pattern": "^art_[a-z0-9]+$"
-        },
-        "version": {
-          "type": "string",
-          "description": "Processing pipeline version or schema version."
-        },
-        "canonical_path": {
-          "type": "string",
-          "description": "Delta table path or location of the canonical document record."
-        },
-        "sections_produced": {
-          "type": "integer",
-          "description": "Number of sections produced, if any.",
-          "minimum": 0
-        },
-        "citations_produced": {
-          "type": "integer",
-          "description": "Number of citations extracted, if any.",
-          "minimum": 0
+        "payload": {
+          "type": "object",
+          "required": [
+            "document_id",
+            "document_revision",
+            "processing_manifest_id",
+            "processing_version",
+            "provenance",
+            "lifecycle_status",
+            "published_document_ref",
+            "published_sections_ref",
+            "processing_manifest_ref"
+          ],
+          "properties": {
+            "document_id": {
+              "type": "string",
+              "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "document_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "processing_manifest_id": {
+              "type": "string",
+              "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "processing_version": {
+              "type": "string"
+            },
+            "provenance": {
+              "$ref": "https://evidara.dev/common/provenance"
+            },
+            "lifecycle_status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "superseded",
+                "repealed",
+                "withdrawn"
+              ]
+            },
+            "published_document_ref": {
+              "$ref": "https://evidara.dev/common/dataset-ref"
+            },
+            "published_sections_ref": {
+              "$ref": "https://evidara.dev/common/dataset-ref"
+            },
+            "processing_manifest_ref": {
+              "$ref": "https://evidara.dev/common/manifest-ref"
+            },
+            "supersedes_processing_manifest_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            }
+          },
+          "additionalProperties": false
         }
-      },
-      "additionalProperties": false
+      }
     }
-  },
-  "additionalProperties": false
+  ]
 }
