@@ -28,7 +28,7 @@ graph LR
 - External image files for diagrams (cannot be diffed, go stale silently)
 - Excalidraw/draw.io exports as images (same problem — not version-controlled as code)
 
-**Exception:** The ASCII diagram in `docs/architecture/system-context.md` is the only legacy exception. It will be replaced by a Structurizr-rendered image when the rendering pipeline is set up.
+**Note:** `docs/architecture/system-context.md` uses Mermaid for the high-level flow; detailed C4 views remain in Structurizr (`structurizr/workspace.dsl`).
 
 ## Mermaid theme
 

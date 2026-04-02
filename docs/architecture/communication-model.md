@@ -77,17 +77,26 @@ This keeps business contracts small while still allowing strong operational trac
 
 ### Who may call whom
 
-```text
-platform-control --event--> document-intelligence --event--> legal-search
-        ^                           |
-        |                           |
-        +---- processing status ----+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart LR
+  PC[platform-control]
+  subgraph DIg["document-intelligence"]
+    DIP[Pipelines & writers]
+    DS[Document Service]
+  end
+  LS[legal-search]
+
+  PC -.->|async events| DIP
+  DIP -.->|async events| LS
+  DIP -.->|processing status| PC
+  LS -->|HTTPS document detail| DS
 ```
 
 ### Strict rules
 
-1. **legal-search does NOT call document-intelligence in the request path.**
-2. **legal-search reads only published DI surfaces referenced by contracts.**
+1. **legal-search does not call DI processing pipelines in the request path.** The BFF may call the **Document Service** (a DI-owned read API) for document detail; that is not a handoff into parsing or canonicalization jobs.
+2. **legal-search reads only published DI surfaces referenced by contracts** (via Document Service for interactive reads, and via the same published surfaces for projection indexing).
 3. **document-intelligence does NOT manage sources, approvals, or acquisition checkpoints.**
 4. **platform-control does NOT parse or canonicalize documents.**
 5. **No component reads another component's operational database directly.**
@@ -107,4 +116,4 @@ platform-control --event--> document-intelligence --event--> legal-search
 |-------------|-----|
 | CRUD on sources, versions, runs, corpora | Operational workflow needs immediate feedback |
 | Search queries | User-facing and latency-sensitive |
-| Document detail retrieval | User-facing and latency-sensitive |
+| Document detail retrieval (BFF → Document Service) | User-facing and latency-sensitive; keeps Delta access behind a DI-owned read boundary |

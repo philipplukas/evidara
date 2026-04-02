@@ -72,7 +72,8 @@ For canonical field-level truth, use the contract files directly:
 |-----------|---------|-----------|
 | document-intelligence → legal-search | `document.processed` event | Async (Pub/Sub) |
 | document-intelligence → legal-search | `document.withdrawn` event | Async (Pub/Sub) |
-| legal-search | reads published canonical surfaces referenced by `published_document_ref`, `published_sections_ref`, and `processing_manifest_ref` in `document.processed` | Sync (read) |
+| legal-search (BFF) → document-intelligence (Document Service) | OpenAPI document-detail reads (lean/full body from published rows) | Sync (HTTPS) |
+| legal-search (search projection) | reads published canonical surfaces referenced by `published_document_ref`, `published_sections_ref`, and `processing_manifest_ref` | Sync (read, bulk indexing) |
 
 ### Core contract objects
 
@@ -110,12 +111,33 @@ The event does **not** embed the full document body and does **not** expose arbi
 
 The `document.processed` event points at those surfaces through `published_document_ref`, `published_sections_ref`, and `processing_manifest_ref`, which keeps internal DI modeling evolvable without breaking `legal-search`. The `document.withdrawn` event does not expose published-surface refs; it carries only the identity fields needed for deindexing.
 
+User-facing **document detail** in the request path goes through the **Document Service** (see [ADR-0010](../adr/0010-document-content-format.md)): the BFF calls a DI-owned read API that returns only contract-shaped content from those published surfaces, not ad hoc Delta paths.
+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart LR
+  subgraph LS["legal-search"]
+    BFF[BFF]
+    SP[Search projection]
+  end
+  subgraph DI["document-intelligence"]
+    DS[Document Service]
+  end
+  DL[("Delta — published surfaces")]
+
+  BFF -->|HTTPS / OpenAPI| DS
+  DS -->|contract-shaped rows| DL
+  SP -->|index build| DL
+```
+
+Canonical C4 relationships live in [`structurizr/workspace.dsl`](../../structurizr/workspace.dsl).
+
 ### Boundary principles
 
 - `document-intelligence` owns canonical truth and document revisioning.
 - `legal-search` owns all OpenSearch mappings, aliases, indexing jobs, and projection logic.
 - `legal-search` must not treat OpenSearch as a source of truth.
-- `legal-search` must not query arbitrary internal DI tables; it reads only published surfaces.
+- `legal-search` must not query arbitrary internal DI tables; the BFF uses the Document Service for request-path reads, and projection jobs read only published surfaces referenced by contracts.
 - `document.processed` is emitted per document, not per bundle.
 
 ### Supersession and withdrawal

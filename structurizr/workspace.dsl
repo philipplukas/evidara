@@ -21,7 +21,7 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         evidara = softwareSystem "Evidara" "Document intelligence platform" {
 
             # --- platform-control ---
-            platformControl = container "platform-control" "Source lifecycle, runs, approvals, reference data" "Cloud Run / NestJS" {
+            platformControl = container "platform-control" "Source lifecycle, runs, approvals, reference data" "Cloud Run / FastAPI" {
                 sourceRegistry = component "Source Registry" "Manages seed sources and source versions"
                 runOrchestrator = component "Run Orchestrator" "Creates and tracks processing runs"
                 approvalWorkflow = component "Approval Workflow" "Manages approval state for source versions"
@@ -34,6 +34,9 @@ workspace "Evidara" "Document intelligence platform for legal research" {
                 segmenter = component "Segmenter" "Splits documents into sections"
                 citationExtractor = component "Citation Extractor" "Identifies and normalizes legal citations"
                 canonicalWriter = component "Canonical Writer" "Writes canonical entities to Delta tables"
+                documentService = component "Document Service" "Read surface for lean/full document body from published Delta rows (BFF only)" "HTTPS / OpenAPI" {
+                    tags "Read API"
+                }
             }
 
             # --- legal-search ---
@@ -73,13 +76,14 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         pubSub -> legalSearch "Delivers document publication, withdrawal, and index update events"
 
         legalSearch -> openSearch "Writes and queries search projections"
-        legalSearch -> deltaLake "Reads published canonical surfaces only"
 
         # --- Internal component relationships ---
         frontend -> bff "API calls" "HTTPS / OpenAPI"
         bff -> openSearch "Search queries"
+        bff -> documentService "Document detail reads (lean/full body)" "HTTPS / OpenAPI"
+        documentService -> deltaLake "Queries published document / section / Docling surfaces only"
         pubSub -> searchProjection "Delivers publication and reindex events"
-        searchProjection -> deltaLake "Reads published canonical surfaces"
+        searchProjection -> deltaLake "Reads published canonical surfaces for projection build"
         searchProjection -> openSearch "Writes projections and alias updates"
 
         sourceRegistry -> postgres "CRUD"
@@ -148,6 +152,12 @@ workspace "Evidara" "Document intelligence platform for legal research" {
             }
             element "Database" {
                 shape Cylinder
+            }
+            element "Read API" {
+                background #2a9d8f
+                color #ffffff
+                stroke #1d7066
+                strokeWidth 2
             }
         }
     }
