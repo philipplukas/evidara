@@ -29,6 +29,7 @@ Testing strategy for the platform-control component, which owns:
 - Source config schemas: valid configs pass, invalid configs are rejected
 - Acquisition spec schemas: valid Firecrawl-backed configs pass, invalid configs are rejected
 - Extractor profile references are validated at source-version creation time
+- Reference-data seed files validate before any write is attempted
 - Required fields for source creation: name, jurisdiction, authority
 - Source version requires a source to exist
 
@@ -40,6 +41,7 @@ Testing strategy for the platform-control component, which owns:
 - Captured-resource normalization produces stable provider-neutral rows
 - GCS artifact storage writes deterministic object paths
 - Pub/Sub event publishing emits the expected `raw_artifact.available` envelope
+- Seed loading is idempotent and supports dry-run mode
 
 ### Contract Tests
 

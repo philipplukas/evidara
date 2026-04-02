@@ -18,6 +18,10 @@ dependencies = [
   "sqlalchemy>=2.0.41,<3",
   "uvicorn>=0.35.0,<1",
 ]
+
+[project.scripts]
+platform-control-seed-reference-data = "platform_control.seed_reference_data:main"
+
 [dependency-groups]
 dev = [
   "pytest-asyncio>=1.1.0,<2",
