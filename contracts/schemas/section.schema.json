@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/section",
+  "title": "Section",
+  "description": "Canonical published section entity for a document revision.",
+  "type": "object",
+  "required": [
+    "section_id",
+    "document_id",
+    "document_revision",
+    "processing_manifest_id",
+    "provenance",
+    "ordinal",
+    "depth",
+    "content"
+  ],
+  "properties": {
+    "section_id": {
+      "type": "string",
+      "pattern": "^sec_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Section identifier."
+    },
+    "document_id": {
+      "type": "string",
+      "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Parent logical document identifier."
+    },
+    "document_revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Document revision this section belongs to."
+    },
+    "processing_manifest_id": {
+      "type": "string",
+      "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Immutable processing result that produced this section."
+    },
+    "provenance": {
+      "$ref": "https://evidara.dev/common/provenance"
+    },
+    "parent_section_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sec_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "Parent section when the hierarchy is nested."
+    },
+    "ordinal": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Position within the parent scope."
+    },
+    "depth": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Hierarchy depth where 0 is top-level."
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Section heading if one exists."
+    },
+    "content": {
+      "type": "string",
+      "description": "Canonical section text."
+    },
+    "section_type": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Structural section type such as chapter, article, paragraph, or appendix."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional section metadata.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,4 +1,4 @@
-# Omnilex Search — Documentation
+# Evidara Legal Search — Documentation
 
 ## Docs
 

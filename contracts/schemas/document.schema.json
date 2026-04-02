@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/document",
+  "title": "Document",
+  "description": "Canonical document entity produced by document-intelligence. Represents a single legal or regulatory document.",
+  "type": "object",
+  "required": [
+    "document_id",
+    "artifact_id",
+    "source_id",
+    "run_id",
+    "title",
+    "processed_at"
+  ],
+  "properties": {
+    "document_id": {
+      "type": "string",
+      "description": "Unique identifier for the canonical document. Format: doc_{ulid}",
+      "pattern": "^doc_[a-zA-Z0-9]+$"
+    },
+    "artifact_id": {
+      "type": "string",
+      "description": "ID of the raw artifact this document was derived from.",
+      "pattern": "^art_[a-zA-Z0-9]+$"
+    },
+    "source_id": {
+      "type": "string",
+      "description": "ID of the source. Carried through for lineage.",
+      "pattern": "^src_[a-zA-Z0-9]+$"
+    },
+    "source_version_id": {
+      "type": "string",
+      "description": "ID of the source version. Carried through for lineage.",
+      "pattern": "^sv_[a-zA-Z0-9]+$"
+    },
+    "run_id": {
+      "type": "string",
+      "description": "ID of the run that produced the raw artifact.",
+      "pattern": "^run_[a-zA-Z0-9]+$"
+    },
+    "title": {
+      "type": "string",
+      "description": "Title of the document."
+    },
+    "content": {
+      "type": "string",
+      "description": "Full text content of the document, if extracted."
+    },
+    "content_type": {
+      "type": "string",
+      "description": "Original content type of the source artifact."
+    },
+    "content_docling": {
+      "type": "object",
+      "description": "Structured DoclingDocument JSON produced by the docling pipeline (ADR-0010). A first-class canonical artifact intended for downstream consumption."
+    },
+    "jurisdiction": {
+      "type": "string",
+      "description": "Jurisdiction the document belongs to. MUST use normalized values from contracts/vocabularies/jurisdiction.json (ISO 3166-1 alpha-2).",
+      "enum": ["CH", "AT", "DE", "LI"]
+    },
+    "document_type": {
+      "type": "string",
+      "description": "Normalized document type classification. MUST use values from contracts/vocabularies/document-type.json. Upstream mapping of raw extraction labels to these values is required before canonical output.",
+      "enum": ["law", "decision", "commentary", "rechtssatz"]
+    },
+    "language": {
+      "type": "string",
+      "description": "Primary language of the document content. ISO 639-1 code.",
+      "pattern": "^[a-z]{2}$"
+    },
+    "structural_path": {
+      "type": "string",
+      "description": "Intrinsic document hierarchy as a delimited path (e.g., 'OR › Gesellschaftsrecht › Verantwortlichkeit'). Represents stable structural position derived from document analysis, not a UI artifact. May evolve to a structured array representation in the future."
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the document became effective, if applicable."
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the document was processed."
+    },
+    "processing_version": {
+      "type": "string",
+      "description": "Version of the processing pipeline that produced this document."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional processing metadata.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,54 @@
+## Summary
+
+<!-- Describe what this PR does and why. -->
+
+## Change Classification
+
+<!-- Check all that apply. -->
+
+- [ ] `internal-refactor`
+- [ ] `user-visible-behavior`
+- [ ] `contract-change`
+- [ ] `infra-change`
+- [ ] `pipeline-change`
+- [ ] `architecture-change`
+- [ ] `docs-only`
+
+## Affected Components
+
+<!-- Check all that apply. -->
+
+- [ ] `platform-control`
+- [ ] `document-intelligence`
+- [ ] `legal-search`
+- [ ] `contracts`
+- [ ] `infra`
+- [ ] `docs`
+- [ ] `scripts`
+
+## Sync Impact
+
+<!-- Updated where applicable: -->
+
+- [ ] Tests
+- [ ] Docs
+- [ ] Contracts (OpenAPI / JSON Schema)
+- [ ] Architecture (`structurizr/workspace.dsl`, ADRs)
+- [ ] Infra docs
+
+## Why No Updates Were Needed
+
+<!-- If any applicable sync item was NOT updated, explain why here. Delete this section if all relevant items were updated. -->
+
+N/A
+
+## Checklist
+
+- [ ] PR title follows conventional commit format (`feat:`, `fix:`, etc.)
+- [ ] `pre-commit run --all-files` passes
+- [ ] CI should pass
+- [ ] Backwards compatible (or breaking changes documented above)
+
+## Reviewer Notes
+
+<!-- Anything the reviewer should pay special attention to. -->

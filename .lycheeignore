@@ -1,0 +1,18 @@
+# Lychee link checker ignore list
+# See: https://lychee.cli.rs/
+
+# Local development
+http://localhost
+https://localhost
+http://127.0.0.1
+https://127.0.0.1
+
+# Placeholder examples in docs
+http://example.com
+https://example.com
+
+# GitHub-specific URLs that require auth
+https://github.com/philipplukas/evidara/settings
+
+# Structurizr local
+http://localhost:8080

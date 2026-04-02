@@ -1,10 +1,10 @@
 "use client";
 
 import { Suspense } from "react";
+import { filters, searchContext, searchResults } from "@/lib/mock-data";
 import { SearchConstraintsProvider } from "@/lib/search-constraints-store";
 import { WorkspaceProvider } from "@/lib/workspace-store";
 import WorkspaceClient from "./WorkspaceClient";
-import { searchContext, filters, searchResults } from "@/lib/mock-data";
 
 export default function Home() {
   return (

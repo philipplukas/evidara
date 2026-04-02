@@ -1,0 +1,48 @@
+name: Research / Workflow Idea
+description: Propose a research direction or workflow improvement
+title: "[Research]: "
+labels: ["research"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to propose a research direction, workflow experiment, or AI-assisted automation idea.
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis / Goal
+      description: What do you want to explore or achieve?
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed Approach
+      description: How would you explore or implement this?
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: Expected Value
+      description: What would success look like?
+    validations:
+      required: true
+  - type: dropdown
+    id: components
+    attributes:
+      label: Related Components
+      description: Which components might be involved?
+      multiple: true
+      options:
+        - platform-control
+        - document-intelligence
+        - legal-search
+        - contracts
+        - infra
+        - docs
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: References, prior art, or related ideas.

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/common/dataset-ref",
+  "title": "DatasetRef",
+  "description": "Logical reference to a published downstream-consumable dataset surface. References name the stable surface, not an internal Delta table path.",
+  "type": "object",
+  "required": [
+    "surface_name",
+    "surface_version"
+  ],
+  "properties": {
+    "surface_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Stable logical published surface name, for example published_documents."
+    },
+    "surface_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Major version of the published surface contract."
+    },
+    "record_key": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "Exact immutable selector for a single published record.",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "integer",
+          "boolean"
+        ]
+      }
+    },
+    "record_filter": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "Filter selector for multiple published records, for example all sections for one processing manifest.",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "integer",
+          "boolean"
+        ]
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "record_key"
+      ]
+    },
+    {
+      "required": [
+        "record_filter"
+      ]
+    }
+  ],
+  "additionalProperties": false
+}

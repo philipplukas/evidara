@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/events/document-processed",
+  "title": "DocumentProcessed",
+  "description": "Event emitted by document-intelligence when one logical document revision becomes canonical-ready and safe for downstream consumption.",
+  "allOf": [
+    {
+      "$ref": "https://evidara.dev/common/event-envelope"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "document.processed"
+        },
+        "event_version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "document-intelligence"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "document_id",
+            "document_revision",
+            "processing_manifest_id",
+            "processing_version",
+            "provenance",
+            "lifecycle_status",
+            "published_document_ref",
+            "published_sections_ref",
+            "processing_manifest_ref"
+          ],
+          "properties": {
+            "document_id": {
+              "type": "string",
+              "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "document_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "processing_manifest_id": {
+              "type": "string",
+              "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            },
+            "processing_version": {
+              "type": "string"
+            },
+            "provenance": {
+              "$ref": "https://evidara.dev/common/provenance"
+            },
+            "lifecycle_status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "superseded",
+                "repealed",
+                "withdrawn"
+              ]
+            },
+            "published_document_ref": {
+              "$ref": "https://evidara.dev/common/dataset-ref"
+            },
+            "published_sections_ref": {
+              "$ref": "https://evidara.dev/common/dataset-ref"
+            },
+            "processing_manifest_ref": {
+              "$ref": "https://evidara.dev/common/manifest-ref"
+            },
+            "supersedes_processing_manifest_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

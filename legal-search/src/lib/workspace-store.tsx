@@ -1,18 +1,12 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useReducer,
-  type ReactNode,
-  type Dispatch,
-} from "react";
+import { createContext, type Dispatch, type ReactNode, useContext, useReducer } from "react";
 import type {
-  SearchResultViewModel,
+  PinnedItem,
   ResultSet,
   ResultSetSource,
+  SearchResultViewModel,
   TrailEntry,
-  PinnedItem,
 } from "./types";
 
 // ─── Actions ───
@@ -44,10 +38,7 @@ interface WorkspaceState {
   pinned: PinnedItem[];
 }
 
-function createInitialState(
-  results: SearchResultViewModel[],
-  query: string
-): WorkspaceState {
+function createInitialState(results: SearchResultViewModel[], query: string): WorkspaceState {
   return {
     resultSet: {
       source: { type: "search", query },
@@ -62,10 +53,7 @@ function createInitialState(
 
 // ─── Reducer ───
 
-function workspaceReducer(
-  state: WorkspaceState,
-  action: WorkspaceAction
-): WorkspaceState {
+function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
     case "SEARCH":
       return {
@@ -91,8 +79,7 @@ function workspaceReducer(
 
     case "BACK": {
       if (state.resultSetStack.length === 0) return state;
-      const previous =
-        state.resultSetStack[state.resultSetStack.length - 1];
+      const previous = state.resultSetStack[state.resultSetStack.length - 1];
       return {
         ...state,
         resultSet: previous,
@@ -142,8 +129,7 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function useWorkspace(): WorkspaceContextValue {
   const ctx = useContext(WorkspaceContext);
-  if (!ctx)
-    throw new Error("useWorkspace must be used within a WorkspaceProvider");
+  if (!ctx) throw new Error("useWorkspace must be used within a WorkspaceProvider");
   return ctx;
 }
 
@@ -160,12 +146,10 @@ export function WorkspaceProvider({
 }: WorkspaceProviderProps) {
   const [state, dispatch] = useReducer(
     workspaceReducer,
-    createInitialState(initialResults, initialQuery)
+    createInitialState(initialResults, initialQuery),
   );
 
   return (
-    <WorkspaceContext.Provider value={{ state, dispatch }}>
-      {children}
-    </WorkspaceContext.Provider>
+    <WorkspaceContext.Provider value={{ state, dispatch }}>{children}</WorkspaceContext.Provider>
   );
 }

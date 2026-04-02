@@ -1,0 +1,59 @@
+{
+  "event_type": "document.processed",
+  "event_version": 1,
+  "event_id": "evt_01jq7c61be9zmhz58mmp3jx0b2",
+  "occurred_at": "2026-03-29T09:41:25Z",
+  "producer": "document-intelligence",
+  "correlation_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+  "causation_id": "evt_01jq7bz6b7npge5hr2eb9n74ba",
+  "payload": {
+    "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+    "document_revision": 3,
+    "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+    "processing_version": "di_2026_03_29",
+    "provenance": {
+      "tenant_id": "tenant_public",
+      "corpus_id": "corpus_public_ch_federal_law",
+      "scope_type": "global_public",
+      "source_id": "src_01jq79xv3wdd6yr8q5bn0m3zfk",
+      "source_version_id": "sv_01jq79zcskf4m3m4gm3t5s59xq",
+      "run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+      "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+      "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+      "artifact_id": "art_01jq7af3f8qqc46zc6xvkf9y4x",
+      "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+      "document_revision": 3,
+      "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+    },
+    "lifecycle_status": "active",
+    "published_document_ref": {
+      "surface_name": "published_documents",
+      "surface_version": 1,
+      "record_key": {
+        "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+        "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+      }
+    },
+    "published_sections_ref": {
+      "surface_name": "published_sections",
+      "surface_version": 1,
+      "record_filter": {
+        "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+        "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+      }
+    },
+    "processing_manifest_ref": {
+      "manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+      "manifest_type": "processing_manifest",
+      "manifest_version": 1,
+      "dataset_ref": {
+        "surface_name": "processing_manifests",
+        "surface_version": 1,
+        "record_key": {
+          "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+        }
+      }
+    },
+    "supersedes_processing_manifest_id": "pm_01jq79m7jx0n796f7qgpe4cg2k"
+  }
+}

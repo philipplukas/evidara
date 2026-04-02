@@ -1,0 +1,1 @@
+"""Contract-shaped validation helpers."""

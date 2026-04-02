@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/events/index-update-requested",
+  "title": "IndexUpdateRequested",
+  "description": "Event emitted to request legal-search to update its OpenSearch projections. Used for targeted replay, index rebuilds, and operational backfills. Version 2 formalizes tenant and corpus scoping after a pre-runtime draft v1 shape.",
+  "$comment": "No deployed v1 emitters exist. Event version 2 is the first intended implementation shape.",
+  "allOf": [
+    {
+      "$ref": "https://evidara.dev/common/event-envelope"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "const": "index_update.requested"
+        },
+        "event_version": {
+          "const": 2
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "tenant_id",
+            "corpus_id",
+            "scope_type",
+            "scope"
+          ],
+          "properties": {
+            "tenant_id": {
+              "type": "string",
+              "pattern": "^tenant_[a-z0-9_]+$"
+            },
+            "corpus_id": {
+              "type": "string",
+              "pattern": "^corpus_[a-z0-9_]+$"
+            },
+            "scope_type": {
+              "type": "string",
+              "enum": [
+                "global_public",
+                "tenant_private",
+                "tenant_shared"
+              ]
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "full",
+                "incremental",
+                "document"
+              ]
+            },
+            "document_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+              }
+            },
+            "projection_version": {
+              "type": "string",
+              "description": "Projection version that should be built or rebuilt."
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "scope": {
+                    "const": "document"
+                  }
+                },
+                "required": [
+                  "scope"
+                ]
+              },
+              "then": {
+                "required": [
+                  "document_ids"
+                ]
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "document_ids"
+                  ]
+                }
+              }
+            }
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

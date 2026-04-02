@@ -1,0 +1,6 @@
+{
+  "title": "Nested Structure Act",
+  "section_count": 3,
+  "key_headings": ["Chapter 1", "Article 1", "Article 2"],
+  "status_flow": ["accepted", "processing", "canonical_ready"]
+}

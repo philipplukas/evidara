@@ -1,6 +1,6 @@
 # Architecture — Component Hierarchy & Data Flow
 
-> Function-level map of every React component, its CSS surface, state, and interaction logic.
+> Function-level map of every React component in Evidara Legal Search, its CSS surface, state, and interaction logic.
 
 ---
 
@@ -25,20 +25,26 @@ RootLayout (layout.tsx)                       [Server Component]
                 │
                 ├── Center Panel (46%)
                 │   ├── ExactMatchStrip      [Highlighted direct matches]
+                │   │   └── Badge ×N         [primitives/Badge]
                 │   └── ResultList
-                │       ├── ResultSetScopeBar [Scope label + BACK button]
-                │       └── ResultCard ×N    [Title, badges, snippet, pivots, pin]
+                │       ├── ResultSetScopeBar [Scope + ActionTextLink BACK]
+                │       └── ResultCard ×N    [Title, Badge, snippet, AccentButton]
                 │
                 └── Right Panel (36%)
                     └── DetailPanel          [Tabbed detail view]
                         ├── Breadcrumbs
+                        ├── DetailPanelHeader [Title, AccentButton pin/copy]
+                        ├── DetailTabs       [URL-driven tab switcher]
                         ├── DetailsTab
                         │   └── MetadataSection
-                        ├── RelatedTab       [Grouped related items + "Show all"]
-                        ├── ReferencesTab    [Incoming/outgoing refs + "Show all"]
+                        ├── RelatedTab       [SectionLabel + InteractiveRow + ActionTextLink]
+                        ├── ReferencesTab    [SectionLabel + InteractiveRow + ActionTextLink]
                         ├── AnnotationTab    [AI/editorial annotations]
                         ├── StructureTab     [Local document TOC]
                         └── EmptySection     [Shared empty state]
+
+Primitives (src/components/primitives/):
+  SectionLabel, InteractiveRow, AccentButton, ActionTextLink, Badge
 ```
 
 ---
@@ -51,7 +57,7 @@ RootLayout (layout.tsx)                       [Server Component]
 | Center | 46% | 30% | — | `ExactMatchStrip` + `ResultList` |
 | Right | 36% | 25% | 45% | `DetailPanel` |
 
-All panels: `h-full overflow-y-auto bg-white`. Left/right have `border-r`/`border-l`.
+All panels: `h-full overflow-y-auto bg-surface-panel`. Left/right have `border-r`/`border-l`.
 
 ---
 
@@ -153,23 +159,27 @@ sequenceDiagram
 |---------|-----------|------------|
 | Hover color swap | `transition-colors` | NavLink, ChipGroup, TabGroup, buttons |
 | Hover reveal | `opacity-0 group-hover:opacity-100 transition-opacity` | ResultCard action bar |
-| Selected accent | `border-l-2 border-l-[#2563eb]` | ResultCard, StructureTab |
-| Tab underline | `border-b-2` + `transition-colors` | DetailPanel tabs |
+| Selected accent | `border-l-2 border-l-brand` | ResultCard, StructureTab |
+| Tab underline | `border-b-2 border-brand` + `transition-colors` | DetailTabs |
 | Toggle slide | `transition-transform translate-x-*` | FilterGroup toggle switch |
 | Chip toggle | `transition-all` + bg/text swap | ChipGroup, FilterGroup chips |
-| Focus ring | `focus:ring-2 ring-[#2563eb]/20` | Search input |
+| Focus ring | `focus:ring-2 ring-focus-ring` | Search input |
 | Hover shadow | `hover:shadow-sm transition-all` | ExactMatchStrip buttons |
 
 ---
 
 ## Design Tokens
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| Brand accent | `#2563eb` | Active states, focus rings, links |
-| Brand dark | `#1a2332` | Wordmark, active chips |
-| Serif font | `Source Serif 4` | Snippets, annotations, legal content |
-| Sans font | `Inter` | All UI text |
-| Border | `oklch(0.922 0 0)` via `--border` | Panel/section borders |
-| Muted bg | `oklch(0.97 0 0)` via `--muted` | Inactive chip bg, hover states |
-| Radius | `0.625rem` | Base `--radius` token |
+Full token reference in [design-system.md](./design-system.md). Key tokens:
+
+| Token | Tailwind | Usage |
+|-------|----------|-------|
+| `--brand` | `text-brand`, `bg-brand` | Active states, focus rings, links |
+| `--brand-strong` | `bg-brand-strong` | Wordmark, active chips |
+| `--surface-page` | `bg-surface-page` | Workspace shell background |
+| `--surface-panel` | `bg-surface-panel` | All panel content |
+| `--font-serif` via `.font-document` | `font-document` class | Legal content (snippets, annotations) |
+| `--font-inter` | `font-sans` | All UI text |
+| `--border` | `border-border` | Panel/section borders |
+| `--muted` | `bg-muted` | Inactive chip bg, hover states |
+| `--radius` | `rounded-*` | Base `0.625rem` token |

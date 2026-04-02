@@ -1,9 +1,9 @@
 "use client";
 
-import { Search, MapPin, Clock, User, SlidersHorizontal } from "lucide-react";
-import { useState, useEffect, type FormEvent } from "react";
-import { useWorkspace } from "@/lib/workspace-store";
+import { Clock, MapPin, Search, SlidersHorizontal, User } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
 import { searchResults } from "@/lib/mock-data";
+import { useWorkspace } from "@/lib/workspace-store";
 
 interface AppHeaderProps {
   onOpenFilters?: () => void;
@@ -11,8 +11,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ onOpenFilters }: AppHeaderProps) {
   const { state, dispatch } = useWorkspace();
-  const storeQuery =
-    state.resultSet.source.type === "search" ? state.resultSet.source.query : "";
+  const storeQuery = state.resultSet.source.type === "search" ? state.resultSet.source.query : "";
   const [query, setQuery] = useState(storeQuery);
 
   // Keep the input in sync when a SEARCH is dispatched from elsewhere
@@ -34,9 +33,7 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
           <div className="w-7 h-7 rounded-lg bg-brand-strong flex items-center justify-center">
             <span className="text-white font-bold text-sm">E</span>
           </div>
-          <span className="text-lg font-semibold tracking-tight text-brand-strong">
-            Evidara
-          </span>
+          <span className="text-lg font-semibold tracking-tight text-brand-strong">Evidara</span>
         </div>
 
         {/* Search Bar */}
@@ -59,6 +56,7 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
         <nav className="flex items-center gap-1 shrink-0">
           {onOpenFilters && (
             <button
+              type="button"
               onClick={onOpenFilters}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium
                 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors lg:hidden"
@@ -81,8 +79,11 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
 
         {/* User */}
         <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-border">
-          <button className="w-8 h-8 rounded-full bg-interactive-accent-muted flex items-center justify-center
-            hover:bg-brand/20 transition-colors">
+          <button
+            type="button"
+            className="w-8 h-8 rounded-full bg-interactive-accent-muted flex items-center justify-center
+            hover:bg-brand/20 transition-colors"
+          >
             <User className="w-4 h-4 text-brand" />
           </button>
         </div>
@@ -104,6 +105,7 @@ function NavLink({
 }) {
   return (
     <button
+      type="button"
       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
         ${
           active
@@ -114,7 +116,7 @@ function NavLink({
       {icon}
       {label}
       {count != null && (
-        <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-interactive-accent-muted text-[10px] font-semibold text-brand leading-none">
+        <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-interactive-accent-muted text-tiny font-semibold text-brand leading-none">
           {count}
         </span>
       )}

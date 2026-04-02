@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { useState } from "react";
+import { getIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel } from "@/lib/types";
-import { getIcon } from "@/lib/icons";
 import { SectionLabel } from "../primitives";
 
 interface FilterPanelProps {
@@ -29,9 +29,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
   const [expanded, setExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const refinement = constraints.refinements.find(
-    (r) => r.field === filter.key
-  );
+  const refinement = constraints.refinements.find((r) => r.field === filter.key);
   const selected = refinement?.values ?? filter.selected;
 
   const toggle = (value: string) => {
@@ -72,12 +70,13 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
   };
 
   const filteredOptions = filter.options.filter((opt) =>
-    opt.label.toLowerCase().includes(searchQuery.toLowerCase())
+    opt.label.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
     <div className="border-b border-border/60 last:border-0">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium
           text-foreground hover:bg-muted/50 transition-colors"
@@ -113,6 +112,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                 const isSelected = selected.includes(opt.value);
                 return (
                   <button
+                    type="button"
                     key={opt.value}
                     onClick={() => toggle(opt.value)}
                     className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all
@@ -125,7 +125,9 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                     {icon && <span className="text-xs">{icon}</span>}
                     {opt.label}
                     {opt.count != null && (
-                      <span className={`text-[10px] ${isSelected ? "text-white/60" : "text-muted-foreground/60"}`}>
+                      <span
+                        className={`text-tiny ${isSelected ? "text-white/60" : "text-muted-foreground/60"}`}
+                      >
                         {opt.count.toLocaleString()}
                       </span>
                     )}
@@ -153,7 +155,13 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                         }`}
                     >
                       {isSelected && (
-                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <svg
+                          className="w-2.5 h-2.5 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       )}
@@ -162,7 +170,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                       {opt.label}
                     </span>
                     {opt.count != null && (
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-tiny text-muted-foreground">
                         {opt.count.toLocaleString()}
                       </span>
                     )}
@@ -190,9 +198,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
           {filter.type === "toggle" && (
             <label className="flex items-center gap-2 cursor-pointer">
               <div
-                onClick={() =>
-                  setSelected(selected.length > 0 ? [] : ["true"])
-                }
+                onClick={() => setSelected(selected.length > 0 ? [] : ["true"])}
                 className={`w-8 h-4.5 rounded-full relative transition-colors cursor-pointer
                   ${selected.length > 0 ? "bg-brand" : "bg-muted-foreground/20"}`}
               >

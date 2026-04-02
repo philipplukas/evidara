@@ -1,0 +1,18 @@
+{
+  "event_type": "index_update.requested",
+  "event_version": 2,
+  "event_id": "evt_01jq7cftrgv27rjfk1scb4h2ff",
+  "occurred_at": "2026-03-29T10:15:00Z",
+  "producer": "legal-search",
+  "payload": {
+    "tenant_id": "tenant_public",
+    "corpus_id": "corpus_public_ch_federal_law",
+    "scope_type": "global_public",
+    "scope": "document",
+    "document_ids": [
+      "doc_01jq7bdptzqv3xs0c41xpw1ybg"
+    ],
+    "projection_version": "search_projection_v1",
+    "reason": "Replay projection after alias cutover."
+  }
+}

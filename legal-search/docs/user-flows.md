@@ -1,6 +1,6 @@
 # User Flows & Interaction Design
 
-> High-level user journeys through the Omnilex legal research workspace.
+> High-level user journeys through the Evidara legal research workspace.
 
 ---
 

@@ -1,0 +1,83 @@
+# CI for legal-search (frontend + API).
+#
+# KEY DESIGN DECISION: CI runs `npm run check` — the SAME script
+# that pre-commit runs locally. This ensures CI and pre-commit
+# never drift apart. If you add a new quality gate, add it to
+# the `check` script in package.json and both environments get it.
+
+name: Legal Search
+
+on:
+  pull_request:
+    paths:
+      - 'legal-search/**'
+      - 'contracts/**'
+  push:
+    branches: [main]
+    paths:
+      - 'legal-search/**'
+      - 'contracts/**'
+
+jobs:
+  # ─── API quality gate ───
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legal-search/api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: legal-search/api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # typecheck → lint → test (unit + smoke + integration)
+      - name: Check (typecheck + lint + test)
+        run: npm run check
+
+  # ─── Frontend quality gate ───
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legal-search
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: legal-search/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # typecheck → lint → test
+      - name: Check (typecheck + lint + test)
+        run: npm run check
+
+      # Build separately — catches SSR issues tsc misses.
+      - name: Build
+        run: npm run build
+
+      # Contract lint — validates the OpenAPI spec.
+      - name: Contract lint
+        run: npm run openapi:lint
+
+      # Drift check — re-generates the typed client from the spec and
+      # fails if the committed output differs.
+      - name: Contract drift check
+        run: npm run openapi:check

@@ -1,8 +1,8 @@
-import {
-  SearchResultViewModel,
+import type {
   DetailViewModel,
   FilterViewModel,
   SearchContextViewModel,
+  SearchResultViewModel,
 } from "./types";
 
 // ─── Search Context ───
@@ -221,9 +221,7 @@ export const searchResults: SearchResultViewModel[] = [
       "Die Vorstandsmitglieder haben bei ihrer Geschäftsführung die Sorgfalt eines ordentlichen und gewissenhaften Geschäftsleiters anzuwenden. Vorstandsmitglieder, die ihre Obliegenheiten verletzen, sind der Gesellschaft zum Ersatz des daraus entstehenden Schadens als Gesamtschuldner verpflichtet.",
     structuralContext: "Aktiengesetz › Vorstand › Sorgfaltspflicht und Verantwortlichkeit",
     badges: [{ label: "Law", colorKey: "blue", iconKey: "at" }],
-    metadataRows: [
-      { label: "Enacted", value: "1965 (rev. 2021)" },
-    ],
+    metadataRows: [{ label: "Enacted", value: "1965 (rev. 2021)" }],
     relatedCounts: [
       { label: "Commentary", count: 5 },
       { label: "Rechtssätze", count: 23 },
@@ -270,9 +268,7 @@ export const searchResults: SearchResultViewModel[] = [
       "Gründer, welche bei der Gründung der Gesellschaft durch absichtliche oder fahrlässige Verletzung ihrer Pflichten die Gesellschaft, die Aktionäre oder die Gesellschaftsgläubiger geschädigt haben, sind diesen zum Ersatz des Schadens verpflichtet.",
     structuralContext: "Obligationenrecht › Gesellschaftsrecht › Verantwortlichkeit",
     badges: [{ label: "Law", colorKey: "blue", iconKey: "ch" }],
-    metadataRows: [
-      { label: "Enacted", value: "1911 (rev. 2020)" },
-    ],
+    metadataRows: [{ label: "Enacted", value: "1911 (rev. 2020)" }],
     relatedCounts: [
       { label: "Commentary", count: 3 },
       { label: "Court decisions", count: 31 },
@@ -347,17 +343,47 @@ export const articleDetail: DetailViewModel = {
     {
       groupLabel: "Court decisions",
       items: [
-        { id: "d1", title: "BGer 4A_123/2022", subtitle: "Federal Supreme Court · 15.03.2022", badge: { label: "Decision", colorKey: "pink" } },
-        { id: "d2", title: "BGer 4A_456/2021", subtitle: "Federal Supreme Court · 08.11.2021", badge: { label: "Decision", colorKey: "pink" } },
-        { id: "d3", title: "BGer 4A_789/2020", subtitle: "Federal Supreme Court · 22.06.2020", badge: { label: "Decision", colorKey: "pink" } },
-        { id: "d4", title: "HG Zürich HG190245", subtitle: "Handelsgericht Zürich · 03.09.2019", badge: { label: "Decision", colorKey: "pink" } },
+        {
+          id: "d1",
+          title: "BGer 4A_123/2022",
+          subtitle: "Federal Supreme Court · 15.03.2022",
+          badge: { label: "Decision", colorKey: "pink" },
+        },
+        {
+          id: "d2",
+          title: "BGer 4A_456/2021",
+          subtitle: "Federal Supreme Court · 08.11.2021",
+          badge: { label: "Decision", colorKey: "pink" },
+        },
+        {
+          id: "d3",
+          title: "BGer 4A_789/2020",
+          subtitle: "Federal Supreme Court · 22.06.2020",
+          badge: { label: "Decision", colorKey: "pink" },
+        },
+        {
+          id: "d4",
+          title: "HG Zürich HG190245",
+          subtitle: "Handelsgericht Zürich · 03.09.2019",
+          badge: { label: "Decision", colorKey: "pink" },
+        },
       ],
     },
     {
       groupLabel: "Commentary",
       items: [
-        { id: "c1", title: "Basler Kommentar OR II – Art. 754", subtitle: "Widmer/Banz · 7th ed. 2023", badge: { label: "Commentary", colorKey: "green" } },
-        { id: "c2", title: "Zürcher Kommentar – Verantwortlichkeit", subtitle: "Forstmoser/Meier-Hayoz/Nobel · 5th ed. 2022", badge: { label: "Commentary", colorKey: "green" } },
+        {
+          id: "c1",
+          title: "Basler Kommentar OR II – Art. 754",
+          subtitle: "Widmer/Banz · 7th ed. 2023",
+          badge: { label: "Commentary", colorKey: "green" },
+        },
+        {
+          id: "c2",
+          title: "Zürcher Kommentar – Verantwortlichkeit",
+          subtitle: "Forstmoser/Meier-Hayoz/Nobel · 5th ed. 2022",
+          badge: { label: "Commentary", colorKey: "green" },
+        },
       ],
     },
   ],
@@ -365,7 +391,11 @@ export const articleDetail: DetailViewModel = {
     {
       direction: "Cited by",
       items: [
-        { id: "r1", title: "Art. 756 OR", subtitle: "Klagerecht der Gesellschaft und der Aktionäre" },
+        {
+          id: "r1",
+          title: "Art. 756 OR",
+          subtitle: "Klagerecht der Gesellschaft und der Aktionäre",
+        },
         { id: "r2", title: "Art. 757 OR", subtitle: "Klagerecht der Gläubiger" },
         { id: "r3", title: "Art. 725a OR", subtitle: "Drohende Zahlungsunfähigkeit" },
       ],
@@ -406,11 +436,7 @@ export const decisionDetail: DetailViewModel = {
   type: "decision",
   title: "BGer 4A_123/2022",
   subtitle: "Verantwortlichkeit des Verwaltungsrats – Beweislastverteilung",
-  breadcrumbs: [
-    "Federal Supreme Court",
-    "I. Civil Law Division",
-    "4A_123/2022",
-  ],
+  breadcrumbs: ["Federal Supreme Court", "I. Civil Law Division", "4A_123/2022"],
   metadata: [
     { label: "Court", value: "Federal Supreme Court", iconKey: "ch" },
     { label: "Date", value: "15.03.2022" },
@@ -434,15 +460,35 @@ export const decisionDetail: DetailViewModel = {
     {
       groupLabel: "Applied norms",
       items: [
-        { id: "n1", title: "Art. 754 OR", subtitle: "Haftung der Verwaltung", badge: { label: "Law", colorKey: "blue" } },
-        { id: "n2", title: "Art. 717 OR", subtitle: "Sorgfalts- und Treuepflicht", badge: { label: "Law", colorKey: "blue" } },
-        { id: "n3", title: "Art. 8 ZGB", subtitle: "Beweislast", badge: { label: "Law", colorKey: "blue" } },
+        {
+          id: "n1",
+          title: "Art. 754 OR",
+          subtitle: "Haftung der Verwaltung",
+          badge: { label: "Law", colorKey: "blue" },
+        },
+        {
+          id: "n2",
+          title: "Art. 717 OR",
+          subtitle: "Sorgfalts- und Treuepflicht",
+          badge: { label: "Law", colorKey: "blue" },
+        },
+        {
+          id: "n3",
+          title: "Art. 8 ZGB",
+          subtitle: "Beweislast",
+          badge: { label: "Law", colorKey: "blue" },
+        },
       ],
     },
     {
       groupLabel: "Commentary",
       items: [
-        { id: "c1", title: "Basler Kommentar OR II – Art. 754", subtitle: "Widmer/Banz", badge: { label: "Commentary", colorKey: "green" } },
+        {
+          id: "c1",
+          title: "Basler Kommentar OR II – Art. 754",
+          subtitle: "Widmer/Banz",
+          badge: { label: "Commentary", colorKey: "green" },
+        },
       ],
     },
   ],
