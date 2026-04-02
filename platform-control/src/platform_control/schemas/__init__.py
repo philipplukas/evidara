@@ -1,4 +1,10 @@
 from platform_control.schemas.health import HealthResponse
+from platform_control.schemas.processing_status import (
+    DocumentProcessingStatusUpdatedEvent,
+    EventAcceptedResponse,
+    ProcessingStatusUpdateListResponse,
+    ProcessingStatusUpdateResponse,
+)
 from platform_control.schemas.run import CreateRunRequest, RunResponse, WebhookAcceptedResponse
 from platform_control.schemas.source import (
     CreateSourceRequest,
@@ -14,8 +20,12 @@ __all__ = [
     "CreateRunRequest",
     "CreateSourceRequest",
     "CreateSourceVersionRequest",
+    "DocumentProcessingStatusUpdatedEvent",
+    "EventAcceptedResponse",
     "FirecrawlAcquisitionSpec",
     "HealthResponse",
+    "ProcessingStatusUpdateListResponse",
+    "ProcessingStatusUpdateResponse",
     "RunResponse",
     "SourceListResponse",
     "SourceResponse",

@@ -12,7 +12,7 @@ from platform_control.errors import (
     ProviderConfigurationError,
     SignatureVerificationError,
 )
-from platform_control.routers import firecrawl, health, runs, sources, versions
+from platform_control.routers import di_events, firecrawl, health, runs, sources, versions
 
 
 def create_app() -> FastAPI:
@@ -23,6 +23,7 @@ def create_app() -> FastAPI:
     app.include_router(versions.router)
     app.include_router(runs.router)
     app.include_router(firecrawl.router)
+    app.include_router(di_events.router)
 
     @app.exception_handler(NotFoundError)
     async def not_found_handler(_: Request, exc: NotFoundError) -> JSONResponse:

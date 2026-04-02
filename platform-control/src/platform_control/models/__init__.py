@@ -1,6 +1,7 @@
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.extractor_profile import ExtractorProfile
+from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
@@ -13,6 +14,7 @@ __all__ = [
     "CapturedResource",
     "ExtractorProfile",
     "Jurisdiction",
+    "ProcessingStatusUpdate",
     "ProviderJob",
     "RawArtifact",
     "Run",

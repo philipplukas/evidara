@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from platform_control import models as _models  # noqa: F401
 from platform_control.config import get_settings
 from platform_control.database import reset_database_caches
 from platform_control.models.base import Base

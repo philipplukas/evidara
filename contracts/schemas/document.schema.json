@@ -64,6 +64,52 @@
       "description": "Normalized document type classification. MUST use values from contracts/vocabularies/document-type.json. Upstream mapping of raw extraction labels to these values is required before canonical output.",
       "enum": ["law", "decision", "commentary", "rechtssatz"]
     },
+    "type": {
+      "type": "string",
+      "description": "Source-native legal instrument type label (for example from Fedlex)."
+    },
+    "number": {
+      "type": "string",
+      "description": "Source-native document number or citation identifier."
+    },
+    "source": {
+      "type": "string",
+      "description": "External source system code (for example: fedlex)."
+    },
+    "status": {
+      "type": "string",
+      "description": "Source-native lifecycle status (for example: In force)."
+    },
+    "inForceTo": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date until which the document remains in force, when known."
+    },
+    "abstractUri": {
+      "type": "string",
+      "format": "uri",
+      "description": "Stable abstract URI for the legal instrument (for example ELI URI)."
+    },
+    "applicableTo": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date until which applicability is defined, when provided by upstream source."
+    },
+    "documentDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Official document date provided by the upstream legal source."
+    },
+    "inForceSince": {
+      "type": "string",
+      "format": "date",
+      "description": "Date from which the document entered into force."
+    },
+    "applicableFrom": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date from which applicability starts, when provided by upstream source."
+    },
     "language": {
       "type": "string",
       "description": "Primary language of the document content. ISO 639-1 code.",
