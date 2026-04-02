@@ -1,0 +1,32 @@
+name: Document Intelligence
+
+on:
+  pull_request:
+    paths:
+      - "document-intelligence/**"
+      - "contracts/api/document-intelligence.openapi.yaml"
+      - "scripts/check-document-intelligence.sh"
+      - ".github/workflows/document-intelligence.yml"
+  push:
+    branches: [main]
+    paths:
+      - "document-intelligence/**"
+      - "contracts/api/document-intelligence.openapi.yaml"
+      - "scripts/check-document-intelligence.sh"
+      - ".github/workflows/document-intelligence.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check (unittest + service extra)
+        run: bash scripts/check-document-intelligence.sh
