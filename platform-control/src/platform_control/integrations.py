@@ -29,6 +29,7 @@ def get_raw_artifact_publisher(settings: Settings | None = None) -> RawArtifactP
     if active_settings.event_publisher_backend == "pubsub":
         return PubSubRawArtifactPublisher(
             topic_name=active_settings.raw_artifact_pubsub_topic,
+            bundle_topic_name=active_settings.artifact_bundle_pubsub_topic,
             project_id=active_settings.gcp_project_id,
         )
     return NoopRawArtifactPublisher()

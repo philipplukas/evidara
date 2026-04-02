@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
-from platform_control.services.artifact_store import GcsArtifactStore
+from platform_control.services.artifact_store import GcsArtifactStore, LocalArtifactStore
 
 
 class FakeBlob:
@@ -56,3 +57,19 @@ async def test_gcs_artifact_store_uploads_json_payload() -> None:
     payload, content_type = blob.uploads[0]
     assert json.loads(payload.decode("utf-8")) == {"hello": "world"}
     assert content_type == "application/json"
+
+
+@pytest.mark.asyncio
+async def test_local_artifact_store_stores_bundle_manifest_with_checksum(tmp_path: Path) -> None:
+    store = LocalArtifactStore(base_dir=tmp_path)
+    storage_ref = await store.store_bundle_manifest(
+        run_id="run_123",
+        bundle_manifest_id="abm_456",
+        payload={"bundle_manifest_id": "abm_456", "artifacts": []},
+    )
+
+    assert storage_ref["uri"].startswith("file://")
+    assert storage_ref["content_type"] == "application/json"
+    assert storage_ref["byte_size"] > 0
+    assert storage_ref["checksum_algorithm"] == "sha256"
+    assert len(storage_ref["checksum"]) == 64
