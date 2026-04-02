@@ -6,7 +6,7 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 
 - Tolerant parsing of `artifact_bundle.available` events
 - Bundle-manifest and artifact loading for `file://`, plain filesystem paths, and `gs://`
-- Minimal HTML normalization into a shared IR and section extraction from that IR
+- Minimal HTML and XML normalization into a shared IR and section extraction from that IR
 - Contract-shaped `Document`, `Section`, and `ProcessingManifest` models
 - Contract-shaped `document.processing_status.updated` and `document.processed` event builders
 - In-memory published-surface sink for fast tests
@@ -15,15 +15,19 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 - Offline JSON Schema validation helpers against repo `contracts/`
 - Golden bundle fixtures plus GCS, Delta, CLI, and contract tests
 - A simple processing job entrypoint with env-driven sink selection
-- A Databricks-oriented runtime entrypoint for the same pipeline surface
+- A Databricks-oriented runtime entrypoint plus Databricks Asset Bundle scaffolding under [`databricks/`](databricks/)
+- Terraform stubs for Unity Catalog scaffolding under [`../infra/terraform/databricks/document_intelligence/`](../infra/terraform/databricks/document_intelligence/)
+- A top-level Databricks Terraform stack plus `dev` / `staging` / `prod` tfvars under [`../infra/terraform/databricks/document_intelligence_stack/`](../infra/terraform/databricks/document_intelligence_stack/) and [`../infra/env/`](../infra/env/)
+- SQL/bootstrap assets for published surface registration under [`databricks/sql/`](databricks/sql/)
 
 ## What does not exist yet
 
-- Databricks Asset Bundle and Terraform scaffolding
-- Unity Catalog table/view registration automation
+- Databricks workflow wiring
+- Spark-native Delta writes and Unity Catalog table/view creation automation
+- Terraform apply/deploy integration in CI/CD
 - Citation extraction
 - Canonical jurisdiction assignment
-- XML-specific normalization and parsing
+- RIS-specific XML schema tuning beyond the current heuristic path
 
 ## Local test run
 

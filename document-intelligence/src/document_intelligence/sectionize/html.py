@@ -32,6 +32,7 @@ def build_sections_from_ir(document_ir: NormalizedDocumentIR) -> List[SectionCan
                 "metadata": {
                     "heading_level": block.level,
                     "block_id": block.id,
+                    **dict(block.attrs),
                 },
             }
             continue

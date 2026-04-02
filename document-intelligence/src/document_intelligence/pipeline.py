@@ -25,6 +25,7 @@ from document_intelligence.normalize.html import (
     normalize_plain_text_document,
 )
 from document_intelligence.normalize.ir import NormalizedDocumentIR
+from document_intelligence.normalize.xml import normalize_xml_document
 from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
 from document_intelligence.quality.invariants import validate_document_and_sections
 from document_intelligence.sectionize.html import SectionCandidate, build_sections_from_ir
@@ -124,6 +125,7 @@ class ProcessingPipeline:
             processing_version=self._processing_version,
             input_bundle_manifest_id=event.payload.bundle_manifest_id,
             input_bundle_manifest_ref=event.payload.bundle_manifest_ref.to_dict(),
+            normalized_document=normalized_document,
         )
 
         canonical_ready_event = build_processing_status_event(
@@ -170,9 +172,11 @@ class ProcessingPipeline:
         artifact: ArtifactBundleManifestArtifact,
         artifact_text: str,
     ) -> NormalizedDocumentIR:
-        content_type = (artifact.storage_ref.content_type or "").lower()
+        content_type = _normalized_content_type(artifact.storage_ref.content_type or "")
         if content_type in {"text/html", "application/xhtml+xml"}:
             return normalize_html_document(artifact_text, artifact.artifact_id)
+        if content_type in {"application/xml", "text/xml"}:
+            return normalize_xml_document(artifact_text, artifact.artifact_id)
         if content_type.startswith("text/plain"):
             return normalize_plain_text_document(artifact_text, artifact.artifact_id)
         raise ProcessingError(
@@ -195,6 +199,19 @@ def _build_document(
     processing_version: str,
 ) -> Document:
     now = _utc_now()
+    metadata = {
+        "normalizer": normalized_document.metadata.get("normalizer"),
+        "source_origin_kind": manifest.source_origin_kind,
+        "trust_tier": manifest.trust_tier,
+        "source_defaults": dict(manifest.source_defaults),
+    }
+    extracted_metadata = dict(normalized_document.metadata.get("extracted_metadata") or {})
+    if extracted_metadata:
+        metadata["extracted_metadata"] = extracted_metadata
+    source_flavor = normalized_document.metadata.get("source_flavor")
+    if source_flavor:
+        metadata["source_flavor"] = source_flavor
+
     return Document(
         document_id=document_id,
         document_revision=document_revision,
@@ -207,13 +224,9 @@ def _build_document(
         lifecycle_status="active",
         full_text=normalized_document.full_text,
         body_text=normalized_document.body_text,
-        document_type=manifest.source_defaults.get("document_type_hint"),
-        metadata={
-            "normalizer": normalized_document.metadata.get("normalizer"),
-            "source_origin_kind": manifest.source_origin_kind,
-            "trust_tier": manifest.trust_tier,
-            "source_defaults": dict(manifest.source_defaults),
-        },
+        document_type=normalized_document.metadata.get("document_type")
+        or manifest.source_defaults.get("document_type_hint"),
+        metadata=metadata,
         extensions={},
     )
 
@@ -259,6 +272,7 @@ def _build_processing_manifest(
     processing_version: str,
     input_bundle_manifest_id: str,
     input_bundle_manifest_ref: Dict[str, Any],
+    normalized_document: NormalizedDocumentIR,
 ) -> ProcessingManifest:
     published_document_ref = {
         "surface_name": "published_documents",
@@ -278,7 +292,8 @@ def _build_processing_manifest(
     }
     selected_profiles = {
         "source_profile_ref": manifest.di_overrides.get(
-            "source_profile_ref", "default_html_v1"
+            "source_profile_ref",
+            normalized_document.metadata.get("source_profile_ref", "default_html_v1"),
         ),
         "jurisdiction_profile_ref": manifest.di_overrides.get(
             "jurisdiction_profile_ref", "default_jurisdiction_v1"
@@ -287,7 +302,10 @@ def _build_processing_manifest(
             "resolution_policy_ref", "default_resolution_v1"
         ),
     }
-    normalization_profile_ref = manifest.di_overrides.get("normalization_profile_ref")
+    normalization_profile_ref = manifest.di_overrides.get(
+        "normalization_profile_ref",
+        normalized_document.metadata.get("normalization_profile_ref"),
+    )
     if normalization_profile_ref:
         selected_profiles["normalization_profile_ref"] = normalization_profile_ref
 
@@ -344,6 +362,10 @@ def _choose_document_title(normalized_document: NormalizedDocumentIR) -> str:
         if block.type == "heading":
             return block.text
     return "Untitled document"
+
+
+def _normalized_content_type(content_type: str) -> str:
+    return (content_type or "").split(";", 1)[0].strip().lower()
 
 
 def _utc_now() -> str:
