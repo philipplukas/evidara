@@ -120,7 +120,7 @@ describe('mapDocumentToDetailView', () => {
   it('should warn on unknown document_type', () => {
     const warn: WarnFn = vi.fn();
     const hit = { ...minimalDoc, document_type: 'regulation' };
-    mapDocumentToDetailView(hit, [], [], warn);
+    mapDocumentToDetailView(hit, [], [], 'de', warn);
     expect(warn).toHaveBeenCalledWith('unknown_document_type_detail', {
       document_id: 'doc_099',
       document_type: 'regulation',
@@ -130,7 +130,7 @@ describe('mapDocumentToDetailView', () => {
   it('should warn on unknown jurisdiction', () => {
     const warn: WarnFn = vi.fn();
     const hit = { ...minimalDoc, jurisdiction: 'XX' };
-    mapDocumentToDetailView(hit, [], [], warn);
+    mapDocumentToDetailView(hit, [], [], 'de', warn);
     expect(warn).toHaveBeenCalledWith('unknown_jurisdiction_detail', {
       document_id: 'doc_099',
       jurisdiction: 'XX',

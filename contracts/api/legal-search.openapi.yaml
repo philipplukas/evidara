@@ -10,7 +10,8 @@ info:
 
     See ADR-0011 for contract conventions.
     See ADR-0012 for layered contract governance.
-  version: 0.2.0
+    See ADR-0013 for internationalization strategy.
+  version: 0.3.0
   contact:
     name: Evidara Team
 
@@ -30,6 +31,7 @@ paths:
         Facet counts are live (computed from the same query via OpenSearch aggs).
       tags: [search]
       parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
         - name: q
           in: query
           required: true
@@ -75,6 +77,8 @@ paths:
         Returns global search context (jurisdictions, languages, source types).
         Query-independent and cacheable. Changes rarely.
       tags: [search]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
       responses:
         "200":
           description: Search context
@@ -89,6 +93,7 @@ paths:
       summary: Get document detail
       tags: [documents]
       parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
         - name: document_id
           in: path
           required: true
@@ -129,6 +134,21 @@ paths:
                       $ref: "#/components/schemas/SectionSummary"
 
 components:
+  parameters:
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      schema:
+        type: string
+        default: de
+        example: fr-CH
+      description: |
+        Preferred UI locale for composed display labels (badges, facets, tabs,
+        metadata). Accepts standard HTTP language tags (e.g. "de", "fr", "fr-CH").
+        Falls back to "de" (German) when omitted or unsupported.
+        See ADR-0013 for locale resolution rules.
+
   securitySchemes:
     bearerAuth:
       type: http

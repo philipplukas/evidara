@@ -2,8 +2,7 @@
  * Search result ViewModel mapper.
  *
  * Pure functions that compose SearchResultView from SearchHitEntity.
- * This is the core BFF logic — it encodes the rules for badges, actions,
- * metadata rows, subtitle composition, etc.
+ * Accepts locale parameter for all display-label composition (ADR-0013).
  *
  * Observable fallbacks (ADR-0012):
  * - Unknown vocabulary values produce a warning via WarnFn, not silent degradation.
@@ -14,8 +13,11 @@
  * - Optional scalar fields omitted when absent
  */
 
+import { t } from '../../../core/i18n';
+import type { SupportedLocale } from '../../../core/i18n';
+import { DEFAULT_LOCALE } from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
-import { DOCUMENT_TYPE_LABELS, JURISDICTION_META } from '../../../core/vocabularies';
+import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { SearchHitEntity } from '../entities/search.entities';
 
 // ─── Public Types (ViewModel shapes) ───
@@ -68,56 +70,50 @@ export interface SearchResultView {
 // ─── Document Type Rules (presentation config) ───
 
 interface DocumentTypeConfig {
-  badgeLabel: string;
   badgeColorKey: string;
-  actions: ActionView[];
+  actionKeys: [string, string][];
 }
 
 const DOCUMENT_TYPE_CONFIG: Record<string, DocumentTypeConfig> = {
   law: {
-    badgeLabel: DOCUMENT_TYPE_LABELS['law'] ?? 'Gesetz',
     badgeColorKey: 'blue',
-    actions: [
-      { label: 'Artikel öffnen', icon: 'file-text' },
-      { label: 'Verwandt', icon: 'link' },
+    actionKeys: [
+      ['actions.openArticle', 'file-text'],
+      ['actions.related', 'link'],
     ],
   },
   decision: {
-    badgeLabel: DOCUMENT_TYPE_LABELS['decision'] ?? 'Gerichtsentscheid',
     badgeColorKey: 'pink',
-    actions: [
-      { label: 'Entscheid öffnen', icon: 'scale' },
-      { label: 'Verwandt', icon: 'link' },
+    actionKeys: [
+      ['actions.openDecision', 'gavel'],
+      ['actions.relatedDecision', 'link'],
     ],
   },
   commentary: {
-    badgeLabel: DOCUMENT_TYPE_LABELS['commentary'] ?? 'Kommentar',
-    badgeColorKey: 'green',
-    actions: [
-      { label: 'Kommentar öffnen', icon: 'book-open' },
-      { label: 'Artikel anzeigen', icon: 'file-text' },
+    badgeColorKey: 'amber',
+    actionKeys: [
+      ['actions.openCommentary', 'book-open'],
+      ['actions.viewArticle', 'file-text'],
     ],
   },
   rechtssatz: {
-    badgeLabel: DOCUMENT_TYPE_LABELS['rechtssatz'] ?? 'Rechtssatz',
-    badgeColorKey: 'indigo',
-    actions: [
-      { label: 'Öffnen', icon: 'bookmark' },
-      { label: 'Verwandter Entscheid', icon: 'scale' },
+    badgeColorKey: 'green',
+    actionKeys: [
+      ['actions.open', 'file-text'],
+      ['actions.related', 'link'],
     ],
   },
 };
 
 const DEFAULT_TYPE_CONFIG: DocumentTypeConfig = {
-  badgeLabel: 'Dokument',
   badgeColorKey: 'slate',
-  actions: [{ label: 'Öffnen', icon: 'file-text' }],
+  actionKeys: [['actions.open', 'file-text']],
 };
 
 // ─── Composition Functions ───
 
 /** Compose badge views from document type and jurisdiction. Warns on unknown values. */
-export function composeBadges(hit: SearchHitEntity, warn?: WarnFn): BadgeView[] {
+export function composeBadges(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE, warn?: WarnFn): BadgeView[] {
   const docType = hit.document_type ?? '';
   const config = DOCUMENT_TYPE_CONFIG[docType];
 
@@ -129,52 +125,58 @@ export function composeBadges(hit: SearchHitEntity, warn?: WarnFn): BadgeView[] 
   }
 
   const resolvedConfig = config ?? DEFAULT_TYPE_CONFIG;
-  const jurisdiction = JURISDICTION_META[hit.jurisdiction ?? ''];
+  const jurisdictionMeta = getJurisdictionMeta(hit.jurisdiction ?? '', locale);
 
-  if (hit.jurisdiction && !jurisdiction) {
+  if (hit.jurisdiction && !jurisdictionMeta) {
     warn?.('unknown_jurisdiction', {
       document_id: hit.document_id,
       jurisdiction: hit.jurisdiction,
     });
   }
 
+  const badgeLabel = docType && config
+    ? getDocumentTypeLabel(docType, locale)
+    : t('labels.document', locale);
+
   return [
     {
-      label: resolvedConfig.badgeLabel,
+      label: badgeLabel,
       colorKey: resolvedConfig.badgeColorKey,
-      ...(jurisdiction && { iconKey: jurisdiction.iconKey }),
+      ...(jurisdictionMeta && { iconKey: jurisdictionMeta.iconKey }),
     },
   ];
 }
 
 /** Compose subtitle from jurisdiction label and document type label. */
-export function composeSubtitle(hit: SearchHitEntity, warn?: WarnFn): string {
+export function composeSubtitle(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE, warn?: WarnFn): string {
   const parts: string[] = [];
-  const jurisdiction = JURISDICTION_META[hit.jurisdiction ?? ''];
+  const jurisdictionMeta = getJurisdictionMeta(hit.jurisdiction ?? '', locale);
 
-  if (hit.jurisdiction && !jurisdiction) {
+  if (hit.jurisdiction && !jurisdictionMeta) {
     warn?.('unknown_jurisdiction_subtitle', {
       document_id: hit.document_id,
       jurisdiction: hit.jurisdiction,
     });
   }
 
-  if (jurisdiction) parts.push(jurisdiction.label);
+  if (jurisdictionMeta) parts.push(jurisdictionMeta.label);
 
   const config = DOCUMENT_TYPE_CONFIG[hit.document_type ?? ''];
-  if (config) {
-    parts.push(config.badgeLabel);
+  if (config && hit.document_type) {
+    parts.push(getDocumentTypeLabel(hit.document_type, locale));
   }
 
-  return parts.join(' · ') || (hit.document_type ?? 'Dokument');
+  return parts.join(' · ') || (hit.document_type ?? t('labels.document', locale));
 }
 
 /** Compose metadata rows (date label varies by document type). */
-export function composeMetadata(hit: SearchHitEntity): MetadataRowView[] {
+export function composeMetadata(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE): MetadataRowView[] {
   const rows: MetadataRowView[] = [];
 
   if (hit.effective_date) {
-    const label = hit.document_type === 'decision' ? 'Datum' : 'In Kraft';
+    const label = hit.document_type === 'decision'
+      ? t('metadata.date', locale)
+      : t('metadata.inForce', locale);
     rows.push({ label, value: hit.effective_date });
   }
 
@@ -182,30 +184,30 @@ export function composeMetadata(hit: SearchHitEntity): MetadataRowView[] {
 }
 
 /** Compose related-count chips from hit entity counts. */
-export function composeRelatedCounts(hit: SearchHitEntity): RelatedCountView[] {
+export function composeRelatedCounts(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE): RelatedCountView[] {
   const counts: RelatedCountView[] = [];
 
   if (hit.related_commentary_count && hit.related_commentary_count > 0) {
     counts.push({
-      label: 'Kommentare',
+      label: t('counts.commentary', locale),
       count: hit.related_commentary_count,
     });
   }
   if (hit.related_decisions_count && hit.related_decisions_count > 0) {
     counts.push({
-      label: 'Gerichtsentscheide',
+      label: t('counts.courtDecisions', locale),
       count: hit.related_decisions_count,
     });
   }
   if (hit.citations_count && hit.citations_count > 0) {
-    counts.push({ label: 'Zitationen', count: hit.citations_count });
+    counts.push({ label: t('counts.citations', locale), count: hit.citations_count });
   }
 
   return counts;
 }
 
 /** Compose action buttons from document type config. Warns on unknown types. */
-export function composeActions(hit: SearchHitEntity, warn?: WarnFn): ActionView[] {
+export function composeActions(hit: SearchHitEntity, locale: SupportedLocale = DEFAULT_LOCALE, warn?: WarnFn): ActionView[] {
   const docType = hit.document_type ?? '';
   const config = DOCUMENT_TYPE_CONFIG[docType];
 
@@ -216,7 +218,8 @@ export function composeActions(hit: SearchHitEntity, warn?: WarnFn): ActionView[
     });
   }
 
-  return [...(config ?? DEFAULT_TYPE_CONFIG).actions];
+  const actionKeys = (config ?? DEFAULT_TYPE_CONFIG).actionKeys;
+  return actionKeys.map(([key, icon]) => ({ label: t(key, locale), icon }));
 }
 
 /** Compose content-language view from hit language field. */
@@ -231,18 +234,22 @@ export function composeLanguage(hit: { language?: string }): ContentLanguageView
 
 // ─── Main Mapper ───
 
-/** Map a single SearchHitEntity to a complete SearchResultView. Threads WarnFn to all sub-composers. */
-export function mapSearchHitToView(hit: SearchHitEntity, warn?: WarnFn): SearchResultView {
+/** Map a single SearchHitEntity to a complete SearchResultView. Threads locale and WarnFn to all sub-composers. */
+export function mapSearchHitToView(
+  hit: SearchHitEntity,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+  warn?: WarnFn,
+): SearchResultView {
   return {
     id: hit.document_id,
     type: hit.document_type ?? 'unknown',
     title: hit.title,
-    subtitle: composeSubtitle(hit, warn),
+    subtitle: composeSubtitle(hit, locale, warn),
     snippet: hit.snippet ?? '',
-    badges: composeBadges(hit, warn),
-    metadataRows: composeMetadata(hit),
-    relatedCounts: composeRelatedCounts(hit),
-    actions: composeActions(hit, warn),
+    badges: composeBadges(hit, locale, warn),
+    metadataRows: composeMetadata(hit, locale),
+    relatedCounts: composeRelatedCounts(hit, locale),
+    actions: composeActions(hit, locale, warn),
     // Optional scalars — omit when absent (ADR-0011)
     ...(hit.structural_path && { structuralContext: hit.structural_path }),
     ...(hit.language && { contentLanguage: composeLanguage(hit) }),

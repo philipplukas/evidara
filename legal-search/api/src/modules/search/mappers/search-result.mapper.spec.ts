@@ -66,7 +66,7 @@ describe('composeBadges', () => {
   it('should warn on unknown document_type', () => {
     const warn: WarnFn = vi.fn();
     const hit = { ...minimalHit, document_type: 'regulation' };
-    composeBadges(hit, warn);
+    composeBadges(hit, 'de', warn);
     expect(warn).toHaveBeenCalledWith('unknown_document_type', {
       document_id: 'doc_003',
       document_type: 'regulation',
@@ -76,7 +76,7 @@ describe('composeBadges', () => {
   it('should warn on unknown jurisdiction', () => {
     const warn: WarnFn = vi.fn();
     const hit = { ...minimalHit, jurisdiction: 'XX' };
-    composeBadges(hit, warn);
+    composeBadges(hit, 'de', warn);
     expect(warn).toHaveBeenCalledWith('unknown_jurisdiction', {
       document_id: 'doc_003',
       jurisdiction: 'XX',
@@ -85,7 +85,7 @@ describe('composeBadges', () => {
 
   it('should not warn for missing document_type (empty string)', () => {
     const warn: WarnFn = vi.fn();
-    composeBadges(minimalHit, warn);
+    composeBadges(minimalHit, 'de', warn);
     expect(warn).not.toHaveBeenCalled();
   });
 });
@@ -175,7 +175,7 @@ describe('composeActions', () => {
   it('should warn on unknown document_type', () => {
     const warn: WarnFn = vi.fn();
     const hit = { ...minimalHit, document_type: 'regulation' };
-    composeActions(hit, warn);
+    composeActions(hit, 'de', warn);
     expect(warn).toHaveBeenCalledWith('unknown_document_type_actions', {
       document_id: 'doc_003',
       document_type: 'regulation',
@@ -242,12 +242,50 @@ describe('mapSearchHitToView', () => {
       document_type: 'regulation',
       jurisdiction: 'XX',
     };
-    mapSearchHitToView(hit, warn);
+    mapSearchHitToView(hit, 'de', warn);
     // Should have warned about unknown type and jurisdiction
     expect(warn).toHaveBeenCalled();
     const calls = (warn as ReturnType<typeof vi.fn>).mock.calls;
     const events = calls.map((c) => c[0]);
     expect(events).toContain('unknown_document_type');
     expect(events).toContain('unknown_jurisdiction');
+  });
+});
+
+// ─── Locale Switching (ADR-0013) ───
+
+describe('locale-aware label resolution', () => {
+  it('should render French badges when locale is fr', () => {
+    const badges = composeBadges(lawHit, 'fr');
+    expect(badges[0].label).toBe('Loi');
+  });
+
+  it('should render French subtitle when locale is fr', () => {
+    expect(composeSubtitle(lawHit, 'fr')).toBe('Suisse · Loi');
+  });
+
+  it('should render French metadata when locale is fr', () => {
+    const rows = composeMetadata(lawHit, 'fr');
+    expect(rows[0].label).toBe('En vigueur');
+  });
+
+  it('should render French related counts when locale is fr', () => {
+    const counts = composeRelatedCounts(
+      { ...lawHit, related_commentary_count: 3 },
+      'fr',
+    );
+    expect(counts[0].label).toBe('Commentaires');
+  });
+
+  it('should render French actions when locale is fr', () => {
+    const actions = composeActions(lawHit, 'fr');
+    expect(actions[0].label).toBe("Ouvrir l'article");
+  });
+
+  it('should compose complete French view', () => {
+    const view = mapSearchHitToView(lawHit, 'fr');
+    expect(view.badges[0].label).toBe('Loi');
+    expect(view.subtitle).toBe('Suisse · Loi');
+    expect(view.actions[0].label).toBe("Ouvrir l'article");
   });
 });

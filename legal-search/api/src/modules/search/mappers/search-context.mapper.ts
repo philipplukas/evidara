@@ -2,10 +2,13 @@
  * Search context mapper.
  *
  * Maps global aggregation data to the SearchContextView ViewModel.
- * Query-independent and cacheable.
+ * Query-independent and cacheable. Accepts locale for label resolution (ADR-0013).
  */
 
-import { DOCUMENT_TYPE_LABELS, JURISDICTION_META } from '../../../core/vocabularies';
+import { t } from '../../../core/i18n';
+import type { SupportedLocale } from '../../../core/i18n';
+import { DEFAULT_LOCALE } from '../../../core/i18n';
+import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { ContextAggregations } from '../entities/search.entities';
 
 export interface ContextChipView {
@@ -34,10 +37,13 @@ const LANGUAGE_LABELS: Record<string, string> = {
 // ─── Mapper ───
 
 /** Map raw OpenSearch aggregation buckets to the SearchContextView ViewModel. */
-export function mapContextAggregations(aggs: ContextAggregations): SearchContextView {
+export function mapContextAggregations(
+  aggs: ContextAggregations,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): SearchContextView {
   return {
     jurisdictions: aggs.jurisdictions.map((bucket) => {
-      const mapped = JURISDICTION_META[bucket.key];
+      const mapped = getJurisdictionMeta(bucket.key, locale);
       return {
         key: bucket.key.toLowerCase(),
         label: mapped?.label ?? bucket.key,
@@ -51,10 +57,10 @@ export function mapContextAggregations(aggs: ContextAggregations): SearchContext
       active: bucket.key === 'de', // default: DE active
     })),
     sourceTypes: [
-      { key: 'all', label: 'Alle', active: true },
+      { key: 'all', label: t('labels.all', locale), active: true },
       ...aggs.source_types.map((bucket) => ({
         key: bucket.key,
-        label: DOCUMENT_TYPE_LABELS[bucket.key] ?? bucket.key,
+        label: getDocumentTypeLabel(bucket.key, locale),
         active: false,
       })),
     ],

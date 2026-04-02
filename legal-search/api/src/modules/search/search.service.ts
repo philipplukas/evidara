@@ -1,4 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { SupportedLocale } from '../../core/i18n';
+import { DEFAULT_LOCALE } from '../../core/i18n';
 import type { WarnFn } from '../../core/types/warn';
 import { mapContextAggregations } from './mappers/search-context.mapper';
 import { mapAggregationsToFacets } from './mappers/search-facet.mapper';
@@ -24,8 +26,10 @@ export class SearchService {
       documentType?: string;
       page?: number;
       pageSize?: number;
+      locale?: SupportedLocale;
     },
   ) {
+    const locale = options?.locale ?? DEFAULT_LOCALE;
     const result = await this.repository.search(query, {
       jurisdiction: options?.jurisdiction,
       documentType: options?.documentType,
@@ -34,14 +38,14 @@ export class SearchService {
     });
 
     return {
-      results: result.hits.map((hit) => mapSearchHitToView(hit, this.warn)),
-      facets: mapAggregationsToFacets(result.aggregations),
+      results: result.hits.map((hit) => mapSearchHitToView(hit, locale, this.warn)),
+      facets: mapAggregationsToFacets(result.aggregations, locale),
       totalResults: result.total,
     };
   }
 
-  async getContext() {
+  async getContext(locale: SupportedLocale = DEFAULT_LOCALE) {
     const aggs = await this.repository.getContextAggregations();
-    return mapContextAggregations(aggs);
+    return mapContextAggregations(aggs, locale);
   }
 }

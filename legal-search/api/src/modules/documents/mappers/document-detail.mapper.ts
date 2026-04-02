@@ -2,11 +2,15 @@
  * Document detail ViewModel mapper.
  *
  * Composes DetailView from DocumentEntity + sections + citations.
+ * Accepts locale parameter for all composed labels (ADR-0013).
  * Observable fallbacks via WarnFn (ADR-0012).
  */
 
+import { t } from '../../../core/i18n';
+import type { SupportedLocale } from '../../../core/i18n';
+import { DEFAULT_LOCALE } from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
-import { DOCUMENT_TYPE_LABELS, JURISDICTION_META } from '../../../core/vocabularies';
+import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/document.entities';
 
 // ─── ViewModel Types ───
@@ -50,48 +54,53 @@ export interface DetailView {
   };
 }
 
-// Badge colors are resolved via DOCUMENT_TYPE_LABELS + per-type config in search-result.mapper.
-
 // ─── Composition ───
 
-function composeSubtitle(doc: DocumentEntity, warn?: WarnFn): string {
+function composeSubtitle(doc: DocumentEntity, locale: SupportedLocale, warn?: WarnFn): string {
   const parts: string[] = [];
-  const jurisdiction = JURISDICTION_META[doc.jurisdiction ?? ''];
+  const jurisdictionMeta = getJurisdictionMeta(doc.jurisdiction ?? '', locale);
 
-  if (doc.jurisdiction && !jurisdiction) {
+  if (doc.jurisdiction && !jurisdictionMeta) {
     warn?.('unknown_jurisdiction_detail', {
       document_id: doc.document_id,
       jurisdiction: doc.jurisdiction,
     });
   }
 
-  if (jurisdiction) parts.push(jurisdiction.label);
+  if (jurisdictionMeta) parts.push(jurisdictionMeta.label);
 
-  const typeLabel = DOCUMENT_TYPE_LABELS[doc.document_type ?? ''];
-  if (doc.document_type && !typeLabel) {
-    warn?.('unknown_document_type_detail', {
-      document_id: doc.document_id,
-      document_type: doc.document_type,
-    });
+  if (doc.document_type) {
+    const typeLabel = getDocumentTypeLabel(doc.document_type, locale);
+    if (typeLabel !== doc.document_type) {
+      // Only push if we have a real label, not just the raw code
+      parts.push(typeLabel);
+    } else {
+      warn?.('unknown_document_type_detail', {
+        document_id: doc.document_id,
+        document_type: doc.document_type,
+      });
+    }
   }
-  if (typeLabel) parts.push(typeLabel);
 
-  return parts.join(' · ') || (doc.document_type ?? 'Dokument');
+  return parts.join(' · ') || (doc.document_type ?? t('labels.document', locale));
 }
 
 function composeMetadata(
   doc: DocumentEntity,
+  locale: SupportedLocale,
 ): { label: string; value: string; iconKey?: string }[] {
   const rows: { label: string; value: string; iconKey?: string }[] = [];
 
   if (doc.effective_date) {
-    const label = doc.document_type === 'decision' ? 'Datum' : 'In Kraft';
+    const label = doc.document_type === 'decision'
+      ? t('metadata.date', locale)
+      : t('metadata.inForce', locale);
     rows.push({ label, value: doc.effective_date });
   }
   if (doc.jurisdiction) {
-    const meta = JURISDICTION_META[doc.jurisdiction];
+    const meta = getJurisdictionMeta(doc.jurisdiction, locale);
     rows.push({
-      label: 'Zuständigkeit',
+      label: t('metadata.jurisdiction', locale),
       value: meta?.label ?? doc.jurisdiction,
       ...(meta?.iconKey && { iconKey: meta.iconKey }),
     });
@@ -104,34 +113,35 @@ function composeTabs(
   _doc: DocumentEntity,
   sectionsCount: number,
   citationsCount: number,
+  locale: SupportedLocale,
 ): { key: string; label: string; count?: number }[] {
   const tabs: { key: string; label: string; count?: number }[] = [
-    { key: 'content', label: 'Inhalt' },
+    { key: 'content', label: t('tabs.content', locale) },
   ];
 
   if (sectionsCount > 0) {
-    tabs.push({ key: 'sections', label: 'Abschnitte', count: sectionsCount });
+    tabs.push({ key: 'sections', label: t('tabs.sections', locale), count: sectionsCount });
   }
   if (citationsCount > 0) {
     tabs.push({
       key: 'citations',
-      label: 'Zitationen',
+      label: t('tabs.citations', locale),
       count: citationsCount,
     });
   }
 
-  tabs.push({ key: 'details', label: 'Details' });
+  tabs.push({ key: 'details', label: t('tabs.details', locale) });
 
   return tabs;
 }
 
-function composeReferences(citations: CitationEntity[]): DetailView['references'] {
+function composeReferences(citations: CitationEntity[], locale: SupportedLocale): DetailView['references'] {
   if (citations.length === 0) return [];
 
   // Group by citation type
   const groups = new Map<string, DetailView['references'][0]>();
   for (const cit of citations) {
-    const groupLabel = cit.citation_type ?? 'Referenzen';
+    const groupLabel = cit.citation_type ?? t('labels.references', locale);
     if (!groups.has(groupLabel)) {
       groups.set(groupLabel, { label: groupLabel, items: [] });
     }
@@ -150,6 +160,7 @@ function composeReferences(citations: CitationEntity[]): DetailView['references'
 
 function composeLocalStructure(
   sections: SectionEntity[],
+  locale: SupportedLocale,
 ): DetailView['localStructure'] | undefined {
   if (sections.length === 0) return undefined;
 
@@ -158,7 +169,7 @@ function composeLocalStructure(
       .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
       .map((s) => ({
         id: s.section_id,
-        label: s.title ?? `Abschnitt ${s.ordinal ?? 0}`,
+        label: s.title ?? `${t('labels.section', locale)} ${s.ordinal ?? 0}`,
         depth: s.depth,
       })),
   };
@@ -171,6 +182,7 @@ export function mapDocumentToDetailView(
   doc: DocumentEntity,
   sections: SectionEntity[],
   citations: CitationEntity[],
+  locale: SupportedLocale = DEFAULT_LOCALE,
   warn?: WarnFn,
 ): DetailView {
   const sectionsCount = doc.sections_count ?? sections.length;
@@ -180,11 +192,11 @@ export function mapDocumentToDetailView(
     id: doc.document_id,
     type: doc.document_type ?? 'unknown',
     title: doc.title,
-    subtitle: composeSubtitle(doc, warn),
-    metadata: composeMetadata(doc),
-    tabs: composeTabs(doc, sectionsCount, citationsCount),
+    subtitle: composeSubtitle(doc, locale, warn),
+    metadata: composeMetadata(doc, locale),
+    tabs: composeTabs(doc, sectionsCount, citationsCount, locale),
     relatedGroups: [],
-    references: composeReferences(citations),
+    references: composeReferences(citations, locale),
     annotations: [],
     // Optional fields — omit when absent (ADR-0011)
     ...(doc.structural_path && {
@@ -200,7 +212,7 @@ export function mapDocumentToDetailView(
       },
     }),
     ...(sections.length > 0 && {
-      localStructure: composeLocalStructure(sections),
+      localStructure: composeLocalStructure(sections, locale),
     }),
   };
 }
