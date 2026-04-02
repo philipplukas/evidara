@@ -66,22 +66,39 @@ Central documentation including architecture, ADRs, onboarding, runbooks, and co
 
 ## Main Interaction Flow
 
-```text
-┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────┐
-│   platform-control  │────▶│  document-intelligence   │────▶│  legal-search   │
-│                     │     │                          │     │                 │
-│  sources, versions  │     │  parsing, canonical      │     │  search, serve  │
-│  runs, approvals    │     │  truth in Delta          │     │  projections    │
-└────────┬────────────┘     └──────────┬───────────────┘     └────────┬────────┘
-         │                             │                              │
-         │         ┌───────────────────┘                              │
-         │         │                                                  │
-         ▼         ▼                                                  ▼
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │                          contracts                                  │
-    │    OpenAPI specs · JSON Schemas · Event schemas · Shared IDs        │
-    └──────────────────────────────────────────────────────────────────────┘
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart TB
+  subgraph PC["platform-control"]
+    P[Acquisition & ops]
+  end
+  subgraph DI["document-intelligence"]
+    D[Pipelines]
+    DS[Document Service]
+  end
+  subgraph LS["legal-search"]
+    UI[UI & BFF]
+    IDX[Search projection]
+  end
+  subgraph stores["Data & search"]
+    DL[("Delta Lake")]
+    OS[("OpenSearch")]
+  end
+
+  P -.->|Pub/Sub events| D
+  D ==>|canonical write| DL
+  D -.->|document.processed / withdrawn| UI
+  D -.->|document.processed / withdrawn| IDX
+  UI -->|document detail| DS
+  DS ==>|published surfaces| DL
+  IDX ==>|projection build| DL
+  UI -->|search queries| OS
+  IDX -->|index & aliases| OS
 ```
+
+Cross-cutting **contracts** (build-time only): OpenAPI specs, JSON Schemas, event schemas, and shared IDs in `contracts/`.
+
+For container- and component-level views, render [`structurizr/workspace.dsl`](../../structurizr/workspace.dsl) (Structurizr Lite or CLI).
 
 ## Feedback Loops
 
