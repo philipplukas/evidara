@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/search-projection",
+  "title": "Search Projection",
+  "description": "Schema for the OpenSearch search-projection document. This is the read-model contract between the projection builder and the BFF. It includes canonical fields copied forward, derived metrics, and denormalized joins. Runtime fields (e.g., search highlight snippets) are NOT part of this schema — they are attached at query time.",
+  "type": "object",
+  "required": [
+    "document_id",
+    "title",
+    "sections_count",
+    "citations_count"
+  ],
+  "properties": {
+    "document_id": {
+      "type": "string",
+      "description": "Canonical document ID. Copied from canonical output.",
+      "pattern": "^doc_[a-zA-Z0-9]+$"
+    },
+    "title": {
+      "type": "string",
+      "description": "Document title. Copied from canonical output."
+    },
+    "jurisdiction": {
+      "type": "string",
+      "description": "Normalized jurisdiction code. Copied from canonical output. MUST match contracts/vocabularies/jurisdiction.json.",
+      "enum": ["CH", "AT", "DE", "LI"]
+    },
+    "document_type": {
+      "type": "string",
+      "description": "Normalized document type. Copied from canonical output. MUST match contracts/vocabularies/document-type.json.",
+      "enum": ["law", "decision", "commentary", "rechtssatz"]
+    },
+    "language": {
+      "type": "string",
+      "description": "Primary language (ISO 639-1). Copied from canonical output.",
+      "pattern": "^[a-z]{2}$"
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Effective date. Copied from canonical output."
+    },
+    "structural_path": {
+      "type": "string",
+      "description": "Intrinsic document hierarchy path. Copied from canonical output."
+    },
+    "content": {
+      "type": "string",
+      "description": "Full text content for search indexing and snippet generation."
+    },
+    "content_docling": {
+      "type": "object",
+      "description": "DoclingDocument JSON (ADR-0010). Stored for detail view pass-through. May be large — consider indexing constraints."
+    },
+
+    "sections_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Derived: count of sections belonging to this document. Computed by the projection builder from the sections index."
+    },
+    "citations_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Derived: count of citations from this document. Computed by the projection builder from the citations index."
+    },
+    "related_decisions_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Derived: count of related decision documents. Computed by reverse citation join."
+    },
+    "related_commentary_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Derived: count of related commentary documents. Computed by reverse citation join."
+    },
+    "content_preview": {
+      "type": "string",
+      "description": "Derived: first ~200 characters of content for lightweight display without loading the full document."
+    },
+
+    "source_id": {
+      "type": "string",
+      "description": "Lineage: source ID. Copied from canonical output.",
+      "pattern": "^src_[a-zA-Z0-9]+$"
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the canonical document was processed."
+    }
+  },
+  "additionalProperties": false
+}

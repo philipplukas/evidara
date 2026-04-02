@@ -6,7 +6,7 @@ Provision and document runtime and deployment environments for all Evidara compo
 
 ## Current state
 
-Repository structure exists with Terraform directory layout. No Terraform modules or cloud resources are defined yet. Environment strategy (dev/staging/prod) is documented as planned but not configured.
+Initial Terraform scaffolding now exists for the `document-intelligence` Databricks layer. The repo now has a reusable Unity Catalog module, a top-level Databricks stack, and per-environment tfvars for `dev`, `staging`, and `prod`. GCP, GitHub, remote state, CI/CD wiring, and most runtime resources are still not implemented.
 
 ## Source of truth
 
@@ -20,7 +20,7 @@ Repository structure exists with Terraform directory layout. No Terraform module
 infra/
   terraform/
     gcp/         # Google Cloud resources
-    databricks/  # Databricks workspace and resources
+    databricks/  # Databricks modules and stacks
     github/      # GitHub repository automation
   env/
     dev/         # Development environment config
@@ -31,13 +31,13 @@ infra/
 ## Minimal next tasks
 
 - [ ] Define target GCP services and resource names
-- [ ] Define target Databricks resources
-- [ ] Define Terraform module structure
-- [ ] Define environment strategy (dev/staging/prod)
+- [x] Define target Databricks resources for the initial DI Unity Catalog layer
+- [x] Define Terraform module structure for the initial Databricks path
+- [x] Define environment strategy (dev/staging/prod)
 - [ ] Define naming conventions for cloud resources
 - [ ] Define secrets strategy (Google Secret Manager)
-- [ ] Document infrastructure overview (`docs/setup/infrastructure-overview.md`)
-- [ ] Document environment strategy (`docs/setup/environment-strategy.md`)
+- [x] Document infrastructure overview (`docs/setup/infrastructure-overview.md`)
+- [x] Document environment strategy (`docs/setup/environment-strategy.md`)
 
 ## Minimal v1 Outcome
 

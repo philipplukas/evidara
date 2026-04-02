@@ -1,0 +1,36 @@
+bundle:
+  name: document-intelligence
+
+include:
+  - resources/*.yml
+
+artifacts:
+  document_intelligence_wheel:
+    type: whl
+    path: .
+    build: python3 -m pip wheel --no-deps --wheel-dir dist .
+
+variables:
+  workspace_host:
+    description: Databricks workspace host for the target environment.
+  spark_version:
+    description: Databricks Runtime version for the document-intelligence job cluster.
+    default: 15.4.x-scala2.12
+  node_type_id:
+    description: Cluster node type for the document-intelligence job.
+    default: n2-standard-4
+  num_workers:
+    description: Number of workers for the job cluster.
+    default: "1"
+  surfaces_root_uri:
+    description: Root Delta path or volume path under which published surfaces are written.
+  processing_version:
+    description: DI processing version to stamp into canonical outputs.
+    default: 0.1.0-dev
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      host: ${var.workspace_host}
