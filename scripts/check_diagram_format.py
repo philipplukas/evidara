@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-DOCS_DIR = Path("docs")
+DOCS_DIRS = (Path("docs"), Path("legal-search/frontend/docs"))
 ERRORS = []
 
 # Patterns that suggest non-Mermaid diagrams
@@ -48,18 +48,22 @@ def check_file(path: Path) -> list[str]:
 
 
 def main() -> int:
-    if not DOCS_DIR.exists():
+    if not any(docs_dir.exists() for docs_dir in DOCS_DIRS):
         return 0
 
-    for md_file in sorted(DOCS_DIR.rglob("*.md")):
-        ERRORS.extend(check_file(md_file))
+    for docs_dir in DOCS_DIRS:
+        if not docs_dir.exists():
+            continue
+        for md_file in sorted(docs_dir.rglob("*.md")):
+            ERRORS.extend(check_file(md_file))
 
     if ERRORS:
         print("Diagram format violations:")
         for error in ERRORS:
             print(f"  {error}")
         print(
-            "\nAll diagrams in docs/ must use Mermaid fenced code blocks."
+            "\nAll diagrams in docs/ and legal-search/frontend/docs/ "
+            "must use Mermaid fenced code blocks."
             "\nSee docs/documentation/mermaid-style-guide.md for templates."
         )
         return 1

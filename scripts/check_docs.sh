@@ -11,6 +11,8 @@ python3 scripts/validate_json_schemas.py
 python3 scripts/check_component_docs.py
 python3 scripts/check_runbooks.py
 python3 scripts/check_doc_links.py
+python3 scripts/check_diagram_format.py
+npm run --silent check:mermaid
 
 # 3. Build docs site (strict mode catches broken cross-references)
 echo "Building docs site (strict mode)..."

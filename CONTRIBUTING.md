@@ -109,6 +109,8 @@ pre-commit run --all-files
 
 This runs markdownlint, schema validation, contract checks, doc checks, and legal-search typecheck/lint/test.
 
+Documentation checks now include Mermaid validation. Install the pinned repo-root Node dependencies once with `npm install` so `npm run --silent check:mermaid` is available locally.
+
 ## Code Review
 
 - At least **1 review** (human or AI) is required before merging.

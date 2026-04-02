@@ -28,6 +28,10 @@ jobs:
         run: |
           npm install -g markdownlint-cli
 
+      - name: Install Mermaid validation dependencies
+        run: |
+          npm ci
+
       - name: Run markdown lint
         run: |
           markdownlint \
@@ -57,6 +61,14 @@ jobs:
       - name: Check doc links
         run: |
           python scripts/check_doc_links.py
+
+      - name: Check diagram format
+        run: |
+          python scripts/check_diagram_format.py
+
+      - name: Check Mermaid diagrams render
+        run: |
+          npm run --silent check:mermaid
 
       - name: Build docs site (strict)
         run: |
