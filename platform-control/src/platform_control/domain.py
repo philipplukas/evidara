@@ -40,3 +40,12 @@ class ProviderJobStatus(StrEnum):
 class FirecrawlMode(StrEnum):
     CRAWL = "crawl"
     BATCH_SCRAPE = "batch_scrape"
+
+
+class ProcessingStatus(StrEnum):
+    ACCEPTED = "accepted"
+    PROCESSING = "processing"
+    CANONICAL_READY = "canonical_ready"
+    FAILED = "failed"
+    WITHDRAWN = "withdrawn"
+    SKIPPED_DUPLICATE = "skipped_duplicate"

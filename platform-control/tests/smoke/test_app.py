@@ -85,6 +85,74 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
             },
         )
         assert run_response.status_code == 201
-        assert run_response.json()["status"] == "running"
+        run_body = run_response.json()
+        assert run_body["status"] == "running"
+        run_id = run_body["run_id"]
+
+        status_event_response = await client.post(
+            "/v1/di/events/document-processing-status-updated",
+            json={
+                "event_type": "document.processing_status.updated",
+                "event_version": 1,
+                "event_id": "evt_status_smoke_1",
+                "occurred_at": "2026-04-02T12:00:00Z",
+                "producer": "document-intelligence",
+                "correlation_id": run_id,
+                "payload": {
+                    "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+                    "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+                    "document_revision": 3,
+                    "provenance": {
+                        "tenant_id": "tenant_public",
+                        "corpus_id": "corpus_public_ch_federal_law",
+                        "scope_type": "global_public",
+                        "source_id": source_id,
+                        "source_version_id": source_version_id,
+                        "run_id": run_id,
+                        "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+                        "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+                    },
+                    "processing_version": "di_2026_03_29",
+                    "status": "canonical_ready",
+                    "error_code": None,
+                    "error_summary": None,
+                },
+            },
+        )
+        assert status_event_response.status_code == 202
+
+        statuses_response = await client.get(f"/v1/runs/{run_id}/processing-status")
+        assert statuses_response.status_code == 200
+        statuses_body = statuses_response.json()
+        assert len(statuses_body["data"]) == 1
+        assert statuses_body["data"][0]["status"] == "canonical_ready"
+        assert statuses_body["data"][0]["processing_manifest_id"] == "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+
+        invalid_failed_response = await client.post(
+            "/v1/di/events/document-processing-status-updated",
+            json={
+                "event_type": "document.processing_status.updated",
+                "event_version": 1,
+                "event_id": "evt_status_smoke_invalid",
+                "occurred_at": "2026-04-02T12:00:01Z",
+                "producer": "document-intelligence",
+                "payload": {
+                    "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8d",
+                    "provenance": {
+                        "tenant_id": "tenant_public",
+                        "corpus_id": "corpus_public_ch_federal_law",
+                        "scope_type": "global_public",
+                        "source_id": source_id,
+                        "source_version_id": source_version_id,
+                        "run_id": run_id,
+                    },
+                    "processing_version": "di_2026_03_29",
+                    "status": "failed",
+                    "error_code": None,
+                    "error_summary": None,
+                },
+            },
+        )
+        assert invalid_failed_response.status_code == 422
 
     app.dependency_overrides.clear()

@@ -21,6 +21,7 @@ tags:
   - name: sources
   - name: source-versions
   - name: runs
+  - name: di-events
   - name: firecrawl
   - name: health
 
@@ -189,6 +190,45 @@ paths:
                 $ref: "#/components/schemas/Run"
         "404":
           description: Run not found
+
+  /v1/runs/{run_id}/processing-status:
+    get:
+      operationId: listRunProcessingStatus
+      summary: List DI processing status updates for a run
+      tags: [runs]
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Processing status updates for the run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessingStatusUpdateListResponse"
+        "404":
+          description: Run not found
+
+  /v1/di/events/document-processing-status-updated:
+    post:
+      operationId: receiveDocumentProcessingStatusUpdated
+      summary: Ingest processing status events emitted by document-intelligence
+      tags: [di-events]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentProcessingStatusUpdatedEvent"
+      responses:
+        "202":
+          description: Event accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventAcceptedResponse"
+        "422":
+          description: Event validation failed
 
   /v1/firecrawl/webhooks:
     post:
@@ -497,6 +537,221 @@ components:
           type: string
           enum: [preview, production]
           default: preview
+
+    ProcessingStatusUpdate:
+      type: object
+      required:
+        - event_id
+        - processing_manifest_id
+        - processing_version
+        - status
+        - occurred_at
+        - created_at
+        - updated_at
+      properties:
+        event_id:
+          type: string
+        processing_manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+        processing_version:
+          type: string
+        status:
+          type: string
+          enum:
+            - accepted
+            - processing
+            - canonical_ready
+            - failed
+            - withdrawn
+            - skipped_duplicate
+        occurred_at:
+          type: string
+          format: date-time
+        source_snapshot_id:
+          type: string
+          pattern: "^snap_[0-9a-hjkmnp-tv-z]{26}$"
+        bundle_manifest_id:
+          type: string
+          pattern: "^abm_[0-9a-hjkmnp-tv-z]{26}$"
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        error_code:
+          oneOf:
+            - type: string
+            - type: "null"
+        error_summary:
+          oneOf:
+            - type: string
+            - type: "null"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProcessingStatusUpdateListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProcessingStatusUpdate"
+
+    ProcessingStatusProvenance:
+      type: object
+      required:
+        - tenant_id
+        - corpus_id
+        - scope_type
+        - source_id
+        - source_version_id
+        - run_id
+      properties:
+        tenant_id:
+          type: string
+          pattern: "^tenant_[a-z0-9_]+$"
+        corpus_id:
+          type: string
+          pattern: "^corpus_[a-z0-9_]+$"
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+        source_id:
+          type: string
+          pattern: "^src_[0-9a-hjkmnp-tv-z]{26}$"
+        source_version_id:
+          type: string
+          pattern: "^sv_[0-9a-hjkmnp-tv-z]{26}$"
+        run_id:
+          type: string
+          pattern: "^run_[0-9a-hjkmnp-tv-z]{26}$"
+        source_snapshot_id:
+          type: string
+          pattern: "^snap_[0-9a-hjkmnp-tv-z]{26}$"
+        bundle_manifest_id:
+          type: string
+          pattern: "^abm_[0-9a-hjkmnp-tv-z]{26}$"
+        artifact_id:
+          type: string
+          pattern: "^art_[0-9a-hjkmnp-tv-z]{26}$"
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        processing_manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+      additionalProperties: false
+
+    DocumentProcessingStatusPayload:
+      type: object
+      required:
+        - processing_manifest_id
+        - provenance
+        - processing_version
+        - status
+      properties:
+        processing_manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        provenance:
+          $ref: "#/components/schemas/ProcessingStatusProvenance"
+        processing_version:
+          type: string
+        status:
+          type: string
+          enum:
+            - accepted
+            - processing
+            - canonical_ready
+            - failed
+            - withdrawn
+            - skipped_duplicate
+        error_code:
+          oneOf:
+            - type: string
+            - type: "null"
+        error_summary:
+          oneOf:
+            - type: string
+            - type: "null"
+      allOf:
+        - if:
+            properties:
+              status:
+                const: failed
+            required: [status]
+          then:
+            required: [error_code, error_summary]
+            properties:
+              error_code:
+                type: string
+                minLength: 1
+              error_summary:
+                type: string
+                minLength: 1
+          else:
+            properties:
+              error_code:
+                type: "null"
+              error_summary:
+                type: "null"
+      additionalProperties: false
+
+    DocumentProcessingStatusUpdatedEvent:
+      type: object
+      required:
+        - event_type
+        - event_version
+        - event_id
+        - occurred_at
+        - producer
+        - payload
+      properties:
+        event_type:
+          type: string
+          const: document.processing_status.updated
+        event_version:
+          type: integer
+          const: 1
+        event_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        producer:
+          type: string
+          const: document-intelligence
+        correlation_id:
+          type: string
+        causation_id:
+          type: string
+        payload:
+          $ref: "#/components/schemas/DocumentProcessingStatusPayload"
+      additionalProperties: false
+
+    EventAcceptedResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted]
 
     FirecrawlWebhookEvent:
       type: object
