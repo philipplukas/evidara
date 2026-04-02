@@ -1,0 +1,12 @@
+{
+  "name": "evidara-doc-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:mermaid": "node scripts/check_mermaid_diagrams.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0",
+    "mermaid": "11.6.0"
+  }
+}

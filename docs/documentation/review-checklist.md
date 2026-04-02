@@ -27,6 +27,7 @@ Use this checklist when reviewing PRs that include documentation changes, or whe
 - [ ] **All internal links are valid** (run `python scripts/check_doc_links.py`)
 - [ ] **Component docs have required headings** (run `python scripts/check_component_docs.py`)
 - [ ] **Runbooks have required metadata** (run `python scripts/check_runbooks.py`)
+- [ ] **Mermaid diagrams validate** (run `npm run --silent check:mermaid`)
 - [ ] **Markdown lint passes** (run `markdownlint <file> --config .markdownlint.json`)
 - [ ] **Language is plain and direct** — avoid jargon, vague qualifiers, and passive voice
 - [ ] **Examples are concrete** — show actual values, not "e.g., some value"
@@ -44,6 +45,8 @@ Use this checklist when reviewing PRs that include documentation changes, or whe
 python scripts/check_doc_links.py
 python scripts/check_component_docs.py
 python scripts/check_runbooks.py
+python scripts/check_diagram_format.py
+npm run --silent check:mermaid
 python scripts/validate_openapi.py
 python scripts/validate_json_schemas.py
 ```

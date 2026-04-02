@@ -76,7 +76,14 @@ repos:
         entry: python scripts/check_diagram_format.py
         language: system
         pass_filenames: false
-        files: ^docs/.*\.md$
+        files: ^(docs|legal-search/frontend/docs)/.*\.md$
+
+      - id: check-mermaid-render
+        name: Check Mermaid diagrams render
+        entry: npm run --silent check:mermaid
+        language: system
+        pass_filenames: false
+        files: ^(docs|legal-search/frontend/docs)/.*\.md$
 
       - id: legal-search-check
         name: Legal Search checks (typecheck + lint + test)
