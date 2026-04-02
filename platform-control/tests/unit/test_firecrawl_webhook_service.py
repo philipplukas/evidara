@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -24,9 +25,13 @@ from platform_control.services.firecrawl_webhook_service import FirecrawlWebhook
 class CollectingPublisher(RawArtifactPublisher):
     def __init__(self) -> None:
         self.published_ids: list[str] = []
+        self.bundle_events: list[dict[str, object]] = []
 
     async def publish_raw_artifact_available(self, artifact: RawArtifact) -> None:
         self.published_ids.append(artifact.artifact_id)
+
+    async def publish_artifact_bundle_available(self, event: dict[str, object]) -> None:
+        self.bundle_events.append(event)
 
 
 @pytest.mark.asyncio
@@ -73,7 +78,7 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
     session.add_all([source, source_version, run, provider_job])
     await session.commit()
 
-    payload = {
+    crawl_page_payload = {
         "type": "crawl.page",
         "id": "crawl_123",
         "data": {
@@ -88,12 +93,12 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
             },
         },
     }
-    raw_body = json.dumps(payload, sort_keys=True).encode("utf-8")
-    signature = (
+    page_body = json.dumps(crawl_page_payload, sort_keys=True).encode("utf-8")
+    page_signature = (
         "sha256="
         + hmac.new(
             b"test-secret",
-            raw_body,
+            page_body,
             digestmod=hashlib.sha256,
         ).hexdigest()
     )
@@ -106,12 +111,53 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
         webhook_secret="test-secret",
     )
 
-    await service.process(payload=payload, raw_body=raw_body, signature=signature)
-    await service.process(payload=payload, raw_body=raw_body, signature=signature)
+    await service.process(payload=crawl_page_payload, raw_body=page_body, signature=page_signature)
+    await service.process(payload=crawl_page_payload, raw_body=page_body, signature=page_signature)
+
+    crawl_completed_payload = {"type": "crawl.completed", "id": "crawl_123", "data": {}}
+    completed_body = json.dumps(crawl_completed_payload, sort_keys=True).encode("utf-8")
+    completed_signature = (
+        "sha256="
+        + hmac.new(
+            b"test-secret",
+            completed_body,
+            digestmod=hashlib.sha256,
+        ).hexdigest()
+    )
+    await service.process(
+        payload=crawl_completed_payload,
+        raw_body=completed_body,
+        signature=completed_signature,
+    )
 
     receipt_count = await session.scalar(select(func.count()).select_from(WebhookReceipt))
     artifact_count = await session.scalar(select(func.count()).select_from(RawArtifact))
 
-    assert receipt_count == 1
+    assert receipt_count == 2
     assert artifact_count == 1
     assert publisher.published_ids
+    assert publisher.bundle_events
+    bundle_event = publisher.bundle_events[0]
+    payload = bundle_event["payload"]  # type: ignore[index]
+    manifest_storage_ref = payload["bundle_manifest_ref"]["storage_ref"]  # type: ignore[index]
+    assert bundle_event["event_type"] == "artifact_bundle.available"
+    assert payload["provenance"]["run_id"] == "run_seed"  # type: ignore[index]
+    assert str(manifest_storage_ref["uri"]).startswith("file://")  # type: ignore[index]
+
+
+def test_storage_ref_marks_uri_hash_when_checksum_is_unavailable() -> None:
+    artifact = RawArtifact(
+        artifact_id="art_123",
+        run_id="run_123",
+        source_id="src_123",
+        source_version_id="sv_123",
+        storage_path="gs://bucket/path/art_123.json",
+        content_type="application/json",
+        artifact_metadata={},
+        created_at=datetime(2026, 4, 2, 12, 0, tzinfo=UTC),
+    )
+
+    storage_ref = FirecrawlWebhookService._build_storage_ref_for_artifact(artifact)
+
+    assert storage_ref["checksum_algorithm"] == "uri-hash"
+    assert len(str(storage_ref["checksum"])) == 64

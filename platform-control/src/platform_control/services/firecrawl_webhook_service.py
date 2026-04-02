@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -10,12 +11,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.domain import ProviderJobStatus, RunStatus
 from platform_control.errors import SignatureVerificationError
+from platform_control.events.artifact_bundle import (
+    build_artifact_bundle_available_event,
+    build_artifact_bundle_manifest,
+)
 from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.ids import generate_prefixed_id
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
+from platform_control.models.source import Source
+from platform_control.models.source_version import SourceVersion
 from platform_control.models.webhook_receipt import WebhookReceipt
 from platform_control.services.artifact_store import ArtifactStore
 
@@ -164,6 +171,7 @@ class FirecrawlWebhookService:
             provider_job.status = ProviderJobStatus.COMPLETED
             run.status = RunStatus.COMPLETED
             run.completed_at = datetime.now(UTC)
+            await self._publish_bundle_manifest(run)
             return
 
         if event_type == "crawl.failed":
@@ -185,3 +193,131 @@ class FirecrawlWebhookService:
             or page.get("content_type")
             or "text/html"
         )
+
+    async def _publish_bundle_manifest(self, run: Run) -> None:
+        artifacts = list(
+            await self.session.scalars(
+                select(RawArtifact)
+                .where(RawArtifact.run_id == run.run_id)
+                .order_by(RawArtifact.created_at.asc())
+            )
+        )
+        if not artifacts:
+            return
+
+        source = await self.session.get(Source, run.source_id)
+        source_version = await self.session.get(SourceVersion, run.source_version_id)
+        if source is None or source_version is None:
+            return
+
+        source_snapshot_id = generate_prefixed_id("snap")
+        bundle_manifest_id = generate_prefixed_id("abm")
+        upstream_locator = self._upstream_locator(artifacts[0].artifact_metadata)
+
+        manifest_artifacts: list[dict[str, Any]] = []
+        for index, artifact in enumerate(artifacts):
+            if artifact.content_type.startswith("application/json"):
+                role = "metadata"
+            elif index == 0:
+                role = "primary_document"
+            else:
+                role = "attachment"
+            manifest_artifacts.append(
+                {
+                    "artifact_id": artifact.artifact_id,
+                    "artifact_role": role,
+                    "storage_ref": self._build_storage_ref_for_artifact(artifact),
+                }
+            )
+
+        acquisition_spec = source_version.acquisition_spec or {}
+        tenant_id = str(acquisition_spec.get("tenant_id") or "tenant_public")
+        corpus_id = str(acquisition_spec.get("corpus_id") or f"corpus_{source.jurisdiction_id}")
+        scope_type = str(acquisition_spec.get("scope_type") or "global_public")
+        source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
+        trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
+
+        manifest = build_artifact_bundle_manifest(
+            bundle_manifest_id=bundle_manifest_id,
+            source_snapshot_id=source_snapshot_id,
+            source_id=source.source_id,
+            source_version_id=source_version.source_version_id,
+            run_id=run.run_id,
+            jurisdiction_id=source.jurisdiction_id,
+            authority_id=source.authority_id,
+            upstream_locator=upstream_locator,
+            artifacts=manifest_artifacts,
+            tenant_id=tenant_id,
+            corpus_id=corpus_id,
+            scope_type=scope_type,
+            source_origin_kind=source_origin_kind,
+            trust_tier=trust_tier,
+            language_codes=acquisition_spec.get("language_codes") or [],
+            document_type_hint=acquisition_spec.get("document_type_hint"),
+            snapshot_captured_at=run.completed_at or datetime.now(UTC),
+        )
+        manifest_storage_ref = await self.artifact_store.store_bundle_manifest(
+            run_id=run.run_id,
+            bundle_manifest_id=bundle_manifest_id,
+            payload=manifest,
+        )
+        manifest_ref = {
+            "manifest_id": bundle_manifest_id,
+            "manifest_type": "artifact_bundle_manifest",
+            "manifest_version": 1,
+            "storage_ref": manifest_storage_ref,
+        }
+        event = build_artifact_bundle_available_event(
+            bundle_manifest_id=bundle_manifest_id,
+            source_snapshot_id=source_snapshot_id,
+            source_origin_kind=source_origin_kind,
+            trust_tier=trust_tier,
+            provenance=manifest["provenance"],
+            bundle_manifest_ref=manifest_ref,
+            correlation_id=run.run_id,
+            occurred_at=run.completed_at or datetime.now(UTC),
+        )
+        await self.publisher.publish_artifact_bundle_available(event)
+
+    @staticmethod
+    def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:
+        metadata = artifact_metadata.get("metadata", {})
+        return str(
+            artifact_metadata.get("url")
+            or metadata.get("sourceURL")
+            or metadata.get("url")
+            or "https://unknown.local/resource"
+        )
+
+    @staticmethod
+    def _build_storage_ref_for_artifact(artifact: RawArtifact) -> dict[str, Any]:
+        uri = artifact.storage_path
+        byte_size = int(artifact.artifact_metadata.get("byte_size") or 0)
+        checksum = str(artifact.artifact_metadata.get("checksum") or "")
+        checksum_algorithm = str(artifact.artifact_metadata.get("checksum_algorithm") or "sha256")
+
+        if "://" not in uri:
+            file_path = Path(uri).resolve()
+            uri = f"file://{file_path}"
+            if file_path.exists():
+                hasher = hashlib.sha256()
+                byte_size = 0
+                with file_path.open("rb") as handle:
+                    while chunk := handle.read(65536):
+                        byte_size += len(chunk)
+                        hasher.update(chunk)
+                checksum = hasher.hexdigest()
+                checksum_algorithm = "sha256"
+
+        if not checksum:
+            checksum = hashlib.sha256(uri.encode("utf-8")).hexdigest()
+            checksum_algorithm = "uri-hash"
+
+        return {
+            "uri": uri,
+            "content_type": artifact.content_type,
+            "byte_size": byte_size,
+            "checksum": checksum,
+            "checksum_algorithm": checksum_algorithm,
+            "created_at": artifact.created_at.isoformat(),
+        }

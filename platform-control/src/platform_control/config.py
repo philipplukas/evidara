@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     raw_artifact_local_dir: Path = Field(default=Path(".data/raw-artifacts"))
     event_publisher_backend: Literal["noop", "pubsub"] = "noop"
     raw_artifact_pubsub_topic: str = "raw-artifact-available"
+    artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
 
 
 @lru_cache
