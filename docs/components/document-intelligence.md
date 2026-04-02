@@ -19,6 +19,7 @@ See [Document Intelligence Implementation Plan](document-intelligence-implementa
 - Unity Catalog lineage for DI-internal job, table, and published-surface lineage
 - Processing logic in Databricks workflows
 - `contracts/schemas/document.schema.json`, `contracts/schemas/section.schema.json`, and `contracts/schemas/processing-manifest.schema.json`
+- **Document Service (read API):** `contracts/api/document-intelligence.openapi.yaml` — Docling full / lean / plain text over HTTPS (ADR-0010)
 
 ## Responsibilities
 
