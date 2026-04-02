@@ -149,6 +149,7 @@ class ContractSchemaValidationTests(unittest.TestCase):
             "artifact-bundle-manifest.json": "schemas/artifact-bundle-manifest.schema.json",
             "document-processed.json": "events/document-processed.schema.json",
             "document-processing-status-updated.json": "events/document-processing-status-updated.schema.json",
+            "document-withdrawn.json": "events/document-withdrawn.schema.json",
             "processing-manifest.json": "schemas/processing-manifest.schema.json",
         }
 
@@ -162,6 +163,9 @@ class ContractSchemaValidationTests(unittest.TestCase):
     def test_builds_validator_with_local_refs_only(self) -> None:
         validator = build_contract_validator("events/document-processed.schema.json")
         validator.validate(load_contract_example("document-processed.json"))
+
+        withdrawn_validator = build_contract_validator("events/document-withdrawn.schema.json")
+        withdrawn_validator.validate(load_contract_example("document-withdrawn.json"))
 
 
 if __name__ == "__main__":
