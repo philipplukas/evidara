@@ -1,0 +1,140 @@
+/**
+ * ResultList — Component Tests
+ *
+ * WHY THESE TESTS EXIST:
+ * ResultList orchestrates the result cards, empty states, and pagination.
+ * If it fails, users see nothing after searching.
+ *
+ * WHAT WE TEST:
+ * - Shows "no results" empty state
+ * - Shows "start searching" state when no query
+ * - Renders result count and cards
+ * - Shows "Load more" button when results exceed PAGE_SIZE
+ * - Loading state shows spinner
+ */
+
+import { fireEvent, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { ResultList } from "@/components/results/ResultList";
+import type { SearchResultViewModel } from "@/lib/types";
+import { renderWithProviders } from "./helpers/render-with-providers";
+
+function makeResults(count: number): SearchResultViewModel[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `r-${i}`,
+    title: `Result ${i + 1}`,
+    subtitle: "Subtitle",
+    snippet: "Snippet text",
+    type: "law",
+    badges: [{ label: "Law", colorKey: "blue" }],
+    metadataRows: [],
+    relatedCounts: [],
+    actions: [],
+  }));
+}
+
+describe("ResultList", () => {
+  it("shows contextual empty state when query is provided", () => {
+    renderWithProviders(
+      <ResultList
+        results={[]}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+        query="nonexistent"
+      />,
+    );
+
+    expect(screen.getByText(/No results for/)).toBeInTheDocument();
+  });
+
+  it("shows start-searching state when no query", () => {
+    renderWithProviders(
+      <ResultList
+        results={[]}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+      />,
+    );
+
+    expect(screen.getByText("Start searching")).toBeInTheDocument();
+  });
+
+  it("shows loading spinner when isLoading", () => {
+    renderWithProviders(
+      <ResultList
+        results={[]}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+        isLoading
+      />,
+    );
+
+    expect(screen.getByText("Searching…")).toBeInTheDocument();
+  });
+
+  it("renders result count and cards", () => {
+    renderWithProviders(
+      <ResultList
+        results={makeResults(3)}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+      />,
+    );
+
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Result 1")).toBeInTheDocument();
+    expect(screen.getByText("Result 2")).toBeInTheDocument();
+    expect(screen.getByText("Result 3")).toBeInTheDocument();
+  });
+
+  it("shows Load more button when results exceed page size", () => {
+    renderWithProviders(
+      <ResultList
+        results={makeResults(15)}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+      />,
+    );
+
+    expect(screen.getByText("Load more results")).toBeInTheDocument();
+    expect(screen.getByText("(5 remaining)")).toBeInTheDocument();
+    // Only first 10 visible
+    expect(screen.getByText("Result 1")).toBeInTheDocument();
+    expect(screen.getByText("Result 10")).toBeInTheDocument();
+    expect(screen.queryByText("Result 11")).not.toBeInTheDocument();
+  });
+
+  it("loads more results when button is clicked", () => {
+    renderWithProviders(
+      <ResultList
+        results={makeResults(15)}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Load more results"));
+    expect(screen.getByText("Result 11")).toBeInTheDocument();
+    expect(screen.getByText("Result 15")).toBeInTheDocument();
+    // No more "Load more" button
+    expect(screen.queryByText("Load more results")).not.toBeInTheDocument();
+  });
+});

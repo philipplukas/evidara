@@ -91,10 +91,17 @@ Central documentation including architecture, ADRs, onboarding, runbooks, and co
 
 ## Deployment Topology
 
-| Component | Primary Runtime | Storage |
-|-----------|----------------|---------|
-| platform-control | Cloud Run (GCP) | Cloud SQL (Postgres) |
-| document-intelligence | Databricks | Delta tables, Cloud Storage |
-| legal-search | Cloud Run (GCP) | OpenSearch |
-| contracts | Build-time only | N/A |
-| infra | Terraform | N/A |
+| Component | Primary Runtime | Language | Storage |
+|-----------|----------------|----------|---------|
+| platform-control | Cloud Run (GCP) | Python / FastAPI | Cloud SQL (Postgres) |
+| document-intelligence | Databricks | Python | Delta tables, Cloud Storage |
+| legal-search (frontend) | Cloud Run (GCP) | TypeScript / Next.js | — |
+| legal-search (api) | Cloud Run (GCP) | TypeScript / NestJS | OpenSearch |
+| contracts | Build-time only | — | N/A |
+| infra | Terraform | HCL | N/A |
+
+### Ops UI
+
+| Tool | Purpose |
+|------|---------|
+| Retool | Internal ops UI for operators — connects to platform-control API and directly to Postgres for read views |

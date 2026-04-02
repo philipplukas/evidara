@@ -3,7 +3,7 @@ evidara
 monorepo
 OpenSearch
 OpenAPI
-BFF
+FastAPI
 NestJS
 Databricks
 Terraform
@@ -30,6 +30,7 @@ HTML
 JSON
 MVP
 NestJS
+ORM
 PDF
 PR
 PRs
@@ -68,3 +69,13 @@ webhook
 webhooks
 autolayout
 canonicalize
+Pydantic
+Alembic
+SQLAlchemy
+Retool
+Ruff
+pyproject
+Testcontainers
+uv
+pytest
+fastapi

@@ -1,0 +1,54 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { type RenderOptions, render } from "@testing-library/react";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
+import type { ReactElement, ReactNode } from "react";
+import { searchResults } from "@/lib/mock-data";
+import { SearchConstraintsProvider } from "@/lib/search-constraints-store";
+import type { SearchResultViewModel } from "@/lib/types";
+import { WorkspaceProvider } from "@/lib/workspace-store";
+
+interface ProviderOptions {
+  initialQuery?: string;
+  initialResults?: SearchResultViewModel[];
+  /** URL search params to initialize nuqs with, e.g. { item: "law-1", tab: "related" } */
+  searchParams?: Record<string, string>;
+}
+
+/**
+ * Wraps a component in all required providers for testing:
+ * - NuqsTestingAdapter (URL state)
+ * - QueryClientProvider (React Query)
+ * - WorkspaceProvider (workspace state)
+ * - SearchConstraintsProvider (filter state)
+ */
+export function renderWithProviders(
+  ui: ReactElement,
+  options?: ProviderOptions & Omit<RenderOptions, "wrapper">,
+) {
+  const {
+    initialQuery = "Art 754 OR",
+    initialResults = searchResults,
+    searchParams = {},
+    ...renderOptions
+  } = options ?? {};
+
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <NuqsTestingAdapter searchParams={searchParams}>
+        <QueryClientProvider client={queryClient}>
+          <SearchConstraintsProvider>
+            <WorkspaceProvider initialResults={initialResults} initialQuery={initialQuery}>
+              {children}
+            </WorkspaceProvider>
+          </SearchConstraintsProvider>
+        </QueryClientProvider>
+      </NuqsTestingAdapter>
+    );
+  }
+
+  return render(ui, { wrapper: Wrapper, ...renderOptions });
+}
