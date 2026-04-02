@@ -128,6 +128,92 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
         assert statuses_body["data"][0]["status"] == "canonical_ready"
         assert statuses_body["data"][0]["processing_manifest_id"] == "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
 
+        processed_event_response = await client.post(
+            "/v1/di/events/document-processed",
+            json={
+                "event_type": "document.processed",
+                "event_version": 1,
+                "event_id": "evt_processed_smoke_1",
+                "occurred_at": "2026-04-02T12:00:02Z",
+                "producer": "document-intelligence",
+                "correlation_id": run_id,
+                "payload": {
+                    "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+                    "document_revision": 3,
+                    "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+                    "processing_version": "di_2026_03_29",
+                    "provenance": {
+                        "tenant_id": "tenant_public",
+                        "corpus_id": "corpus_public_ch_federal_law",
+                        "scope_type": "global_public",
+                        "source_id": source_id,
+                        "source_version_id": source_version_id,
+                        "run_id": run_id,
+                        "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+                        "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+                    },
+                    "lifecycle_status": "active",
+                    "published_document_ref": {
+                        "surface_name": "published_documents",
+                        "surface_version": 1,
+                    },
+                    "published_sections_ref": {
+                        "surface_name": "published_sections",
+                        "surface_version": 1,
+                    },
+                    "processing_manifest_ref": {
+                        "manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+                        "manifest_type": "processing_manifest",
+                        "manifest_version": 1,
+                        "dataset_ref": {
+                            "surface_name": "processing_manifests",
+                            "surface_version": 1,
+                        },
+                    },
+                    "supersedes_processing_manifest_id": None,
+                },
+            },
+        )
+        assert processed_event_response.status_code == 202
+
+        withdrawn_event_response = await client.post(
+            "/v1/di/events/document-withdrawn",
+            json={
+                "event_type": "document.withdrawn",
+                "event_version": 1,
+                "event_id": "evt_withdrawn_smoke_1",
+                "occurred_at": "2026-04-02T12:00:03Z",
+                "producer": "document-intelligence",
+                "correlation_id": run_id,
+                "payload": {
+                    "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+                    "document_revision": 4,
+                    "processing_manifest_id": "pm_01jq7cacd0zdw8r9nm7j7n6cnp",
+                    "provenance": {
+                        "tenant_id": "tenant_public",
+                        "corpus_id": "corpus_public_ch_federal_law",
+                        "scope_type": "global_public",
+                        "source_id": source_id,
+                        "source_version_id": source_version_id,
+                        "run_id": run_id,
+                        "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+                        "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+                    },
+                    "reason_code": "operator_withdrawn",
+                    "reason_summary": "Operator withdrew this revision.",
+                    "search_disposition": "remove",
+                },
+            },
+        )
+        assert withdrawn_event_response.status_code == 202
+
+        lifecycle_response = await client.get(f"/v1/runs/{run_id}/document-lifecycle")
+        assert lifecycle_response.status_code == 200
+        lifecycle_body = lifecycle_response.json()
+        assert len(lifecycle_body["data"]) == 2
+        assert lifecycle_body["data"][0]["event_type"] == "document.withdrawn"
+        assert lifecycle_body["data"][1]["event_type"] == "document.processed"
+
         invalid_failed_response = await client.post(
             "/v1/di/events/document-processing-status-updated",
             json={
@@ -136,6 +222,7 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
                 "event_id": "evt_status_smoke_invalid",
                 "occurred_at": "2026-04-02T12:00:01Z",
                 "producer": "document-intelligence",
+                "correlation_id": run_id,
                 "payload": {
                     "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8d",
                     "provenance": {

@@ -1,3 +1,9 @@
+from platform_control.schemas.document_events import (
+    DocumentLifecycleEventListResponse,
+    DocumentLifecycleEventResponse,
+    DocumentProcessedEvent,
+    DocumentWithdrawnEvent,
+)
 from platform_control.schemas.health import HealthResponse
 from platform_control.schemas.processing_status import (
     DocumentProcessingStatusUpdatedEvent,
@@ -20,7 +26,11 @@ __all__ = [
     "CreateRunRequest",
     "CreateSourceRequest",
     "CreateSourceVersionRequest",
+    "DocumentLifecycleEventListResponse",
+    "DocumentLifecycleEventResponse",
     "DocumentProcessingStatusUpdatedEvent",
+    "DocumentProcessedEvent",
+    "DocumentWithdrawnEvent",
     "EventAcceptedResponse",
     "FirecrawlAcquisitionSpec",
     "HealthResponse",

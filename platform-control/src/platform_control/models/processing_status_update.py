@@ -17,7 +17,11 @@ class ProcessingStatusUpdate(TimestampMixin, Base):
     processing_manifest_id: Mapped[str] = mapped_column(index=True)
     processing_version: Mapped[str] = mapped_column()
     status: Mapped[ProcessingStatus] = mapped_column(
-        Enum(ProcessingStatus, native_enum=False),
+        Enum(
+            ProcessingStatus,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         default=ProcessingStatus.ACCEPTED,
     )
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

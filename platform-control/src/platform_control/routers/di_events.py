@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
+from platform_control.schemas.document_events import (
+    DocumentProcessedEvent,
+    DocumentWithdrawnEvent,
+)
 from platform_control.schemas.processing_status import (
     DocumentProcessingStatusUpdatedEvent,
     EventAcceptedResponse,
@@ -25,4 +29,32 @@ async def receive_document_processing_status_updated(
 ) -> EventAcceptedResponse:
     service = ProcessingStatusService(session)
     await service.record_document_processing_status(event)
+    return EventAcceptedResponse()
+
+
+@router.post(
+    "/document-processed",
+    response_model=EventAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def receive_document_processed(
+    event: DocumentProcessedEvent,
+    session: SessionDep,
+) -> EventAcceptedResponse:
+    service = ProcessingStatusService(session)
+    await service.record_document_processed(event)
+    return EventAcceptedResponse()
+
+
+@router.post(
+    "/document-withdrawn",
+    response_model=EventAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def receive_document_withdrawn(
+    event: DocumentWithdrawnEvent,
+    session: SessionDep,
+) -> EventAcceptedResponse:
+    service = ProcessingStatusService(session)
+    await service.record_document_withdrawn(event)
     return EventAcceptedResponse()

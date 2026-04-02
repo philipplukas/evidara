@@ -49,3 +49,22 @@ class ProcessingStatus(StrEnum):
     FAILED = "failed"
     WITHDRAWN = "withdrawn"
     SKIPPED_DUPLICATE = "skipped_duplicate"
+
+
+class DocumentLifecycleStatus(StrEnum):
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    REPEALED = "repealed"
+    WITHDRAWN = "withdrawn"
+
+
+class DocumentWithdrawalReason(StrEnum):
+    DUPLICATE = "duplicate"
+    INVALID_SOURCE = "invalid_source"
+    RIGHTS_RESTRICTED = "rights_restricted"
+    OPERATOR_WITHDRAWN = "operator_withdrawn"
+
+
+class SearchDisposition(StrEnum):
+    REMOVE = "remove"
+    HIDE = "hide"
