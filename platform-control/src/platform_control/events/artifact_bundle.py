@@ -59,9 +59,7 @@ def build_artifact_bundle_manifest(
                 {
                     content_type
                     for artifact in artifacts
-                    if (
-                        content_type := artifact.get("storage_ref", {}).get("content_type")
-                    )
+                    if (content_type := artifact.get("storage_ref", {}).get("content_type"))
                 }
             ),
             "preferred_primary_artifact_roles": ["primary_document"],
