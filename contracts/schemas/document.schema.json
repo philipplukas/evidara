@@ -2,115 +2,94 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://evidara.dev/schemas/document",
   "title": "Document",
-  "description": "Canonical published document entity produced by document-intelligence. Represents one logical document revision within a corpus.",
+  "description": "Canonical document entity produced by document-intelligence. Represents a single legal or regulatory document.",
   "type": "object",
   "required": [
     "document_id",
-    "document_revision",
-    "processing_manifest_id",
-    "provenance",
-    "primary_artifact_id",
+    "artifact_id",
+    "source_id",
+    "run_id",
     "title",
-    "processed_at",
-    "processing_version",
-    "lifecycle_status",
-    "full_text",
-    "body_text"
+    "processed_at"
   ],
   "properties": {
     "document_id": {
       "type": "string",
-      "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$",
-      "description": "Stable logical document identifier."
+      "description": "Unique identifier for the canonical document. Format: doc_{ulid}",
+      "pattern": "^doc_[a-zA-Z0-9]+$"
     },
-    "document_revision": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Monotonic canonical revision number for this document within the corpus."
-    },
-    "processing_manifest_id": {
+    "artifact_id": {
       "type": "string",
-      "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$",
-      "description": "Immutable processing result that produced this canonical revision."
+      "description": "ID of the raw artifact this document was derived from.",
+      "pattern": "^art_[a-zA-Z0-9]+$"
     },
-    "provenance": {
-      "$ref": "https://evidara.dev/common/provenance"
-    },
-    "primary_artifact_id": {
+    "source_id": {
       "type": "string",
-      "pattern": "^art_[0-9a-hjkmnp-tv-z]{26}$",
-      "description": "Primary artifact chosen as the anchor for this document revision."
+      "description": "ID of the source. Carried through for lineage.",
+      "pattern": "^src_[a-zA-Z0-9]+$"
     },
-    "jurisdiction_id": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "pattern": "^jur_[a-z0-9_]+$",
-      "description": "Resolved canonical jurisdiction reference."
+    "source_version_id": {
+      "type": "string",
+      "description": "ID of the source version. Carried through for lineage.",
+      "pattern": "^sv_[a-zA-Z0-9]+$"
     },
-    "authority_id": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "pattern": "^auth_[a-z0-9_]+$",
-      "description": "Resolved canonical issuing authority reference."
+    "run_id": {
+      "type": "string",
+      "description": "ID of the run that produced the raw artifact.",
+      "pattern": "^run_[a-zA-Z0-9]+$"
     },
     "title": {
       "type": "string",
-      "description": "Resolved canonical title."
+      "description": "Title of the document."
+    },
+    "content": {
+      "type": "string",
+      "description": "Full text content of the document, if extracted."
+    },
+    "content_type": {
+      "type": "string",
+      "description": "Original content type of the source artifact."
+    },
+    "content_docling": {
+      "type": "object",
+      "description": "Structured DoclingDocument JSON produced by the docling pipeline (ADR-0010). A first-class canonical artifact intended for downstream consumption."
+    },
+    "jurisdiction": {
+      "type": "string",
+      "description": "Jurisdiction the document belongs to. MUST use normalized values from contracts/vocabularies/jurisdiction.json (ISO 3166-1 alpha-2).",
+      "enum": ["CH", "AT", "DE", "LI"]
     },
     "document_type": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Resolved document type."
+      "type": "string",
+      "description": "Normalized document type classification. MUST use values from contracts/vocabularies/document-type.json. Upstream mapping of raw extraction labels to these values is required before canonical output.",
+      "enum": ["law", "decision", "commentary", "rechtssatz"]
+    },
+    "language": {
+      "type": "string",
+      "description": "Primary language of the document content. ISO 639-1 code.",
+      "pattern": "^[a-z]{2}$"
+    },
+    "structural_path": {
+      "type": "string",
+      "description": "Intrinsic document hierarchy as a delimited path (e.g., 'OR › Gesellschaftsrecht › Verantwortlichkeit'). Represents stable structural position derived from document analysis, not a UI artifact. May evolve to a structured array representation in the future."
     },
     "effective_date": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": "string",
       "format": "date",
-      "description": "Resolved effective date when known."
+      "description": "Date the document became effective, if applicable."
     },
     "processed_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp when this canonical revision became available."
+      "description": "ISO 8601 timestamp of when the document was processed."
     },
     "processing_version": {
       "type": "string",
-      "description": "Version of the DI pipeline that produced the revision."
-    },
-    "lifecycle_status": {
-      "type": "string",
-      "enum": [
-        "active",
-        "superseded",
-        "repealed",
-        "withdrawn"
-      ],
-      "description": "Document lifecycle state as exposed to downstream consumers."
-    },
-    "full_text": {
-      "type": "string",
-      "description": "Normalized full-document text, preserving material outside the main body where relevant."
-    },
-    "body_text": {
-      "type": "string",
-      "description": "Normalized body-only text intended for most retrieval and sectionization workflows."
+      "description": "Version of the processing pipeline that produced this document."
     },
     "metadata": {
       "type": "object",
-      "description": "Resolved canonical metadata and traceable low-risk metadata fields.",
-      "additionalProperties": true
-    },
-    "extensions": {
-      "type": "object",
-      "description": "Non-canonical extension area for narrowly scoped downstream-compatible additions.",
+      "description": "Additional processing metadata.",
       "additionalProperties": true
     }
   },

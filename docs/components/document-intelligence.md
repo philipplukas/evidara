@@ -6,7 +6,11 @@ Turn immutable artifact bundles into canonical structured document intelligence.
 
 ## Current state
 
-Contracts are defined, but the processing pipelines are not yet implemented.
+Initial implementation scaffolding now exists under `document-intelligence/`. The component now has a Python package skeleton, tolerant inbound event parsing, bundle-manifest and artifact loading for local files and `gs://`, minimal HTML and XML normalization with shared-IR section extraction, explicit published-surface definitions, an in-memory sink plus a Delta-backed sink, offline JSON Schema validation helpers, a Databricks runtime entrypoint, Databricks Asset Bundle files, a reusable Terraform module plus top-level Databricks stack and `dev` / `staging` / `prod` tfvars for Unity Catalog scaffolding, SQL/bootstrap assets for published-surface registration, and bundle/adapter/CLI tests for the first processing path.
+
+The production processing pipelines are still not fully implemented. Spark-native runtime wiring, CI/CD deployment integration for Terraform + Bundles, richer XML source-family coverage, citation extraction, jurisdiction resolution, and stricter final contract hardening are still pending.
+
+See [Document Intelligence Implementation Plan](document-intelligence-implementation-plan.md) for the planned architecture and phased delivery approach.
 
 ## Source of truth
 
@@ -38,9 +42,18 @@ Document-intelligence should lean on Databricks-native lineage for internal trac
 - [x] Define canonical `Document` schema
 - [x] Define canonical `Section` schema
 - [x] Define `ProcessingManifest` schema
-- [ ] Define initial Delta table schemas and published views
-- [ ] Define first Databricks workflow/job
+- [x] Land initial local Python scaffold under `document-intelligence/`
+- [x] Adapt the scaffold from the earlier single-artifact intake to `artifact_bundle.available` plus immutable bundle manifests
+- [x] Implement GCS-native bundle-manifest and artifact reads
+- [x] Implement Delta-backed canonical persistence and published-surface writes
+- [x] Implement `document.processing_status.updated` and `document.processed` emission against the settled contracts
+- [x] Add schema validation, golden bundles, and adapter/CLI tests
+- [x] Define initial published surface schemas explicitly
+- [x] Define first Databricks workflow/job scaffold
+- [x] Add Terraform and SQL/bootstrap scaffolding for Unity Catalog published-surface registration
+- [x] Add an XML-first second source family with RIS-style fixture coverage
 - [ ] Define source/jurisdiction profile registry
+- [ ] Harden HTML parsing and broaden source-family support deliberately
 
 ## Minimal v1 Outcome
 
@@ -88,8 +101,12 @@ See [Document Intelligence Testing](testing/document-intelligence-testing.md) fo
 Key tests:
 
 - Unit tests for parsing helpers and section construction
-- Schema validation for `Document`, `Section`, and `ProcessingManifest`
+- Offline JSON Schema validation for `Document`, `Section`, `ProcessingManifest`, and current event contracts
 - Golden document tests with representative bundles
+- GCS loader tests with stubbed storage client behavior
+- Delta sink tests with real local Delta tables
+- CLI smoke test for bundle processing
+- Databricks runtime wrapper and bundle-config tests
 - Invariant checks on provenance, revisions, and section ordering
 - One minimal end-to-end processing path
 

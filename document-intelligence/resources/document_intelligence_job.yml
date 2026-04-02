@@ -1,0 +1,28 @@
+resources:
+  jobs:
+    document_intelligence_process_bundle:
+      name: document-intelligence-process-bundle
+      queue:
+        enabled: true
+      parameters:
+        - name: event_path
+          default: ""
+        - name: processing_version
+          default: ${var.processing_version}
+        - name: surfaces_root_uri
+          default: ${var.surfaces_root_uri}
+      tasks:
+        - task_key: process_bundle
+          python_wheel_task:
+            package_name: document-intelligence
+            entry_point: databricks_process_event
+            named_parameters:
+              event_path: "{{job.parameters.event_path}}"
+              processing_version: "{{job.parameters.processing_version}}"
+              surfaces_root_uri: "{{job.parameters.surfaces_root_uri}}"
+          libraries:
+            - whl: ./dist/*.whl
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: ${var.num_workers}

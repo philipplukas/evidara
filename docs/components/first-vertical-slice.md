@@ -23,6 +23,24 @@ The smallest end-to-end flow that proves the architecture works: a single source
 
 ## What Must Exist
 
+## Parallel execution tracks
+
+The vertical slice can progress in parallel with clear handoff boundaries:
+
+- **Track A — Platform Control handoff producer**
+  - deliver source/version/run and artifact registration
+  - emit `artifact_bundle.available`
+- **Track B — Document Intelligence processor**
+  - consume `artifact_bundle.available`
+  - publish canonical refs and emit `document.processed`
+- **Track C — Legal Search serving projection**
+  - consume `document.processed`
+  - upsert OpenSearch projection and expose search/detail
+- **Track D — Infra and runtime plumbing**
+  - provision buckets, topics/subscriptions, Cloud Run jobs/services, OpenSearch
+- **Track E — Contracts and compatibility**
+  - keep schema/event/OpenAPI compatibility checks green as tracks evolve
+
 ### platform-control
 
 - [ ] Source and corpus CRUD API
