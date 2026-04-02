@@ -51,8 +51,16 @@ describe('GET /v1/search', () => {
     expect(typeof res.body.totalResults).toBe('number');
   });
 
-  it('returns 200 when q is missing (pending strict query validation)', async () => {
-    await supertest(app.getHttpServer()).get('/v1/search').expect(200);
+  it('returns 400 when q is missing', async () => {
+    await supertest(app.getHttpServer()).get('/v1/search').expect(400);
+  });
+
+  it('returns 400 when page is below minimum', async () => {
+    await supertest(app.getHttpServer()).get('/v1/search?q=test&page=0').expect(400);
+  });
+
+  it('returns 400 when page_size exceeds maximum', async () => {
+    await supertest(app.getHttpServer()).get('/v1/search?q=test&page_size=101').expect(400);
   });
 });
 
