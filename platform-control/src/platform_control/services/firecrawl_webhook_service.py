@@ -216,9 +216,12 @@ class FirecrawlWebhookService:
 
         manifest_artifacts: list[dict[str, Any]] = []
         for index, artifact in enumerate(artifacts):
-            role = "primary_document" if index == 0 else "attachment"
             if artifact.content_type.startswith("application/json"):
                 role = "metadata"
+            elif index == 0:
+                role = "primary_document"
+            else:
+                role = "attachment"
             manifest_artifacts.append(
                 {
                     "artifact_id": artifact.artifact_id,
@@ -297,13 +300,18 @@ class FirecrawlWebhookService:
             file_path = Path(uri).resolve()
             uri = f"file://{file_path}"
             if file_path.exists():
-                payload = file_path.read_bytes()
-                byte_size = len(payload)
-                checksum = hashlib.sha256(payload).hexdigest()
+                hasher = hashlib.sha256()
+                byte_size = 0
+                with file_path.open("rb") as handle:
+                    while chunk := handle.read(65536):
+                        byte_size += len(chunk)
+                        hasher.update(chunk)
+                checksum = hasher.hexdigest()
                 checksum_algorithm = "sha256"
 
         if not checksum:
             checksum = hashlib.sha256(uri.encode("utf-8")).hexdigest()
+            checksum_algorithm = "uri-hash"
 
         return {
             "uri": uri,

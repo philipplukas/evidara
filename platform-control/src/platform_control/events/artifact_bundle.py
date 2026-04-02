@@ -56,7 +56,13 @@ def build_artifact_bundle_manifest(
         "parser_hints": {
             "expected_modalities": ["html"],
             "expected_content_types": sorted(
-                {artifact["storage_ref"]["content_type"] for artifact in artifacts}
+                {
+                    content_type
+                    for artifact in artifacts
+                    if (
+                        content_type := artifact.get("storage_ref", {}).get("content_type")
+                    )
+                }
             ),
             "preferred_primary_artifact_roles": ["primary_document"],
             "ocr_expected": False,

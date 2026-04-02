@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -142,3 +143,21 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
     assert bundle_event["event_type"] == "artifact_bundle.available"
     assert payload["provenance"]["run_id"] == "run_seed"  # type: ignore[index]
     assert str(manifest_storage_ref["uri"]).startswith("file://")  # type: ignore[index]
+
+
+def test_storage_ref_marks_uri_hash_when_checksum_is_unavailable() -> None:
+    artifact = RawArtifact(
+        artifact_id="art_123",
+        run_id="run_123",
+        source_id="src_123",
+        source_version_id="sv_123",
+        storage_path="gs://bucket/path/art_123.json",
+        content_type="application/json",
+        artifact_metadata={},
+        created_at=datetime(2026, 4, 2, 12, 0, tzinfo=UTC),
+    )
+
+    storage_ref = FirecrawlWebhookService._build_storage_ref_for_artifact(artifact)
+
+    assert storage_ref["checksum_algorithm"] == "uri-hash"
+    assert len(str(storage_ref["checksum"])) == 64
