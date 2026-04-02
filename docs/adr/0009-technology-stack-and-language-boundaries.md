@@ -28,7 +28,7 @@ Without explicit boundaries, the platform risks accumulating unnecessary languag
 | **legal-search frontend** | TypeScript | Next.js (React) | Shared types with BFF, SSR, rich interactivity |
 | **legal-search BFF** | TypeScript | NestJS / Node.js | Shared types with frontend, OpenAPI generation |
 | **platform-control API** | TypeScript | NestJS / Node.js / Cloud Run | Control-plane APIs, run orchestration, source management |
-| **platform-control workers** | Python | Cloud Run jobs | Provider SDKs, scraping, upstream fetching |
+| **platform-control workers** | Python | Cloud Run jobs or worker processes | Provider SDKs, scraping, and upstream fetching decoupled from API runtime |
 | **document-intelligence** | Python | Databricks (Spark) / local CLI | NLP/ML ecosystem, Docling, Delta Lake |
 | **OpenSearch indexing** | Python | Standalone job | Shared models with DI, Docling chunking |
 | **Infrastructure** | HCL | Terraform | Industry standard for GCP/Databricks |

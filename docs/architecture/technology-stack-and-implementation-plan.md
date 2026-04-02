@@ -34,7 +34,7 @@ This means the platform is intentionally polyglot, but only in a controlled way:
 - SQL for data modeling
 - HCL for infrastructure
 
-Do not add Scala, Java, Go, or another backend language in MVP unless a later ADR justifies it.
+Do not add Scala, Java, Go, Rust, or another backend language in MVP unless a later ADR justifies it.
 
 ## Architecture Principles
 
