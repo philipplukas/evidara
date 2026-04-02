@@ -50,6 +50,14 @@ Testing strategy for the platform-control component, which owns:
 - All required fields are present: `source_id`, `source_version_id`, `run_id`, `artifact_id`, `storage_path`, `content_type`
 - Fixture webhook payloads map to internal models without dropping required lineage fields
 
+### Event-Driven Tests Before Pub/Sub Hookup
+
+- Test the producer boundary through the publisher seam. Most workflow tests should run with a capture fake or no-op publisher instead of a live broker.
+- Unit-test the Pub/Sub adapter separately with a fake publisher client and assert the serialized envelope plus message attributes for the published handoff event.
+- For inbound events, call the application service directly or go through a thin HTTP ingress route if one exists. These tests should prove persistence, ordering, and idempotency without subscriptions.
+- Include duplicate-delivery, out-of-order delivery, unknown-run, and invalid-payload cases as normal consumer tests rather than waiting for broker wiring.
+- Add Pub/Sub emulator coverage later only for adapter and infrastructure confidence: topic resolution, publish permissions, subscription wiring, and local delivery expectations.
+
 ### Workflow Tests
 
 - Approval workflow: create source → create version → approve version
