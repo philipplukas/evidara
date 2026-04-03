@@ -50,9 +50,11 @@ async def test_health_endpoint_returns_200(session_maker) -> None:
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get("/health")
+        response = await client.get("/health", headers={"X-Correlation-Id": "corr_health_123"})
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
+        assert response.headers["X-Correlation-Id"] == "corr_health_123"
+        assert response.headers["X-Request-ID"] == "corr_health_123"
 
 
 @pytest.mark.asyncio

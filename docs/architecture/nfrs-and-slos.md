@@ -24,8 +24,8 @@ This page captures **platform-level** expectations for reliability and performan
 
 ## Observability
 
-- **Correlation IDs** — Propagate `X-Correlation-Id` (or equivalent) from edge → BFF → Document Service and log it consistently (see [ADR-0008](../adr/0008-nestjs-conventions-legal-search.md) for NestJS patterns).
-- **Structured logs** — JSON or key-value fields for `tenant_id`, `corpus_id`, `document_id`, `run_id` where applicable.
+- **Correlation IDs** — Standardize on `X-Correlation-Id` (while still accepting `X-Request-ID`) across `platform-control`, `legal-search/api`, and `document-intelligence` HTTP surfaces; always echo both headers in responses.
+- **Structured logs** — Emit request logs with stable fields (`service`, `method`, `path`, `status_code`, `duration_ms`, `correlation_id`) and include domain IDs (`tenant_id`, `corpus_id`, `document_id`, `run_id`) where applicable.
 - **Metrics** — Request rates, error rates, and latency histograms per service; pipeline job success/failure in Databricks.
 
 ## Review cadence

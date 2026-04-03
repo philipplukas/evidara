@@ -10,9 +10,11 @@ import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class CorrelationIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    const raw = req.headers['x-request-id'];
+    const raw = req.headers['x-correlation-id'] ?? req.headers['x-request-id'];
     const requestId = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : uuidv4();
     req.headers['x-request-id'] = requestId;
+    req.headers['x-correlation-id'] = requestId;
+    res.setHeader('X-Correlation-Id', requestId);
     res.setHeader('X-Request-ID', requestId);
     next();
   }
