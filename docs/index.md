@@ -8,22 +8,37 @@ Evidara is a document intelligence platform for legal research. It ingests raw l
 
 ## Platform Architecture
 
-```text
-┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────┐
-│   platform-control  │────▶│  document-intelligence   │────▶│  legal-search   │
-│                     │     │                          │     │                 │
-│  sources, versions  │     │  parsing, canonical      │     │  search, serve  │
-│  runs, approvals    │     │  truth in Delta          │     │  projections    │
-└────────┬────────────┘     └──────────┬───────────────┘     └────────┬────────┘
-         │                             │                              │
-         │         ┌───────────────────┘                              │
-         │         │                                                  │
-         ▼         ▼                                                  ▼
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │                          contracts                                  │
-    │    OpenAPI specs · JSON Schemas · Event schemas · Shared IDs        │
-    └──────────────────────────────────────────────────────────────────────┘
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart TB
+  subgraph PC["platform-control"]
+    P[Acquisition & ops]
+  end
+  subgraph DI["document-intelligence"]
+    D[Pipelines]
+    DS[Document Service]
+  end
+  subgraph LS["legal-search"]
+    UI[UI & BFF]
+    IDX[Search projection]
+  end
+  subgraph stores["Data & search"]
+    DL[("Delta Lake")]
+    OS[("OpenSearch")]
+  end
+
+  P -.->|Pub/Sub| D
+  D ==>|writes| DL
+  D -.->|events| UI
+  D -.->|events| IDX
+  UI -->|document detail| DS
+  DS ==>|published surfaces| DL
+  IDX ==>|projection| DL
+  UI -->|search| OS
+  IDX -->|index| OS
 ```
+
+Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `contracts/`. Detailed C4 views: `structurizr/workspace.dsl`.
 
 ## Quick links
 
@@ -34,8 +49,7 @@ Evidara is a document intelligence platform for legal research. It ingests raw l
 | [Components](components/legal-search.md) | Domain component documentation |
 | [Testing](testing/README.md) | Testing strategy and guides |
 | [Setup](setup/environment-strategy.md) | Development and deployment setup |
-| [CD Workflow Blueprint](setup/cd-workflow-blueprint.md) | GitHub Actions + environment plumbing blueprint |
-| [API Reference](api/legal-search.md) | OpenAPI interactive docs |
+| [API Reference](api/legal-search.md) | OpenAPI interactive docs (legal-search, document-intelligence, platform-control) |
 
 ## Repository structure
 

@@ -9,7 +9,7 @@ Provide the shared language between all Evidara components. Contracts define the
 Core v1 contract building blocks now exist:
 
 - shared envelope/ref schemas in `contracts/common/`
-- control-plane, search, and document-intelligence OpenAPI specs in `contracts/api/`
+- control-plane and search OpenAPI specs in `contracts/api/`
 - bundle, canonical, and processing schemas in `contracts/schemas/`
 - event schemas in `contracts/events/`
 - realistic examples in `contracts/examples/`

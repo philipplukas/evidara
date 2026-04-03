@@ -6,19 +6,9 @@ Own source lifecycle and operational control. Platform-control is the entry poin
 
 ## Current state
 
-Platform-control now has a running FastAPI service with persisted entities and migration-backed schemas for source lifecycle, runs, webhook receipts, raw artifacts, bundle manifests, and DI status/lifecycle event consumption. Core API endpoints are implemented for reference data, sources, versions, runs, preview-summary review, Firecrawl callbacks, and DI event ingest (`document.processing_status.updated`, `document.processed`, `document.withdrawn`) with run-scoped read surfaces.
+Platform-control now has a running FastAPI service with persisted entities and migration-backed schemas for source lifecycle, runs, webhook receipts, raw artifacts, bundle manifests, and DI status/lifecycle event consumption. Core API endpoints are implemented for sources, versions, runs, Firecrawl callbacks, and DI event ingest (`document.processing_status.updated`, `document.processed`, `document.withdrawn`) with run-scoped read surfaces.
 
 For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope_type` are frozen through source-version acquisition config and copied into bundle/event provenance. Run creation now also accepts explicit `scope` and `replay` metadata so partial reruns and backfills can be recorded on the control-plane side even though resumable frontier orchestration is still follow-on work. First-class corpus CRUD is still follow-on work.
-
-Repo-owned Retool control-panel artifacts now live under `platform-control/retool/`, including the
-control-panel manifest, direct-Postgres queries, preview workflow, and Source Setup Copilot prompt.
-
-Repo-owned Retool control-panel artifacts now live under `platform-control/retool/`, including the
-control-panel manifest, direct-Postgres queries, preview workflow, and Source Setup Copilot prompt.
-These artifacts are now historical reference material. The primary operator path is the
-code-managed admin app under `platform-control/admin`; see
-[Platform-Control React-Admin Migration](platform-control-react-admin-migration.md) and
-[ADR-0015](../adr/0015-control-plane-admin-frontend-strategy.md).
 
 See [Platform Control Implementation Plan](platform-control-implementation-plan.md) for the planned repo structure, worker layout, and phased delivery approach.
 
@@ -53,15 +43,12 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 - [x] Define OpenAPI spec (`contracts/api/platform-control.openapi.yaml`)
 - [x] Define `ArtifactBundleManifest` schema
 - [x] Create the initial `platform-control/` API scaffold
-- [x] Create the connector-worker scaffold under `platform-control/`
-- [x] Add operator read APIs for a code-managed admin frontend
-- [x] Scaffold `platform-control/admin`
+- [ ] Create the connector-worker scaffold under `platform-control/`
 - [~] Define run lifecycle and replay modes
   Current API support exists for `scope` and `replay` metadata on run creation, but resumable checkpoints/frontier orchestration are not implemented yet.
 - [x] Define approval states and transitions
 - [~] Define reference snapshot export mechanics for DI
-- [~] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
-- [~] Continue source setup ergonomics and richer preview-review guidance in the admin app
+- [ ] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
 
 ## Minimal v1 Outcome
 
@@ -77,7 +64,7 @@ A user can:
 
 | Phase | Capability |
 |-------|-----------|
-| Next | Source setup ergonomics and preview-review polish in `platform-control/admin` |
+| Next | Reference-data editing UI |
 | Next | Drift and repair workflows |
 | Later | AI-generated draft source versions |
 | Later | More granular source family support |
@@ -119,12 +106,10 @@ See [Platform Control Testing](testing/platform-control-testing.md) for the full
 Key tests:
 
 - Unit tests for run and approval state transitions
-- Unit tests for reference-data management and Firecrawl request mapping
 - Contract tests for `ArtifactBundleManifest`
 - Contract tests for `artifact_bundle.available`
 - Contract tests for consumed `document.processing_status.updated` values, including invalid-status handling
-- Smoke tests for health, preview success, preview summary, and failed preview handling
-- Integration test for Postgres webhook-dedupe behavior
+- Smoke test for one source family lifecycle
 
 ## Drift risks
 
