@@ -1,16 +1,44 @@
-# Local development services for legal-search.
+# Local development services for Evidara components.
 #
 # Usage:
-#   docker compose up -d          # Start OpenSearch
+#   docker compose up -d          # Start shared local infra
 #   docker compose down           # Stop
 #   docker compose down -v        # Stop + delete data
 #
-# After starting:
+# Included services:
+#   - OpenSearch for legal-search
+#   - Postgres for platform-control
+#
+# After starting platform-control dependencies:
+#   cd platform-control
+#   cp .env.example .env
+#   uv run alembic upgrade head
+#   uv run platform-control-seed-reference-data
+#   uv run uvicorn platform_control.main:app --reload --app-dir src
+#
+# After starting legal-search dependencies:
 #   cd legal-search/api
-#   npm run seed:index            # Seed data from OpenCaseLaw
-#   npm run dev                   # Start the API
+#   npm run seed:index
+#   npm run dev
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: evidara-platform-control-postgres
+    environment:
+      POSTGRES_DB: platform_control
+      POSTGRES_USER: platform_control
+      POSTGRES_PASSWORD: platform_control
+    ports:
+      - "5432:5432"
+    volumes:
+      - platform-control-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform_control -d platform_control"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   opensearch:
     image: opensearchproject/opensearch:2.17.1
     container_name: evidara-opensearch
@@ -45,4 +73,5 @@ services:
   #       condition: service_healthy
 
 volumes:
+  platform-control-postgres-data:
   opensearch-data:

@@ -296,6 +296,30 @@ paths:
           description: Invalid source version state transition
 
   /v1/runs:
+    get:
+      operationId: listRuns
+      summary: List preview and production runs for operator review
+      tags: [runs]
+      parameters:
+        - name: mode
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [preview, production]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, cancelled]
+      responses:
+        "200":
+          description: Runs matching the requested filters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunListResponse"
     post:
       operationId: createRun
       summary: Trigger a new preview or production run
@@ -332,6 +356,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Run"
+        "404":
+          description: Run not found
+
+  /v1/runs/{run_id}/captured-resources:
+    get:
+      operationId: listRunCapturedResources
+      summary: List captured resources recorded for a run
+      tags: [runs]
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/RunScopedListLimit"
+        - $ref: "#/components/parameters/RunScopedListOffset"
+      responses:
+        "200":
+          description: Captured resources for the run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapturedResourceListResponse"
+        "404":
+          description: Run not found
+
+  /v1/runs/{run_id}/raw-artifacts:
+    get:
+      operationId: listRunRawArtifacts
+      summary: List raw artifacts captured for a run
+      tags: [runs]
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/RunScopedListLimit"
+        - $ref: "#/components/parameters/RunScopedListOffset"
+      responses:
+        "200":
+          description: Raw artifacts for the run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawArtifactListResponse"
+        "404":
+          description: Run not found
+
+  /v1/runs/{run_id}/provider-jobs:
+    get:
+      operationId: listRunProviderJobs
+      summary: List provider job diagnostics for a run
+      tags: [runs]
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/RunScopedListLimit"
+        - $ref: "#/components/parameters/RunScopedListOffset"
+      responses:
+        "200":
+          description: Provider jobs for the run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderJobListResponse"
         "404":
           description: Run not found
 
@@ -544,6 +625,25 @@ components:
       schema:
         type: string
         pattern: "^run_[a-z0-9]+$"
+    RunScopedListLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return for this run-scoped list.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    RunScopedListOffset:
+      name: offset
+      in: query
+      required: false
+      description: Number of items to skip before returning results.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
 
   schemas:
     Jurisdiction:
@@ -988,6 +1088,266 @@ components:
           oneOf:
             - type: string
             - type: "null"
+
+    RunListItem:
+      type: object
+      description: >
+        Run summary row for operator list views. Omits scope/replay metadata, which is only
+        materialized on the full Run detail response.
+      required:
+        - run_id
+        - source_id
+        - source_version_id
+        - mode
+        - status
+        - artifacts_count
+        - captured_resources_count
+        - created_at
+        - updated_at
+        - source_name
+        - version_label
+      properties:
+        run_id:
+          type: string
+          pattern: "^run_[a-z0-9]+$"
+        source_id:
+          type: string
+          pattern: "^src_[a-z0-9]+$"
+        source_version_id:
+          type: string
+          pattern: "^sv_[a-z0-9]+$"
+        mode:
+          type: string
+          enum: [preview, production]
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        started_at:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        completed_at:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        artifacts_count:
+          type: integer
+        captured_resources_count:
+          type: integer
+        failure_reason:
+          oneOf:
+            - type: string
+            - type: "null"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        source_name:
+          type: string
+        version_label:
+          type: string
+
+    RunListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunListItem"
+
+    CapturedResource:
+      type: object
+      required:
+        - captured_resource_id
+        - run_id
+        - source_url
+        - final_url
+        - content_type
+        - fetched_at
+        - created_at
+        - updated_at
+      properties:
+        captured_resource_id:
+          type: string
+          pattern: "^cap_[a-z0-9]+$"
+        run_id:
+          type: string
+          pattern: "^run_[a-z0-9]+$"
+        source_url:
+          type: string
+          format: uri
+        final_url:
+          type: string
+          format: uri
+        title:
+          oneOf:
+            - type: string
+            - type: "null"
+        content_type:
+          type: string
+        http_status:
+          oneOf:
+            - type: integer
+            - type: "null"
+        discovery_depth:
+          oneOf:
+            - type: integer
+            - type: "null"
+        checksum:
+          oneOf:
+            - type: string
+            - type: "null"
+        fetched_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CapturedResourceListResponse:
+      type: object
+      required: [data, total, limit, offset]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapturedResource"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+
+    RawArtifact:
+      type: object
+      required:
+        - artifact_id
+        - run_id
+        - source_id
+        - source_version_id
+        - storage_path
+        - content_type
+        - artifact_metadata
+        - created_at
+        - updated_at
+      properties:
+        artifact_id:
+          type: string
+          pattern: "^art_[a-z0-9]+$"
+        run_id:
+          type: string
+          pattern: "^run_[a-z0-9]+$"
+        source_id:
+          type: string
+          pattern: "^src_[a-z0-9]+$"
+        source_version_id:
+          type: string
+          pattern: "^sv_[a-z0-9]+$"
+        storage_path:
+          type: string
+        content_type:
+          type: string
+        artifact_metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    RawArtifactListResponse:
+      type: object
+      required: [data, total, limit, offset]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RawArtifact"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+
+    ProviderJob:
+      type: object
+      required:
+        - provider_job_id
+        - run_id
+        - provider
+        - status
+        - request_payload
+        - response_payload
+        - created_at
+        - updated_at
+      properties:
+        provider_job_id:
+          type: string
+          pattern: "^pjob_[a-z0-9]+$"
+        run_id:
+          type: string
+          pattern: "^run_[a-z0-9]+$"
+        provider:
+          type: string
+        external_job_id:
+          oneOf:
+            - type: string
+            - type: "null"
+        status:
+          type: string
+          enum: [accepted, running, completed, failed]
+        last_event_type:
+          oneOf:
+            - type: string
+            - type: "null"
+        request_payload:
+          type: object
+          additionalProperties: true
+        response_payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProviderJobListResponse:
+      type: object
+      required: [data, total, limit, offset]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderJob"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
 
     CreateRunRequest:
       type: object

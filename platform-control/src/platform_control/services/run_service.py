@@ -14,11 +14,19 @@ from platform_control.errors import (
 )
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.provider_job import ProviderJob
+from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.schemas.run import (
+    CapturedResourceListResponse,
+    CapturedResourceResponse,
     CreateRunRequest,
+    ProviderJobListResponse,
+    ProviderJobResponse,
+    RawArtifactListResponse,
+    RawArtifactResponse,
+    RunListItemResponse,
     RunPreviewSummaryBreakdownEntry,
     RunPreviewSummaryDriftCheck,
     RunPreviewSummaryResponse,
@@ -47,6 +55,41 @@ class RunService:
         self.session = session
         self.provider = provider
         self.run_dispatch_backend = run_dispatch_backend
+
+    async def list_runs(
+        self,
+        *,
+        mode: RunMode | None = None,
+        status: RunStatus | None = None,
+    ) -> list[RunListItemResponse]:
+        query = (
+            select(
+                Run.run_id,
+                Run.source_id,
+                Run.source_version_id,
+                Run.mode,
+                Run.status,
+                Run.started_at,
+                Run.completed_at,
+                Run.artifacts_count,
+                Run.captured_resources_count,
+                Run.failure_reason,
+                Run.created_at,
+                Run.updated_at,
+                Source.name.label("source_name"),
+                SourceVersion.version_label.label("version_label"),
+            )
+            .join(Source, Source.source_id == Run.source_id)
+            .join(SourceVersion, SourceVersion.source_version_id == Run.source_version_id)
+            .order_by(Run.created_at.desc())
+        )
+        if mode is not None:
+            query = query.where(Run.mode == mode)
+        if status is not None:
+            query = query.where(Run.status == status)
+
+        rows = await self.session.execute(query)
+        return [RunListItemResponse.model_validate(dict(row._mapping)) for row in rows]
 
     async def create_run(self, request: CreateRunRequest) -> Run:
         source = await self.session.get(Source, request.source_id)
@@ -116,6 +159,74 @@ class RunService:
         if run is None:
             raise NotFoundError(f"Run not found: {run_id}")
         return run
+
+    async def list_captured_resources(
+        self,
+        run_id: str,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> CapturedResourceListResponse:
+        await self.get_run(run_id)
+        total_stmt = (
+            select(func.count())
+            .select_from(CapturedResource)
+            .where(CapturedResource.run_id == run_id)
+        )
+        total = int((await self.session.execute(total_stmt)).scalar_one())
+        result = await self.session.scalars(
+            select(CapturedResource)
+            .where(CapturedResource.run_id == run_id)
+            .order_by(CapturedResource.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        data = [CapturedResourceResponse.model_validate(resource) for resource in result]
+        return CapturedResourceListResponse(data=data, total=total, limit=limit, offset=offset)
+
+    async def list_raw_artifacts(
+        self,
+        run_id: str,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> RawArtifactListResponse:
+        await self.get_run(run_id)
+        total_stmt = (
+            select(func.count()).select_from(RawArtifact).where(RawArtifact.run_id == run_id)
+        )
+        total = int((await self.session.execute(total_stmt)).scalar_one())
+        result = await self.session.scalars(
+            select(RawArtifact)
+            .where(RawArtifact.run_id == run_id)
+            .order_by(RawArtifact.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        data = [RawArtifactResponse.model_validate(artifact) for artifact in result]
+        return RawArtifactListResponse(data=data, total=total, limit=limit, offset=offset)
+
+    async def list_provider_jobs(
+        self,
+        run_id: str,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> ProviderJobListResponse:
+        await self.get_run(run_id)
+        total_stmt = (
+            select(func.count()).select_from(ProviderJob).where(ProviderJob.run_id == run_id)
+        )
+        total = int((await self.session.execute(total_stmt)).scalar_one())
+        result = await self.session.scalars(
+            select(ProviderJob)
+            .where(ProviderJob.run_id == run_id)
+            .order_by(ProviderJob.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        data = [ProviderJobResponse.model_validate(job) for job in result]
+        return ProviderJobListResponse(data=data, total=total, limit=limit, offset=offset)
 
     async def cancel_run(self, run_id: str) -> Run:
         run = await self.get_run(run_id)

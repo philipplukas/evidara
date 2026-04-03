@@ -37,6 +37,12 @@ Testing strategy for the platform-control component, which owns:
 - Draft and rejected source versions can be edited, but approved versions cannot
 - Reference-data create/update flows validate linked jurisdictions
 
+#### Admin frontend tests
+
+- React-admin data-provider mappings stay aligned with operator read and action endpoints
+- Source setup helpers keep authority choices scoped to the selected jurisdiction
+- Preview-review helpers expose the expected run-review affordances without requiring browser e2e coverage
+
 #### Provider integration tests
 
 - Firecrawl request mapping preserves source, version, and run identity
@@ -112,7 +118,7 @@ These tests should answer:
 
 - Do not build comprehensive CRUD tests for every entity — focus on state transitions and boundaries
 - Do not test database query performance — correctness first
-- Do not build UI tests for Retool admin (it does not exist yet)
+- Do not overbuild browser-level admin UI tests yet — focused data-provider and helper tests are enough for this slice
 - Do not test every possible source configuration — test the schema validation, trust that the schema covers the rest
 - Do not build sophisticated source health monitoring — simple artifact count and content type checks are enough for MVP
 - Do not call live Firecrawl in CI — stub provider calls and use fixture webhook payloads instead

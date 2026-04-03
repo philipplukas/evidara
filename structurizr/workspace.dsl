@@ -27,6 +27,7 @@ workspace "Evidara" "Document intelligence platform for legal research" {
                 approvalWorkflow = component "Approval Workflow" "Manages approval state for source versions"
                 referenceData = component "Reference Data" "Jurisdictions, authorities, metadata"
             }
+            platformControlAdmin = container "platform-control-admin" "Internal control-plane admin UI for operators" "Cloud Run / Next.js + React-admin"
 
             # --- document-intelligence ---
             docIntelligence = container "document-intelligence" "Raw-to-canonical processing pipelines" "Databricks" {
@@ -59,13 +60,14 @@ workspace "Evidara" "Document intelligence platform for legal research" {
 
         # --- Relationships: People ---
         legalResearcher -> legalSearch "Searches and explores documents" "HTTPS"
-        operator -> platformControl "Manages sources and monitors runs" "HTTPS"
+        operator -> platformControlAdmin "Manages sources and monitors runs" "HTTPS"
 
         # --- Relationships: Platform flow ---
         legalSources -> platformControl "Provides raw legal artifacts"
         platformControl -> objectStorage "Stores raw artifacts and bundle manifests"
         platformControl -> pubSub "Publishes artifact bundle events"
         platformControl -> postgres "Persists source, run, approval state"
+        platformControlAdmin -> platformControl "Calls operator read and business APIs" "HTTPS / OpenAPI"
 
         pubSub -> docIntelligence "Delivers artifact bundle events"
         docIntelligence -> objectStorage "Reads raw artifacts and bundle manifests"

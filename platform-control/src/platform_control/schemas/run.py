@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from platform_control.domain import RunMode, RunReplayMode, RunScopeKind, RunStatus
+from platform_control.domain import (
+    ProviderJobStatus,
+    RunMode,
+    RunReplayMode,
+    RunScopeKind,
+    RunStatus,
+)
 
 
 class RunScopeRequest(BaseModel):
@@ -94,6 +101,94 @@ class RunResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RunListItemResponse(BaseModel):
+    run_id: str
+    source_id: str
+    source_version_id: str
+    mode: RunMode
+    status: RunStatus
+    started_at: datetime | None
+    completed_at: datetime | None
+    artifacts_count: int
+    captured_resources_count: int
+    failure_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    source_name: str
+    version_label: str
+
+
+class RunListResponse(BaseModel):
+    data: list[RunListItemResponse]
+
+
+class CapturedResourceResponse(BaseModel):
+    captured_resource_id: str
+    run_id: str
+    source_url: str
+    final_url: str
+    title: str | None
+    content_type: str
+    http_status: int | None
+    discovery_depth: int | None
+    checksum: str | None
+    fetched_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CapturedResourceListResponse(BaseModel):
+    data: list[CapturedResourceResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class RawArtifactResponse(BaseModel):
+    artifact_id: str
+    run_id: str
+    source_id: str
+    source_version_id: str
+    storage_path: str
+    content_type: str
+    artifact_metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RawArtifactListResponse(BaseModel):
+    data: list[RawArtifactResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class ProviderJobResponse(BaseModel):
+    provider_job_id: str
+    run_id: str
+    provider: str
+    external_job_id: str | None
+    status: ProviderJobStatus
+    last_event_type: str | None
+    request_payload: dict[str, Any]
+    response_payload: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProviderJobListResponse(BaseModel):
+    data: list[ProviderJobResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 class WebhookAcceptedResponse(BaseModel):

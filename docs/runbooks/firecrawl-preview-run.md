@@ -1,17 +1,19 @@
 # Firecrawl Preview Run
 
 Owner: Platform team
-Last reviewed: 2026-03-29
+Last reviewed: 2026-04-03
 Last verified: Not yet verified
 Applies to: dev, staging
 
 ## Purpose
 
-Run and troubleshoot a Firecrawl-backed preview for a source version. This runbook covers the v0 source setup flow in platform-control and Retool.
+Run and troubleshoot a Firecrawl-backed preview for a source version. The primary operator path is
+the code-managed admin app in `platform-control/admin`, with direct API calls as the fallback for
+debugging or automation.
 
 ## Prerequisites
 
-- [ ] Access to Retool and the platform-control API
+- [ ] Access to `platform-control/admin` or the platform-control API
 - [ ] Firecrawl API key configured for the target environment
 - [ ] GCS bucket configured for raw artifact storage
 - [ ] Firecrawl webhook secret configured in platform-control
@@ -22,7 +24,7 @@ Run and troubleshoot a Firecrawl-backed preview for a source version. This runbo
 
 ### 1. Confirm the source version is ready
 
-Use Retool or the API to confirm:
+Use `platform-control/admin` or the API to confirm:
 
 - the source exists
 - the source version exists
@@ -33,7 +35,8 @@ Use Retool or the API to confirm:
 
 ### 2. Trigger the preview run
 
-Trigger a preview run from Retool or `POST /v1/runs` using the approved source version.
+Trigger a preview run from the `Source Versions` section in `platform-control/admin` or with
+`POST /v1/runs` using the selected source version.
 
 **Expected output:** A `run_id` is created and enters a non-terminal state. In `inline` dispatch mode, a provider job record is attached immediately; in `worker` mode, run `platform-control-connector-worker` and confirm the provider job appears after dispatch.
 
@@ -49,7 +52,7 @@ Watch the run status and webhook logs for:
 
 ### 4. Verify artifact persistence
 
-Inspect the run in Retool or the database and confirm:
+Inspect the run in `platform-control/admin`, or query the API/database directly, and confirm:
 
 - at least one raw artifact was recorded
 - captured resources were created
@@ -78,7 +81,7 @@ How to confirm the procedure succeeded:
 - [ ] Raw artifacts exist for the run
 - [ ] Captured resources exist for the run
 - [ ] Duplicate webhook delivery does not create duplicate artifacts
-- [ ] Preview summary is visible to the operator in Retool
+- [ ] Preview summary is visible to the operator in `platform-control/admin`
 
 ## Rollback
 
@@ -101,7 +104,7 @@ If something goes wrong:
 
 ## Related
 
+- [Platform-Control Local Demo Setup](../setup/platform-control-local-demo.md)
 - [Platform Control](../components/platform-control.md)
 - [Platform-Control Firecrawl V0 Plan](../architecture/platform-control-firecrawl-v0-plan.md)
 - [Platform Control Testing](../components/testing/platform-control-testing.md)
-- [Platform-Control Retool Control Panel](platform-control-retool-control-panel.md)

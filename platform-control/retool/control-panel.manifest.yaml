@@ -24,6 +24,11 @@ pages:
     reads:
       - sql/list_sources.sql
       - sql/list_source_versions.sql
+    detail:
+      entity: source-version
+      fields:
+        - extractor_profile_id
+        - acquisition_spec
     actions:
       - createSource
       - createSourceVersion
@@ -32,20 +37,47 @@ pages:
       - rejectSourceVersion
   - id: preview-review
     title: Preview Review
+    description: Trigger preview runs, review heuristic summary output, and drill into run diagnostics.
     reads:
       - sql/list_run_captured_resources.sql
       - sql/list_runs.sql
     actions:
+      - getRun
       - getRunPreviewSummary
       - cancelRun
       - createRun
+    links:
+      - run-detail
   - id: runs
     title: Runs
+    description: Browse preview and production runs, filter by mode, and launch production runs.
     reads:
       - sql/list_runs.sql
+    filters:
+      - field: mode
+        label: Run mode
+        options:
+          - preview
+          - production
+    actions:
+      - createRun
+      - getRun
+      - getRunPreviewSummary
+      - cancelRun
+    links:
+      - run-detail
+  - id: run-detail
+    title: Run Detail
+    description: Review run status, preview heuristics, direct-ingest processing updates, and operator diagnostics.
+    reads:
+      - sql/list_run_captured_resources.sql
+      - sql/list_run_provider_jobs.sql
+      - sql/list_run_raw_artifacts.sql
     actions:
       - getRun
       - getRunPreviewSummary
+      - listRunProcessingStatus
+      - listRunDocumentLifecycle
       - cancelRun
 
 actions:
@@ -85,6 +117,12 @@ actions:
   getRunPreviewSummary:
     method: GET
     path: /v1/runs/{{ run_id }}/preview-summary
+  listRunProcessingStatus:
+    method: GET
+    path: /v1/runs/{{ run_id }}/processing-status
+  listRunDocumentLifecycle:
+    method: GET
+    path: /v1/runs/{{ run_id }}/document-lifecycle
   cancelRun:
     method: POST
     path: /v1/runs/{{ run_id }}/cancel

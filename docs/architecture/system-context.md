@@ -111,6 +111,7 @@ For container- and component-level views, render [`structurizr/workspace.dsl`](.
 | Component | Primary Runtime | Language | Storage |
 |-----------|----------------|----------|---------|
 | platform-control | Cloud Run (GCP) | Python / FastAPI | Cloud SQL (Postgres) |
+| platform-control (admin) | Cloud Run (GCP) | TypeScript / Next.js + React-admin | — |
 | document-intelligence | Databricks | Python | Delta tables, Cloud Storage |
 | legal-search (frontend) | Cloud Run (GCP) | TypeScript / Next.js | — |
 | legal-search (api) | Cloud Run (GCP) | TypeScript / NestJS | OpenSearch |
@@ -121,4 +122,4 @@ For container- and component-level views, render [`structurizr/workspace.dsl`](.
 
 | Tool | Purpose |
 |------|---------|
-| Retool | Internal ops UI for operators — connects to platform-control API and directly to Postgres for read views |
+| platform-control (admin) | Internal ops UI for operators — consumes platform-control APIs for both read and action flows |

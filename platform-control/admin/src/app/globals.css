@@ -1,0 +1,27 @@
+:root {
+  --background: #f4efe7;
+  --background-panel: rgba(255, 252, 245, 0.92);
+  --foreground: #1d293d;
+  --accent: #0f4c81;
+  --accent-soft: #d9e8f4;
+  --border: rgba(29, 41, 61, 0.12);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--foreground);
+  background:
+    radial-gradient(circle at top left, rgba(15, 76, 129, 0.16), transparent 36%),
+    radial-gradient(circle at top right, rgba(188, 143, 78, 0.18), transparent 30%),
+    linear-gradient(180deg, #f9f6ef 0%, var(--background) 100%);
+  font-family: var(--font-admin-sans), system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}

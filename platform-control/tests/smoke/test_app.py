@@ -122,6 +122,24 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
         assert run_body["replay"]["parent_run_id"] == "run_ancestor123"
         run_id = run_body["run_id"]
 
+        runs_response = await client.get("/v1/runs")
+        assert runs_response.status_code == 200
+        runs_body = runs_response.json()
+        assert len(runs_body["data"]) == 1
+        assert runs_body["data"][0]["run_id"] == run_id
+        assert runs_body["data"][0]["mode"] == "production"
+        assert runs_body["data"][0]["status"] == "running"
+        assert runs_body["data"][0]["source_name"] == "Zurich decisions"
+        assert runs_body["data"][0]["version_label"] == "v1"
+
+        production_runs_response = await client.get("/v1/runs", params={"mode": "production"})
+        assert production_runs_response.status_code == 200
+        assert len(production_runs_response.json()["data"]) == 1
+
+        preview_runs_response = await client.get("/v1/runs", params={"mode": "preview"})
+        assert preview_runs_response.status_code == 200
+        assert preview_runs_response.json()["data"] == []
+
         status_event_response = await client.post(
             "/v1/di/events/document-processing-status-updated",
             json={
