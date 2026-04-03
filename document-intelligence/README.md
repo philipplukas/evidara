@@ -5,6 +5,8 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 ## What exists
 
 - Tolerant parsing of `artifact_bundle.available` events
+- Pub/Sub push-envelope decoding for the local CLI and Databricks entrypoints
+- Internal HTTP runtime ingress for Pub/Sub-style event delivery
 - Bundle-manifest and artifact loading for `file://`, plain filesystem paths, and `gs://`
 - Minimal HTML and XML normalization into a shared IR and section extraction from that IR
 - Contract-shaped `Document`, `Section`, and `ProcessingManifest` models
@@ -23,18 +25,59 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 ## What does not exist yet
 
 - Databricks workflow wiring
+- Pub/Sub subscription / deployment wiring for the runtime ingress service
 - Spark-native Delta writes and Unity Catalog table/view creation automation
-- Terraform apply/deploy integration in CI/CD
+- Terraform and Databricks bundle deploy/promotion integration in CI/CD
+- Policy Resolver YAML rules and source-profile registry
+- spaCy or comparable NLP pipeline stages
+- Docling integration for structured content extraction
 - Citation extraction
 - Canonical jurisdiction assignment
 - RIS-specific XML schema tuning beyond the current heuristic path
 
-## Local test run
+## Local setup
 
 ```bash
 cd document-intelligence
-python3 -m unittest discover -s tests -v
+python3 -m pip install -e ".[dev]"
 ```
+
+## Local quality gate
+
+```bash
+bash scripts/check-document-intelligence.sh
+```
+
+## Runtime / deployment validation
+
+```bash
+bash scripts/check-document-intelligence-runtime.sh
+```
+
+The Databricks bundle now carries checked-in `dev`, `staging`, and `prod` targets that mirror the tracked Terraform environment inputs for the published surface root and workspace host.
+
+## Event input shape
+
+The local CLI, Databricks entrypoint, and runtime ingress service now accept either:
+
+- a raw `artifact_bundle.available` JSON payload
+- a Pub/Sub push envelope whose `message.data` contains base64-encoded event JSON
+
+That keeps local execution aligned with the eventual subscription payload shape without requiring a live subscriber yet.
+
+## Optional service extras
+
+Install the HTTP services and their tests with:
+
+```bash
+cd document-intelligence
+python3 -m pip install -e ".[dev,service]"
+```
+
+Available entrypoints:
+
+- `document_intelligence_document_service` for the read-oriented document service
+- `document_intelligence_runtime_ingress` for the internal event-processing ingress
 
 ## Optional Delta sink configuration
 
@@ -51,3 +94,15 @@ Optional:
 You can also derive all three published surface URIs from a single root by setting:
 
 - `DI_SURFACES_ROOT_URI`
+
+## Always-on runtime consumer
+
+Consume `artifact_bundle.available` from Pub/Sub and emit status/publication events:
+
+```bash
+document_intelligence_runtime_consumer \
+  --project-id evidara-dev \
+  --subscription-name document-intelligence-artifact-bundle-available
+```
+
+Use `--dry-run-publish` for local replay without outbound event publication.

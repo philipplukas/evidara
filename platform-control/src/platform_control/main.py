@@ -12,13 +12,22 @@ from platform_control.errors import (
     ProviderConfigurationError,
     SignatureVerificationError,
 )
-from platform_control.routers import di_events, firecrawl, health, runs, sources, versions
+from platform_control.routers import (
+    di_events,
+    firecrawl,
+    health,
+    reference_data,
+    runs,
+    sources,
+    versions,
+)
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version="0.1.0")
     app.include_router(health.router)
+    app.include_router(reference_data.router)
     app.include_router(sources.router)
     app.include_router(versions.router)
     app.include_router(runs.router)

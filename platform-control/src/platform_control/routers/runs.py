@@ -7,7 +7,11 @@ from platform_control.config import get_settings
 from platform_control.database import get_session
 from platform_control.schemas.document_events import DocumentLifecycleEventListResponse
 from platform_control.schemas.processing_status import ProcessingStatusUpdateListResponse
-from platform_control.schemas.run import CreateRunRequest, RunResponse
+from platform_control.schemas.run import (
+    CreateRunRequest,
+    RunPreviewSummaryResponse,
+    RunResponse,
+)
 from platform_control.services.firecrawl_provider import FirecrawlProvider
 from platform_control.services.processing_status_service import ProcessingStatusService
 from platform_control.services.run_service import RunService
@@ -29,7 +33,11 @@ async def create_run(
     session: SessionDep,
     provider: ProviderDep,
 ) -> RunResponse:
-    service = RunService(session, provider)
+    service = RunService(
+        session,
+        provider,
+        run_dispatch_backend=get_settings().run_dispatch_backend,
+    )
     return await service.create_run(request)
 
 
@@ -37,10 +45,27 @@ async def create_run(
 async def get_run(
     run_id: str,
     session: SessionDep,
-    provider: ProviderDep,
 ) -> RunResponse:
-    service = RunService(session, provider)
+    service = RunService(session)
     return await service.get_run(run_id)
+
+
+@router.post("/{run_id}/cancel", response_model=RunResponse)
+async def cancel_run(
+    run_id: str,
+    session: SessionDep,
+) -> RunResponse:
+    service = RunService(session)
+    return await service.cancel_run(run_id)
+
+
+@router.get("/{run_id}/preview-summary", response_model=RunPreviewSummaryResponse)
+async def get_run_preview_summary(
+    run_id: str,
+    session: SessionDep,
+) -> RunPreviewSummaryResponse:
+    service = RunService(session)
+    return await service.get_preview_summary(run_id)
 
 
 @router.get("/{run_id}/processing-status", response_model=ProcessingStatusUpdateListResponse)

@@ -10,8 +10,21 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
   "deltalake>=0.18.0",
+  "google-cloud-pubsub>=2.31.0,<3",
   "google-cloud-storage>=2.16.0",
   "jsonschema>=4.14.0",
+  "pyarrow>=16.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "PyYAML>=6.0.1",
+  "ruff>=0.11.8",
+]
+service = [
+  "fastapi>=0.115.0",
+  "httpx>=0.27.0",
+  "uvicorn>=0.30.0",
 ]
 
 [project.scripts]
@@ -19,9 +32,16 @@ document_intelligence_process_event = "document_intelligence.jobs.process_event:
 document_intelligence_databricks_process_event = "document_intelligence.jobs.databricks_process_event:cli"
 databricks_process_event = "document_intelligence.jobs.databricks_process_event:run"
 document_intelligence_render_surface_sql = "document_intelligence.bootstrap.register_surfaces:cli"
+document_intelligence_document_service = "document_intelligence.service.main:main"
+document_intelligence_runtime_ingress = "document_intelligence.consumer.main:main"
+document_intelligence_runtime_consumer = "document_intelligence.jobs.runtime_consumer:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+target-version = "py39"
+src = ["src", "tests"]

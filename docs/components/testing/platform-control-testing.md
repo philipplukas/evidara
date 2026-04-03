@@ -34,6 +34,8 @@ Testing strategy for the platform-control component, which owns:
 - Reference-data seed files validate before any write is attempted
 - Required fields for source creation: name, jurisdiction, authority
 - Source version requires a source to exist
+- Draft and rejected source versions can be edited, but approved versions cannot
+- Reference-data create/update flows validate linked jurisdictions
 
 #### Provider integration tests
 
@@ -45,12 +47,26 @@ Testing strategy for the platform-control component, which owns:
 - Pub/Sub event publishing emits the expected `artifact_bundle.available` envelope after immutable handoff storage succeeds
 - Seed loading is idempotent and supports dry-run mode
 
+### Integration Tests
+
+- Run the webhook persistence path against real Postgres using Testcontainers
+- Verify webhook dedupe works with dialect-specific `ON CONFLICT` handling
+- Catch ORM/schema drift that SQLite would hide, especially timestamp and JSON-column behavior
+
 ### Contract Tests
 
 - `ArtifactBundleManifest` payloads conform to JSON Schema
 - `artifact_bundle.available` event payload conforms to event schema
 - All required lineage fields are present for the DI handoff: `source_id`, `source_version_id`, `run_id`, `source_snapshot_id`, and `bundle_manifest_ref`
 - Fixture webhook payloads map to internal models without dropping required lineage fields
+
+### Event-Driven Tests Before Pub/Sub Hookup
+
+- Test the producer boundary through the publisher seam. Most workflow tests should run with a capture fake or no-op publisher instead of a live broker.
+- Unit-test the Pub/Sub adapter separately with a fake publisher client and assert the serialized envelope plus message attributes for the published handoff event.
+- For inbound events, call the application service directly or go through a thin HTTP ingress route if one exists. These tests should prove persistence, ordering, and idempotency without subscriptions.
+- Include duplicate-delivery, out-of-order delivery, unknown-run, and invalid-payload cases as normal consumer tests rather than waiting for broker wiring.
+- Add Pub/Sub emulator coverage later only for adapter and infrastructure confidence: topic resolution, publish permissions, subscription wiring, and local delivery expectations.
 
 ### Workflow Tests
 
@@ -65,6 +81,8 @@ Testing strategy for the platform-control component, which owns:
 - One source family end-to-end: register source → create version → approve → trigger run → verify artifact metadata is recorded and `artifact_bundle.available` is emitted
 - Health check endpoint returns 200
 - Firecrawl-backed preview run using stubbed provider responses reaches a terminal state
+- Failed preview run returns `failed` status with a surfaced reason
+- Preview summary endpoint exposes heuristic review signals for operators
 
 ---
 
@@ -106,7 +124,6 @@ These tests should answer:
 | Phase | Addition |
 |-------|---------|
 | Post-MVP | Multi-source family smoke tests |
-| Post-MVP | Integration tests with real database |
 | Later | Approval notification tests |
 | Later | Concurrent run behavior tests |
 | Later | Source health trend monitoring |

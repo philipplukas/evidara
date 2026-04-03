@@ -48,7 +48,9 @@ class SurfaceBootstrapSqlTests(unittest.TestCase):
 
 
 class TerraformModuleShapeTests(unittest.TestCase):
-    def test_document_intelligence_terraform_module_contains_expected_resources(self) -> None:
+    def test_document_intelligence_terraform_module_contains_expected_resources(
+        self,
+    ) -> None:
         module_root = os.path.join(
             os.path.dirname(__file__),
             "..",
@@ -58,10 +60,14 @@ class TerraformModuleShapeTests(unittest.TestCase):
             "databricks",
             "document_intelligence",
         )
-        with open(os.path.join(module_root, "main.tf"), "r", encoding="utf-8") as main_tf:
+        with open(
+            os.path.join(module_root, "main.tf"), "r", encoding="utf-8"
+        ) as main_tf:
             main_body = main_tf.read()
 
-        self.assertIn('resource "databricks_catalog" "document_intelligence"', main_body)
+        self.assertIn(
+            'resource "databricks_catalog" "document_intelligence"', main_body
+        )
         self.assertIn('resource "databricks_schema" "published"', main_body)
         self.assertIn(
             'resource "databricks_external_location" "document_intelligence_surfaces"',
@@ -84,7 +90,9 @@ class TerraformModuleShapeTests(unittest.TestCase):
             os.path.join(stack_root, "versions.tf"), "r", encoding="utf-8"
         ) as versions_tf:
             versions_body = versions_tf.read()
-        with open(os.path.join(stack_root, "main.tf"), "r", encoding="utf-8") as main_tf:
+        with open(
+            os.path.join(stack_root, "main.tf"), "r", encoding="utf-8"
+        ) as main_tf:
             main_body = main_tf.read()
         module_root = os.path.join(
             os.path.dirname(__file__),
@@ -107,9 +115,7 @@ class TerraformModuleShapeTests(unittest.TestCase):
         self.assertNotIn('provider "databricks"', module_versions_body)
 
     def test_environment_tfvars_exist_for_all_supported_environments(self) -> None:
-        env_root = os.path.join(
-            os.path.dirname(__file__), "..", "..", "infra", "env"
-        )
+        env_root = os.path.join(os.path.dirname(__file__), "..", "..", "infra", "env")
         for environment in ("dev", "staging", "prod"):
             tfvars_path = os.path.join(
                 env_root, environment, "document_intelligence.databricks.tfvars"

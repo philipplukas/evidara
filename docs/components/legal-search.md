@@ -14,7 +14,7 @@ The `legal-search/` folder contains:
 - **Seed pipeline:** Script to ingest Swiss court decisions from opencaselaw.ch into a local OpenSearch index.
 - **Contracts:** OpenAPI spec, search projection schema with provenance, controlled vocabularies for jurisdiction and document type.
 
-The frontend is not yet connected to the live BFF — it uses mock data. The projection builder and event-driven ingestion pipeline are not yet implemented.
+The frontend is not yet connected to the live BFF — it uses mock data. The API now includes event-ingestion endpoints for projection updates plus an OpenSearch alias cutover script, but DI-ref hydration and full replay automation are still pending.
 
 ## Source of truth
 
@@ -42,11 +42,11 @@ The frontend is not yet connected to the live BFF — it uses mock data. The pro
 - [x] Define search projection schema
 - [x] Define minimal NestJS BFF endpoints
 - [ ] Connect frontend to live BFF (replace mock data with Orval-generated client)
-- [ ] Define initial OpenSearch mapping and alias strategy
-- [ ] Define projection manifest/history model
-- [ ] Implement `document.processed` ingestion and projection writer (consume events, read published refs, transform to projection schema, upsert to OpenSearch)
-- [ ] Implement `document.withdrawn` ingestion and deindex/tombstone behavior, including replay ordering tests
-- [ ] Define reindex workflow
+- [x] Define initial OpenSearch mapping and alias strategy
+- [x] Define projection manifest/history model
+- [~] Implement `document.processed` ingestion and projection writer (consume events, read published refs, transform to projection schema, upsert to OpenSearch)
+- [~] Implement `document.withdrawn` ingestion and deindex/tombstone behavior, including replay ordering tests
+- [x] Define reindex workflow
 - [ ] Internationalization: BFF locale-awareness and frontend `next-intl` (ADR-0013, Phases 1–2)
 
 ## Minimal v1 Outcome
@@ -93,6 +93,7 @@ These replace the need for custom index-lifecycle semantics in shared contracts.
 - **Consumes:** `index_update.requested`
 - **API:** `contracts/api/legal-search.openapi.yaml`
 - **Reads:** published DI surfaces referenced by event refs
+- **Optional upstream:** `contracts/api/document-intelligence.openapi.yaml` — BFF calls the Document Service for lean Docling detail when `DOCUMENT_INTELLIGENCE_BASE_URL` is set (`DOCUMENT_INTELLIGENCE_BEARER_TOKEN` for auth)
 
 ## Testing
 

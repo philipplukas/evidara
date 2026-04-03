@@ -124,7 +124,9 @@ class ProcessingManifest:
         if self.canonical_ready_at is not None:
             output["canonical_ready_at"] = self.canonical_ready_at
         if self.supersedes_processing_manifest_id is not None:
-            output["supersedes_processing_manifest_id"] = self.supersedes_processing_manifest_id
+            output["supersedes_processing_manifest_id"] = (
+                self.supersedes_processing_manifest_id
+            )
         if self.failure is not None:
             output["failure"] = dict(self.failure)
         return output

@@ -98,3 +98,17 @@ repos:
         language: system
         pass_filenames: false
         files: ^platform-control/
+
+      - id: document-intelligence-check
+        name: Document Intelligence checks (ruff + unittest)
+        entry: bash scripts/check-document-intelligence.sh
+        language: system
+        pass_filenames: false
+        files: ^(document-intelligence/|contracts/(common|events|examples|schemas|vocabularies)/)
+
+      - id: document-intelligence-runtime-check
+        name: Document Intelligence runtime checks (terraform fmt + validate)
+        entry: bash scripts/check-document-intelligence-runtime.sh
+        language: system
+        pass_filenames: false
+        files: ^(document-intelligence/(databricks\.yml|databricks/|resources/)|infra/terraform/databricks/document_intelligence(_stack)?/|infra/env/(dev|staging|prod)/document_intelligence\.databricks\.tfvars|\.github/workflows/document-intelligence\.yml)

@@ -95,12 +95,12 @@ For each golden sample, assert:
 | Assertion | Example |
 |-----------|---------|
 | Document exists | Processing produces a non-null Document |
-| Document type correct | `type == "statute"` |
+| Document type correct | `document_type == "law"` |
 | Section count in range | `sections.length >= 5 && sections.length <= 15` |
 | Key sections present | `sections.some(s => s.title.includes("Art. 1"))` |
 | Citations extracted | `citations.length >= 2` |
-| Jurisdiction correct | `jurisdiction == "CH-OR"` |
-| Lineage present | `source_id != null && run_id != null && artifact_id != null` |
+| Jurisdiction correct | `jurisdiction_id == "jur_ch_federal"` |
+| Lineage present | `provenance.source_id != null && provenance.run_id != null && provenance.artifact_id != null` |
 | Required fields populated | `title != null && title.length > 0` |
 
 ### Use tolerances, not exact matches

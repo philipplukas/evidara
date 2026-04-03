@@ -8,6 +8,7 @@ from sqlalchemy import select
 from platform_control.domain import RunMode, RunStatus
 from platform_control.errors import InvalidStateTransitionError
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.provider_job import ProviderJob
 from platform_control.schemas.run import CreateRunRequest
 from platform_control.schemas.source import (
@@ -136,3 +137,158 @@ def test_partial_rerun_requires_parent_run_id() -> None:
             source_version_id="sv_123",
             replay={"mode": "partial_rerun"},
         )
+
+
+@pytest.mark.asyncio
+async def test_cancel_run_marks_it_cancelled(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+
+    cancelled = await run_service.cancel_run(run.run_id)
+
+    assert cancelled.status is RunStatus.CANCELLED
+    assert cancelled.failure_reason == "Cancelled by operator."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "terminal_status",
+    [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED],
+)
+async def test_cancel_run_rejects_terminal_status(session, terminal_status) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    run.status = terminal_status
+    await session.commit()
+
+    with pytest.raises(InvalidStateTransitionError):
+        await run_service.cancel_run(run.run_id)
+
+
+@pytest.mark.asyncio
+async def test_preview_summary_flags_decision_boilerplate_and_duplicate_resources(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    session.add_all(
+        [
+            CapturedResource(
+                captured_resource_id="cap_1",
+                artifact_id="art_1",
+                run_id=run.run_id,
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                provider_job_id=None,
+                source_url="https://example.com/decisions/2026-1",
+                final_url="https://example.com/decisions/2026-1",
+                title="Decision 2026/1",
+                content_type="text/html",
+                checksum="dup_1",
+                http_status=200,
+            ),
+            CapturedResource(
+                captured_resource_id="cap_2",
+                artifact_id="art_2",
+                run_id=run.run_id,
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                provider_job_id=None,
+                source_url="https://example.com/privacy",
+                final_url="https://example.com/privacy",
+                title="Privacy policy",
+                content_type="text/html",
+                checksum="unique_2",
+                http_status=200,
+            ),
+            CapturedResource(
+                captured_resource_id="cap_3",
+                artifact_id="art_3",
+                run_id=run.run_id,
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                provider_job_id=None,
+                source_url="https://example.com/archive/file.pdf",
+                final_url="https://example.com/archive/file.pdf",
+                title="Decision PDF",
+                content_type="application/pdf",
+                checksum="dup_1",
+                http_status=200,
+            ),
+        ]
+    )
+    run.artifacts_count = 3
+    run.captured_resources_count = 3
+    await session.commit()
+
+    summary = await run_service.get_preview_summary(run.run_id)
+
+    assert summary.captured_url_count == 3
+    assert summary.pdf_count == 1
+    assert summary.likely_decision_page_count == 2
+    assert summary.likely_boilerplate_page_count == 1
+    assert summary.likely_duplicate_page_count == 2
+    assert summary.content_type_breakdown[0].count >= summary.content_type_breakdown[-1].count
+
+
+@pytest.mark.asyncio
+async def test_create_run_worker_backend_keeps_run_pending(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider(), run_dispatch_backend="worker")
+
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+
+    assert run.status is RunStatus.PENDING
+    assert provider_job is None
+
+
+@pytest.mark.asyncio
+async def test_dispatch_pending_runs_promotes_runs_to_running(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider(), run_dispatch_backend="worker")
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+
+    dispatched = await run_service.dispatch_pending_runs()
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+    refreshed = await run_service.get_run(run.run_id)
+
+    assert dispatched == 1
+    assert refreshed.status is RunStatus.RUNNING
+    assert provider_job is not None

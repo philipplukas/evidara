@@ -45,6 +45,14 @@ Each example must:
 - include all required fields
 - use realistic values
 
+## Event Contract Tests Before Broker Integration
+
+- Treat the JSON Schema event contract as the source of truth even before Pub/Sub topics and subscriptions exist.
+- Producers and consumers should share fixture payloads from `contracts/examples/` or component-local test fixtures and validate them with locally resolved schema refs only.
+- Keep transport-independent checks here: naming, required lineage fields, versioning rules, and backward-compatible additive changes.
+- Keep transport-specific checks in component adapter tests. Topic names, message attributes, subscription wiring, retries, and dead-letter behavior are not contract-test responsibilities.
+- If transport-level schema enforcement is added later, it should mirror the contract rather than replace it unless an ADR changes the source of truth.
+
 ### OpenAPI validation
 
 - Run OpenAPI validation on all OpenAPI specs

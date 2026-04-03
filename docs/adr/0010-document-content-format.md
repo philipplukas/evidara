@@ -68,6 +68,8 @@ GET /documents/{id}/lean     → Without bounding boxes / confidence
 GET /documents/{id}/text     → Plain text (for debugging / fallback)
 ```
 
+Normative HTTP contract (paths, ids, response media types): [`contracts/api/document-intelligence.openapi.yaml`](../../contracts/api/document-intelligence.openapi.yaml) (`/v1/documents/...`).
+
 This can be implemented as:
 
 | Option | Implementation | When to use |

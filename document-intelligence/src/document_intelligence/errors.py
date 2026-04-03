@@ -8,4 +8,3 @@ class ProcessingError(ValueError):
         super().__init__(summary)
         self.code = code
         self.summary = summary
-

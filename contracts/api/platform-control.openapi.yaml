@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.2.0
+  version: 0.3.1
   contact:
     name: Evidara Team
 
@@ -18,6 +18,7 @@ security:
   - bearerAuth: []
 
 tags:
+  - name: reference-data
   - name: sources
   - name: source-versions
   - name: runs
@@ -26,6 +27,124 @@ tags:
   - name: health
 
 paths:
+  /v1/reference-data/jurisdictions:
+    get:
+      operationId: listJurisdictions
+      summary: List jurisdictions for operator setup flows
+      tags: [reference-data]
+      responses:
+        "200":
+          description: List of jurisdictions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JurisdictionListResponse"
+    post:
+      operationId: createJurisdiction
+      summary: Create a jurisdiction
+      tags: [reference-data]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJurisdictionRequest"
+      responses:
+        "201":
+          description: Jurisdiction created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Jurisdiction"
+
+  /v1/reference-data/jurisdictions/{jurisdiction_id}:
+    patch:
+      operationId: updateJurisdiction
+      summary: Update a jurisdiction
+      tags: [reference-data]
+      parameters:
+        - name: jurisdiction_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^jur_[a-z0-9]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateJurisdictionRequest"
+      responses:
+        "200":
+          description: Jurisdiction updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Jurisdiction"
+        "404":
+          description: Jurisdiction not found
+
+  /v1/reference-data/authorities:
+    get:
+      operationId: listAuthorities
+      summary: List authorities for operator setup flows
+      tags: [reference-data]
+      responses:
+        "200":
+          description: List of authorities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorityListResponse"
+    post:
+      operationId: createAuthority
+      summary: Create an authority
+      tags: [reference-data]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAuthorityRequest"
+      responses:
+        "201":
+          description: Authority created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Authority"
+        "404":
+          description: Jurisdiction not found
+
+  /v1/reference-data/authorities/{authority_id}:
+    patch:
+      operationId: updateAuthority
+      summary: Update an authority
+      tags: [reference-data]
+      parameters:
+        - name: authority_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^auth_[a-z0-9]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAuthorityRequest"
+      responses:
+        "200":
+          description: Authority updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Authority"
+        "404":
+          description: Authority or jurisdiction not found
+
   /v1/sources:
     get:
       operationId: listSources
@@ -132,6 +251,31 @@ paths:
         "409":
           description: Invalid source version state transition
 
+  /v1/versions/{source_version_id}:
+    patch:
+      operationId: updateSourceVersion
+      summary: Update a draft or rejected source version
+      tags: [source-versions]
+      parameters:
+        - $ref: "#/components/parameters/SourceVersionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSourceVersionRequest"
+      responses:
+        "200":
+          description: Source version updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceVersion"
+        "404":
+          description: Source version or extractor profile not found
+        "409":
+          description: Invalid source version state transition
+
   /v1/versions/{source_version_id}/reject:
     post:
       operationId: rejectSourceVersion
@@ -188,6 +332,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Run"
+        "404":
+          description: Run not found
+
+  /v1/runs/{run_id}/cancel:
+    post:
+      operationId: cancelRun
+      summary: Cancel a pending or running run
+      tags: [runs]
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Run cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "404":
+          description: Run not found
+        "409":
+          description: Invalid run state transition
+
+  /v1/runs/{run_id}/preview-summary:
+    get:
+      operationId: getRunPreviewSummary
+      summary: Summarize captured preview output for operator review
+      tags: [runs]
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Preview summary for the run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPreviewSummary"
         "404":
           description: Run not found
 
@@ -366,6 +546,111 @@ components:
         pattern: "^run_[a-z0-9]+$"
 
   schemas:
+    Jurisdiction:
+      type: object
+      required: [jurisdiction_id, name, slug, created_at, updated_at]
+      properties:
+        jurisdiction_id:
+          type: string
+          pattern: "^jur_[a-z0-9]+$"
+        name:
+          type: string
+        slug:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    JurisdictionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Jurisdiction"
+
+    CreateJurisdictionRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+
+    UpdateJurisdictionRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+
+    Authority:
+      type: object
+      required: [authority_id, name, slug, created_at, updated_at]
+      properties:
+        authority_id:
+          type: string
+          pattern: "^auth_[a-z0-9]+$"
+        jurisdiction_id:
+          oneOf:
+            - type: string
+              pattern: "^jur_[a-z0-9]+$"
+            - type: "null"
+        name:
+          type: string
+        slug:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AuthorityListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Authority"
+
+    CreateAuthorityRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        jurisdiction_id:
+          oneOf:
+            - type: string
+              pattern: "^jur_[a-z0-9]+$"
+            - type: "null"
+        name:
+          type: string
+        slug:
+          type: string
+
+    UpdateAuthorityRequest:
+      type: object
+      minProperties: 1
+      properties:
+        jurisdiction_id:
+          oneOf:
+            - type: string
+              pattern: "^jur_[a-z0-9]+$"
+            - type: "null"
+        name:
+          type: string
+        slug:
+          type: string
+
     Source:
       type: object
       required:
@@ -571,6 +856,20 @@ components:
         acquisition_spec:
           $ref: "#/components/schemas/FirecrawlAcquisitionSpec"
 
+    UpdateSourceVersionRequest:
+      type: object
+      minProperties: 1
+      properties:
+        version_label:
+          type: string
+        extractor_profile_id:
+          oneOf:
+            - type: string
+              pattern: "^exp_[a-z0-9]+$"
+            - type: "null"
+        acquisition_spec:
+          $ref: "#/components/schemas/FirecrawlAcquisitionSpec"
+
     Run:
       type: object
       required:
@@ -608,17 +907,23 @@ components:
           type: string
           enum: [pending, running, completed, failed, cancelled]
         started_at:
-          type: string
-          format: date-time
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
         completed_at:
-          type: string
-          format: date-time
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
         artifacts_count:
           type: integer
         captured_resources_count:
           type: integer
         failure_reason:
-          type: string
+          oneOf:
+            - type: string
+            - type: "null"
         created_at:
           type: string
           format: date-time
@@ -705,6 +1010,116 @@ components:
           oneOf:
             - $ref: "#/components/schemas/RunReplay"
             - type: "null"
+
+    RunPreviewSummarySample:
+      type: object
+      required: [captured_resource_id, final_url, content_type, reason]
+      properties:
+        captured_resource_id:
+          type: string
+          pattern: "^cap_[a-z0-9]+$"
+        title:
+          oneOf:
+            - type: string
+            - type: "null"
+        final_url:
+          type: string
+          format: uri
+        content_type:
+          type: string
+        http_status:
+          oneOf:
+            - type: integer
+            - type: "null"
+        reason:
+          type: string
+
+    RunPreviewSummaryBreakdownEntry:
+      type: object
+      required: [content_type, count]
+      properties:
+        content_type:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+
+    RunPreviewSummaryDriftCheck:
+      type: object
+      required: [name, status, detail]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ok, warn]
+        detail:
+          type: string
+
+    RunPreviewSummary:
+      type: object
+      required:
+        - run_id
+        - captured_url_count
+        - artifacts_count
+        - captured_resources_count
+        - pdf_count
+        - likely_decision_page_count
+        - likely_boilerplate_page_count
+        - likely_duplicate_page_count
+        - content_type_breakdown
+        - likely_decision_pages
+        - likely_boilerplate_pages
+        - likely_duplicate_pages
+        - drift_checks
+      properties:
+        run_id:
+          type: string
+          pattern: "^run_[a-z0-9]+$"
+        captured_url_count:
+          type: integer
+          minimum: 0
+        artifacts_count:
+          type: integer
+          minimum: 0
+        captured_resources_count:
+          type: integer
+          minimum: 0
+        pdf_count:
+          type: integer
+          minimum: 0
+        likely_decision_page_count:
+          type: integer
+          minimum: 0
+        likely_boilerplate_page_count:
+          type: integer
+          minimum: 0
+        likely_duplicate_page_count:
+          type: integer
+          minimum: 0
+        content_type_breakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunPreviewSummaryBreakdownEntry"
+        likely_decision_pages:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/RunPreviewSummarySample"
+        likely_boilerplate_pages:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/RunPreviewSummarySample"
+        likely_duplicate_pages:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/RunPreviewSummarySample"
+        drift_checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunPreviewSummaryDriftCheck"
 
     ProcessingStatusUpdate:
       type: object

@@ -142,7 +142,9 @@ def normalize_plain_text_document(text: str, artifact_id: str) -> NormalizedDocu
                 attrs={"normalizer": "plain_text_v1"},
             )
         )
-    return NormalizedDocumentIR(blocks=blocks, metadata={"title": None, "normalizer": "plain_text_v1"})
+    return NormalizedDocumentIR(
+        blocks=blocks, metadata={"title": None, "normalizer": "plain_text_v1"}
+    )
 
 
 def _normalize_whitespace(value: str) -> str:

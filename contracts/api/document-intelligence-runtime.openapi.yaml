@@ -1,0 +1,106 @@
+openapi: 3.1.0
+info:
+  title: Document Intelligence Runtime API
+  description: |
+    Internal runtime ingress for `document-intelligence`.
+
+    This API accepts immutable acquisition handoff events from Pub/Sub push delivery,
+    resolves the underlying `artifact_bundle.available` envelope, and runs the
+    component pipeline against the configured canonical sink.
+  version: 0.1.0
+  contact:
+    name: Evidara Team
+  license:
+    name: Proprietary
+    identifier: UNLICENSED
+
+servers:
+  - url: http://localhost:8091
+    description: Local development (representative port)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: ingestion
+    description: Internal event-ingest endpoints
+
+paths:
+  /internal/events/artifact-bundles:process:
+    post:
+      operationId: processArtifactBundleEvent
+      summary: Process an artifact bundle event
+      description: |
+        Accepts either:
+
+        - a raw `artifact_bundle.available` JSON event
+        - a Pub/Sub push envelope whose `message.data` field contains the same event as
+          base64-encoded UTF-8 JSON
+
+        Successful `200` responses acknowledge the event to Pub/Sub.
+      tags: [ingestion]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtifactBundleIngressRequest"
+      responses:
+        "200":
+          description: Event processed and acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactBundleProcessingResult"
+        "400":
+          description: Invalid event envelope or unsupported payload shape
+        "500":
+          description: Processing failed; caller should retry
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Service-to-service token for internal runtime ingress.
+
+  schemas:
+    ArtifactBundleIngressRequest:
+      type: object
+      description: |
+        Either the raw `artifact_bundle.available` event or the surrounding Pub/Sub push
+        request body. The canonical business contract remains the event schema under
+        `contracts/events/artifact-bundle-available.schema.json`.
+      additionalProperties: true
+
+    ArtifactBundleProcessingResult:
+      type: object
+      required:
+        - status
+        - event_id
+        - bundle_manifest_id
+        - document_id
+        - document_revision
+        - processing_manifest_id
+        - sections
+      properties:
+        status:
+          type: string
+          const: processed
+        event_id:
+          type: string
+        bundle_manifest_id:
+          type: string
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        processing_manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+        sections:
+          type: integer
+          minimum: 0

@@ -17,7 +17,9 @@ from document_intelligence.contracts.envelope import (
     Provenance,
 )
 from document_intelligence.errors import ProcessingError
-from document_intelligence.events.document_processed import build_document_processed_event
+from document_intelligence.events.document_processed import (
+    build_document_processed_event,
+)
 from document_intelligence.events.status_updated import build_processing_status_event
 from document_intelligence.ingest.loaders import BundleLoader, DispatchingBundleLoader
 from document_intelligence.normalize.html import (
@@ -28,13 +30,38 @@ from document_intelligence.normalize.ir import NormalizedDocumentIR
 from document_intelligence.normalize.xml import normalize_xml_document
 from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
 from document_intelligence.quality.invariants import validate_document_and_sections
-from document_intelligence.sectionize.html import SectionCandidate, build_sections_from_ir
+from document_intelligence.sectionize.html import (
+    SectionCandidate,
+    build_sections_from_ir,
+)
 from document_intelligence.validate.validator import (
     validate_document,
     validate_event,
     validate_processing_manifest,
     validate_sections,
 )
+
+_DOCUMENT_TYPE_ALIASES = {
+    "statute": "law",
+    "act": "law",
+    "gesetz": "law",
+    "loi": "law",
+    "legge": "law",
+    "bundesgesetz": "law",
+    "judgment": "decision",
+    "ruling": "decision",
+    "urteil": "decision",
+    "arrêt": "decision",
+    "sentenza": "decision",
+    "entscheid": "decision",
+    "beschluss": "decision",
+    "kommentar": "commentary",
+    "commentaire": "commentary",
+    "commento": "commentary",
+    "headnote": "rechtssatz",
+    "legal principle": "rechtssatz",
+    "leitsatz": "rechtssatz",
+}
 
 
 class ProcessingPipeline:
@@ -52,7 +79,9 @@ class ProcessingPipeline:
 
     def process_event(self, event_data: Dict[str, Any]) -> ProcessingResult:
         event = ArtifactBundleAvailableEvent.from_dict(event_data)
-        selected_bundle = self._bundle_loader.load_bundle(event.payload.bundle_manifest_ref)
+        selected_bundle = self._bundle_loader.load_bundle(
+            event.payload.bundle_manifest_ref
+        )
         primary_artifact = selected_bundle.primary_artifact
         artifact_text = self._bundle_loader.read_artifact_text(primary_artifact)
 
@@ -205,7 +234,9 @@ def _build_document(
         "trust_tier": manifest.trust_tier,
         "source_defaults": dict(manifest.source_defaults),
     }
-    extracted_metadata = dict(normalized_document.metadata.get("extracted_metadata") or {})
+    extracted_metadata = dict(
+        normalized_document.metadata.get("extracted_metadata") or {}
+    )
     if extracted_metadata:
         metadata["extracted_metadata"] = extracted_metadata
     source_flavor = normalized_document.metadata.get("source_flavor")
@@ -218,14 +249,18 @@ def _build_document(
         processing_manifest_id=processing_manifest_id,
         provenance=provenance,
         primary_artifact_id=primary_artifact.artifact_id,
+        jurisdiction_id=manifest.source_defaults.get("jurisdiction_id"),
+        authority_id=manifest.source_defaults.get("authority_id"),
         title=_choose_document_title(normalized_document),
         processed_at=now,
         processing_version=processing_version,
         lifecycle_status="active",
         full_text=normalized_document.full_text,
         body_text=normalized_document.body_text,
-        document_type=normalized_document.metadata.get("document_type")
-        or manifest.source_defaults.get("document_type_hint"),
+        document_type=_normalize_document_type(
+            normalized_document.metadata.get("document_type")
+            or manifest.source_defaults.get("document_type_hint")
+        ),
         metadata=metadata,
         extensions={},
     )
@@ -366,6 +401,15 @@ def _choose_document_title(normalized_document: NormalizedDocumentIR) -> str:
 
 def _normalized_content_type(content_type: str) -> str:
     return (content_type or "").split(";", 1)[0].strip().lower()
+
+
+def _normalize_document_type(document_type: Optional[str]) -> Optional[str]:
+    if document_type is None:
+        return None
+    normalized = document_type.strip().lower()
+    if not normalized:
+        return None
+    return _DOCUMENT_TYPE_ALIASES.get(normalized, normalized)
 
 
 def _utc_now() -> str:

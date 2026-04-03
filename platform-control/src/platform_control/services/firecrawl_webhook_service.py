@@ -50,12 +50,11 @@ class FirecrawlWebhookService:
         payload_sha256 = hashlib.sha256(raw_body).hexdigest()
 
         # Atomic dedupe: attempt insert and skip if the (provider, payload_sha256)
-        # unique constraint already exists.  This avoids a TOCTOU race that the
-        # previous read-then-insert pattern was susceptible to.
-        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-
+        # unique constraint already exists. This keeps webhook replay handling safe
+        # on both local SQLite and production Postgres.
+        insert_fn = self._insert_for_current_dialect()
         stmt = (
-            sqlite_insert(WebhookReceipt)
+            insert_fn(WebhookReceipt)
             .values(
                 webhook_receipt_id=generate_prefixed_id("whr"),
                 provider="firecrawl",
@@ -110,6 +109,17 @@ class FirecrawlWebhookService:
         actual = signature.removeprefix("sha256=")
         if not hmac.compare_digest(expected, actual):
             raise SignatureVerificationError("Firecrawl signature verification failed.")
+
+    def _insert_for_current_dialect(self):
+        dialect_name = self.session.get_bind().dialect.name
+        if dialect_name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert as insert_fn
+
+            return insert_fn
+
+        from sqlalchemy.dialects.sqlite import insert as insert_fn
+
+        return insert_fn
 
     async def _apply_event(
         self,

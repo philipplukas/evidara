@@ -6,11 +6,11 @@ Turn immutable artifact bundles into canonical structured document intelligence.
 
 ## Current state
 
-Initial implementation scaffolding now exists under `document-intelligence/`. The component now has a Python package skeleton, tolerant inbound event parsing, bundle-manifest and artifact loading for local files and `gs://`, minimal HTML and XML normalization with shared-IR section extraction, explicit published-surface definitions, an in-memory sink plus a Delta-backed sink, offline JSON Schema validation helpers, a Databricks runtime entrypoint, Databricks Asset Bundle files, a reusable Terraform module plus top-level Databricks stack and `dev` / `staging` / `prod` tfvars for Unity Catalog scaffolding, SQL/bootstrap assets for published-surface registration, and bundle/adapter/CLI tests for the first processing path.
+Initial implementation scaffolding now exists under `document-intelligence/`. The component now has a Python package skeleton, tolerant inbound event parsing, file-based intake for both raw `artifact_bundle.available` events and Pub/Sub push envelopes, a dedicated internal runtime ingress service for Pub/Sub-style event delivery, bundle-manifest and artifact loading for local files and `gs://`, minimal HTML and XML normalization with shared-IR section extraction, explicit published-surface definitions, an in-memory sink plus a Delta-backed sink, offline JSON Schema validation helpers, a Databricks runtime entrypoint, Databricks Asset Bundle files with tracked `dev` / `staging` / `prod` targets, a reusable Terraform module plus top-level Databricks stack and `dev` / `staging` / `prod` tfvars for Unity Catalog scaffolding, SQL/bootstrap assets for published-surface registration, a dedicated local quality gate under [`../../scripts/check-document-intelligence.sh`](../../scripts/check-document-intelligence.sh), a runtime/deployment validation script under [`../../scripts/check-document-intelligence-runtime.sh`](../../scripts/check-document-intelligence-runtime.sh), and component CI coverage in GitHub Actions for linting, regression tests, and Terraform validation.
 
 For the current M4 slice, freeze the primary happy path on Firecrawl-acquired HTML bundles with one primary document artifact. The existing RIS-style XML path remains useful regression coverage, but it is not the required deployment path for the first end-to-end searchable slice.
 
-The production processing pipelines are still not fully implemented. Spark-native runtime wiring, CI/CD deployment integration for Terraform + Bundles, richer XML source-family coverage, citation extraction, jurisdiction resolution, and stricter final contract hardening are still pending.
+The production processing pipelines are still not fully implemented. A runtime Pub/Sub consumer scaffold and an internal ingress API now exist for `artifact_bundle.available` handling, but deployed subscription wiring, Spark-native runtime wiring, CI/CD deployment integration for Terraform + Bundles, richer XML source-family coverage, citation extraction, jurisdiction resolution, and stricter final contract hardening are still pending.
 
 See [Document Intelligence Implementation Plan](document-intelligence-implementation-plan.md) for the planned architecture and phased delivery approach.
 
@@ -54,7 +54,7 @@ Document-intelligence should lean on Databricks-native lineage for internal trac
 - [x] Define first Databricks workflow/job scaffold
 - [x] Add Terraform and SQL/bootstrap scaffolding for Unity Catalog published-surface registration
 - [x] Add an XML-first second source family with RIS-style fixture coverage
-- [ ] Add always-on runtime wiring for `artifact_bundle.available` consumption
+- [~] Add always-on runtime wiring for `artifact_bundle.available` consumption
 - [ ] Define source/jurisdiction profile registry
 - [ ] Harden HTML parsing and broaden source-family support deliberately
 
@@ -91,6 +91,7 @@ One bundle can be transformed into:
 ## Key Contracts
 
 - **Consumes:** `artifact_bundle.available`
+- **Internal API:** runtime ingress for Pub/Sub push delivery
 - **Consumes:** reference snapshot sets published by platform-control
 - **Produces:** `document.processing_status.updated`
 - **Produces:** `document.processed`
@@ -109,6 +110,8 @@ Key tests:
 - GCS loader tests with stubbed storage client behavior
 - Delta sink tests with real local Delta tables
 - CLI smoke test for bundle processing
+- Pub/Sub push-envelope decoding tests for both processing entrypoints
+- HTTP ingress tests for the internal runtime consumer
 - Databricks runtime wrapper and bundle-config tests
 - Invariant checks on provenance, revisions, and section ordering
 - One minimal end-to-end processing path

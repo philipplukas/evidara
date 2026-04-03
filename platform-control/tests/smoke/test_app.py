@@ -89,6 +89,12 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
         approve_response = await client.post(f"/v1/versions/{source_version_id}/approve")
         assert approve_response.status_code == 200
 
+        update_approved_version_response = await client.patch(
+            f"/v1/versions/{source_version_id}",
+            json={"version_label": "should-not-work"},
+        )
+        assert update_approved_version_response.status_code == 409
+
         run_response = await client.post(
             "/v1/runs",
             json={
@@ -268,5 +274,28 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
             },
         )
         assert invalid_failed_response.status_code == 422
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_sync_hierarchy_endpoint(session_maker) -> None:
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post("/v1/reference-data/hierarchy/sync?dry_run=true")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["dry_run"] is True
+        assert body["jurisdictions"]["created"] >= 1
+        assert body["authorities"]["created"] >= 1
+        assert body["scrape_targets"]["created"] >= 1
 
     app.dependency_overrides.clear()

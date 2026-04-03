@@ -12,6 +12,10 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run test",
+    "e2e": "playwright test",
+    "e2e:smoke": "playwright test -g @smoke",
+    "e2e:visual": "playwright test e2e/visual.spec.ts",
+    "e2e:headed": "playwright test --headed",
     "openapi:lint": "redocly lint ../../contracts/api/legal-search.openapi.yaml",
     "openapi:generate": "orval --config orval.config.ts",
     "openapi:check": "npm run openapi:generate && git diff --exit-code src/lib/api/generated/"
@@ -36,6 +40,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.9",
+    "@playwright/test": "^1.59.1",
     "@redocly/cli": "^1.25.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",

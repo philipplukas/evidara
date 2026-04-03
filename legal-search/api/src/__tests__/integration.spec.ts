@@ -11,7 +11,7 @@
  */
 
 import type { INestApplication } from '@nestjs/common';
-import { afterAll, beforeAll, describe, expect, it, type vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { DocumentsRepository } from '../modules/documents/documents.repository';
 import type { SearchRepository } from '../modules/search/search.repository';
 import { createTestApp, EMPTY_SEARCH } from './test-app';
@@ -205,6 +205,45 @@ describe('document detail contract (ADR-0011)', () => {
     (documentsRepo.getById as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
 
     await supertest(app.getHttpServer()).get('/v1/documents/doc_nonexistent').expect(404);
+  });
+
+  it('accepts valid processing_manifest_id query', async () => {
+    await supertest(app.getHttpServer())
+      .get('/v1/documents/doc_001?processing_manifest_id=pm_01jq7bhgy7g0pkj4f1d03f8f8c')
+      .expect(200);
+  });
+
+  it('rejects invalid processing_manifest_id', async () => {
+    await supertest(app.getHttpServer())
+      .get('/v1/documents/doc_001?processing_manifest_id=not-a-pm')
+      .expect(400);
+  });
+});
+
+// ─── Document Service overlay (contract integration) ───
+
+describe('document detail Document Service overlay', () => {
+  let overlayApp: INestApplication;
+
+  beforeAll(async () => {
+    const testApp = await createTestApp({
+      documentContent: {
+        fetchLeanContent: vi.fn().mockResolvedValue({ schema_version: 'lean' }),
+      },
+    });
+    overlayApp = testApp.app;
+  });
+
+  afterAll(async () => {
+    await overlayApp?.close();
+  });
+
+  it('merges lean JSON into DetailView.content when the port returns a body', async () => {
+    const res = await supertest(overlayApp.getHttpServer())
+      .get('/v1/documents/doc_001')
+      .expect(200);
+
+    expect(res.body.content).toEqual({ schema_version: 'lean' });
   });
 });
 

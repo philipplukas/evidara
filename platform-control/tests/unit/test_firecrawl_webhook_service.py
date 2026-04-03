@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import func, select
 
 from platform_control.domain import ProviderJobStatus, RunMode, RunStatus, SourceVersionStatus
+from platform_control.errors import SignatureVerificationError
 from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.provider_job import ProviderJob
@@ -182,3 +183,21 @@ def test_storage_ref_marks_uri_hash_when_checksum_is_unavailable() -> None:
 
     assert storage_ref["checksum_algorithm"] == "uri-hash"
     assert len(str(storage_ref["checksum"])) == 64
+
+
+@pytest.mark.asyncio
+async def test_webhook_processing_rejects_tampered_signature(session, tmp_path: Path) -> None:
+    publisher = CollectingPublisher()
+    service = FirecrawlWebhookService(
+        session=session,
+        artifact_store=LocalArtifactStore(base_dir=tmp_path / "artifacts"),
+        publisher=publisher,
+        webhook_secret="test-secret",
+    )
+
+    with pytest.raises(SignatureVerificationError):
+        await service.process(
+            payload={"type": "crawl.page", "id": "crawl_123", "data": {}},
+            raw_body=b"{}",
+            signature="sha256=definitely-wrong",
+        )

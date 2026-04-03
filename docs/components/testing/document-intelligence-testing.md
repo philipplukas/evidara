@@ -40,9 +40,17 @@ The MVP test plan assumes bundle ingestion, canonical `Document`, `Section`, and
 - Pipeline-produced `Section` output conforms to JSON Schema
 - Pipeline-produced `ProcessingManifest` output conforms to JSON Schema
 - `artifact_bundle.available`, `document.processed`, and `document.processing_status.updated` conform to event schemas
-- Repo examples under `contracts/examples/` validate against locally resolved schemas without network access
+- Repo examples under `contracts/examples/` for `Document`, `Section`, `ProcessingManifest`, and the current DI event set validate against locally resolved schemas without network access
 
 Add `Citation` schema validation once citation extraction is implemented.
+
+### Event-Driven Tests Before Pub/Sub Hookup
+
+- Drive bundle-processing tests with checked-in `event.json` fixtures and call `ProcessingPipeline.process_event(...)` directly for the fastest feedback loop.
+- Use the local CLI and Databricks-style entrypoints as thin adapter tests only. They should prove file loading and runtime wiring, not replace pipeline unit and golden tests.
+- Prefer in-memory sinks for most event-path tests so canonical output, status events, and `document.processed` payloads can be asserted without external infrastructure.
+- Keep Delta-backed sink tests focused on published-surface writes and replay-safe persistence rather than broker delivery.
+- Add a future broker adapter behind a narrow publisher seam and test it separately with a fake client first, then a Pub/Sub emulator only if transport confidence becomes necessary.
 
 ### Golden Document Tests
 
@@ -89,11 +97,15 @@ Add citation count and canonical jurisdiction assertions once those capabilities
 4. Verify `document.processing_status.updated` and `document.processed` behaviors are validated for the relevant lifecycle path
 5. Verify lineage is traceable
 
+The default local quality gate for this component is [`../../../scripts/check-document-intelligence.sh`](../../../scripts/check-document-intelligence.sh). It runs Ruff plus the full unittest suite and should match the GitHub Actions check.
+
 ### Adapter coverage
 
 - GCS bundle loader tests use a stubbed storage client and verify manifest/artifact reads plus checksum enforcement
 - Delta sink tests write to temporary Delta tables and read them back to verify published rows and replay-safe appends
 - CLI smoke tests exercise the bundle-processing entrypoint with local fixtures
+- Event-ingest tests cover both direct `artifact_bundle.available` payloads and Pub/Sub push envelopes with base64-decoded event JSON
+- Runtime consumer HTTP tests cover successful Pub/Sub-style ingestion, invalid envelope rejection, and optional bearer protection
 - Databricks runtime tests validate the wrapper configuration plus a local Delta-backed bundle run using the Databricks-style entrypoint
 - Bootstrap asset tests verify the published-surface SQL renderer and Terraform module shape for the Unity Catalog scaffolding path
 - Bootstrap asset tests also verify the top-level Databricks stack wiring and the presence of `dev` / `staging` / `prod` tfvars for the DI Terraform path

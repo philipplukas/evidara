@@ -9,7 +9,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from document_intelligence.persist.sinks import InMemoryCanonicalSink
 from document_intelligence.pipeline import ProcessingPipeline
-from document_intelligence.validate.schema_validation import validate_instance_against_contract
+from document_intelligence.validate.schema_validation import (
+    validate_instance_against_contract,
+)
 from support import build_bundle_event, build_manifest_payload
 
 
@@ -55,11 +57,15 @@ SAMPLE_RIS_XML = """
 
 class ProcessingPipelineTests(unittest.TestCase):
     def test_processes_local_html_bundle_into_contract_valid_outputs(self) -> None:
-        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".html", delete=False
+        ) as html_handle:
             html_handle.write(SAMPLE_HTML)
             artifact_path = html_handle.name
 
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False
+        ) as manifest_handle:
             json.dump(
                 build_manifest_payload(
                     artifact_path,
@@ -79,6 +85,9 @@ class ProcessingPipelineTests(unittest.TestCase):
 
             self.assertEqual(result.document.title, "Sample Statute")
             self.assertEqual(result.document.document_revision, 1)
+            self.assertEqual(result.document.document_type, "law")
+            self.assertEqual(result.document.jurisdiction_id, "jur_ch_federal")
+            self.assertEqual(result.document.authority_id, "auth_fedlex")
             self.assertEqual(len(result.sections), 2)
             self.assertEqual(result.sections[0].title, "Section 1")
             self.assertIn("Introductory material", result.sections[0].content)
@@ -136,11 +145,15 @@ class ProcessingPipelineTests(unittest.TestCase):
             os.unlink(manifest_path)
 
     def test_replay_keeps_document_identity_stable(self) -> None:
-        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".html", delete=False
+        ) as html_handle:
             html_handle.write(SAMPLE_HTML)
             artifact_path = html_handle.name
 
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False
+        ) as manifest_handle:
             json.dump(
                 build_manifest_payload(
                     artifact_path,
@@ -151,12 +164,12 @@ class ProcessingPipelineTests(unittest.TestCase):
             manifest_path = manifest_handle.name
 
         try:
-            first = ProcessingPipeline(processing_version="di_2026_03_29").process_event(
-                build_bundle_event(manifest_path)
-            )
-            second = ProcessingPipeline(processing_version="di_2026_03_29").process_event(
-                build_bundle_event(manifest_path)
-            )
+            first = ProcessingPipeline(
+                processing_version="di_2026_03_29"
+            ).process_event(build_bundle_event(manifest_path))
+            second = ProcessingPipeline(
+                processing_version="di_2026_03_29"
+            ).process_event(build_bundle_event(manifest_path))
 
             self.assertEqual(first.document.document_id, second.document.document_id)
             self.assertNotEqual(
@@ -168,11 +181,15 @@ class ProcessingPipelineTests(unittest.TestCase):
             os.unlink(manifest_path)
 
     def test_processes_ris_style_xml_bundle(self) -> None:
-        with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as xml_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".xml", delete=False
+        ) as xml_handle:
             xml_handle.write(SAMPLE_RIS_XML)
             artifact_path = xml_handle.name
 
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False
+        ) as manifest_handle:
             json.dump(
                 build_manifest_payload(
                     artifact_path,
@@ -198,7 +215,9 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(
                 result.document.title, "Bundesgesetz über digitale Register"
             )
-            self.assertEqual(result.document.document_type, "statute")
+            self.assertEqual(result.document.document_type, "law")
+            self.assertEqual(result.document.jurisdiction_id, "jur_ch_federal")
+            self.assertEqual(result.document.authority_id, "auth_fedlex")
             self.assertEqual(len(result.sections), 2)
             self.assertEqual(result.sections[0].title, "§ 1 Geltungsbereich")
             self.assertIn(

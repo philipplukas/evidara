@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import os
@@ -12,6 +13,7 @@ SOURCE_ID = "src_01jq79xv3wdd6yr8q5bn0m3zfk"
 SOURCE_VERSION_ID = "sv_01jq79zcskf4m3m4gm3t5s59xq"
 RUN_ID = "run_01jq7a3s9b7j4dndd9sgv6pb9d"
 ARTIFACT_ID = "art_01jq7af3f8qqc46zc6xvkf9y4x"
+PUBSUB_MESSAGE_ID = "2070443601311540"
 
 
 def storage_ref_for_path(path: str, content_type: str) -> Dict[str, Any]:
@@ -56,6 +58,23 @@ def build_bundle_event(manifest_path: str) -> Dict[str, Any]:
                 "storage_ref": storage_ref_for_path(manifest_path, "application/json"),
             },
         },
+    }
+
+
+def build_pubsub_push_envelope(event_payload: Dict[str, Any]) -> Dict[str, Any]:
+    encoded_payload = base64.b64encode(
+        json.dumps(event_payload, sort_keys=True).encode("utf-8")
+    ).decode("ascii")
+    return {
+        "message": {
+            "data": encoded_payload,
+            "messageId": PUBSUB_MESSAGE_ID,
+            "publishTime": "2026-04-03T09:30:06Z",
+            "attributes": {
+                "event_type": str(event_payload.get("event_type", "")),
+            },
+        },
+        "subscription": "projects/evidara-dev/subscriptions/document-intelligence",
     }
 
 

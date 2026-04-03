@@ -98,3 +98,39 @@ class RunResponse(BaseModel):
 
 class WebhookAcceptedResponse(BaseModel):
     status: str
+
+
+class RunPreviewSummarySample(BaseModel):
+    captured_resource_id: str
+    title: str | None
+    final_url: str
+    content_type: str
+    http_status: int | None
+    reason: str
+
+
+class RunPreviewSummaryBreakdownEntry(BaseModel):
+    content_type: str
+    count: int
+
+
+class RunPreviewSummaryDriftCheck(BaseModel):
+    name: str
+    status: str
+    detail: str
+
+
+class RunPreviewSummaryResponse(BaseModel):
+    run_id: str
+    captured_url_count: int
+    artifacts_count: int
+    captured_resources_count: int
+    pdf_count: int
+    likely_decision_page_count: int
+    likely_boilerplate_page_count: int
+    likely_duplicate_page_count: int
+    content_type_breakdown: list[RunPreviewSummaryBreakdownEntry]
+    likely_decision_pages: list[RunPreviewSummarySample]
+    likely_boilerplate_pages: list[RunPreviewSummarySample]
+    likely_duplicate_pages: list[RunPreviewSummarySample]
+    drift_checks: list[RunPreviewSummaryDriftCheck]

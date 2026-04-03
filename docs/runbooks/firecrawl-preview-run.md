@@ -33,9 +33,9 @@ Use Retool or the API to confirm:
 
 ### 2. Trigger the preview run
 
-Trigger a preview run from Retool or the planned `POST /v1/runs` API action using the approved source version.
+Trigger a preview run from Retool or `POST /v1/runs` using the approved source version.
 
-**Expected output:** A `run_id` is created, the run enters a non-terminal state, and a provider job record is attached to the run.
+**Expected output:** A `run_id` is created and enters a non-terminal state. In `inline` dispatch mode, a provider job record is attached immediately; in `worker` mode, run `platform-control-connector-worker` and confirm the provider job appears after dispatch.
 
 ### 3. Confirm Firecrawl callbacks are being accepted
 
@@ -104,3 +104,4 @@ If something goes wrong:
 - [Platform Control](../components/platform-control.md)
 - [Platform-Control Firecrawl V0 Plan](../architecture/platform-control-firecrawl-v0-plan.md)
 - [Platform Control Testing](../components/testing/platform-control-testing.md)
+- [Platform-Control Retool Control Panel](platform-control-retool-control-panel.md)

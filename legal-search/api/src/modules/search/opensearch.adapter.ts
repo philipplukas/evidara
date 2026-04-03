@@ -20,6 +20,15 @@ import type {
 } from './entities/search.entities';
 import type { SearchOptions, SearchRepository } from './search.repository';
 
+type OpenSearchHit = {
+  _source?: Record<string, unknown>;
+  _score?: number;
+  highlight?: {
+    content?: string[];
+    regeste?: string[];
+  };
+};
+
 @Injectable()
 export class SearchOpenSearchAdapter implements SearchRepository {
   private readonly logger = new Logger(SearchOpenSearchAdapter.name);
@@ -101,10 +110,10 @@ export class SearchOpenSearchAdapter implements SearchRepository {
       const total =
         typeof result.hits.total === 'number' ? result.hits.total : (result.hits.total?.value ?? 0);
 
-      const hits: SearchHitEntity[] = (result.hits.hits as any[])
+      const hits: SearchHitEntity[] = (result.hits.hits as OpenSearchHit[])
         .filter((hit) => hit._source != null)
         .map((hit) => {
-          const src = hit._source;
+          const src = hit._source as Record<string, unknown>;
           return {
             document_id: src.document_id as string,
             title: src.title as string,

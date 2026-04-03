@@ -34,6 +34,7 @@ _ALLOWED_PREFIXES = frozenset(
         "run",
         "snap",
         "src",
+        "stg",
         "sv",
         "whr",
     }
@@ -44,7 +45,7 @@ def generate_prefixed_id(prefix: str) -> str:
     """Generate a ULID-based ID with a domain prefix (e.g. ``src_…``).
 
     Allowed prefixes: ``abm``, ``art``, ``auth``, ``cap``, ``evt``, ``exp``,
-    ``jur``, ``pjob``, ``run``, ``snap``, ``src``, ``sv``, ``whr``.
+    ``jur``, ``pjob``, ``run``, ``snap``, ``src``, ``stg``, ``sv``, ``whr``.
     """
     if prefix not in _ALLOWED_PREFIXES:
         raise ValueError(
