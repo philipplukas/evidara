@@ -18,8 +18,8 @@ The MVP test plan assumes bundle ingestion, canonical `Document`, `Section`, and
 
 ## Current automated gates
 
-- **Pre-commit:** root [`.pre-commit-config.yaml`](../../.pre-commit-config.yaml) runs `bash scripts/check-document-intelligence.sh` when DI/contracts-related paths change.
-- **CI:** [`.github/workflows/document-intelligence.yml`](../../.github/workflows/document-intelligence.yml) runs the same script on PR/push path filters.
+- **Pre-commit:** root [`.pre-commit-config.yaml`](../../../.pre-commit-config.yaml) runs `bash scripts/check-document-intelligence.sh` when DI/contracts-related paths change.
+- **CI:** [`.github/workflows/document-intelligence.yml`](../../../.github/workflows/document-intelligence.yml) runs the same script on PR/push path filters.
 - **Script gate:** `scripts/check-document-intelligence.sh` performs:
   - contract/schema example validation
   - `python3 -m unittest discover -s tests -v`
