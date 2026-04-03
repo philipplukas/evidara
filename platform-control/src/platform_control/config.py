@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     event_publisher_backend: Literal["noop", "pubsub"] = "noop"
     raw_artifact_pubsub_topic: str = "raw-artifact-available"
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
+    run_dispatch_backend: Literal["inline", "worker"] = "inline"
 
 
 @lru_cache

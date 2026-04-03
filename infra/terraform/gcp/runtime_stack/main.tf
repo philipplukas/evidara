@@ -12,6 +12,25 @@ locals {
     var.event_topic_names,
     toset([for subscription in values(var.event_subscriptions) : subscription.topic_name]),
   )
+
+  prefixed_secret_ids = {
+    for key, secret_id in var.runtime_secret_ids :
+    key => "${secret_id}-${local.environment}"
+  }
+
+  prefixed_service_account_ids = {
+    for key, account_id in var.runtime_service_account_ids :
+    key => "${account_id}-${local.environment}"
+  }
+
+  cloud_run_services = {
+    for service_name, service in var.cloud_run_services :
+    service_name => merge(service, {
+      prefixed_name = "${service_name}-${local.environment}"
+    })
+  }
+
+  cloud_sql_instance_name = "evidara-control-${local.environment}"
 }
 
 check "subscription_topics_exist" {
@@ -65,4 +84,170 @@ resource "google_pubsub_subscription" "events" {
   ack_deadline_seconds       = each.value.ack_deadline_seconds
   message_retention_duration = each.value.message_retention_duration
   labels                     = local.labels
+}
+
+resource "google_service_account" "runtime" {
+  for_each = local.prefixed_service_account_ids
+
+  account_id   = each.value
+  display_name = "${replace(each.key, "_", " ")} ${local.environment}"
+}
+
+resource "google_project_iam_member" "runtime_pubsub_publisher" {
+  for_each = google_service_account.runtime
+
+  project = var.project_id
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${each.value.email}"
+}
+
+resource "google_project_iam_member" "runtime_pubsub_subscriber" {
+  for_each = google_service_account.runtime
+
+  project = var.project_id
+  role    = "roles/pubsub.subscriber"
+  member  = "serviceAccount:${each.value.email}"
+}
+
+resource "google_project_iam_member" "runtime_storage_object_admin" {
+  for_each = google_service_account.runtime
+
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${each.value.email}"
+}
+
+resource "google_secret_manager_secret" "runtime" {
+  for_each = local.prefixed_secret_ids
+
+  secret_id = each.value
+  replication {
+    auto {}
+  }
+
+  labels = local.labels
+}
+
+resource "google_project_iam_member" "runtime_secret_accessor" {
+  for_each = google_service_account.runtime
+
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${each.value.email}"
+}
+
+resource "google_sql_database_instance" "platform_control" {
+  count = var.enable_cloud_sql ? 1 : 0
+
+  name             = local.cloud_sql_instance_name
+  region           = var.region
+  database_version = "POSTGRES_15"
+
+  settings {
+    tier            = var.cloud_sql_tier
+    disk_size       = var.cloud_sql_disk_size_gb
+    disk_autoresize = true
+
+    ip_configuration {
+      ipv4_enabled = true
+      ssl_mode     = "ENCRYPTED_ONLY"
+    }
+
+    backup_configuration {
+      enabled = true
+    }
+
+    user_labels = local.labels
+  }
+
+  deletion_protection = true
+}
+
+resource "google_sql_database" "platform_control" {
+  count = var.enable_cloud_sql ? 1 : 0
+
+  name     = var.platform_control_database_name
+  instance = google_sql_database_instance.platform_control[0].name
+}
+
+resource "google_project_iam_member" "runtime_cloudsql_client" {
+  for_each = var.enable_cloud_sql ? google_service_account.runtime : {}
+
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${each.value.email}"
+}
+
+resource "google_cloud_run_v2_service" "runtime" {
+  for_each = local.cloud_run_services
+
+  name     = each.value.prefixed_name
+  location = var.region
+  ingress  = each.value.ingress
+
+  template {
+    service_account = google_service_account.runtime[each.value.service_account_key].email
+    timeout         = "${each.value.timeout_seconds}s"
+
+    scaling {
+      min_instance_count = each.value.min_instance_count
+      max_instance_count = each.value.max_instance_count
+    }
+
+    containers {
+      image = each.value.image
+
+      resources {
+        limits = {
+          cpu    = each.value.cpu
+          memory = each.value.memory
+        }
+      }
+
+      ports {
+        container_port = each.value.container_port
+      }
+
+      dynamic "env" {
+        for_each = each.value.env_vars
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = each.value.secret_env_vars
+        content {
+          name = env.key
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.runtime[env.value.secret_name].secret_id
+              version = env.value.version
+            }
+          }
+        }
+      }
+    }
+  }
+
+  labels = local.labels
+
+  depends_on = [
+    google_project_iam_member.runtime_secret_accessor,
+    google_project_iam_member.runtime_storage_object_admin,
+  ]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "runtime_public_invoker" {
+  for_each = {
+    for name, service in local.cloud_run_services :
+    name => service if service.allow_unauthenticated
+  }
+
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.runtime[each.key].name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 }

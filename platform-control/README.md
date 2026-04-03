@@ -30,6 +30,13 @@ curl -X POST "http://localhost:8080/v1/reference-data/hierarchy/sync?dry_run=tru
 curl -X POST "http://localhost:8080/v1/reference-data/hierarchy/sync"
 ```
 
+Dispatch queued runs via connector worker:
+
+```bash
+uv run platform-control-connector-worker --once
+uv run platform-control-connector-worker --limit 25 --interval-seconds 10
+```
+
 Local configuration starts from `.env.example`. Keep real secrets out of Git.
 
 ## Checks

@@ -10,7 +10,7 @@ Initial implementation scaffolding now exists under `document-intelligence/`. Th
 
 For the current M4 slice, freeze the primary happy path on Firecrawl-acquired HTML bundles with one primary document artifact. The existing RIS-style XML path remains useful regression coverage, but it is not the required deployment path for the first end-to-end searchable slice.
 
-The production processing pipelines are still not fully implemented. The internal ingress API now exists, but deployed Pub/Sub subscription wiring, YAML policy resolution, spaCy or comparable NLP stages, Docling-based structured extraction, Spark-native runtime execution, deploy/promotion execution for Terraform + Databricks Bundles, richer XML source-family coverage, citation extraction, jurisdiction resolution, and stricter final contract hardening are still pending.
+The production processing pipelines are still not fully implemented. A runtime Pub/Sub consumer scaffold and an internal ingress API now exist for `artifact_bundle.available` handling, but deployed subscription wiring, Spark-native runtime wiring, CI/CD deployment integration for Terraform + Bundles, richer XML source-family coverage, citation extraction, jurisdiction resolution, and stricter final contract hardening are still pending.
 
 See [Document Intelligence Implementation Plan](document-intelligence-implementation-plan.md) for the planned architecture and phased delivery approach.
 

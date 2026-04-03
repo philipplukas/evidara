@@ -41,9 +41,12 @@ class RunService:
         self,
         session: AsyncSession,
         provider: FirecrawlProvider | None = None,
+        *,
+        run_dispatch_backend: str = "inline",
     ) -> None:
         self.session = session
         self.provider = provider
+        self.run_dispatch_backend = run_dispatch_backend
 
     async def create_run(self, request: CreateRunRequest) -> Run:
         source = await self.session.get(Source, request.source_id)
@@ -69,24 +72,40 @@ class RunService:
         self.session.add(run)
         await self.session.flush()
 
-        if self.provider is None:
-            raise ProviderConfigurationError("A provider is required before creating runs.")
+        if self.run_dispatch_backend == "worker":
+            await self.session.commit()
+            await self.session.refresh(run)
+            return run
 
-        provider_result = await self.provider.start_run(source, source_version, run)
-        provider_job = ProviderJob(
-            run_id=run.run_id,
-            external_job_id=provider_result.external_job_id,
-            status=ProviderJobStatus.ACCEPTED,
-            request_payload=provider_result.request_payload,
-            response_payload=provider_result.response_payload,
-        )
-        self.session.add(provider_job)
-
-        run.status = RunStatus.RUNNING
-        run.started_at = datetime.now(UTC)
+        await self._dispatch_run(source, source_version, run)
         await self.session.commit()
         await self.session.refresh(run)
         return run
+
+    async def dispatch_pending_runs(self, limit: int = 10) -> int:
+        if self.provider is None:
+            raise ProviderConfigurationError("A provider is required before dispatching runs.")
+
+        pending_runs = list(
+            await self.session.scalars(
+                select(Run)
+                .where(Run.status == RunStatus.PENDING)
+                .order_by(Run.created_at.asc())
+                .limit(limit)
+            )
+        )
+        dispatched = 0
+        for run in pending_runs:
+            source = await self.session.get(Source, run.source_id)
+            source_version = await self.session.get(SourceVersion, run.source_version_id)
+            if source is None or source_version is None:
+                continue
+            await self._dispatch_run(source, source_version, run)
+            dispatched += 1
+
+        if dispatched > 0:
+            await self.session.commit()
+        return dispatched
 
     async def get_run(self, run_id: str) -> Run:
         run = await self.session.get(Run, run_id)
@@ -257,3 +276,24 @@ class RunService:
             status="ok" if ok else "warn",
             detail=success if ok else failure,
         )
+
+    async def _dispatch_run(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+        run: Run,
+    ) -> None:
+        if self.provider is None:
+            raise ProviderConfigurationError("A provider is required before creating runs.")
+
+        provider_result = await self.provider.start_run(source, source_version, run)
+        provider_job = ProviderJob(
+            run_id=run.run_id,
+            external_job_id=provider_result.external_job_id,
+            status=ProviderJobStatus.ACCEPTED,
+            request_payload=provider_result.request_payload,
+            response_payload=provider_result.response_payload,
+        )
+        self.session.add(provider_job)
+        run.status = RunStatus.RUNNING
+        run.started_at = datetime.now(UTC)

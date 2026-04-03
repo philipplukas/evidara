@@ -33,7 +33,11 @@ async def create_run(
     session: SessionDep,
     provider: ProviderDep,
 ) -> RunResponse:
-    service = RunService(session, provider)
+    service = RunService(
+        session,
+        provider,
+        run_dispatch_backend=get_settings().run_dispatch_backend,
+    )
     return await service.create_run(request)
 
 
