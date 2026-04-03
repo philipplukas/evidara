@@ -34,7 +34,7 @@ def test_get_raw_artifact_publisher_requires_project_for_short_topic_names() -> 
         get_raw_artifact_publisher(settings)
 
 
-def test_get_raw_artifact_publisher_accepts_full_topic_paths_without_project_id(monkeypatch) -> None:
+def test_get_raw_artifact_publisher_accepts_full_topic_paths(monkeypatch) -> None:
     monkeypatch.setattr(
         "platform_control.events.publisher.pubsub_v1.PublisherClient",
         FakePublisherClient,
