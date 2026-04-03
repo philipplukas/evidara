@@ -233,13 +233,76 @@ async def test_run_detail_lists_expose_resources_artifacts_and_provider_jobs(ses
     raw_artifacts = await run_service.list_raw_artifacts(run.run_id)
     provider_jobs = await run_service.list_provider_jobs(run.run_id)
 
-    assert [resource.captured_resource_id for resource in captured_resources] == ["cap_detail_1"]
-    assert captured_resources[0].title == "Decision detail"
-    assert [artifact.artifact_id for artifact in raw_artifacts] == ["art_detail_1"]
-    assert raw_artifacts[0].artifact_metadata == {"pageTitle": "Decision"}
-    assert [job.provider_job_id for job in provider_jobs] == [provider_job.provider_job_id]
-    assert provider_jobs[0].status is ProviderJobStatus.COMPLETED
-    assert provider_jobs[0].last_event_type == "crawl.completed"
+    cap_ids = [r.captured_resource_id for r in captured_resources.data]
+    assert cap_ids == ["cap_detail_1"]
+    assert captured_resources.data[0].title == "Decision detail"
+    assert captured_resources.total == 1
+    assert [artifact.artifact_id for artifact in raw_artifacts.data] == ["art_detail_1"]
+    assert raw_artifacts.data[0].artifact_metadata == {"pageTitle": "Decision"}
+    assert raw_artifacts.total == 1
+    assert [job.provider_job_id for job in provider_jobs.data] == [provider_job.provider_job_id]
+    assert provider_jobs.data[0].status is ProviderJobStatus.COMPLETED
+    assert provider_jobs.data[0].last_event_type == "crawl.completed"
+    assert provider_jobs.total == 1
+
+
+@pytest.mark.asyncio
+async def test_run_scoped_captured_resource_list_is_paginated(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run = await RunService(session, StubProvider()).create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    for i in range(3):
+        artifact_id = f"art_pag_{i}"
+        session.add(
+            RawArtifact(
+                artifact_id=artifact_id,
+                run_id=run.run_id,
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                storage_path=f"gs://bucket/{artifact_id}",
+                content_type="text/html",
+                artifact_metadata={},
+            )
+        )
+        await session.flush()
+        session.add(
+            CapturedResource(
+                captured_resource_id=f"cap_pag_{i}",
+                artifact_id=artifact_id,
+                run_id=run.run_id,
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                provider_job_id=None,
+                source_url=f"https://example.com/{i}",
+                final_url=f"https://example.com/{i}",
+                title=f"Page {i}",
+                content_type="text/html",
+                checksum=f"chk_{i}",
+                http_status=200,
+                discovery_depth=1,
+            )
+        )
+        await session.flush()
+    await session.commit()
+
+    run_service = RunService(session)
+    first_page = await run_service.list_captured_resources(run.run_id, limit=2, offset=0)
+    second_page = await run_service.list_captured_resources(run.run_id, limit=2, offset=2)
+
+    assert first_page.total == 3
+    assert len(first_page.data) == 2
+    assert second_page.total == 3
+    assert len(second_page.data) == 1
+    seen = {r.captured_resource_id for r in first_page.data} | {
+        r.captured_resource_id for r in second_page.data
+    }
+    assert len(seen) == 3
 
 
 @pytest.mark.asyncio

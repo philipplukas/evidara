@@ -179,6 +179,9 @@ async def test_preview_run_reaches_terminal_state_and_exposes_summary(session_ma
         captured_resources = await client.get(f"/v1/runs/{run_id}/captured-resources")
         assert captured_resources.status_code == 200
         captured_resources_body = captured_resources.json()
+        assert captured_resources_body["total"] == 2
+        assert captured_resources_body["limit"] == 100
+        assert captured_resources_body["offset"] == 0
         assert len(captured_resources_body["data"]) == 2
         assert captured_resources_body["data"][0]["title"] == "Decision 2026/01"
         assert captured_resources_body["data"][1]["content_type"] == "application/pdf"
@@ -186,6 +189,9 @@ async def test_preview_run_reaches_terminal_state_and_exposes_summary(session_ma
         raw_artifacts_response = await client.get(f"/v1/runs/{run_id}/raw-artifacts")
         assert raw_artifacts_response.status_code == 200
         raw_artifacts_body = raw_artifacts_response.json()
+        assert raw_artifacts_body["total"] == 2
+        assert raw_artifacts_body["limit"] == 100
+        assert raw_artifacts_body["offset"] == 0
         assert len(raw_artifacts_body["data"]) == 2
         assert raw_artifacts_body["data"][0]["storage_path"]
         assert {artifact["content_type"] for artifact in raw_artifacts_body["data"]} == {
@@ -196,6 +202,9 @@ async def test_preview_run_reaches_terminal_state_and_exposes_summary(session_ma
         provider_jobs_response = await client.get(f"/v1/runs/{run_id}/provider-jobs")
         assert provider_jobs_response.status_code == 200
         provider_jobs_body = provider_jobs_response.json()
+        assert provider_jobs_body["total"] == 1
+        assert provider_jobs_body["limit"] == 100
+        assert provider_jobs_body["offset"] == 0
         assert len(provider_jobs_body["data"]) == 1
         assert provider_jobs_body["data"][0]["external_job_id"] == "crawl_preview_123"
         assert provider_jobs_body["data"][0]["status"] == "completed"

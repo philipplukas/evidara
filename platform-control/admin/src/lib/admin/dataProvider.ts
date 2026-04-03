@@ -21,6 +21,13 @@ type ListResponse<T> = {
   data: T[];
 };
 
+type RunScopedPaginatedList<T> = {
+  data: T[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 type ReferenceDataBase = {
   created_at: string;
   updated_at: string;
@@ -452,6 +459,17 @@ const getSimpleListResult = async <TResource extends SimpleListResourceName>(
   };
 };
 
+const buildRunScopedListQuery = (params: GetListParams): string => {
+  const page = params.pagination?.page ?? 1;
+  const perPage = params.pagination?.perPage ?? 100;
+  const limit = Math.min(Math.max(perPage, 1), 500);
+  const offset = Math.max((page - 1) * perPage, 0);
+  const query = new URLSearchParams();
+  query.set("limit", String(limit));
+  query.set("offset", String(offset));
+  return `?${query.toString()}`;
+};
+
 const getRunDetailList = async <TResource extends RunDetailResourceName>(
   resource: TResource,
   params: GetListParams,
@@ -464,12 +482,12 @@ const getRunDetailList = async <TResource extends RunDetailResourceName>(
     };
   }
   const config = RUN_DETAIL_RESOURCE_CONFIG[resource];
-  const response = await requestJson<ListResponse<ResourceRecordMap[TResource]>>(
-    config.path(runId),
+  const response = await requestJson<RunScopedPaginatedList<ResourceRecordMap[TResource]>>(
+    `${config.path(runId)}${buildRunScopedListQuery(params)}`,
   );
   return {
     data: response.data.map((item) => toRecord(item, config.idField)),
-    total: response.data.length,
+    total: response.total,
   };
 };
 

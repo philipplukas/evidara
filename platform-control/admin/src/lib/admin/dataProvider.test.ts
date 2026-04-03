@@ -83,6 +83,9 @@ describe("controlPlaneDataProvider", () => {
               updated_at: "2026-04-03T09:01:00Z",
             },
           ],
+          total: 1,
+          limit: 100,
+          offset: 0,
         }),
         {
           status: 200,
@@ -100,7 +103,7 @@ describe("controlPlaneDataProvider", () => {
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/platform-control/v1/runs/run_01/provider-jobs",
+      "/api/platform-control/v1/runs/run_01/provider-jobs?limit=100&offset=0",
       expect.objectContaining({
         cache: "no-store",
         headers: {

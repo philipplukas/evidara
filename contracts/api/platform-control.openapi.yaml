@@ -366,6 +366,8 @@ paths:
       tags: [runs]
       parameters:
         - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/RunScopedListLimit"
+        - $ref: "#/components/parameters/RunScopedListOffset"
       responses:
         "200":
           description: Captured resources for the run
@@ -383,6 +385,8 @@ paths:
       tags: [runs]
       parameters:
         - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/RunScopedListLimit"
+        - $ref: "#/components/parameters/RunScopedListOffset"
       responses:
         "200":
           description: Raw artifacts for the run
@@ -400,6 +404,8 @@ paths:
       tags: [runs]
       parameters:
         - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/RunScopedListLimit"
+        - $ref: "#/components/parameters/RunScopedListOffset"
       responses:
         "200":
           description: Provider jobs for the run
@@ -619,6 +625,25 @@ components:
       schema:
         type: string
         pattern: "^run_[a-z0-9]+$"
+    RunScopedListLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return for this run-scoped list.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    RunScopedListOffset:
+      name: offset
+      in: query
+      required: false
+      description: Number of items to skip before returning results.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
 
   schemas:
     Jurisdiction:
@@ -1065,17 +1090,66 @@ components:
             - type: "null"
 
     RunListItem:
-      allOf:
-        - $ref: "#/components/schemas/Run"
-        - type: object
-          required:
-            - source_name
-            - version_label
-          properties:
-            source_name:
-              type: string
-            version_label:
-              type: string
+      type: object
+      description: >
+        Run summary row for operator list views. Omits scope/replay metadata, which is only
+        materialized on the full Run detail response.
+      required:
+        - run_id
+        - source_id
+        - source_version_id
+        - mode
+        - status
+        - artifacts_count
+        - captured_resources_count
+        - created_at
+        - updated_at
+        - source_name
+        - version_label
+      properties:
+        run_id:
+          type: string
+          pattern: "^run_[a-z0-9]+$"
+        source_id:
+          type: string
+          pattern: "^src_[a-z0-9]+$"
+        source_version_id:
+          type: string
+          pattern: "^sv_[a-z0-9]+$"
+        mode:
+          type: string
+          enum: [preview, production]
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        started_at:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        completed_at:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        artifacts_count:
+          type: integer
+        captured_resources_count:
+          type: integer
+        failure_reason:
+          oneOf:
+            - type: string
+            - type: "null"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        source_name:
+          type: string
+        version_label:
+          type: string
 
     RunListResponse:
       type: object
@@ -1140,12 +1214,21 @@ components:
 
     CapturedResourceListResponse:
       type: object
-      required: [data]
+      required: [data, total, limit, offset]
       properties:
         data:
           type: array
           items:
             $ref: "#/components/schemas/CapturedResource"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
 
     RawArtifact:
       type: object
@@ -1188,12 +1271,21 @@ components:
 
     RawArtifactListResponse:
       type: object
-      required: [data]
+      required: [data, total, limit, offset]
       properties:
         data:
           type: array
           items:
             $ref: "#/components/schemas/RawArtifact"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
 
     ProviderJob:
       type: object
@@ -1241,12 +1333,21 @@ components:
 
     ProviderJobListResponse:
       type: object
-      required: [data]
+      required: [data, total, limit, offset]
       properties:
         data:
           type: array
           items:
             $ref: "#/components/schemas/ProviderJob"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
 
     CreateRunRequest:
       type: object

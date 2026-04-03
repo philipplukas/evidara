@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.config import get_settings
@@ -69,27 +69,33 @@ async def get_run(
 async def list_run_captured_resources(
     run_id: str,
     session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> CapturedResourceListResponse:
     service = RunService(session)
-    return CapturedResourceListResponse(data=await service.list_captured_resources(run_id))
+    return await service.list_captured_resources(run_id, limit=limit, offset=offset)
 
 
 @router.get("/{run_id}/raw-artifacts", response_model=RawArtifactListResponse)
 async def list_run_raw_artifacts(
     run_id: str,
     session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> RawArtifactListResponse:
     service = RunService(session)
-    return RawArtifactListResponse(data=await service.list_raw_artifacts(run_id))
+    return await service.list_raw_artifacts(run_id, limit=limit, offset=offset)
 
 
 @router.get("/{run_id}/provider-jobs", response_model=ProviderJobListResponse)
 async def list_run_provider_jobs(
     run_id: str,
     session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ProviderJobListResponse:
     service = RunService(session)
-    return ProviderJobListResponse(data=await service.list_provider_jobs(run_id))
+    return await service.list_provider_jobs(run_id, limit=limit, offset=offset)
 
 
 @router.post("/{run_id}/cancel", response_model=RunResponse)

@@ -143,6 +143,9 @@ class CapturedResourceResponse(BaseModel):
 
 class CapturedResourceListResponse(BaseModel):
     data: list[CapturedResourceResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 class RawArtifactResponse(BaseModel):
@@ -161,6 +164,9 @@ class RawArtifactResponse(BaseModel):
 
 class RawArtifactListResponse(BaseModel):
     data: list[RawArtifactResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 class ProviderJobResponse(BaseModel):
@@ -180,6 +186,9 @@ class ProviderJobResponse(BaseModel):
 
 class ProviderJobListResponse(BaseModel):
     data: list[ProviderJobResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 class WebhookAcceptedResponse(BaseModel):

@@ -19,9 +19,12 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.schemas.run import (
+    CapturedResourceListResponse,
     CapturedResourceResponse,
     CreateRunRequest,
+    ProviderJobListResponse,
     ProviderJobResponse,
+    RawArtifactListResponse,
     RawArtifactResponse,
     RunListItemResponse,
     RunPreviewSummaryBreakdownEntry,
@@ -157,32 +160,73 @@ class RunService:
             raise NotFoundError(f"Run not found: {run_id}")
         return run
 
-    async def list_captured_resources(self, run_id: str) -> list[CapturedResourceResponse]:
+    async def list_captured_resources(
+        self,
+        run_id: str,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> CapturedResourceListResponse:
         await self.get_run(run_id)
+        total_stmt = (
+            select(func.count())
+            .select_from(CapturedResource)
+            .where(CapturedResource.run_id == run_id)
+        )
+        total = int((await self.session.execute(total_stmt)).scalar_one())
         result = await self.session.scalars(
             select(CapturedResource)
             .where(CapturedResource.run_id == run_id)
             .order_by(CapturedResource.created_at.asc())
+            .limit(limit)
+            .offset(offset)
         )
-        return [CapturedResourceResponse.model_validate(resource) for resource in result]
+        data = [CapturedResourceResponse.model_validate(resource) for resource in result]
+        return CapturedResourceListResponse(data=data, total=total, limit=limit, offset=offset)
 
-    async def list_raw_artifacts(self, run_id: str) -> list[RawArtifactResponse]:
+    async def list_raw_artifacts(
+        self,
+        run_id: str,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> RawArtifactListResponse:
         await self.get_run(run_id)
+        total_stmt = (
+            select(func.count()).select_from(RawArtifact).where(RawArtifact.run_id == run_id)
+        )
+        total = int((await self.session.execute(total_stmt)).scalar_one())
         result = await self.session.scalars(
             select(RawArtifact)
             .where(RawArtifact.run_id == run_id)
             .order_by(RawArtifact.created_at.asc())
+            .limit(limit)
+            .offset(offset)
         )
-        return [RawArtifactResponse.model_validate(artifact) for artifact in result]
+        data = [RawArtifactResponse.model_validate(artifact) for artifact in result]
+        return RawArtifactListResponse(data=data, total=total, limit=limit, offset=offset)
 
-    async def list_provider_jobs(self, run_id: str) -> list[ProviderJobResponse]:
+    async def list_provider_jobs(
+        self,
+        run_id: str,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> ProviderJobListResponse:
         await self.get_run(run_id)
+        total_stmt = (
+            select(func.count()).select_from(ProviderJob).where(ProviderJob.run_id == run_id)
+        )
+        total = int((await self.session.execute(total_stmt)).scalar_one())
         result = await self.session.scalars(
             select(ProviderJob)
             .where(ProviderJob.run_id == run_id)
             .order_by(ProviderJob.created_at.asc())
+            .limit(limit)
+            .offset(offset)
         )
-        return [ProviderJobResponse.model_validate(job) for job in result]
+        data = [ProviderJobResponse.model_validate(job) for job in result]
+        return ProviderJobListResponse(data=data, total=total, limit=limit, offset=offset)
 
     async def cancel_run(self, run_id: str) -> Run:
         run = await self.get_run(run_id)
