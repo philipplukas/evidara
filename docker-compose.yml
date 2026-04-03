@@ -89,6 +89,24 @@ services:
   #     opensearch:
   #       condition: service_healthy
 
+  # Optional: Platform-control connector worker
+  # Polls for pending runs and dispatches them to connector providers.
+  # Uncomment to run the worker alongside the API.
+  # platform-control-worker:
+  #   build:
+  #     context: ./platform-control
+  #     dockerfile: Dockerfile.worker
+  #   container_name: evidara-platform-control-worker
+  #   env_file: ./platform-control/.env
+  #   environment:
+  #     PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
+  #     PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: worker
+  #   command: ["platform-control-connector-worker", "--limit", "10", "--interval-seconds", "5"]
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
 volumes:
   platform-control-postgres-data:
   opensearch-data:

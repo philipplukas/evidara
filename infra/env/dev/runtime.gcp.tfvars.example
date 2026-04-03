@@ -96,3 +96,13 @@ cloud_run_services = {
     }
   }
 }
+
+# --- Monitoring & Alerting ---
+# Set enable_monitoring = true and provide notification targets to
+# provision Cloud Monitoring alert policies.
+# See docs/adr/sli-slo-definitions.md for SLI/SLO details.
+
+enable_monitoring             = false
+monitoring_notification_email = ""
+# monitoring_slack_webhook_url = ""  # Set via TF_VAR or secrets
+
