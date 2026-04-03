@@ -13,6 +13,14 @@ function createRepositoryMock(): ProjectionRepository {
     upsertProjection: vi.fn().mockResolvedValue(undefined),
     deleteProjection: vi.fn().mockResolvedValue(undefined),
     appendHistory: vi.fn().mockResolvedValue(undefined),
+    queryHistory: vi.fn().mockResolvedValue({ data: [], total: 0, limit: 50, offset: 0 }),
+    getHistoryStats: vi.fn().mockResolvedValue({
+      totalEvents: 0,
+      applied: 0,
+      stale: 0,
+      ignoredDuplicate: 0,
+      uniqueDocuments: 0,
+    }),
   };
 }
 
