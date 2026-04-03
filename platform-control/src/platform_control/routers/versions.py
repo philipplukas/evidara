@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
-from platform_control.schemas.source import SourceVersionResponse
+from platform_control.schemas.source import SourceVersionResponse, UpdateSourceVersionRequest
 from platform_control.services.source_service import SourceService
 
 router = APIRouter(prefix="/v1/versions", tags=["source-versions"])
@@ -18,6 +18,16 @@ async def approve_source_version(
 ) -> SourceVersionResponse:
     service = SourceService(session)
     return await service.approve_source_version(source_version_id)
+
+
+@router.patch("/{source_version_id}", response_model=SourceVersionResponse)
+async def update_source_version(
+    source_version_id: str,
+    request: UpdateSourceVersionRequest,
+    session: SessionDep,
+) -> SourceVersionResponse:
+    service = SourceService(session)
+    return await service.update_source_version(source_version_id, request)
 
 
 @router.post("/{source_version_id}/reject", response_model=SourceVersionResponse)

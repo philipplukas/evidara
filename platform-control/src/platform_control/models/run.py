@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Enum, ForeignKey
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from platform_control.domain import RunMode, RunStatus
@@ -23,8 +23,12 @@ class Run(TimestampMixin, Base):
     status: Mapped[RunStatus] = mapped_column(
         Enum(RunStatus, native_enum=False), default=RunStatus.PENDING
     )
-    started_at: Mapped[datetime | None] = mapped_column(nullable=True, default=utcnow)
-    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=utcnow,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     artifacts_count: Mapped[int] = mapped_column(default=0)
     captured_resources_count: Mapped[int] = mapped_column(default=0)
     failure_reason: Mapped[str | None] = mapped_column(nullable=True)

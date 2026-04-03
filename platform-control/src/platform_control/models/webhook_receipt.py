@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, UniqueConstraint
+from sqlalchemy import JSON, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from platform_control.ids import generate_prefixed_id
@@ -20,5 +20,5 @@ class WebhookReceipt(TimestampMixin, Base):
     payload_sha256: Mapped[str] = mapped_column()
     signature: Mapped[str | None] = mapped_column(nullable=True)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
-    received_at: Mapped[datetime] = mapped_column(default=utcnow)
-    processed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

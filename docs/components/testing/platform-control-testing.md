@@ -34,6 +34,8 @@ Testing strategy for the platform-control component, which owns:
 - Reference-data seed files validate before any write is attempted
 - Required fields for source creation: name, jurisdiction, authority
 - Source version requires a source to exist
+- Draft and rejected source versions can be edited, but approved versions cannot
+- Reference-data create/update flows validate linked jurisdictions
 
 #### Provider integration tests
 
@@ -44,6 +46,12 @@ Testing strategy for the platform-control component, which owns:
 - GCS artifact storage writes deterministic object paths
 - Pub/Sub event publishing emits the expected `artifact_bundle.available` envelope after immutable handoff storage succeeds
 - Seed loading is idempotent and supports dry-run mode
+
+### Integration Tests
+
+- Run the webhook persistence path against real Postgres using Testcontainers
+- Verify webhook dedupe works with dialect-specific `ON CONFLICT` handling
+- Catch ORM/schema drift that SQLite would hide, especially timestamp and JSON-column behavior
 
 ### Contract Tests
 
@@ -65,6 +73,8 @@ Testing strategy for the platform-control component, which owns:
 - One source family end-to-end: register source → create version → approve → trigger run → verify artifact metadata is recorded and `artifact_bundle.available` is emitted
 - Health check endpoint returns 200
 - Firecrawl-backed preview run using stubbed provider responses reaches a terminal state
+- Failed preview run returns `failed` status with a surfaced reason
+- Preview summary endpoint exposes heuristic review signals for operators
 
 ---
 
@@ -106,7 +116,6 @@ These tests should answer:
 | Phase | Addition |
 |-------|---------|
 | Post-MVP | Multi-source family smoke tests |
-| Post-MVP | Integration tests with real database |
 | Later | Approval notification tests |
 | Later | Concurrent run behavior tests |
 | Later | Source health trend monitoring |

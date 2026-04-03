@@ -16,6 +16,6 @@ npm run --silent check:mermaid
 
 # 3. Build docs site (strict mode catches broken cross-references)
 echo "Building docs site (strict mode)..."
-mkdocs build --strict --quiet
+python3 -m mkdocs build --strict --quiet
 
 echo "All documentation checks passed."

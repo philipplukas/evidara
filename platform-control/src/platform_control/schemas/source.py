@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from platform_control.domain import FirecrawlMode, SourceStatus, SourceVersionStatus
 
@@ -54,6 +54,22 @@ class CreateSourceVersionRequest(BaseModel):
     version_label: str
     acquisition_spec: FirecrawlAcquisitionSpec
     extractor_profile_id: str | None = None
+
+
+class UpdateSourceVersionRequest(BaseModel):
+    version_label: str | None = None
+    acquisition_spec: FirecrawlAcquisitionSpec | None = None
+    extractor_profile_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_has_changes(self) -> UpdateSourceVersionRequest:
+        if (
+            self.version_label is None
+            and self.acquisition_spec is None
+            and self.extractor_profile_id is None
+        ):
+            raise ValueError("At least one field must be provided.")
+        return self
 
 
 class SourceVersionResponse(BaseModel):

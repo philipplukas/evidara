@@ -6,9 +6,12 @@ Own source lifecycle and operational control. Platform-control is the entry poin
 
 ## Current state
 
-Platform-control now has a running FastAPI service with persisted entities and migration-backed schemas for source lifecycle, runs, webhook receipts, raw artifacts, bundle manifests, and DI status/lifecycle event consumption. Core API endpoints are implemented for sources, versions, runs, Firecrawl callbacks, and DI event ingest (`document.processing_status.updated`, `document.processed`, `document.withdrawn`) with run-scoped read surfaces.
+Platform-control now has a running FastAPI service with persisted entities and migration-backed schemas for source lifecycle, runs, webhook receipts, raw artifacts, bundle manifests, and DI status/lifecycle event consumption. Core API endpoints are implemented for reference data, sources, versions, runs, preview-summary review, Firecrawl callbacks, and DI event ingest (`document.processing_status.updated`, `document.processed`, `document.withdrawn`) with run-scoped read surfaces.
 
 For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope_type` are frozen through source-version acquisition config and copied into bundle/event provenance. First-class corpus CRUD is still follow-on work.
+
+Repo-owned Retool control-panel artifacts now live under `platform-control/retool/`, including the
+control-panel manifest, direct-Postgres queries, preview workflow, and Source Setup Copilot prompt.
 
 See [Platform Control Implementation Plan](platform-control-implementation-plan.md) for the planned repo structure, worker layout, and phased delivery approach.
 
@@ -105,10 +108,12 @@ See [Platform Control Testing](testing/platform-control-testing.md) for the full
 Key tests:
 
 - Unit tests for run and approval state transitions
+- Unit tests for reference-data management and Firecrawl request mapping
 - Contract tests for `ArtifactBundleManifest`
 - Contract tests for `artifact_bundle.available`
 - Contract tests for consumed `document.processing_status.updated` values, including invalid-status handling
-- Smoke test for one source family lifecycle
+- Smoke tests for health, preview success, preview summary, and failed preview handling
+- Integration test for Postgres webhook-dedupe behavior
 
 ## Drift risks
 

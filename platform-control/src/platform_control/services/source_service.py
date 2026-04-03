@@ -9,7 +9,11 @@ from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.extractor_profile import ExtractorProfile
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
-from platform_control.schemas.source import CreateSourceRequest, CreateSourceVersionRequest
+from platform_control.schemas.source import (
+    CreateSourceRequest,
+    CreateSourceVersionRequest,
+    UpdateSourceVersionRequest,
+)
 
 
 class SourceService:
@@ -81,6 +85,39 @@ class SourceService:
             acquisition_spec=request.acquisition_spec.model_dump(mode="json"),
         )
         self.session.add(version)
+        await self.session.commit()
+        await self.session.refresh(version)
+        return version
+
+    async def update_source_version(
+        self,
+        source_version_id: str,
+        request: UpdateSourceVersionRequest,
+    ) -> SourceVersion:
+        version = await self._get_source_version(source_version_id)
+        if version.status not in {SourceVersionStatus.DRAFT, SourceVersionStatus.REJECTED}:
+            raise InvalidStateTransitionError(
+                f"Cannot edit source version in status {version.status}."
+            )
+
+        payload = request.model_dump(exclude_unset=True)
+        if "extractor_profile_id" in payload and payload["extractor_profile_id"] is not None:
+            extractor_profile = await self.session.get(
+                ExtractorProfile,
+                payload["extractor_profile_id"],
+            )
+            if extractor_profile is None:
+                raise NotFoundError(
+                    f"Extractor profile not found: {payload['extractor_profile_id']}"
+                )
+
+        if "version_label" in payload:
+            version.version_label = payload["version_label"]
+        if "acquisition_spec" in request.model_fields_set and request.acquisition_spec is not None:
+            version.acquisition_spec = request.acquisition_spec.model_dump(mode="json")
+        if "extractor_profile_id" in payload:
+            version.extractor_profile_id = payload["extractor_profile_id"]
+
         await self.session.commit()
         await self.session.refresh(version)
         return version
