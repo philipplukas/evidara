@@ -40,7 +40,7 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     @Inject(ConfigService)
     config: ConfigService,
   ) {
-    this.indexDocuments = config.get<string>('opensearch.indexDocuments') ?? 'documents';
+    this.indexDocuments = config.get<string>('opensearch.indexDocumentsRead') ?? 'documents-read';
   }
 
   async search(query: string, options?: SearchOptions): Promise<SearchResultEntity> {
