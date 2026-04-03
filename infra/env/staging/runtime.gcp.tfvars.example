@@ -26,6 +26,17 @@ cloud_run_services = {
       OPENSEARCH_INDEX_CITATIONS          = "evidara-citations-read-staging"
       OPENSEARCH_INDEX_PROJECTION_HISTORY = "evidara-projection-history-staging"
     }
+    secret_env_vars = {
+      OPENSEARCH_NODE = {
+        secret_name = "opensearch_node"
+      }
+      OPENSEARCH_USERNAME = {
+        secret_name = "opensearch_username"
+      }
+      OPENSEARCH_PASSWORD = {
+        secret_name = "opensearch_password"
+      }
+    }
   }
 }
 
