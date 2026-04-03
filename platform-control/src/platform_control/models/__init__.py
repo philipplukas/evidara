@@ -6,6 +6,7 @@ from platform_control.models.processing_status_update import ProcessingStatusUpd
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
+from platform_control.models.schedule import Schedule
 from platform_control.models.scrape_target import ScrapeTarget
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
@@ -21,6 +22,7 @@ __all__ = [
     "ProviderJob",
     "RawArtifact",
     "Run",
+    "Schedule",
     "ScrapeTarget",
     "Source",
     "SourceVersion",

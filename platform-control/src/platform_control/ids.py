@@ -32,6 +32,7 @@ _ALLOWED_PREFIXES = frozenset(
         "jur",
         "pjob",
         "run",
+        "sched",
         "snap",
         "src",
         "stg",
