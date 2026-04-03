@@ -7,6 +7,24 @@ terraform -chdir=infra/terraform/gcp/runtime_stack fmt -check
 terraform -chdir=infra/terraform/gcp/runtime_stack init -backend=false -input=false
 terraform -chdir=infra/terraform/gcp/runtime_stack validate
 
+runtime_variables_file="infra/terraform/gcp/runtime_stack/variables.tf"
+if ! grep -Eq "\"legal-search-document-processed\"[[:space:]]*=[[:space:]]*\\{" "${runtime_variables_file}"; then
+  echo "Missing legal-search document.processed subscription in ${runtime_variables_file}" >&2
+  exit 1
+fi
+if ! grep -Eq "\"legal-search-document-withdrawn\"[[:space:]]*=[[:space:]]*\\{" "${runtime_variables_file}"; then
+  echo "Missing legal-search document.withdrawn subscription in ${runtime_variables_file}" >&2
+  exit 1
+fi
+if ! grep -Eq "topic_name[[:space:]]*=[[:space:]]*\"document-processed\"" "${runtime_variables_file}"; then
+  echo "Missing document-processed topic mapping in ${runtime_variables_file}" >&2
+  exit 1
+fi
+if ! grep -Eq "topic_name[[:space:]]*=[[:space:]]*\"document-withdrawn\"" "${runtime_variables_file}"; then
+  echo "Missing document-withdrawn topic mapping in ${runtime_variables_file}" >&2
+  exit 1
+fi
+
 for env in dev staging prod; do
   runtime_tfvars_file="infra/env/${env}/runtime.gcp.tfvars.example"
   case "${env}" in
