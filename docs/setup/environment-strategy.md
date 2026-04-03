@@ -76,6 +76,16 @@ Current example files:
 - [`../../infra/env/dev/document_intelligence.databricks.tfvars`](../../infra/env/dev/document_intelligence.databricks.tfvars)
 - [`../../infra/env/staging/document_intelligence.databricks.tfvars`](../../infra/env/staging/document_intelligence.databricks.tfvars)
 - [`../../infra/env/prod/document_intelligence.databricks.tfvars`](../../infra/env/prod/document_intelligence.databricks.tfvars)
+- [`../../infra/env/dev/runtime.gcp.tfvars.example`](../../infra/env/dev/runtime.gcp.tfvars.example)
+- [`../../infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example)
+- [`../../infra/env/prod/runtime.gcp.tfvars.example`](../../infra/env/prod/runtime.gcp.tfvars.example)
+- [`../../infra/env/dev/opensearch.gke.tfvars.example`](../../infra/env/dev/opensearch.gke.tfvars.example)
+- [`../../infra/env/staging/opensearch.gke.tfvars.example`](../../infra/env/staging/opensearch.gke.tfvars.example)
+- [`../../infra/env/prod/opensearch.gke.tfvars.example`](../../infra/env/prod/opensearch.gke.tfvars.example)
+
+Runtime stack module checks can be run locally with:
+
+- `bash scripts/check-runtime-stack.sh`
 
 ## Naming Conventions
 
