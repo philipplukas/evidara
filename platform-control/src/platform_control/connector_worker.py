@@ -12,6 +12,7 @@ from platform_control.config import get_settings
 from platform_control.database import get_session_maker
 from platform_control.services.firecrawl_provider import FirecrawlProvider
 from platform_control.services.run_service import RunService
+from platform_control.services.schedule_evaluator import evaluate_due_schedules
 
 LOGGER = logging.getLogger("platform_control.connector_worker")
 
@@ -59,30 +60,53 @@ class _GracefulShutdown:
         self.should_exit = True
 
 
-async def _run_once(limit: int) -> int:
+async def _run_once(limit: int, *, enable_schedules: bool = True) -> int:
     settings = get_settings()
     provider = FirecrawlProvider(settings)
     session_maker = get_session_maker()
     async with session_maker() as session:
+        # Evaluate due schedules first — creates PENDING runs
+        scheduled = 0
+        if enable_schedules:
+            try:
+                scheduled = await evaluate_due_schedules(session)
+                if scheduled > 0:
+                    await session.commit()
+                    LOGGER.info(
+                        "Scheduled %d run(s) from due schedules",
+                        scheduled,
+                        extra={
+                            "extra_fields": {
+                                "event": "schedules_evaluated",
+                                "scheduled": scheduled,
+                            }
+                        },
+                    )
+            except Exception:
+                LOGGER.exception("Error evaluating schedules")
+                await session.rollback()
+
+        # Then dispatch pending runs (including any just created)
         service = RunService(session, provider, run_dispatch_backend="worker")
         return await service.dispatch_pending_runs(limit=limit)
 
 
-async def _run_loop(limit: int, interval_seconds: float) -> None:
+async def _run_loop(limit: int, interval_seconds: float, *, enable_schedules: bool = True) -> None:
     shutdown = _GracefulShutdown()
     cycle = 0
 
     LOGGER.info(
-        "Worker starting poll loop (limit=%d, interval=%.1fs)",
+        "Worker starting poll loop (limit=%d, interval=%.1fs, schedules=%s)",
         limit,
         interval_seconds,
+        enable_schedules,
     )
 
     while not shutdown.should_exit:
         cycle += 1
         start = time.monotonic()
         try:
-            dispatched = await _run_once(limit=limit)
+            dispatched = await _run_once(limit=limit, enable_schedules=enable_schedules)
             elapsed_ms = round((time.monotonic() - start) * 1000, 2)
             LOGGER.info(
                 "Poll cycle %d: dispatched %d run(s) in %.2fms",
@@ -132,12 +156,18 @@ def main() -> None:
         default=5.0,
         help="Seconds between poll cycles",
     )
+    parser.add_argument(
+        "--no-schedules",
+        action="store_true",
+        help="Disable schedule evaluation",
+    )
     args = parser.parse_args()
 
     _setup_logging()
+    enable_schedules = not args.no_schedules
 
     if args.once:
-        dispatched = asyncio.run(_run_once(limit=args.limit))
+        dispatched = asyncio.run(_run_once(limit=args.limit, enable_schedules=enable_schedules))
         LOGGER.info(
             "Single-shot: dispatched %d run(s)",
             dispatched,
@@ -150,7 +180,13 @@ def main() -> None:
         )
         return
 
-    asyncio.run(_run_loop(limit=args.limit, interval_seconds=args.interval_seconds))
+    asyncio.run(
+        _run_loop(
+            limit=args.limit,
+            interval_seconds=args.interval_seconds,
+            enable_schedules=enable_schedules,
+        )
+    )
 
 
 if __name__ == "__main__":

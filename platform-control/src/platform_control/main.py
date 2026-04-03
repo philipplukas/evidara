@@ -23,6 +23,7 @@ from platform_control.routers import (
     health,
     reference_data,
     runs,
+    schedules,
     sources,
     versions,
 )
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(sources.router)
     app.include_router(versions.router)
     app.include_router(runs.router)
+    app.include_router(schedules.router)
     app.include_router(firecrawl.router)
     app.include_router(di_events.router)
 

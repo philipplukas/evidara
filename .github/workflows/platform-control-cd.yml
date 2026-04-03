@@ -18,6 +18,10 @@ concurrency:
   group: runtime-cloud-run-cd-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  # Image tag = short SHA for traceability across environments
+  IMAGE_TAG: ${{ github.sha }}
+
 jobs:
   deploy-dev:
     name: Deploy runtime services to dev
@@ -48,32 +52,88 @@ jobs:
           gcloud run services update "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:latest"
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
 
       - name: Deploy platform-control worker (dev)
         run: |
           gcloud run services update "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:latest"
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
 
       - name: Deploy legal-search API (dev)
         run: |
           gcloud run services update "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:latest"
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:${IMAGE_TAG}"
 
       - name: Verify deployed revisions (dev)
+        id: verify-dev
         run: |
-          gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
+          PC_REV=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --format='value(status.latestReadyRevisionName)'
-          gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
+            --format='value(status.latestReadyRevisionName)')
+          LS_REV=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --format='value(status.latestReadyRevisionName)'
+            --format='value(status.latestReadyRevisionName)')
+          echo "platform_control_revision=${PC_REV}" >> "$GITHUB_OUTPUT"
+          echo "legal_search_revision=${LS_REV}" >> "$GITHUB_OUTPUT"
+          echo "### Dev Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | Revision |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|----------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| platform-control | \`${PC_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| legal-search-api | \`${LS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test — platform-control health (dev)
+        run: |
+          PC_URL=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          echo "Checking ${PC_URL}/health ..."
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${PC_URL}/health" || echo "000")
+          echo "HTTP ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::platform-control health check failed (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      - name: Smoke test — legal-search health (dev)
+        run: |
+          LS_URL=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          echo "Checking ${LS_URL}/health ..."
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${LS_URL}/health" || echo "000")
+          echo "HTTP ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::legal-search health check failed (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      - name: Smoke test — platform-control readiness (dev)
+        continue-on-error: true
+        run: |
+          PC_URL=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          echo "Checking ${PC_URL}/ready ..."
+          BODY=$(curl -s --max-time 10 "${PC_URL}/ready" || echo '{"status":"unreachable"}')
+          echo "${BODY}" | jq .
+          STATUS=$(echo "${BODY}" | jq -r '.status // "unknown"')
+          echo "Readiness status: ${STATUS}"
+          if [ "$STATUS" = "degraded" ]; then
+            echo "::warning::platform-control readiness is degraded"
+          fi
+
+  # ── Promotion Gate ──────────────────────────────
+  # The prod job requires the dev environment to pass.
+  # GitHub environment protection rules can add manual approval.
 
   deploy-prod:
     name: Deploy runtime services to prod
@@ -100,34 +160,67 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
+      # Deploy the SAME image SHA that passed dev smoke tests
       - name: Deploy platform-control API (prod)
         run: |
           gcloud run services update "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:latest"
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
 
       - name: Deploy platform-control worker (prod)
         run: |
           gcloud run services update "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:latest"
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
 
       - name: Deploy legal-search API (prod)
         run: |
           gcloud run services update "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:latest"
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:${IMAGE_TAG}"
 
       - name: Verify deployed revisions (prod)
         run: |
-          gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
+          PC_REV=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --format='value(status.latestReadyRevisionName)'
-          gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
+            --format='value(status.latestReadyRevisionName)')
+          LS_REV=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --format='value(status.latestReadyRevisionName)'
+            --format='value(status.latestReadyRevisionName)')
+          echo "### Prod Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | Revision |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|----------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| platform-control | \`${PC_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| legal-search-api | \`${LS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| image-tag | \`${IMAGE_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test — platform-control health (prod)
+        run: |
+          PC_URL=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${PC_URL}/health" || echo "000")
+          echo "platform-control health: HTTP ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::platform-control health check failed in prod (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      - name: Smoke test — legal-search health (prod)
+        run: |
+          LS_URL=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${LS_URL}/health" || echo "000")
+          echo "legal-search health: HTTP ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::legal-search health check failed in prod (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
