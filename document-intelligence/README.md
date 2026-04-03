@@ -19,12 +19,16 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 - Terraform stubs for Unity Catalog scaffolding under [`../infra/terraform/databricks/document_intelligence/`](../infra/terraform/databricks/document_intelligence/)
 - A top-level Databricks Terraform stack plus `dev` / `staging` / `prod` tfvars under [`../infra/terraform/databricks/document_intelligence_stack/`](../infra/terraform/databricks/document_intelligence_stack/) and [`../infra/env/`](../infra/env/)
 - SQL/bootstrap assets for published surface registration under [`databricks/sql/`](databricks/sql/)
+- Optional parser/NLP runtime flags (`DI_PARSER_BACKEND`, `DI_ENABLE_SPACY`) with safe defaults
+- Initial dbt scaffold under [`dbt/`](dbt/)
+- Databricks resource wiring for canonical processing, bronze autoloader bootstrap, dbt transformations, and smoke jobs under [`resources/`](resources/)
 
 ## What does not exist yet
 
-- Databricks workflow wiring
 - Spark-native Delta writes and Unity Catalog table/view creation automation
-- Terraform apply/deploy integration in CI/CD
+- Databricks bundle validate/deploy automation in CI/CD
+- Terraform apply/deploy automation in CI/CD
+- dbt run/test execution against a real Databricks SQL Warehouse in CI
 - Citation extraction
 - Canonical jurisdiction assignment
 - RIS-specific XML schema tuning beyond the current heuristic path
@@ -47,6 +51,40 @@ Set these together to switch the CLI path from the in-memory sink to the Delta s
 Optional:
 
 - `DI_PROCESSING_VERSION`
+- `DI_PARSER_BACKEND` (`legacy` by default, optional `docling` scaffold path)
+- `DI_ENABLE_SPACY` (`false` by default)
+- `DI_SPACY_MODEL_NAME` (`xx_sent_ud_sm` by default)
+- `DI_SPACY_MAX_CHARS_PER_SECTION` (`100000` by default)
+- `DI_SPACY_BATCH_SIZE` (`32` by default)
+
+## dbt validation
+
+The repository check script now validates dbt package resolution and project parsing:
+
+```bash
+bash scripts/check-document-intelligence.sh
+```
+
+The check currently runs:
+
+- JSON Schema validation for shared contracts and examples
+- `unittest` suite for `document-intelligence`
+- `dbt deps` + `dbt parse` (target `dev`) using [`dbt/profiles.yml`](dbt/profiles.yml)
+
+## Databricks Asset Bundle targets
+
+The bundle currently defines these targets:
+
+- `dev`
+- `staging`
+- `prod`
+
+Validate a target locally:
+
+```bash
+cd document-intelligence
+databricks bundle validate -t staging
+```
 
 You can also derive all three published surface URIs from a single root by setting:
 

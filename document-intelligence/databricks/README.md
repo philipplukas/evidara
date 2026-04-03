@@ -6,6 +6,9 @@ This directory documents the first Databricks-oriented runtime packaging for `do
 
 - `../databricks.yml`: Databricks Asset Bundle root for the component
 - `../resources/document_intelligence_job.yml`: Lakeflow Job definition for bundle processing
+- `../resources/document_intelligence_autoloader_job.yml`: bronze ingest bootstrap job definition
+- `../resources/document_intelligence_dbt_job.yml`: dbt transformation job definition
+- `../resources/document_intelligence_smoke_job.yml`: smoke notebook job definition
 - `sql/README.md`: Published-surface SQL/bootstrap guidance
 - [`../../infra/terraform/databricks/document_intelligence_stack/`](../../infra/terraform/databricks/document_intelligence_stack/): top-level Terraform stack for one Databricks workspace/environment
 - [`../../infra/terraform/databricks/document_intelligence/`](../../infra/terraform/databricks/document_intelligence/): Terraform module for Unity Catalog scaffolding
@@ -17,6 +20,11 @@ This directory documents the first Databricks-oriented runtime packaging for `do
   - `event_path`
   - `processing_version`
   - `surfaces_root_uri`
+  - `parser_backend` (`legacy` or `docling`)
+  - `enable_spacy` (`true`/`false`)
+  - `spacy_model_name`
+  - `spacy_max_chars_per_section`
+  - `spacy_batch_size`
 - The runtime writes Delta outputs under:
   - `${surfaces_root_uri}/published_documents`
   - `${surfaces_root_uri}/published_sections`
@@ -35,7 +43,7 @@ databricks bundle run -t dev document_intelligence_process_bundle --params event
 This slice does not yet include:
 
 - Spark-native processing or sink implementations
-- XML parsing or citation extraction
+- citation extraction
 
 ## Ownership split
 

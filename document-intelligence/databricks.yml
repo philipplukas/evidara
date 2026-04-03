@@ -13,6 +13,13 @@ artifacts:
 variables:
   workspace_host:
     description: Databricks workspace host for the target environment.
+  workspace_root_path:
+    description: Databricks workspace root path for bundle artifacts.
+    default: /Shared/evidara/.bundle/document-intelligence
+  catalog:
+    description: Unity Catalog catalog containing document-intelligence surfaces.
+  gcs_processed_bucket:
+    description: GCS bucket URI where processed Docling/NLP outputs are staged.
   spark_version:
     description: Databricks Runtime version for the document-intelligence job cluster.
     default: 15.4.x-scala2.12
@@ -27,10 +34,42 @@ variables:
   processing_version:
     description: DI processing version to stamp into canonical outputs.
     default: 0.1.0-dev
+  parser_backend:
+    description: Parser backend to use (legacy or docling).
+    default: legacy
+  enable_spacy:
+    description: Enable optional spaCy enrichment metadata.
+    default: "false"
+  spacy_model_name:
+    description: spaCy model name used for optional enrichment.
+    default: xx_sent_ud_sm
+  spacy_max_chars_per_section:
+    description: Max text chars passed to spaCy enrichment.
+    default: "100000"
+  spacy_batch_size:
+    description: Batch size for spaCy pipeline execution.
+    default: "32"
 
 targets:
   dev:
     default: true
     mode: development
+    variables:
+      workspace_root_path: /Shared/evidara/.bundle/document-intelligence/dev
     workspace:
       host: ${var.workspace_host}
+      root_path: ${var.workspace_root_path}
+  staging:
+    mode: production
+    variables:
+      workspace_root_path: /Shared/evidara/.bundle/document-intelligence/staging
+    workspace:
+      host: ${var.workspace_host}
+      root_path: ${var.workspace_root_path}
+  prod:
+    mode: production
+    variables:
+      workspace_root_path: /Shared/evidara/.bundle/document-intelligence/prod
+    workspace:
+      host: ${var.workspace_host}
+      root_path: ${var.workspace_root_path}

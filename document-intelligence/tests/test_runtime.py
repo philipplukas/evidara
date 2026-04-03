@@ -46,6 +46,40 @@ class RuntimeSettingsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             RuntimeSettings.from_mapping({"DI_PUBLISHED_DOCUMENTS_URI": "/tmp/docs"})
 
+    def test_defaults_parser_backend_and_spacy_toggle(self) -> None:
+        settings = RuntimeSettings.from_mapping({})
+        self.assertEqual(settings.parser_backend, "legacy")
+        self.assertFalse(settings.enable_spacy)
+        self.assertEqual(settings.spacy_model_name, "xx_sent_ud_sm")
+        self.assertEqual(settings.spacy_max_chars_per_section, 100000)
+        self.assertEqual(settings.spacy_batch_size, 32)
+
+    def test_parses_parser_backend_and_spacy_toggle_from_mapping(self) -> None:
+        settings = RuntimeSettings.from_mapping(
+            {
+                "DI_PARSER_BACKEND": "docling",
+                "DI_ENABLE_SPACY": "true",
+                "DI_SPACY_MODEL_NAME": "en_core_web_sm",
+                "DI_SPACY_MAX_CHARS_PER_SECTION": "777",
+                "DI_SPACY_BATCH_SIZE": "8",
+            }
+        )
+        self.assertEqual(settings.parser_backend, "docling")
+        self.assertTrue(settings.enable_spacy)
+        self.assertEqual(settings.spacy_model_name, "en_core_web_sm")
+        self.assertEqual(settings.spacy_max_chars_per_section, 777)
+        self.assertEqual(settings.spacy_batch_size, 8)
+
+    def test_rejects_unknown_parser_backend(self) -> None:
+        with self.assertRaises(ValueError):
+            RuntimeSettings.from_mapping({"DI_PARSER_BACKEND": "unknown"})
+
+    def test_rejects_invalid_spacy_limits(self) -> None:
+        with self.assertRaises(ValueError):
+            RuntimeSettings.from_mapping({"DI_SPACY_MAX_CHARS_PER_SECTION": "0"})
+        with self.assertRaises(ValueError):
+            RuntimeSettings.from_mapping({"DI_SPACY_BATCH_SIZE": "0"})
+
 
 class SurfaceDefinitionTests(unittest.TestCase):
     def test_exposes_expected_surface_definitions(self) -> None:

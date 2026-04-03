@@ -98,3 +98,10 @@ repos:
         language: system
         pass_filenames: false
         files: ^platform-control/
+
+      - id: document-intelligence-check
+        name: Document Intelligence checks (schemas + tests + dbt parse)
+        entry: bash scripts/check-document-intelligence.sh
+        language: system
+        pass_filenames: false
+        files: ^(document-intelligence/|contracts/(common|events|examples|schemas)/|scripts/check-document-intelligence\.sh|scripts/validate_json_schemas\.py)

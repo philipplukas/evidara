@@ -1,0 +1,47 @@
+name: "document_intelligence"
+version: "0.1.0"
+config-version: 2
+
+profile: "document_intelligence"
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  document_intelligence:
+    +materialized: view
+    +persist_docs:
+      relation: true
+      columns: true
+    staging:
+      +schema: di_staging
+    intermediate:
+      +materialized: incremental
+      +schema: di_intermediate
+      +incremental_strategy: merge
+      +on_schema_change: merge
+    marts:
+      +materialized: table
+      +schema: di_marts
+
+vars:
+  entity_labels:
+    - PERSON
+    - ORG
+    - GPE
+    - LOC
+    - DATE
+    - MONEY
+    - LAW
+    - PRODUCT
+    - EVENT
+  chunk_size_tokens: 512
+  chunk_overlap_tokens: 64

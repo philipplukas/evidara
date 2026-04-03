@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: int_control_versions
+    columns:
+      - name: document_version_id
+        tests:
+          - not_null
+          - unique
+      - name: status
+        tests:
+          - not_null
+  - name: int_document_identity
+    columns:
+      - name: document_id
+        tests:
+          - not_null
+      - name: document_version_id
+        tests:
+          - not_null
+          - unique
+  - name: int_document_sections
+    columns:
+      - name: section_id
+        tests:
+          - not_null
+          - unique
+      - name: document_version_id
+        tests:
+          - not_null
+  - name: int_entities
+    columns:
+      - name: entity_id
+        tests:
+          - not_null
+          - unique
+      - name: entity_label
+        tests:
+          - not_null
+  - name: int_relations
+    columns:
+      - name: relation_id
+        tests:
+          - not_null
+          - unique

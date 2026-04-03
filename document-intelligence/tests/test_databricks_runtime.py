@@ -22,21 +22,50 @@ class DatabricksBundleConfigTests(unittest.TestCase):
         bundle_path = os.path.join(
             os.path.dirname(__file__), "..", "databricks.yml"
         )
-        resource_path = os.path.join(
+        process_resource_path = os.path.join(
             os.path.dirname(__file__), "..", "resources", "document_intelligence_job.yml"
+        )
+        autoloader_resource_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "resources",
+            "document_intelligence_autoloader_job.yml",
+        )
+        dbt_resource_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "resources",
+            "document_intelligence_dbt_job.yml",
+        )
+        smoke_resource_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "resources",
+            "document_intelligence_smoke_job.yml",
         )
 
         with open(bundle_path, "r", encoding="utf-8") as bundle_file:
             bundle_config = yaml.safe_load(bundle_file)
-        with open(resource_path, "r", encoding="utf-8") as resource_file:
-            resource_config = yaml.safe_load(resource_file)
+        with open(process_resource_path, "r", encoding="utf-8") as resource_file:
+            process_resource_config = yaml.safe_load(resource_file)
+        with open(autoloader_resource_path, "r", encoding="utf-8") as resource_file:
+            autoloader_resource_config = yaml.safe_load(resource_file)
+        with open(dbt_resource_path, "r", encoding="utf-8") as resource_file:
+            dbt_resource_config = yaml.safe_load(resource_file)
+        with open(smoke_resource_path, "r", encoding="utf-8") as resource_file:
+            smoke_resource_config = yaml.safe_load(resource_file)
 
         self.assertEqual(bundle_config["bundle"]["name"], "document-intelligence")
         self.assertEqual(
             bundle_config["artifacts"]["document_intelligence_wheel"]["type"], "whl"
         )
+        self.assertIn("dev", bundle_config["targets"])
+        self.assertIn("staging", bundle_config["targets"])
+        self.assertIn("prod", bundle_config["targets"])
+        self.assertIn("catalog", bundle_config["variables"])
+        self.assertIn("gcs_processed_bucket", bundle_config["variables"])
 
-        job = resource_config["resources"]["jobs"]["document_intelligence_process_bundle"]
+        job = process_resource_config["resources"]["jobs"]["document_intelligence_process_bundle"]
         task = job["tasks"][0]
         self.assertEqual(
             task["python_wheel_task"]["entry_point"], "databricks_process_event"
@@ -44,6 +73,24 @@ class DatabricksBundleConfigTests(unittest.TestCase):
         self.assertEqual(
             task["python_wheel_task"]["package_name"], "document-intelligence"
         )
+        self.assertIn("parser_backend", bundle_config["variables"])
+        self.assertIn("enable_spacy", bundle_config["variables"])
+        self.assertIn("spacy_model_name", bundle_config["variables"])
+        self.assertIn("spacy_max_chars_per_section", bundle_config["variables"])
+        self.assertIn("spacy_batch_size", bundle_config["variables"])
+        named_parameters = task["python_wheel_task"]["named_parameters"]
+        self.assertIn("parser_backend", named_parameters)
+        self.assertIn("enable_spacy", named_parameters)
+        self.assertIn("spacy_model_name", named_parameters)
+        self.assertIn("spacy_max_chars_per_section", named_parameters)
+        self.assertIn("spacy_batch_size", named_parameters)
+
+        autoloader_jobs = autoloader_resource_config["resources"]["jobs"]
+        self.assertIn("document_intelligence_autoloader_bronze", autoloader_jobs)
+        dbt_jobs = dbt_resource_config["resources"]["jobs"]
+        self.assertIn("document_intelligence_dbt_transformations", dbt_jobs)
+        smoke_jobs = smoke_resource_config["resources"]["jobs"]
+        self.assertIn("document_intelligence_smoke_test", smoke_jobs)
 
 
 @unittest.skipUnless(DELTA_AVAILABLE, "deltalake is not installed")

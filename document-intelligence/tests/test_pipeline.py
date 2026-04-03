@@ -198,7 +198,7 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(
                 result.document.title, "Bundesgesetz über digitale Register"
             )
-            self.assertEqual(result.document.document_type, "statute")
+            self.assertEqual(result.document.document_type, "law")
             self.assertEqual(len(result.sections), 2)
             self.assertEqual(result.sections[0].title, "§ 1 Geltungsbereich")
             self.assertIn(
@@ -252,6 +252,44 @@ class ProcessingPipelineTests(unittest.TestCase):
         pipeline = ProcessingPipeline()
         with self.assertRaises(Exception):
             pipeline.process_event(build_bundle_event("/tmp/does-not-exist.json"))
+
+    def test_docling_backend_and_spacy_toggle_add_metadata_scaffolding(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(SAMPLE_HTML)
+            artifact_path = html_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(
+                build_manifest_payload(
+                    artifact_path,
+                    artifact_role="primary_document",
+                ),
+                manifest_handle,
+            )
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(
+                processing_version="di_2026_04_03",
+                parser_backend="docling",
+                enable_spacy=True,
+            ).process_event(build_bundle_event(manifest_path))
+            self.assertEqual(
+                result.manifest.selected_profiles["normalization_profile_ref"],
+                "docling_fallback_v1",
+            )
+            self.assertIn("docling", result.document.metadata)
+            self.assertIn("nlp", result.document.metadata)
+            self.assertTrue(result.document.metadata["nlp"]["enabled"])
+            self.assertEqual(result.document.metadata["docling"]["backend"], "fallback")
+            self.assertEqual(result.document.metadata["nlp"]["model_name"], "xx_sent_ud_sm")
+            self.assertEqual(
+                result.document.metadata["nlp"]["max_chars_per_section"], 100000
+            )
+            self.assertEqual(result.document.metadata["nlp"]["batch_size"], 32)
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
 
 
 if __name__ == "__main__":
