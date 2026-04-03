@@ -5,3 +5,19 @@ region     = "europe-west6"
 
 raw_artifact_bucket_name = "evidara-raw-artifacts-prod"
 manifest_bucket_name     = "evidara-manifests-prod"
+
+enable_cloud_sql = true
+
+cloud_run_services = {
+  "platform-control-api" = {
+    image               = "europe-west6-docker.pkg.dev/evidara-prod/runtime/platform-control:latest"
+    service_account_key = "platform_control_api"
+    allow_unauthenticated = false
+  }
+
+  "legal-search-api" = {
+    image               = "europe-west6-docker.pkg.dev/evidara-prod/runtime/legal-search-api:latest"
+    service_account_key = "legal_search_api"
+    allow_unauthenticated = false
+  }
+}

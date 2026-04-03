@@ -5,3 +5,72 @@ region     = "europe-west6"
 
 raw_artifact_bucket_name = "evidara-raw-artifacts-dev"
 manifest_bucket_name     = "evidara-manifests-dev"
+
+enable_cloud_sql = true
+
+cloud_run_services = {
+  "platform-control-api" = {
+    image               = "europe-west6-docker.pkg.dev/evidara-dev/runtime/platform-control:latest"
+    service_account_key = "platform_control_api"
+    allow_unauthenticated = false
+    env_vars = {
+      PLATFORM_CONTROL_GCP_PROJECT_ID      = "evidara-dev"
+      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND = "gcs"
+      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND = "pubsub"
+      PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET = "evidara-raw-artifacts-dev"
+      PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC = "raw-artifact-available"
+      PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC = "artifact-bundle-available"
+    }
+    secret_env_vars = {
+      PLATFORM_CONTROL_DATABASE_URL = {
+        secret_name = "platform_control_dsn"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_API_KEY = {
+        secret_name = "firecrawl_api_key"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_WEBHOOK_SECRET = {
+        secret_name = "firecrawl_webhook"
+      }
+    }
+  }
+
+  "legal-search-api" = {
+    image               = "europe-west6-docker.pkg.dev/evidara-dev/runtime/legal-search-api:latest"
+    service_account_key = "legal_search_api"
+    allow_unauthenticated = false
+    env_vars = {
+      OPENSEARCH_INDEX_DOCUMENTS          = "evidara-documents-read-dev"
+      OPENSEARCH_INDEX_SECTIONS           = "evidara-sections-read-dev"
+      OPENSEARCH_INDEX_CITATIONS          = "evidara-citations-read-dev"
+      OPENSEARCH_INDEX_PROJECTION_HISTORY = "evidara-projection-history-dev"
+    }
+    secret_env_vars = {
+      OPENSEARCH_NODE = {
+        secret_name = "opensearch_node"
+      }
+      OPENSEARCH_USERNAME = {
+        secret_name = "opensearch_username"
+      }
+      OPENSEARCH_PASSWORD = {
+        secret_name = "opensearch_password"
+      }
+    }
+  }
+
+  "platform-control-worker" = {
+    image               = "europe-west6-docker.pkg.dev/evidara-dev/runtime/platform-control-worker:latest"
+    service_account_key = "platform_control_worker"
+    allow_unauthenticated = false
+    env_vars = {
+      PLATFORM_CONTROL_RUN_DISPATCH_BACKEND = "worker"
+    }
+    secret_env_vars = {
+      PLATFORM_CONTROL_DATABASE_URL = {
+        secret_name = "platform_control_dsn"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_API_KEY = {
+        secret_name = "firecrawl_api_key"
+      }
+    }
+  }
+}

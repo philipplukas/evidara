@@ -65,7 +65,7 @@ The vertical slice can progress in parallel with clear handoff boundaries:
 
 ### document-intelligence
 
-- [~] `artifact_bundle.available` processing entrypoints exist, but always-on Pub/Sub/runtime wiring is still pending
+- [~] `artifact_bundle.available` processing entrypoints exist, with runtime consumer scaffolding landed; deployment wiring is still pending
 - [x] Bundle-manifest and raw-artifact reader
 - [x] Canonical `Document` and `Section` writers
 - [x] Published surfaces for documents, sections, and processing manifests
@@ -74,10 +74,10 @@ The vertical slice can progress in parallel with clear handoff boundaries:
 
 ### legal-search
 
-- [ ] `document.processed` consumer
+- [~] `document.processed` consumer
 - [ ] Projection builder from published DI surfaces
-- [ ] OpenSearch index and alias setup
-- [ ] Minimal projection manifest/history record
+- [x] OpenSearch index and alias setup
+- [x] Minimal projection manifest/history record
 - [x] Search and detail API
 - [~] Minimal frontend exists, but it is still mock-backed rather than connected to the live BFF
 
@@ -91,12 +91,12 @@ The vertical slice can progress in parallel with clear handoff boundaries:
 
 ### infra
 
-- [ ] GCS bucket for raw artifacts and bundle manifests
-- [ ] Pub/Sub topics and subscriptions
+- [x] GCS bucket for raw artifacts and bundle manifests
+- [x] Pub/Sub topics and subscriptions
 - [~] Databricks workspace and published-surface scaffolding exists in Terraform and bundle files, but deployment/runtime wiring is still pending
 - [ ] OpenSearch cluster
-- [ ] OpenSearch alias cutover path
-- [ ] Cloud Run services
+- [x] OpenSearch alias cutover path
+- [~] Cloud Run services
 
 ## Success criteria
 

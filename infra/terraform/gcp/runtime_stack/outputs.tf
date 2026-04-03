@@ -20,3 +20,32 @@ output "event_subscription_names" {
     subscription_name => subscription.name
   }
 }
+
+output "runtime_service_accounts" {
+  value = {
+    for key, account in google_service_account.runtime :
+    key => account.email
+  }
+}
+
+output "runtime_secret_ids" {
+  value = {
+    for key, secret in google_secret_manager_secret.runtime :
+    key => secret.secret_id
+  }
+}
+
+output "cloud_sql_instance_connection_name" {
+  value = (
+    var.enable_cloud_sql
+    ? google_sql_database_instance.platform_control[0].connection_name
+    : null
+  )
+}
+
+output "cloud_run_service_names" {
+  value = {
+    for key, service in google_cloud_run_v2_service.runtime :
+    key => service.name
+  }
+}
