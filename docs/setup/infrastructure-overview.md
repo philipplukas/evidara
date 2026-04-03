@@ -64,7 +64,7 @@ Manifests should be stored as immutable JSON objects. Search and filtering over 
 Current repo scaffolding splits ownership this way:
 
 - Terraform under [`../../infra/terraform/databricks/document_intelligence_stack`](../../infra/terraform/databricks/document_intelligence_stack) wires the top-level Databricks workspace/environment layer and invokes the reusable module under [`../../infra/terraform/databricks/document_intelligence`](../../infra/terraform/databricks/document_intelligence)
-- Terraform under [`../../infra/terraform/gcp/runtime_stack`](../../infra/terraform/gcp/runtime_stack) provisions environment runtime primitives (GCS buckets plus Pub/Sub topics/subscriptions)
+- Terraform under [`../../infra/terraform/gcp/runtime_stack`](../../infra/terraform/gcp/runtime_stack) provisions environment runtime primitives (GCS, Pub/Sub, service accounts, Secret Manager placeholders, Cloud SQL and Cloud Run scaffolding)
 - Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for both runtime GCP and DI Databricks stacks
 - Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job
 - SQL/bootstrap assets under [`../../document-intelligence/databricks/sql`](../../document-intelligence/databricks/sql) register the published Delta surfaces after the first successful write
@@ -83,7 +83,7 @@ Current repo scaffolding splits ownership this way:
 |---------|---------|
 | `evidara-search-{env}` | Search serving for legal-search |
 
-Provider remains TBD. OpenSearch stays a serving layer only and must be rebuildable from published DI surfaces.
+Provider remains TBD. OpenSearch stays a serving layer only and must be rebuildable from published DI surfaces. Alias cutover and replay scripting currently live in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
 
 Recommended lifecycle pattern:
 

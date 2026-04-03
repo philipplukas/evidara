@@ -46,11 +46,11 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 - [x] Define OpenAPI spec (`contracts/api/platform-control.openapi.yaml`)
 - [x] Define `ArtifactBundleManifest` schema
 - [x] Create the initial `platform-control/` API scaffold
-- [ ] Create the connector-worker scaffold under `platform-control/`
+- [x] Create the connector-worker scaffold under `platform-control/`
 - [~] Define run lifecycle and replay modes
 - [x] Define approval states and transitions
 - [~] Define reference snapshot export mechanics for DI
-- [ ] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
+- [~] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
 
 ## Minimal v1 Outcome
 
