@@ -14,6 +14,7 @@ import type { INestApplication } from '@nestjs/common';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { DocumentIntelligenceClient } from '../lib/document-intelligence/document-intelligence.client';
 import type { DocumentsRepository } from '../modules/documents/documents.repository';
+import type { ProjectionRepository } from '../modules/projections/projections.repository';
 import type { SearchRepository } from '../modules/search/search.repository';
 import { createTestApp, EMPTY_SEARCH } from './test-app';
 
@@ -24,12 +25,14 @@ const supertest = require('supertest');
 let app: INestApplication;
 let searchRepo: SearchRepository;
 let documentsRepo: DocumentsRepository;
+let projectionsRepo: ProjectionRepository;
 
 beforeAll(async () => {
   const testApp = await createTestApp();
   app = testApp.app;
   searchRepo = testApp.searchRepo;
   documentsRepo = testApp.documentsRepo;
+  projectionsRepo = testApp.projectionsRepo;
 });
 
 afterAll(async () => {
@@ -271,5 +274,83 @@ describe('input validation', () => {
 
   it('rejects page below minimum', async () => {
     await supertest(app.getHttpServer()).get('/v1/search?q=test&page=0').expect(400);
+  });
+});
+
+describe('projections event ingestion', () => {
+  const processedEvent = {
+    event_id: 'evt_01jq8bhgy7g0pkj4f1d03f8f8c',
+    event_type: 'document.processed',
+    event_version: 1,
+    occurred_at: '2026-04-03T10:00:00Z',
+    producer: 'document-intelligence',
+    payload: {
+      document_id: 'doc_01jq7bhgy7g0pkj4f1d03f8f8c',
+      document_revision: 2,
+      processing_manifest_id: 'pm_01jq7bhgy7g0pkj4f1d03f8f8c',
+      processing_version: 'v1.0.0',
+      lifecycle_status: 'active',
+      provenance: {
+        tenant_id: 'tenant_evidara',
+        corpus_id: 'ch_de',
+        scope_type: 'source-version',
+        source_id: 'src_01jq7bhgy7g0pkj4f1d03f8f8c',
+        source_version_id: 'sv_01jq7bhgy7g0pkj4f1d03f8f8c',
+        run_id: 'run_01jq7bhgy7g0pkj4f1d03f8f8c',
+      },
+    },
+  };
+
+  const withdrawnEvent = {
+    event_id: 'evt_01jq8chgy7g0pkj4f1d03f8f8c',
+    event_type: 'document.withdrawn',
+    event_version: 1,
+    occurred_at: '2026-04-03T10:05:00Z',
+    producer: 'document-intelligence',
+    payload: {
+      document_id: 'doc_01jq7bhgy7g0pkj4f1d03f8f8c',
+      document_revision: 3,
+      processing_manifest_id: 'pm_01jq7chgy7g0pkj4f1d03f8f8c',
+      provenance: {
+        tenant_id: 'tenant_evidara',
+        corpus_id: 'ch_de',
+        scope_type: 'source-version',
+        source_id: 'src_01jq7bhgy7g0pkj4f1d03f8f8c',
+        source_version_id: 'sv_01jq7bhgy7g0pkj4f1d03f8f8c',
+        run_id: 'run_01jq7bhgy7g0pkj4f1d03f8f8c',
+      },
+      reason_code: 'operator_withdrawn',
+      reason_summary: 'manual withdraw',
+      search_disposition: 'remove',
+    },
+  };
+
+  it('accepts document.processed event and applies projection', async () => {
+    const res = await supertest(app.getHttpServer())
+      .post('/v1/projections/events/document-processed')
+      .send(processedEvent)
+      .expect(202);
+
+    expect(res.body.status).toBe('applied');
+  });
+
+  it('returns ignored_duplicate for duplicate redelivery by event id', async () => {
+    (projectionsRepo.hasHistoryEvent as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+    const res = await supertest(app.getHttpServer())
+      .post('/v1/projections/events/document-processed')
+      .send(processedEvent)
+      .expect(202);
+
+    expect(res.body.status).toBe('ignored_duplicate');
+  });
+
+  it('accepts document.withdrawn event and de-indexes', async () => {
+    const res = await supertest(app.getHttpServer())
+      .post('/v1/projections/events/document-withdrawn')
+      .send(withdrawnEvent)
+      .expect(202);
+
+    expect(res.body.status).toBe('applied');
   });
 });

@@ -27,6 +27,12 @@ import type { DocumentsRepository } from '../modules/documents/documents.reposit
 import { DOCUMENTS_REPOSITORY } from '../modules/documents/documents.repository';
 import { DocumentsService } from '../modules/documents/documents.service';
 import { HealthController } from '../modules/health/health.controller';
+import { ProjectionsController } from '../modules/projections/projections.controller';
+import {
+  PROJECTION_REPOSITORY,
+  type ProjectionRepository,
+} from '../modules/projections/projections.repository';
+import { ProjectionsService } from '../modules/projections/projections.service';
 import type {
   ContextAggregations,
   SearchResultEntity,
@@ -97,11 +103,13 @@ export interface TestApp {
   app: INestApplication;
   searchRepo: SearchRepository;
   documentsRepo: DocumentsRepository;
+  projectionsRepo: ProjectionRepository;
 }
 
 export async function createTestApp(overrides?: {
   searchRepo?: Partial<SearchRepository>;
   documentsRepo?: Partial<DocumentsRepository>;
+  projectionsRepo?: Partial<ProjectionRepository>;
   documentIntelligenceClient?: DocumentIntelligenceClient;
 }): Promise<TestApp> {
   const searchRepo: SearchRepository = {
@@ -144,6 +152,14 @@ export async function createTestApp(overrides?: {
     ]),
     ...overrides?.documentsRepo,
   };
+  const projectionsRepo: ProjectionRepository = {
+    hasHistoryEvent: vi.fn().mockResolvedValue(false),
+    getLatestRevision: vi.fn().mockResolvedValue(null),
+    upsertProjection: vi.fn().mockResolvedValue(undefined),
+    deleteProjection: vi.fn().mockResolvedValue(undefined),
+    appendHistory: vi.fn().mockResolvedValue(undefined),
+    ...overrides?.projectionsRepo,
+  };
 
   // Build the module explicitly — avoids decorator metadata issues
   // with vitest's oxc/esbuild transform which doesn't emit metadata.
@@ -154,12 +170,14 @@ export async function createTestApp(overrides?: {
     imports: [
       ConfigModule.forRoot({ isGlobal: true, load: [opensearchConfig, documentIntelligenceConfig] }),
     ],
-    controllers: [HealthController, SearchController, DocumentsController],
+    controllers: [HealthController, SearchController, DocumentsController, ProjectionsController],
     providers: [
       SearchService,
       DocumentsService,
+      ProjectionsService,
       { provide: SEARCH_REPOSITORY, useValue: searchRepo },
       { provide: DOCUMENTS_REPOSITORY, useValue: documentsRepo },
+      { provide: PROJECTION_REPOSITORY, useValue: projectionsRepo },
       { provide: DOCUMENT_INTELLIGENCE_CLIENT, useValue: diClient },
     ],
   }).compile();
@@ -177,7 +195,7 @@ export async function createTestApp(overrides?: {
 
   await app.init();
 
-  return { app, searchRepo, documentsRepo };
+  return { app, searchRepo, documentsRepo, projectionsRepo };
 }
 
 export { CONTEXT_AGGS, EMPTY_SEARCH, SEARCH_WITH_RESULTS };
