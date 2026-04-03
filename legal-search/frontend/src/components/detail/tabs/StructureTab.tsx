@@ -11,7 +11,7 @@ interface StructureTabProps {
 }
 
 export function StructureTab({ items, onFocus }: StructureTabProps) {
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>, id: string) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, id: string) => {
     if (!onFocus) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -24,10 +24,9 @@ export function StructureTab({ items, onFocus }: StructureTabProps) {
       <SectionLabel className="mb-3">Local Structure</SectionLabel>
       <div className="space-y-0.5">
         {items.map((item) => (
-          <div
+          <button
+            type="button"
             key={item.id}
-            role="button"
-            tabIndex={0}
             onClick={() => onFocus?.(item.id)}
             onKeyDown={(event) => handleKeyDown(event, item.id)}
             className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-all text-xs
@@ -39,7 +38,7 @@ export function StructureTab({ items, onFocus }: StructureTabProps) {
           >
             <BookOpen className="w-3 h-3 shrink-0" />
             <span className="truncate">{item.label}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>

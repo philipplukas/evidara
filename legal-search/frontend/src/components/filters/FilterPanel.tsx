@@ -142,14 +142,17 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
               {filteredOptions.map((opt) => {
                 const isSelected = selected.includes(opt.value);
                 return (
-                  <button
-                    type="button"
+                  <label
                     key={opt.value}
-                    role="checkbox"
-                    aria-checked={isSelected}
-                    onClick={() => toggle(opt.value)}
                     className="flex items-center gap-2 py-1 cursor-pointer group w-full text-left"
                   >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      aria-checked={isSelected}
+                      onChange={() => toggle(opt.value)}
+                      className="sr-only"
+                    />
                     <div
                       className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all
                         ${
@@ -178,7 +181,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                         {opt.count.toLocaleString()}
                       </span>
                     )}
-                  </button>
+                  </label>
                 );
               })}
             </div>

@@ -2,9 +2,9 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DetailPanelHeader } from "@/components/detail/DetailPanelHeader";
 import { DetailTabs } from "@/components/detail/DetailTabs";
+import { ContextBar } from "@/components/layout/ContextBar";
 import { ExactMatchStrip } from "@/components/results/ExactMatchStrip";
 import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
-import { ContextBar } from "@/components/layout/ContextBar";
 import { articleDetail, searchContext, searchResults } from "@/lib/mock-data";
 import { useWorkspace } from "@/lib/workspace-store";
 import { renderWithProviders } from "./helpers/render-with-providers";
@@ -77,7 +77,11 @@ describe("High-impact interaction controls", () => {
             onClick={() =>
               dispatch({
                 type: "PIVOT",
-                source: { type: "pivot", label: "Commentary", parentSource: state.resultSet.source },
+                source: {
+                  type: "pivot",
+                  label: "Commentary",
+                  parentSource: state.resultSet.source,
+                },
                 results: [searchResults[1]],
                 scopeLabel: "Commentary for Art. 754 OR",
               })
