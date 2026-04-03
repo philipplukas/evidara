@@ -1,6 +1,7 @@
 "use client";
 
 import { BookOpen } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import type { LocalStructureItem } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 
@@ -10,6 +11,14 @@ interface StructureTabProps {
 }
 
 export function StructureTab({ items, onFocus }: StructureTabProps) {
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>, id: string) => {
+    if (!onFocus) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onFocus(id);
+    }
+  };
+
   return (
     <div className="p-5">
       <SectionLabel className="mb-3">Local Structure</SectionLabel>
@@ -17,7 +26,10 @@ export function StructureTab({ items, onFocus }: StructureTabProps) {
         {items.map((item) => (
           <div
             key={item.id}
+            role="button"
+            tabIndex={0}
             onClick={() => onFocus?.(item.id)}
+            onKeyDown={(event) => handleKeyDown(event, item.id)}
             className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-all text-xs
               ${
                 item.active

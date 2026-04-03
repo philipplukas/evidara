@@ -73,6 +73,22 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke tests
+        run: npm run e2e:smoke
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-playwright-artifacts
+          path: |
+            legal-search/frontend/test-results
+            legal-search/frontend/playwright-report
+          if-no-files-found: ignore
+
       # Contract lint — validates the OpenAPI spec.
       - name: Contract lint
         run: npm run openapi:lint

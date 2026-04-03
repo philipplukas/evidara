@@ -3,7 +3,9 @@
 import { Clock, MapPin, Search, SlidersHorizontal, User } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { type FormEvent, useEffect, useState } from "react";
-import { searchMockResults } from "@/lib/mock-data";
+import "@/lib/api/axios-instance";
+import { searchDocuments } from "@/lib/api/generated/hooks";
+import { toSearchResults } from "@/lib/api-adapters";
 import { useWorkspace } from "@/lib/workspace-store";
 
 interface AppHeaderProps {
@@ -27,8 +29,10 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
   // resync the store search state if needed.
   useEffect(() => {
     if (urlQuery && urlQuery !== storeQuery) {
-      const results = searchMockResults(urlQuery);
-      dispatch({ type: "SEARCH", query: urlQuery, results });
+      searchDocuments({ q: urlQuery }).then((response) => {
+        const results = response.data?.results ? toSearchResults(response.data.results) : [];
+        dispatch({ type: "SEARCH", query: urlQuery, results });
+      });
     }
   }, [urlQuery, storeQuery, dispatch]);
 
@@ -37,8 +41,10 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
     const trimmed = inputValue.trim();
     if (!trimmed) return;
 
-    const results = searchMockResults(trimmed);
-    dispatch({ type: "SEARCH", query: trimmed, results });
+    searchDocuments({ q: trimmed }).then((response) => {
+      const results = response.data?.results ? toSearchResults(response.data.results) : [];
+      dispatch({ type: "SEARCH", query: trimmed, results });
+    });
     setUrlQuery(trimmed);
   };
 
@@ -98,6 +104,7 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
         <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-border">
           <button
             type="button"
+            aria-label="Open user menu"
             className="w-8 h-8 rounded-full bg-interactive-accent-muted flex items-center justify-center
             hover:bg-brand/20 transition-colors"
           >
