@@ -36,6 +36,7 @@ Options:
   --databricks-host-prod <url>
   --databricks-profile-dev <name>   (default: dev)
   --databricks-profile-prod <name>  (default: prod)
+  --databricks-token-source <mode>  (gsm|profile, default: gsm)
   --gsm-token-secret-dev <name>
   --gsm-token-secret-prod <name>
   -h, --help
@@ -172,7 +173,29 @@ detect_service_account() {
 
 detect_databricks_host_from_profile() {
   local profile_name="$1"
-  databricks auth env --profile "$profile_name" 2>/dev/null | awk -F= '/^DATABRICKS_HOST=/{print $2; exit}' || true
+  local payload
+  payload="$(databricks auth env --profile "$profile_name" --output json 2>/dev/null || true)"
+  [[ -n "$payload" ]] || return 0
+  printf '%s' "$payload" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("env",{}).get("DATABRICKS_HOST",""))'
+}
+
+get_databricks_token_from_profile() {
+  local profile_name="$1"
+  local payload
+  payload="$(databricks auth env --profile "$profile_name" --output json 2>/dev/null || true)"
+  [[ -n "$payload" ]] || die "Unable to read Databricks auth env for profile '$profile_name'."
+  printf '%s' "$payload" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("env",{}).get("DATABRICKS_TOKEN",""))'
+}
+
+upsert_gsm_secret_version() {
+  local secret_name="$1"
+  local project_id="$2"
+  local secret_value="$3"
+  if [[ "$APPLY" == "true" ]]; then
+    printf '%s' "$secret_value" | CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud secrets versions add "$secret_name" --project "$project_id" --data-file=- >/dev/null
+  else
+    echo "DRY-RUN: gcloud secrets versions add $secret_name --project $project_id --data-file=- <hidden>"
+  fi
 }
 
 detect_gsm_token_secret_name() {
@@ -247,19 +270,35 @@ set_env_secret() {
 
 run_preflight_checks() {
   local failures=0
+  local active_account="(unset)"
+  local adc_status="missing"
+
+  active_account="$(gcloud config get-value core/account 2>/dev/null || true)"
+  [[ -n "$active_account" && "$active_account" != "(unset)" ]] || active_account="(unset)"
+  if gcloud auth application-default print-access-token >/dev/null 2>&1; then
+    adc_status="configured"
+  fi
+
+  echo "Auth context:"
+  echo "  gcloud active account: $active_account"
+  echo "  gcloud ADC status:     $adc_status"
   echo "Preflight checks:"
   preflight_check "GitHub auth available" gh auth status || failures=$((failures + 1))
-  preflight_check "GCP account configured" gcloud auth list --filter=status:ACTIVE --format='value(account)' || failures=$((failures + 1))
-  preflight_check "DEV project visible ($DEV_PROJECT)" gcloud projects describe "$DEV_PROJECT" --format='value(projectId)' || failures=$((failures + 1))
-  preflight_check "PROD project visible ($PROD_PROJECT)" gcloud projects describe "$PROD_PROJECT" --format='value(projectId)' || failures=$((failures + 1))
+  preflight_check "GCP account configured" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud auth list --filter=status:ACTIVE --format='value(account)' || failures=$((failures + 1))
+  preflight_check "DEV project visible ($DEV_PROJECT)" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud projects describe "$DEV_PROJECT" --format='value(projectId)' || failures=$((failures + 1))
+  preflight_check "PROD project visible ($PROD_PROJECT)" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud projects describe "$PROD_PROJECT" --format='value(projectId)' || failures=$((failures + 1))
   if [[ "$SYNC_SECRETS" == "true" ]]; then
     local wif_check_project="${WIF_PROJECT:-$DEV_PROJECT}"
-    preflight_check "WIF pools listable ($wif_check_project)" gcloud iam workload-identity-pools list --project "$wif_check_project" --location global --limit=1 || failures=$((failures + 1))
-    preflight_check "DEV service accounts listable" gcloud iam service-accounts list --project "$DEV_PROJECT" --limit=1 || failures=$((failures + 1))
-    preflight_check "PROD service accounts listable" gcloud iam service-accounts list --project "$PROD_PROJECT" --limit=1 || failures=$((failures + 1))
-    preflight_check "DEV secrets listable" gcloud secrets list --project "$DEV_PROJECT" --limit=1 || failures=$((failures + 1))
-    preflight_check "PROD secrets listable" gcloud secrets list --project "$PROD_PROJECT" --limit=1 || failures=$((failures + 1))
+    preflight_check "WIF pools listable ($wif_check_project)" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud iam workload-identity-pools list --project "$wif_check_project" --location global --limit=1 || failures=$((failures + 1))
+    preflight_check "DEV service accounts listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud iam service-accounts list --project "$DEV_PROJECT" --limit=1 || failures=$((failures + 1))
+    preflight_check "PROD service accounts listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud iam service-accounts list --project "$PROD_PROJECT" --limit=1 || failures=$((failures + 1))
+    preflight_check "DEV secrets listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud secrets list --project "$DEV_PROJECT" --limit=1 || failures=$((failures + 1))
+    preflight_check "PROD secrets listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud secrets list --project "$PROD_PROJECT" --limit=1 || failures=$((failures + 1))
     preflight_check "Databricks CLI available" databricks --version || failures=$((failures + 1))
+    if [[ "$DATABRICKS_TOKEN_SOURCE" == "profile" ]]; then
+      preflight_check "Databricks dev profile auth env readable ($DATABRICKS_PROFILE_DEV)" databricks auth env --profile "$DATABRICKS_PROFILE_DEV" --output json || failures=$((failures + 1))
+      preflight_check "Databricks prod profile auth env readable ($DATABRICKS_PROFILE_PROD)" databricks auth env --profile "$DATABRICKS_PROFILE_PROD" --output json || failures=$((failures + 1))
+    fi
   fi
   (( failures == 0 )) || die "Preflight failed with $failures failing checks."
   log "Preflight passed."
@@ -325,6 +364,9 @@ EOF
   service account prod:        $SERVICE_ACCOUNT_PROD
   databricks host dev:         $DATABRICKS_HOST_DEV
   databricks host prod:        $DATABRICKS_HOST_PROD
+  databricks token source:     $DATABRICKS_TOKEN_SOURCE
+  databricks profile dev:      $DATABRICKS_PROFILE_DEV
+  databricks profile prod:     $DATABRICKS_PROFILE_PROD
   gsm token secret dev:        $GSM_TOKEN_SECRET_DEV
   gsm token secret prod:       $GSM_TOKEN_SECRET_PROD
 EOF
@@ -352,6 +394,7 @@ DATABRICKS_HOST_DEV=""
 DATABRICKS_HOST_PROD=""
 DATABRICKS_PROFILE_DEV="dev"
 DATABRICKS_PROFILE_PROD="prod"
+DATABRICKS_TOKEN_SOURCE="gsm"
 GSM_TOKEN_SECRET_DEV=""
 GSM_TOKEN_SECRET_PROD=""
 
@@ -375,6 +418,7 @@ while [[ $# -gt 0 ]]; do
     --databricks-host-prod) DATABRICKS_HOST_PROD="$2"; shift 2 ;;
     --databricks-profile-dev) DATABRICKS_PROFILE_DEV="$2"; shift 2 ;;
     --databricks-profile-prod) DATABRICKS_PROFILE_PROD="$2"; shift 2 ;;
+    --databricks-token-source) DATABRICKS_TOKEN_SOURCE="$2"; shift 2 ;;
     --gsm-token-secret-dev) GSM_TOKEN_SECRET_DEV="$2"; shift 2 ;;
     --gsm-token-secret-prod) GSM_TOKEN_SECRET_PROD="$2"; shift 2 ;;
     --sync-secrets) SYNC_SECRETS="true"; shift ;;
@@ -415,14 +459,18 @@ fi
 
 if [[ "$SYNC_SECRETS" == "true" ]]; then
   require_cmd databricks
+  require_cmd python3
+  [[ "$DATABRICKS_TOKEN_SOURCE" == "gsm" || "$DATABRICKS_TOKEN_SOURCE" == "profile" ]] || die "--databricks-token-source must be 'gsm' or 'profile'."
   [[ -n "$WIF_PROJECT" ]] || WIF_PROJECT="$DEV_PROJECT"
   [[ -n "$WIF_PROVIDER" ]] || WIF_PROVIDER="$(detect_wif_provider "$WIF_PROJECT" "$WIF_POOL_ID" "$WIF_PROVIDER_ID")"
   [[ -n "$SERVICE_ACCOUNT_DEV" ]] || SERVICE_ACCOUNT_DEV="$(detect_service_account "$DEV_PROJECT" "dev")"
   [[ -n "$SERVICE_ACCOUNT_PROD" ]] || SERVICE_ACCOUNT_PROD="$(detect_service_account "$PROD_PROJECT" "prod")"
   [[ -n "$DATABRICKS_HOST_DEV" ]] || DATABRICKS_HOST_DEV="$(detect_databricks_host_from_profile "$DATABRICKS_PROFILE_DEV")"
   [[ -n "$DATABRICKS_HOST_PROD" ]] || DATABRICKS_HOST_PROD="$(detect_databricks_host_from_profile "$DATABRICKS_PROFILE_PROD")"
-  [[ -n "$GSM_TOKEN_SECRET_DEV" ]] || GSM_TOKEN_SECRET_DEV="$(detect_gsm_token_secret_name "$DEV_PROJECT" "dev")"
-  [[ -n "$GSM_TOKEN_SECRET_PROD" ]] || GSM_TOKEN_SECRET_PROD="$(detect_gsm_token_secret_name "$PROD_PROJECT" "prod")"
+  if [[ "$DATABRICKS_TOKEN_SOURCE" == "gsm" || -n "$GSM_TOKEN_SECRET_DEV" || -n "$GSM_TOKEN_SECRET_PROD" ]]; then
+    [[ -n "$GSM_TOKEN_SECRET_DEV" ]] || GSM_TOKEN_SECRET_DEV="$(detect_gsm_token_secret_name "$DEV_PROJECT" "dev")"
+    [[ -n "$GSM_TOKEN_SECRET_PROD" ]] || GSM_TOKEN_SECRET_PROD="$(detect_gsm_token_secret_name "$PROD_PROJECT" "prod")"
+  fi
 fi
 
 print_plan
@@ -440,9 +488,23 @@ set_repo_var "ARTIFACT_REGISTRY_REPOSITORY" "$ARTIFACT_REPO"
 set_repo_var "PLATFORM_CONTROL_SERVICE_NAME" "$PLATFORM_CONTROL_SERVICE"
 
 if [[ "$SYNC_SECRETS" == "true" ]]; then
-  log "Reading Databricks tokens from Secret Manager"
-  DATABRICKS_TOKEN_DEV="$(get_gsm_secret "$GSM_TOKEN_SECRET_DEV" "$DEV_PROJECT")"
-  DATABRICKS_TOKEN_PROD="$(get_gsm_secret "$GSM_TOKEN_SECRET_PROD" "$PROD_PROJECT")"
+  if [[ "$DATABRICKS_TOKEN_SOURCE" == "profile" ]]; then
+    log "Reading Databricks tokens from CLI profiles"
+    DATABRICKS_TOKEN_DEV="$(get_databricks_token_from_profile "$DATABRICKS_PROFILE_DEV")"
+    DATABRICKS_TOKEN_PROD="$(get_databricks_token_from_profile "$DATABRICKS_PROFILE_PROD")"
+    [[ -n "$DATABRICKS_TOKEN_DEV" ]] || die "Databricks token is empty for profile '$DATABRICKS_PROFILE_DEV'."
+    [[ -n "$DATABRICKS_TOKEN_PROD" ]] || die "Databricks token is empty for profile '$DATABRICKS_PROFILE_PROD'."
+
+    if [[ -n "$GSM_TOKEN_SECRET_DEV" && -n "$GSM_TOKEN_SECRET_PROD" ]]; then
+      log "Rotating Databricks tokens in Secret Manager from CLI profiles"
+      upsert_gsm_secret_version "$GSM_TOKEN_SECRET_DEV" "$DEV_PROJECT" "$DATABRICKS_TOKEN_DEV"
+      upsert_gsm_secret_version "$GSM_TOKEN_SECRET_PROD" "$PROD_PROJECT" "$DATABRICKS_TOKEN_PROD"
+    fi
+  else
+    log "Reading Databricks tokens from Secret Manager"
+    DATABRICKS_TOKEN_DEV="$(get_gsm_secret "$GSM_TOKEN_SECRET_DEV" "$DEV_PROJECT")"
+    DATABRICKS_TOKEN_PROD="$(get_gsm_secret "$GSM_TOKEN_SECRET_PROD" "$PROD_PROJECT")"
+  fi
 
   log "Syncing dev environment secrets"
   set_env_secret "dev" "GCP_WORKLOAD_IDENTITY_PROVIDER" "$WIF_PROVIDER"

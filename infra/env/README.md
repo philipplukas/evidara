@@ -14,6 +14,7 @@ Current scaffold:
 - [`staging/opensearch.gke.tfvars.example`](staging/opensearch.gke.tfvars.example)
 - [`prod/opensearch.gke.tfvars.example`](prod/opensearch.gke.tfvars.example)
 - [`github.repo_settings.tfvars.example`](github.repo_settings.tfvars.example)
+- [`github_cd_bootstrap.gcp.tfvars.example`](github_cd_bootstrap.gcp.tfvars.example)
 
 These files contain non-secret environment scaffolding only.
 Do not commit credentials or secret values here.

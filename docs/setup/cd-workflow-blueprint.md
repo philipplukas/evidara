@@ -49,7 +49,7 @@ For `document-intelligence` specifically, configure per-environment secrets:
 
 Repository environments/variables/secrets can be provisioned via Terraform in [`../../infra/terraform/github/repo_settings`](../../infra/terraform/github/repo_settings) with example inputs in [`../../infra/env/github.repo_settings.tfvars.example`](../../infra/env/github.repo_settings.tfvars.example).
 
-For CLI-driven synchronization (discovery via `gcloud`/Databricks CLI and write via `gh`), use [`../../scripts/sync-github-cd-config.sh`](../../scripts/sync-github-cd-config.sh). It supports dry-run by default, optional secret sync via Google Secret Manager, auto-detection for common WIF/token naming patterns, and an `--interactive` mode for account/project selection when gcloud context needs fixing.
+For CLI-driven synchronization (discovery via `gcloud`/Databricks CLI and write via `gh`), use [`../../scripts/sync-github-cd-config.sh`](../../scripts/sync-github-cd-config.sh). It supports dry-run by default, optional secret sync via Google Secret Manager, optional Databricks PAT sourcing from local Databricks CLI profiles (`--databricks-token-source profile`) with Secret Manager rotation, auto-detection for common WIF/token naming patterns, and an `--interactive` mode for account/project selection when gcloud context needs fixing.
 
 Recommended first run:
 
@@ -61,6 +61,28 @@ scripts/sync-github-cd-config.sh \
 ```
 
 Then run with `--apply` after preflight passes.
+
+Recommended token rotation flow (Databricks CLI profile -> Secret Manager -> GitHub):
+
+```bash
+scripts/sync-github-cd-config.sh \
+  --dev-project data-platform-dev-492214 \
+  --prod-project data-platform-prod-492214 \
+  --region europe-west6 \
+  --artifact-project data-platform-dev-492214 \
+  --artifact-repo runtime \
+  --platform-control-service platform-control \
+  --wif-provider "projects/585502170445/locations/global/workloadIdentityPools/github/providers/evidara" \
+  --service-account-dev "gha-deployer-dev@data-platform-dev-492214.iam.gserviceaccount.com" \
+  --service-account-prod "gha-deployer-prod@data-platform-prod-492214.iam.gserviceaccount.com" \
+  --databricks-profile-dev DEFAULT \
+  --databricks-profile-prod DEFAULT \
+  --databricks-token-source profile \
+  --gsm-token-secret-dev evidara-databricks-token-dev \
+  --gsm-token-secret-prod evidara-databricks-token-prod \
+  --sync-secrets \
+  --apply
+```
 
 ## Minimum IAM and Access
 
