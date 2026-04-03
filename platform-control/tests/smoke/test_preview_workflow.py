@@ -7,10 +7,14 @@ from dataclasses import dataclass
 
 import httpx
 import pytest
+from sqlalchemy import select
 
 from platform_control.database import get_session
+from platform_control.domain import ProviderJobStatus
 from platform_control.main import create_app
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.provider_job import ProviderJob
+from platform_control.models.raw_artifact import RawArtifact
 from platform_control.routers.runs import get_firecrawl_provider
 from platform_control.services.firecrawl_provider import ProviderStartResult
 
@@ -171,6 +175,54 @@ async def test_preview_run_reaches_terminal_state_and_exposes_summary(session_ma
         assert body["pdf_count"] == 1
         assert body["likely_decision_page_count"] >= 1
         assert body["likely_boilerplate_page_count"] >= 1
+
+        captured_resources = await client.get(f"/v1/runs/{run_id}/captured-resources")
+        assert captured_resources.status_code == 200
+        captured_resources_body = captured_resources.json()
+        assert len(captured_resources_body["data"]) == 2
+        assert captured_resources_body["data"][0]["title"] == "Decision 2026/01"
+        assert captured_resources_body["data"][1]["content_type"] == "application/pdf"
+
+        raw_artifacts_response = await client.get(f"/v1/runs/{run_id}/raw-artifacts")
+        assert raw_artifacts_response.status_code == 200
+        raw_artifacts_body = raw_artifacts_response.json()
+        assert len(raw_artifacts_body["data"]) == 2
+        assert raw_artifacts_body["data"][0]["storage_path"]
+        assert {artifact["content_type"] for artifact in raw_artifacts_body["data"]} == {
+            "application/pdf",
+            "text/html",
+        }
+
+        provider_jobs_response = await client.get(f"/v1/runs/{run_id}/provider-jobs")
+        assert provider_jobs_response.status_code == 200
+        provider_jobs_body = provider_jobs_response.json()
+        assert len(provider_jobs_body["data"]) == 1
+        assert provider_jobs_body["data"][0]["external_job_id"] == "crawl_preview_123"
+        assert provider_jobs_body["data"][0]["status"] == "completed"
+        assert provider_jobs_body["data"][0]["last_event_type"] == "crawl.completed"
+
+    async with session_maker() as verification_session:
+        provider_job = await verification_session.scalar(
+            select(ProviderJob).where(ProviderJob.run_id == run_id)
+        )
+        raw_artifacts = list(
+            await verification_session.scalars(
+                select(RawArtifact)
+                .where(RawArtifact.run_id == run_id)
+                .order_by(RawArtifact.created_at.asc())
+            )
+        )
+
+    assert provider_job is not None
+    assert provider_job.external_job_id == "crawl_preview_123"
+    assert provider_job.status is ProviderJobStatus.COMPLETED
+    assert provider_job.last_event_type == "crawl.completed"
+    assert len(raw_artifacts) == 2
+    assert all(artifact.storage_path for artifact in raw_artifacts)
+    assert {artifact.content_type for artifact in raw_artifacts} == {
+        "application/pdf",
+        "text/html",
+    }
 
 
 @pytest.mark.asyncio

@@ -14,11 +14,16 @@ from platform_control.errors import (
 )
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.provider_job import ProviderJob
+from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.schemas.run import (
+    CapturedResourceResponse,
     CreateRunRequest,
+    ProviderJobResponse,
+    RawArtifactResponse,
+    RunListItemResponse,
     RunPreviewSummaryBreakdownEntry,
     RunPreviewSummaryDriftCheck,
     RunPreviewSummaryResponse,
@@ -47,6 +52,41 @@ class RunService:
         self.session = session
         self.provider = provider
         self.run_dispatch_backend = run_dispatch_backend
+
+    async def list_runs(
+        self,
+        *,
+        mode: RunMode | None = None,
+        status: RunStatus | None = None,
+    ) -> list[RunListItemResponse]:
+        query = (
+            select(
+                Run.run_id,
+                Run.source_id,
+                Run.source_version_id,
+                Run.mode,
+                Run.status,
+                Run.started_at,
+                Run.completed_at,
+                Run.artifacts_count,
+                Run.captured_resources_count,
+                Run.failure_reason,
+                Run.created_at,
+                Run.updated_at,
+                Source.name.label("source_name"),
+                SourceVersion.version_label.label("version_label"),
+            )
+            .join(Source, Source.source_id == Run.source_id)
+            .join(SourceVersion, SourceVersion.source_version_id == Run.source_version_id)
+            .order_by(Run.created_at.desc())
+        )
+        if mode is not None:
+            query = query.where(Run.mode == mode)
+        if status is not None:
+            query = query.where(Run.status == status)
+
+        rows = await self.session.execute(query)
+        return [RunListItemResponse.model_validate(dict(row._mapping)) for row in rows]
 
     async def create_run(self, request: CreateRunRequest) -> Run:
         source = await self.session.get(Source, request.source_id)
@@ -116,6 +156,33 @@ class RunService:
         if run is None:
             raise NotFoundError(f"Run not found: {run_id}")
         return run
+
+    async def list_captured_resources(self, run_id: str) -> list[CapturedResourceResponse]:
+        await self.get_run(run_id)
+        result = await self.session.scalars(
+            select(CapturedResource)
+            .where(CapturedResource.run_id == run_id)
+            .order_by(CapturedResource.created_at.asc())
+        )
+        return [CapturedResourceResponse.model_validate(resource) for resource in result]
+
+    async def list_raw_artifacts(self, run_id: str) -> list[RawArtifactResponse]:
+        await self.get_run(run_id)
+        result = await self.session.scalars(
+            select(RawArtifact)
+            .where(RawArtifact.run_id == run_id)
+            .order_by(RawArtifact.created_at.asc())
+        )
+        return [RawArtifactResponse.model_validate(artifact) for artifact in result]
+
+    async def list_provider_jobs(self, run_id: str) -> list[ProviderJobResponse]:
+        await self.get_run(run_id)
+        result = await self.session.scalars(
+            select(ProviderJob)
+            .where(ProviderJob.run_id == run_id)
+            .order_by(ProviderJob.created_at.asc())
+        )
+        return [ProviderJobResponse.model_validate(job) for job in result]
 
     async def cancel_run(self, run_id: str) -> Run:
         run = await self.get_run(run_id)

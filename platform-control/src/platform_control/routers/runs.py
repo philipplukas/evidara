@@ -5,10 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.config import get_settings
 from platform_control.database import get_session
+from platform_control.domain import RunMode, RunStatus
 from platform_control.schemas.document_events import DocumentLifecycleEventListResponse
 from platform_control.schemas.processing_status import ProcessingStatusUpdateListResponse
 from platform_control.schemas.run import (
+    CapturedResourceListResponse,
     CreateRunRequest,
+    ProviderJobListResponse,
+    RawArtifactListResponse,
+    RunListResponse,
     RunPreviewSummaryResponse,
     RunResponse,
 )
@@ -25,6 +30,16 @@ def get_firecrawl_provider() -> FirecrawlProvider:
 
 
 ProviderDep = Annotated[FirecrawlProvider, Depends(get_firecrawl_provider)]
+
+
+@router.get("", response_model=RunListResponse)
+async def list_runs(
+    session: SessionDep,
+    mode: RunMode | None = None,
+    status: RunStatus | None = None,
+) -> RunListResponse:
+    service = RunService(session)
+    return RunListResponse(data=await service.list_runs(mode=mode, status=status))
 
 
 @router.post("", response_model=RunResponse, status_code=status.HTTP_201_CREATED)
@@ -48,6 +63,33 @@ async def get_run(
 ) -> RunResponse:
     service = RunService(session)
     return await service.get_run(run_id)
+
+
+@router.get("/{run_id}/captured-resources", response_model=CapturedResourceListResponse)
+async def list_run_captured_resources(
+    run_id: str,
+    session: SessionDep,
+) -> CapturedResourceListResponse:
+    service = RunService(session)
+    return CapturedResourceListResponse(data=await service.list_captured_resources(run_id))
+
+
+@router.get("/{run_id}/raw-artifacts", response_model=RawArtifactListResponse)
+async def list_run_raw_artifacts(
+    run_id: str,
+    session: SessionDep,
+) -> RawArtifactListResponse:
+    service = RunService(session)
+    return RawArtifactListResponse(data=await service.list_raw_artifacts(run_id))
+
+
+@router.get("/{run_id}/provider-jobs", response_model=ProviderJobListResponse)
+async def list_run_provider_jobs(
+    run_id: str,
+    session: SessionDep,
+) -> ProviderJobListResponse:
+    service = RunService(session)
+    return ProviderJobListResponse(data=await service.list_provider_jobs(run_id))
 
 
 @router.post("/{run_id}/cancel", response_model=RunResponse)

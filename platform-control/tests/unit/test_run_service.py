@@ -5,11 +5,12 @@ from dataclasses import dataclass
 import pytest
 from sqlalchemy import select
 
-from platform_control.domain import RunMode, RunStatus
+from platform_control.domain import ProviderJobStatus, RunMode, RunStatus
 from platform_control.errors import InvalidStateTransitionError
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.provider_job import ProviderJob
+from platform_control.models.raw_artifact import RawArtifact
 from platform_control.schemas.run import CreateRunRequest
 from platform_control.schemas.source import (
     CreateSourceRequest,
@@ -137,6 +138,108 @@ def test_partial_rerun_requires_parent_run_id() -> None:
             source_version_id="sv_123",
             replay={"mode": "partial_rerun"},
         )
+
+
+async def test_list_runs_supports_filters_and_joined_display_fields(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+
+    preview_run = await RunService(
+        session,
+        StubProvider(external_job_id="crawl_job_preview"),
+    ).create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+
+    await source_service.approve_source_version(version.source_version_id)
+    production_run = await RunService(
+        session,
+        StubProvider(external_job_id="crawl_job_production"),
+    ).create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+    preview_run.status = RunStatus.COMPLETED
+    await session.commit()
+
+    run_service = RunService(session)
+    all_runs = await run_service.list_runs()
+    production_only = await run_service.list_runs(mode=RunMode.PRODUCTION)
+    completed_only = await run_service.list_runs(status=RunStatus.COMPLETED)
+
+    assert [run.run_id for run in all_runs] == [production_run.run_id, preview_run.run_id]
+    assert all_runs[0].source_name == "Zurich decisions"
+    assert all_runs[0].version_label == "v1"
+    assert [run.run_id for run in production_only] == [production_run.run_id]
+    assert [run.run_id for run in completed_only] == [preview_run.run_id]
+
+
+@pytest.mark.asyncio
+async def test_run_detail_lists_expose_resources_artifacts_and_provider_jobs(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run = await RunService(session, StubProvider(external_job_id="crawl_job_detail")).create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+
+    session.add_all(
+        [
+            RawArtifact(
+                artifact_id="art_detail_1",
+                run_id=run.run_id,
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                storage_path="gs://bucket/runs/run_detail/art_detail_1.json",
+                content_type="text/html",
+                artifact_metadata={"pageTitle": "Decision"},
+            ),
+            CapturedResource(
+                captured_resource_id="cap_detail_1",
+                artifact_id="art_detail_1",
+                run_id=run.run_id,
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                provider_job_id=None,
+                source_url="https://example.com/detail",
+                final_url="https://example.com/detail",
+                title="Decision detail",
+                content_type="text/html",
+                checksum="checksum_detail_1",
+                http_status=200,
+                discovery_depth=1,
+            ),
+        ]
+    )
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+    assert provider_job is not None
+    provider_job.status = ProviderJobStatus.COMPLETED
+    provider_job.last_event_type = "crawl.completed"
+    run.artifacts_count = 1
+    run.captured_resources_count = 1
+    await session.commit()
+
+    run_service = RunService(session)
+    captured_resources = await run_service.list_captured_resources(run.run_id)
+    raw_artifacts = await run_service.list_raw_artifacts(run.run_id)
+    provider_jobs = await run_service.list_provider_jobs(run.run_id)
+
+    assert [resource.captured_resource_id for resource in captured_resources] == ["cap_detail_1"]
+    assert captured_resources[0].title == "Decision detail"
+    assert [artifact.artifact_id for artifact in raw_artifacts] == ["art_detail_1"]
+    assert raw_artifacts[0].artifact_metadata == {"pageTitle": "Decision"}
+    assert [job.provider_job_id for job in provider_jobs] == [provider_job.provider_job_id]
+    assert provider_jobs[0].status is ProviderJobStatus.COMPLETED
+    assert provider_jobs[0].last_event_type == "crawl.completed"
 
 
 @pytest.mark.asyncio
