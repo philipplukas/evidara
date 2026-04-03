@@ -10,6 +10,7 @@ Current implemented example:
 
 - [`../../.github/workflows/platform-control.yml`](../../.github/workflows/platform-control.yml)
 - [`../../.github/workflows/document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
+- [`../../.github/workflows/document-intelligence-cd.yml`](../../.github/workflows/document-intelligence-cd.yml)
 
 ## Baseline Principles
 
