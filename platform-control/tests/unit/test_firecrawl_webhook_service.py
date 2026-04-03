@@ -58,7 +58,17 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
         source_id="src_seed",
         version_label="v1",
         status=SourceVersionStatus.APPROVED,
-        acquisition_spec={"seed_url": "https://example.com/decisions", "mode": "crawl"},
+        acquisition_spec={
+            "seed_url": "https://example.com/decisions",
+            "mode": "crawl",
+            "tenant_id": "tenant_public",
+            "corpus_id": "corpus_public_ch_admin_decisions",
+            "scope_type": "global_public",
+            "source_origin_kind": "official_primary",
+            "trust_tier": "authoritative",
+            "language_codes": ["de"],
+            "document_type_hint": "decision",
+        },
     )
     run = Run(
         run_id="run_seed",
@@ -142,7 +152,18 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
     manifest_storage_ref = payload["bundle_manifest_ref"]["storage_ref"]  # type: ignore[index]
     assert bundle_event["event_type"] == "artifact_bundle.available"
     assert payload["provenance"]["run_id"] == "run_seed"  # type: ignore[index]
+    assert payload["provenance"]["tenant_id"] == "tenant_public"  # type: ignore[index]
+    assert payload["provenance"]["corpus_id"] == "corpus_public_ch_admin_decisions"  # type: ignore[index]
+    assert payload["provenance"]["scope_type"] == "global_public"  # type: ignore[index]
+    assert payload["source_origin_kind"] == "official_primary"  # type: ignore[index]
+    assert payload["trust_tier"] == "authoritative"  # type: ignore[index]
     assert str(manifest_storage_ref["uri"]).startswith("file://")  # type: ignore[index]
+
+    manifest_uri = str(manifest_storage_ref["uri"])  # type: ignore[index]
+    manifest_path = Path(manifest_uri.removeprefix("file://"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["source_defaults"]["language_codes"] == ["de"]
+    assert manifest["source_defaults"]["document_type_hint"] == "decision"
 
 
 def test_storage_ref_marks_uri_hash_when_checksum_is_unavailable() -> None:

@@ -97,3 +97,42 @@ async def test_create_run_persists_provider_job(session) -> None:
     assert run.status is RunStatus.RUNNING
     assert provider_job is not None
     assert provider_job.external_job_id == "crawl_job_123"
+
+
+@pytest.mark.asyncio
+async def test_create_run_persists_explicit_scope_and_replay_metadata(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+            scope={
+                "kind": "time_window",
+                "since": "2026-01-01T00:00:00Z",
+                "until": "2026-01-31T23:59:59Z",
+                "max_resources": 250,
+            },
+            replay={
+                "mode": "backfill",
+                "reason": "Fill January gap after provider outage",
+            },
+        )
+    )
+
+    assert run.run_metadata["scope"]["kind"] == "time_window"
+    assert run.run_metadata["scope"]["max_resources"] == 250
+    assert run.run_metadata["replay"]["mode"] == "backfill"
+    assert run.run_metadata["replay"]["reason"] == "Fill January gap after provider outage"
+
+
+def test_partial_rerun_requires_parent_run_id() -> None:
+    with pytest.raises(ValueError):
+        CreateRunRequest(
+            source_id="src_123",
+            source_version_id="sv_123",
+            replay={"mode": "partial_rerun"},
+        )
