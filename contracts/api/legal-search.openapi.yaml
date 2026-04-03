@@ -105,6 +105,7 @@ paths:
       tags: [documents]
       parameters:
         - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/CorrelationId'
         - name: document_id
           in: path
           required: true
@@ -161,6 +162,13 @@ components:
         metadata). Accepts standard HTTP language tags (e.g. "de", "fr", "fr-CH").
         Falls back to "de" (German) when omitted or unsupported.
         See ADR-0013 for locale resolution rules.
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Propagated for tracing across frontend -> legal-search -> document-intelligence.
 
   securitySchemes:
     bearerAuth:

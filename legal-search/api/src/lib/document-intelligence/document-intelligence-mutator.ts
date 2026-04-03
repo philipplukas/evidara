@@ -58,7 +58,15 @@ export const documentIntelligenceFetch = async <T>(path: string, init: RequestIn
     return { data: undefined, status: 204, headers: responseHeaders } as T;
   }
 
-  const data = ct.includes('text/plain') ? await res.text() : await res.json();
+  let data: unknown;
+  if (ct.includes('text/plain')) {
+    data = await res.text();
+  } else if (ct.includes('json')) {
+    data = await res.json();
+  } else {
+    // Preserve response body for unexpected content types without forcing JSON parse errors.
+    data = await res.text();
+  }
 
   return {
     data,

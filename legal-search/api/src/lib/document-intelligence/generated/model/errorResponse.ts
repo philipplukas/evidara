@@ -15,7 +15,7 @@ added under `contracts/schemas/` when the on-wire subset is frozen.
  */
 
 export interface ErrorResponse {
-  message?: string;
+  message: string;
   code?: string;
   [key: string]: unknown;
  }
