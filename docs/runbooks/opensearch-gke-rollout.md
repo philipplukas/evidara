@@ -1,5 +1,10 @@
 # OpenSearch on GKE Rollout Runbook
 
+Owner: Platform team
+Last reviewed: 2026-04-03
+Last verified: Not yet verified
+Applies to: dev, staging, prod
+
 ## Scope
 
 This runbook provisions and validates self-managed OpenSearch on GKE with a dedicated VPC for `dev`, `staging`, and `prod`.
