@@ -122,6 +122,6 @@ curl -s "${LS_URL}/v1/search?q=test&limit=1" | jq '.total'
 
 ## Related Resources
 
-- [CD Workflow](.github/workflows/platform-control-cd.yml)
+- [CD Workflow](../../.github/workflows/platform-control-cd.yml)
 - [Alert Response Playbook](./alert-response-playbook.md)
 - [Connector Worker Operations](./connector-worker-operations.md)
