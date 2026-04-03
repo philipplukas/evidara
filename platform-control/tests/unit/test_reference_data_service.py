@@ -45,3 +45,17 @@ async def test_update_authority_requires_existing_jurisdiction(session) -> None:
             authority.authority_id,
             UpdateAuthorityRequest(jurisdiction_id="jur_missing"),
         )
+
+
+@pytest.mark.asyncio
+async def test_create_authority_requires_existing_jurisdiction(session) -> None:
+    service = ReferenceDataService(session)
+
+    with pytest.raises(NotFoundError):
+        await service.create_authority(
+            CreateAuthorityRequest(
+                jurisdiction_id="jur_missing",
+                name="Ghost Authority",
+                slug="ghost-authority",
+            )
+        )

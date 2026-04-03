@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class JurisdictionResponse(BaseModel):
@@ -27,6 +27,12 @@ class CreateJurisdictionRequest(BaseModel):
 class UpdateJurisdictionRequest(BaseModel):
     name: str | None = None
     slug: str | None = None
+
+    @model_validator(mode="after")
+    def validate_has_changes(self) -> UpdateJurisdictionRequest:
+        if self.name is None and self.slug is None:
+            raise ValueError("At least one field must be provided.")
+        return self
 
 
 class AuthorityResponse(BaseModel):
@@ -54,3 +60,9 @@ class UpdateAuthorityRequest(BaseModel):
     jurisdiction_id: str | None = None
     name: str | None = None
     slug: str | None = None
+
+    @model_validator(mode="after")
+    def validate_has_changes(self) -> UpdateAuthorityRequest:
+        if self.jurisdiction_id is None and self.name is None and self.slug is None:
+            raise ValueError("At least one field must be provided.")
+        return self

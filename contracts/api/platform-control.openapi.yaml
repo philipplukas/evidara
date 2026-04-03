@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.3.0
+  version: 0.3.1
   contact:
     name: Evidara Team
 
@@ -584,6 +584,7 @@ components:
 
     UpdateJurisdictionRequest:
       type: object
+      minProperties: 1
       properties:
         name:
           type: string
@@ -638,6 +639,7 @@ components:
 
     UpdateAuthorityRequest:
       type: object
+      minProperties: 1
       properties:
         jurisdiction_id:
           oneOf:
@@ -821,6 +823,7 @@ components:
 
     UpdateSourceVersionRequest:
       type: object
+      minProperties: 1
       properties:
         version_label:
           type: string
@@ -993,14 +996,17 @@ components:
             $ref: "#/components/schemas/RunPreviewSummaryBreakdownEntry"
         likely_decision_pages:
           type: array
+          maxItems: 10
           items:
             $ref: "#/components/schemas/RunPreviewSummarySample"
         likely_boilerplate_pages:
           type: array
+          maxItems: 10
           items:
             $ref: "#/components/schemas/RunPreviewSummarySample"
         likely_duplicate_pages:
           type: array
+          maxItems: 10
           items:
             $ref: "#/components/schemas/RunPreviewSummarySample"
         drift_checks:

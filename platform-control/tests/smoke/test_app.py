@@ -76,6 +76,12 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
         approve_response = await client.post(f"/v1/versions/{source_version_id}/approve")
         assert approve_response.status_code == 200
 
+        update_approved_version_response = await client.patch(
+            f"/v1/versions/{source_version_id}",
+            json={"version_label": "should-not-work"},
+        )
+        assert update_approved_version_response.status_code == 409
+
         run_response = await client.post(
             "/v1/runs",
             json={

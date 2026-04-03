@@ -120,6 +120,29 @@ async def test_cancel_run_marks_it_cancelled(session) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "terminal_status",
+    [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED],
+)
+async def test_cancel_run_rejects_terminal_status(session, terminal_status) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    run.status = terminal_status
+    await session.commit()
+
+    with pytest.raises(InvalidStateTransitionError):
+        await run_service.cancel_run(run.run_id)
+
+
+@pytest.mark.asyncio
 async def test_preview_summary_flags_decision_boilerplate_and_duplicate_resources(session) -> None:
     source, version, source_service = await _seed_source_version(session)
     await source_service.approve_source_version(version.source_version_id)

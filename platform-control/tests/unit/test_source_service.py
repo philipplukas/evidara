@@ -174,3 +174,40 @@ async def test_update_source_version_allows_editing_rejected_draft_content(sessi
     assert updated.version_label == "draft-v2"
     assert updated.acquisition_spec["seed_url"] == "https://example.com/cases"
     assert updated.acquisition_spec["limit"] == 12
+
+
+@pytest.mark.asyncio
+async def test_update_source_version_rejects_approved_version(session) -> None:
+    session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+    session.add(
+        Authority(
+            authority_id="auth_zh_admin",
+            jurisdiction_id="jur_ch",
+            name="Zurich Administrative Court",
+            slug="zh-admin-court",
+        )
+    )
+    await session.commit()
+
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="Zurich decisions",
+            jurisdiction_id="jur_ch",
+            authority_id="auth_zh_admin",
+        )
+    )
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="draft-v1",
+            acquisition_spec=FirecrawlAcquisitionSpec(seed_url="https://example.com/decisions"),
+        ),
+    )
+    await service.approve_source_version(version.source_version_id)
+
+    with pytest.raises(InvalidStateTransitionError):
+        await service.update_source_version(
+            version.source_version_id,
+            UpdateSourceVersionRequest(version_label="draft-v2"),
+        )

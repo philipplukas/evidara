@@ -10,4 +10,5 @@ select
   s.name as source_name
 from source_versions sv
 join sources s on s.source_id = sv.source_id
+where sv.source_id = {{ source_id }}
 order by sv.created_at desc;

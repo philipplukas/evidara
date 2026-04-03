@@ -111,7 +111,7 @@ class FirecrawlWebhookService:
             raise SignatureVerificationError("Firecrawl signature verification failed.")
 
     def _insert_for_current_dialect(self):
-        dialect_name = self.session.bind.dialect.name if self.session.bind is not None else "sqlite"
+        dialect_name = self.session.get_bind().dialect.name
         if dialect_name == "postgresql":
             from sqlalchemy.dialects.postgresql import insert as insert_fn
 

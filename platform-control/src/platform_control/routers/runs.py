@@ -41,9 +41,8 @@ async def create_run(
 async def get_run(
     run_id: str,
     session: SessionDep,
-    provider: ProviderDep,
 ) -> RunResponse:
-    service = RunService(session, provider)
+    service = RunService(session)
     return await service.get_run(run_id)
 
 
@@ -51,9 +50,8 @@ async def get_run(
 async def cancel_run(
     run_id: str,
     session: SessionDep,
-    provider: ProviderDep,
 ) -> RunResponse:
-    service = RunService(session, provider)
+    service = RunService(session)
     return await service.cancel_run(run_id)
 
 
@@ -61,9 +59,8 @@ async def cancel_run(
 async def get_run_preview_summary(
     run_id: str,
     session: SessionDep,
-    provider: ProviderDep,
 ) -> RunPreviewSummaryResponse:
-    service = RunService(session, provider)
+    service = RunService(session)
     return await service.get_preview_summary(run_id)
 
 

@@ -7,7 +7,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.domain import ProviderJobStatus, RunMode, RunStatus, SourceVersionStatus
-from platform_control.errors import InvalidStateTransitionError, NotFoundError
+from platform_control.errors import (
+    InvalidStateTransitionError,
+    NotFoundError,
+    ProviderConfigurationError,
+)
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.run import Run
@@ -33,7 +37,11 @@ class RunService:
         re.IGNORECASE,
     )
 
-    def __init__(self, session: AsyncSession, provider: FirecrawlProvider) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        provider: FirecrawlProvider | None = None,
+    ) -> None:
         self.session = session
         self.provider = provider
 
@@ -60,6 +68,9 @@ class RunService:
         )
         self.session.add(run)
         await self.session.flush()
+
+        if self.provider is None:
+            raise ProviderConfigurationError("A provider is required before creating runs.")
 
         provider_result = await self.provider.start_run(source, source_version, run)
         provider_job = ProviderJob(
