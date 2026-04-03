@@ -2,14 +2,6 @@ locals {
   environment          = lower(var.environment)
   raw_bucket_name      = coalesce(var.raw_artifact_bucket_name, "evidara-raw-artifacts-${local.environment}")
   manifest_bucket_name = coalesce(var.manifest_bucket_name, "evidara-manifests-${local.environment}")
-  runtime_private_egress = (
-    var.runtime_vpc_access_connector == null
-    ? null
-    : {
-      connector = var.runtime_vpc_access_connector
-      egress    = var.runtime_vpc_egress
-    }
-  )
   labels = {
     environment = local.environment
     managed_by  = "terraform"
@@ -200,6 +192,14 @@ resource "google_cloud_run_v2_service" "runtime" {
     scaling {
       min_instance_count = each.value.min_instance_count
       max_instance_count = each.value.max_instance_count
+    }
+
+    dynamic "vpc_access" {
+      for_each = each.value.vpc_connector == null ? [] : [each.value.vpc_connector]
+      content {
+        connector = vpc_access.value
+        egress    = each.value.vpc_egress
+      }
     }
 
     containers {

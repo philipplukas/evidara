@@ -50,7 +50,9 @@ output "cloud_run_service_names" {
   }
 }
 
-output "runtime_private_egress" {
-  description = "Cloud Run private egress assumptions for runtime services."
-  value       = local.runtime_private_egress
+output "cloud_run_service_urls" {
+  value = {
+    for key, service in google_cloud_run_v2_service.runtime :
+    key => service.uri
+  }
 }

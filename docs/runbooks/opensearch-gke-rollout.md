@@ -23,11 +23,11 @@ This runbook provisions and validates self-managed OpenSearch on GKE with a dedi
 ```bash
 cd infra/terraform/opensearch/gke_stack
 terraform init
-terraform plan -var-file=../../../env/<env>/opensearch.gke.tfvars
-terraform apply -var-file=../../../env/<env>/opensearch.gke.tfvars
+terraform plan -var-file=../../env/<env>/opensearch.gke.tfvars
+terraform apply -var-file=../../env/<env>/opensearch.gke.tfvars
 ```
 
-1. Sync OpenSearch endpoint and credentials into Secret Manager:
+2. Sync OpenSearch endpoint and credentials into Secret Manager:
 
 ```bash
 python3 scripts/sync_opensearch_secrets.py \
@@ -36,11 +36,9 @@ python3 scripts/sync_opensearch_secrets.py \
   --opensearch-stack-dir infra/terraform/opensearch/gke_stack
 ```
 
-1. Set runtime private egress assumptions in `infra/env/<env>/runtime.gcp.tfvars`:
-   - `runtime_vpc_access_connector` (from OpenSearch stack output `vpc_connector_id`)
-   - `runtime_vpc_egress` (`PRIVATE_RANGES_ONLY` recommended)
+3. Update runtime Cloud Run services to use the VPC connector output (`vpc_connector_id`) in `runtime.gcp.tfvars` (`vpc_connector`, `vpc_egress`), then apply runtime stack.
 
-1. Apply runtime stack and roll services so new secret versions and networking assumptions are active.
+4. Roll runtime services and verify they can connect to OpenSearch.
 
 ## Validation gates
 
@@ -50,13 +48,11 @@ Run these before promoting from `dev` to `staging` and `prod`.
 
 ```bash
 terraform fmt -check -recursive infra/terraform
-terraform -chdir=infra/terraform/opensearch/gke_stack init -backend=false
 terraform -chdir=infra/terraform/opensearch/gke_stack validate
-terraform -chdir=infra/terraform/gcp/runtime_stack init -backend=false
 terraform -chdir=infra/terraform/gcp/runtime_stack validate
 ```
 
-1. Endpoint/auth/alias check:
+2. Endpoint/auth/alias check:
 
 ```bash
 python3 scripts/verify_opensearch_runtime.py \
@@ -65,14 +61,13 @@ python3 scripts/verify_opensearch_runtime.py \
   --password "$(gcloud secrets versions access latest --secret=opensearch-password-<env> --project=<project-id>)"
 ```
 
-1. Application validation:
-
-   - Run legal-search replay against the new endpoint.
-   - Run alias cutover script in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
-   - Verify search and detail API responses.
+3. Application validation:
+- Run legal-search projection replay against the new endpoint.
+- Run alias cutover script in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
+- Verify search and detail API responses against expected documents.
 
 ## Rotation and recovery
 
-- Rotate credentials by adding new Secret Manager versions, then roll Cloud Run revisions.
-- Keep aliases on previously healthy indices during incident response.
-- Rebuild indices from DI published surfaces when needed; OpenSearch is a rebuildable serving layer.
+- Rotate credentials by adding new Secret Manager versions, then rolling Cloud Run revisions.
+- If OpenSearch service degrades, keep aliases pointing at previous healthy indices while repairing cluster state.
+- Rebuild indices from DI published surfaces if corruption is detected; OpenSearch remains a rebuildable serving layer.

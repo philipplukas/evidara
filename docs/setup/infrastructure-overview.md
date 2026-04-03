@@ -52,6 +52,26 @@ Manifests should be stored as immutable JSON objects. Search and filtering over 
 |----------|----------|---------|
 | `evidara-control-{env}` | `platform_control` | platform-control |
 
+### Secret and env management
+
+Evidara uses a split model for runtime configuration:
+
+- **Terraform-managed**: secret containers (names), IAM access, and Cloud Run secret references.
+- **Ops/CI-managed**: secret values (Secret Manager versions), injected after Terraform and rotated independently.
+
+Secret categories:
+
+- **Upstream-provided** (must match provider values): Firecrawl API key/webhook secret, OpenSearch endpoint and credentials.
+- **Internally generated** (platform-owned): service bearer tokens, internal webhook shared secrets, generated DB credentials where applicable.
+
+Standard deployment flow:
+
+1. `terraform apply` infrastructure and secret containers.
+2. Add/update secret values in Secret Manager.
+   - For self-managed OpenSearch on GKE, sync stack outputs with `scripts/sync_opensearch_secrets.py`.
+3. Deploy or roll Cloud Run services to load latest secret versions.
+4. Verify health and event flow.
+
 ## Databricks
 
 | Resource | Purpose |
@@ -66,10 +86,8 @@ Current repo scaffolding splits ownership this way:
 
 - Terraform under [`../../infra/terraform/databricks/document_intelligence_stack`](../../infra/terraform/databricks/document_intelligence_stack) wires the top-level Databricks workspace/environment layer and invokes the reusable module under [`../../infra/terraform/databricks/document_intelligence`](../../infra/terraform/databricks/document_intelligence)
 - Terraform under [`../../infra/terraform/gcp/runtime_stack`](../../infra/terraform/gcp/runtime_stack) provisions environment runtime primitives (GCS, Pub/Sub, service accounts, Secret Manager placeholders, Cloud SQL and Cloud Run scaffolding)
-- Terraform under [`../../infra/terraform/gcp/github_cd_bootstrap`](../../infra/terraform/gcp/github_cd_bootstrap) provisions GitHub OIDC workload identity, deployer service accounts, and Databricks token secret containers
-- Terraform under [`../../infra/terraform/opensearch/gke_stack`](../../infra/terraform/opensearch/gke_stack) provisions self-managed OpenSearch on GKE with dedicated networking and a Serverless VPC connector
-- Terraform under [`../../infra/terraform/github/repo_settings`](../../infra/terraform/github/repo_settings) manages GitHub repository environments plus Actions variables/secrets used by CD workflows
-- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for runtime GCP, OpenSearch GKE, and DI Databricks stacks
+- Terraform under [`../../infra/terraform/opensearch/gke_stack`](../../infra/terraform/opensearch/gke_stack) provisions self-managed OpenSearch on GKE with dedicated networking
+- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for runtime GCP, GKE OpenSearch, and DI Databricks stacks
 - Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job
 - SQL/bootstrap assets under [`../../document-intelligence/databricks/sql`](../../document-intelligence/databricks/sql) register the published Delta surfaces after the first successful write
 - GitHub Actions validates the DI Terraform path plus the Databricks bundle/runtime shape before merge
@@ -88,7 +106,7 @@ Current repo scaffolding splits ownership this way:
 |---------|---------|
 | `evidara-search-{env}` | Search serving for legal-search |
 
-OpenSearch is provisioned through `infra/terraform/opensearch/gke_stack` as a self-managed GKE workload in a dedicated VPC. Runtime services consume endpoint and credentials through Secret Manager (`opensearch-node-*`, `opensearch-username-*`, `opensearch-password-*`). OpenSearch stays a serving layer only and must be rebuildable from published DI surfaces. Alias cutover and replay scripting currently live in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
+Search is provisioned through the dedicated GKE stack (`infra/terraform/opensearch/gke_stack`) and exposed privately in a dedicated VPC. Runtime services consume endpoint and credentials from Secret Manager after syncing stack outputs. It remains a serving layer only and must be rebuildable from published DI surfaces. Alias cutover and replay scripting currently live in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
 
 Recommended lifecycle pattern:
 

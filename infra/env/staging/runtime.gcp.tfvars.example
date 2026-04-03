@@ -13,6 +13,8 @@ cloud_run_services = {
     image               = "europe-west6-docker.pkg.dev/evidara-staging/runtime/platform-control:latest"
     service_account_key = "platform_control_api"
     allow_unauthenticated = false
+    vpc_connector = "projects/evidara-staging/locations/europe-west6/connectors/evidara-search-staging-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
   }
 
   "legal-search-api" = {
@@ -37,9 +39,7 @@ cloud_run_services = {
         secret_name = "opensearch_password"
       }
     }
+    vpc_connector = "projects/evidara-staging/locations/europe-west6/connectors/evidara-search-staging-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
   }
 }
-
-# Optional private egress assumptions for Cloud Run runtime services:
-# runtime_vpc_access_connector = "projects/evidara-staging/locations/europe-west6/connectors/evidara-search-staging-connector"
-# runtime_vpc_egress          = "PRIVATE_RANGES_ONLY"
