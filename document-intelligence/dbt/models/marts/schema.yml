@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: fct_document_processing
+    columns:
+      - name: document_id
+        tests:
+          - not_null
+          - unique
+      - name: latest_processed_at
+        tests:
+          - not_null
+  - name: document_knowledge_base
+    columns:
+      - name: document_version_id
+        tests:
+          - not_null
+          - unique
+  - name: embeddings_ready
+    columns:
+      - name: chunk_id
+        tests:
+          - not_null
+          - unique
+  - name: srv_search_documents
+    columns:
+      - name: document_version_id
+        tests:
+          - not_null
+          - unique
+  - name: srv_search_chunks
+    columns:
+      - name: chunk_id
+        tests:
+          - not_null
+          - unique

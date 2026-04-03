@@ -11,6 +11,16 @@ resources:
           default: ${var.processing_version}
         - name: surfaces_root_uri
           default: ${var.surfaces_root_uri}
+        - name: parser_backend
+          default: ${var.parser_backend}
+        - name: enable_spacy
+          default: ${var.enable_spacy}
+        - name: spacy_model_name
+          default: ${var.spacy_model_name}
+        - name: spacy_max_chars_per_section
+          default: ${var.spacy_max_chars_per_section}
+        - name: spacy_batch_size
+          default: ${var.spacy_batch_size}
       tasks:
         - task_key: process_bundle
           python_wheel_task:
@@ -20,6 +30,11 @@ resources:
               event_path: "{{job.parameters.event_path}}"
               processing_version: "{{job.parameters.processing_version}}"
               surfaces_root_uri: "{{job.parameters.surfaces_root_uri}}"
+              parser_backend: "{{job.parameters.parser_backend}}"
+              enable_spacy: "{{job.parameters.enable_spacy}}"
+              spacy_model_name: "{{job.parameters.spacy_model_name}}"
+              spacy_max_chars_per_section: "{{job.parameters.spacy_max_chars_per_section}}"
+              spacy_batch_size: "{{job.parameters.spacy_batch_size}}"
           libraries:
             - whl: ./dist/*.whl
           new_cluster:
