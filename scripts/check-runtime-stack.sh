@@ -13,7 +13,7 @@ for env in dev staging prod; do
     echo "Missing ${runtime_tfvars_file}" >&2
     exit 1
   fi
-  if ! rg -q "^environment\\s*=\\s*\"${env}\"$" "${runtime_tfvars_file}"; then
+  if ! grep -Eq "^environment[[:space:]]*=[[:space:]]*\"${env}\"$" "${runtime_tfvars_file}"; then
     echo "Unexpected environment value in ${runtime_tfvars_file}" >&2
     exit 1
   fi
@@ -23,7 +23,7 @@ for env in dev staging prod; do
     echo "Missing ${opensearch_tfvars_file}" >&2
     exit 1
   fi
-  if ! rg -q "^environment\\s*=\\s*\"${env}\"$" "${opensearch_tfvars_file}"; then
+  if ! grep -Eq "^environment[[:space:]]*=[[:space:]]*\"${env}\"$" "${opensearch_tfvars_file}"; then
     echo "Unexpected environment value in ${opensearch_tfvars_file}" >&2
     exit 1
   fi
