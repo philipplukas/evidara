@@ -84,6 +84,71 @@ resource "google_pubsub_subscription" "events" {
   ack_deadline_seconds       = each.value.ack_deadline_seconds
   message_retention_duration = each.value.message_retention_duration
   labels                     = local.labels
+
+  dynamic "retry_policy" {
+    for_each = each.value.retry_policy != null ? [each.value.retry_policy] : []
+    content {
+      minimum_backoff = retry_policy.value.minimum_backoff
+      maximum_backoff = retry_policy.value.maximum_backoff
+    }
+  }
+
+  dynamic "dead_letter_policy" {
+    for_each = each.value.dead_letter_policy != null ? [each.value.dead_letter_policy] : []
+    content {
+      dead_letter_topic     = google_pubsub_topic.dead_letter[each.key].id
+      max_delivery_attempts = dead_letter_policy.value.max_delivery_attempts
+    }
+  }
+}
+
+# --- Dead-letter queues ---
+
+locals {
+  dlq_subscriptions = {
+    for name, sub in var.event_subscriptions :
+    name => sub if sub.dead_letter_policy != null
+  }
+}
+
+resource "google_pubsub_topic" "dead_letter" {
+  for_each = local.dlq_subscriptions
+
+  name   = "${each.key}-dlq"
+  labels = local.labels
+}
+
+resource "google_pubsub_subscription" "dead_letter" {
+  for_each = local.dlq_subscriptions
+
+  name                       = "${each.key}-dlq-sub"
+  topic                      = google_pubsub_topic.dead_letter[each.key].id
+  ack_deadline_seconds       = 60
+  message_retention_duration = "604800s"
+  labels                     = local.labels
+}
+
+# Pub/Sub service agent needs publisher access on DLQ topics to forward
+# failed messages, and subscriber access on source subscriptions to modify
+# ack deadlines during dead-lettering.
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
+resource "google_pubsub_topic_iam_member" "dlq_publisher" {
+  for_each = local.dlq_subscriptions
+
+  topic  = google_pubsub_topic.dead_letter[each.key].name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "dlq_subscriber" {
+  for_each = local.dlq_subscriptions
+
+  subscription = google_pubsub_subscription.events[each.key].name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_service_account" "runtime" {

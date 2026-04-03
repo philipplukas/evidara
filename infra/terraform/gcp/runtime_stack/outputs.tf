@@ -21,6 +21,20 @@ output "event_subscription_names" {
   }
 }
 
+output "dead_letter_topic_names" {
+  value = {
+    for name, topic in google_pubsub_topic.dead_letter :
+    name => topic.name
+  }
+}
+
+output "dead_letter_subscription_names" {
+  value = {
+    for name, subscription in google_pubsub_subscription.dead_letter :
+    name => subscription.name
+  }
+}
+
 output "runtime_service_accounts" {
   value = {
     for key, account in google_service_account.runtime :

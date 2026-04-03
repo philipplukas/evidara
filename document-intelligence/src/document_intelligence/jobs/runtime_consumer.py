@@ -130,14 +130,16 @@ def main(argv: list[str] | None = None) -> int:
                     }
                 )
             except Exception:
-                LOGGER.exception("failed to process message %s", received.message.message_id)
-                subscriber.modify_ack_deadline(
-                    request={
-                        "subscription": subscription_path,
-                        "ack_ids": [received.ack_id],
-                        "ack_deadline_seconds": 0,
-                    }
+                delivery_attempt = received.message.attributes.get("googclient_deliveryattempt", "unknown")
+                LOGGER.exception(
+                    "failed to process message %s (delivery_attempt=%s)",
+                    received.message.message_id,
+                    delivery_attempt,
                 )
+                # Do NOT ack — let ack deadline expire so Pub/Sub
+                # retry_policy applies exponential backoff before
+                # redelivery. After max_delivery_attempts the message
+                # is forwarded to the dead-letter topic.
 
     LOGGER.info("consumer stopped")
     return 0
