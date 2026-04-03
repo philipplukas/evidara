@@ -119,6 +119,11 @@ export class DocumentProcessedEventDto {
   @IsIn(['document-intelligence'])
   producer!: 'document-intelligence';
 
+  @IsOptional()
+  @IsString()
+  @Matches(RUN_ID_PATTERN)
+  correlation_id?: string;
+
   @ValidateNested()
   @Type(() => ProcessedPayloadDto)
   payload!: ProcessedPayloadDto;
@@ -143,6 +148,11 @@ export class DocumentWithdrawnEventDto {
   @IsString()
   @IsIn(['document-intelligence'])
   producer!: 'document-intelligence';
+
+  @IsOptional()
+  @IsString()
+  @Matches(RUN_ID_PATTERN)
+  correlation_id?: string;
 
   @ValidateNested()
   @Type(() => WithdrawnPayloadDto)

@@ -15,11 +15,13 @@ from typing import Any
 from google.cloud import pubsub_v1
 
 from document_intelligence.config.runtime import RuntimeSettings
+from document_intelligence.contracts.envelope import EnvelopeError
 from document_intelligence.events.publisher import (
     EventPublisherConfig,
     PubSubEventPublisher,
 )
 from document_intelligence.ingest.loaders import GcsBundleLoader
+from document_intelligence.observability.event_logging import log_event
 from document_intelligence.persist.sinks import (
     DeltaCanonicalSink,
     InMemoryCanonicalSink,
@@ -27,6 +29,10 @@ from document_intelligence.persist.sinks import (
 from document_intelligence.pipeline import DocumentProcessingPipeline
 
 LOGGER = logging.getLogger("document_intelligence.runtime_consumer")
+
+# Permanent failures are deterministic and message-content-driven:
+# retrying the identical payload will produce the same error.
+_PERMANENT_ERRORS = (EnvelopeError, json.JSONDecodeError, KeyError)
 
 
 def _build_pipeline(
@@ -76,6 +82,22 @@ def _process_message(
         publisher.publish_document_processed_event(result.document_processed_event)
 
 
+def _extract_event_context(data: bytes) -> dict[str, str | None]:
+    """Best-effort extraction of event context fields for logging."""
+    try:
+        payload = json.loads(data.decode("utf-8"))
+        inner = payload.get("payload", {})
+        provenance = inner.get("provenance", {}) if isinstance(inner, dict) else {}
+        return {
+            "correlation_id": payload.get("correlation_id"),
+            "event_id": payload.get("event_id"),
+            "event_type": payload.get("event_type"),
+            "run_id": provenance.get("run_id") if isinstance(provenance, dict) else None,
+        }
+    except Exception:
+        return {"correlation_id": None, "event_id": None, "event_type": None, "run_id": None}
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -121,25 +143,77 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
         for received in response.received_messages:
+            msg_id = received.message.message_id
+            delivery_attempt = received.message.attributes.get("googclient_deliveryattempt", "unknown")
+            ctx = _extract_event_context(received.message.data)
+            start = time.monotonic()
+
             try:
                 _process_message(received.message, pipeline, publisher)
+                duration_ms = round((time.monotonic() - start) * 1000, 2)
                 subscriber.acknowledge(
                     request={
                         "subscription": subscription_path,
                         "ack_ids": [received.ack_id],
                     }
                 )
-            except Exception:
-                delivery_attempt = received.message.attributes.get("googclient_deliveryattempt", "unknown")
-                LOGGER.exception(
-                    "failed to process message %s (delivery_attempt=%s)",
-                    received.message.message_id,
-                    delivery_attempt,
+                log_event(
+                    LOGGER,
+                    logging.INFO,
+                    "message_processed",
+                    event_type=ctx["event_type"],
+                    event_id=ctx["event_id"],
+                    correlation_id=ctx["correlation_id"],
+                    run_id=ctx["run_id"],
+                    message_id=msg_id,
+                    duration_ms=duration_ms,
+                    subscription=args.subscription_name,
                 )
-                # Do NOT ack — let ack deadline expire so Pub/Sub
-                # retry_policy applies exponential backoff before
-                # redelivery. After max_delivery_attempts the message
-                # is forwarded to the dead-letter topic.
+
+            except _PERMANENT_ERRORS as exc:
+                # Deterministic, message-content-driven — ack immediately,
+                # do not waste retry budget or pollute DLQ.
+                subscriber.acknowledge(
+                    request={
+                        "subscription": subscription_path,
+                        "ack_ids": [received.ack_id],
+                    }
+                )
+                log_event(
+                    LOGGER,
+                    logging.WARNING,
+                    "message_rejected_permanent",
+                    event_type=ctx["event_type"],
+                    event_id=ctx["event_id"],
+                    correlation_id=ctx["correlation_id"],
+                    run_id=ctx["run_id"],
+                    message_id=msg_id,
+                    delivery_attempt=delivery_attempt,
+                    error_class="permanent",
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                    subscription=args.subscription_name,
+                )
+
+            except Exception as exc:
+                # Transient — do NOT ack.  Let ack deadline expire so
+                # Pub/Sub retry_policy applies exponential backoff.
+                # After max_delivery_attempts the message goes to DLQ.
+                log_event(
+                    LOGGER,
+                    logging.ERROR,
+                    "message_processing_failed",
+                    event_type=ctx["event_type"],
+                    event_id=ctx["event_id"],
+                    correlation_id=ctx["correlation_id"],
+                    run_id=ctx["run_id"],
+                    message_id=msg_id,
+                    delivery_attempt=delivery_attempt,
+                    error_class="transient",
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                    subscription=args.subscription_name,
+                )
 
     LOGGER.info("consumer stopped")
     return 0

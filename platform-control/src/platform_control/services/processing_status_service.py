@@ -22,7 +22,8 @@ class ProcessingStatusService:
     async def record_document_processing_status(
         self,
         event: DocumentProcessingStatusUpdatedEvent,
-    ) -> None:
+    ) -> str:
+        """Record a processing status update. Returns 'inserted' or 'duplicate'."""
         payload = event.payload
         provenance = payload.provenance
         update = ProcessingStatusUpdate(
@@ -39,9 +40,10 @@ class ProcessingStatusService:
             error_code=payload.error_code,
             error_summary=payload.error_summary,
         )
-        await self._insert_idempotent(update)
+        return await self._insert_idempotent(update)
 
-    async def record_document_processed(self, event: DocumentProcessedEvent) -> None:
+    async def record_document_processed(self, event: DocumentProcessedEvent) -> str:
+        """Record a document-processed lifecycle event. Returns 'inserted' or 'duplicate'."""
         payload = event.payload
         event_row = DocumentLifecycleEvent(
             event_id=event.event_id,
@@ -57,9 +59,10 @@ class ProcessingStatusService:
             search_disposition=None,
             occurred_at=event.occurred_at,
         )
-        await self._insert_idempotent(event_row)
+        return await self._insert_idempotent(event_row)
 
-    async def record_document_withdrawn(self, event: DocumentWithdrawnEvent) -> None:
+    async def record_document_withdrawn(self, event: DocumentWithdrawnEvent) -> str:
+        """Record a document-withdrawn lifecycle event. Returns 'inserted' or 'duplicate'."""
         payload = event.payload
         event_row = DocumentLifecycleEvent(
             event_id=event.event_id,
@@ -75,7 +78,7 @@ class ProcessingStatusService:
             search_disposition=payload.search_disposition,
             occurred_at=event.occurred_at,
         )
-        await self._insert_idempotent(event_row)
+        return await self._insert_idempotent(event_row)
 
     async def list_run_processing_status(self, run_id: str) -> list[ProcessingStatusUpdate]:
         await self._ensure_run_exists(run_id)
@@ -105,9 +108,12 @@ class ProcessingStatusService:
     async def _insert_idempotent(
         self,
         row: ProcessingStatusUpdate | DocumentLifecycleEvent,
-    ) -> None:
+    ) -> str:
+        """Insert a row; return 'inserted' or 'duplicate' on PK conflict."""
         self.session.add(row)
         try:
             await self.session.commit()
+            return "inserted"
         except IntegrityError:
             await self.session.rollback()
+            return "duplicate"
