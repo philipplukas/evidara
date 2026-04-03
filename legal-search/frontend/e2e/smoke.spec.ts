@@ -26,7 +26,7 @@ test.describe("Frontend smoke journeys", () => {
 
     await resultTitle.click();
 
-    await expect(page).toHaveURL(/item=law-1/);
+    await expect(page).toHaveURL(/item=exact-1/);
   });
 
   test("@smoke clears selection with Escape", async ({ page }) => {
@@ -34,7 +34,7 @@ test.describe("Frontend smoke journeys", () => {
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
     await page.getByText("Art. 754 OR").first().click();
-    await expect(page).toHaveURL(/item=law-1/);
+    await expect(page).toHaveURL(/item=exact-1/);
 
     await page.keyboard.press("Escape");
 
