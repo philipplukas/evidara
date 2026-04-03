@@ -83,27 +83,6 @@ variable "event_subscriptions" {
   }
 }
 
-variable "runtime_vpc_access_connector" {
-  description = "Optional Serverless VPC Access connector id for Cloud Run private egress (for example from OpenSearch GKE stack output vpc_connector_id)."
-  type        = string
-  default     = null
-  nullable    = true
-}
-
-variable "runtime_vpc_egress" {
-  description = "Cloud Run VPC egress mode assumption when runtime_vpc_access_connector is set."
-  type        = string
-  default     = "PRIVATE_RANGES_ONLY"
-
-  validation {
-    condition = contains([
-      "PRIVATE_RANGES_ONLY",
-      "ALL_TRAFFIC",
-    ], var.runtime_vpc_egress)
-    error_message = "runtime_vpc_egress must be PRIVATE_RANGES_ONLY or ALL_TRAFFIC."
-  }
-}
-
 variable "enable_cloud_sql" {
   description = "Whether to provision the Cloud SQL Postgres instance for platform-control."
   type        = bool
@@ -153,6 +132,8 @@ variable "cloud_run_services" {
     cpu                   = optional(string, "1")
     memory                = optional(string, "512Mi")
     timeout_seconds       = optional(number, 300)
+    vpc_connector         = optional(string, null)
+    vpc_egress            = optional(string, "PRIVATE_RANGES_ONLY")
     env_vars              = optional(map(string), {})
     secret_env_vars = optional(map(object({
       secret_name = string

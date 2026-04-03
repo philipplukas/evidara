@@ -2,9 +2,7 @@
 """Sync OpenSearch Terraform outputs into GCP Secret Manager.
 
 Expected Terraform outputs in the OpenSearch stack:
-- service_uri (optional if service_host + service_port exist)
-- service_host
-- service_port
+- service_uri
 - service_username
 - service_password
 """
@@ -120,13 +118,11 @@ def main() -> int:
                 "No terraform outputs found. Apply the OpenSearch stack first "
                 "(terraform apply in infra/terraform/opensearch/gke_stack)."
             )
-
         node = read_output(outputs, "service_uri", allow_empty=True)
         if not node:
             host = read_output(outputs, "service_host")
             port = read_output(outputs, "service_port")
             node = f"https://{host}:{port}"
-
         username = read_output(outputs, "service_username")
         password = read_output(outputs, "service_password")
 

@@ -1,9 +1,9 @@
 environment = "prod"
 
-project_id = "evidara-prod"
+project_id = "your-gcp-project-id"
 region     = "europe-west6"
 
-node_locations    = ["europe-west6-a", "europe-west6-b", "europe-west6-c"]
+node_locations = ["europe-west6-a", "europe-west6-b", "europe-west6-c"]
 node_machine_type = "e2-standard-8"
 node_disk_size_gb = 500
 node_count        = 6

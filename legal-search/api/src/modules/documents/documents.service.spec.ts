@@ -1,8 +1,12 @@
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
 import type { DocumentsRepository } from './documents.repository';
 import { DocumentsService } from './documents.service';
-import type { DocumentContentPort } from './ports/document-content.port';
+
+function createNoopDiClient(): DocumentIntelligenceClient {
+  return { fetchLeanDocument: vi.fn().mockResolvedValue(null) };
+}
 
 // ─── Mock Repository ───
 
@@ -39,16 +43,12 @@ function createMockRepo(overrides?: Partial<DocumentsRepository>): DocumentsRepo
   };
 }
 
-const noopContent: DocumentContentPort = {
-  fetchLeanContent: vi.fn().mockResolvedValue(undefined),
-};
-
 // ─── Tests ───
 
 describe('DocumentsService', () => {
   it('should return a composed DetailView', async () => {
     const repo = createMockRepo();
-    const service = new DocumentsService(repo, noopContent);
+    const service = new DocumentsService(repo, createNoopDiClient());
 
     const detail = await service.getDetail('doc_001');
 
@@ -64,9 +64,41 @@ describe('DocumentsService', () => {
     const repo = createMockRepo({
       getById: vi.fn().mockResolvedValue(null),
     });
-    const service = new DocumentsService(repo, noopContent);
+    const service = new DocumentsService(repo, createNoopDiClient());
 
     await expect(service.getDetail('doc_missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('should merge lean Docling from Document Service when OpenSearch has no body', async () => {
+    const fetchLeanDocument = vi.fn().mockResolvedValue({ schema_name: 'docling', version: '1' });
+    const repo = createMockRepo();
+    const service = new DocumentsService(repo, { fetchLeanDocument });
+
+    const detail = await service.getDetail('doc_001', undefined, 'corr-1');
+
+    expect(fetchLeanDocument).toHaveBeenCalledWith('doc_001', { correlationId: 'corr-1' });
+    expect(detail.content).toEqual({ schema_name: 'docling', version: '1' });
+  });
+
+  it('should not call Document Service when content_docling already present', async () => {
+    const fetchLeanDocument = vi.fn();
+    const repo = createMockRepo({
+      getById: vi.fn().mockResolvedValue({
+        document_id: 'doc_001',
+        title: 'Test Law',
+        document_type: 'law',
+        jurisdiction: 'CH',
+        effective_date: '2024-01-01',
+        sections_count: 2,
+        citations_count: 1,
+        content_docling: { existing: true },
+      }),
+    });
+    const service = new DocumentsService(repo, { fetchLeanDocument });
+
+    await service.getDetail('doc_001');
+
+    expect(fetchLeanDocument).not.toHaveBeenCalled();
   });
 
   it('should always return arrays per ADR-0011', async () => {
@@ -74,7 +106,7 @@ describe('DocumentsService', () => {
       getSections: vi.fn().mockResolvedValue([]),
       getCitations: vi.fn().mockResolvedValue([]),
     });
-    const service = new DocumentsService(repo, noopContent);
+    const service = new DocumentsService(repo, createNoopDiClient());
 
     const detail = await service.getDetail('doc_001');
 
@@ -87,32 +119,11 @@ describe('DocumentsService', () => {
 
   it('should delegate getSections to repository', async () => {
     const repo = createMockRepo();
-    const service = new DocumentsService(repo, noopContent);
+    const service = new DocumentsService(repo, createNoopDiClient());
 
     const sections = await service.getSections('doc_001');
 
     expect(repo.getSections).toHaveBeenCalledWith('doc_001');
     expect(sections).toHaveLength(1);
-  });
-
-  it('overlays lean Docling JSON from Document Service when the port returns a body', async () => {
-    const repo = createMockRepo({
-      getById: vi.fn().mockResolvedValue({
-        document_id: 'doc_001',
-        title: 'Test Law',
-        document_type: 'law',
-        jurisdiction: 'CH',
-        content_docling: { from_index: true },
-      }),
-    });
-    const port: DocumentContentPort = {
-      fetchLeanContent: vi.fn().mockResolvedValue({ from_di: true }),
-    };
-    const service = new DocumentsService(repo, port);
-
-    const detail = await service.getDetail('doc_001');
-
-    expect(detail.content).toEqual({ from_di: true });
-    expect(port.fetchLeanContent).toHaveBeenCalledWith('doc_001', undefined);
   });
 });

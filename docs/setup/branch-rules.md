@@ -34,7 +34,7 @@ Add a scope in parentheses to indicate the affected component:
 ```text
 feat(legal-search): add jurisdiction filter
 fix(platform-control): correct run state transition
-docs(adr): ADR-0008 caching strategy
+docs(adr): ADR-0011 NestJS caching note
 chore(infra): update GCP provider version
 ```
 
