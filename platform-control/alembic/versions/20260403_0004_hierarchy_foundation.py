@@ -52,7 +52,7 @@ def upgrade() -> None:
         "scrape_targets",
         sa.Column("scrape_target_id", sa.String(), primary_key=True),
         sa.Column("path", sa.String(), nullable=False),
-        sa.Column("depth", sa.Integer(), nullable=False),
+        sa.Column("depth", sa.Integer(), nullable=False, server_default="0"),
         sa.Column(
             "jurisdiction_id",
             sa.String(),
@@ -67,8 +67,18 @@ def upgrade() -> None:
         ),
         sa.Column("selector", sa.JSON(), nullable=False),
         sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
         sa.UniqueConstraint("path", name="uq_scrape_targets_path"),
     )
 
