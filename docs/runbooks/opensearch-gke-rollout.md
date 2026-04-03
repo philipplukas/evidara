@@ -21,10 +21,11 @@ This runbook provisions and validates self-managed OpenSearch on GKE with a dedi
 1. Apply OpenSearch GKE stack:
 
 ```bash
-cd infra/terraform/opensearch/gke_stack
-terraform init
-terraform plan -var-file=../../env/<env>/opensearch.gke.tfvars
-terraform apply -var-file=../../env/<env>/opensearch.gke.tfvars
+terraform -chdir=infra/terraform/opensearch/gke_stack init
+terraform -chdir=infra/terraform/opensearch/gke_stack plan \
+  -var-file=../../../env/<env>/opensearch.gke.tfvars
+terraform -chdir=infra/terraform/opensearch/gke_stack apply \
+  -var-file=../../../env/<env>/opensearch.gke.tfvars
 ```
 
 1. Sync OpenSearch endpoint and credentials into Secret Manager:
@@ -36,7 +37,10 @@ python3 scripts/sync_opensearch_secrets.py \
   --opensearch-stack-dir infra/terraform/opensearch/gke_stack
 ```
 
-1. Update runtime Cloud Run services to use the VPC connector output (`vpc_connector_id`) in `runtime.gcp.tfvars` (`vpc_connector`, `vpc_egress`), then apply runtime stack.
+1. Set per-service networking in `infra/env/<env>/runtime.gcp.tfvars` before runtime apply:
+
+   - On each `cloud_run_services` entry that must reach OpenSearch, set `vpc_connector` from OpenSearch stack output `vpc_connector_id`.
+   - Set `vpc_egress` (`PRIVATE_RANGES_ONLY` recommended) for those same services.
 
 1. Roll runtime services and verify they can connect to OpenSearch.
 

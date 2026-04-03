@@ -4,7 +4,6 @@ set -euo pipefail
 PROJECT_ID="${PROJECT_ID:-}"
 REGION="${REGION:-europe-west6}"
 REPOSITORY="${REPOSITORY:-runtime}"
-TAG="${TAG:-latest}"
 
 if [[ -z "${PROJECT_ID}" ]]; then
   echo "PROJECT_ID is required (e.g. project-dacd6b7b-dc96-4534-b82)." >&2
@@ -13,6 +12,8 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DEFAULT_TAG="${GITHUB_SHA:-$(git -C "${ROOT_DIR}" rev-parse --short=12 HEAD 2>/dev/null || echo latest)}"
+TAG="${TAG:-${DEFAULT_TAG}}"
 
 build_image() {
   local context="$1"
