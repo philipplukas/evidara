@@ -68,6 +68,10 @@ class RunService:
             source_version_id=source_version.source_version_id,
             mode=request.mode,
             status=RunStatus.PENDING,
+            run_metadata={
+                "scope": request.scope.model_dump(mode="json"),
+                "replay": request.replay.model_dump(mode="json") if request.replay else None,
+            },
         )
         self.session.add(run)
         await self.session.flush()

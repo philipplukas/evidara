@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from platform_control.domain import FirecrawlMode, SourceStatus, SourceVersionStatus
+
+LanguageCode = Annotated[str, Field(pattern=r"^[a-z]{2}(?:-[A-Z]{2})?$")]
 
 
 class FirecrawlAcquisitionSpec(BaseModel):
@@ -18,6 +20,19 @@ class FirecrawlAcquisitionSpec(BaseModel):
     max_discovery_depth: int = Field(default=2, ge=0, le=10)
     scrape_formats: list[str] = Field(default_factory=lambda: ["markdown", "html"])
     zero_data_retention: bool = False
+    tenant_id: str = Field(default="tenant_public", pattern=r"^tenant_[a-z0-9_]+$")
+    corpus_id: str = Field(default="corpus_public_default", pattern=r"^corpus_[a-z0-9_]+$")
+    scope_type: Literal["global_public", "tenant_private", "tenant_shared"] = "global_public"
+    source_origin_kind: Literal[
+        "official_primary",
+        "official_mirror",
+        "licensed_provider",
+        "community_curated",
+        "tenant_internal",
+    ] = "official_primary"
+    trust_tier: Literal["authoritative", "preferred", "supplemental", "untrusted"] = "authoritative"
+    language_codes: list[LanguageCode] = Field(default_factory=list)
+    document_type_hint: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 

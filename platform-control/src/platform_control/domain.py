@@ -30,6 +30,19 @@ class RunMode(StrEnum):
     PRODUCTION = "production"
 
 
+class RunScopeKind(StrEnum):
+    FULL_SOURCE = "full_source"
+    DISCOVERED_SUBSET = "discovered_subset"
+    SOURCE_SNAPSHOT = "source_snapshot"
+    TIME_WINDOW = "time_window"
+
+
+class RunReplayMode(StrEnum):
+    PARTIAL_RERUN = "partial_rerun"
+    BACKFILL = "backfill"
+    FULL_REFRESH = "full_refresh"
+
+
 class ProviderJobStatus(StrEnum):
     ACCEPTED = "accepted"
     RUNNING = "running"

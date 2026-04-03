@@ -8,7 +8,7 @@ Own source lifecycle and operational control. Platform-control is the entry poin
 
 Platform-control now has a running FastAPI service with persisted entities and migration-backed schemas for source lifecycle, runs, webhook receipts, raw artifacts, bundle manifests, and DI status/lifecycle event consumption. Core API endpoints are implemented for reference data, sources, versions, runs, preview-summary review, Firecrawl callbacks, and DI event ingest (`document.processing_status.updated`, `document.processed`, `document.withdrawn`) with run-scoped read surfaces.
 
-For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope_type` are frozen through source-version acquisition config and copied into bundle/event provenance. First-class corpus CRUD is still follow-on work.
+For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope_type` are frozen through source-version acquisition config and copied into bundle/event provenance. Run creation now also accepts explicit `scope` and `replay` metadata so partial reruns and backfills can be recorded on the control-plane side even though resumable frontier orchestration is still follow-on work. First-class corpus CRUD is still follow-on work.
 
 Repo-owned Retool control-panel artifacts now live under `platform-control/retool/`, including the
 control-panel manifest, direct-Postgres queries, preview workflow, and Source Setup Copilot prompt.
@@ -48,6 +48,7 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 - [x] Create the initial `platform-control/` API scaffold
 - [x] Create the connector-worker scaffold under `platform-control/`
 - [~] Define run lifecycle and replay modes
+  Current API support exists for `scope` and `replay` metadata on run creation, but resumable checkpoints/frontier orchestration are not implemented yet.
 - [x] Define approval states and transitions
 - [~] Define reference snapshot export mechanics for DI
 - [~] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)

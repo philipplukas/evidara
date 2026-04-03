@@ -67,11 +67,24 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
                     "seed_url": "https://example.com/decisions",
                     "mode": "crawl",
                     "limit": 5,
+                    "tenant_id": "tenant_public",
+                    "corpus_id": "corpus_public_ch_admin_decisions",
+                    "scope_type": "global_public",
+                    "source_origin_kind": "official_primary",
+                    "trust_tier": "authoritative",
+                    "language_codes": ["de"],
+                    "document_type_hint": "decision",
                 },
             },
         )
         assert version_response.status_code == 201
-        source_version_id = version_response.json()["source_version_id"]
+        version_body = version_response.json()
+        source_version_id = version_body["source_version_id"]
+        assert version_body["acquisition_spec"]["tenant_id"] == "tenant_public"
+        assert version_body["acquisition_spec"]["corpus_id"] == "corpus_public_ch_admin_decisions"
+        assert version_body["acquisition_spec"]["scope_type"] == "global_public"
+        assert version_body["acquisition_spec"]["language_codes"] == ["de"]
+        assert version_body["acquisition_spec"]["document_type_hint"] == "decision"
 
         approve_response = await client.post(f"/v1/versions/{source_version_id}/approve")
         assert approve_response.status_code == 200
@@ -88,11 +101,25 @@ async def test_create_source_approve_and_trigger_run(session_maker) -> None:
                 "source_id": source_id,
                 "source_version_id": source_version_id,
                 "mode": "production",
+                "scope": {
+                    "kind": "discovered_subset",
+                    "include_urls": ["https://example.com/decisions"],
+                    "max_resources": 10,
+                },
+                "replay": {
+                    "mode": "partial_rerun",
+                    "parent_run_id": "run_ancestor123",
+                    "reason": "Repair subset after parser changes",
+                },
             },
         )
         assert run_response.status_code == 201
         run_body = run_response.json()
         assert run_body["status"] == "running"
+        assert run_body["scope"]["kind"] == "discovered_subset"
+        assert run_body["scope"]["max_resources"] == 10
+        assert run_body["replay"]["mode"] == "partial_rerun"
+        assert run_body["replay"]["parent_run_id"] == "run_ancestor123"
         run_id = run_body["run_id"]
 
         status_event_response = await client.post(

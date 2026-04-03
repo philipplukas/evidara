@@ -37,3 +37,12 @@ class Run(TimestampMixin, Base):
     source = relationship("Source", back_populates="runs")
     source_version = relationship("SourceVersion", back_populates="runs")
     provider_jobs = relationship("ProviderJob", back_populates="run")
+
+    @property
+    def scope(self) -> dict:
+        return dict((self.run_metadata or {}).get("scope") or {"kind": "full_source"})
+
+    @property
+    def replay(self) -> dict | None:
+        replay = (self.run_metadata or {}).get("replay")
+        return dict(replay) if isinstance(replay, dict) else None

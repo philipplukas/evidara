@@ -764,6 +764,41 @@ components:
         zero_data_retention:
           type: boolean
           default: false
+        tenant_id:
+          type: string
+          pattern: "^tenant_[a-z0-9_]+$"
+          default: tenant_public
+        corpus_id:
+          type: string
+          pattern: "^corpus_[a-z0-9_]+$"
+          default: corpus_public_default
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+          default: global_public
+        source_origin_kind:
+          type: string
+          enum:
+            [
+              official_primary,
+              official_mirror,
+              licensed_provider,
+              community_curated,
+              tenant_internal,
+            ]
+          default: official_primary
+        trust_tier:
+          type: string
+          enum: [authoritative, preferred, supplemental, untrusted]
+          default: authoritative
+        language_codes:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-z]{2}(?:-[A-Z]{2})?$"
+          default: []
+        document_type_hint:
+          type: string
 
     SourceVersion:
       type: object
@@ -842,6 +877,7 @@ components:
         - source_id
         - source_version_id
         - mode
+        - scope
         - status
         - artifacts_count
         - captured_resources_count
@@ -861,6 +897,12 @@ components:
         mode:
           type: string
           enum: [preview, production]
+        scope:
+          $ref: "#/components/schemas/RunScope"
+        replay:
+          oneOf:
+            - $ref: "#/components/schemas/RunReplay"
+            - type: "null"
         status:
           type: string
           enum: [pending, running, completed, failed, cancelled]
@@ -889,9 +931,68 @@ components:
           type: string
           format: date-time
 
+    RunScope:
+      type: object
+      required: [kind]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum: [full_source, discovered_subset, source_snapshot, time_window]
+          default: full_source
+        source_snapshot_id:
+          oneOf:
+            - type: string
+              pattern: "^snap_[a-z0-9]+$"
+            - type: "null"
+        captured_resource_ids:
+          type: array
+          items:
+            type: string
+        include_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+        since:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        until:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        max_resources:
+          oneOf:
+            - type: integer
+              minimum: 1
+              maximum: 10000
+            - type: "null"
+
+    RunReplay:
+      type: object
+      required: [mode]
+      additionalProperties: false
+      properties:
+        mode:
+          type: string
+          enum: [partial_rerun, backfill, full_refresh]
+        parent_run_id:
+          oneOf:
+            - type: string
+              pattern: "^run_[a-z0-9]+$"
+            - type: "null"
+        reason:
+          oneOf:
+            - type: string
+            - type: "null"
+
     CreateRunRequest:
       type: object
       required: [source_id, source_version_id]
+      additionalProperties: false
       properties:
         source_id:
           type: string
@@ -903,6 +1004,12 @@ components:
           type: string
           enum: [preview, production]
           default: preview
+        scope:
+          $ref: "#/components/schemas/RunScope"
+        replay:
+          oneOf:
+            - $ref: "#/components/schemas/RunReplay"
+            - type: "null"
 
     RunPreviewSummarySample:
       type: object

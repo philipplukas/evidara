@@ -75,6 +75,8 @@ class FirecrawlProvider:
                     "source_id": source.source_id,
                     "source_version_id": source_version.source_version_id,
                     "mode": run.mode.value,
+                    "run_scope_kind": run.scope.get("kind"),
+                    "replay_mode": (run.replay or {}).get("mode"),
                 },
                 "events": events,
             }
@@ -98,6 +100,8 @@ class FirecrawlProvider:
                     "source_id": source.source_id,
                     "source_version_id": source_version.source_version_id,
                     "run_mode": RunMode(run.mode).value,
+                    "run_scope": run.scope,
+                    "replay": run.replay,
                 },
             }
             if acquisition_spec.get("include_paths"):
