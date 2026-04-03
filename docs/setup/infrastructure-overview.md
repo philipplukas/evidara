@@ -19,6 +19,7 @@ Evidara targets three cloud/platform providers:
 | **Cloud Storage (GCS)** | Raw artifacts and manifests | platform-control, document-intelligence |
 | **Pub/Sub** | Asynchronous event messaging | All components |
 | **Secret Manager** | Credential and secret storage | All components |
+| **Google Kubernetes Engine (GKE)** | Self-managed OpenSearch runtime | legal-search |
 | **Cloud DNS** | DNS management | All components |
 | **Cloud Monitoring** | Observability | All components |
 
@@ -65,7 +66,8 @@ Current repo scaffolding splits ownership this way:
 
 - Terraform under [`../../infra/terraform/databricks/document_intelligence_stack`](../../infra/terraform/databricks/document_intelligence_stack) wires the top-level Databricks workspace/environment layer and invokes the reusable module under [`../../infra/terraform/databricks/document_intelligence`](../../infra/terraform/databricks/document_intelligence)
 - Terraform under [`../../infra/terraform/gcp/runtime_stack`](../../infra/terraform/gcp/runtime_stack) provisions environment runtime primitives (GCS, Pub/Sub, service accounts, Secret Manager placeholders, Cloud SQL and Cloud Run scaffolding)
-- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for both runtime GCP and DI Databricks stacks
+- Terraform under [`../../infra/terraform/opensearch/gke_stack`](../../infra/terraform/opensearch/gke_stack) provisions self-managed OpenSearch on GKE with dedicated networking and a Serverless VPC connector
+- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for runtime GCP, OpenSearch GKE, and DI Databricks stacks
 - Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job
 - SQL/bootstrap assets under [`../../document-intelligence/databricks/sql`](../../document-intelligence/databricks/sql) register the published Delta surfaces after the first successful write
 - GitHub Actions validates the DI Terraform path plus the Databricks bundle/runtime shape before merge
@@ -84,7 +86,7 @@ Current repo scaffolding splits ownership this way:
 |---------|---------|
 | `evidara-search-{env}` | Search serving for legal-search |
 
-Provider remains TBD. OpenSearch stays a serving layer only and must be rebuildable from published DI surfaces. Alias cutover and replay scripting currently live in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
+OpenSearch is provisioned through `infra/terraform/opensearch/gke_stack` as a self-managed GKE workload in a dedicated VPC. Runtime services consume endpoint and credentials through Secret Manager (`opensearch-node-*`, `opensearch-username-*`, `opensearch-password-*`). OpenSearch stays a serving layer only and must be rebuildable from published DI surfaces. Alias cutover and replay scripting currently live in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
 
 Recommended lifecycle pattern:
 

@@ -74,3 +74,8 @@ cloud_run_services = {
     }
   }
 }
+
+# Optional private egress assumptions for Cloud Run runtime services:
+# Use output vpc_connector_id from infra/terraform/opensearch/gke_stack.
+# runtime_vpc_access_connector = "projects/evidara-dev/locations/europe-west6/connectors/evidara-search-dev-connector"
+# runtime_vpc_egress          = "PRIVATE_RANGES_ONLY"
