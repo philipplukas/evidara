@@ -177,7 +177,7 @@ class RunService:
         result = await self.session.scalars(
             select(CapturedResource)
             .where(CapturedResource.run_id == run_id)
-            .order_by(CapturedResource.created_at.asc())
+            .order_by(CapturedResource.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
@@ -199,7 +199,7 @@ class RunService:
         result = await self.session.scalars(
             select(RawArtifact)
             .where(RawArtifact.run_id == run_id)
-            .order_by(RawArtifact.created_at.asc())
+            .order_by(RawArtifact.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
@@ -221,7 +221,7 @@ class RunService:
         result = await self.session.scalars(
             select(ProviderJob)
             .where(ProviderJob.run_id == run_id)
-            .order_by(ProviderJob.created_at.asc())
+            .order_by(ProviderJob.created_at.desc())
             .limit(limit)
             .offset(offset)
         )

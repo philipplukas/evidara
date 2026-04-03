@@ -65,6 +65,65 @@ describe("controlPlaneDataProvider", () => {
     });
   });
 
+  it("applies client pagination and sort to unbounded run lists", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              run_id: "run_old",
+              source_id: "src_01",
+              source_version_id: "sv_01",
+              mode: "preview",
+              status: "completed",
+              started_at: "2026-04-03T08:00:00Z",
+              completed_at: "2026-04-03T08:05:00Z",
+              artifacts_count: 1,
+              captured_resources_count: 1,
+              failure_reason: null,
+              created_at: "2026-04-03T08:00:00Z",
+              updated_at: "2026-04-03T08:05:00Z",
+              source_name: "Older",
+              version_label: "v0",
+            },
+            {
+              run_id: "run_new",
+              source_id: "src_01",
+              source_version_id: "sv_01",
+              mode: "preview",
+              status: "completed",
+              started_at: "2026-04-03T10:00:00Z",
+              completed_at: "2026-04-03T10:05:00Z",
+              artifacts_count: 2,
+              captured_resources_count: 2,
+              failure_reason: null,
+              created_at: "2026-04-03T10:00:00Z",
+              updated_at: "2026-04-03T10:05:00Z",
+              source_name: "Newer",
+              version_label: "v1",
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("runs", {
+      pagination: { page: 1, perPage: 1 },
+      sort: { field: "created_at", order: "DESC" },
+      filter: {},
+    });
+
+    expect(result.total).toBe(2);
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]?.run_id).toBe("run_new");
+  });
+
   it("maps run-scoped diagnostics resources onto run detail endpoints", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(
@@ -589,5 +648,35 @@ describe("controlPlaneDataProvider", () => {
       captured_url_count: 5,
       likely_decision_page_count: 3,
     });
+  });
+
+  it("fills missing preview summary collections and normalizes drift status", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          run_id: "run_01",
+          captured_url_count: 0,
+          artifacts_count: 0,
+          captured_resources_count: 0,
+          pdf_count: 0,
+          likely_decision_page_count: 0,
+          likely_boilerplate_page_count: 0,
+          likely_duplicate_page_count: 0,
+          drift_checks: [{ name: "x", status: "unknown", detail: "y" }],
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneActions.getRunPreviewSummary("run_01");
+
+    expect(result.content_type_breakdown).toEqual([]);
+    expect(result.likely_decision_pages).toEqual([]);
+    expect(result.drift_checks[0]?.status).toBe("ok");
   });
 });

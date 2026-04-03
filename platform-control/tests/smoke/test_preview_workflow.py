@@ -183,8 +183,9 @@ async def test_preview_run_reaches_terminal_state_and_exposes_summary(session_ma
         assert captured_resources_body["limit"] == 100
         assert captured_resources_body["offset"] == 0
         assert len(captured_resources_body["data"]) == 2
-        assert captured_resources_body["data"][0]["title"] == "Decision 2026/01"
-        assert captured_resources_body["data"][1]["content_type"] == "application/pdf"
+        by_title = {row["title"]: row for row in captured_resources_body["data"]}
+        assert by_title["Decision 2026/01"]["content_type"] == "text/html"
+        assert by_title["Privacy policy"]["content_type"] == "application/pdf"
 
         raw_artifacts_response = await client.get(f"/v1/runs/{run_id}/raw-artifacts")
         assert raw_artifacts_response.status_code == 200

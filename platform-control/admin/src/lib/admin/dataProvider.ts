@@ -409,6 +409,61 @@ const toQueryString = (params: GetListParams): string => {
   return queryString.length > 0 ? `?${queryString}` : "";
 };
 
+const compareSortValues = (left: unknown, right: unknown): number => {
+  if (left === right) {
+    return 0;
+  }
+  if (left === undefined || left === null) {
+    return -1;
+  }
+  if (right === undefined || right === null) {
+    return 1;
+  }
+  if (typeof left === "number" && typeof right === "number") {
+    return left - right;
+  }
+  if (typeof left === "boolean" && typeof right === "boolean") {
+    return Number(left) - Number(right);
+  }
+  return String(left).localeCompare(String(right));
+};
+
+/** Sort + page full list responses when the API returns an unbounded array. */
+const applyClientListWindow = <T extends Record<string, unknown>>(
+  records: T[],
+  params: GetListParams,
+): { data: T[]; total: number } => {
+  const sortField = params.sort?.field ?? "id";
+  const sortOrder = params.sort?.order ?? "ASC";
+  const page = params.pagination?.page ?? 1;
+  const perPage = params.pagination?.perPage ?? 25;
+
+  const sorted = [...records].sort((left, right) => {
+    const cmp = compareSortValues(left[sortField as keyof T], right[sortField as keyof T]);
+    return sortOrder === "DESC" ? -cmp : cmp;
+  });
+
+  const total = sorted.length;
+  const limit = Math.min(Math.max(perPage, 1), 500);
+  const start = Math.max((page - 1) * limit, 0);
+  const data = sorted.slice(start, start + limit);
+  return { data, total };
+};
+
+const normalizeDriftStatus = (status: string): "ok" | "warn" => (status === "warn" ? "warn" : "ok");
+
+const normalizeRunPreviewSummary = (raw: RunPreviewSummary): RunPreviewSummary => ({
+  ...raw,
+  content_type_breakdown: raw.content_type_breakdown ?? [],
+  likely_decision_pages: raw.likely_decision_pages ?? [],
+  likely_boilerplate_pages: raw.likely_boilerplate_pages ?? [],
+  likely_duplicate_pages: raw.likely_duplicate_pages ?? [],
+  drift_checks: (raw.drift_checks ?? []).map((check) => ({
+    ...check,
+    status: normalizeDriftStatus(check.status),
+  })),
+});
+
 const isMissingFilterValue = (value: string | undefined): boolean =>
   value === undefined || value.length === 0 || value === EMPTY_FILTER_VALUE;
 
@@ -451,19 +506,18 @@ const toSourceVersionPayload = (
 const getSimpleListResult = async <TResource extends SimpleListResourceName>(
   resource: TResource,
   idField: keyof ResourceRecordMap[TResource],
+  params: GetListParams,
 ): Promise<GetListResult<ResourceRecordMap[TResource] & RaRecord<Identifier>>> => {
   const items = await fetchSimpleList(resource);
-  return {
-    data: items.map((item) => toRecord(item, idField)),
-    total: items.length,
-  };
+  const records = items.map((item) => toRecord(item, idField));
+  return applyClientListWindow(records, params);
 };
 
 const buildRunScopedListQuery = (params: GetListParams): string => {
   const page = params.pagination?.page ?? 1;
   const perPage = params.pagination?.perPage ?? 100;
   const limit = Math.min(Math.max(perPage, 1), 500);
-  const offset = Math.max((page - 1) * perPage, 0);
+  const offset = Math.max((page - 1) * limit, 0);
   const query = new URLSearchParams();
   query.set("limit", String(limit));
   query.set("offset", String(offset));
@@ -500,7 +554,8 @@ export const controlPlaneActions = {
   },
 
   async getRunPreviewSummary(runId: string): Promise<RunPreviewSummary> {
-    return requestJson<RunPreviewSummary>(`/v1/runs/${runId}/preview-summary`);
+    const raw = await requestJson<RunPreviewSummary>(`/v1/runs/${runId}/preview-summary`);
+    return normalizeRunPreviewSummary(raw);
   },
 
   async approveSourceVersion(sourceVersionId: string): Promise<SourceVersionRecord> {
@@ -521,15 +576,15 @@ export const controlPlaneActions = {
 export const controlPlaneDataProvider: DataProvider = {
   async getList(resource, params): Promise<GetListResult> {
     if (resource === "jurisdictions") {
-      return getSimpleListResult("jurisdictions", "jurisdiction_id");
+      return getSimpleListResult("jurisdictions", "jurisdiction_id", params);
     }
 
     if (resource === "authorities") {
-      return getSimpleListResult("authorities", "authority_id");
+      return getSimpleListResult("authorities", "authority_id", params);
     }
 
     if (resource === "sources") {
-      return getSimpleListResult("sources", "source_id");
+      return getSimpleListResult("sources", "source_id", params);
     }
 
     if (resource === "source-versions") {
@@ -543,20 +598,16 @@ export const controlPlaneDataProvider: DataProvider = {
       const response = await requestJson<ListResponse<SourceVersion>>(
         `/v1/sources/${sourceId}/versions`,
       );
-      return {
-        data: response.data.map((item) => toRecord(item, "source_version_id")),
-        total: response.data.length,
-      };
+      const records = response.data.map((item) => toRecord(item, "source_version_id"));
+      return applyClientListWindow(records, params);
     }
 
     if (resource === "runs") {
       const response = await requestJson<ListResponse<RunListItem>>(
         `/v1/runs${toQueryString(params)}`,
       );
-      return {
-        data: response.data.map((item) => toRecord(item, "run_id")),
-        total: response.data.length,
-      };
+      const records = response.data.map((item) => toRecord(item, "run_id"));
+      return applyClientListWindow(records, params);
     }
 
     if (resource === "preview-review") {
@@ -570,10 +621,8 @@ export const controlPlaneDataProvider: DataProvider = {
       const response = await requestJson<ListResponse<RunListItem>>(
         `/v1/runs${toQueryString(previewParams)}`,
       );
-      return {
-        data: response.data.map((item) => toRecord(item, "run_id")),
-        total: response.data.length,
-      };
+      const records = response.data.map((item) => toRecord(item, "run_id"));
+      return applyClientListWindow(records, params);
     }
 
     if (isRunDetailResource(resource)) {

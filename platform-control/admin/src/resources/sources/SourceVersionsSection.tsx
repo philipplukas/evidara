@@ -435,7 +435,7 @@ export function SourceVersionsSection() {
 
         {versions.error ? <Alert severity="error">Unable to load source versions.</Alert> : null}
 
-        {!versions.error && (versions.data?.length ?? 0) === 0 ? (
+        {!versions.isPending && !versions.error && (versions.data?.length ?? 0) === 0 ? (
           <Typography variant="body2" color="text.secondary">
             No source versions exist for this source yet.
           </Typography>

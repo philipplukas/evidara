@@ -11,7 +11,7 @@ import {
   Stack,
   TextField,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDataProvider, useGetList, useNotify, useRedirect } from "react-admin";
 import type {
   RunCreateInput,
@@ -56,6 +56,16 @@ const createInitialState = (defaultMode: "preview" | "production"): RunLaunchFor
   mode: defaultMode,
 });
 
+const versionAllowedForMode = (
+  status: SourceVersionRecord["status"],
+  mode: "preview" | "production",
+): boolean => {
+  if (mode === "production") {
+    return status === "approved";
+  }
+  return status !== "rejected" && status !== "superseded";
+};
+
 export function RunLaunchButton({
   label,
   buttonVariant = "contained",
@@ -84,14 +94,27 @@ export function RunLaunchButton({
     filter: { source_id: formState.source_id || "__none__" },
   });
 
-  const versionChoices = useMemo(
-    () =>
-      (sourceVersions.data ?? []).map((version) => ({
+  const versionChoices = useMemo(() => {
+    const versions = sourceVersions.data ?? [];
+    return versions
+      .filter((version) => versionAllowedForMode(version.status, formState.mode))
+      .map((version) => ({
         value: version.source_version_id,
         label: `${version.version_label} (${version.status})`,
-      })),
-    [sourceVersions.data],
-  );
+      }));
+  }, [sourceVersions.data, formState.mode]);
+
+  useEffect(() => {
+    const versions = sourceVersions.data ?? [];
+    const allowedIds = new Set(
+      versions
+        .filter((v) => versionAllowedForMode(v.status, formState.mode))
+        .map((v) => v.source_version_id),
+    );
+    if (formState.source_version_id && !allowedIds.has(formState.source_version_id)) {
+      setFormState((prev) => ({ ...prev, source_version_id: "" }));
+    }
+  }, [formState.mode, formState.source_version_id, sourceVersions.data]);
 
   const reset = () => {
     setFormState(createInitialState(initialMode));
@@ -142,12 +165,24 @@ export function RunLaunchButton({
               select
               label="Run mode"
               value={formState.mode}
-              onChange={(event) =>
-                setFormState({
-                  ...formState,
-                  mode: event.target.value as RunLaunchFormState["mode"],
-                })
-              }
+              onChange={(event) => {
+                const mode = event.target.value as RunLaunchFormState["mode"];
+                setFormState((prev) => {
+                  const versions = sourceVersions.data ?? [];
+                  const allowedIds = new Set(
+                    versions
+                      .filter((v) => versionAllowedForMode(v.status, mode))
+                      .map((v) => v.source_version_id),
+                  );
+                  return {
+                    ...prev,
+                    mode,
+                    source_version_id: allowedIds.has(prev.source_version_id)
+                      ? prev.source_version_id
+                      : "",
+                  };
+                });
+              }}
               fullWidth
               disabled={allowedModes.length === 1}
             >
