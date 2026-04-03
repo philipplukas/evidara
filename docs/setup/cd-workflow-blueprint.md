@@ -8,8 +8,8 @@ Use this as the template for service-specific workflows.
 
 Current implemented example:
 
-- [`../../.github/workflows/platform-control-cd.yml`](../../.github/workflows/platform-control-cd.yml)
-- [`../../.github/workflows/document-intelligence-cd.yml`](../../.github/workflows/document-intelligence-cd.yml)
+- [`../../.github/workflows/platform-control.yml`](../../.github/workflows/platform-control.yml)
+- [`../../.github/workflows/document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
 
 ## Baseline Principles
 
