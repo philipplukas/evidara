@@ -1,0 +1,7 @@
+environment = "dev"
+
+project_id = "evidara-dev"
+region     = "europe-west6"
+
+raw_artifact_bucket_name = "evidara-raw-artifacts-dev"
+manifest_bucket_name     = "evidara-manifests-dev"

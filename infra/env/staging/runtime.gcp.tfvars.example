@@ -1,0 +1,7 @@
+environment = "staging"
+
+project_id = "evidara-staging"
+region     = "europe-west6"
+
+raw_artifact_bucket_name = "evidara-raw-artifacts-staging"
+manifest_bucket_name     = "evidara-manifests-staging"

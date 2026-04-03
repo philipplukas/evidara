@@ -1,0 +1,7 @@
+environment = "prod"
+
+project_id = "evidara-prod"
+region     = "europe-west6"
+
+raw_artifact_bucket_name = "evidara-raw-artifacts-prod"
+manifest_bucket_name     = "evidara-manifests-prod"
