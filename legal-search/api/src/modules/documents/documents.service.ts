@@ -2,9 +2,12 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { SupportedLocale } from '../../core/i18n';
 import { DEFAULT_LOCALE } from '../../core/i18n';
 import type { WarnFn } from '../../core/types/warn';
+import {
+  DOCUMENT_INTELLIGENCE_CLIENT,
+  type DocumentIntelligenceClient,
+} from '../../lib/document-intelligence/document-intelligence.client';
 import { DOCUMENTS_REPOSITORY, type DocumentsRepository } from './documents.repository';
 import { mapDocumentToDetailView } from './mappers/document-detail.mapper';
-import { DOCUMENT_CONTENT_PORT, type DocumentContentPort } from './ports/document-content.port';
 
 @Injectable()
 export class DocumentsService {
@@ -14,18 +17,14 @@ export class DocumentsService {
   constructor(
     @Inject(DOCUMENTS_REPOSITORY)
     private readonly repository: DocumentsRepository,
-    @Inject(DOCUMENT_CONTENT_PORT)
-    private readonly documentContent: DocumentContentPort,
+    @Inject(DOCUMENT_INTELLIGENCE_CLIENT)
+    private readonly documentIntelligence: DocumentIntelligenceClient,
   ) {
     this.warn = (event, meta) => this.logger.warn(`[contract] ${event}`, meta);
   }
 
-  async getDetail(
-    id: string,
-    locale: SupportedLocale = DEFAULT_LOCALE,
-    processingManifestId?: string,
-  ) {
-    const doc = await this.repository.getById(id);
+  async getDetail(id: string, locale: SupportedLocale = DEFAULT_LOCALE, correlationId?: string) {
+    let doc = await this.repository.getById(id);
     if (!doc) throw new NotFoundException(`Document ${id} not found`);
 
     const [sections, citations] = await Promise.all([
@@ -33,12 +32,18 @@ export class DocumentsService {
       this.repository.getCitations(id),
     ]);
 
-    const view = mapDocumentToDetailView(doc, sections, citations, locale, this.warn);
-    const lean = await this.documentContent.fetchLeanContent(id, processingManifestId);
-    if (lean !== undefined) {
-      return { ...view, content: lean };
+    const needsLean =
+      (doc.content_docling === undefined || doc.content_docling === null) &&
+      (doc.content === undefined || doc.content === null);
+
+    if (needsLean) {
+      const lean = await this.documentIntelligence.fetchLeanDocument(id, { correlationId });
+      if (lean !== null) {
+        doc = { ...doc, content_docling: lean };
+      }
     }
-    return view;
+
+    return mapDocumentToDetailView(doc, sections, citations, locale, this.warn);
   }
 
   async getSections(documentId: string) {

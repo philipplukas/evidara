@@ -17,14 +17,15 @@ import { Test } from '@nestjs/testing';
 import { vi } from 'vitest';
 import documentIntelligenceConfig from '../core/config/document-intelligence.config';
 import opensearchConfig from '../core/config/opensearch.config';
+import {
+  DOCUMENT_INTELLIGENCE_CLIENT,
+  type DocumentIntelligenceClient,
+  NoopDocumentIntelligenceClient,
+} from '../lib/document-intelligence/document-intelligence.client';
 import { DocumentsController } from '../modules/documents/documents.controller';
 import type { DocumentsRepository } from '../modules/documents/documents.repository';
 import { DOCUMENTS_REPOSITORY } from '../modules/documents/documents.repository';
 import { DocumentsService } from '../modules/documents/documents.service';
-import {
-  DOCUMENT_CONTENT_PORT,
-  type DocumentContentPort,
-} from '../modules/documents/ports/document-content.port';
 import { HealthController } from '../modules/health/health.controller';
 import type {
   ContextAggregations,
@@ -101,7 +102,7 @@ export interface TestApp {
 export async function createTestApp(overrides?: {
   searchRepo?: Partial<SearchRepository>;
   documentsRepo?: Partial<DocumentsRepository>;
-  documentContent?: Partial<DocumentContentPort>;
+  documentIntelligenceClient?: DocumentIntelligenceClient;
 }): Promise<TestApp> {
   const searchRepo: SearchRepository = {
     search: vi.fn().mockResolvedValue(SEARCH_WITH_RESULTS),
@@ -144,19 +145,14 @@ export async function createTestApp(overrides?: {
     ...overrides?.documentsRepo,
   };
 
-  const documentContent: DocumentContentPort = {
-    fetchLeanContent:
-      overrides?.documentContent?.fetchLeanContent ?? vi.fn().mockResolvedValue(undefined),
-  };
-
   // Build the module explicitly — avoids decorator metadata issues
   // with vitest's oxc/esbuild transform which doesn't emit metadata.
+  const diClient =
+    overrides?.documentIntelligenceClient ?? new NoopDocumentIntelligenceClient();
+
   const moduleRef = await Test.createTestingModule({
     imports: [
-      ConfigModule.forRoot({
-        isGlobal: true,
-        load: [opensearchConfig, documentIntelligenceConfig],
-      }),
+      ConfigModule.forRoot({ isGlobal: true, load: [opensearchConfig, documentIntelligenceConfig] }),
     ],
     controllers: [HealthController, SearchController, DocumentsController],
     providers: [
@@ -164,7 +160,7 @@ export async function createTestApp(overrides?: {
       DocumentsService,
       { provide: SEARCH_REPOSITORY, useValue: searchRepo },
       { provide: DOCUMENTS_REPOSITORY, useValue: documentsRepo },
-      { provide: DOCUMENT_CONTENT_PORT, useValue: documentContent },
+      { provide: DOCUMENT_INTELLIGENCE_CLIENT, useValue: diClient },
     ],
   }).compile();
 

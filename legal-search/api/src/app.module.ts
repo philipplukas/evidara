@@ -5,7 +5,6 @@ import opensearchConfig from './core/config/opensearch.config';
 import { OpenSearchModule } from './core/opensearch/client';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
-import { ProjectionsModule } from './modules/projections/projections.module';
 import { SearchModule } from './modules/search/search.module';
 
 @Module({
@@ -18,7 +17,6 @@ import { SearchModule } from './modules/search/search.module';
     HealthModule,
     SearchModule,
     DocumentsModule,
-    ProjectionsModule,
   ],
 })
 export class AppModule {}

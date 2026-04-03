@@ -45,7 +45,10 @@
     }
   },
   "files": {
-    "includes": ["src/**"],
-    "experimentalScannerIgnores": ["src/__tests__/**"]
+    "includes": [
+      "src/**",
+      "!!src/lib/document-intelligence/generated/**",
+      "!!src/__tests__/**"
+    ]
   }
 }
