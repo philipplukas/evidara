@@ -1,0 +1,70 @@
+name: Document Intelligence CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/document-intelligence-cd.yml"
+      - "document-intelligence/**"
+      - "contracts/events/**"
+      - "contracts/schemas/**"
+      - "scripts/check-document-intelligence-runtime.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: document-intelligence-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-dev:
+    name: Deploy bundle to dev
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate Databricks bundle (dev)
+        working-directory: document-intelligence
+        run: |
+          databricks bundle validate --target dev --var "workspace_host=${DATABRICKS_HOST}"
+
+      - name: Deploy Databricks bundle (dev)
+        working-directory: document-intelligence
+        run: |
+          databricks bundle deploy --target dev --var "workspace_host=${DATABRICKS_HOST}"
+
+  deploy-prod:
+    name: Deploy bundle to prod
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    environment: prod
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate Databricks bundle (prod)
+        working-directory: document-intelligence
+        run: |
+          databricks bundle validate --target prod --var "workspace_host=${DATABRICKS_HOST}"
+
+      - name: Deploy Databricks bundle (prod)
+        working-directory: document-intelligence
+        run: |
+          databricks bundle deploy --target prod --var "workspace_host=${DATABRICKS_HOST}"
