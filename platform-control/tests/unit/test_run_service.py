@@ -212,3 +212,44 @@ async def test_preview_summary_flags_decision_boilerplate_and_duplicate_resource
     assert summary.likely_boilerplate_page_count == 1
     assert summary.likely_duplicate_page_count == 2
     assert summary.content_type_breakdown[0].count >= summary.content_type_breakdown[-1].count
+
+
+@pytest.mark.asyncio
+async def test_create_run_worker_backend_keeps_run_pending(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider(), run_dispatch_backend="worker")
+
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+
+    assert run.status is RunStatus.PENDING
+    assert provider_job is None
+
+
+@pytest.mark.asyncio
+async def test_dispatch_pending_runs_promotes_runs_to_running(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider(), run_dispatch_backend="worker")
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+
+    dispatched = await run_service.dispatch_pending_runs()
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+    refreshed = await run_service.get_run(run.run_id)
+
+    assert dispatched == 1
+    assert refreshed.status is RunStatus.RUNNING
+    assert provider_job is not None
