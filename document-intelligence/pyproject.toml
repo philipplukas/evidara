@@ -20,12 +20,19 @@ dev = [
   "PyYAML>=6.0.1",
   "ruff>=0.11.8",
 ]
+service = [
+  "fastapi>=0.115.0",
+  "httpx>=0.27.0",
+  "uvicorn>=0.30.0",
+]
 
 [project.scripts]
 document_intelligence_process_event = "document_intelligence.jobs.process_event:main"
 document_intelligence_databricks_process_event = "document_intelligence.jobs.databricks_process_event:cli"
 databricks_process_event = "document_intelligence.jobs.databricks_process_event:run"
 document_intelligence_render_surface_sql = "document_intelligence.bootstrap.register_surfaces:cli"
+document_intelligence_document_service = "document_intelligence.service.main:main"
+document_intelligence_runtime_ingress = "document_intelligence.consumer.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -6,6 +6,7 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 
 - Tolerant parsing of `artifact_bundle.available` events
 - Pub/Sub push-envelope decoding for the local CLI and Databricks entrypoints
+- Internal HTTP runtime ingress for Pub/Sub-style event delivery
 - Bundle-manifest and artifact loading for `file://`, plain filesystem paths, and `gs://`
 - Minimal HTML and XML normalization into a shared IR and section extraction from that IR
 - Contract-shaped `Document`, `Section`, and `ProcessingManifest` models
@@ -24,7 +25,7 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 ## What does not exist yet
 
 - Databricks workflow wiring
-- Always-on Pub/Sub consumer/subscription wiring
+- Pub/Sub subscription / deployment wiring for the runtime ingress service
 - Spark-native Delta writes and Unity Catalog table/view creation automation
 - Terraform and Databricks bundle deploy/promotion integration in CI/CD
 - Policy Resolver YAML rules and source-profile registry
@@ -57,12 +58,26 @@ The Databricks bundle now carries checked-in `dev`, `staging`, and `prod` target
 
 ## Event input shape
 
-The local CLI and Databricks entrypoints now accept either:
+The local CLI, Databricks entrypoint, and runtime ingress service now accept either:
 
 - a raw `artifact_bundle.available` JSON payload
 - a Pub/Sub push envelope whose `message.data` contains base64-encoded event JSON
 
 That keeps local execution aligned with the eventual subscription payload shape without requiring a live subscriber yet.
+
+## Optional service extras
+
+Install the HTTP services and their tests with:
+
+```bash
+cd document-intelligence
+python3 -m pip install -e ".[dev,service]"
+```
+
+Available entrypoints:
+
+- `document_intelligence_document_service` for the read-oriented document service
+- `document_intelligence_runtime_ingress` for the internal event-processing ingress
 
 ## Optional Delta sink configuration
 

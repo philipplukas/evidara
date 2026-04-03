@@ -5,10 +5,8 @@ import json
 from typing import Any, Dict, Optional
 
 from document_intelligence.config.runtime import RuntimeSettings
-from document_intelligence.ingest import load_artifact_bundle_event
 from document_intelligence.ingest.loaders import DispatchingBundleLoader
-from document_intelligence.persist.sinks import DeltaCanonicalSink
-from document_intelligence.pipeline import ProcessingPipeline
+from document_intelligence.processing_runtime import process_artifact_bundle_event
 
 
 def run(
@@ -34,23 +32,22 @@ def run(
             "published surface URIs"
         )
 
-    event_payload = load_artifact_bundle_event(event_path)
+    with open(event_path, "r", encoding="utf-8") as event_file:
+        event_payload = json.load(event_file)
 
-    result = ProcessingPipeline(
+    output = process_artifact_bundle_event(
+        event_payload,
+        runtime_settings=runtime_settings,
         bundle_loader=DispatchingBundleLoader(),
-        sink=DeltaCanonicalSink(runtime_settings.surface_uris.to_delta_sink_config()),
-        processing_version=runtime_settings.processing_version,
-    ).process_event(event_payload)
-
-    return {
-        "document_id": result.document.document_id,
-        "document_revision": result.document.document_revision,
-        "processing_manifest_id": result.manifest.processing_manifest_id,
-        "sections": len(result.sections),
-        "published_documents_uri": runtime_settings.surface_uris.published_documents_uri,
-        "published_sections_uri": runtime_settings.surface_uris.published_sections_uri,
-        "processing_manifests_uri": runtime_settings.surface_uris.processing_manifests_uri,
-    }
+    )
+    output.update(
+        {
+            "published_documents_uri": runtime_settings.surface_uris.published_documents_uri,
+            "published_sections_uri": runtime_settings.surface_uris.published_sections_uri,
+            "processing_manifests_uri": runtime_settings.surface_uris.processing_manifests_uri,
+        }
+    )
+    return output
 
 
 def cli(argv: Optional[list[str]] = None) -> int:
