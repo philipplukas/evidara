@@ -1,16 +1,15 @@
 openapi: 3.1.0
 info:
-  title: Document Intelligence — Document Service API
+  title: Document Intelligence — Document Service
   description: |
-    Read API for canonical **DoclingDocument** content stored on published Delta surfaces.
+    Read API for published canonical document bodies as Docling JSON.
 
-    Exposed by document-intelligence (implementation may be Databricks SQL, a thin Cloud Run
-    service, or Delta Sharing — see ADR-0010). Intended callers: **legal-search BFF** for
-    interactive document detail; operators may use plain-text responses for debugging.
+    Owned by **document-intelligence**; primary consumer is the **legal-search BFF** for document
+    detail (not a handoff into parsing or pipeline jobs). See ADR-0010
+    (`docs/adr/0010-document-content-format.md`) and `docs/architecture/boundary-contracts.md`.
 
-    This spec is the source of truth for paths, parameters, and response **media types**.
-    The JSON shape of DoclingDocument follows IBM Docling; a stricter JSON Schema may be
-    added later under `contracts/schemas/`.
+    Wire format: IBM Docling `DoclingDocument` serialized as JSON. A dedicated JSON Schema may be
+    added under `contracts/schemas/` when the on-wire subset is frozen.
   version: 0.1.0
   contact:
     name: Evidara Team
@@ -19,30 +18,26 @@ info:
     identifier: UNLICENSED
 
 servers:
-  - url: http://localhost:8090
-    description: Local development (representative port)
-  - url: https://document-intelligence.evidara.dev
-    description: Production
+  - url: http://localhost:8082
+    description: Local development (placeholder — bind to actual service or SQL gateway)
+  - url: https://document-intelligence.internal
+    description: Internal service URL (replace per environment)
 
-security:
-  - bearerAuth: []
-
-tags:
-  - name: documents
-    description: Published document body reads (Docling / plain text)
+security: []
 
 paths:
   /v1/documents/{document_id}:
     get:
-      operationId: getDocumentDoclingFull
+      operationId: getDocumentFull
       summary: Get full DoclingDocument JSON
       description: |
-        Returns the **full** DoclingDocument JSON for a published document revision, including
-        layout metadata (e.g. bounding boxes, confidence) when present in the canonical store.
+        Returns the full lossless Docling document as stored in published Delta surfaces
+        (including layout metadata such as bounding boxes where present).
       tags: [documents]
       parameters:
         - $ref: "#/components/parameters/DocumentId"
-        - $ref: "#/components/parameters/ProcessingManifestId"
+        - $ref: "#/components/parameters/DocumentRevision"
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
         "200":
           description: DoclingDocument JSON
@@ -50,45 +45,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DoclingDocumentJson"
-        "400":
-          description: Invalid document or processing manifest id
         "404":
-          description: Document revision not found or not published
+          description: Document not found or not visible for the caller scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/documents/{document_id}/lean:
     get:
-      operationId: getDocumentDoclingLean
+      operationId: getDocumentLean
       summary: Get lean DoclingDocument JSON
       description: |
-        Same structure as the full document, but **without** layout-only fields such as
-        bounding boxes and confidence scores, suitable for BFF → frontend pass-through (ADR-0010).
+        Same structure as full document with layout-only fields stripped (e.g. bounding boxes,
+        confidence) per ADR-0010 — suitable for BFF → frontend responses.
       tags: [documents]
       parameters:
         - $ref: "#/components/parameters/DocumentId"
-        - $ref: "#/components/parameters/ProcessingManifestId"
+        - $ref: "#/components/parameters/DocumentRevision"
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
         "200":
           description: Lean DoclingDocument JSON
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LeanDoclingDocumentJson"
-        "400":
-          description: Invalid document or processing manifest id
+                $ref: "#/components/schemas/DoclingDocumentJson"
         "404":
-          description: Document revision not found or not published
+          description: Document not found or not visible for the caller scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/documents/{document_id}/text:
     get:
       operationId: getDocumentPlainText
-      summary: Get plain text body
-      description: |
-        Flattened plain text for debugging, tooling, or simple fallbacks. Not a substitute
-        for structured rendering in the product UI.
+      summary: Get plain text fallback
+      description: Debugging and fallback retrieval — not the primary UI path.
       tags: [documents]
       parameters:
         - $ref: "#/components/parameters/DocumentId"
-        - $ref: "#/components/parameters/ProcessingManifestId"
+        - $ref: "#/components/parameters/DocumentRevision"
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
         "200":
           description: Plain text body
@@ -96,55 +95,59 @@ paths:
             text/plain:
               schema:
                 type: string
-        "400":
-          description: Invalid document or processing manifest id
         "404":
-          description: Document revision not found or not published
+          description: Document not found or not visible for the caller scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Service-to-service or user token as agreed for the deployment.
-
   parameters:
     DocumentId:
       name: document_id
       in: path
       required: true
-      description: Canonical document identifier (`doc_…` ULID).
       schema:
         type: string
-        pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
-      example: doc_01jq7bdptzqv3xs0c41xpw1ybg
-
-    ProcessingManifestId:
-      name: processing_manifest_id
+      description: Stable `document_id` from Evidara contracts.
+    DocumentRevision:
+      name: document_revision
       in: query
       required: false
+      schema:
+        type: integer
+        minimum: 1
       description: |
-        Selects a specific published processing revision. When omitted, the implementation
-        returns the **latest** published revision for `document_id` (behavior must be
-        deterministic and documented at deploy time).
+        Optional explicit revision. When omitted, the implementation returns the latest published
+        revision the caller is allowed to see.
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
       schema:
         type: string
-        pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
-      example: pm_01jq7bhgy7g0pkj4f1d03f8f8c
+      description: Propagated for tracing across BFF → Document Service → data plane.
 
   schemas:
     DoclingDocumentJson:
       type: object
       description: |
-        IBM Docling **DoclingDocument** as JSON. Canonical field-level constraints may be
-        shared via `contracts/schemas/` in a later change; consumers must tolerate unknown
-        properties as Docling evolves.
+        Docling `DoclingDocument` as JSON. Field inventory is owned by the Docling version pinned
+        in document-intelligence; Evidara may add a stricter schema later.
       additionalProperties: true
 
-    LeanDoclingDocumentJson:
+    ErrorResponse:
       type: object
-      description: |
-        DoclingDocument JSON with layout-only fields stripped (see ADR-0010). Same
-        openness as the full document for forward compatibility.
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        code:
+          type: string
       additionalProperties: true
+
+tags:
+  - name: documents
+    description: Published document body reads

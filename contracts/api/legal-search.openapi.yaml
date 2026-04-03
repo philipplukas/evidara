@@ -11,7 +11,8 @@ info:
     See ADR-0011 for contract conventions.
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
-  version: 0.3.1
+    Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
+  version: 0.3.0
   contact:
     name: Evidara Team
   license:
@@ -101,20 +102,15 @@ paths:
     get:
       operationId: getDocument
       summary: Get document detail
-      description: |
-        Composes metadata, sections, and citations from the search projection. When
-        `DOCUMENT_INTELLIGENCE_BASE_URL` is configured, the BFF may overlay **lean**
-        Docling JSON from the document-intelligence Document Service (see
-        `contracts/api/document-intelligence.openapi.yaml`) onto `DetailView.content`.
       tags: [documents]
       parameters:
         - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/CorrelationId'
         - name: document_id
           in: path
           required: true
           schema:
             type: string
-        - $ref: '#/components/parameters/ProcessingManifestIdQuery'
       responses:
         "200":
           description: Document detail as composed ViewModel
@@ -122,8 +118,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DetailView"
-        "400":
-          description: Invalid query parameters (e.g. malformed processing_manifest_id)
         "404":
           description: Document not found
 
@@ -168,18 +162,13 @@ components:
         metadata). Accepts standard HTTP language tags (e.g. "de", "fr", "fr-CH").
         Falls back to "de" (German) when omitted or unsupported.
         See ADR-0013 for locale resolution rules.
-
-    ProcessingManifestIdQuery:
-      name: processing_manifest_id
-      in: query
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
       required: false
-      description: |
-        When calling the document-intelligence Document Service for lean Docling content,
-        selects a specific published processing revision (`pm_…` ULID). Omit for latest.
       schema:
         type: string
-        pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
-      example: pm_01jq7bhgy7g0pkj4f1d03f8f8c
+      description: Propagated for tracing across frontend -> legal-search -> document-intelligence.
 
   securitySchemes:
     bearerAuth:
