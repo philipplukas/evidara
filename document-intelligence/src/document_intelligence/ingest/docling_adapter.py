@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any
 
 from document_intelligence.normalize.html import (
     normalize_html_document,
@@ -80,7 +80,7 @@ def _convert_with_docling(
     artifact_id: str,
     artifact_text: str,
     content_type: str,
-) -> Tuple[List[Block], str] | None:
+) -> tuple[list[Block], str] | None:
     try:
         from docling.document_converter import DocumentConverter
     except ImportError:
@@ -104,7 +104,7 @@ def _convert_with_docling(
         conversion_result = converter.convert(str(temp_path))
         doc = conversion_result.document
         title = (getattr(doc, "name", "") or "").strip() or "Untitled document"
-        blocks: List[Block] = []
+        blocks: list[Block] = []
         for order, item in enumerate(doc.iterate_items()):
             text = _item_text(item)
             if not text:
@@ -113,7 +113,7 @@ def _convert_with_docling(
             block_type = "heading" if level is not None else "paragraph"
             blocks.append(
                 Block(
-                    id="docling_{artifact}_{idx}".format(artifact=artifact_id, idx=order),
+                    id=f"docling_{artifact_id}_{order}",
                     type=block_type,
                     text=text,
                     order=order,

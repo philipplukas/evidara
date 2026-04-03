@@ -1,7 +1,7 @@
 """Outbound processing status event construction."""
 
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from document_intelligence.canonical.ids import random_prefixed_id
 from document_intelligence.contracts.envelope import Provenance
@@ -13,13 +13,13 @@ def build_processing_status_event(
     provenance: Provenance,
     processing_version: str,
     status: str,
-    document_id: Optional[str],
-    document_revision: Optional[int],
-    correlation_id: Optional[str],
-    causation_id: Optional[str],
-    error_code: Optional[str] = None,
-    error_summary: Optional[str] = None,
-) -> Dict[str, Any]:
+    document_id: str | None,
+    document_revision: int | None,
+    correlation_id: str | None,
+    causation_id: str | None,
+    error_code: str | None = None,
+    error_summary: str | None = None,
+) -> dict[str, Any]:
     return {
         "event_type": "document.processing_status.updated",
         "event_version": 1,
@@ -42,4 +42,4 @@ def build_processing_status_event(
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")

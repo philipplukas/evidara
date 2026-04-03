@@ -1,11 +1,9 @@
 """XML normalization into the shared intermediate representation."""
 
-from typing import Dict, Optional
 from xml.etree import ElementTree
 
 from document_intelligence.errors import ProcessingError
 from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
-
 
 _TITLE_TAGS = {
     "langtitel",
@@ -102,9 +100,7 @@ def normalize_xml_document(xml_text: str, artifact_id: str) -> NormalizedDocumen
         "normalizer": "xml_v1",
         "source_profile_ref": "default_xml_v1",
         "normalization_profile_ref": "xml_v1",
-        "source_flavor": "ris_like"
-        if _looks_like_ris(root, extracted_metadata)
-        else "generic_xml",
+        "source_flavor": "ris_like" if _looks_like_ris(root, extracted_metadata) else "generic_xml",
         "root_tag": _local_name(root.tag),
         "extracted_metadata": extracted_metadata,
     }
@@ -131,9 +127,7 @@ class _XmlIrBuilder:
             return
 
         if tag in _STRUCTURAL_LEVELS:
-            heading_block_id = self._emit_structural_heading(
-                element, tag, parent_heading_id
-            )
+            heading_block_id = self._emit_structural_heading(element, tag, parent_heading_id)
             next_parent_id = heading_block_id or parent_heading_id
             for child in list(element):
                 child_tag = _local_name(child.tag)
@@ -212,10 +206,10 @@ class _XmlIrBuilder:
         self._order += 1
 
     def _next_block_id(self) -> str:
-        return "blk_{order:04d}".format(order=self._order)
+        return f"blk_{self._order:04d}"
 
 
-def _choose_title(root, blocks) -> Optional[str]:
+def _choose_title(root, blocks) -> str | None:
     for candidate_tag in ("langtitel", "kurztitel", "titel", "title"):
         for element in root.iter():
             if _local_name(element.tag) != candidate_tag:
@@ -229,11 +223,9 @@ def _choose_title(root, blocks) -> Optional[str]:
     return None
 
 
-def _extract_metadata(root) -> Dict[str, str]:
-    output: Dict[str, str] = {}
-    language = root.attrib.get(
-        "{http://www.w3.org/XML/1998/namespace}lang"
-    ) or root.attrib.get("lang")
+def _extract_metadata(root) -> dict[str, str]:
+    output: dict[str, str] = {}
+    language = root.attrib.get("{http://www.w3.org/XML/1998/namespace}lang") or root.attrib.get("lang")
     if language:
         output["language"] = language
     output["root_tag"] = _local_name(root.tag)
@@ -249,16 +241,14 @@ def _extract_metadata(root) -> Dict[str, str]:
     return output
 
 
-def _looks_like_ris(root, extracted_metadata: Dict[str, str]) -> bool:
+def _looks_like_ris(root, extracted_metadata: dict[str, str]) -> bool:
     if "dokumentnummer" in extracted_metadata or "gesetzesnummer" in extracted_metadata:
         return True
     observed_tags = {_local_name(element.tag) for element in root.iter()}
-    return bool(
-        observed_tags & {"paragraf", "absatz", "artikel", "anlage", "kundmachungsorgan"}
-    )
+    return bool(observed_tags & {"paragraf", "absatz", "artikel", "anlage", "kundmachungsorgan"})
 
 
-def _extract_heading_text(element) -> Optional[str]:
+def _extract_heading_text(element) -> str | None:
     for child in list(element):
         if _local_name(child.tag) not in _TITLE_TAGS:
             continue
@@ -268,26 +258,26 @@ def _extract_heading_text(element) -> Optional[str]:
     return None
 
 
-def _derive_official_label(element, tag: str) -> Optional[str]:
+def _derive_official_label(element, tag: str) -> str | None:
     raw = _raw_label_value(element)
     if not raw:
         return None
     if tag == "paragraf":
-        return "§ {value}".format(value=raw)
+        return f"§ {raw}"
     if tag in {"artikel", "article"}:
-        return "Art. {value}".format(value=raw)
+        return f"Art. {raw}"
     if tag in {"anlage", "annex"}:
-        return "Anlage {value}".format(value=raw)
+        return f"Anlage {raw}"
     if tag in {"teil", "part"}:
-        return "Teil {value}".format(value=raw)
+        return f"Teil {raw}"
     if tag == "abschnitt":
-        return "Abschnitt {value}".format(value=raw)
+        return f"Abschnitt {raw}"
     if tag in {"kapitel", "chapter"}:
-        return "Kapitel {value}".format(value=raw)
+        return f"Kapitel {raw}"
     return raw
 
 
-def _raw_label_value(element) -> Optional[str]:
+def _raw_label_value(element) -> str | None:
     for key in ("nummer", "nr", "number", "label", "bezeichnung"):
         if key in element.attrib:
             value = _normalize_whitespace(str(element.attrib[key]))
@@ -302,19 +292,17 @@ def _raw_label_value(element) -> Optional[str]:
     return None
 
 
-def _compose_heading_display(
-    official_label: Optional[str], heading_text: Optional[str]
-) -> Optional[str]:
+def _compose_heading_display(official_label: str | None, heading_text: str | None) -> str | None:
     if official_label and heading_text:
         if heading_text.startswith(official_label):
             return heading_text
-        return "{label} {heading}".format(label=official_label, heading=heading_text)
+        return f"{official_label} {heading_text}"
     return heading_text or official_label
 
 
-def _compose_inline_text(official_label: Optional[str], text: str) -> str:
+def _compose_inline_text(official_label: str | None, text: str) -> str:
     if official_label and not text.startswith(official_label):
-        return "{label} {text}".format(label=official_label, text=text)
+        return f"{official_label} {text}"
     return text
 
 

@@ -1,7 +1,7 @@
 """Canonical entities produced by document-intelligence."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from document_intelligence.contracts.envelope import ManifestRef, Provenance
 
@@ -19,14 +19,14 @@ class Document:
     lifecycle_status: str
     full_text: str
     body_text: str
-    jurisdiction_id: Optional[str] = None
-    authority_id: Optional[str] = None
-    document_type: Optional[str] = None
-    effective_date: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    extensions: Dict[str, Any] = field(default_factory=dict)
+    jurisdiction_id: str | None = None
+    authority_id: str | None = None
+    document_type: str | None = None
+    effective_date: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    extensions: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "document_id": self.document_id,
             "document_revision": self.document_revision,
@@ -58,12 +58,12 @@ class Section:
     ordinal: int
     depth: int
     content: str
-    parent_section_id: Optional[str] = None
-    title: Optional[str] = None
-    section_type: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    parent_section_id: str | None = None
+    title: str | None = None
+    section_type: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "section_id": self.section_id,
             "document_id": self.document_id,
@@ -90,18 +90,18 @@ class ProcessingManifest:
     status: str
     provenance: Provenance
     input_bundle_manifest_ref: ManifestRef
-    selected_profiles: Dict[str, str]
-    reference_snapshot_set_ref: Optional[str] = None
-    published_document_ref: Optional[Dict[str, Any]] = None
-    published_sections_ref: Optional[Dict[str, Any]] = None
-    canonical_ready_at: Optional[str] = None
-    supersedes_processing_manifest_id: Optional[str] = None
+    selected_profiles: dict[str, str]
+    reference_snapshot_set_ref: str | None = None
+    published_document_ref: dict[str, Any] | None = None
+    published_sections_ref: dict[str, Any] | None = None
+    canonical_ready_at: str | None = None
+    supersedes_processing_manifest_id: str | None = None
     document_count: int = 0
     section_count: int = 0
     citation_count: int = 0
-    failure: Optional[Dict[str, str]] = None
+    failure: dict[str, str] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         output = {
             "processing_manifest_id": self.processing_manifest_id,
             "manifest_version": self.manifest_version,
@@ -124,9 +124,7 @@ class ProcessingManifest:
         if self.canonical_ready_at is not None:
             output["canonical_ready_at"] = self.canonical_ready_at
         if self.supersedes_processing_manifest_id is not None:
-            output["supersedes_processing_manifest_id"] = (
-                self.supersedes_processing_manifest_id
-            )
+            output["supersedes_processing_manifest_id"] = self.supersedes_processing_manifest_id
         if self.failure is not None:
             output["failure"] = dict(self.failure)
         return output
@@ -135,7 +133,7 @@ class ProcessingManifest:
 @dataclass(frozen=True)
 class ProcessingResult:
     document: Document
-    sections: List[Section]
+    sections: list[Section]
     manifest: ProcessingManifest
-    status_events: List[Dict[str, Any]]
-    document_processed_event: Dict[str, Any]
+    status_events: list[dict[str, Any]]
+    document_processed_event: dict[str, Any]

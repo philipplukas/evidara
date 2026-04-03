@@ -1,24 +1,24 @@
 """Section extraction from the shared intermediate representation."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from document_intelligence.normalize.ir import NormalizedDocumentIR
 
 
 @dataclass(frozen=True)
 class SectionCandidate:
-    title: Optional[str]
+    title: str | None
     content: str
     depth: int = 0
-    section_type: Optional[str] = "section"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    section_type: str | None = "section"
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
-def build_sections_from_ir(document_ir: NormalizedDocumentIR) -> List[SectionCandidate]:
-    sections: List[SectionCandidate] = []
-    preamble_parts: List[str] = []
-    current: Optional[Dict[str, Any]] = None
+def build_sections_from_ir(document_ir: NormalizedDocumentIR) -> list[SectionCandidate]:
+    sections: list[SectionCandidate] = []
+    preamble_parts: list[str] = []
+    current: dict[str, Any] | None = None
 
     for block in document_ir.blocks:
         if block.type == "heading":
@@ -64,9 +64,7 @@ def build_sections_from_ir(document_ir: NormalizedDocumentIR) -> List[SectionCan
         first_section = sections[0]
         sections[0] = SectionCandidate(
             title=first_section.title,
-            content="{preamble}\n\n{content}".format(
-                preamble=preamble, content=first_section.content
-            ).strip(),
+            content=f"{preamble}\n\n{first_section.content}".strip(),
             depth=first_section.depth,
             section_type=first_section.section_type,
             metadata=first_section.metadata,
@@ -75,12 +73,10 @@ def build_sections_from_ir(document_ir: NormalizedDocumentIR) -> List[SectionCan
     return sections
 
 
-def _finalize_section(raw_section: Dict[str, Any]) -> SectionCandidate:
+def _finalize_section(raw_section: dict[str, Any]) -> SectionCandidate:
     return SectionCandidate(
         title=raw_section["title"],
-        content="\n\n".join(
-            part for part in raw_section["content_parts"] if part
-        ).strip(),
+        content="\n\n".join(part for part in raw_section["content_parts"] if part).strip(),
         depth=raw_section["depth"],
         section_type=raw_section["section_type"],
         metadata=dict(raw_section["metadata"]),

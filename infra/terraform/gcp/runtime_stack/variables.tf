@@ -63,22 +63,40 @@ variable "event_subscriptions" {
     topic_name                 = string
     ack_deadline_seconds       = optional(number, 20)
     message_retention_duration = optional(string, "604800s")
+    retry_policy = optional(object({
+      minimum_backoff = optional(string, "10s")
+      maximum_backoff = optional(string, "600s")
+    }), null)
+    dead_letter_policy = optional(object({
+      max_delivery_attempts = optional(number, 10)
+    }), null)
   }))
   default = {
     "document-intelligence-artifact-bundle-available" = {
-      topic_name = "artifact-bundle-available"
+      topic_name           = "artifact-bundle-available"
+      ack_deadline_seconds = 120
+      retry_policy         = { minimum_backoff = "30s", maximum_backoff = "600s" }
+      dead_letter_policy   = { max_delivery_attempts = 10 }
     }
     "platform-control-document-processing-status-updated" = {
-      topic_name = "document-processing-status-updated"
+      topic_name         = "document-processing-status-updated"
+      retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+      dead_letter_policy = { max_delivery_attempts = 5 }
     }
     "legal-search-document-processed" = {
-      topic_name = "document-processed"
+      topic_name         = "document-processed"
+      retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+      dead_letter_policy = { max_delivery_attempts = 5 }
     }
     "legal-search-document-withdrawn" = {
-      topic_name = "document-withdrawn"
+      topic_name         = "document-withdrawn"
+      retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+      dead_letter_policy = { max_delivery_attempts = 5 }
     }
     "legal-search-index-update-requested" = {
-      topic_name = "index-update-requested"
+      topic_name         = "index-update-requested"
+      retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+      dead_letter_policy = { max_delivery_attempts = 5 }
     }
   }
 }

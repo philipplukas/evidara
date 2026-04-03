@@ -18,9 +18,7 @@ class SurfaceBootstrapSqlTests(unittest.TestCase):
         )
 
         self.assertIn("CREATE CATALOG IF NOT EXISTS `document_intelligence`;", sql)
-        self.assertIn(
-            "CREATE SCHEMA IF NOT EXISTS `document_intelligence`.`published`;", sql
-        )
+        self.assertIn("CREATE SCHEMA IF NOT EXISTS `document_intelligence`.`published`;", sql)
         self.assertIn(
             "CREATE TABLE IF NOT EXISTS `document_intelligence`.`published`.`published_documents`",
             sql,
@@ -60,14 +58,10 @@ class TerraformModuleShapeTests(unittest.TestCase):
             "databricks",
             "document_intelligence",
         )
-        with open(
-            os.path.join(module_root, "main.tf"), "r", encoding="utf-8"
-        ) as main_tf:
+        with open(os.path.join(module_root, "main.tf"), encoding="utf-8") as main_tf:
             main_body = main_tf.read()
 
-        self.assertIn(
-            'resource "databricks_catalog" "document_intelligence"', main_body
-        )
+        self.assertIn('resource "databricks_catalog" "document_intelligence"', main_body)
         self.assertIn('resource "databricks_schema" "published"', main_body)
         self.assertIn(
             'resource "databricks_external_location" "document_intelligence_surfaces"',
@@ -86,13 +80,9 @@ class TerraformModuleShapeTests(unittest.TestCase):
             "databricks",
             "document_intelligence_stack",
         )
-        with open(
-            os.path.join(stack_root, "versions.tf"), "r", encoding="utf-8"
-        ) as versions_tf:
+        with open(os.path.join(stack_root, "versions.tf"), encoding="utf-8") as versions_tf:
             versions_body = versions_tf.read()
-        with open(
-            os.path.join(stack_root, "main.tf"), "r", encoding="utf-8"
-        ) as main_tf:
+        with open(os.path.join(stack_root, "main.tf"), encoding="utf-8") as main_tf:
             main_body = main_tf.read()
         module_root = os.path.join(
             os.path.dirname(__file__),
@@ -103,9 +93,7 @@ class TerraformModuleShapeTests(unittest.TestCase):
             "databricks",
             "document_intelligence",
         )
-        with open(
-            os.path.join(module_root, "versions.tf"), "r", encoding="utf-8"
-        ) as module_versions_tf:
+        with open(os.path.join(module_root, "versions.tf"), encoding="utf-8") as module_versions_tf:
             module_versions_body = module_versions_tf.read()
 
         self.assertIn('provider "databricks"', versions_body)
@@ -117,11 +105,9 @@ class TerraformModuleShapeTests(unittest.TestCase):
     def test_environment_tfvars_exist_for_all_supported_environments(self) -> None:
         env_root = os.path.join(os.path.dirname(__file__), "..", "..", "infra", "env")
         for environment in ("dev", "staging", "prod"):
-            tfvars_path = os.path.join(
-                env_root, environment, "document_intelligence.databricks.tfvars"
-            )
+            tfvars_path = os.path.join(env_root, environment, "document_intelligence.databricks.tfvars")
             self.assertTrue(os.path.exists(tfvars_path), tfvars_path)
-            with open(tfvars_path, "r", encoding="utf-8") as tfvars_file:
+            with open(tfvars_path, encoding="utf-8") as tfvars_file:
                 tfvars_body = tfvars_file.read()
 
             self.assertIn(f'environment = "{environment}"', tfvars_body)

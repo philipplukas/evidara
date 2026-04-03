@@ -46,10 +46,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Install document-intelligence dependencies
         run: python -m pip install -e "./document-intelligence[dev,service]"
 
-      - name: Check (ruff + unittest)
+      - name: Check (ruff + unittest + contracts + dbt)
         run: bash scripts/check-document-intelligence.sh
 
   document-intelligence-runtime-check:

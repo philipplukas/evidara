@@ -22,9 +22,7 @@ from support import (
 )
 
 
-@unittest.skipUnless(
-    TestClient is not None, "Install document-intelligence[service] for HTTP tests"
-)
+@unittest.skipUnless(TestClient is not None, "Install document-intelligence[service] for HTTP tests")
 class TestRuntimeConsumerHTTP(unittest.TestCase):
     def test_health_sets_generated_correlation_headers(self) -> None:
         client = TestClient(create_app())
@@ -48,8 +46,7 @@ class TestRuntimeConsumerHTTP(unittest.TestCase):
         manifest_path = os.path.join(temp_dir, "bundle-manifest.json")
         with open(artifact_path, "w", encoding="utf-8") as artifact_file:
             artifact_file.write(
-                "<html><head><title>Ingress Doc</title></head>"
-                "<body><h1>Intro</h1><p>Body</p></body></html>"
+                "<html><head><title>Ingress Doc</title></head><body><h1>Intro</h1><p>Body</p></body></html>"
             )
         with open(manifest_path, "w", encoding="utf-8") as manifest_file:
             json.dump(
@@ -63,9 +60,7 @@ class TestRuntimeConsumerHTTP(unittest.TestCase):
 
     def test_processes_raw_artifact_bundle_event(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(
-                temp_dir, "delta_surfaces"
-            )
+            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(temp_dir, "delta_surfaces")
             try:
                 client = TestClient(create_app())
                 response = client.post(
@@ -83,16 +78,12 @@ class TestRuntimeConsumerHTTP(unittest.TestCase):
 
     def test_processes_pubsub_push_envelope(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(
-                temp_dir, "delta_surfaces"
-            )
+            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(temp_dir, "delta_surfaces")
             try:
                 client = TestClient(create_app())
                 response = client.post(
                     "/internal/events/artifact-bundles:process",
-                    json=build_pubsub_push_envelope(
-                        self._build_event_payload(temp_dir)
-                    ),
+                    json=build_pubsub_push_envelope(self._build_event_payload(temp_dir)),
                 )
             finally:
                 del os.environ["DI_SURFACES_ROOT_URI"]
@@ -112,12 +103,8 @@ class TestRuntimeConsumerHTTP(unittest.TestCase):
 
     def test_ingest_bearer_required_when_configured(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            os.environ["DOCUMENT_INTELLIGENCE_INGEST_BEARER_TOKEN"] = (
-                "secret-ingest-token"
-            )
-            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(
-                temp_dir, "delta_surfaces"
-            )
+            os.environ["DOCUMENT_INTELLIGENCE_INGEST_BEARER_TOKEN"] = "secret-ingest-token"
+            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(temp_dir, "delta_surfaces")
             try:
                 client = TestClient(create_app())
                 payload = self._build_event_payload(temp_dir)

@@ -2,7 +2,7 @@
 
 import argparse
 import json
-from typing import Any, Dict, Optional
+from typing import Any
 
 from document_intelligence.config.runtime import RuntimeSettings
 from document_intelligence.ingest.loaders import DispatchingBundleLoader
@@ -22,7 +22,7 @@ def run(
     spacy_model_name: str = "",
     spacy_max_chars_per_section: int = 100000,
     spacy_batch_size: int = 32,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     runtime_settings = RuntimeSettings.from_mapping(
         {},
         processing_version=processing_version or None,
@@ -38,11 +38,10 @@ def run(
     )
     if runtime_settings.surface_uris is None:
         raise ValueError(
-            "Databricks runtime requires DI_SURFACES_ROOT_URI or all three explicit "
-            "published surface URIs"
+            "Databricks runtime requires DI_SURFACES_ROOT_URI or all three explicit published surface URIs"
         )
 
-    with open(event_path, "r", encoding="utf-8") as event_file:
+    with open(event_path, encoding="utf-8") as event_file:
         event_payload = json.load(event_file)
 
     output = process_artifact_bundle_event(
@@ -63,7 +62,7 @@ def run(
     }
 
 
-def cli(argv: Optional[list[str]] = None) -> int:
+def cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="document_intelligence_databricks_process_event",
         description="Process a bundle event using Delta-backed published surfaces.",

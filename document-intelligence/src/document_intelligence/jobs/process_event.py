@@ -14,7 +14,7 @@ def main(argv=None) -> int:
         return 1
 
     event_path = args[0]
-    with open(event_path, "r", encoding="utf-8") as event_file:
+    with open(event_path, encoding="utf-8") as event_file:
         event_payload = json.load(event_file)
 
     runtime_settings = RuntimeSettings.from_environment()

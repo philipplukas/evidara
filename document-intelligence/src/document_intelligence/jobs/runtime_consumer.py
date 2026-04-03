@@ -55,9 +55,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--subscription-name",
         default="document-intelligence-artifact-bundle-available",
     )
-    parser.add_argument(
-        "--status-topic-name", default="document-processing-status-updated"
-    )
+    parser.add_argument("--status-topic-name", default="document-processing-status-updated")
     parser.add_argument("--processed-topic-name", default="document-processed")
     parser.add_argument("--idle-sleep-seconds", type=float, default=1.0)
     parser.add_argument("--max-messages", type=int, default=10)
@@ -80,9 +78,7 @@ def _process_message(
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     pipeline, _ = _build_pipeline(os.environ)
     publisher = (
@@ -134,16 +130,16 @@ def main(argv: list[str] | None = None) -> int:
                     }
                 )
             except Exception:
+                delivery_attempt = received.message.attributes.get("googclient_deliveryattempt", "unknown")
                 LOGGER.exception(
-                    "failed to process message %s", received.message.message_id
+                    "failed to process message %s (delivery_attempt=%s)",
+                    received.message.message_id,
+                    delivery_attempt,
                 )
-                subscriber.modify_ack_deadline(
-                    request={
-                        "subscription": subscription_path,
-                        "ack_ids": [received.ack_id],
-                        "ack_deadline_seconds": 0,
-                    }
-                )
+                # Do NOT ack — let ack deadline expire so Pub/Sub
+                # retry_policy applies exponential backoff before
+                # redelivery. After max_delivery_attempts the message
+                # is forwarded to the dead-letter topic.
 
     LOGGER.info("consumer stopped")
     return 0

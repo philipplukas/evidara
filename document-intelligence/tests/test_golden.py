@@ -25,13 +25,9 @@ class GoldenBundleTests(unittest.TestCase):
         ]
         for fixture_name in fixture_names:
             with self.subTest(fixture=fixture_name):
-                temp_dir, event_payload, expected = materialize_golden_fixture(
-                    fixture_name
-                )
+                temp_dir, event_payload, expected = materialize_golden_fixture(fixture_name)
                 try:
-                    result = ProcessingPipeline(
-                        processing_version="di_2026_03_29"
-                    ).process_event(event_payload)
+                    result = ProcessingPipeline(processing_version="di_2026_03_29").process_event(event_payload)
 
                     self.assertEqual(result.document.title, expected["title"])
                     self.assertEqual(len(result.sections), expected["section_count"])
@@ -39,23 +35,17 @@ class GoldenBundleTests(unittest.TestCase):
                         [event["payload"]["status"] for event in result.status_events],
                         expected["status_flow"],
                     )
-                    headings = [
-                        section.title for section in result.sections if section.title
-                    ]
+                    headings = [section.title for section in result.sections if section.title]
                     for heading in expected["key_headings"]:
                         self.assertIn(heading, headings)
                 finally:
                     shutil.rmtree(temp_dir)
 
     def test_invalid_bundle_without_primary_artifact(self) -> None:
-        temp_dir, event_payload, expected = materialize_golden_fixture(
-            "invalid_no_primary"
-        )
+        temp_dir, event_payload, expected = materialize_golden_fixture("invalid_no_primary")
         try:
             with self.assertRaises(BundleLoadError) as context:
-                ProcessingPipeline(processing_version="di_2026_03_29").process_event(
-                    event_payload
-                )
+                ProcessingPipeline(processing_version="di_2026_03_29").process_event(event_payload)
             self.assertEqual(context.exception.code, expected["error_code"])
         finally:
             shutil.rmtree(temp_dir)
@@ -103,9 +93,7 @@ def _discover_artifact_source(fixture_root: str) -> str:
         path = os.path.join(fixture_root, candidate)
         if os.path.exists(path):
             return path
-    raise FileNotFoundError(
-        "no artifact file found in fixture {root}".format(root=fixture_root)
-    )
+    raise FileNotFoundError(f"no artifact file found in fixture {fixture_root}")
 
 
 if __name__ == "__main__":

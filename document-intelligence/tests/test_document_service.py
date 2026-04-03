@@ -22,9 +22,7 @@ _DOC = "doc_01jq7bdptzqv3xs0c41xpw1ybg"
 _PM = "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
 
 
-@unittest.skipUnless(
-    TestClient is not None, "Install document-intelligence[service] for HTTP tests"
-)
+@unittest.skipUnless(TestClient is not None, "Install document-intelligence[service] for HTTP tests")
 class TestDocumentServiceHTTP(unittest.TestCase):
     def setUp(self) -> None:
         self._dir = tempfile.TemporaryDirectory()
