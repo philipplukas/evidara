@@ -6,9 +6,9 @@ locals {
     var.runtime_vpc_access_connector == null
     ? null
     : {
-        connector = var.runtime_vpc_access_connector
-        egress    = var.runtime_vpc_egress
-      }
+      connector = var.runtime_vpc_access_connector
+      egress    = var.runtime_vpc_egress
+    }
   )
   labels = {
     environment = local.environment
