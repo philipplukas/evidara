@@ -48,6 +48,7 @@ Boundaries and contracts between these components are documented in [docs/archit
 ## Getting Started
 
 See [docs/setup/](docs/setup/) for infrastructure and environment documentation.
+For local end-to-end runtime bring-up, use [Local Vertical Slice Setup](docs/setup/local-vertical-slice.md).
 
 See each component's doc in [docs/components/](docs/components/) for component-specific guidance.
 

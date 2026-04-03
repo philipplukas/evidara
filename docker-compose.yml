@@ -8,6 +8,7 @@
 # Included services:
 #   - OpenSearch for legal-search
 #   - Postgres for platform-control
+#   - Pub/Sub emulator for local event-driven runtime flow
 #
 # After starting platform-control dependencies:
 #   cd platform-control
@@ -57,6 +58,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:522.0.0-slim
+    container_name: evidara-pubsub-emulator
+    command:
+      [
+        "gcloud",
+        "beta",
+        "emulators",
+        "pubsub",
+        "start",
+        "--project=evidara-local",
+        "--host-port=0.0.0.0:8681",
+      ]
+    ports:
+      - "8681:8681"
 
   # Optional: OpenSearch Dashboards for browsing data
   # Uncomment if you want a web UI at http://localhost:5601
