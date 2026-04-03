@@ -36,9 +36,7 @@ def upgrade() -> None:
         sa.Column("cron_expression", sa.String(128), nullable=False),
         sa.Column("timezone", sa.String(64), nullable=False, server_default="UTC"),
         sa.Column("mode", sa.String(), nullable=False, server_default="live"),
-        sa.Column(
-            "enabled", sa.Boolean(), nullable=False, server_default=sa.text("true")
-        ),
+        sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("description", sa.String(512), nullable=True),
         sa.Column(
             "last_triggered_at",
