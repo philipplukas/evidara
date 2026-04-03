@@ -10,6 +10,14 @@ Evidara targets three cloud/platform providers:
 - **Databricks** — target document-intelligence processing and published canonical surfaces
 - **GitHub** — current source control and CI/CD system
 
+## Local Runtime Stack
+
+For vertical-slice local development, use the repo compose stack plus helper script:
+
+- `bash scripts/local-vertical-slice.sh up` to start Postgres, OpenSearch, and Pub/Sub emulator
+- `bash scripts/local-vertical-slice.sh env` to print local env wiring
+- guide: [Local Vertical Slice Setup](./local-vertical-slice.md)
+
 ## GCP Services
 
 | Service | Purpose | Used by |
