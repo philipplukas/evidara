@@ -83,6 +83,8 @@ logs/
 
 # --- Generated files ---
 generated/
+!legal-search/api/src/lib/document-intelligence/generated/
+!legal-search/api/src/lib/document-intelligence/generated/**
 *.generated.*
 
 # --- Build outputs ---
