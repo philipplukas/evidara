@@ -20,13 +20,18 @@ from document_intelligence.events.publisher import (
     PubSubEventPublisher,
 )
 from document_intelligence.ingest.loaders import GcsBundleLoader
-from document_intelligence.persist.sinks import DeltaCanonicalSink, InMemoryCanonicalSink
+from document_intelligence.persist.sinks import (
+    DeltaCanonicalSink,
+    InMemoryCanonicalSink,
+)
 from document_intelligence.pipeline import DocumentProcessingPipeline
 
 LOGGER = logging.getLogger("document_intelligence.runtime_consumer")
 
 
-def _build_pipeline(environment: Mapping[str, str]) -> tuple[DocumentProcessingPipeline, Any]:
+def _build_pipeline(
+    environment: Mapping[str, str],
+) -> tuple[DocumentProcessingPipeline, Any]:
     settings = RuntimeSettings.from_mapping(environment)
     if settings.surface_uris is None:
         sink = InMemoryCanonicalSink()
@@ -50,7 +55,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--subscription-name",
         default="document-intelligence-artifact-bundle-available",
     )
-    parser.add_argument("--status-topic-name", default="document-processing-status-updated")
+    parser.add_argument(
+        "--status-topic-name", default="document-processing-status-updated"
+    )
     parser.add_argument("--processed-topic-name", default="document-processed")
     parser.add_argument("--idle-sleep-seconds", type=float, default=1.0)
     parser.add_argument("--max-messages", type=int, default=10)
@@ -69,9 +76,13 @@ def _process_message(
         for status_event in result.status_events:
             publisher.publish_status_event(status_event)
         publisher.publish_document_processed_event(result.document_processed_event)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     pipeline, _ = _build_pipeline(os.environ)
     publisher = (
@@ -123,7 +134,9 @@ def main(argv: list[str] | None = None) -> int:
                     }
                 )
             except Exception:
-                LOGGER.exception("failed to process message %s", received.message.message_id)
+                LOGGER.exception(
+                    "failed to process message %s", received.message.message_id
+                )
                 subscriber.modify_ack_deadline(
                     request={
                         "subscription": subscription_path,
