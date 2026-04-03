@@ -105,6 +105,7 @@ The default local quality gate for this component is [`../../../scripts/check-do
 - Delta sink tests write to temporary Delta tables and read them back to verify published rows and replay-safe appends
 - CLI smoke tests exercise the bundle-processing entrypoint with local fixtures
 - Event-ingest tests cover both direct `artifact_bundle.available` payloads and Pub/Sub push envelopes with base64-decoded event JSON
+- Runtime consumer HTTP tests cover successful Pub/Sub-style ingestion, invalid envelope rejection, and optional bearer protection
 - Databricks runtime tests validate the wrapper configuration plus a local Delta-backed bundle run using the Databricks-style entrypoint
 - Bootstrap asset tests verify the published-surface SQL renderer and Terraform module shape for the Unity Catalog scaffolding path
 - Bootstrap asset tests also verify the top-level Databricks stack wiring and the presence of `dev` / `staging` / `prod` tfvars for the DI Terraform path
