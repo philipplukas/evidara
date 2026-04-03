@@ -60,6 +60,7 @@ gcloud pubsub subscriptions pull \
 ```
 
 Key attributes to check:
+
 - `googclient_deliveryattempt`: How many times delivery was attempted
 - `message.data`: The original event payload (base64-encoded)
 - `message.messageId`: Correlate with Cloud Logging
@@ -117,6 +118,7 @@ gcloud pubsub subscriptions seek \
 ## Escalation
 
 Escalate if:
+
 - DLQ messages accumulate for >24 hours without investigation
 - The same message type repeatedly appears in DLQ after a fix
 - More than 50 messages are dead-lettered in a single hour
