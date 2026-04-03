@@ -107,6 +107,16 @@ async def cancel_run(
     return await service.cancel_run(run_id)
 
 
+@router.post("/{run_id}/retry", response_model=RunResponse)
+async def retry_run(
+    run_id: str,
+    session: SessionDep,
+) -> RunResponse:
+    """Retry a failed or cancelled run. Resets the run to PENDING status."""
+    service = RunService(session)
+    return await service.retry_run(run_id)
+
+
 @router.get("/{run_id}/preview-summary", response_model=RunPreviewSummaryResponse)
 async def get_run_preview_summary(
     run_id: str,

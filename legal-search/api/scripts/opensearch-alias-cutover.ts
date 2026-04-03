@@ -13,6 +13,7 @@
 
 const args = process.argv.slice(2);
 const shouldReindex = args.includes('--reindex');
+const dryRun = args.includes('--dry-run');
 const sourceIndexArg = (() => {
   const sourceIndexArgIndex = args.indexOf('--source-index');
   if (sourceIndexArgIndex === -1) return undefined;
@@ -145,11 +146,20 @@ async function cutoverAliases(
 }
 
 async function main(): Promise<void> {
-  console.log(`creating new projection index: ${nextIndex}`);
-  await ensureIndex(nextIndex);
+  if (dryRun) {
+    console.log('[DRY RUN] No changes will be made.');
+  }
 
+  console.log(`[1/4] Creating new projection index: ${nextIndex}`);
+  if (!dryRun) {
+    await ensureIndex(nextIndex);
+  }
+
+  console.log(`[2/4] Reading current alias targets...`);
   const currentReadTargets = await getAliasIndices(readAlias);
   const currentWriteTargets = await getAliasIndices(writeAlias);
+  console.log(`  read alias → [${currentReadTargets.join(', ')}]`);
+  console.log(`  write alias → [${currentWriteTargets.join(', ')}]`);
 
   if (shouldReindex) {
     const sourceIndex = sourceIndexArg ?? (() => {
@@ -163,16 +173,28 @@ async function main(): Promise<void> {
     })();
 
     if (sourceIndex) {
-      console.log(`reindexing data from ${sourceIndex} to ${nextIndex}`);
-      await reindex(sourceIndex, nextIndex);
+      console.log(`[3/4] Reindexing data: ${sourceIndex} → ${nextIndex}`);
+      if (!dryRun) {
+        const start = Date.now();
+        await reindex(sourceIndex, nextIndex);
+        console.log(`  Reindex completed in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+      } else {
+        console.log(`  [DRY RUN] Would reindex from ${sourceIndex}`);
+      }
     } else {
-      console.log(`--reindex requested but read alias ${readAlias} has no current targets; skipping reindex`);
+      console.log(`[3/4] Skipping reindex — no current read alias targets`);
     }
+  } else {
+    console.log(`[3/4] Skipping reindex (not requested)`);
   }
 
-  console.log(`cutting over aliases: read=${readAlias}, write=${writeAlias}`);
-  await cutoverAliases(currentReadTargets, currentWriteTargets, nextIndex);
-  console.log('alias cutover complete');
+  console.log(`[4/4] Cutting over aliases: read=${readAlias}, write=${writeAlias} → ${nextIndex}`);
+  if (!dryRun) {
+    await cutoverAliases(currentReadTargets, currentWriteTargets, nextIndex);
+    console.log('Alias cutover complete ✓');
+  } else {
+    console.log(`  [DRY RUN] Would remove ${currentReadTargets.length} read + ${currentWriteTargets.length} write targets, point to ${nextIndex}`);
+  }
 }
 
 main().catch((error) => {

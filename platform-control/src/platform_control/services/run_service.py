@@ -241,6 +241,23 @@ class RunService:
         await self.session.refresh(run)
         return run
 
+    async def retry_run(self, run_id: str) -> Run:
+        """Reset a failed or cancelled run to PENDING so the worker can re-dispatch it."""
+        run = await self.get_run(run_id)
+        if run.status not in {RunStatus.FAILED, RunStatus.CANCELLED}:
+            raise InvalidStateTransitionError(
+                f"Cannot retry run in status {run.status}."
+                " Only failed or cancelled runs can be retried."
+            )
+
+        run.status = RunStatus.PENDING
+        run.started_at = None
+        run.completed_at = None
+        run.failure_reason = None
+        await self.session.commit()
+        await self.session.refresh(run)
+        return run
+
     async def get_preview_summary(self, run_id: str) -> RunPreviewSummaryResponse:
         run = await self.get_run(run_id)
         resources = list(
