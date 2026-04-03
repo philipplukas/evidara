@@ -190,8 +190,8 @@ export function useDetail(id: string | null) {
 
 ### Current Phase
 
-**Phase 1 (mock)**: `fetchDetail()` does a synchronous lookup from `mock-data.ts`.
-**Phase 2 (planned)**: Swap to async BFF fetch — the hook interface stays identical.
+`useDetail()` now calls the live BFF endpoint (`GET /v1/documents/{document_id}`) via the generated client.
+The hook contract stays stable while data loading and caching are handled by React Query.
 
 ---
 
