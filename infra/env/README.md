@@ -13,8 +13,6 @@ Current scaffold:
 - [`dev/opensearch.gke.tfvars.example`](dev/opensearch.gke.tfvars.example)
 - [`staging/opensearch.gke.tfvars.example`](staging/opensearch.gke.tfvars.example)
 - [`prod/opensearch.gke.tfvars.example`](prod/opensearch.gke.tfvars.example)
-- [`github.repo_settings.tfvars.example`](github.repo_settings.tfvars.example)
-- [`github_cd_bootstrap.gcp.tfvars.example`](github_cd_bootstrap.gcp.tfvars.example)
 
 These files contain non-secret environment scaffolding only.
 Do not commit credentials or secret values here.
@@ -23,46 +21,88 @@ Do not commit credentials or secret values here.
 
 Use this flow for each environment (`dev`, `staging`, `prod`):
 
-1. Apply Terraform to create or update infrastructure resources and secret containers.
-2. Add secret values as Secret Manager versions (outside Terraform state).
+1. Apply Terraform to create/update infrastructure resources, Secret Manager secret containers, IAM, and Cloud Run wiring.
+2. Add secret **values** as Secret Manager versions (outside Terraform state):
+   - Upstream-provided values: Firecrawl API key, OpenSearch endpoint/credentials.
+   - Internal-generated values: service bearer tokens, internal webhook shared secrets, DB password (if managed by platform).
 3. Deploy or roll Cloud Run revisions so services read the newest secret versions.
-4. Verify health, connectivity, and core event flow.
+   - For private OpenSearch access, set `vpc_connector` and `vpc_egress` in each runtime `cloud_run_services` entry.
+4. Verify health and core event flow.
 
 ### Rules
 
-- Never commit secret values to `*.tfvars`, `.env`, or docs.
-- Keep non-sensitive runtime config in Terraform variables.
-- Keep sensitive values in Secret Manager and rotate with new versions.
-- For OpenSearch, keep secret IDs stable:
-  - `opensearch-node-{env}`
-  - `opensearch-username-{env}`
-  - `opensearch-password-{env}`
+- Never commit secret values to `*.tfvars`, `.env` files in git, or docs.
+- Keep non-sensitive runtime config in Terraform `env_vars`.
+- Keep sensitive values in Secret Manager via `secret_env_vars`.
+- Rotate by adding a new secret version, redeploying/rolling revisions, then revoking old upstream credentials.
 
-### Cloud Run private egress assumptions
+### Helper script
 
-Runtime tfvars support optional private egress assumptions:
+Use `scripts/manage_runtime_secrets.py` to create missing secret containers and add versions with hidden prompts:
 
-- `runtime_vpc_access_connector`
-- `runtime_vpc_egress` (`PRIVATE_RANGES_ONLY` or `ALL_TRAFFIC`)
+```bash
+python3 scripts/manage_runtime_secrets.py \
+  --project-id project-dacd6b7b-dc96-4534-b82 \
+  --env dev
+```
 
-For OpenSearch on GKE, set `runtime_vpc_access_connector` using output `vpc_connector_id` from `infra/terraform/opensearch/gke_stack`.
+Optional: process only selected secrets:
 
-### OpenSearch secret sync helper
+```bash
+python3 scripts/manage_runtime_secrets.py \
+  --project-id project-dacd6b7b-dc96-4534-b82 \
+  --env dev \
+  --only firecrawl-api-key firecrawl-webhook-secret
+```
 
-After applying the OpenSearch GKE stack, sync stack outputs into Secret Manager:
+Load OpenSearch values directly from a local `.env` file:
+
+```bash
+python3 scripts/manage_runtime_secrets.py \
+  --project-id project-dacd6b7b-dc96-4534-b82 \
+  --env dev \
+  --only opensearch-node opensearch-username opensearch-password \
+  --from-env-file /path/to/.env
+```
+
+### Firecrawl runtime helper
+
+Firecrawl account settings are not fully Terraform-managed. Use this helper after Cloud Run deploy to derive and wire the webhook URL:
+
+```bash
+python3 scripts/configure_firecrawl_runtime.py \
+  --project-id project-dacd6b7b-dc96-4534-b82 \
+  --region europe-west6 \
+  --env dev \
+  --tfvars-path infra/env/dev/runtime.gcp.tfvars
+```
+
+Optional: send a signed test callback using the current webhook secret:
+
+```bash
+python3 scripts/configure_firecrawl_runtime.py \
+  --project-id project-dacd6b7b-dc96-4534-b82 \
+  --region europe-west6 \
+  --env dev \
+  --verify-callback
+```
+
+### GKE OpenSearch secret sync
+
+After applying the self-managed OpenSearch GKE stack, sync stack outputs into GCP Secret Manager:
 
 ```bash
 python3 scripts/sync_opensearch_secrets.py \
-  --project-id <project-id> \
+  --project-id project-dacd6b7b-dc96-4534-b82 \
   --env dev \
   --opensearch-stack-dir infra/terraform/opensearch/gke_stack
 ```
 
-Preview without writing versions:
+Preview without writing secret versions:
 
 ```bash
 python3 scripts/sync_opensearch_secrets.py \
-  --project-id <project-id> \
+  --project-id project-dacd6b7b-dc96-4534-b82 \
   --env dev \
   --dry-run
 ```

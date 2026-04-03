@@ -21,10 +21,11 @@ This runbook provisions and validates self-managed OpenSearch on GKE with a dedi
 1. Apply OpenSearch GKE stack:
 
 ```bash
-cd infra/terraform/opensearch/gke_stack
-terraform init
-terraform plan -var-file=../../../env/<env>/opensearch.gke.tfvars
-terraform apply -var-file=../../../env/<env>/opensearch.gke.tfvars
+terraform -chdir=infra/terraform/opensearch/gke_stack init
+terraform -chdir=infra/terraform/opensearch/gke_stack plan \
+  -var-file=../../../env/<env>/opensearch.gke.tfvars
+terraform -chdir=infra/terraform/opensearch/gke_stack apply \
+  -var-file=../../../env/<env>/opensearch.gke.tfvars
 ```
 
 1. Sync OpenSearch endpoint and credentials into Secret Manager:
@@ -36,11 +37,12 @@ python3 scripts/sync_opensearch_secrets.py \
   --opensearch-stack-dir infra/terraform/opensearch/gke_stack
 ```
 
-1. Set runtime private egress assumptions in `infra/env/<env>/runtime.gcp.tfvars`:
-   - `runtime_vpc_access_connector` (from OpenSearch stack output `vpc_connector_id`)
-   - `runtime_vpc_egress` (`PRIVATE_RANGES_ONLY` recommended)
+1. Set per-service networking in `infra/env/<env>/runtime.gcp.tfvars` before runtime apply:
 
-1. Apply runtime stack and roll services so new secret versions and networking assumptions are active.
+   - On each `cloud_run_services` entry that must reach OpenSearch, set `vpc_connector` from OpenSearch stack output `vpc_connector_id`.
+   - Set `vpc_egress` (`PRIVATE_RANGES_ONLY` recommended) for those same services.
+
+1. Roll runtime services and verify they can connect to OpenSearch.
 
 ## Validation gates
 
@@ -50,9 +52,7 @@ Run these before promoting from `dev` to `staging` and `prod`.
 
 ```bash
 terraform fmt -check -recursive infra/terraform
-terraform -chdir=infra/terraform/opensearch/gke_stack init -backend=false
 terraform -chdir=infra/terraform/opensearch/gke_stack validate
-terraform -chdir=infra/terraform/gcp/runtime_stack init -backend=false
 terraform -chdir=infra/terraform/gcp/runtime_stack validate
 ```
 
@@ -67,12 +67,12 @@ python3 scripts/verify_opensearch_runtime.py \
 
 1. Application validation:
 
-   - Run legal-search replay against the new endpoint.
+   - Run legal-search projection replay against the new endpoint.
    - Run alias cutover script in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
-   - Verify search and detail API responses.
+   - Verify search and detail API responses against expected documents.
 
 ## Rotation and recovery
 
-- Rotate credentials by adding new Secret Manager versions, then roll Cloud Run revisions.
-- Keep aliases on previously healthy indices during incident response.
-- Rebuild indices from DI published surfaces when needed; OpenSearch is a rebuildable serving layer.
+- Rotate credentials by adding new Secret Manager versions, then rolling Cloud Run revisions.
+- If OpenSearch service degrades, keep aliases pointing at previous healthy indices while repairing cluster state.
+- Rebuild indices from DI published surfaces if corruption is detected; OpenSearch remains a rebuildable serving layer.

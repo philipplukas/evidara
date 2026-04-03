@@ -13,6 +13,9 @@ cloud_run_services = {
     image               = "europe-west6-docker.pkg.dev/evidara-dev/runtime/platform-control:latest"
     service_account_key = "platform_control_api"
     allow_unauthenticated = false
+    # Use output vpc_connector_id from infra/terraform/opensearch/gke_stack
+    vpc_connector = "projects/evidara-dev/locations/europe-west6/connectors/evidara-search-dev-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
     env_vars = {
       PLATFORM_CONTROL_GCP_PROJECT_ID      = "evidara-dev"
       PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND = "gcs"
@@ -38,6 +41,8 @@ cloud_run_services = {
     image               = "europe-west6-docker.pkg.dev/evidara-dev/runtime/legal-search-api:latest"
     service_account_key = "legal_search_api"
     allow_unauthenticated = false
+    vpc_connector = "projects/evidara-dev/locations/europe-west6/connectors/evidara-search-dev-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
     env_vars = {
       OPENSEARCH_ALIAS_READ              = "evidara-documents-read-dev"
       OPENSEARCH_ALIAS_WRITE             = "evidara-documents-write-dev"
@@ -62,6 +67,8 @@ cloud_run_services = {
     image               = "europe-west6-docker.pkg.dev/evidara-dev/runtime/platform-control-worker:latest"
     service_account_key = "platform_control_worker"
     allow_unauthenticated = false
+    vpc_connector = "projects/evidara-dev/locations/europe-west6/connectors/evidara-search-dev-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
     env_vars = {
       PLATFORM_CONTROL_RUN_DISPATCH_BACKEND = "worker"
     }
@@ -75,8 +82,3 @@ cloud_run_services = {
     }
   }
 }
-
-# Optional private egress assumptions for Cloud Run runtime services:
-# Use output vpc_connector_id from infra/terraform/opensearch/gke_stack.
-# runtime_vpc_access_connector = "projects/evidara-dev/locations/europe-west6/connectors/evidara-search-dev-connector"
-# runtime_vpc_egress          = "PRIVATE_RANGES_ONLY"
