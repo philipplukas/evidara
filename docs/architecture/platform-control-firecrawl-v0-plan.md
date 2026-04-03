@@ -2,7 +2,7 @@
 
 ## Status
 
-Partially implemented. The FastAPI service, initial schema, Firecrawl webhook path, raw artifact persistence, and bundle-manifest publication path now exist in-repo. Retool, dedicated worker separation, and broader operator tooling remain planned.
+Partially implemented. The FastAPI service, initial schema, Firecrawl webhook path, raw artifact persistence, bundle-manifest publication path, preview-summary API surface, and repo-owned Retool control-panel artifacts now exist in-repo. Dedicated worker separation and deployed operator tooling still remain follow-on work.
 
 ## Purpose
 

@@ -1,0 +1,98 @@
+version: 1
+name: platform-control-control-panel
+resources:
+  - name: platform_control_db
+    type: postgres
+    usage: browse_filter_list
+  - name: platform_control_api
+    type: rest
+    usage: business_actions
+
+pages:
+  - id: reference-data
+    title: Reference Data
+    reads:
+      - sql/list_jurisdictions.sql
+      - sql/list_authorities.sql
+    actions:
+      - createJurisdiction
+      - updateJurisdiction
+      - createAuthority
+      - updateAuthority
+  - id: sources
+    title: Sources
+    reads:
+      - sql/list_sources.sql
+      - sql/list_source_versions.sql
+    actions:
+      - createSource
+      - createSourceVersion
+      - updateSourceVersion
+      - approveSourceVersion
+      - rejectSourceVersion
+  - id: preview-review
+    title: Preview Review
+    reads:
+      - sql/list_run_captured_resources.sql
+      - sql/list_runs.sql
+    actions:
+      - getRunPreviewSummary
+      - cancelRun
+      - createRun
+  - id: runs
+    title: Runs
+    reads:
+      - sql/list_runs.sql
+    actions:
+      - getRun
+      - getRunPreviewSummary
+      - cancelRun
+
+actions:
+  createJurisdiction:
+    method: POST
+    path: /v1/reference-data/jurisdictions
+  updateJurisdiction:
+    method: PATCH
+    path: /v1/reference-data/jurisdictions/{{ jurisdiction_id }}
+  createAuthority:
+    method: POST
+    path: /v1/reference-data/authorities
+  updateAuthority:
+    method: PATCH
+    path: /v1/reference-data/authorities/{{ authority_id }}
+  createSource:
+    method: POST
+    path: /v1/sources
+  createSourceVersion:
+    method: POST
+    path: /v1/sources/{{ source_id }}/versions
+  updateSourceVersion:
+    method: PATCH
+    path: /v1/versions/{{ source_version_id }}
+  approveSourceVersion:
+    method: POST
+    path: /v1/versions/{{ source_version_id }}/approve
+  rejectSourceVersion:
+    method: POST
+    path: /v1/versions/{{ source_version_id }}/reject
+  createRun:
+    method: POST
+    path: /v1/runs
+  getRun:
+    method: GET
+    path: /v1/runs/{{ run_id }}
+  getRunPreviewSummary:
+    method: GET
+    path: /v1/runs/{{ run_id }}/preview-summary
+  cancelRun:
+    method: POST
+    path: /v1/runs/{{ run_id }}/cancel
+
+workflow:
+  name: run_firecrawl_preview
+  file: workflows/run_firecrawl_preview.yaml
+
+agent:
+  name: Source Setup Copilot
+  file: agents/source-setup-copilot.md

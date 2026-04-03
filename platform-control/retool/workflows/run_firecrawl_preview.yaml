@@ -1,0 +1,26 @@
+version: 1
+name: run_firecrawl_preview
+description: Create or reuse a draft source version, trigger a preview run, and fetch the preview summary.
+
+steps:
+  - id: save_draft_version
+    action: updateSourceVersion
+    when: source_version_id is set
+  - id: create_draft_version
+    action: createSourceVersion
+    when: source_version_id is not set
+  - id: trigger_preview
+    action: createRun
+    input:
+      mode: preview
+  - id: fetch_preview_run
+    action: getRun
+  - id: fetch_preview_summary
+    action: getRunPreviewSummary
+
+outputs:
+  - run_id
+  - status
+  - artifacts_count
+  - captured_resources_count
+  - preview_summary

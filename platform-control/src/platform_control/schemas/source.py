@@ -56,6 +56,12 @@ class CreateSourceVersionRequest(BaseModel):
     extractor_profile_id: str | None = None
 
 
+class UpdateSourceVersionRequest(BaseModel):
+    version_label: str | None = None
+    acquisition_spec: FirecrawlAcquisitionSpec | None = None
+    extractor_profile_id: str | None = None
+
+
 class SourceVersionResponse(BaseModel):
     source_version_id: str
     source_id: str
