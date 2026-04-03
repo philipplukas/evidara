@@ -33,10 +33,20 @@ export class ProjectionsController {
       const duration_ms = Date.now() - start;
 
       if (result.status === 'applied') {
-        this.logger.log({ event: 'projection_applied', ...ctx, status: result.status, duration_ms });
+        this.logger.log({
+          event: 'projection_applied',
+          ...ctx,
+          status: result.status,
+          duration_ms,
+        });
       } else {
         // stale or ignored_duplicate — not an error, but worth tracking
-        this.logger.warn({ event: 'projection_skipped', ...ctx, status: result.status, duration_ms });
+        this.logger.warn({
+          event: 'projection_skipped',
+          ...ctx,
+          status: result.status,
+          duration_ms,
+        });
       }
       return result;
     } catch (error) {
@@ -74,9 +84,19 @@ export class ProjectionsController {
       const duration_ms = Date.now() - start;
 
       if (result.status === 'applied') {
-        this.logger.log({ event: 'projection_applied', ...ctx, status: result.status, duration_ms });
+        this.logger.log({
+          event: 'projection_applied',
+          ...ctx,
+          status: result.status,
+          duration_ms,
+        });
       } else {
-        this.logger.warn({ event: 'projection_skipped', ...ctx, status: result.status, duration_ms });
+        this.logger.warn({
+          event: 'projection_skipped',
+          ...ctx,
+          status: result.status,
+          duration_ms,
+        });
       }
       return result;
     } catch (error) {

@@ -89,21 +89,25 @@ async def _run_loop(limit: int, interval_seconds: float) -> None:
                 cycle,
                 dispatched,
                 elapsed_ms,
-                extra={"extra_fields": {
-                    "event": "worker_poll_cycle",
-                    "cycle": cycle,
-                    "dispatched": dispatched,
-                    "elapsed_ms": elapsed_ms,
-                }},
+                extra={
+                    "extra_fields": {
+                        "event": "worker_poll_cycle",
+                        "cycle": cycle,
+                        "dispatched": dispatched,
+                        "elapsed_ms": elapsed_ms,
+                    }
+                },
             )
         except Exception:
             LOGGER.exception(
                 "Poll cycle %d: unhandled error",
                 cycle,
-                extra={"extra_fields": {
-                    "event": "worker_poll_error",
-                    "cycle": cycle,
-                }},
+                extra={
+                    "extra_fields": {
+                        "event": "worker_poll_error",
+                        "cycle": cycle,
+                    }
+                },
             )
 
         # Wait with early exit on shutdown signal
@@ -137,10 +141,12 @@ def main() -> None:
         LOGGER.info(
             "Single-shot: dispatched %d run(s)",
             dispatched,
-            extra={"extra_fields": {
-                "event": "worker_single_shot",
-                "dispatched": dispatched,
-            }},
+            extra={
+                "extra_fields": {
+                    "event": "worker_single_shot",
+                    "dispatched": dispatched,
+                }
+            },
         )
         return
 

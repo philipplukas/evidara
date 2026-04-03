@@ -2,6 +2,7 @@
 
 Owner: Platform team
 Last reviewed: 2026-04-03
+Last verified: Not yet verified
 Applies to: dev, staging, prod
 
 ## Overview
