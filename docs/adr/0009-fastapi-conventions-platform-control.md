@@ -93,6 +93,7 @@ GET    /v1/runs/{id}                        ← run status (programmatic access)
 GET    /v1/runs/{id}/captured-resources     ← operator diagnostics
 GET    /v1/runs/{id}/raw-artifacts          ← operator diagnostics
 GET    /v1/runs/{id}/provider-jobs          ← operator diagnostics
+GET    /v1/runs/{id}/preview-summary        ← operator preview review
 GET    /health                              ← health check
 ```
 

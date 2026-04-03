@@ -51,6 +51,7 @@ The code-managed admin app now lives in `admin/` and covers:
 
 The current app is backed by the existing reference-data and source/version APIs plus
 `GET /v1/runs`,
+`GET /v1/runs/{run_id}/preview-summary`,
 `GET /v1/runs/{run_id}/captured-resources`, `GET /v1/runs/{run_id}/raw-artifacts`,
 `GET /v1/runs/{run_id}/provider-jobs`, `GET /v1/runs/{run_id}/processing-status`, and
 `GET /v1/runs/{run_id}/document-lifecycle` APIs.

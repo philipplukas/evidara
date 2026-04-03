@@ -14,9 +14,11 @@ export const filterAuthoritiesByJurisdiction = (
   authorities: AuthorityRecord[],
   jurisdictionId?: string | null,
 ): AuthorityRecord[] =>
-  jurisdictionId
-    ? authorities.filter((authority) => authority.jurisdiction_id === jurisdictionId)
-    : authorities;
+  authorities.filter((authority) =>
+    jurisdictionId
+      ? authority.jurisdiction_id === jurisdictionId || authority.jurisdiction_id === null
+      : authority.jurisdiction_id === null,
+  );
 
 export const isAuthorityValidForJurisdiction = (
   authorities: AuthorityRecord[],
@@ -27,12 +29,11 @@ export const isAuthorityValidForJurisdiction = (
     return true;
   }
 
-  if (!jurisdictionId) {
-    return false;
-  }
-
   return authorities.some(
     (authority) =>
-      authority.authority_id === authorityId && authority.jurisdiction_id === jurisdictionId,
+      authority.authority_id === authorityId &&
+      (jurisdictionId
+        ? authority.jurisdiction_id === jurisdictionId || authority.jurisdiction_id === null
+        : authority.jurisdiction_id === null),
   );
 };

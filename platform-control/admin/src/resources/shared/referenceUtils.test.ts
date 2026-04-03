@@ -25,6 +25,15 @@ const authorities: AuthorityRecord[] = [
     created_at: "2026-04-03T09:00:00Z",
     updated_at: "2026-04-03T09:00:00Z",
   },
+  {
+    id: "auth_global",
+    authority_id: "auth_global",
+    jurisdiction_id: null,
+    name: "Global Bulletin",
+    slug: "global-bulletin",
+    created_at: "2026-04-03T09:00:00Z",
+    updated_at: "2026-04-03T09:00:00Z",
+  },
 ];
 
 describe("referenceUtils", () => {
@@ -38,13 +47,18 @@ describe("referenceUtils", () => {
   });
 
   it("filters authorities to the selected jurisdiction", () => {
-    expect(filterAuthoritiesByJurisdiction(authorities, "jur_01")).toEqual([authorities[0]]);
-    expect(filterAuthoritiesByJurisdiction(authorities, null)).toEqual(authorities);
+    expect(filterAuthoritiesByJurisdiction(authorities, "jur_01")).toEqual([
+      authorities[0],
+      authorities[2],
+    ]);
+    expect(filterAuthoritiesByJurisdiction(authorities, null)).toEqual([authorities[2]]);
   });
 
   it("validates authority choices against the selected jurisdiction", () => {
     expect(isAuthorityValidForJurisdiction(authorities, "auth_01", "jur_01")).toBe(true);
     expect(isAuthorityValidForJurisdiction(authorities, "auth_01", "jur_02")).toBe(false);
+    expect(isAuthorityValidForJurisdiction(authorities, "auth_global", "jur_02")).toBe(true);
+    expect(isAuthorityValidForJurisdiction(authorities, "auth_global", null)).toBe(true);
     expect(isAuthorityValidForJurisdiction(authorities, "auth_01", null)).toBe(false);
   });
 });

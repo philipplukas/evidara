@@ -349,26 +349,46 @@ function RunTableSection<TRecord extends { id: Identifier }>({
 export function RunDetailSections() {
   const run = useRecordContext<RunRecord>();
 
-  const capturedResources = useGetList<CapturedResourceRecord>("run-captured-resources", {
-    ...LIST_PARAMS,
-    filter: { run_id: run?.run_id },
-  });
-  const rawArtifacts = useGetList<RawArtifactRecord>("run-raw-artifacts", {
-    ...LIST_PARAMS,
-    filter: { run_id: run?.run_id },
-  });
-  const providerJobs = useGetList<ProviderJobRecord>("run-provider-jobs", {
-    ...LIST_PARAMS,
-    filter: { run_id: run?.run_id },
-  });
-  const processingStatus = useGetList<ProcessingStatusRecord>("run-processing-status", {
-    ...LIST_PARAMS,
-    filter: { run_id: run?.run_id },
-  });
-  const documentLifecycle = useGetList<DocumentLifecycleRecord>("run-document-lifecycle", {
-    ...LIST_PARAMS,
-    filter: { run_id: run?.run_id },
-  });
+  const capturedResources = useGetList<CapturedResourceRecord>(
+    "run-captured-resources",
+    {
+      ...LIST_PARAMS,
+      filter: { run_id: run?.run_id },
+    },
+    { enabled: Boolean(run?.run_id) },
+  );
+  const rawArtifacts = useGetList<RawArtifactRecord>(
+    "run-raw-artifacts",
+    {
+      ...LIST_PARAMS,
+      filter: { run_id: run?.run_id },
+    },
+    { enabled: Boolean(run?.run_id) },
+  );
+  const providerJobs = useGetList<ProviderJobRecord>(
+    "run-provider-jobs",
+    {
+      ...LIST_PARAMS,
+      filter: { run_id: run?.run_id },
+    },
+    { enabled: Boolean(run?.run_id) },
+  );
+  const processingStatus = useGetList<ProcessingStatusRecord>(
+    "run-processing-status",
+    {
+      ...LIST_PARAMS,
+      filter: { run_id: run?.run_id },
+    },
+    { enabled: Boolean(run?.run_id) },
+  );
+  const documentLifecycle = useGetList<DocumentLifecycleRecord>(
+    "run-document-lifecycle",
+    {
+      ...LIST_PARAMS,
+      filter: { run_id: run?.run_id },
+    },
+    { enabled: Boolean(run?.run_id) },
+  );
 
   if (!run) {
     return null;

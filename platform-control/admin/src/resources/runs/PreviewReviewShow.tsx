@@ -7,7 +7,11 @@ import { RunDetailSections } from "./RunDetailSections";
 
 export function PreviewReviewShow() {
   return (
-    <Show resource="preview-review" title="Preview Review">
+    <Show
+      resource="preview-review"
+      title="Preview Review"
+      queryOptions={{ meta: { mode: "preview" } }}
+    >
       <SimpleShowLayout>
         <Box sx={{ pb: 1 }}>
           <RunActionStack />

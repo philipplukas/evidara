@@ -48,6 +48,7 @@ export function PreviewReviewList() {
       title="Preview Review"
       perPage={25}
       sort={{ field: "created_at", order: "DESC" }}
+      filter={{ mode: "preview" }}
       filters={previewFilters}
       actions={<PreviewReviewActions />}
     >

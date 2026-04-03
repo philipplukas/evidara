@@ -427,11 +427,19 @@ const toSourcePayload = (data: Partial<Source>): Partial<Source> => ({
 
 const toSourceVersionPayload = (
   data: Partial<SourceVersionMutationData>,
-): Omit<SourceVersionMutationData, "source_id"> => ({
-  version_label: data.version_label ?? "",
-  extractor_profile_id: normalizeNullableString(data.extractor_profile_id),
-  acquisition_spec: data.acquisition_spec as FirecrawlAcquisitionSpec,
-});
+): Partial<Omit<SourceVersionMutationData, "source_id">> => {
+  const payload: Partial<Omit<SourceVersionMutationData, "source_id">> = {};
+  if (data.version_label !== undefined) {
+    payload.version_label = data.version_label;
+  }
+  if (data.extractor_profile_id !== undefined) {
+    payload.extractor_profile_id = normalizeNullableString(data.extractor_profile_id);
+  }
+  if (data.acquisition_spec !== undefined) {
+    payload.acquisition_spec = data.acquisition_spec as FirecrawlAcquisitionSpec;
+  }
+  return payload;
+};
 
 const getSimpleListResult = async <TResource extends SimpleListResourceName>(
   resource: TResource,
@@ -592,6 +600,9 @@ export const controlPlaneDataProvider: DataProvider = {
 
     if (resource === "preview-review") {
       const response = await requestJson<RunResponse>(`/v1/runs/${params.id}`);
+      if (response.mode !== "preview") {
+        throw new HttpError("Preview review run not found", 404);
+      }
       return {
         data: toRecord(response, "run_id"),
       };

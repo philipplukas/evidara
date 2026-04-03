@@ -70,6 +70,21 @@ compose_status() {
   (cd "$ROOT_DIR" && docker compose ps postgres)
 }
 
+wait_for_postgres() {
+  require_cmd docker
+  echo "Waiting for Postgres to be ready..."
+  local retries=30
+  while ! (cd "$ROOT_DIR" && docker compose exec -T postgres pg_isready -U platform_control -d platform_control >/dev/null 2>&1); do
+    retries=$((retries - 1))
+    if [ "$retries" -eq 0 ]; then
+      echo "Postgres did not become ready in time." >&2
+      exit 1
+    fi
+    sleep 1
+  done
+  echo "Postgres is ready."
+}
+
 sync_deps() {
   require_cmd uv
   run_in_platform_control uv sync --group dev
@@ -113,6 +128,7 @@ check_health() {
 
 bootstrap() {
   compose_up
+  wait_for_postgres
   sync_deps
   migrate_db
   seed_reference_data

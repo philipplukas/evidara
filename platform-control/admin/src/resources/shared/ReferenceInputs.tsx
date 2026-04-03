@@ -111,8 +111,8 @@ export function AuthoritySelectInput({
 
       if (!isAuthorityValidForJurisdiction(authorityRecords, value, jurisdictionId)) {
         return jurisdictionId
-          ? "Select an authority within the chosen jurisdiction."
-          : "Select a jurisdiction before choosing an authority.";
+          ? "Select an authority within the chosen jurisdiction or a global authority."
+          : "Select a global authority or choose a jurisdiction first.";
       }
 
       return undefined;
@@ -127,12 +127,12 @@ export function AuthoritySelectInput({
       isPending={authorities.isPending}
       emptyText={allowEmpty ? "No authority" : undefined}
       emptyValue=""
-      disabled={disabled || !jurisdictionId}
+      disabled={disabled}
       helperText={
         helperText ??
         (jurisdictionId
-          ? "Authority choices are filtered to the selected jurisdiction."
-          : "Select a jurisdiction first to narrow the authority list.")
+          ? "Authority choices include the selected jurisdiction and global authorities."
+          : "Authority choices are limited to global authorities until a jurisdiction is selected.")
       }
       parse={(value) => (value === "" ? null : value)}
       format={(value) => value ?? ""}

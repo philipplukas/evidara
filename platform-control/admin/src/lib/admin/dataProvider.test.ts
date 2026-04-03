@@ -170,6 +170,41 @@ describe("controlPlaneDataProvider", () => {
     });
   });
 
+  it("rejects preview-review getOne responses that are not preview runs", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          run_id: "run_prod_01",
+          source_id: "src_01",
+          source_version_id: "sv_01",
+          mode: "production",
+          status: "running",
+          started_at: "2026-04-03T09:00:00Z",
+          completed_at: null,
+          artifacts_count: 0,
+          captured_resources_count: 0,
+          failure_reason: null,
+          created_at: "2026-04-03T09:00:00Z",
+          updated_at: "2026-04-03T09:00:00Z",
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    await expect(
+      controlPlaneDataProvider.getOne("preview-review", {
+        id: "run_prod_01",
+      }),
+    ).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
   it("returns an empty source-version list before a source is selected", async () => {
     global.fetch = vi.fn() as typeof fetch;
 
@@ -263,6 +298,98 @@ describe("controlPlaneDataProvider", () => {
       source_version_id: "sv_01",
       version_label: "v2",
     });
+  });
+
+  it("does not send version_label when updating source versions without it", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          source_version_id: "sv_01",
+          source_id: "src_01",
+          extractor_profile_id: "exp_custom",
+          version_label: "v-existing",
+          status: "draft",
+          acquisition_spec: {
+            seed_url: "https://example.com/decisions",
+            seed_urls: [],
+            mode: "crawl",
+            include_paths: [],
+            exclude_paths: [],
+            limit: 20,
+            max_discovery_depth: 2,
+            scrape_formats: ["markdown", "html"],
+            zero_data_retention: false,
+          },
+          created_at: "2026-04-03T09:00:00Z",
+          updated_at: "2026-04-03T09:00:00Z",
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    await controlPlaneDataProvider.update("source-versions", {
+      id: "sv_01",
+      data: {
+        source_id: "src_01",
+        acquisition_spec: {
+          seed_url: "https://example.com/decisions",
+          seed_urls: [],
+          mode: "crawl",
+          include_paths: [],
+          exclude_paths: [],
+          limit: 20,
+          max_discovery_depth: 2,
+          scrape_formats: ["markdown", "html"],
+          zero_data_retention: false,
+        },
+      },
+      previousData: {
+        id: "sv_01",
+        source_version_id: "sv_01",
+        source_id: "src_01",
+        extractor_profile_id: "exp_default",
+        version_label: "v-existing",
+        status: "draft",
+        acquisition_spec: {
+          seed_url: "https://example.com/decisions",
+          seed_urls: [],
+          mode: "crawl",
+          include_paths: [],
+          exclude_paths: [],
+          limit: 20,
+          max_discovery_depth: 2,
+          scrape_formats: ["markdown", "html"],
+          zero_data_retention: false,
+        },
+        created_at: "2026-04-03T09:00:00Z",
+        updated_at: "2026-04-03T09:00:00Z",
+      },
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/versions/sv_01",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          acquisition_spec: {
+            seed_url: "https://example.com/decisions",
+            seed_urls: [],
+            mode: "crawl",
+            include_paths: [],
+            exclude_paths: [],
+            limit: 20,
+            max_discovery_depth: 2,
+            scrape_formats: ["markdown", "html"],
+            zero_data_retention: false,
+          },
+        }),
+      }),
+    );
   });
 
   it("creates runs through the runs endpoint", async () => {

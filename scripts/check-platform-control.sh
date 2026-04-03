@@ -11,6 +11,6 @@ if [[ -f admin/package.json ]]; then
   (
     cd admin
     npm run check
-    npm run build
+    PLATFORM_CONTROL_API_URL="${PLATFORM_CONTROL_API_URL:-http://127.0.0.1:8000}" npm run build
   )
 fi

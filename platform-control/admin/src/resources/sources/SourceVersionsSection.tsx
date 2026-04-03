@@ -106,14 +106,36 @@ const toFormState = (version?: SourceVersionRecord | null): SourceVersionFormSta
   };
 };
 
+const parseIntegerField = (
+  value: string,
+  fieldName: string,
+  { min, max }: { min: number; max: number },
+): number => {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error(`${fieldName} is required.`);
+  }
+  if (!/^-?\d+$/.test(trimmed)) {
+    throw new Error(`${fieldName} must be an integer.`);
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  if (parsed < min || parsed > max) {
+    throw new Error(`${fieldName} must be between ${min} and ${max}.`);
+  }
+  return parsed;
+};
+
 const toAcquisitionSpec = (state: SourceVersionFormState): FirecrawlAcquisitionSpec => ({
   seed_url: state.seed_url.trim().length > 0 ? state.seed_url.trim() : null,
   seed_urls: textToList(state.seed_urls_text),
   mode: state.mode,
   include_paths: textToList(state.include_paths_text),
   exclude_paths: textToList(state.exclude_paths_text),
-  limit: Number(state.limit),
-  max_discovery_depth: Number(state.max_discovery_depth),
+  limit: parseIntegerField(state.limit, "Limit", { min: 1, max: 500 }),
+  max_discovery_depth: parseIntegerField(state.max_discovery_depth, "Max discovery depth", {
+    min: 0,
+    max: 10,
+  }),
   scrape_formats: textToList(state.scrape_formats_text),
   zero_data_retention: state.zero_data_retention,
 });

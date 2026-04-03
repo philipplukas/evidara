@@ -23,4 +23,4 @@ code-managed React-admin app in `platform-control/admin`.
 - `platform_control_api` is the REST resource for business actions
 
 This follows ADR-0006: Retool reads via Postgres and uses the API for actions with state logic.
-These artifacts are no longer part of the primary local setup or operator run workflow.
+These artifacts are no longer part of the primary local setup or operator-run workflow.

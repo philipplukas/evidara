@@ -40,6 +40,16 @@ type RunLaunchFormState = {
   mode: "preview" | "production";
 };
 
+const resolveInitialMode = (
+  defaultMode: "preview" | "production",
+  allowedModes: Array<"preview" | "production">,
+): "preview" | "production" => {
+  if (allowedModes.includes(defaultMode)) {
+    return defaultMode;
+  }
+  return allowedModes[0] ?? "preview";
+};
+
 const createInitialState = (defaultMode: "preview" | "production"): RunLaunchFormState => ({
   source_id: "",
   source_version_id: "",
@@ -60,7 +70,8 @@ export function RunLaunchButton({
 
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formState, setFormState] = useState<RunLaunchFormState>(createInitialState(defaultMode));
+  const initialMode = resolveInitialMode(defaultMode, allowedModes);
+  const [formState, setFormState] = useState<RunLaunchFormState>(createInitialState(initialMode));
 
   const sources = useGetList<SourceRecord>("sources", {
     ...LIST_PARAMS,
@@ -83,7 +94,7 @@ export function RunLaunchButton({
   );
 
   const reset = () => {
-    setFormState(createInitialState(defaultMode));
+    setFormState(createInitialState(initialMode));
   };
 
   const closeDialog = () => {

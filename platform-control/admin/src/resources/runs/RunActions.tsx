@@ -40,7 +40,11 @@ export function CancelRunButton({ size = "small" }: CancelRunButtonProps) {
       size={size}
       color="warning"
       variant="outlined"
-      onClick={cancelRun}
+      onClick={(event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        void cancelRun();
+      }}
       disabled={isSubmitting}
     >
       {isSubmitting ? "Cancelling..." : "Cancel"}
