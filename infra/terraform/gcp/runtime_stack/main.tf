@@ -14,6 +14,16 @@ locals {
   )
 }
 
+check "subscription_topics_exist" {
+  assert {
+    condition = alltrue([
+      for subscription in values(var.event_subscriptions) :
+      contains(var.event_topic_names, subscription.topic_name)
+    ])
+    error_message = "Each event_subscriptions[*].topic_name must exist in event_topic_names."
+  }
+}
+
 resource "google_storage_bucket" "raw_artifacts" {
   name                        = local.raw_bucket_name
   location                    = var.bucket_location
@@ -51,7 +61,7 @@ resource "google_pubsub_subscription" "events" {
   for_each = var.event_subscriptions
 
   name                       = each.key
-  topic                      = google_pubsub_topic.events[each.value.topic_name].name
+  topic                      = google_pubsub_topic.events[each.value.topic_name].id
   ack_deadline_seconds       = each.value.ack_deadline_seconds
   message_retention_duration = each.value.message_retention_duration
   labels                     = local.labels

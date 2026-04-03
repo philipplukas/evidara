@@ -49,6 +49,7 @@ variable "event_topic_names" {
   type        = set(string)
   default = [
     "artifact-bundle-available",
+    "raw-artifact-available",
     "document-processing-status-updated",
     "document-processed",
     "document-withdrawn",

@@ -41,7 +41,6 @@ yarn-error.log*
 *.tfstate
 *.tfstate.*
 *.tfvars
-!infra/env/**/*.tfvars
 !*.tfvars.example
 !infra/env/**/*.tfvars.example
 crash.log
