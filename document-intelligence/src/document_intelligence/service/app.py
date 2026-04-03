@@ -9,6 +9,7 @@ from typing import Annotated, Any, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
+from document_intelligence.http_observability import install_http_observability
 from document_intelligence.service.lean import to_lean_dict, to_plain_text
 from document_intelligence.service.store import (
     EmptyPublishedDocumentStore,
@@ -52,6 +53,7 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
         version="0.1.0",
         openapi_url="/openapi.json",
     )
+    install_http_observability(app, "document-intelligence-service")
 
     def get_store() -> PublishedDocumentStore:
         return effective

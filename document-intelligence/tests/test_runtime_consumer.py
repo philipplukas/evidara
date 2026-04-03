@@ -26,6 +26,23 @@ from support import (
     TestClient is not None, "Install document-intelligence[service] for HTTP tests"
 )
 class TestRuntimeConsumerHTTP(unittest.TestCase):
+    def test_health_sets_generated_correlation_headers(self) -> None:
+        client = TestClient(create_app())
+        response = client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.headers.get("X-Correlation-Id"))
+        self.assertEqual(
+            response.headers.get("X-Correlation-Id"),
+            response.headers.get("X-Request-ID"),
+        )
+
+    def test_health_reuses_incoming_correlation_header(self) -> None:
+        client = TestClient(create_app())
+        response = client.get("/health", headers={"X-Correlation-Id": "corr_ingest_123"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("X-Correlation-Id"), "corr_ingest_123")
+        self.assertEqual(response.headers.get("X-Request-ID"), "corr_ingest_123")
+
     def _build_event_payload(self, temp_dir: str) -> dict[str, object]:
         artifact_path = os.path.join(temp_dir, "document.html")
         manifest_path = os.path.join(temp_dir, "bundle-manifest.json")

@@ -9,6 +9,7 @@ from typing import Any, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException
 
 from document_intelligence.contracts.envelope import EnvelopeError
+from document_intelligence.http_observability import install_http_observability
 from document_intelligence.processing_runtime import process_artifact_bundle_event
 
 
@@ -42,6 +43,7 @@ def create_app(
         version="0.1.0",
         openapi_url="/openapi.json",
     )
+    install_http_observability(app, "document-intelligence-consumer")
 
     @app.post("/internal/events/artifact-bundles:process", tags=["ingestion"])
     async def process_artifact_bundle(

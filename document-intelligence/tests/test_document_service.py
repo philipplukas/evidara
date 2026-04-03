@@ -50,6 +50,15 @@ class TestDocumentServiceHTTP(unittest.TestCase):
         self.assertEqual(r.json()["schema"], "docling-like")
         self.assertIn("bbox", r.json())
 
+    def test_health_sets_correlation_headers(self) -> None:
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.headers.get("X-Correlation-Id"))
+        self.assertEqual(
+            response.headers.get("X-Correlation-Id"),
+            response.headers.get("X-Request-ID"),
+        )
+
     def test_lean_strips_bbox(self) -> None:
         r = self.client.get(f"/v1/documents/{_DOC}/lean")
         self.assertEqual(r.status_code, 200)
