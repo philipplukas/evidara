@@ -140,3 +140,10 @@ document_intelligence_runtime_consumer \
 ```
 
 Use `--dry-run-publish` for local replay without outbound event publication.
+
+Containerized runtime deployments can use `document-intelligence/Dockerfile` with:
+
+- `DI_GCP_PROJECT_ID`
+- `DI_SUBSCRIPTION_NAME` (optional; defaults to `document-intelligence-artifact-bundle-available`)
+- `DI_STATUS_TOPIC_NAME` (optional; defaults to `document-processing-status-updated`)
+- `DI_PROCESSED_TOPIC_NAME` (optional; defaults to `document-processed`)
