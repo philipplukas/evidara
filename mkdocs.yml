@@ -60,9 +60,14 @@ nav:
       - Communication Model: architecture/communication-model.md
       - Boundary Contracts: architecture/boundary-contracts.md
       - Storage Model: architecture/storage-model.md
+      - Security & Tenancy: architecture/security-and-tenancy.md
+      - NFRs & SLOs: architecture/nfrs-and-slos.md
+      - Disaster Recovery: architecture/disaster-recovery.md
+      - Data Lifecycle: architecture/data-lifecycle.md
       - Implementation Principles: architecture/implementation-principles.md
       - Clean-Room Principles: architecture/clean-room-principles.md
   - ADRs:
+      - Index: adr/README.md
       - "0001: Monorepo Structure": adr/0001-monorepo-structure.md
       - "0002: Component Boundaries": adr/0002-top-level-component-boundaries.md
       - "0003: Storage Strategy": adr/0003-storage-strategy.md
@@ -70,6 +75,14 @@ nav:
       - "0005: Search Strategy": adr/0005-search-strategy.md
       - "0006: Internal Ops UI": adr/0006-internal-ops-ui-strategy.md
       - "0007: OpenAPI Client Strategy": adr/0007-openapi-client-strategy-legal-search.md
+      - "0008: Contract Interaction Model": adr/0008-contract-interaction-model.md
+      - "0009: Technology Stack": adr/0009-technology-stack-and-language-boundaries.md
+      - "0010: Document Content Format": adr/0010-document-content-format.md
+      - "0011: NestJS Conventions": adr/0011-nestjs-conventions-legal-search.md
+      - "0012: Layered Contract Governance": adr/0012-layered-contract-governance.md
+      - "0013: Internationalization": adr/0013-internationalization-strategy.md
+      - "0014: DI Pipeline Integration": adr/0014-document-intelligence-pipeline-integration.md
+      - "0015: FastAPI Conventions": adr/0015-fastapi-conventions-platform-control.md
   - Components:
       - Platform Control: components/platform-control.md
       - Document Intelligence: components/document-intelligence.md
@@ -92,6 +105,9 @@ nav:
           - Legal Search: components/testing/legal-search-testing.md
           - Contracts: components/testing/contracts-testing.md
           - Infrastructure: components/testing/infra-testing.md
+  - Runbooks:
+      - Document Service & Detail: runbooks/document-service-document-detail.md
+      - Firecrawl Preview Run: runbooks/firecrawl-preview-run.md
   - Setup:
       - Environment Strategy: setup/environment-strategy.md
       - Infrastructure Overview: setup/infrastructure-overview.md
@@ -107,4 +123,5 @@ nav:
       - Mermaid Style Guide: documentation/mermaid-style-guide.md
   - API Reference:
       - Legal Search API: api/legal-search.md
+      - Document Intelligence API: api/document-intelligence.md
       - Platform Control API: api/platform-control.md
