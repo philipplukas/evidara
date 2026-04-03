@@ -1,0 +1,18 @@
+resources:
+  jobs:
+    document_intelligence_dbt_transformations:
+      name: document-intelligence-dbt-transformations
+      queue:
+        enabled: true
+      tasks:
+        - task_key: dbt_run
+          dbt_task:
+            project_directory: ./dbt
+            commands:
+              - dbt deps
+              - dbt run --target ${bundle.target}
+              - dbt test --target ${bundle.target}
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: ${var.num_workers}

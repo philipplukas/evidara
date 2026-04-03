@@ -16,6 +16,17 @@ The MVP test plan assumes bundle ingestion, canonical `Document`, `Section`, and
 
 ---
 
+## Current automated gates
+
+- **Pre-commit:** root [`.pre-commit-config.yaml`](../../../.pre-commit-config.yaml) runs `bash scripts/check-document-intelligence.sh` when DI/contracts-related paths change.
+- **CI:** [`.github/workflows/document-intelligence.yml`](../../../.github/workflows/document-intelligence.yml) runs the same script on PR/push path filters.
+- **Script gate:** `scripts/check-document-intelligence.sh` performs:
+  - contract/schema example validation
+  - `python3 -m unittest discover -s tests -v`
+  - `dbt deps` + `dbt parse --target dev`
+
+---
+
 ## Minimal Tests for MVP
 
 ### Unit tests
@@ -107,6 +118,7 @@ The default local quality gate for this component is [`../../../scripts/check-do
 - Event-ingest tests cover both direct `artifact_bundle.available` payloads and Pub/Sub push envelopes with base64-decoded event JSON
 - Runtime consumer HTTP tests cover successful Pub/Sub-style ingestion, invalid envelope rejection, and optional bearer protection
 - Databricks runtime tests validate the wrapper configuration plus a local Delta-backed bundle run using the Databricks-style entrypoint
+- Databricks bundle-shape tests verify target presence (`dev` / `staging` / `prod`) and expected job/runtime parameters
 - Bootstrap asset tests verify the published-surface SQL renderer and Terraform module shape for the Unity Catalog scaffolding path
 - Bootstrap asset tests also verify the top-level Databricks stack wiring and the presence of `dev` / `staging` / `prod` tfvars for the DI Terraform path
 - XML bundle tests verify RIS-style section labels and extracted metadata survive canonicalization

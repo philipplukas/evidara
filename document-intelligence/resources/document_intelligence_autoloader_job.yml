@@ -1,0 +1,24 @@
+resources:
+  jobs:
+    document_intelligence_autoloader_bronze:
+      name: document-intelligence-autoloader-bronze
+      queue:
+        enabled: true
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: gcs_processed_bucket
+          default: ${var.gcs_processed_bucket}
+      tasks:
+        - task_key: run_autoloader
+          notebook_task:
+            notebook_path: ./databricks/notebooks/00_autoloader_bronze.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              gcs_processed_bucket: "{{job.parameters.gcs_processed_bucket}}"
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: ${var.num_workers}
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"

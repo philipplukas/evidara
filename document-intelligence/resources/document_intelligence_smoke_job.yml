@@ -1,0 +1,19 @@
+resources:
+  jobs:
+    document_intelligence_smoke_test:
+      name: document-intelligence-smoke-test
+      queue:
+        enabled: true
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+      tasks:
+        - task_key: smoke_test
+          notebook_task:
+            notebook_path: ./databricks/notebooks/99_smoke_test.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: "1"

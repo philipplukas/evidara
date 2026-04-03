@@ -17,9 +17,10 @@ def main(argv=None) -> int:
     with open(event_path, "r", encoding="utf-8") as event_file:
         event_payload = json.load(event_file)
 
+    runtime_settings = RuntimeSettings.from_environment()
     output = process_artifact_bundle_event(
         event_payload,
-        runtime_settings=RuntimeSettings.from_environment(),
+        runtime_settings=runtime_settings,
     )
     print(json.dumps(output, indent=2, sort_keys=True))
     return 0
