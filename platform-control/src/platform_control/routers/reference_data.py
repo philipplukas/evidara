@@ -1,6 +1,7 @@
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
@@ -9,15 +10,19 @@ from platform_control.schemas.reference_data import (
     AuthorityResponse,
     CreateAuthorityRequest,
     CreateJurisdictionRequest,
+    HierarchySyncCountsResponse,
+    HierarchySyncResponse,
     JurisdictionListResponse,
     JurisdictionResponse,
     UpdateAuthorityRequest,
     UpdateJurisdictionRequest,
 )
+from platform_control.services.hierarchy_sync_service import HierarchySyncService
 from platform_control.services.reference_data_service import ReferenceDataService
 
 router = APIRouter(prefix="/v1/reference-data", tags=["reference-data"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+DEFAULT_HIERARCHY_DIR = Path(__file__).resolve().parents[3] / "hierarchies"
 
 
 @router.get("/jurisdictions", response_model=JurisdictionListResponse)
@@ -76,3 +81,29 @@ async def update_authority(
 ) -> AuthorityResponse:
     service = ReferenceDataService(session)
     return await service.update_authority(authority_id, request)
+
+
+@router.post("/hierarchy/sync", response_model=HierarchySyncResponse)
+async def sync_hierarchy(
+    session: SessionDep,
+    dry_run: bool = Query(default=False),
+) -> HierarchySyncResponse:
+    summary = await HierarchySyncService(session).sync(DEFAULT_HIERARCHY_DIR, dry_run=dry_run)
+    return HierarchySyncResponse(
+        dry_run=dry_run,
+        jurisdictions=HierarchySyncCountsResponse(
+            created=summary.jurisdictions.created,
+            updated=summary.jurisdictions.updated,
+            unchanged=summary.jurisdictions.unchanged,
+        ),
+        authorities=HierarchySyncCountsResponse(
+            created=summary.authorities.created,
+            updated=summary.authorities.updated,
+            unchanged=summary.authorities.unchanged,
+        ),
+        scrape_targets=HierarchySyncCountsResponse(
+            created=summary.scrape_targets.created,
+            updated=summary.scrape_targets.updated,
+            unchanged=summary.scrape_targets.unchanged,
+        ),
+    )

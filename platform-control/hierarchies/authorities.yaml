@@ -1,0 +1,17 @@
+version: 1
+items:
+  - authority_id: auth_fedlex
+    jurisdiction_path: ch/federal
+    path: ch/federal/fedlex
+    slug: fedlex
+    name: Fedlex
+  - authority_id: auth_bger
+    jurisdiction_path: ch/federal
+    path: ch/federal/bger
+    slug: bger
+    name: Swiss Federal Supreme Court
+  - authority_id: auth_ris
+    jurisdiction_path: at/federal
+    path: at/federal/ris
+    slug: ris
+    name: Rechtsinformationssystem des Bundes

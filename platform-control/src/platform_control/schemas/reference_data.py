@@ -66,3 +66,16 @@ class UpdateAuthorityRequest(BaseModel):
         if self.jurisdiction_id is None and self.name is None and self.slug is None:
             raise ValueError("At least one field must be provided.")
         return self
+
+
+class HierarchySyncCountsResponse(BaseModel):
+    created: int
+    updated: int
+    unchanged: int
+
+
+class HierarchySyncResponse(BaseModel):
+    dry_run: bool
+    jurisdictions: HierarchySyncCountsResponse
+    authorities: HierarchySyncCountsResponse
+    scrape_targets: HierarchySyncCountsResponse
