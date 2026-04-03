@@ -106,7 +106,9 @@ class GcsBundleLoaderTests(unittest.TestCase):
         selected_bundle = loader.load_bundle(manifest_ref)
         artifact_text = loader.read_artifact_text(selected_bundle.primary_artifact)
 
-        self.assertEqual(selected_bundle.primary_artifact.artifact_role, "primary_document")
+        self.assertEqual(
+            selected_bundle.primary_artifact.artifact_role, "primary_document"
+        )
         self.assertIn("GCS Doc", artifact_text)
 
 
@@ -119,9 +121,13 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             result = build_processing_result()
             sink = DeltaCanonicalSink(
                 DeltaSinkConfig(
-                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
+                    published_documents_uri=os.path.join(
+                        temp_dir, "published_documents"
+                    ),
                     published_sections_uri=os.path.join(temp_dir, "published_sections"),
-                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                    processing_manifests_uri=os.path.join(
+                        temp_dir, "processing_manifests"
+                    ),
                 )
             )
 
@@ -129,15 +135,21 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             sink.record_status_events(result.status_events)
             sink.record_document_processed_event(result.document_processed_event)
 
-            document_rows = deltalake.DeltaTable(
-                os.path.join(temp_dir, "published_documents")
-            ).to_pyarrow_table().to_pylist()
-            section_rows = deltalake.DeltaTable(
-                os.path.join(temp_dir, "published_sections")
-            ).to_pyarrow_table().to_pylist()
-            manifest_rows = deltalake.DeltaTable(
-                os.path.join(temp_dir, "processing_manifests")
-            ).to_pyarrow_table().to_pylist()
+            document_rows = (
+                deltalake.DeltaTable(os.path.join(temp_dir, "published_documents"))
+                .to_pyarrow_table()
+                .to_pylist()
+            )
+            section_rows = (
+                deltalake.DeltaTable(os.path.join(temp_dir, "published_sections"))
+                .to_pyarrow_table()
+                .to_pylist()
+            )
+            manifest_rows = (
+                deltalake.DeltaTable(os.path.join(temp_dir, "processing_manifests"))
+                .to_pyarrow_table()
+                .to_pylist()
+            )
 
             self.assertEqual(len(document_rows), 1)
             self.assertEqual(len(section_rows), len(result.sections))
@@ -152,15 +164,21 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             self.assertEqual(len(sink.status_events), 3)
             self.assertEqual(len(sink.document_processed_events), 1)
 
-    def test_replay_appends_new_manifest_rows_while_document_identity_stays_stable(self) -> None:
+    def test_replay_appends_new_manifest_rows_while_document_identity_stays_stable(
+        self,
+    ) -> None:
         import deltalake
 
         with tempfile.TemporaryDirectory() as temp_dir:
             sink = DeltaCanonicalSink(
                 DeltaSinkConfig(
-                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
+                    published_documents_uri=os.path.join(
+                        temp_dir, "published_documents"
+                    ),
                     published_sections_uri=os.path.join(temp_dir, "published_sections"),
-                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                    processing_manifests_uri=os.path.join(
+                        temp_dir, "processing_manifests"
+                    ),
                 )
             )
             first = build_processing_result()
@@ -169,12 +187,16 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             sink.persist(first.document, first.sections, first.manifest)
             sink.persist(second.document, second.sections, second.manifest)
 
-            document_rows = deltalake.DeltaTable(
-                os.path.join(temp_dir, "published_documents")
-            ).to_pyarrow_table().to_pylist()
-            manifest_rows = deltalake.DeltaTable(
-                os.path.join(temp_dir, "processing_manifests")
-            ).to_pyarrow_table().to_pylist()
+            document_rows = (
+                deltalake.DeltaTable(os.path.join(temp_dir, "published_documents"))
+                .to_pyarrow_table()
+                .to_pylist()
+            )
+            manifest_rows = (
+                deltalake.DeltaTable(os.path.join(temp_dir, "processing_manifests"))
+                .to_pyarrow_table()
+                .to_pylist()
+            )
 
             self.assertEqual(first.document.document_id, second.document.document_id)
             self.assertNotEqual(
@@ -191,7 +213,9 @@ def build_processing_result():
         html_handle.write(html)
         artifact_path = html_handle.name
 
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".json", delete=False
+    ) as manifest_handle:
         json.dump(
             build_manifest_payload(
                 artifact_path,
@@ -233,5 +257,7 @@ class FakeBlob:
 
     def download_as_bytes(self):
         return self._payload
+
+
 if __name__ == "__main__":
     unittest.main()

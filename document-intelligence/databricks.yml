@@ -32,5 +32,22 @@ targets:
   dev:
     default: true
     mode: development
+    variables:
+      workspace_host: https://dbc-0000000000000000.cloud.databricks.com
+      surfaces_root_uri: gs://evidara-document-intelligence-surfaces-dev/published
+    workspace:
+      host: ${var.workspace_host}
+  staging:
+    mode: production
+    variables:
+      workspace_host: https://dbc-0000000000000000.cloud.databricks.com
+      surfaces_root_uri: gs://evidara-document-intelligence-surfaces-staging/published
+    workspace:
+      host: ${var.workspace_host}
+  prod:
+    mode: production
+    variables:
+      workspace_host: https://dbc-0000000000000000.cloud.databricks.com
+      surfaces_root_uri: gs://evidara-document-intelligence-surfaces-prod/published
     workspace:
       host: ${var.workspace_host}

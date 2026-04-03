@@ -4,33 +4,59 @@ on:
   pull_request:
     paths:
       - "document-intelligence/**"
-      - "contracts/api/document-intelligence.openapi.yaml"
-      - "contracts/schemas/document.schema.json"
-      - "contracts/common/provenance.schema.json"
+      - "contracts/common/**"
+      - "contracts/events/**"
+      - "contracts/examples/**"
+      - "contracts/schemas/**"
+      - "contracts/vocabularies/document-type.json"
       - "scripts/check-document-intelligence.sh"
-      - ".github/workflows/document-intelligence.yml"
+      - "scripts/check-document-intelligence-runtime.sh"
+      - "infra/terraform/databricks/document_intelligence/**"
+      - "infra/terraform/databricks/document_intelligence_stack/**"
+      - "infra/env/*/document_intelligence.databricks.tfvars"
   push:
     branches: [main]
     paths:
       - "document-intelligence/**"
-      - "contracts/api/document-intelligence.openapi.yaml"
-      - "contracts/schemas/document.schema.json"
-      - "contracts/common/provenance.schema.json"
+      - "contracts/common/**"
+      - "contracts/events/**"
+      - "contracts/examples/**"
+      - "contracts/schemas/**"
+      - "contracts/vocabularies/document-type.json"
       - "scripts/check-document-intelligence.sh"
-      - ".github/workflows/document-intelligence.yml"
+      - "scripts/check-document-intelligence-runtime.sh"
+      - "infra/terraform/databricks/document_intelligence/**"
+      - "infra/terraform/databricks/document_intelligence_stack/**"
+      - "infra/env/*/document_intelligence.databricks.tfvars"
 
 jobs:
-  check:
+  document-intelligence-check:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Check (unittest + service extra)
+      - name: Install document-intelligence dependencies
+        run: python -m pip install -e "./document-intelligence[dev]"
+
+      - name: Check (ruff + unittest)
         run: bash scripts/check-document-intelligence.sh
+
+  document-intelligence-runtime-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Runtime / deployment checks
+        run: bash scripts/check-document-intelligence-runtime.sh

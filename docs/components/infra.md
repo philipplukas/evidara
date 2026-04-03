@@ -6,7 +6,7 @@ Provision and document runtime and deployment environments for all Evidara compo
 
 ## Current state
 
-Initial Terraform scaffolding now exists for the `document-intelligence` Databricks layer. The repo now has a reusable Unity Catalog module, a top-level Databricks stack, and per-environment tfvars for `dev`, `staging`, and `prod`. GCP, GitHub, remote state, CI/CD wiring, and most runtime resources are still not implemented.
+Initial Terraform scaffolding now exists for the `document-intelligence` Databricks layer. The repo now has a reusable Unity Catalog module, a top-level Databricks stack, per-environment tfvars for `dev`, `staging`, and `prod`, and CI validation for Terraform formatting/validation on the DI Databricks path. GCP, GitHub, remote state, deploy/promotion orchestration, and most runtime resources are still not implemented.
 
 ## Source of truth
 

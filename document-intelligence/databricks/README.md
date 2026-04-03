@@ -17,6 +17,7 @@ This directory documents the first Databricks-oriented runtime packaging for `do
   - `event_path`
   - `processing_version`
   - `surfaces_root_uri`
+- `event_path` can point to either a raw `artifact_bundle.available` JSON file or a Pub/Sub push envelope whose `message.data` contains the base64-encoded event.
 - The runtime writes Delta outputs under:
   - `${surfaces_root_uri}/published_documents`
   - `${surfaces_root_uri}/published_sections`
@@ -27,14 +28,33 @@ This directory documents the first Databricks-oriented runtime packaging for `do
 Typical commands from the `document-intelligence/` directory:
 
 ```bash
+cd ..
+bash scripts/check-document-intelligence-runtime.sh
+
+# then deploy from the component directory
+cd document-intelligence
 databricks bundle validate -t dev
+databricks bundle validate -t staging
+databricks bundle validate -t prod
 databricks bundle deploy -t dev
-databricks bundle run -t dev document_intelligence_process_bundle --params event_path=/Workspace/...,surfaces_root_uri=gs://...
+databricks bundle deploy -t staging
+databricks bundle deploy -t prod
+databricks bundle run -t dev document_intelligence_process_bundle --params event_path=/Workspace/...
 ```
+
+The checked-in targets mirror the tracked Terraform env files for:
+
+- `workspace_host`
+- `surfaces_root_uri`
+
+That keeps the bundle and Unity Catalog stack aligned for `dev`, `staging`, and `prod`.
 
 This slice does not yet include:
 
 - Spark-native processing or sink implementations
+- automated promotion/deploy orchestration from CI
+- an always-on Pub/Sub-triggered runtime
+- Docling or spaCy-backed NLP stages
 - XML parsing or citation extraction
 
 ## Ownership split

@@ -31,7 +31,9 @@ def verify_bearer(
     if not expected:
         return
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid Authorization header"
+        )
     token = authorization.removeprefix("Bearer ").strip()
     if token != expected:
         raise HTTPException(status_code=401, detail="Invalid bearer token")
@@ -39,7 +41,11 @@ def verify_bearer(
 
 def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     """Create app; uses ``DOCUMENT_SERVICE_CONTENT_DIR`` when ``store`` is omitted."""
-    effective: PublishedDocumentStore = store if store is not None else (store_from_env() or EmptyPublishedDocumentStore())
+    effective: PublishedDocumentStore = (
+        store
+        if store is not None
+        else (store_from_env() or EmptyPublishedDocumentStore())
+    )
 
     app = FastAPI(
         title="Document Intelligence — Document Service",
@@ -59,7 +65,9 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     ) -> dict[str, Any]:
         if not _DOC_ID_RE.fullmatch(document_id):
             raise _bad_id("Invalid document_id")
-        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
+        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(
+            processing_manifest_id
+        ):
             raise _bad_id("Invalid processing_manifest_id")
         body = st.get_full(document_id, processing_manifest_id)
         if body is None:
@@ -75,7 +83,9 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     ) -> dict[str, Any]:
         if not _DOC_ID_RE.fullmatch(document_id):
             raise _bad_id("Invalid document_id")
-        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
+        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(
+            processing_manifest_id
+        ):
             raise _bad_id("Invalid processing_manifest_id")
         body = st.get_full(document_id, processing_manifest_id)
         if body is None:
@@ -95,13 +105,17 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     ) -> PlainTextResponse:
         if not _DOC_ID_RE.fullmatch(document_id):
             raise _bad_id("Invalid document_id")
-        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
+        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(
+            processing_manifest_id
+        ):
             raise _bad_id("Invalid processing_manifest_id")
         body = st.get_full(document_id, processing_manifest_id)
         if body is None:
             raise HTTPException(status_code=404, detail="Document revision not found")
         text = to_plain_text(body)
-        return PlainTextResponse(content=text or "", media_type="text/plain; charset=utf-8")
+        return PlainTextResponse(
+            content=text or "", media_type="text/plain; charset=utf-8"
+        )
 
     @app.get("/health", include_in_schema=False)
     async def health() -> dict[str, str]:

@@ -64,10 +64,10 @@ Manifests should be stored as immutable JSON objects. Search and filtering over 
 Current repo scaffolding splits ownership this way:
 
 - Terraform under [`../../infra/terraform/databricks/document_intelligence_stack`](../../infra/terraform/databricks/document_intelligence_stack) wires the top-level Databricks workspace/environment layer and invokes the reusable module under [`../../infra/terraform/databricks/document_intelligence`](../../infra/terraform/databricks/document_intelligence)
-- Terraform under [`../../infra/terraform/gcp/runtime_stack`](../../infra/terraform/gcp/runtime_stack) provisions environment runtime primitives (GCS buckets plus Pub/Sub topics/subscriptions)
-- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for both runtime GCP and DI Databricks stacks
-- Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job
+- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for the DI Databricks stack
+- Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job and checked-in `dev` / `staging` / `prod` targets
 - SQL/bootstrap assets under [`../../document-intelligence/databricks/sql`](../../document-intelligence/databricks/sql) register the published Delta surfaces after the first successful write
+- GitHub Actions validates the DI Terraform path plus the Databricks bundle/runtime shape before merge
 
 ### Published Surfaces
 

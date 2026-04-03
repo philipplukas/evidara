@@ -13,7 +13,9 @@ def stable_prefixed_id(prefix: str, *parts: str) -> str:
 
 
 def random_prefixed_id(prefix: str) -> str:
-    return "{prefix}_{value}".format(prefix=prefix, value=_encode_128_bits(uuid4().bytes))
+    return "{prefix}_{value}".format(
+        prefix=prefix, value=_encode_128_bits(uuid4().bytes)
+    )
 
 
 def _join_parts(parts: tuple[str, ...]) -> str:

@@ -47,10 +47,14 @@ class FilePublishedDocumentStore:
             return None
         return json.loads(path.read_text(encoding="utf-8"))
 
-    def _resolve_path(self, document_id: str, processing_manifest_id: str | None) -> Path | None:
+    def _resolve_path(
+        self, document_id: str, processing_manifest_id: str | None
+    ) -> Path | None:
         if not _DOC_ID_RE.fullmatch(document_id):
             return None
-        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
+        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(
+            processing_manifest_id
+        ):
             return None
 
         if processing_manifest_id:
