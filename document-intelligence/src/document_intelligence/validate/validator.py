@@ -1,7 +1,8 @@
 """Lightweight contract validators aligned to the current repo schemas."""
 
 import re
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from document_intelligence.canonical.models import Document, ProcessingManifest, Section
 from document_intelligence.contracts.envelope import (
@@ -9,7 +10,6 @@ from document_intelligence.contracts.envelope import (
     Provenance,
     StorageObjectRef,
 )
-
 
 _PATTERNS = {
     "document_id": re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$"),
@@ -57,9 +57,7 @@ def validate_processing_manifest(manifest: ProcessingManifest) -> None:
         raise ValueError("processing manifest version must be 1")
     if manifest.document_revision < 1:
         raise ValueError("processing manifest document_revision must be >= 1")
-    _require_non_empty(
-        manifest.processing_version, "processing manifest processing_version"
-    )
+    _require_non_empty(manifest.processing_version, "processing manifest processing_version")
     _require_non_empty(manifest.status, "processing manifest status")
     validate_provenance(manifest.provenance)
     validate_manifest_ref(manifest.input_bundle_manifest_ref)
@@ -70,13 +68,11 @@ def validate_processing_manifest(manifest: ProcessingManifest) -> None:
     ]:
         _require_non_empty(
             manifest.selected_profiles.get(key),
-            "selected_profiles.{key}".format(key=key),
+            f"selected_profiles.{key}",
         )
     if manifest.status == "canonical_ready":
         if not manifest.published_document_ref or not manifest.published_sections_ref:
-            raise ValueError(
-                "canonical_ready processing manifest requires published refs"
-            )
+            raise ValueError("canonical_ready processing manifest requires published refs")
         _require_non_empty(manifest.canonical_ready_at, "canonical_ready_at")
         validate_dataset_ref(manifest.published_document_ref, expect_key=True)
         validate_dataset_ref(manifest.published_sections_ref, expect_key=False)
@@ -93,9 +89,7 @@ def validate_event(event: Mapping[str, Any]) -> None:
     ]
     for field_name in required_fields:
         if event.get(field_name) is None:
-            raise ValueError(
-                "event missing required field: {field}".format(field=field_name)
-            )
+            raise ValueError(f"event missing required field: {field_name}")
     _require_pattern("event_id", str(event["event_id"]))
     if not isinstance(event["payload"], Mapping):
         raise ValueError("event payload must be an object")
@@ -120,9 +114,7 @@ def validate_manifest_ref(manifest_ref: ManifestRef) -> None:
     if manifest_ref.storage_ref is not None:
         validate_storage_ref(manifest_ref.storage_ref)
     if manifest_ref.dataset_ref is not None:
-        validate_dataset_ref(
-            manifest_ref.dataset_ref, expect_key=True, allow_filter=True
-        )
+        validate_dataset_ref(manifest_ref.dataset_ref, expect_key=True, allow_filter=True)
 
 
 def validate_storage_ref(storage_ref: StorageObjectRef) -> None:
@@ -153,16 +145,12 @@ def validate_dataset_ref(
 
 def _require_non_empty(value: Any, name: str) -> None:
     if value is None:
-        raise ValueError("{name} must be populated".format(name=name))
+        raise ValueError(f"{name} must be populated")
     if isinstance(value, str) and not value.strip():
-        raise ValueError("{name} must be populated".format(name=name))
+        raise ValueError(f"{name} must be populated")
 
 
 def _require_pattern(pattern_key: str, value: str) -> None:
     pattern = _PATTERNS[pattern_key]
     if not pattern.match(value):
-        raise ValueError(
-            "{pattern_key} does not match expected pattern: {value}".format(
-                pattern_key=pattern_key, value=value
-            )
-        )
+        raise ValueError(f"{pattern_key} does not match expected pattern: {value}")

@@ -1,7 +1,7 @@
 """Outbound document publication event construction."""
 
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from document_intelligence.canonical.ids import random_prefixed_id
 from document_intelligence.canonical.models import Document, ProcessingManifest
@@ -11,9 +11,9 @@ def build_document_processed_event(
     *,
     document: Document,
     manifest: ProcessingManifest,
-    correlation_id: Optional[str],
-    causation_id: Optional[str],
-) -> Dict[str, Any]:
+    correlation_id: str | None,
+    causation_id: str | None,
+) -> dict[str, Any]:
     payload = {
         "document_id": document.document_id,
         "document_revision": document.document_revision,
@@ -30,16 +30,12 @@ def build_document_processed_event(
             "dataset_ref": {
                 "surface_name": "processing_manifests",
                 "surface_version": 1,
-                "record_key": {
-                    "processing_manifest_id": manifest.processing_manifest_id
-                },
+                "record_key": {"processing_manifest_id": manifest.processing_manifest_id},
             },
         },
     }
     if manifest.supersedes_processing_manifest_id is not None:
-        payload["supersedes_processing_manifest_id"] = (
-            manifest.supersedes_processing_manifest_id
-        )
+        payload["supersedes_processing_manifest_id"] = manifest.supersedes_processing_manifest_id
 
     return {
         "event_type": "document.processed",
@@ -54,4 +50,4 @@ def build_document_processed_event(
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")

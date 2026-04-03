@@ -9,11 +9,7 @@ from fastapi import FastAPI, Request
 
 
 def _correlation_id_from_request(request: Request) -> str:
-    return (
-        request.headers.get("x-correlation-id")
-        or request.headers.get("x-request-id")
-        or str(uuid4())
-    )
+    return request.headers.get("x-correlation-id") or request.headers.get("x-request-id") or str(uuid4())
 
 
 def install_http_observability(app: FastAPI, service_name: str) -> None:

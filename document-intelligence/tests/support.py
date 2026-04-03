@@ -3,8 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 EVENT_ID = "evt_01jq7bz6b7npge5hr2eb9n74ba"
 BUNDLE_MANIFEST_ID = "abm_01jq7ab8x4nm7m3qz3b8e9q2fk"
@@ -16,10 +15,10 @@ ARTIFACT_ID = "art_01jq7af3f8qqc46zc6xvkf9y4x"
 PUBSUB_MESSAGE_ID = "2070443601311540"
 
 
-def storage_ref_for_path(path: str, content_type: str) -> Dict[str, Any]:
+def storage_ref_for_path(path: str, content_type: str) -> dict[str, Any]:
     payload = Path(path).read_bytes()
     return {
-        "uri": "file://{path}".format(path=path),
+        "uri": f"file://{path}",
         "content_type": content_type,
         "byte_size": len(payload),
         "checksum": hashlib.sha256(payload).hexdigest(),
@@ -28,7 +27,7 @@ def storage_ref_for_path(path: str, content_type: str) -> Dict[str, Any]:
     }
 
 
-def build_bundle_event(manifest_path: str) -> Dict[str, Any]:
+def build_bundle_event(manifest_path: str) -> dict[str, Any]:
     return {
         "event_type": "artifact_bundle.available",
         "event_version": 1,
@@ -61,10 +60,8 @@ def build_bundle_event(manifest_path: str) -> Dict[str, Any]:
     }
 
 
-def build_pubsub_push_envelope(event_payload: Dict[str, Any]) -> Dict[str, Any]:
-    encoded_payload = base64.b64encode(
-        json.dumps(event_payload, sort_keys=True).encode("utf-8")
-    ).decode("ascii")
+def build_pubsub_push_envelope(event_payload: dict[str, Any]) -> dict[str, Any]:
+    encoded_payload = base64.b64encode(json.dumps(event_payload, sort_keys=True).encode("utf-8")).decode("ascii")
     return {
         "message": {
             "data": encoded_payload,
@@ -83,8 +80,8 @@ def build_manifest_payload(
     *,
     artifact_role: str,
     content_type: str = "text/html",
-    parser_hints: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    parser_hints: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         "bundle_manifest_id": BUNDLE_MANIFEST_ID,
         "manifest_version": 1,
@@ -133,17 +130,14 @@ def build_manifest_payload(
     }
 
 
-def load_json(path: str) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as handle:
+def load_json(path: str) -> dict[str, Any]:
+    with open(path, encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def replace_placeholders(value: Any, replacements: Dict[str, str]) -> Any:
+def replace_placeholders(value: Any, replacements: dict[str, str]) -> Any:
     if isinstance(value, dict):
-        return {
-            key: replace_placeholders(inner_value, replacements)
-            for key, inner_value in value.items()
-        }
+        return {key: replace_placeholders(inner_value, replacements) for key, inner_value in value.items()}
     if isinstance(value, list):
         return [replace_placeholders(item, replacements) for item in value]
     if isinstance(value, str):

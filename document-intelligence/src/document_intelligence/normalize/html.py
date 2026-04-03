@@ -1,7 +1,7 @@
 """HTML normalization into the shared intermediate representation."""
 
 from html.parser import HTMLParser
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
 
@@ -14,20 +14,20 @@ class _SimpleHtmlParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self._artifact_id = artifact_id
         self._skip_depth = 0
-        self._current_target: Optional[str] = None
-        self._buffer: List[str] = []
-        self._blocks: List[Block] = []
-        self._title_buffer: List[str] = []
+        self._current_target: str | None = None
+        self._buffer: list[str] = []
+        self._blocks: list[Block] = []
+        self._title_buffer: list[str] = []
         self._in_title = False
         self._block_order = 0
 
     @property
-    def title(self) -> Optional[str]:
+    def title(self) -> str | None:
         title = _normalize_whitespace("".join(self._title_buffer))
         return title or None
 
     @property
-    def blocks(self) -> List[Block]:
+    def blocks(self) -> list[Block]:
         return list(self._blocks)
 
     def handle_starttag(self, tag: str, attrs) -> None:  # type: ignore[override]
@@ -76,7 +76,7 @@ class _SimpleHtmlParser(HTMLParser):
         if tag in self._HEADING_TAGS:
             block_type = "heading"
             level = self._HEADING_TAGS[tag]
-            attrs: Dict[str, Any] = {"tag": tag}
+            attrs: dict[str, Any] = {"tag": tag}
         elif tag == "li":
             block_type = "list_item"
             level = None
@@ -86,7 +86,7 @@ class _SimpleHtmlParser(HTMLParser):
             level = None
             attrs = {"tag": tag}
         return Block(
-            id="blk_{order:04d}".format(order=self._block_order),
+            id=f"blk_{self._block_order:04d}",
             type=block_type,
             text=text,
             level=level,
@@ -142,9 +142,7 @@ def normalize_plain_text_document(text: str, artifact_id: str) -> NormalizedDocu
                 attrs={"normalizer": "plain_text_v1"},
             )
         )
-    return NormalizedDocumentIR(
-        blocks=blocks, metadata={"title": None, "normalizer": "plain_text_v1"}
-    )
+    return NormalizedDocumentIR(blocks=blocks, metadata={"title": None, "normalizer": "plain_text_v1"})
 
 
 def _normalize_whitespace(value: str) -> str:

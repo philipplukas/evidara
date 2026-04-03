@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import PlainTextResponse
@@ -26,15 +26,13 @@ def _bad_id(message: str) -> HTTPException:
 
 
 def verify_bearer(
-    authorization: Annotated[Optional[str], Header()] = None,
+    authorization: Annotated[str | None, Header()] = None,
 ) -> None:
     expected = os.environ.get("DOCUMENT_SERVICE_BEARER_TOKEN", "").strip()
     if not expected:
         return
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid Authorization header"
-        )
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     token = authorization.removeprefix("Bearer ").strip()
     if token != expected:
         raise HTTPException(status_code=401, detail="Invalid bearer token")
@@ -43,9 +41,7 @@ def verify_bearer(
 def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     """Create app; uses ``DOCUMENT_SERVICE_CONTENT_DIR`` when ``store`` is omitted."""
     effective: PublishedDocumentStore = (
-        store
-        if store is not None
-        else (store_from_env() or EmptyPublishedDocumentStore())
+        store if store is not None else (store_from_env() or EmptyPublishedDocumentStore())
     )
 
     app = FastAPI(
@@ -61,15 +57,13 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     @app.get("/v1/documents/{document_id}", tags=["documents"])
     async def get_document_docling_full(
         document_id: str,
-        processing_manifest_id: Annotated[Optional[str], Query()] = None,
+        processing_manifest_id: Annotated[str | None, Query()] = None,
         _auth: None = Depends(verify_bearer),
         st: PublishedDocumentStore = Depends(get_store),
     ) -> dict[str, Any]:
         if not _DOC_ID_RE.fullmatch(document_id):
             raise _bad_id("Invalid document_id")
-        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(
-            processing_manifest_id
-        ):
+        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
             raise _bad_id("Invalid processing_manifest_id")
         body = st.get_full(document_id, processing_manifest_id)
         if body is None:
@@ -79,15 +73,13 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     @app.get("/v1/documents/{document_id}/lean", tags=["documents"])
     async def get_document_docling_lean(
         document_id: str,
-        processing_manifest_id: Annotated[Optional[str], Query()] = None,
+        processing_manifest_id: Annotated[str | None, Query()] = None,
         _auth: None = Depends(verify_bearer),
         st: PublishedDocumentStore = Depends(get_store),
     ) -> dict[str, Any]:
         if not _DOC_ID_RE.fullmatch(document_id):
             raise _bad_id("Invalid document_id")
-        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(
-            processing_manifest_id
-        ):
+        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
             raise _bad_id("Invalid processing_manifest_id")
         body = st.get_full(document_id, processing_manifest_id)
         if body is None:
@@ -101,23 +93,19 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     )
     async def get_document_plain_text(
         document_id: str,
-        processing_manifest_id: Annotated[Optional[str], Query()] = None,
+        processing_manifest_id: Annotated[str | None, Query()] = None,
         _auth: None = Depends(verify_bearer),
         st: PublishedDocumentStore = Depends(get_store),
     ) -> PlainTextResponse:
         if not _DOC_ID_RE.fullmatch(document_id):
             raise _bad_id("Invalid document_id")
-        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(
-            processing_manifest_id
-        ):
+        if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
             raise _bad_id("Invalid processing_manifest_id")
         body = st.get_full(document_id, processing_manifest_id)
         if body is None:
             raise HTTPException(status_code=404, detail="Document revision not found")
         text = to_plain_text(body)
-        return PlainTextResponse(
-            content=text or "", media_type="text/plain; charset=utf-8"
-        )
+        return PlainTextResponse(content=text or "", media_type="text/plain; charset=utf-8")
 
     @app.get("/health", include_in_schema=False)
     async def health() -> dict[str, str]:

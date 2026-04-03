@@ -18,15 +18,11 @@ from support import (
     build_pubsub_push_envelope,
 )
 
-
 DELTA_AVAILABLE = importlib.util.find_spec("deltalake") is not None
 
 
 def _write_local_bundle_event_fixture(temp_dir: str) -> dict[str, object]:
-    html = (
-        "<html><head><title>Bundle Job Doc</title></head><body><h1>Scope</h1>"
-        "<p>Body</p></body></html>"
-    )
+    html = "<html><head><title>Bundle Job Doc</title></head><body><h1>Scope</h1><p>Body</p></body></html>"
     artifact_path = os.path.join(temp_dir, "document.html")
     manifest_path = os.path.join(temp_dir, "bundle-manifest.json")
 
@@ -46,9 +42,7 @@ def _write_local_bundle_event_fixture(temp_dir: str) -> dict[str, object]:
 
 class DatabricksBundleConfigTests(unittest.TestCase):
     def test_bundle_and_job_files_have_expected_runtime_shape(self) -> None:
-        bundle_path = os.path.join(
-            os.path.dirname(__file__), "..", "databricks.yml"
-        )
+        bundle_path = os.path.join(os.path.dirname(__file__), "..", "databricks.yml")
         process_resource_path = os.path.join(
             os.path.dirname(__file__), "..", "resources", "document_intelligence_job.yml"
         )
@@ -71,21 +65,19 @@ class DatabricksBundleConfigTests(unittest.TestCase):
             "document_intelligence_smoke_job.yml",
         )
 
-        with open(bundle_path, "r", encoding="utf-8") as bundle_file:
+        with open(bundle_path, encoding="utf-8") as bundle_file:
             bundle_config = yaml.safe_load(bundle_file)
-        with open(process_resource_path, "r", encoding="utf-8") as resource_file:
+        with open(process_resource_path, encoding="utf-8") as resource_file:
             process_resource_config = yaml.safe_load(resource_file)
-        with open(autoloader_resource_path, "r", encoding="utf-8") as resource_file:
+        with open(autoloader_resource_path, encoding="utf-8") as resource_file:
             autoloader_resource_config = yaml.safe_load(resource_file)
-        with open(dbt_resource_path, "r", encoding="utf-8") as resource_file:
+        with open(dbt_resource_path, encoding="utf-8") as resource_file:
             dbt_resource_config = yaml.safe_load(resource_file)
-        with open(smoke_resource_path, "r", encoding="utf-8") as resource_file:
+        with open(smoke_resource_path, encoding="utf-8") as resource_file:
             smoke_resource_config = yaml.safe_load(resource_file)
 
         self.assertEqual(bundle_config["bundle"]["name"], "document-intelligence")
-        self.assertEqual(
-            bundle_config["artifacts"]["document_intelligence_wheel"]["type"], "whl"
-        )
+        self.assertEqual(bundle_config["artifacts"]["document_intelligence_wheel"]["type"], "whl")
         self.assertIn("dev", bundle_config["targets"])
         self.assertIn("staging", bundle_config["targets"])
         self.assertIn("prod", bundle_config["targets"])
@@ -94,12 +86,8 @@ class DatabricksBundleConfigTests(unittest.TestCase):
 
         job = process_resource_config["resources"]["jobs"]["document_intelligence_process_bundle"]
         task = job["tasks"][0]
-        self.assertEqual(
-            task["python_wheel_task"]["entry_point"], "databricks_process_event"
-        )
-        self.assertEqual(
-            task["python_wheel_task"]["package_name"], "document-intelligence"
-        )
+        self.assertEqual(task["python_wheel_task"]["entry_point"], "databricks_process_event")
+        self.assertEqual(task["python_wheel_task"]["package_name"], "document-intelligence")
         self.assertIn("parser_backend", bundle_config["variables"])
         self.assertIn("enable_spacy", bundle_config["variables"])
         self.assertIn("spacy_model_name", bundle_config["variables"])
@@ -123,15 +111,13 @@ class DatabricksBundleConfigTests(unittest.TestCase):
         bundle_path = os.path.join(os.path.dirname(__file__), "..", "databricks.yml")
         env_root = os.path.join(os.path.dirname(__file__), "..", "..", "infra", "env")
 
-        with open(bundle_path, "r", encoding="utf-8") as bundle_file:
+        with open(bundle_path, encoding="utf-8") as bundle_file:
             bundle_config = yaml.safe_load(bundle_file)
 
         for environment in ("dev", "staging", "prod"):
             with self.subTest(environment=environment):
-                tfvars_path = os.path.join(
-                    env_root, environment, "document_intelligence.databricks.tfvars"
-                )
-                with open(tfvars_path, "r", encoding="utf-8") as tfvars_file:
+                tfvars_path = os.path.join(env_root, environment, "document_intelligence.databricks.tfvars")
+                with open(tfvars_path, encoding="utf-8") as tfvars_file:
                     tfvars_body = tfvars_file.read()
 
                 target = bundle_config["targets"][environment]
@@ -148,7 +134,7 @@ class DatabricksBundleConfigTests(unittest.TestCase):
 
 def _read_tfvars_string(tfvars_body: str, field_name: str) -> str:
     match = re.search(
-        r'^\s*{field}\s*=\s*"([^"]+)"\s*$'.format(field=re.escape(field_name)),
+        rf'^\s*{re.escape(field_name)}\s*=\s*"([^"]+)"\s*$',
         tfvars_body,
         re.MULTILINE,
     )
@@ -176,14 +162,10 @@ class DatabricksRuntimeIntegrationTests(unittest.TestCase):
             )
 
             self.assertEqual(output["sections"], 1)
-            self.assertTrue(
-                output["published_documents_uri"].endswith("published_documents")
-            )
+            self.assertTrue(output["published_documents_uri"].endswith("published_documents"))
 
             document_rows = (
-                deltalake.DeltaTable(
-                    os.path.join(surfaces_root_uri, "published_documents")
-                )
+                deltalake.DeltaTable(os.path.join(surfaces_root_uri, "published_documents"))
                 .to_pyarrow_table()
                 .to_pylist()
             )
@@ -199,9 +181,7 @@ class DatabricksRuntimeIntegrationTests(unittest.TestCase):
 
             with open(event_path, "w", encoding="utf-8") as event_file:
                 json.dump(
-                    build_pubsub_push_envelope(
-                        _write_local_bundle_event_fixture(temp_dir)
-                    ),
+                    build_pubsub_push_envelope(_write_local_bundle_event_fixture(temp_dir)),
                     event_file,
                 )
 
@@ -214,9 +194,7 @@ class DatabricksRuntimeIntegrationTests(unittest.TestCase):
             self.assertEqual(output["sections"], 1)
 
             document_rows = (
-                deltalake.DeltaTable(
-                    os.path.join(surfaces_root_uri, "published_documents")
-                )
+                deltalake.DeltaTable(os.path.join(surfaces_root_uri, "published_documents"))
                 .to_pyarrow_table()
                 .to_pylist()
             )

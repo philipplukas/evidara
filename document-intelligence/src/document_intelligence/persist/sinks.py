@@ -2,8 +2,8 @@
 
 import importlib
 import os
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Sequence
 
 import pyarrow as pa
 
@@ -17,17 +17,15 @@ class CanonicalSink:
     def persist(
         self,
         document: Document,
-        sections: List[Section],
+        sections: list[Section],
         manifest: ProcessingManifest,
     ) -> None:
         raise NotImplementedError
 
-    def record_status_events(self, status_events: List[Dict[str, object]]) -> None:
+    def record_status_events(self, status_events: list[dict[str, object]]) -> None:
         raise NotImplementedError
 
-    def record_document_processed_event(
-        self, document_processed_event: Dict[str, object]
-    ) -> None:
+    def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
         raise NotImplementedError
 
 
@@ -40,28 +38,26 @@ class DeltaSinkConfig:
 
 @dataclass
 class InMemoryCanonicalSink(CanonicalSink):
-    published_documents: List[Document] = field(default_factory=list)
-    published_sections: List[Section] = field(default_factory=list)
-    processing_manifests: List[ProcessingManifest] = field(default_factory=list)
-    status_events: List[Dict[str, object]] = field(default_factory=list)
-    document_processed_events: List[Dict[str, object]] = field(default_factory=list)
+    published_documents: list[Document] = field(default_factory=list)
+    published_sections: list[Section] = field(default_factory=list)
+    processing_manifests: list[ProcessingManifest] = field(default_factory=list)
+    status_events: list[dict[str, object]] = field(default_factory=list)
+    document_processed_events: list[dict[str, object]] = field(default_factory=list)
 
     def persist(
         self,
         document: Document,
-        sections: List[Section],
+        sections: list[Section],
         manifest: ProcessingManifest,
     ) -> None:
         self.published_documents.append(document)
         self.published_sections.extend(sections)
         self.processing_manifests.append(manifest)
 
-    def record_status_events(self, status_events: List[Dict[str, object]]) -> None:
+    def record_status_events(self, status_events: list[dict[str, object]]) -> None:
         self.status_events.extend(status_events)
 
-    def record_document_processed_event(
-        self, document_processed_event: Dict[str, object]
-    ) -> None:
+    def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
         self.document_processed_events.append(document_processed_event)
 
 
@@ -72,17 +68,17 @@ class DeltaCanonicalSink(CanonicalSink):
         self,
         config: DeltaSinkConfig,
         *,
-        writer: Optional[Callable[..., object]] = None,
+        writer: Callable[..., object] | None = None,
     ) -> None:
         self._config = config
         self._writer = writer or _default_delta_writer()
-        self.status_events: List[Dict[str, object]] = []
-        self.document_processed_events: List[Dict[str, object]] = []
+        self.status_events: list[dict[str, object]] = []
+        self.document_processed_events: list[dict[str, object]] = []
 
     def persist(
         self,
         document: Document,
-        sections: List[Section],
+        sections: list[Section],
         manifest: ProcessingManifest,
     ) -> None:
         self._write_rows(self._config.published_documents_uri, [document.to_dict()])
@@ -95,15 +91,13 @@ class DeltaCanonicalSink(CanonicalSink):
             [manifest.to_dict()],
         )
 
-    def record_status_events(self, status_events: List[Dict[str, object]]) -> None:
+    def record_status_events(self, status_events: list[dict[str, object]]) -> None:
         self.status_events.extend(status_events)
 
-    def record_document_processed_event(
-        self, document_processed_event: Dict[str, object]
-    ) -> None:
+    def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
         self.document_processed_events.append(document_processed_event)
 
-    def _write_rows(self, uri: str, rows: Sequence[Dict[str, object]]) -> None:
+    def _write_rows(self, uri: str, rows: Sequence[dict[str, object]]) -> None:
         if not rows:
             return
         try:
@@ -112,7 +106,7 @@ class DeltaCanonicalSink(CanonicalSink):
         except Exception as error:  # pragma: no cover - library-specific
             raise ProcessingError(
                 "delta_write_failed",
-                "failed to write canonical rows to Delta surface {uri}".format(uri=uri),
+                f"failed to write canonical rows to Delta surface {uri}",
             ) from error
 
 
@@ -135,20 +129,12 @@ def _delta_write_mode(uri: str) -> str:
     return "append" if os.path.exists(delta_log_path) else "overwrite"
 
 
-def _delta_ready_rows(rows: Sequence[Dict[str, object]]) -> List[Dict[str, object]]:
-    normalized_rows = [
-        {key: _normalize_delta_value(value) for key, value in row.items()}
-        for row in rows
-    ]
+def _delta_ready_rows(rows: Sequence[dict[str, object]]) -> list[dict[str, object]]:
+    normalized_rows = [{key: _normalize_delta_value(value) for key, value in row.items()} for row in rows]
     retained_keys = {
-        key
-        for key in normalized_rows[0].keys()
-        if any(row.get(key) is not None for row in normalized_rows)
+        key for key in normalized_rows[0].keys() if any(row.get(key) is not None for row in normalized_rows)
     }
-    return [
-        {key: value for key, value in row.items() if key in retained_keys}
-        for row in normalized_rows
-    ]
+    return [{key: value for key, value in row.items() if key in retained_keys} for row in normalized_rows]
 
 
 def _normalize_delta_value(value):

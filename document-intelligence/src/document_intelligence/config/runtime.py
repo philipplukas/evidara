@@ -1,8 +1,9 @@
 """Runtime configuration helpers for local and Databricks execution."""
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from document_intelligence.persist.sinks import DeltaSinkConfig
 from document_intelligence.persist.surfaces import (
@@ -29,22 +30,16 @@ class SurfaceUris:
     def from_root_uri(cls, root_uri: str) -> "SurfaceUris":
         normalized_root = root_uri.rstrip("/")
         return cls(
-            published_documents_uri=_join_uri(
-                normalized_root, PUBLISHED_DOCUMENTS.surface_name
-            ),
-            published_sections_uri=_join_uri(
-                normalized_root, PUBLISHED_SECTIONS.surface_name
-            ),
-            processing_manifests_uri=_join_uri(
-                normalized_root, PROCESSING_MANIFESTS.surface_name
-            ),
+            published_documents_uri=_join_uri(normalized_root, PUBLISHED_DOCUMENTS.surface_name),
+            published_sections_uri=_join_uri(normalized_root, PUBLISHED_SECTIONS.surface_name),
+            processing_manifests_uri=_join_uri(normalized_root, PROCESSING_MANIFESTS.surface_name),
         )
 
 
 @dataclass(frozen=True)
 class RuntimeSettings:
     processing_version: str
-    surface_uris: Optional[SurfaceUris] = None
+    surface_uris: SurfaceUris | None = None
     parser_backend: str = "legacy"
     enable_spacy: bool = False
     spacy_model_name: str = "xx_sent_ud_sm"
@@ -56,23 +51,19 @@ class RuntimeSettings:
         cls,
         mapping: Mapping[str, str],
         *,
-        processing_version: Optional[str] = None,
-        surfaces_root_uri: Optional[str] = None,
-        published_documents_uri: Optional[str] = None,
-        published_sections_uri: Optional[str] = None,
-        processing_manifests_uri: Optional[str] = None,
-        parser_backend: Optional[str] = None,
-        enable_spacy: Optional[Any] = None,
-        spacy_model_name: Optional[str] = None,
-        spacy_max_chars_per_section: Optional[Any] = None,
-        spacy_batch_size: Optional[Any] = None,
+        processing_version: str | None = None,
+        surfaces_root_uri: str | None = None,
+        published_documents_uri: str | None = None,
+        published_sections_uri: str | None = None,
+        processing_manifests_uri: str | None = None,
+        parser_backend: str | None = None,
+        enable_spacy: Any | None = None,
+        spacy_model_name: str | None = None,
+        spacy_max_chars_per_section: Any | None = None,
+        spacy_batch_size: Any | None = None,
     ) -> "RuntimeSettings":
-        effective_processing_version = (
-            processing_version or mapping.get("DI_PROCESSING_VERSION") or "0.1.0-dev"
-        )
-        effective_parser_backend = (
-            parser_backend or mapping.get("DI_PARSER_BACKEND") or "legacy"
-        ).strip()
+        effective_processing_version = processing_version or mapping.get("DI_PROCESSING_VERSION") or "0.1.0-dev"
+        effective_parser_backend = (parser_backend or mapping.get("DI_PARSER_BACKEND") or "legacy").strip()
         if effective_parser_backend not in {"legacy", "docling"}:
             raise ValueError("DI_PARSER_BACKEND must be one of: legacy, docling")
         effective_enable_spacy = (
@@ -80,9 +71,7 @@ class RuntimeSettings:
             if enable_spacy is not None
             else _parse_bool(mapping.get("DI_ENABLE_SPACY", "false"))
         )
-        effective_spacy_model_name = (
-            (spacy_model_name or mapping.get("DI_SPACY_MODEL_NAME") or "xx_sent_ud_sm").strip()
-        )
+        effective_spacy_model_name = (spacy_model_name or mapping.get("DI_SPACY_MODEL_NAME") or "xx_sent_ud_sm").strip()
         effective_spacy_max_chars_per_section = _coerce_int(
             spacy_max_chars_per_section
             if spacy_max_chars_per_section is not None
@@ -91,28 +80,18 @@ class RuntimeSettings:
             minimum=1,
         )
         effective_spacy_batch_size = _coerce_int(
-            spacy_batch_size
-            if spacy_batch_size is not None
-            else mapping.get("DI_SPACY_BATCH_SIZE", "32"),
+            spacy_batch_size if spacy_batch_size is not None else mapping.get("DI_SPACY_BATCH_SIZE", "32"),
             name="DI_SPACY_BATCH_SIZE",
             minimum=1,
         )
 
-        direct_documents_uri = published_documents_uri or mapping.get(
-            "DI_PUBLISHED_DOCUMENTS_URI"
-        )
-        direct_sections_uri = published_sections_uri or mapping.get(
-            "DI_PUBLISHED_SECTIONS_URI"
-        )
-        direct_manifests_uri = processing_manifests_uri or mapping.get(
-            "DI_PROCESSING_MANIFESTS_URI"
-        )
+        direct_documents_uri = published_documents_uri or mapping.get("DI_PUBLISHED_DOCUMENTS_URI")
+        direct_sections_uri = published_sections_uri or mapping.get("DI_PUBLISHED_SECTIONS_URI")
+        direct_manifests_uri = processing_manifests_uri or mapping.get("DI_PROCESSING_MANIFESTS_URI")
         root_uri = surfaces_root_uri or mapping.get("DI_SURFACES_ROOT_URI")
 
         if any([direct_documents_uri, direct_sections_uri, direct_manifests_uri]):
-            if not all(
-                [direct_documents_uri, direct_sections_uri, direct_manifests_uri]
-            ):
+            if not all([direct_documents_uri, direct_sections_uri, direct_manifests_uri]):
                 raise ValueError("published surface URIs must be provided together")
             surface_uris = SurfaceUris(
                 published_documents_uri=direct_documents_uri or "",
@@ -135,7 +114,7 @@ class RuntimeSettings:
         )
 
     @classmethod
-    def from_environment(cls, environment: Optional[Mapping[str, str]] = None):
+    def from_environment(cls, environment: Mapping[str, str] | None = None):
         return cls.from_mapping(environment or os.environ)
 
 
@@ -163,8 +142,7 @@ def _coerce_int(value: Any, *, name: str, minimum: int) -> int:
     try:
         parsed = int(value)
     except (TypeError, ValueError) as error:
-        raise ValueError("{name} must be an integer".format(name=name)) from error
+        raise ValueError(f"{name} must be an integer") from error
     if parsed < minimum:
-        raise ValueError("{name} must be >= {minimum}".format(name=name, minimum=minimum))
+        raise ValueError(f"{name} must be >= {minimum}")
     return parsed
-

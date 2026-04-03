@@ -1,5 +1,5 @@
-import importlib.util
 import hashlib
+import importlib.util
 import json
 import os
 import sys
@@ -15,14 +15,13 @@ from document_intelligence.persist.sinks import DeltaCanonicalSink, DeltaSinkCon
 from document_intelligence.pipeline import ProcessingPipeline
 from support import (
     BUNDLE_MANIFEST_ID,
+    RUN_ID,
     SOURCE_ID,
     SOURCE_SNAPSHOT_ID,
     SOURCE_VERSION_ID,
-    RUN_ID,
     build_bundle_event,
     build_manifest_payload,
 )
-
 
 DELTA_AVAILABLE = importlib.util.find_spec("deltalake") is not None
 
@@ -106,9 +105,7 @@ class GcsBundleLoaderTests(unittest.TestCase):
         selected_bundle = loader.load_bundle(manifest_ref)
         artifact_text = loader.read_artifact_text(selected_bundle.primary_artifact)
 
-        self.assertEqual(
-            selected_bundle.primary_artifact.artifact_role, "primary_document"
-        )
+        self.assertEqual(selected_bundle.primary_artifact.artifact_role, "primary_document")
         self.assertIn("GCS Doc", artifact_text)
 
 
@@ -121,13 +118,9 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             result = build_processing_result()
             sink = DeltaCanonicalSink(
                 DeltaSinkConfig(
-                    published_documents_uri=os.path.join(
-                        temp_dir, "published_documents"
-                    ),
+                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
                     published_sections_uri=os.path.join(temp_dir, "published_sections"),
-                    processing_manifests_uri=os.path.join(
-                        temp_dir, "processing_manifests"
-                    ),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
                 )
             )
 
@@ -136,27 +129,19 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             sink.record_document_processed_event(result.document_processed_event)
 
             document_rows = (
-                deltalake.DeltaTable(os.path.join(temp_dir, "published_documents"))
-                .to_pyarrow_table()
-                .to_pylist()
+                deltalake.DeltaTable(os.path.join(temp_dir, "published_documents")).to_pyarrow_table().to_pylist()
             )
             section_rows = (
-                deltalake.DeltaTable(os.path.join(temp_dir, "published_sections"))
-                .to_pyarrow_table()
-                .to_pylist()
+                deltalake.DeltaTable(os.path.join(temp_dir, "published_sections")).to_pyarrow_table().to_pylist()
             )
             manifest_rows = (
-                deltalake.DeltaTable(os.path.join(temp_dir, "processing_manifests"))
-                .to_pyarrow_table()
-                .to_pylist()
+                deltalake.DeltaTable(os.path.join(temp_dir, "processing_manifests")).to_pyarrow_table().to_pylist()
             )
 
             self.assertEqual(len(document_rows), 1)
             self.assertEqual(len(section_rows), len(result.sections))
             self.assertEqual(len(manifest_rows), 1)
-            self.assertEqual(
-                document_rows[0]["document_id"], result.document.document_id
-            )
+            self.assertEqual(document_rows[0]["document_id"], result.document.document_id)
             self.assertEqual(
                 manifest_rows[0]["published_document_ref"]["surface_name"],
                 "published_documents",
@@ -172,13 +157,9 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             sink = DeltaCanonicalSink(
                 DeltaSinkConfig(
-                    published_documents_uri=os.path.join(
-                        temp_dir, "published_documents"
-                    ),
+                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
                     published_sections_uri=os.path.join(temp_dir, "published_sections"),
-                    processing_manifests_uri=os.path.join(
-                        temp_dir, "processing_manifests"
-                    ),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
                 )
             )
             first = build_processing_result()
@@ -188,14 +169,10 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             sink.persist(second.document, second.sections, second.manifest)
 
             document_rows = (
-                deltalake.DeltaTable(os.path.join(temp_dir, "published_documents"))
-                .to_pyarrow_table()
-                .to_pylist()
+                deltalake.DeltaTable(os.path.join(temp_dir, "published_documents")).to_pyarrow_table().to_pylist()
             )
             manifest_rows = (
-                deltalake.DeltaTable(os.path.join(temp_dir, "processing_manifests"))
-                .to_pyarrow_table()
-                .to_pylist()
+                deltalake.DeltaTable(os.path.join(temp_dir, "processing_manifests")).to_pyarrow_table().to_pylist()
             )
 
             self.assertEqual(first.document.document_id, second.document.document_id)
@@ -213,9 +190,7 @@ def build_processing_result():
         html_handle.write(html)
         artifact_path = html_handle.name
 
-    with tempfile.NamedTemporaryFile(
-        "w", suffix=".json", delete=False
-    ) as manifest_handle:
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
         json.dump(
             build_manifest_payload(
                 artifact_path,
@@ -226,9 +201,7 @@ def build_processing_result():
         manifest_path = manifest_handle.name
 
     try:
-        return ProcessingPipeline(processing_version="di_2026_03_29").process_event(
-            build_bundle_event(manifest_path)
-        )
+        return ProcessingPipeline(processing_version="di_2026_03_29").process_event(build_bundle_event(manifest_path))
     finally:
         os.unlink(artifact_path)
         os.unlink(manifest_path)

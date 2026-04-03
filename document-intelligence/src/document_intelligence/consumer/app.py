@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 
@@ -14,7 +14,7 @@ from document_intelligence.processing_runtime import process_artifact_bundle_eve
 
 
 def verify_ingest_bearer(
-    authorization: Optional[str] = Header(default=None),
+    authorization: str | None = Header(default=None),
 ) -> None:
     expected = os.environ.get("DOCUMENT_INTELLIGENCE_INGEST_BEARER_TOKEN", "").strip()
     if not expected:
@@ -22,9 +22,7 @@ def verify_ingest_bearer(
     if not expected:
         return
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid Authorization header"
-        )
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     token = authorization.removeprefix("Bearer ").strip()
     if token != expected:
         raise HTTPException(status_code=401, detail="Invalid bearer token")

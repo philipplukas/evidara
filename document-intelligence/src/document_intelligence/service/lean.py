@@ -29,11 +29,7 @@ _LAYOUT_KEYS = frozenset(
 def strip_layout_fields(obj: Any) -> Any:
     """Recursively remove layout-oriented keys from dict/list structures."""
     if isinstance(obj, dict):
-        return {
-            k: strip_layout_fields(v)
-            for k, v in obj.items()
-            if k not in _LAYOUT_KEYS and not k.endswith("_bbox")
-        }
+        return {k: strip_layout_fields(v) for k, v in obj.items() if k not in _LAYOUT_KEYS and not k.endswith("_bbox")}
     if isinstance(obj, list):
         return [strip_layout_fields(x) for x in obj]
     return obj

@@ -1,7 +1,7 @@
 """HTML-first bundle-based processing pipeline."""
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from document_intelligence.canonical.ids import random_prefixed_id, stable_prefixed_id
 from document_intelligence.canonical.models import (
@@ -71,8 +71,8 @@ class ProcessingPipeline:
 
     def __init__(
         self,
-        bundle_loader: Optional[BundleLoader] = None,
-        sink: Optional[CanonicalSink] = None,
+        bundle_loader: BundleLoader | None = None,
+        sink: CanonicalSink | None = None,
         processing_version: str = "0.1.0-dev",
         parser_backend: str = "legacy",
         enable_spacy: bool = False,
@@ -91,11 +91,9 @@ class ProcessingPipeline:
         self._spacy_max_chars_per_section = spacy_max_chars_per_section
         self._spacy_batch_size = spacy_batch_size
 
-    def process_event(self, event_data: Dict[str, Any]) -> ProcessingResult:
+    def process_event(self, event_data: dict[str, Any]) -> ProcessingResult:
         event = ArtifactBundleAvailableEvent.from_dict(event_data)
-        selected_bundle = self._bundle_loader.load_bundle(
-            event.payload.bundle_manifest_ref
-        )
+        selected_bundle = self._bundle_loader.load_bundle(event.payload.bundle_manifest_ref)
         primary_artifact = selected_bundle.primary_artifact
         artifact_text = self._bundle_loader.read_artifact_text(primary_artifact)
 
@@ -238,9 +236,7 @@ class ProcessingPipeline:
             return normalize_plain_text_document(artifact_text, artifact.artifact_id)
         raise ProcessingError(
             "unsupported_primary_artifact",
-            "unsupported primary artifact content type: {content_type}".format(
-                content_type=artifact.storage_ref.content_type
-            ),
+            f"unsupported primary artifact content type: {artifact.storage_ref.content_type}",
         )
 
 
@@ -249,9 +245,9 @@ _DOCUMENT_TYPE_HINT_MAP = {"statute": "law"}
 
 
 def _resolve_document_type(
-    extracted: Optional[str],
-    hint: Optional[str],
-) -> Optional[str]:
+    extracted: str | None,
+    hint: str | None,
+) -> str | None:
     candidate = extracted or hint
     if candidate is None:
         return None
@@ -279,9 +275,7 @@ def _build_document(
         "trust_tier": manifest.trust_tier,
         "source_defaults": dict(manifest.source_defaults),
     }
-    extracted_metadata = dict(
-        normalized_document.metadata.get("extracted_metadata") or {}
-    )
+    extracted_metadata = dict(normalized_document.metadata.get("extracted_metadata") or {})
     if extracted_metadata:
         metadata["extracted_metadata"] = extracted_metadata
     source_flavor = normalized_document.metadata.get("source_flavor")
@@ -320,15 +314,13 @@ def _build_sections(
     document_revision: int,
     processing_manifest_id: str,
     provenance: Provenance,
-    section_candidates: List[SectionCandidate],
-) -> List[Section]:
-    sections: List[Section] = []
+    section_candidates: list[SectionCandidate],
+) -> list[Section]:
+    sections: list[Section] = []
     for ordinal, candidate in enumerate(section_candidates):
         sections.append(
             Section(
-                section_id=stable_prefixed_id(
-                    "sec", document_id, str(document_revision), str(ordinal)
-                ),
+                section_id=stable_prefixed_id("sec", document_id, str(document_revision), str(ordinal)),
                 document_id=document_id,
                 document_revision=document_revision,
                 processing_manifest_id=processing_manifest_id,
@@ -350,11 +342,11 @@ def _build_processing_manifest(
     manifest: ArtifactBundleManifest,
     provenance: Provenance,
     document: Document,
-    sections: List[Section],
+    sections: list[Section],
     processing_manifest_id: str,
     processing_version: str,
     input_bundle_manifest_id: str,
-    input_bundle_manifest_ref: Dict[str, Any],
+    input_bundle_manifest_ref: dict[str, Any],
     normalized_document: NormalizedDocumentIR,
 ) -> ProcessingManifest:
     published_document_ref = {
@@ -378,12 +370,8 @@ def _build_processing_manifest(
             "source_profile_ref",
             normalized_document.metadata.get("source_profile_ref", "default_html_v1"),
         ),
-        "jurisdiction_profile_ref": manifest.di_overrides.get(
-            "jurisdiction_profile_ref", "default_jurisdiction_v1"
-        ),
-        "resolution_policy_ref": manifest.di_overrides.get(
-            "resolution_policy_ref", "default_resolution_v1"
-        ),
+        "jurisdiction_profile_ref": manifest.di_overrides.get("jurisdiction_profile_ref", "default_jurisdiction_v1"),
+        "resolution_policy_ref": manifest.di_overrides.get("resolution_policy_ref", "default_resolution_v1"),
     }
     normalization_profile_ref = manifest.di_overrides.get(
         "normalization_profile_ref",
@@ -402,9 +390,7 @@ def _build_processing_manifest(
         provenance=provenance,
         input_bundle_manifest_ref=_manifest_ref_from_dict(input_bundle_manifest_ref),
         selected_profiles=selected_profiles,
-        reference_snapshot_set_ref=manifest.reference_context.get(
-            "reference_snapshot_set_ref"
-        ),
+        reference_snapshot_set_ref=manifest.reference_context.get("reference_snapshot_set_ref"),
         published_document_ref=published_document_ref,
         published_sections_ref=published_sections_ref,
         canonical_ready_at=_utc_now(),
@@ -416,7 +402,7 @@ def _build_processing_manifest(
     )
 
 
-def _manifest_ref_from_dict(data: Dict[str, Any]):
+def _manifest_ref_from_dict(data: dict[str, Any]):
     from document_intelligence.contracts.envelope import ManifestRef
 
     return ManifestRef.from_dict(data)
@@ -451,7 +437,7 @@ def _normalized_content_type(content_type: str) -> str:
     return (content_type or "").split(";", 1)[0].strip().lower()
 
 
-def _normalize_document_type(document_type: Optional[str]) -> Optional[str]:
+def _normalize_document_type(document_type: str | None) -> str | None:
     if document_type is None:
         return None
     normalized = document_type.strip().lower()
@@ -461,4 +447,4 @@ def _normalize_document_type(document_type: Optional[str]) -> Optional[str]:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")

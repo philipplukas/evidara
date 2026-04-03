@@ -87,13 +87,9 @@ class SurfaceDefinitionTests(unittest.TestCase):
         section_surface = get_surface_definition("published_sections")
         manifest_surface = get_surface_definition("processing_manifests")
 
-        self.assertEqual(
-            document_surface.surface_name, PUBLISHED_DOCUMENTS.surface_name
-        )
+        self.assertEqual(document_surface.surface_name, PUBLISHED_DOCUMENTS.surface_name)
         self.assertEqual(section_surface.surface_name, PUBLISHED_SECTIONS.surface_name)
-        self.assertEqual(
-            manifest_surface.surface_name, PROCESSING_MANIFESTS.surface_name
-        )
+        self.assertEqual(manifest_surface.surface_name, PROCESSING_MANIFESTS.surface_name)
         self.assertIn("document_id", document_surface.column_names())
         self.assertIn("section_id", section_surface.column_names())
         self.assertIn("processing_manifest_id", manifest_surface.column_names())

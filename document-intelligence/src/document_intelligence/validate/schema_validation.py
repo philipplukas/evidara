@@ -3,25 +3,23 @@
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from jsonschema import FormatChecker, RefResolver, validators
 
 
-def validate_instance_against_contract(
-    instance: Any, schema_relative_path: str
-) -> None:
+def validate_instance_against_contract(instance: Any, schema_relative_path: str) -> None:
     validator = build_contract_validator(schema_relative_path)
     validator.validate(instance)
 
 
-def load_contract_schema(schema_relative_path: str) -> Dict[str, Any]:
+def load_contract_schema(schema_relative_path: str) -> dict[str, Any]:
     schema_path = _contracts_root() / schema_relative_path
     with schema_path.open("r", encoding="utf-8") as schema_file:
         return json.load(schema_file)
 
 
-def load_contract_example(example_filename: str) -> Dict[str, Any]:
+def load_contract_example(example_filename: str) -> dict[str, Any]:
     example_path = _contracts_root() / "examples" / example_filename
     with example_path.open("r", encoding="utf-8") as example_file:
         return json.load(example_file)
@@ -40,8 +38,8 @@ def build_contract_validator(schema_relative_path: str):
 
 
 @lru_cache(maxsize=1)
-def _schema_store() -> Dict[str, Dict[str, Any]]:
-    store: Dict[str, Dict[str, Any]] = {}
+def _schema_store() -> dict[str, dict[str, Any]]:
+    store: dict[str, dict[str, Any]] = {}
     for schema_path in _contracts_root().rglob("*.json"):
         if "examples" in schema_path.parts:
             continue

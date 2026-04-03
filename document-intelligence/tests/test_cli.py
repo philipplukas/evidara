@@ -18,10 +18,7 @@ from support import (
 
 
 def _write_local_bundle_event_fixture(temp_dir: str) -> dict[str, object]:
-    html = (
-        "<html><head><title>CLI Doc</title></head><body><h1>Intro</h1>"
-        "<p>Body</p></body></html>"
-    )
+    html = "<html><head><title>CLI Doc</title></head><body><h1>Intro</h1><p>Body</p></body></html>"
     artifact_path = os.path.join(temp_dir, "document.html")
     manifest_path = os.path.join(temp_dir, "bundle-manifest.json")
 

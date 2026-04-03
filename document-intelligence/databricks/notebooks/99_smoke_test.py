@@ -15,7 +15,7 @@ spark = SparkSession.builder.getOrCreate()
 
 catalog = _get_widget_value("catalog", "")
 if catalog:
-    spark.sql("USE CATALOG {catalog}".format(catalog=catalog))
+    spark.sql(f"USE CATALOG {catalog}")
     print({"message": "catalog selected", "catalog": catalog})
 else:
     print({"message": "smoke test ran without catalog override"})

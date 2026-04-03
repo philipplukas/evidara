@@ -7,7 +7,7 @@ name = "document-intelligence"
 version = "0.1.0"
 description = "Initial Evidara document-intelligence scaffold"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
   "deltalake>=0.18.0",
   "google-cloud-pubsub>=2.31.0,<3",
@@ -18,6 +18,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = [
+  "ruff>=0.4.0",
+]
+service = [
+  "fastapi>=0.111.0",
+  "uvicorn>=0.30.0",
+]
 docling = [
   "docling>=2.0.0",
 ]
@@ -41,5 +48,15 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py312"
 src = ["src", "tests"]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"databricks/notebooks/*.py" = ["F821"]  # dbutils is injected by Databricks runtime
+
+[tool.ruff.format]
+quote-style = "double"

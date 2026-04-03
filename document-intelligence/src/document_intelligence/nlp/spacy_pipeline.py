@@ -1,6 +1,6 @@
 """Optional spaCy-based enrichment helpers."""
 
-from typing import Any, Dict, List
+from typing import Any
 
 
 def enrich_with_spacy(
@@ -10,7 +10,7 @@ def enrich_with_spacy(
     model_name: str,
     max_chars_per_section: int,
     batch_size: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return a small, deterministic enrichment payload for metadata."""
     if not enabled:
         return {
@@ -48,12 +48,8 @@ def enrich_with_spacy(
         nlp.add_pipe("sentencizer")
     docs = list(nlp.pipe([text_window], batch_size=batch_size))
     doc = docs[0] if docs else nlp("")
-    sentences: List[str] = [span.text.strip() for span in doc.sents if span.text.strip()]
-    entities = [
-        {"text": ent.text, "label": ent.label_}
-        for ent in doc.ents
-        if ent.text and ent.label_
-    ]
+    sentences: list[str] = [span.text.strip() for span in doc.sents if span.text.strip()]
+    entities = [{"text": ent.text, "label": ent.label_} for ent in doc.ents if ent.text and ent.label_]
     return {
         "enabled": True,
         "backend": backend,

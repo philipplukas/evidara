@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from document_intelligence.config.runtime import RuntimeSettings
 from document_intelligence.contracts.envelope import ArtifactBundleAvailableEvent
@@ -20,7 +20,7 @@ from document_intelligence.pipeline import ProcessingPipeline
 def build_processing_pipeline(
     *,
     runtime_settings: RuntimeSettings,
-    bundle_loader: Optional[BundleLoader] = None,
+    bundle_loader: BundleLoader | None = None,
 ) -> ProcessingPipeline:
     if runtime_settings.surface_uris is None:
         sink = InMemoryCanonicalSink()
@@ -36,8 +36,8 @@ def build_processing_pipeline(
 def process_artifact_bundle_event(
     event_payload: Mapping[str, Any],
     *,
-    runtime_settings: Optional[RuntimeSettings] = None,
-    bundle_loader: Optional[BundleLoader] = None,
+    runtime_settings: RuntimeSettings | None = None,
+    bundle_loader: BundleLoader | None = None,
     require_surface_uris: bool = False,
 ) -> dict[str, Any]:
     resolved_event_payload = resolve_artifact_bundle_event(event_payload)

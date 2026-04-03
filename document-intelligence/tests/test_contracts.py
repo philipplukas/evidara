@@ -24,10 +24,10 @@ from document_intelligence.validate.schema_validation import (
 from support import (
     BUNDLE_MANIFEST_ID,
     EVENT_ID,
+    RUN_ID,
     SOURCE_ID,
     SOURCE_SNAPSHOT_ID,
     SOURCE_VERSION_ID,
-    RUN_ID,
     build_bundle_event,
     build_manifest_payload,
 )
@@ -35,9 +35,7 @@ from support import (
 
 class ArtifactBundleAvailableEventTests(unittest.TestCase):
     def test_parses_current_contract_shape(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".json", delete=False
-        ) as manifest_handle:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
             json.dump({"placeholder": True}, manifest_handle)
             manifest_path = manifest_handle.name
 
@@ -70,7 +68,7 @@ class ArtifactBundleAvailableEventTests(unittest.TestCase):
                             "manifest_type": "artifact_bundle_manifest",
                             "manifest_version": 1,
                             "storage_ref": {
-                                "uri": "file://{path}".format(path=manifest_path),
+                                "uri": f"file://{manifest_path}",
                                 "content_type": "application/json",
                                 "byte_size": 18,
                                 "checksum": "24e6ec454d00f7a8e7b676f6f1668d7875504c731d087f75f66e905b00d69a6a",
@@ -87,15 +85,11 @@ class ArtifactBundleAvailableEventTests(unittest.TestCase):
 
         self.assertEqual(event.payload.bundle_manifest_id, BUNDLE_MANIFEST_ID)
         self.assertEqual(event.payload.provenance.source_version_id, SOURCE_VERSION_ID)
-        self.assertEqual(
-            event.payload.extra_fields["extra_payload_field"], "kept-for-later"
-        )
+        self.assertEqual(event.payload.extra_fields["extra_payload_field"], "kept-for-later")
         self.assertEqual(event.extra_fields["extra_event_field"], "also-preserved")
 
     def test_parses_manifest_with_primary_html_artifact(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".html", delete=False
-        ) as artifact_handle:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as artifact_handle:
             artifact_handle.write("<html><body>Hello</body></html>")
             artifact_path = artifact_handle.name
 
@@ -114,14 +108,10 @@ class ArtifactBundleAvailableEventTests(unittest.TestCase):
 
     def test_raises_for_missing_required_payload_fields(self) -> None:
         with self.assertRaises(EnvelopeError):
-            ArtifactBundleAvailableEvent.from_dict(
-                {"payload": {"bundle_manifest_id": BUNDLE_MANIFEST_ID}}
-            )
+            ArtifactBundleAvailableEvent.from_dict({"payload": {"bundle_manifest_id": BUNDLE_MANIFEST_ID}})
 
     def test_rejects_manifest_without_selectable_primary_artifact(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".json", delete=False
-        ) as artifact_handle:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as artifact_handle:
             json.dump({"metadata": True}, artifact_handle)
             artifact_path = artifact_handle.name
 
@@ -174,9 +164,7 @@ class ContractSchemaValidationTests(unittest.TestCase):
         validator = build_contract_validator("events/document-processed.schema.json")
         validator.validate(load_contract_example("document-processed.json"))
 
-        withdrawn_validator = build_contract_validator(
-            "events/document-withdrawn.schema.json"
-        )
+        withdrawn_validator = build_contract_validator("events/document-withdrawn.schema.json")
         withdrawn_validator.validate(load_contract_example("document-withdrawn.json"))
 
 
