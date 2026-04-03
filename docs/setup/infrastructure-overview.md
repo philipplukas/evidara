@@ -67,6 +67,7 @@ Current repo scaffolding splits ownership this way:
 - Terraform under [`../../infra/terraform/databricks/document_intelligence_stack`](../../infra/terraform/databricks/document_intelligence_stack) wires the top-level Databricks workspace/environment layer and invokes the reusable module under [`../../infra/terraform/databricks/document_intelligence`](../../infra/terraform/databricks/document_intelligence)
 - Terraform under [`../../infra/terraform/gcp/runtime_stack`](../../infra/terraform/gcp/runtime_stack) provisions environment runtime primitives (GCS, Pub/Sub, service accounts, Secret Manager placeholders, Cloud SQL and Cloud Run scaffolding)
 - Terraform under [`../../infra/terraform/opensearch/gke_stack`](../../infra/terraform/opensearch/gke_stack) provisions self-managed OpenSearch on GKE with dedicated networking and a Serverless VPC connector
+- Terraform under [`../../infra/terraform/github/repo_settings`](../../infra/terraform/github/repo_settings) manages GitHub repository environments plus Actions variables/secrets used by CD workflows
 - Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for runtime GCP, OpenSearch GKE, and DI Databricks stacks
 - Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job
 - SQL/bootstrap assets under [`../../document-intelligence/databricks/sql`](../../document-intelligence/databricks/sql) register the published Delta surfaces after the first successful write

@@ -1,0 +1,41 @@
+# Repository owner/name
+github_owner    = "philipplukas"
+repository_name = "evidara"
+
+# Default environment model for current CD strategy.
+environments = ["dev", "prod"]
+
+# Repository-level variables used by CD workflows.
+repository_variables = {
+  GCP_REGION                   = "europe-west6"
+  GCP_PROJECT_ID_DEV           = "evidara-dev"
+  GCP_PROJECT_ID_PROD          = "evidara-prod"
+  GCP_ARTIFACT_PROJECT_ID      = "evidara-dev"
+  ARTIFACT_REGISTRY_REPOSITORY = "evidara-images"
+  PLATFORM_CONTROL_SERVICE_NAME = "platform-control"
+}
+
+# Optional environment-scoped variables.
+environment_variables = {
+  dev  = {}
+  prod = {}
+}
+
+# Do not commit real secret values.
+# Pass secrets via TF_VAR_environment_secrets / TF_VAR_repository_secrets
+# in your shell or CI instead.
+# Example shape:
+# environment_secrets = {
+#   dev = {
+#     GCP_WORKLOAD_IDENTITY_PROVIDER = "projects/123456/locations/global/workloadIdentityPools/github/providers/evidara"
+#     GCP_SERVICE_ACCOUNT_DEV        = "gha-deployer-dev@evidara-dev.iam.gserviceaccount.com"
+#     DATABRICKS_HOST                = "https://dbc-xxxxxxxx.cloud.databricks.com"
+#     DATABRICKS_TOKEN               = "..."
+#   }
+#   prod = {
+#     GCP_WORKLOAD_IDENTITY_PROVIDER = "projects/123456/locations/global/workloadIdentityPools/github/providers/evidara"
+#     GCP_SERVICE_ACCOUNT_PROD       = "gha-deployer-prod@evidara-prod.iam.gserviceaccount.com"
+#     DATABRICKS_HOST                = "https://dbc-xxxxxxxx.cloud.databricks.com"
+#     DATABRICKS_TOKEN               = "..."
+#   }
+# }
