@@ -6,6 +6,9 @@ import type {
 import {
   PROJECTION_REPOSITORY,
   type ProjectionHistoryEntry,
+  type ProjectionHistoryPage,
+  type ProjectionHistoryQuery,
+  type ProjectionHistoryStats,
   type ProjectionRepository,
   type SearchProjectionDocument,
 } from './projections.repository';
@@ -56,6 +59,14 @@ export class ProjectionsService {
     await this.repository.deleteProjection(event.payload.document_id);
     await this.appendWithdrawnHistory(event, 'applied');
     return { eventId: event.event_id, status: 'applied' };
+  }
+
+  async queryHistory(query: ProjectionHistoryQuery): Promise<ProjectionHistoryPage> {
+    return this.repository.queryHistory(query);
+  }
+
+  async getHistoryStats(): Promise<ProjectionHistoryStats> {
+    return this.repository.getHistoryStats();
   }
 
   private buildProjection(event: DocumentProcessedEventDto): SearchProjectionDocument {

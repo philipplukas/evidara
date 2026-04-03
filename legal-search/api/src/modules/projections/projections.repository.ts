@@ -40,7 +40,32 @@ export interface ProjectionRepository {
   upsertProjection(document: SearchProjectionDocument): Promise<void>;
   deleteProjection(documentId: string): Promise<void>;
   appendHistory(entry: ProjectionHistoryEntry): Promise<void>;
+  queryHistory(query: ProjectionHistoryQuery): Promise<ProjectionHistoryPage>;
+  getHistoryStats(): Promise<ProjectionHistoryStats>;
 }
+
+export type ProjectionHistoryQuery = {
+  documentId?: string;
+  runId?: string;
+  status?: ProjectionHistoryStatus;
+  limit?: number;
+  offset?: number;
+};
+
+export type ProjectionHistoryPage = {
+  data: ProjectionHistoryEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type ProjectionHistoryStats = {
+  totalEvents: number;
+  applied: number;
+  stale: number;
+  ignoredDuplicate: number;
+  uniqueDocuments: number;
+};
 
 export const PROJECTION_REPOSITORY = Symbol('PROJECTION_REPOSITORY');
 

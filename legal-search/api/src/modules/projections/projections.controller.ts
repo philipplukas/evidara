@@ -1,7 +1,19 @@
-import { Body, Controller, HttpCode, HttpStatus, Logger, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 // biome-ignore lint/style/useImportType: DTO classes are needed for runtime validation metadata.
 import { DocumentProcessedEventDto, DocumentWithdrawnEventDto } from './dto/projection-events.dto';
+import type { ProjectionHistoryStatus } from './projections.repository';
 // biome-ignore lint/style/useImportType: Nest DI needs runtime class metadata.
 import { type ProjectionApplyResult, ProjectionsService } from './projections.service';
 
@@ -111,5 +123,27 @@ export class ProjectionsController {
       });
       throw error;
     }
+  }
+
+  @Get('/history')
+  async queryHistory(
+    @Query('document_id') documentId?: string,
+    @Query('run_id') runId?: string,
+    @Query('status') status?: string,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit?: number,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset?: number,
+  ) {
+    return this.service.queryHistory({
+      documentId,
+      runId,
+      status: status as ProjectionHistoryStatus | undefined,
+      limit,
+      offset,
+    });
+  }
+
+  @Get('/history/stats')
+  async getHistoryStats() {
+    return this.service.getHistoryStats();
   }
 }
