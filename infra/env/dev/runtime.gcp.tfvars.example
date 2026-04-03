@@ -81,4 +81,18 @@ cloud_run_services = {
       }
     }
   }
+
+  "document-intelligence-consumer" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-dev/runtime/document-intelligence-consumer:latest"
+    service_account_key   = "document_intelligence"
+    allow_unauthenticated = false
+    env_vars = {
+      DI_GCP_PROJECT_ID      = "evidara-dev"
+      DI_SUBSCRIPTION_NAME   = "document-intelligence-artifact-bundle-available"
+      DI_STATUS_TOPIC_NAME   = "document-processing-status-updated"
+      DI_PROCESSED_TOPIC_NAME = "document-processed"
+      DI_SURFACES_ROOT_URI   = "gs://evidara-document-intelligence-surfaces-dev/published"
+      DI_PROCESSING_VERSION  = "0.1.0-dev"
+    }
+  }
 }

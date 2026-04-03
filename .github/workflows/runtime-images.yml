@@ -6,6 +6,7 @@ on:
       - ".github/workflows/runtime-images.yml"
       - "platform-control/**"
       - "legal-search/api/**"
+      - "document-intelligence/**"
       - "contracts/**"
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - ".github/workflows/runtime-images.yml"
       - "platform-control/**"
       - "legal-search/api/**"
+      - "document-intelligence/**"
       - "contracts/**"
 
 permissions:
@@ -92,6 +94,44 @@ jobs:
         with:
           context: .
           file: ./legal-search/api/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  document-intelligence-consumer:
+    name: Build document-intelligence consumer image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (document-intelligence-consumer)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/evidara-document-intelligence-consumer
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and optionally push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./document-intelligence/Dockerfile
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
