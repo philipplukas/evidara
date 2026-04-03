@@ -8,15 +8,25 @@ terraform -chdir=infra/terraform/gcp/runtime_stack init -backend=false -input=fa
 terraform -chdir=infra/terraform/gcp/runtime_stack validate
 
 for env in dev staging prod; do
-  tfvars_file="infra/env/${env}/runtime.gcp.tfvars.example"
-  if [[ ! -f "${tfvars_file}" ]]; then
-    echo "Missing ${tfvars_file}" >&2
+  runtime_tfvars_file="infra/env/${env}/runtime.gcp.tfvars.example"
+  if [[ ! -f "${runtime_tfvars_file}" ]]; then
+    echo "Missing ${runtime_tfvars_file}" >&2
     exit 1
   fi
-  if ! rg -q "^environment\\s*=\\s*\"${env}\"$" "${tfvars_file}"; then
-    echo "Unexpected environment value in ${tfvars_file}" >&2
+  if ! rg -q "^environment\\s*=\\s*\"${env}\"$" "${runtime_tfvars_file}"; then
+    echo "Unexpected environment value in ${runtime_tfvars_file}" >&2
+    exit 1
+  fi
+
+  opensearch_tfvars_file="infra/env/${env}/opensearch.gke.tfvars.example"
+  if [[ ! -f "${opensearch_tfvars_file}" ]]; then
+    echo "Missing ${opensearch_tfvars_file}" >&2
+    exit 1
+  fi
+  if ! rg -q "^environment\\s*=\\s*\"${env}\"$" "${opensearch_tfvars_file}"; then
+    echo "Unexpected environment value in ${opensearch_tfvars_file}" >&2
     exit 1
   fi
 done
 
-echo "Runtime-stack checks passed."
+echo "Runtime-stack checks passed (runtime + opensearch env tfvars)."
