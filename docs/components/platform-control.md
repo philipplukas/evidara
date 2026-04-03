@@ -13,6 +13,9 @@ For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope
 Repo-owned Retool control-panel artifacts now live under `platform-control/retool/`, including the
 control-panel manifest, direct-Postgres queries, preview workflow, and Source Setup Copilot prompt.
 
+Repo-owned Retool control-panel artifacts now live under `platform-control/retool/`, including the
+control-panel manifest, direct-Postgres queries, preview workflow, and Source Setup Copilot prompt.
+
 See [Platform Control Implementation Plan](platform-control-implementation-plan.md) for the planned repo structure, worker layout, and phased delivery approach.
 
 ## Source of truth
