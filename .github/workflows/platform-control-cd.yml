@@ -1,0 +1,117 @@
+name: Runtime Cloud Run CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/platform-control-cd.yml"
+      - "platform-control/**"
+      - "legal-search/api/**"
+      - "infra/env/*/runtime.gcp.tfvars.example"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: runtime-cloud-run-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-dev:
+    name: Deploy runtime services to dev
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      PLATFORM_CONTROL_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_SERVICE_NAME }}
+      LEGAL_SEARCH_API_SERVICE_NAME: ${{ vars.LEGAL_SEARCH_API_SERVICE_NAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy platform-control API (dev)
+        run: |
+          gcloud run services update "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:latest"
+
+      - name: Deploy legal-search API (dev)
+        run: |
+          gcloud run services update "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:latest"
+
+      - name: Verify deployed revisions (dev)
+        run: |
+          gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.latestReadyRevisionName)'
+          gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.latestReadyRevisionName)'
+
+  deploy-prod:
+    name: Deploy runtime services to prod
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    environment: prod
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID_PROD }}
+      PLATFORM_CONTROL_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_SERVICE_NAME }}
+      LEGAL_SEARCH_API_SERVICE_NAME: ${{ vars.LEGAL_SEARCH_API_SERVICE_NAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_PROD }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy platform-control API (prod)
+        run: |
+          gcloud run services update "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:latest"
+
+      - name: Deploy legal-search API (prod)
+        run: |
+          gcloud run services update "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:latest"
+
+      - name: Verify deployed revisions (prod)
+        run: |
+          gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.latestReadyRevisionName)'
+          gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.latestReadyRevisionName)'

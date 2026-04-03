@@ -12,7 +12,8 @@ repository_variables = {
   GCP_PROJECT_ID_PROD          = "evidara-prod"
   GCP_ARTIFACT_PROJECT_ID      = "evidara-dev"
   ARTIFACT_REGISTRY_REPOSITORY = "evidara-images"
-  PLATFORM_CONTROL_SERVICE_NAME = "platform-control"
+  PLATFORM_CONTROL_SERVICE_NAME = "platform-control-api"
+  LEGAL_SEARCH_API_SERVICE_NAME = "legal-search-api"
 }
 
 # Optional environment-scoped variables.

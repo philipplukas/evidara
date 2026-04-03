@@ -26,6 +26,7 @@ Options:
   --artifact-project <id>
   --artifact-repo <name>
   --platform-control-service <name>
+  --legal-search-api-service <name>
   --wif-provider <resource>
   --wif-project <id>
   --wif-pool-id <id>
@@ -48,7 +49,8 @@ Examples:
     --interactive \
     --region europe-west6 \
     --artifact-repo evidara-images \
-    --platform-control-service platform-control \
+    --platform-control-service platform-control-api \
+    --legal-search-api-service legal-search-api \
     --sync-secrets \
     --apply
 EOF
@@ -149,7 +151,7 @@ detect_platform_control_service() {
   local project_id="$1"
   local region="$2"
   local services preferred fallback_name
-  fallback_name="${EVIDARA_DEFAULT_PLATFORM_CONTROL_SERVICE:-platform-control}"
+  fallback_name="${EVIDARA_DEFAULT_PLATFORM_CONTROL_SERVICE:-platform-control-api}"
   services="$(gcloud run services list --project "$project_id" --region "$region" --format='value(metadata.name)' 2>/dev/null || true)"
   if [[ -z "$services" ]]; then
     log "Cloud Run service auto-detect unavailable; using fallback '$fallback_name'."
@@ -157,7 +159,30 @@ detect_platform_control_service() {
     return
   fi
   preferred="$(printf '%s\n' "$services" | awk '/platform-control/ {print; exit}')"
-  [[ -n "$preferred" ]] && echo "$preferred" || printf '%s\n' "$services" | awk 'NR==1 {print}'
+  if [[ -n "$preferred" ]]; then
+    printf '%s\n' "$preferred" | sed -E 's/-(dev|staging|prod)$//'
+    return
+  fi
+  printf '%s\n' "$services" | awk 'NR==1 {print}' | sed -E 's/-(dev|staging|prod)$//'
+}
+
+detect_legal_search_api_service() {
+  local project_id="$1"
+  local region="$2"
+  local services preferred fallback_name
+  fallback_name="${EVIDARA_DEFAULT_LEGAL_SEARCH_API_SERVICE:-legal-search-api}"
+  services="$(gcloud run services list --project "$project_id" --region "$region" --format='value(metadata.name)' 2>/dev/null || true)"
+  if [[ -z "$services" ]]; then
+    log "Cloud Run service auto-detect unavailable; using fallback '$fallback_name'."
+    echo "$fallback_name"
+    return
+  fi
+  preferred="$(printf '%s\n' "$services" | awk '/legal-search-api/ {print; exit}')"
+  if [[ -n "$preferred" ]]; then
+    printf '%s\n' "$preferred" | sed -E 's/-(dev|staging|prod)$//'
+    return
+  fi
+  echo "$fallback_name"
 }
 
 detect_service_account() {
@@ -356,6 +381,7 @@ Configuration plan:
   artifact project:            $ARTIFACT_PROJECT
   artifact repository:         $ARTIFACT_REPO
   platform-control service:    $PLATFORM_CONTROL_SERVICE
+  legal-search-api service:    $LEGAL_SEARCH_API_SERVICE
 EOF
   if [[ "$SYNC_SECRETS" == "true" ]]; then
     cat <<EOF
@@ -384,6 +410,7 @@ REGION=""
 ARTIFACT_PROJECT=""
 ARTIFACT_REPO=""
 PLATFORM_CONTROL_SERVICE=""
+LEGAL_SEARCH_API_SERVICE=""
 WIF_PROVIDER=""
 WIF_PROJECT=""
 WIF_POOL_ID=""
@@ -408,6 +435,7 @@ while [[ $# -gt 0 ]]; do
     --artifact-project) ARTIFACT_PROJECT="$2"; shift 2 ;;
     --artifact-repo) ARTIFACT_REPO="$2"; shift 2 ;;
     --platform-control-service) PLATFORM_CONTROL_SERVICE="$2"; shift 2 ;;
+    --legal-search-api-service) LEGAL_SEARCH_API_SERVICE="$2"; shift 2 ;;
     --wif-provider) WIF_PROVIDER="$2"; shift 2 ;;
     --wif-project) WIF_PROJECT="$2"; shift 2 ;;
     --wif-pool-id) WIF_POOL_ID="$2"; shift 2 ;;
@@ -456,6 +484,7 @@ fi
 [[ -n "$ARTIFACT_PROJECT" ]] || ARTIFACT_PROJECT="$DEV_PROJECT"
 [[ -n "$ARTIFACT_REPO" ]] || ARTIFACT_REPO="$(detect_artifact_repo "$ARTIFACT_PROJECT" "$REGION")"
 [[ -n "$PLATFORM_CONTROL_SERVICE" ]] || PLATFORM_CONTROL_SERVICE="$(detect_platform_control_service "$DEV_PROJECT" "$REGION")"
+[[ -n "$LEGAL_SEARCH_API_SERVICE" ]] || LEGAL_SEARCH_API_SERVICE="$(detect_legal_search_api_service "$DEV_PROJECT" "$REGION")"
 
 if [[ "$SYNC_SECRETS" == "true" ]]; then
   require_cmd databricks
@@ -486,6 +515,7 @@ set_repo_var "GCP_PROJECT_ID_PROD" "$PROD_PROJECT"
 set_repo_var "GCP_ARTIFACT_PROJECT_ID" "$ARTIFACT_PROJECT"
 set_repo_var "ARTIFACT_REGISTRY_REPOSITORY" "$ARTIFACT_REPO"
 set_repo_var "PLATFORM_CONTROL_SERVICE_NAME" "$PLATFORM_CONTROL_SERVICE"
+set_repo_var "LEGAL_SEARCH_API_SERVICE_NAME" "$LEGAL_SEARCH_API_SERVICE"
 
 if [[ "$SYNC_SECRETS" == "true" ]]; then
   if [[ "$DATABRICKS_TOKEN_SOURCE" == "profile" ]]; then

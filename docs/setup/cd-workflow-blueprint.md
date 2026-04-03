@@ -10,6 +10,7 @@ Current implemented example:
 
 - [`../../.github/workflows/platform-control.yml`](../../.github/workflows/platform-control.yml)
 - [`../../.github/workflows/document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
+- [`../../.github/workflows/platform-control-cd.yml`](../../.github/workflows/platform-control-cd.yml)
 
 ## Baseline Principles
 
@@ -40,7 +41,7 @@ Typical set for Google Cloud OIDC deployment:
 - `GCP_ARTIFACT_PROJECT_ID`
 - `GCP_REGION`
 - `ARTIFACT_REGISTRY_REPOSITORY`
-- service-specific values (for example `PLATFORM_CONTROL_SERVICE_NAME`, Databricks host/profile references)
+- service-specific values (for example `PLATFORM_CONTROL_SERVICE_NAME`, `LEGAL_SEARCH_API_SERVICE_NAME`, Databricks host/profile references)
 
 For `document-intelligence` specifically, configure per-environment secrets:
 
