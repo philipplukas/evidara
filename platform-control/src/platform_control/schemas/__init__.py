@@ -4,7 +4,7 @@ from platform_control.schemas.document_events import (
     DocumentProcessedEvent,
     DocumentWithdrawnEvent,
 )
-from platform_control.schemas.health import HealthResponse
+from platform_control.schemas.health import DependencyCheck, HealthResponse, ReadinessResponse
 from platform_control.schemas.processing_status import (
     DocumentProcessingStatusUpdatedEvent,
     EventAcceptedResponse,
@@ -31,9 +31,11 @@ __all__ = [
     "DocumentProcessingStatusUpdatedEvent",
     "DocumentProcessedEvent",
     "DocumentWithdrawnEvent",
+    "DependencyCheck",
     "EventAcceptedResponse",
     "FirecrawlAcquisitionSpec",
     "HealthResponse",
+    "ReadinessResponse",
     "ProcessingStatusUpdateListResponse",
     "ProcessingStatusUpdateResponse",
     "RunResponse",

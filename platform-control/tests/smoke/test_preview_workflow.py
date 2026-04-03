@@ -9,6 +9,7 @@ import httpx
 import pytest
 from sqlalchemy import select
 
+import platform_control.routers.health as health_router
 from platform_control.database import get_session
 from platform_control.domain import ProviderJobStatus
 from platform_control.main import create_app
@@ -53,6 +54,56 @@ async def test_health_endpoint_returns_200(session_maker) -> None:
         response = await client.get("/health")
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_readiness_endpoint_returns_200_when_database_is_reachable(session_maker) -> None:
+    app = create_app()
+    transport = httpx.ASGITransport(app=app)
+
+    original_get_session_maker = health_router.get_session_maker
+    health_router.get_session_maker = lambda: session_maker
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/ready")
+            assert response.status_code == 200
+            body = response.json()
+            assert body["status"] == "ok"
+            assert body["checks"]["database"]["status"] == "ok"
+    finally:
+        health_router.get_session_maker = original_get_session_maker
+
+
+@pytest.mark.asyncio
+async def test_readiness_endpoint_returns_503_when_database_check_fails() -> None:
+    app = create_app()
+    transport = httpx.ASGITransport(app=app)
+
+    class _FailingSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def execute(self, *_args, **_kwargs):
+            raise RuntimeError("boom")
+
+    class _FailingSessionMaker:
+        def __call__(self):
+            return _FailingSession()
+
+    original_get_session_maker = health_router.get_session_maker
+    health_router.get_session_maker = lambda: _FailingSessionMaker()
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/ready")
+            assert response.status_code == 503
+            body = response.json()
+            assert body["status"] == "degraded"
+            assert body["checks"]["database"]["status"] == "error"
+    finally:
+        health_router.get_session_maker = original_get_session_maker
 
 
 @pytest.mark.asyncio

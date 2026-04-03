@@ -17,6 +17,17 @@ describe('App smoke tests', () => {
     expect(body.status).toBe('ok');
   });
 
+  it('GET /health/ready → 200 or 503 with dependency checks', async () => {
+    const res = await fetch(`${BASE_URL}/health/ready`);
+    expect([200, 503]).toContain(res.status);
+    const body = (await res.json()) as {
+      status: string;
+      checks?: { opensearch?: { status: string } };
+    };
+    expect(['ok', 'degraded']).toContain(body.status);
+    expect(body.checks?.opensearch?.status).toBeDefined();
+  });
+
   it('GET /api → Swagger UI loads (non-production only)', async () => {
     const res = await fetch(`${BASE_URL}/api`);
     if (process.env.NODE_ENV === 'production') {

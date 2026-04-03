@@ -17,6 +17,7 @@ import { Test } from '@nestjs/testing';
 import { vi } from 'vitest';
 import documentIntelligenceConfig from '../core/config/document-intelligence.config';
 import opensearchConfig from '../core/config/opensearch.config';
+import { OPENSEARCH_CLIENT } from '../core/opensearch/client';
 import {
   DOCUMENT_INTELLIGENCE_CLIENT,
   type DocumentIntelligenceClient,
@@ -179,6 +180,10 @@ export async function createTestApp(overrides?: {
       { provide: DOCUMENTS_REPOSITORY, useValue: documentsRepo },
       { provide: PROJECTION_REPOSITORY, useValue: projectionsRepo },
       { provide: DOCUMENT_INTELLIGENCE_CLIENT, useValue: diClient },
+      {
+        provide: OPENSEARCH_CLIENT,
+        useValue: { ping: vi.fn().mockResolvedValue({}) },
+      },
     ],
   }).compile();
 
