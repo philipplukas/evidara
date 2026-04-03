@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentsRepository } from './documents.repository';
 import { DocumentsService } from './documents.service';
+import type { DocumentContentPort } from './ports/document-content.port';
 
 // ─── Mock Repository ───
 
@@ -38,12 +39,16 @@ function createMockRepo(overrides?: Partial<DocumentsRepository>): DocumentsRepo
   };
 }
 
+const noopContent: DocumentContentPort = {
+  fetchLeanContent: vi.fn().mockResolvedValue(undefined),
+};
+
 // ─── Tests ───
 
 describe('DocumentsService', () => {
   it('should return a composed DetailView', async () => {
     const repo = createMockRepo();
-    const service = new DocumentsService(repo);
+    const service = new DocumentsService(repo, noopContent);
 
     const detail = await service.getDetail('doc_001');
 
@@ -59,7 +64,7 @@ describe('DocumentsService', () => {
     const repo = createMockRepo({
       getById: vi.fn().mockResolvedValue(null),
     });
-    const service = new DocumentsService(repo);
+    const service = new DocumentsService(repo, noopContent);
 
     await expect(service.getDetail('doc_missing')).rejects.toThrow(NotFoundException);
   });
@@ -69,7 +74,7 @@ describe('DocumentsService', () => {
       getSections: vi.fn().mockResolvedValue([]),
       getCitations: vi.fn().mockResolvedValue([]),
     });
-    const service = new DocumentsService(repo);
+    const service = new DocumentsService(repo, noopContent);
 
     const detail = await service.getDetail('doc_001');
 
@@ -82,11 +87,32 @@ describe('DocumentsService', () => {
 
   it('should delegate getSections to repository', async () => {
     const repo = createMockRepo();
-    const service = new DocumentsService(repo);
+    const service = new DocumentsService(repo, noopContent);
 
     const sections = await service.getSections('doc_001');
 
     expect(repo.getSections).toHaveBeenCalledWith('doc_001');
     expect(sections).toHaveLength(1);
+  });
+
+  it('overlays lean Docling JSON from Document Service when the port returns a body', async () => {
+    const repo = createMockRepo({
+      getById: vi.fn().mockResolvedValue({
+        document_id: 'doc_001',
+        title: 'Test Law',
+        document_type: 'law',
+        jurisdiction: 'CH',
+        content_docling: { from_index: true },
+      }),
+    });
+    const port: DocumentContentPort = {
+      fetchLeanContent: vi.fn().mockResolvedValue({ from_di: true }),
+    };
+    const service = new DocumentsService(repo, port);
+
+    const detail = await service.getDetail('doc_001');
+
+    expect(detail.content).toEqual({ from_di: true });
+    expect(port.fetchLeanContent).toHaveBeenCalledWith('doc_001', undefined);
   });
 });

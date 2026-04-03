@@ -38,6 +38,49 @@
       "description": "ID of the run that produced the raw artifact.",
       "pattern": "^run_[a-zA-Z0-9]+$"
     },
+    "document_revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic canonical revision for the logical document."
+    },
+    "processing_manifest_id": {
+      "type": "string",
+      "description": "Processing manifest that produced this document revision.",
+      "pattern": "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "provenance": {
+      "$ref": "https://evidara.dev/common/provenance"
+    },
+    "primary_artifact_id": {
+      "type": "string",
+      "description": "Primary artifact anchor when distinct from lineage-only artifact references.",
+      "pattern": "^art_[a-zA-Z0-9]+$"
+    },
+    "jurisdiction_id": {
+      "type": ["string", "null"],
+      "description": "Internal jurisdiction record id before ISO projection (e.g. jur_ch_federal)."
+    },
+    "authority_id": {
+      "type": ["string", "null"],
+      "description": "Internal authority record id before normalization."
+    },
+    "lifecycle_status": {
+      "type": "string",
+      "description": "Canonical lifecycle state (e.g. active, withdrawn)."
+    },
+    "full_text": {
+      "type": "string",
+      "description": "Full concatenated text including preliminaries when extracted."
+    },
+    "body_text": {
+      "type": "string",
+      "description": "Body text when separated from preliminaries."
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Forward-compatible extension bag.",
+      "additionalProperties": true
+    },
     "title": {
       "type": "string",
       "description": "Title of the document."
@@ -120,7 +163,7 @@
       "description": "Intrinsic document hierarchy as a delimited path (e.g., 'OR › Gesellschaftsrecht › Verantwortlichkeit'). Represents stable structural position derived from document analysis, not a UI artifact. May evolve to a structured array representation in the future."
     },
     "effective_date": {
-      "type": "string",
+      "type": ["string", "null"],
       "format": "date",
       "description": "Date the document became effective, if applicable."
     },

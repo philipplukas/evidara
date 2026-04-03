@@ -4,6 +4,7 @@ import { DEFAULT_LOCALE } from '../../core/i18n';
 import type { WarnFn } from '../../core/types/warn';
 import { DOCUMENTS_REPOSITORY, type DocumentsRepository } from './documents.repository';
 import { mapDocumentToDetailView } from './mappers/document-detail.mapper';
+import { DOCUMENT_CONTENT_PORT, type DocumentContentPort } from './ports/document-content.port';
 
 @Injectable()
 export class DocumentsService {
@@ -13,11 +14,17 @@ export class DocumentsService {
   constructor(
     @Inject(DOCUMENTS_REPOSITORY)
     private readonly repository: DocumentsRepository,
+    @Inject(DOCUMENT_CONTENT_PORT)
+    private readonly documentContent: DocumentContentPort,
   ) {
     this.warn = (event, meta) => this.logger.warn(`[contract] ${event}`, meta);
   }
 
-  async getDetail(id: string, locale: SupportedLocale = DEFAULT_LOCALE) {
+  async getDetail(
+    id: string,
+    locale: SupportedLocale = DEFAULT_LOCALE,
+    processingManifestId?: string,
+  ) {
     const doc = await this.repository.getById(id);
     if (!doc) throw new NotFoundException(`Document ${id} not found`);
 
@@ -26,7 +33,12 @@ export class DocumentsService {
       this.repository.getCitations(id),
     ]);
 
-    return mapDocumentToDetailView(doc, sections, citations, locale, this.warn);
+    const view = mapDocumentToDetailView(doc, sections, citations, locale, this.warn);
+    const lean = await this.documentContent.fetchLeanContent(id, processingManifestId);
+    if (lean !== undefined) {
+      return { ...view, content: lean };
+    }
+    return view;
   }
 
   async getSections(documentId: string) {

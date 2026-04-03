@@ -36,6 +36,14 @@ cd document-intelligence
 python3 -m unittest discover -s tests -v
 ```
 
+HTTP **Document Service** (OpenAPI: `contracts/api/document-intelligence.openapi.yaml`) uses the optional **`[service]`** extra (`fastapi`, `uvicorn`, `docling-core`). Lean and plain-text responses prefer **`DoclingDocument.model_validate`** + **`export_to_dict`** / **`export_to_text`**; invalid or non-Docling JSON falls back to heuristic stripping.
+
+```bash
+pip install -e ".[service]"
+export DOCUMENT_SERVICE_CONTENT_DIR=/path/to/json/files
+document-intelligence-document-service
+```
+
 ## Optional Delta sink configuration
 
 Set these together to switch the CLI path from the in-memory sink to the Delta sink:

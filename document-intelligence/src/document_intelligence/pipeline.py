@@ -187,6 +187,18 @@ class ProcessingPipeline:
         )
 
 
+def _normalize_canonical_document_type(raw: Optional[str]) -> Optional[str]:
+    """Map source hints (e.g. statute) to vocabulary values (contracts/vocabularies/document-type.json)."""
+    if raw is None:
+        return None
+    if raw in ("law", "decision", "commentary", "rechtssatz"):
+        return raw
+    law_aliases = {"statute", "act", "gesetz", "bundesgesetz", "loi", "legge"}
+    if raw in law_aliases:
+        return "law"
+    return raw
+
+
 def _build_document(
     *,
     normalized_document: NormalizedDocumentIR,
@@ -224,8 +236,10 @@ def _build_document(
         lifecycle_status="active",
         full_text=normalized_document.full_text,
         body_text=normalized_document.body_text,
-        document_type=normalized_document.metadata.get("document_type")
-        or manifest.source_defaults.get("document_type_hint"),
+        document_type=_normalize_canonical_document_type(
+            normalized_document.metadata.get("document_type")
+            or manifest.source_defaults.get("document_type_hint"),
+        ),
         metadata=metadata,
         extensions={},
     )

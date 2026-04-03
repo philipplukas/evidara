@@ -93,6 +93,7 @@ These replace the need for custom index-lifecycle semantics in shared contracts.
 - **Consumes:** `index_update.requested`
 - **API:** `contracts/api/legal-search.openapi.yaml`
 - **Reads:** published DI surfaces referenced by event refs
+- **Optional upstream:** `contracts/api/document-intelligence.openapi.yaml` — BFF calls the Document Service for lean Docling detail when `DOCUMENT_INTELLIGENCE_BASE_URL` is set (`DOCUMENT_INTELLIGENCE_BEARER_TOKEN` for auth)
 
 ## Testing
 
