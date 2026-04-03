@@ -1,5 +1,7 @@
 #!/usr/bin/env npx tsx
 
+/// <reference types="node" />
+
 /**
  * Create a new versioned projection index and atomically cut over
  * the stable read/write aliases used by legal-search.
@@ -11,6 +13,15 @@
 
 const args = process.argv.slice(2);
 const shouldReindex = args.includes('--reindex');
+const sourceIndexArg = (() => {
+  const sourceIndexArgIndex = args.indexOf('--source-index');
+  if (sourceIndexArgIndex === -1) return undefined;
+  const value = args[sourceIndexArgIndex + 1];
+  if (!value) {
+    throw new Error('missing value for --source-index');
+  }
+  return value;
+})();
 
 const node = process.env.OPENSEARCH_NODE ?? 'http://localhost:9200';
 const readAlias = process.env.OPENSEARCH_ALIAS_READ ?? 'evidara-documents-read-dev';
@@ -140,9 +151,23 @@ async function main(): Promise<void> {
   const currentReadTargets = await getAliasIndices(readAlias);
   const currentWriteTargets = await getAliasIndices(writeAlias);
 
-  if (shouldReindex && currentReadTargets.length > 0) {
-    console.log(`reindexing data from ${currentReadTargets[0]} to ${nextIndex}`);
-    await reindex(currentReadTargets[0], nextIndex);
+  if (shouldReindex) {
+    const sourceIndex = sourceIndexArg ?? (() => {
+      if (currentReadTargets.length === 1) return currentReadTargets[0];
+      if (currentReadTargets.length > 1) {
+        throw new Error(
+          `multiple read alias targets found (${currentReadTargets.join(', ')}); pass --source-index to choose source index`,
+        );
+      }
+      return undefined;
+    })();
+
+    if (sourceIndex) {
+      console.log(`reindexing data from ${sourceIndex} to ${nextIndex}`);
+      await reindex(sourceIndex, nextIndex);
+    } else {
+      console.log(`--reindex requested but read alias ${readAlias} has no current targets; skipping reindex`);
+    }
   }
 
   console.log(`cutting over aliases: read=${readAlias}, write=${writeAlias}`);
