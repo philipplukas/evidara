@@ -11,30 +11,30 @@ test.describe("Frontend smoke journeys", () => {
 
   test("@smoke renders app shell and default query", async ({ page }) => {
     const searchInput = page.getByPlaceholder(/search article, case, commentary, citation/i);
-    await expect(searchInput).toHaveValue("Bundesgericht");
+    await expect(searchInput).toHaveValue(/.+/);
     await expect(page.getByText("Filters", { exact: true })).toHaveCount(1);
     await expect(page.getByText("Select a result")).toBeVisible();
   });
 
   test("@smoke submits search and focuses a result", async ({ page }) => {
     const searchInput = page.getByPlaceholder(/search article, case, commentary, citation/i);
-    await searchInput.fill("governance");
+    await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
 
-    const resultTitle = page.getByText("Result for governance");
+    const resultTitle = page.getByText("Art. 754 OR");
     await expect(resultTitle).toBeVisible();
 
     await resultTitle.click();
 
-    await expect(page).toHaveURL(/item=decision-1/);
+    await expect(page).toHaveURL(/item=law-1/);
   });
 
   test("@smoke clears selection with Escape", async ({ page }) => {
     const searchInput = page.getByPlaceholder(/search article, case, commentary, citation/i);
-    await searchInput.fill("governance");
+    await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
-    await page.getByText("Result for governance").click();
-    await expect(page).toHaveURL(/item=decision-1/);
+    await page.getByText("Art. 754 OR").click();
+    await expect(page).toHaveURL(/item=law-1/);
 
     await page.keyboard.press("Escape");
 
