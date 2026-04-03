@@ -144,8 +144,15 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                 return (
                   <label
                     key={opt.value}
-                    className="flex items-center gap-2 py-1 cursor-pointer group"
+                    className="flex items-center gap-2 py-1 cursor-pointer group w-full text-left"
                   >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      aria-checked={isSelected}
+                      onChange={() => toggle(opt.value)}
+                      className="sr-only"
+                    />
                     <div
                       className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all
                         ${
@@ -182,6 +189,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
 
           {filter.type === "dropdown" && (
             <select
+              aria-label={filter.label}
               value={selected[0] || ""}
               onChange={(e) => setSelected([e.target.value])}
               className="w-full h-8 px-2 text-xs rounded border border-border bg-surface-panel

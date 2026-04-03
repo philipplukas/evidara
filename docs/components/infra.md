@@ -6,7 +6,7 @@ Provision and document runtime and deployment environments for all Evidara compo
 
 ## Current state
 
-Initial Terraform scaffolding now exists for the `document-intelligence` Databricks layer. The repo now has a reusable Unity Catalog module, a top-level Databricks stack, per-environment tfvars for `dev`, `staging`, and `prod`, and CI validation for Terraform formatting/validation on the DI Databricks path. GCP, GitHub, remote state, deploy/promotion orchestration, and most runtime resources are still not implemented.
+Terraform scaffolding now exists for both the `document-intelligence` Databricks layer and the GCP runtime layer. The repo has per-environment tfvars for `dev`, `staging`, and `prod`, including GCS/PubSub plus Cloud SQL/Cloud Run/service-account/secret scaffolding in `infra/terraform/gcp/runtime_stack`. GitHub, remote state, and CI/CD apply wiring are still pending.
 
 ## Source of truth
 
@@ -30,12 +30,12 @@ infra/
 
 ## Minimal next tasks
 
-- [ ] Define target GCP services and resource names
+- [x] Define target GCP services and resource names
 - [x] Define target Databricks resources for the initial DI Unity Catalog layer
 - [x] Define Terraform module structure for the initial Databricks path
 - [x] Define environment strategy (dev/staging/prod)
-- [ ] Define naming conventions for cloud resources
-- [ ] Define secrets strategy (Google Secret Manager)
+- [~] Define naming conventions for cloud resources
+- [x] Define secrets strategy (Google Secret Manager)
 - [x] Document infrastructure overview (`docs/setup/infrastructure-overview.md`)
 - [x] Document environment strategy (`docs/setup/environment-strategy.md`)
 

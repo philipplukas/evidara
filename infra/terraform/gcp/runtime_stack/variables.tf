@@ -82,3 +82,74 @@ variable "event_subscriptions" {
     }
   }
 }
+
+variable "enable_cloud_sql" {
+  description = "Whether to provision the Cloud SQL Postgres instance for platform-control."
+  type        = bool
+  default     = false
+}
+
+variable "cloud_sql_tier" {
+  description = "Machine tier for Cloud SQL Postgres instance."
+  type        = string
+  default     = "db-custom-1-3840"
+}
+
+variable "cloud_sql_disk_size_gb" {
+  description = "Disk size (GB) for the Cloud SQL instance."
+  type        = number
+  default     = 20
+}
+
+variable "platform_control_database_name" {
+  description = "Primary database name for platform-control."
+  type        = string
+  default     = "platform_control"
+}
+
+variable "runtime_service_account_ids" {
+  description = "Service account IDs for runtime services."
+  type        = map(string)
+  default = {
+    platform_control_api    = "evidara-platform-control-api"
+    platform_control_worker = "evidara-platform-control-worker"
+    legal_search_api        = "evidara-legal-search-api"
+    legal_search_frontend   = "evidara-legal-search-frontend"
+    document_intelligence   = "evidara-document-intelligence"
+  }
+}
+
+variable "cloud_run_services" {
+  description = "Cloud Run service configuration keyed by service name."
+  type = map(object({
+    image                 = string
+    service_account_key   = string
+    container_port        = optional(number, 8080)
+    ingress               = optional(string, "INGRESS_TRAFFIC_ALL")
+    allow_unauthenticated = optional(bool, false)
+    min_instance_count    = optional(number, 0)
+    max_instance_count    = optional(number, 2)
+    cpu                   = optional(string, "1")
+    memory                = optional(string, "512Mi")
+    timeout_seconds       = optional(number, 300)
+    env_vars              = optional(map(string), {})
+    secret_env_vars = optional(map(object({
+      secret_name = string
+      version     = optional(string, "latest")
+    })), {})
+  }))
+  default = {}
+}
+
+variable "runtime_secret_ids" {
+  description = "Secret Manager secret IDs required by runtime services."
+  type        = map(string)
+  default = {
+    opensearch_node      = "opensearch-node"
+    opensearch_username  = "opensearch-username"
+    opensearch_password  = "opensearch-password"
+    firecrawl_api_key    = "firecrawl-api-key"
+    firecrawl_webhook    = "firecrawl-webhook-secret"
+    platform_control_dsn = "platform-control-database-url"
+  }
+}

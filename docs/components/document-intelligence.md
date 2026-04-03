@@ -10,7 +10,7 @@ Initial implementation scaffolding now exists under `document-intelligence/`. Th
 
 For the current M4 slice, freeze the primary happy path on Firecrawl-acquired HTML bundles with one primary document artifact. The existing RIS-style XML path remains useful regression coverage, but it is not the required deployment path for the first end-to-end searchable slice.
 
-The production processing pipelines are still not fully implemented. Always-on Pub/Sub runtime wiring, YAML policy resolution, spaCy or comparable NLP stages, Docling-based structured extraction, Spark-native runtime execution, deploy/promotion execution for Terraform + Databricks Bundles, richer XML source-family coverage, citation extraction, jurisdiction resolution, and stricter final contract hardening are still pending.
+The production processing pipelines are still not fully implemented. A runtime Pub/Sub consumer scaffold now exists for always-on `artifact_bundle.available` handling, but Spark-native runtime wiring, CI/CD deployment integration for Terraform + Bundles, richer XML source-family coverage, citation extraction, jurisdiction resolution, and stricter final contract hardening are still pending.
 
 See [Document Intelligence Implementation Plan](document-intelligence-implementation-plan.md) for the planned architecture and phased delivery approach.
 
@@ -54,7 +54,7 @@ Document-intelligence should lean on Databricks-native lineage for internal trac
 - [x] Define first Databricks workflow/job scaffold
 - [x] Add Terraform and SQL/bootstrap scaffolding for Unity Catalog published-surface registration
 - [x] Add an XML-first second source family with RIS-style fixture coverage
-- [ ] Add always-on runtime wiring for `artifact_bundle.available` consumption
+- [~] Add always-on runtime wiring for `artifact_bundle.available` consumption
 - [ ] Define source/jurisdiction profile registry
 - [ ] Harden HTML parsing and broaden source-family support deliberately
 

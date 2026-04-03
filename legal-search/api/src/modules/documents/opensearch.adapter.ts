@@ -14,6 +14,10 @@ import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type { DocumentsRepository } from './documents.repository';
 import type { CitationEntity, DocumentEntity, SectionEntity } from './entities/document.entities';
 
+type OpenSearchHit = {
+  _source?: Record<string, unknown>;
+};
+
 @Injectable()
 export class DocumentsOpenSearchAdapter implements DocumentsRepository {
   private readonly logger = new Logger(DocumentsOpenSearchAdapter.name);
@@ -82,10 +86,10 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
         },
       });
 
-      return (response.body.hits.hits as any[])
+      return (response.body.hits.hits as OpenSearchHit[])
         .filter((hit) => hit._source != null)
         .map((hit) => {
-          const src = hit._source;
+          const src = hit._source as Record<string, unknown>;
           return {
             section_id: src.section_id as string,
             document_id: src.document_id as string,
@@ -114,10 +118,10 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
         },
       });
 
-      return (response.body.hits.hits as any[])
+      return (response.body.hits.hits as OpenSearchHit[])
         .filter((hit) => hit._source != null)
         .map((hit) => {
-          const src = hit._source;
+          const src = hit._source as Record<string, unknown>;
           return {
             citation_id: src.citation_id as string,
             source_document_id: src.source_document_id as string,

@@ -44,6 +44,14 @@ The MVP test plan assumes bundle ingestion, canonical `Document`, `Section`, and
 
 Add `Citation` schema validation once citation extraction is implemented.
 
+### Event-Driven Tests Before Pub/Sub Hookup
+
+- Drive bundle-processing tests with checked-in `event.json` fixtures and call `ProcessingPipeline.process_event(...)` directly for the fastest feedback loop.
+- Use the local CLI and Databricks-style entrypoints as thin adapter tests only. They should prove file loading and runtime wiring, not replace pipeline unit and golden tests.
+- Prefer in-memory sinks for most event-path tests so canonical output, status events, and `document.processed` payloads can be asserted without external infrastructure.
+- Keep Delta-backed sink tests focused on published-surface writes and replay-safe persistence rather than broker delivery.
+- Add a future broker adapter behind a narrow publisher seam and test it separately with a fake client first, then a Pub/Sub emulator only if transport confidence becomes necessary.
+
 ### Golden Document Tests
 
 Use representative bundles from `tests/golden/`.

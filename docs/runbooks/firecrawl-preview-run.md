@@ -35,7 +35,7 @@ Use Retool or the API to confirm:
 
 Trigger a preview run from Retool or `POST /v1/runs` using the approved source version.
 
-**Expected output:** A `run_id` is created, the run enters a non-terminal state, and a provider job record is attached to the run.
+**Expected output:** A `run_id` is created and enters a non-terminal state. In `inline` dispatch mode, a provider job record is attached immediately; in `worker` mode, run `platform-control-connector-worker` and confirm the provider job appears after dispatch.
 
 ### 3. Confirm Firecrawl callbacks are being accepted
 

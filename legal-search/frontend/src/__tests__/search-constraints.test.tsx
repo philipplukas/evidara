@@ -39,6 +39,16 @@ function wrapper({ children }: { children: ReactNode }) {
   );
 }
 
+function wrapperWithSearchParams(searchParams: Record<string, string>) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <NuqsTestingAdapter searchParams={searchParams}>
+        <SearchConstraintsProvider>{children}</SearchConstraintsProvider>
+      </NuqsTestingAdapter>
+    );
+  };
+}
+
 describe("SearchConstraintsProvider", () => {
   /**
    * WHY: The initial state defines the "default search scope."
@@ -53,6 +63,23 @@ describe("SearchConstraintsProvider", () => {
     expect(result.current.state.context.sourceType).toBeNull();
     expect(result.current.state.context.officialOnly).toBe(false);
     expect(result.current.state.refinements).toEqual([]);
+  });
+
+  it("normalizes URL-backed source type and drops invalid refinements", () => {
+    const { result } = renderHook(() => useSearchConstraints(), {
+      wrapper: wrapperWithSearchParams({
+        sourceType: "UNSUPPORTED",
+        refinements: JSON.stringify([
+          { field: "unknown_field", type: "terms", values: ["x"] },
+          { field: "legal_area", type: "terms", values: [" CIVIL ", "unknown"] },
+        ]),
+      }),
+    });
+
+    expect(result.current.state.context.sourceType).toBeNull();
+    expect(result.current.state.refinements).toEqual([
+      { field: "legal_area", type: "terms", values: ["civil"] },
+    ]);
   });
 
   /**

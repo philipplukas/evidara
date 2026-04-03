@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
   "deltalake>=0.18.0",
+  "google-cloud-pubsub>=2.31.0,<3",
   "google-cloud-storage>=2.16.0",
   "jsonschema>=4.14.0",
   "pyarrow>=16.0.0",
@@ -26,6 +27,8 @@ document_intelligence_process_event = "document_intelligence.jobs.process_event:
 document_intelligence_databricks_process_event = "document_intelligence.jobs.databricks_process_event:cli"
 databricks_process_event = "document_intelligence.jobs.databricks_process_event:run"
 document_intelligence_render_surface_sql = "document_intelligence.bootstrap.register_surfaces:cli"
+document_intelligence_document_service = "document_intelligence.service.main:main"
+document_intelligence_runtime_consumer = "document_intelligence.jobs.runtime_consumer:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

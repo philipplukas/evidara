@@ -79,3 +79,15 @@ Optional:
 You can also derive all three published surface URIs from a single root by setting:
 
 - `DI_SURFACES_ROOT_URI`
+
+## Always-on runtime consumer
+
+Consume `artifact_bundle.available` from Pub/Sub and emit status/publication events:
+
+```bash
+document_intelligence_runtime_consumer \
+  --project-id evidara-dev \
+  --subscription-name document-intelligence-artifact-bundle-available
+```
+
+Use `--dry-run-publish` for local replay without outbound event publication.

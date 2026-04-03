@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run test",
     "seed": "npx -y tsx scripts/seed-from-opencaselaw.ts",
-    "seed:index": "npx -y tsx scripts/seed-from-opencaselaw.ts --index"
+    "seed:index": "npx -y tsx scripts/seed-from-opencaselaw.ts --index",
+    "opensearch:cutover": "npx -y tsx scripts/opensearch-alias-cutover.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.3",
