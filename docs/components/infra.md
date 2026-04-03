@@ -6,7 +6,7 @@ Provision and document runtime and deployment environments for all Evidara compo
 
 ## Current state
 
-Terraform scaffolding now exists for both the `document-intelligence` Databricks layer and the GCP runtime layer. The repo has per-environment tfvars for `dev`, `staging`, and `prod`, including GCS/PubSub plus Cloud SQL/Cloud Run/service-account/secret scaffolding in `infra/terraform/gcp/runtime_stack`. GitHub, remote state, and CI/CD apply wiring are still pending.
+Terraform scaffolding now exists for the `document-intelligence` Databricks layer, the GCP runtime layer, and a self-managed OpenSearch layer (`infra/terraform/opensearch/gke_stack`). The repo has per-environment tfvars for `dev`, `staging`, and `prod`, including GCS/PubSub plus Cloud SQL/Cloud Run/service-account/secret scaffolding in `infra/terraform/gcp/runtime_stack` and OpenSearch-on-GKE inputs in `infra/env/*/opensearch.gke.tfvars.example`. GitHub, remote state, and CI/CD apply wiring are still pending.
 
 ## Source of truth
 
@@ -20,6 +20,7 @@ Terraform scaffolding now exists for both the `document-intelligence` Databricks
 infra/
   terraform/
     gcp/         # Google Cloud resources
+    opensearch/  # OpenSearch stacks (self-managed on GKE)
     databricks/  # Databricks modules and stacks
     github/      # GitHub repository automation
   env/
@@ -77,7 +78,7 @@ The repo can provision:
 | Cloud Storage | GCP | Raw artifact storage |
 | Pub/Sub | GCP | Event messaging |
 | Databricks | Databricks | Document intelligence processing and Delta storage |
-| OpenSearch | Managed | Search serving (provider TBD) |
+| OpenSearch | GKE (self-managed) | Search serving |
 
 ## Principles
 

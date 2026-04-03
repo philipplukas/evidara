@@ -1,0 +1,13 @@
+environment = "dev"
+
+project_id = "evidara-dev"
+region     = "europe-west6"
+
+node_locations    = ["europe-west6-a"]
+node_machine_type = "e2-standard-4"
+node_disk_size_gb = 200
+node_count        = 2
+
+opensearch_replicas         = 2
+opensearch_heap_size        = "1g"
+opensearch_persistence_size = "100Gi"

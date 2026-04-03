@@ -49,3 +49,8 @@ output "cloud_run_service_names" {
     key => service.name
   }
 }
+
+output "runtime_private_egress" {
+  description = "Cloud Run private egress assumptions for runtime services."
+  value       = local.runtime_private_egress
+}

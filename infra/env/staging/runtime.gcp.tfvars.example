@@ -21,3 +21,7 @@ cloud_run_services = {
     allow_unauthenticated = false
   }
 }
+
+# Optional private egress assumptions for Cloud Run runtime services:
+# runtime_vpc_access_connector = "projects/evidara-staging/locations/europe-west6/connectors/evidara-search-staging-connector"
+# runtime_vpc_egress          = "PRIVATE_RANGES_ONLY"

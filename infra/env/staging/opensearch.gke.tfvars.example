@@ -1,0 +1,13 @@
+environment = "staging"
+
+project_id = "evidara-staging"
+region     = "europe-west6"
+
+node_locations    = ["europe-west6-a", "europe-west6-b"]
+node_machine_type = "e2-standard-4"
+node_disk_size_gb = 300
+node_count        = 3
+
+opensearch_replicas         = 3
+opensearch_heap_size        = "2g"
+opensearch_persistence_size = "200Gi"
