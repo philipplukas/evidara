@@ -1,5 +1,10 @@
 # OpenSearch on GKE Rollout Runbook
 
+Owner: Platform team
+Last reviewed: 2026-04-03
+Last verified: Not yet verified
+Applies to: dev, staging, prod
+
 ## Scope
 
 This runbook provisions and validates self-managed OpenSearch on GKE with a dedicated VPC for `dev`, `staging`, and `prod`.
@@ -22,7 +27,7 @@ terraform plan -var-file=../../../env/<env>/opensearch.gke.tfvars
 terraform apply -var-file=../../../env/<env>/opensearch.gke.tfvars
 ```
 
-2. Sync OpenSearch endpoint and credentials into Secret Manager:
+1. Sync OpenSearch endpoint and credentials into Secret Manager:
 
 ```bash
 python3 scripts/sync_opensearch_secrets.py \
@@ -31,11 +36,11 @@ python3 scripts/sync_opensearch_secrets.py \
   --opensearch-stack-dir infra/terraform/opensearch/gke_stack
 ```
 
-3. Set runtime private egress assumptions in `infra/env/<env>/runtime.gcp.tfvars`:
+1. Set runtime private egress assumptions in `infra/env/<env>/runtime.gcp.tfvars`:
    - `runtime_vpc_access_connector` (from OpenSearch stack output `vpc_connector_id`)
    - `runtime_vpc_egress` (`PRIVATE_RANGES_ONLY` recommended)
 
-4. Apply runtime stack and roll services so new secret versions and networking assumptions are active.
+1. Apply runtime stack and roll services so new secret versions and networking assumptions are active.
 
 ## Validation gates
 
@@ -51,7 +56,7 @@ terraform -chdir=infra/terraform/gcp/runtime_stack init -backend=false
 terraform -chdir=infra/terraform/gcp/runtime_stack validate
 ```
 
-2. Endpoint/auth/alias check:
+1. Endpoint/auth/alias check:
 
 ```bash
 python3 scripts/verify_opensearch_runtime.py \
@@ -60,10 +65,11 @@ python3 scripts/verify_opensearch_runtime.py \
   --password "$(gcloud secrets versions access latest --secret=opensearch-password-<env> --project=<project-id>)"
 ```
 
-3. Application validation:
-- Run legal-search replay against the new endpoint.
-- Run alias cutover script in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
-- Verify search and detail API responses.
+1. Application validation:
+
+   - Run legal-search replay against the new endpoint.
+   - Run alias cutover script in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
+   - Verify search and detail API responses.
 
 ## Rotation and recovery
 

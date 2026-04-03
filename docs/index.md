@@ -34,6 +34,7 @@ Evidara is a document intelligence platform for legal research. It ingests raw l
 | [Components](components/legal-search.md) | Domain component documentation |
 | [Testing](testing/README.md) | Testing strategy and guides |
 | [Setup](setup/environment-strategy.md) | Development and deployment setup |
+| [CD Workflow Blueprint](setup/cd-workflow-blueprint.md) | GitHub Actions + environment plumbing blueprint |
 | [API Reference](api/legal-search.md) | OpenAPI interactive docs |
 
 ## Repository structure

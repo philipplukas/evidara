@@ -1,0 +1,15 @@
+dev_project_id  = "data-platform-dev-492214"
+prod_project_id = "data-platform-prod-492214"
+region          = "europe-west6"
+
+github_owner      = "philipplukas"
+github_repository = "evidara"
+
+wif_pool_id     = "github"
+wif_provider_id = "evidara"
+
+deployer_service_account_id_dev  = "gha-deployer-dev"
+deployer_service_account_id_prod = "gha-deployer-prod"
+
+databricks_token_secret_name_dev  = "evidara-databricks-token-dev"
+databricks_token_secret_name_prod = "evidara-databricks-token-prod"
