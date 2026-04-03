@@ -21,7 +21,7 @@ test.describe("Frontend smoke journeys", () => {
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
 
-    const resultTitle = page.getByText("Art. 754 OR");
+    const resultTitle = page.getByText("Art. 754 OR").first();
     await expect(resultTitle).toBeVisible();
 
     await resultTitle.click();
@@ -33,7 +33,7 @@ test.describe("Frontend smoke journeys", () => {
     const searchInput = page.getByPlaceholder(/search article, case, commentary, citation/i);
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
-    await page.getByText("Art. 754 OR").click();
+    await page.getByText("Art. 754 OR").first().click();
     await expect(page).toHaveURL(/item=law-1/);
 
     await page.keyboard.press("Escape");
