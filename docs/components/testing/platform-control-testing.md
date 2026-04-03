@@ -64,6 +64,7 @@ Testing strategy for the platform-control component, which owns:
 
 - One source family end-to-end: register source → create version → approve → trigger run → verify artifact metadata is recorded and `artifact_bundle.available` is emitted
 - Health check endpoint returns 200
+- Readiness endpoint returns 200 when Postgres is reachable and 503 with dependency details when it is not
 - Firecrawl-backed preview run using stubbed provider responses reaches a terminal state
 
 ---
