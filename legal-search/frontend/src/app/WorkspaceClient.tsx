@@ -1,7 +1,7 @@
 "use client";
 
 import { parseAsString, useQueryState } from "nuqs";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DetailPanel } from "@/components/detail/DetailPanel";
 import { FilterPanel } from "@/components/filters/FilterPanel";
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/resizable-panels";
 import { useDesktop } from "@/hooks/use-desktop";
 import { useDetail } from "@/hooks/use-detail";
+import { runSearch } from "@/hooks/use-search";
+import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel, SearchContextViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 
@@ -30,6 +32,12 @@ interface WorkspaceClientProps {
 export default function WorkspaceClient({ searchContext, filters }: WorkspaceClientProps) {
   const isDesktop = useDesktop();
   const { state, dispatch } = useWorkspace();
+  const { state: constraints } = useSearchConstraints();
+  const [activeFilters, setActiveFilters] = useState(filters);
+
+  useEffect(() => {
+    setActiveFilters(filters);
+  }, [filters]);
 
   // URL state via nuqs — replaces manual useSearchParams + router.replace
   const [selectedId, setSelectedId] = useQueryState("item", parseAsString);
@@ -62,21 +70,32 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
   );
 
   const handlePivot = useCallback(
-    (label: string, sourceId: string) => {
-      import("@/lib/mock-data").then(({ pivotDecisionsForArt754 }) => {
-        dispatch({
-          type: "PIVOT",
-          source: {
-            type: "pivot",
-            label,
-            parentSource: state.resultSet.source,
-          },
-          results: pivotDecisionsForArt754,
-          scopeLabel: `${label} for ${state.resultSet.items.find((r) => r.id === sourceId)?.title ?? sourceId}`,
-        });
+    async (label: string, sourceId: string) => {
+      const sourceResult = state.resultSet.items.find((r) => r.id === sourceId);
+      const pivotQuery = sourceResult?.title ?? label;
+      const { results, filters: nextFilters } = await runSearch(pivotQuery, constraints);
+      setActiveFilters(nextFilters);
+      dispatch({
+        type: "PIVOT",
+        source: {
+          type: "pivot",
+          label,
+          parentSource: state.resultSet.source,
+        },
+        results,
+        scopeLabel: `${label} for ${state.resultSet.items.find((r) => r.id === sourceId)?.title ?? sourceId}`,
       });
     },
-    [dispatch, state.resultSet],
+    [dispatch, state.resultSet, constraints],
+  );
+
+  const handleSearch = useCallback(
+    async (query: string) => {
+      const { results, filters: nextFilters } = await runSearch(query, constraints);
+      setActiveFilters(nextFilters);
+      dispatch({ type: "SEARCH", query, results });
+    },
+    [constraints, dispatch],
   );
 
   const handlePin = useCallback(
@@ -136,7 +155,7 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
     return (
       <MobileWorkspace
         searchContext={searchContext}
-        filters={filters}
+        filters={activeFilters}
         results={state.resultSet.items}
         selectedId={selectedId}
         detail={detail ?? null}
@@ -152,7 +171,7 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
   // Desktop
   return (
     <div className="flex flex-col h-screen bg-surface-page">
-      <AppHeader />
+      <AppHeader onSearch={handleSearch} />
       <ContextBar context={searchContext} />
 
       <div className="flex-1 min-h-0">
@@ -167,7 +186,7 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
             collapsedSize={4}
           >
             <div className="h-full overflow-y-auto bg-surface-panel border-r border-border">
-              <FilterPanel filters={filters} />
+              <FilterPanel filters={activeFilters} />
             </div>
           </ResizablePanel>
 

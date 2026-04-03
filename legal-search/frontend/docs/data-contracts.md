@@ -127,10 +127,10 @@ fct_article_annotations   ──►  attach to article      ──► Annotation
 
 | Endpoint | Returns | Drives |
 |----------|---------|--------|
-| `POST /v1/search` | `SearchResultViewModel[]` | Center panel result list |
-| `GET /bff/articles/:id` | `DetailViewModel` | Right panel detail view |
-| `GET /bff/documents/:id/summary` | `DocumentSummary` | Result card badges + counts |
-| `GET /bff/documents/:id/related` | `{ cited_by, cites }` | Detail panel References tab |
+| `GET /v1/search` | `SearchResponseView` (`results`, `facets`, `totalResults`) | Center panel result list + filter facets |
+| `GET /v1/search/context` | `SearchContextView` | Context bar chips/tabs |
+| `GET /v1/documents/{document_id}` | `DetailView` | Right panel detail view |
+| `GET /v1/documents/{document_id}/sections` | `SectionSummary[]` | Local structure navigation |
 
 ### REST (Data layer)
 
@@ -149,16 +149,7 @@ All list endpoints use **cursor-based** pagination (`meta.next_cursor`). UI shou
 
 ---
 
-## Current State: Mock Data
+## Runtime Data Sources
 
-> Source: [`mock-data.ts`](../src/lib/mock-data.ts)
-
-The frontend currently runs on hardcoded mock data. The BFF integration points are:
-
-| Mock | BFF Replacement |
-|------|-----------------|
-| `searchResults` | `POST /v1/search` response |
-| `articleDetail` / `decisionDetail` | `GET /bff/articles/:id` response |
-| `pivotDecisionsForArt754` | `POST /v1/search` with pivot filters |
-| `filters` | Server-driven filter facets from search response |
-| `searchContext` | Server-driven search context (jurisdictions, languages, source types) |
+Frontend runtime now uses the generated API client against live BFF endpoints.
+`mock-data.ts` remains test fixture material, not the runtime source of truth.

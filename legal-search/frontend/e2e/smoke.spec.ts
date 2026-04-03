@@ -21,20 +21,18 @@ test.describe("Frontend smoke journeys", () => {
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
 
-    const resultTitle = page.getByText("Art. 754 OR").first();
-    await expect(resultTitle).toBeVisible();
-
-    await resultTitle.click();
-
-    await expect(page).toHaveURL(/item=exact-1/);
+    const firstResult = page.locator("article").first();
+    await expect(firstResult).toBeVisible();
+    await firstResult.click();
+    await expect(page).toHaveURL(/item=/);
   });
 
   test("@smoke clears selection with Escape", async ({ page }) => {
     const searchInput = page.getByPlaceholder(/search article, case, commentary, citation/i);
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
-    await page.getByText("Art. 754 OR").first().click();
-    await expect(page).toHaveURL(/item=exact-1/);
+    await page.locator("article").first().click();
+    await expect(page).toHaveURL(/item=/);
 
     await page.keyboard.press("Escape");
 

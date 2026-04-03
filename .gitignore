@@ -85,6 +85,8 @@ logs/
 generated/
 !legal-search/api/src/lib/document-intelligence/generated/
 !legal-search/api/src/lib/document-intelligence/generated/**
+!legal-search/frontend/src/lib/api/generated/
+!legal-search/frontend/src/lib/api/generated/**
 *.generated.*
 
 # --- Build outputs ---

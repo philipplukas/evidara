@@ -3,15 +3,15 @@
 import { Clock, MapPin, Search, SlidersHorizontal, User } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { type FormEvent, useEffect, useState } from "react";
-import { searchMockResults } from "@/lib/mock-data";
 import { useWorkspace } from "@/lib/workspace-store";
 
 interface AppHeaderProps {
   onOpenFilters?: () => void;
+  onSearch?: (query: string) => Promise<void>;
 }
 
-export function AppHeader({ onOpenFilters }: AppHeaderProps) {
-  const { state, dispatch } = useWorkspace();
+export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
+  const { state } = useWorkspace();
   const [urlQuery, setUrlQuery] = useQueryState("q", parseAsString.withDefault(""));
   const storeQuery = state.resultSet.source.type === "search" ? state.resultSet.source.query : "";
 
@@ -26,20 +26,21 @@ export function AppHeader({ onOpenFilters }: AppHeaderProps) {
   // On mount or when the URL ?q= param changes (e.g. browser back/forward),
   // resync the store search state if needed.
   useEffect(() => {
+    if (!onSearch) return;
     if (urlQuery && urlQuery !== storeQuery) {
-      const results = searchMockResults(urlQuery);
-      dispatch({ type: "SEARCH", query: urlQuery, results });
+      void onSearch(urlQuery);
     }
-  }, [urlQuery, storeQuery, dispatch]);
+  }, [urlQuery, storeQuery, onSearch]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = inputValue.trim();
     if (!trimmed) return;
 
-    const results = searchMockResults(trimmed);
-    dispatch({ type: "SEARCH", query: trimmed, results });
-    setUrlQuery(trimmed);
+    if (onSearch) {
+      await onSearch(trimmed);
+    }
+    await setUrlQuery(trimmed);
   };
 
   return (
