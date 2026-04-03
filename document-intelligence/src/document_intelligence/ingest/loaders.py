@@ -3,9 +3,8 @@
 import hashlib
 import importlib
 import json
-import os
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from document_intelligence.contracts.envelope import (
     ArtifactBundleManifest,
@@ -84,7 +83,9 @@ class LocalFilesystemBundleLoader(BundleLoader):
         except OSError as error:
             raise BundleLoadError(
                 "unreadable_manifest",
-                "bundle manifest could not be read at {path}".format(path=manifest_path),
+                "bundle manifest could not be read at {path}".format(
+                    path=manifest_path
+                ),
             ) from error
 
         _verify_checksum(manifest_bytes, storage_ref, "bundle manifest")
@@ -239,9 +240,7 @@ def _require_manifest_storage_ref(manifest_ref: ManifestRef):
     return manifest_ref.storage_ref
 
 
-def _verify_checksum(
-    payload: bytes, storage_ref, object_kind: str
-) -> None:
+def _verify_checksum(payload: bytes, storage_ref, object_kind: str) -> None:
     algorithm = (storage_ref.checksum_algorithm or "").lower()
     if algorithm != "sha256":
         raise BundleLoadError(
@@ -300,4 +299,3 @@ def _parse_gcs_uri(uri: str) -> Tuple[str, str]:
 def _manifest_uri(manifest_ref: ManifestRef) -> str:
     storage_ref = _require_manifest_storage_ref(manifest_ref)
     return storage_ref.uri
-

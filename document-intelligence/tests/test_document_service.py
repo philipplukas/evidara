@@ -22,13 +22,19 @@ _DOC = "doc_01jq7bdptzqv3xs0c41xpw1ybg"
 _PM = "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
 
 
-@unittest.skipUnless(TestClient is not None, "Install document-intelligence[service] for HTTP tests")
+@unittest.skipUnless(
+    TestClient is not None, "Install document-intelligence[service] for HTTP tests"
+)
 class TestDocumentServiceHTTP(unittest.TestCase):
     def setUp(self) -> None:
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         base = Path(self._dir.name)
-        payload = {"schema": "docling-like", "bbox": [1, 2, 3], "body": {"text": "Hello"}}
+        payload = {
+            "schema": "docling-like",
+            "bbox": [1, 2, 3],
+            "body": {"text": "Hello"},
+        }
         (base / f"{_DOC}.json").write_text(json.dumps(payload), encoding="utf-8")
         (base / f"{_DOC}__{_PM}.json").write_text(
             json.dumps({**payload, "rev": "specific"}),

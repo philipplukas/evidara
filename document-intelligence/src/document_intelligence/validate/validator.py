@@ -1,10 +1,14 @@
 """Lightweight contract validators aligned to the current repo schemas."""
 
 import re
-from typing import Any, Dict, Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
 from document_intelligence.canonical.models import Document, ProcessingManifest, Section
-from document_intelligence.contracts.envelope import ManifestRef, Provenance, StorageObjectRef
+from document_intelligence.contracts.envelope import (
+    ManifestRef,
+    Provenance,
+    StorageObjectRef,
+)
 
 
 _PATTERNS = {
@@ -53,7 +57,9 @@ def validate_processing_manifest(manifest: ProcessingManifest) -> None:
         raise ValueError("processing manifest version must be 1")
     if manifest.document_revision < 1:
         raise ValueError("processing manifest document_revision must be >= 1")
-    _require_non_empty(manifest.processing_version, "processing manifest processing_version")
+    _require_non_empty(
+        manifest.processing_version, "processing manifest processing_version"
+    )
     _require_non_empty(manifest.status, "processing manifest status")
     validate_provenance(manifest.provenance)
     validate_manifest_ref(manifest.input_bundle_manifest_ref)
@@ -87,7 +93,9 @@ def validate_event(event: Mapping[str, Any]) -> None:
     ]
     for field_name in required_fields:
         if event.get(field_name) is None:
-            raise ValueError("event missing required field: {field}".format(field=field_name))
+            raise ValueError(
+                "event missing required field: {field}".format(field=field_name)
+            )
     _require_pattern("event_id", str(event["event_id"]))
     if not isinstance(event["payload"], Mapping):
         raise ValueError("event payload must be an object")
@@ -112,7 +120,9 @@ def validate_manifest_ref(manifest_ref: ManifestRef) -> None:
     if manifest_ref.storage_ref is not None:
         validate_storage_ref(manifest_ref.storage_ref)
     if manifest_ref.dataset_ref is not None:
-        validate_dataset_ref(manifest_ref.dataset_ref, expect_key=True, allow_filter=True)
+        validate_dataset_ref(
+            manifest_ref.dataset_ref, expect_key=True, allow_filter=True
+        )
 
 
 def validate_storage_ref(storage_ref: StorageObjectRef) -> None:

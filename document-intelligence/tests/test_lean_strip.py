@@ -57,7 +57,10 @@ class TestExtractPlainText(unittest.TestCase):
         self.assertIn("Line three", text)
 
 
-@unittest.skipUnless(HAS_DOCLING_CORE, "docling-core not installed (install document-intelligence[service])")
+@unittest.skipUnless(
+    HAS_DOCLING_CORE,
+    "docling-core not installed (install document-intelligence[service])",
+)
 class TestDoclingPreferredTransforms(unittest.TestCase):
     def test_to_lean_dict_uses_docling_export(self) -> None:
         out = to_lean_dict(_MINIMAL_DOCLING)

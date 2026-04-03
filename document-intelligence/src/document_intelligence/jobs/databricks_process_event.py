@@ -5,6 +5,7 @@ import json
 from typing import Any, Dict, Optional
 
 from document_intelligence.config.runtime import RuntimeSettings
+from document_intelligence.ingest import load_artifact_bundle_event
 from document_intelligence.ingest.loaders import DispatchingBundleLoader
 from document_intelligence.persist.sinks import DeltaCanonicalSink
 from document_intelligence.pipeline import ProcessingPipeline
@@ -33,8 +34,7 @@ def run(
             "published surface URIs"
         )
 
-    with open(event_path, "r", encoding="utf-8") as event_file:
-        event_payload = json.load(event_file)
+    event_payload = load_artifact_bundle_event(event_path)
 
     result = ProcessingPipeline(
         bundle_loader=DispatchingBundleLoader(),

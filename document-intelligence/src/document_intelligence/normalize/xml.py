@@ -102,7 +102,9 @@ def normalize_xml_document(xml_text: str, artifact_id: str) -> NormalizedDocumen
         "normalizer": "xml_v1",
         "source_profile_ref": "default_xml_v1",
         "normalization_profile_ref": "xml_v1",
-        "source_flavor": "ris_like" if _looks_like_ris(root, extracted_metadata) else "generic_xml",
+        "source_flavor": "ris_like"
+        if _looks_like_ris(root, extracted_metadata)
+        else "generic_xml",
         "root_tag": _local_name(root.tag),
         "extracted_metadata": extracted_metadata,
     }
@@ -129,11 +131,18 @@ class _XmlIrBuilder:
             return
 
         if tag in _STRUCTURAL_LEVELS:
-            heading_block_id = self._emit_structural_heading(element, tag, parent_heading_id)
+            heading_block_id = self._emit_structural_heading(
+                element, tag, parent_heading_id
+            )
             next_parent_id = heading_block_id or parent_heading_id
             for child in list(element):
                 child_tag = _local_name(child.tag)
-                if child_tag in _TITLE_TAGS or child_tag in {"nummer", "nr", "label", "bezeichnung"}:
+                if child_tag in _TITLE_TAGS or child_tag in {
+                    "nummer",
+                    "nr",
+                    "label",
+                    "bezeichnung",
+                }:
                     continue
                 self.visit(child, next_parent_id)
             return
@@ -222,7 +231,9 @@ def _choose_title(root, blocks) -> Optional[str]:
 
 def _extract_metadata(root) -> Dict[str, str]:
     output: Dict[str, str] = {}
-    language = root.attrib.get("{http://www.w3.org/XML/1998/namespace}lang") or root.attrib.get("lang")
+    language = root.attrib.get(
+        "{http://www.w3.org/XML/1998/namespace}lang"
+    ) or root.attrib.get("lang")
     if language:
         output["language"] = language
     output["root_tag"] = _local_name(root.tag)
@@ -242,7 +253,9 @@ def _looks_like_ris(root, extracted_metadata: Dict[str, str]) -> bool:
     if "dokumentnummer" in extracted_metadata or "gesetzesnummer" in extracted_metadata:
         return True
     observed_tags = {_local_name(element.tag) for element in root.iter()}
-    return bool(observed_tags & {"paragraf", "absatz", "artikel", "anlage", "kundmachungsorgan"})
+    return bool(
+        observed_tags & {"paragraf", "absatz", "artikel", "anlage", "kundmachungsorgan"}
+    )
 
 
 def _extract_heading_text(element) -> Optional[str]:

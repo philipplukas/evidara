@@ -4,7 +4,10 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from document_intelligence.events.publisher import EventPublisherConfig, PubSubEventPublisher
+from document_intelligence.events.publisher import (
+    EventPublisherConfig,
+    PubSubEventPublisher,
+)
 
 
 class _StubPublishFuture:
@@ -33,7 +36,9 @@ class PubSubEventPublisherTests(unittest.TestCase):
             client=client,  # type: ignore[arg-type]
         )
 
-        publisher.publish_status_event({"event_type": "document.processing_status.updated"})
+        publisher.publish_status_event(
+            {"event_type": "document.processing_status.updated"}
+        )
         publisher.publish_document_processed_event({"event_type": "document.processed"})
 
         self.assertEqual(len(client.calls), 2)

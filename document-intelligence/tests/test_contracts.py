@@ -12,14 +12,16 @@ from document_intelligence.contracts.envelope import (
     ArtifactBundleManifest,
     EnvelopeError,
 )
-from document_intelligence.ingest.loaders import BundleLoadError, LocalFilesystemBundleLoader
+from document_intelligence.ingest.loaders import (
+    BundleLoadError,
+    LocalFilesystemBundleLoader,
+)
 from document_intelligence.validate.schema_validation import (
     build_contract_validator,
     load_contract_example,
     validate_instance_against_contract,
 )
 from support import (
-    ARTIFACT_ID,
     BUNDLE_MANIFEST_ID,
     EVENT_ID,
     SOURCE_ID,
@@ -33,7 +35,9 @@ from support import (
 
 class ArtifactBundleAvailableEventTests(unittest.TestCase):
     def test_parses_current_contract_shape(self) -> None:
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False
+        ) as manifest_handle:
             json.dump({"placeholder": True}, manifest_handle)
             manifest_path = manifest_handle.name
 
@@ -89,7 +93,9 @@ class ArtifactBundleAvailableEventTests(unittest.TestCase):
         self.assertEqual(event.extra_fields["extra_event_field"], "also-preserved")
 
     def test_parses_manifest_with_primary_html_artifact(self) -> None:
-        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as artifact_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".html", delete=False
+        ) as artifact_handle:
             artifact_handle.write("<html><body>Hello</body></html>")
             artifact_path = artifact_handle.name
 
@@ -113,7 +119,9 @@ class ArtifactBundleAvailableEventTests(unittest.TestCase):
             )
 
     def test_rejects_manifest_without_selectable_primary_artifact(self) -> None:
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as artifact_handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False
+        ) as artifact_handle:
             json.dump({"metadata": True}, artifact_handle)
             artifact_path = artifact_handle.name
 
@@ -147,10 +155,12 @@ class ContractSchemaValidationTests(unittest.TestCase):
         example_to_schema = {
             "artifact-bundle-available.json": "events/artifact-bundle-available.schema.json",
             "artifact-bundle-manifest.json": "schemas/artifact-bundle-manifest.schema.json",
+            "document.json": "schemas/document.schema.json",
             "document-processed.json": "events/document-processed.schema.json",
             "document-processing-status-updated.json": "events/document-processing-status-updated.schema.json",
             "document-withdrawn.json": "events/document-withdrawn.schema.json",
             "processing-manifest.json": "schemas/processing-manifest.schema.json",
+            "section.json": "schemas/section.schema.json",
         }
 
         for example_name, schema_path in example_to_schema.items():
@@ -164,7 +174,9 @@ class ContractSchemaValidationTests(unittest.TestCase):
         validator = build_contract_validator("events/document-processed.schema.json")
         validator.validate(load_contract_example("document-processed.json"))
 
-        withdrawn_validator = build_contract_validator("events/document-withdrawn.schema.json")
+        withdrawn_validator = build_contract_validator(
+            "events/document-withdrawn.schema.json"
+        )
         withdrawn_validator.validate(load_contract_example("document-withdrawn.json"))
 
 

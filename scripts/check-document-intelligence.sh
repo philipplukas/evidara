@@ -3,9 +3,9 @@ set -euo pipefail
 
 cd document-intelligence
 
-py="${PYTHON:-python3}"
-command -v "$py" >/dev/null 2>&1 || py="python"
+echo "Running document-intelligence lint checks..."
+python3 -m ruff check src tests
+python3 -m ruff format --check src tests
 
-"$py" -m pip install --upgrade pip
-"$py" -m pip install -e ".[service]"
-"$py" -m unittest discover -s tests -v
+echo "Running document-intelligence test suite..."
+python3 -m unittest discover -s tests -v

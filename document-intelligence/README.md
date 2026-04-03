@@ -5,6 +5,7 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 ## What exists
 
 - Tolerant parsing of `artifact_bundle.available` events
+- Pub/Sub push-envelope decoding for the local CLI and Databricks entrypoints
 - Bundle-manifest and artifact loading for `file://`, plain filesystem paths, and `gs://`
 - Minimal HTML and XML normalization into a shared IR and section extraction from that IR
 - Contract-shaped `Document`, `Section`, and `ProcessingManifest` models
@@ -23,26 +24,45 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 ## What does not exist yet
 
 - Databricks workflow wiring
+- Always-on Pub/Sub consumer/subscription wiring
 - Spark-native Delta writes and Unity Catalog table/view creation automation
-- Terraform apply/deploy integration in CI/CD
+- Terraform and Databricks bundle deploy/promotion integration in CI/CD
+- Policy Resolver YAML rules and source-profile registry
+- spaCy or comparable NLP pipeline stages
+- Docling integration for structured content extraction
 - Citation extraction
 - Canonical jurisdiction assignment
 - RIS-specific XML schema tuning beyond the current heuristic path
 
-## Local test run
+## Local setup
 
 ```bash
 cd document-intelligence
-python3 -m unittest discover -s tests -v
+python3 -m pip install -e ".[dev]"
 ```
 
-HTTP **Document Service** (OpenAPI: `contracts/api/document-intelligence.openapi.yaml`) uses the optional **`[service]`** extra (`fastapi`, `uvicorn`, `docling-core`). Lean and plain-text responses prefer **`DoclingDocument.model_validate`** + **`export_to_dict`** / **`export_to_text`**; invalid or non-Docling JSON falls back to heuristic stripping.
+## Local quality gate
 
 ```bash
-pip install -e ".[service]"
-export DOCUMENT_SERVICE_CONTENT_DIR=/path/to/json/files
-document-intelligence-document-service
+bash scripts/check-document-intelligence.sh
 ```
+
+## Runtime / deployment validation
+
+```bash
+bash scripts/check-document-intelligence-runtime.sh
+```
+
+The Databricks bundle now carries checked-in `dev`, `staging`, and `prod` targets that mirror the tracked Terraform environment inputs for the published surface root and workspace host.
+
+## Event input shape
+
+The local CLI and Databricks entrypoints now accept either:
+
+- a raw `artifact_bundle.available` JSON payload
+- a Pub/Sub push envelope whose `message.data` contains base64-encoded event JSON
+
+That keeps local execution aligned with the eventual subscription payload shape without requiring a live subscriber yet.
 
 ## Optional Delta sink configuration
 

@@ -8,8 +8,9 @@ from typing import Any, Dict
 from jsonschema import FormatChecker, RefResolver, validators
 
 
-def validate_instance_against_contract(instance: Any, schema_relative_path: str) -> None:
-    schema = load_contract_schema(schema_relative_path)
+def validate_instance_against_contract(
+    instance: Any, schema_relative_path: str
+) -> None:
     validator = build_contract_validator(schema_relative_path)
     validator.validate(instance)
 

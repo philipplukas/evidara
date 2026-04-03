@@ -37,5 +37,7 @@ class PubSubEventPublisher:
             self._config.project_id,
             topic_name,
         )
-        payload = json.dumps(event, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        payload = json.dumps(event, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
         self._client.publish(topic_path, payload).result()

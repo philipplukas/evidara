@@ -33,7 +33,9 @@ PUBLISHED_DOCUMENTS = PublishedSurfaceDefinition(
     description="Canonical document revisions published by document-intelligence.",
     columns=(
         SurfaceColumn("document_id", "string", False, "Stable logical document ID."),
-        SurfaceColumn("document_revision", "integer", False, "Published document revision."),
+        SurfaceColumn(
+            "document_revision", "integer", False, "Published document revision."
+        ),
         SurfaceColumn(
             "processing_manifest_id",
             "string",
@@ -47,12 +49,16 @@ PUBLISHED_DOCUMENTS = PublishedSurfaceDefinition(
             False,
             "Selected primary artifact for this canonical revision.",
         ),
-        SurfaceColumn("jurisdiction_id", "string", True, "Resolved jurisdiction reference."),
+        SurfaceColumn(
+            "jurisdiction_id", "string", True, "Resolved jurisdiction reference."
+        ),
         SurfaceColumn("authority_id", "string", True, "Resolved authority reference."),
         SurfaceColumn("title", "string", False, "Canonical title."),
         SurfaceColumn("document_type", "string", True, "Canonical document type."),
         SurfaceColumn("effective_date", "date", True, "Resolved effective date."),
-        SurfaceColumn("processed_at", "timestamp", False, "Canonical publication timestamp."),
+        SurfaceColumn(
+            "processed_at", "timestamp", False, "Canonical publication timestamp."
+        ),
         SurfaceColumn("processing_version", "string", False, "DI pipeline version."),
         SurfaceColumn("lifecycle_status", "string", False, "Lifecycle status."),
         SurfaceColumn("full_text", "string", False, "Normalized full text."),
@@ -72,7 +78,9 @@ PUBLISHED_SECTIONS = PublishedSurfaceDefinition(
     columns=(
         SurfaceColumn("section_id", "string", False, "Section identifier."),
         SurfaceColumn("document_id", "string", False, "Parent document ID."),
-        SurfaceColumn("document_revision", "integer", False, "Parent document revision."),
+        SurfaceColumn(
+            "document_revision", "integer", False, "Parent document revision."
+        ),
         SurfaceColumn(
             "processing_manifest_id",
             "string",
@@ -80,8 +88,12 @@ PUBLISHED_SECTIONS = PublishedSurfaceDefinition(
             "Processing result that produced the section.",
         ),
         SurfaceColumn("provenance", "object", False, "Bundle and run lineage block."),
-        SurfaceColumn("parent_section_id", "string", True, "Parent section ID when nested."),
-        SurfaceColumn("ordinal", "integer", False, "Section order within the document."),
+        SurfaceColumn(
+            "parent_section_id", "string", True, "Parent section ID when nested."
+        ),
+        SurfaceColumn(
+            "ordinal", "integer", False, "Section order within the document."
+        ),
         SurfaceColumn("depth", "integer", False, "Section nesting depth."),
         SurfaceColumn("title", "string", True, "Section heading."),
         SurfaceColumn("content", "string", False, "Canonical section content."),
@@ -104,9 +116,13 @@ PROCESSING_MANIFESTS = PublishedSurfaceDefinition(
             False,
             "Immutable processing result ID.",
         ),
-        SurfaceColumn("manifest_version", "integer", False, "Manifest contract version."),
+        SurfaceColumn(
+            "manifest_version", "integer", False, "Manifest contract version."
+        ),
         SurfaceColumn("document_id", "string", False, "Document identity."),
-        SurfaceColumn("document_revision", "integer", False, "Published document revision."),
+        SurfaceColumn(
+            "document_revision", "integer", False, "Published document revision."
+        ),
         SurfaceColumn("processing_version", "string", False, "DI pipeline version."),
         SurfaceColumn("status", "string", False, "Processing lifecycle state."),
         SurfaceColumn("provenance", "object", False, "Bundle and run lineage block."),
@@ -155,7 +171,9 @@ PROCESSING_MANIFESTS = PublishedSurfaceDefinition(
         SurfaceColumn("document_count", "integer", False, "Published document count."),
         SurfaceColumn("section_count", "integer", False, "Published section count."),
         SurfaceColumn("citation_count", "integer", False, "Published citation count."),
-        SurfaceColumn("failure", "object", True, "Failure payload for failed processing."),
+        SurfaceColumn(
+            "failure", "object", True, "Failure payload for failed processing."
+        ),
     ),
 )
 
@@ -172,4 +190,3 @@ def iter_surface_definitions() -> Iterable[PublishedSurfaceDefinition]:
 
 def get_surface_definition(surface_name: str) -> PublishedSurfaceDefinition:
     return SURFACE_DEFINITIONS[surface_name]
-

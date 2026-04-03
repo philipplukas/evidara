@@ -6,7 +6,7 @@ Turn immutable artifact bundles into canonical structured document intelligence.
 
 ## Current state
 
-Initial implementation scaffolding now exists under `document-intelligence/`. The component now has a Python package skeleton, tolerant inbound event parsing, bundle-manifest and artifact loading for local files and `gs://`, minimal HTML and XML normalization with shared-IR section extraction, explicit published-surface definitions, an in-memory sink plus a Delta-backed sink, offline JSON Schema validation helpers, a Databricks runtime entrypoint, Databricks Asset Bundle files, a reusable Terraform module plus top-level Databricks stack and `dev` / `staging` / `prod` tfvars for Unity Catalog scaffolding, SQL/bootstrap assets for published-surface registration, and bundle/adapter/CLI tests for the first processing path.
+Initial implementation scaffolding now exists under `document-intelligence/`. The component now has a Python package skeleton, tolerant inbound event parsing, file-based intake for both raw `artifact_bundle.available` events and Pub/Sub push envelopes, bundle-manifest and artifact loading for local files and `gs://`, minimal HTML and XML normalization with shared-IR section extraction, explicit published-surface definitions, an in-memory sink plus a Delta-backed sink, offline JSON Schema validation helpers, a Databricks runtime entrypoint, Databricks Asset Bundle files with tracked `dev` / `staging` / `prod` targets, a reusable Terraform module plus top-level Databricks stack and `dev` / `staging` / `prod` tfvars for Unity Catalog scaffolding, SQL/bootstrap assets for published-surface registration, a dedicated local quality gate under [`../../scripts/check-document-intelligence.sh`](../../scripts/check-document-intelligence.sh), a runtime/deployment validation script under [`../../scripts/check-document-intelligence-runtime.sh`](../../scripts/check-document-intelligence-runtime.sh), and component CI coverage in GitHub Actions for linting, regression tests, and Terraform validation.
 
 For the current M4 slice, freeze the primary happy path on Firecrawl-acquired HTML bundles with one primary document artifact. The existing RIS-style XML path remains useful regression coverage, but it is not the required deployment path for the first end-to-end searchable slice.
 
@@ -21,7 +21,6 @@ See [Document Intelligence Implementation Plan](document-intelligence-implementa
 - Unity Catalog lineage for DI-internal job, table, and published-surface lineage
 - Processing logic in Databricks workflows
 - `contracts/schemas/document.schema.json`, `contracts/schemas/section.schema.json`, and `contracts/schemas/processing-manifest.schema.json`
-- **Document Service (read API):** `contracts/api/document-intelligence.openapi.yaml` — Docling full / lean / plain text over HTTPS (ADR-0010). The optional `[service]` stack uses **`docling-core`** (`DoclingDocument.export_to_dict` / `export_to_text`) when stored JSON validates; otherwise heuristic stripping / string flattening.
 
 ## Responsibilities
 
@@ -110,6 +109,7 @@ Key tests:
 - GCS loader tests with stubbed storage client behavior
 - Delta sink tests with real local Delta tables
 - CLI smoke test for bundle processing
+- Pub/Sub push-envelope decoding tests for both processing entrypoints
 - Databricks runtime wrapper and bundle-config tests
 - Invariant checks on provenance, revisions, and section ordering
 - One minimal end-to-end processing path

@@ -32,11 +32,7 @@ class Document:
             "document_revision": self.document_revision,
             "processing_manifest_id": self.processing_manifest_id,
             "provenance": self.provenance.to_dict(),
-            "artifact_id": self.primary_artifact_id,
             "primary_artifact_id": self.primary_artifact_id,
-            "source_id": self.provenance.source_id,
-            "source_version_id": self.provenance.source_version_id,
-            "run_id": self.provenance.run_id,
             "jurisdiction_id": self.jurisdiction_id,
             "authority_id": self.authority_id,
             "title": self.title,
@@ -128,7 +124,9 @@ class ProcessingManifest:
         if self.canonical_ready_at is not None:
             output["canonical_ready_at"] = self.canonical_ready_at
         if self.supersedes_processing_manifest_id is not None:
-            output["supersedes_processing_manifest_id"] = self.supersedes_processing_manifest_id
+            output["supersedes_processing_manifest_id"] = (
+                self.supersedes_processing_manifest_id
+            )
         if self.failure is not None:
             output["failure"] = dict(self.failure)
         return output

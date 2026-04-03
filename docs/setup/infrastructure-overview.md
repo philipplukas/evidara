@@ -68,6 +68,7 @@ Current repo scaffolding splits ownership this way:
 - Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for both runtime GCP and DI Databricks stacks
 - Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job
 - SQL/bootstrap assets under [`../../document-intelligence/databricks/sql`](../../document-intelligence/databricks/sql) register the published Delta surfaces after the first successful write
+- GitHub Actions validates the DI Terraform path plus the Databricks bundle/runtime shape before merge
 
 ### Published Surfaces
 

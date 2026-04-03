@@ -64,7 +64,9 @@ class ManifestRef:
         storage_ref = data.get("storage_ref")
         dataset_ref = data.get("dataset_ref")
         if storage_ref is None and dataset_ref is None:
-            raise EnvelopeError("manifest ref requires either storage_ref or dataset_ref")
+            raise EnvelopeError(
+                "manifest ref requires either storage_ref or dataset_ref"
+            )
         return cls(
             manifest_id=str(data["manifest_id"]),
             manifest_type=str(data["manifest_type"]),
@@ -185,7 +187,9 @@ class ArtifactBundleAvailablePayload:
         if not isinstance(provenance, Mapping):
             raise EnvelopeError("artifact bundle payload provenance must be an object")
         if not isinstance(manifest_ref, Mapping):
-            raise EnvelopeError("artifact bundle payload bundle_manifest_ref must be an object")
+            raise EnvelopeError(
+                "artifact bundle payload bundle_manifest_ref must be an object"
+            )
 
         known_fields = {
             "bundle_manifest_id",
@@ -202,7 +206,9 @@ class ArtifactBundleAvailablePayload:
             source_origin_kind=str(data["source_origin_kind"]),
             trust_tier=str(data["trust_tier"]),
             bundle_manifest_ref=ManifestRef.from_dict(manifest_ref),
-            extra_fields={key: value for key, value in data.items() if key not in known_fields},
+            extra_fields={
+                key: value for key, value in data.items() if key not in known_fields
+            },
         )
 
 
@@ -236,11 +242,17 @@ class ArtifactBundleAvailableEvent:
 
         event_type = str(data["event_type"])
         if event_type != "artifact_bundle.available":
-            raise EnvelopeError("unexpected event type: {event_type}".format(event_type=event_type))
+            raise EnvelopeError(
+                "unexpected event type: {event_type}".format(event_type=event_type)
+            )
 
         producer = str(data["producer"])
         if producer != "platform-control":
-            raise EnvelopeError("unexpected producer for artifact_bundle.available: {producer}".format(producer=producer))
+            raise EnvelopeError(
+                "unexpected producer for artifact_bundle.available: {producer}".format(
+                    producer=producer
+                )
+            )
 
         known_fields = {
             "event_type",
@@ -261,7 +273,9 @@ class ArtifactBundleAvailableEvent:
             producer=producer,
             correlation_id=_optional_string(data.get("correlation_id")),
             causation_id=_optional_string(data.get("causation_id")),
-            extra_fields={key: value for key, value in data.items() if key not in known_fields},
+            extra_fields={
+                key: value for key, value in data.items() if key not in known_fields
+            },
         )
 
 
@@ -275,7 +289,9 @@ class ArtifactBundleManifestArtifact:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "ArtifactBundleManifestArtifact":
         required_fields = ["artifact_id", "artifact_role", "storage_ref"]
-        _raise_for_missing_fields(data, required_fields, "artifact bundle manifest artifact")
+        _raise_for_missing_fields(
+            data, required_fields, "artifact bundle manifest artifact"
+        )
 
         storage_ref = data.get("storage_ref")
         if not isinstance(storage_ref, Mapping):
@@ -286,7 +302,9 @@ class ArtifactBundleManifestArtifact:
             artifact_id=str(data["artifact_id"]),
             artifact_role=str(data["artifact_role"]),
             storage_ref=StorageObjectRef.from_dict(storage_ref),
-            extra_fields={key: value for key, value in data.items() if key not in known_fields},
+            extra_fields={
+                key: value for key, value in data.items() if key not in known_fields
+            },
         )
 
 
@@ -331,7 +349,9 @@ class ArtifactBundleManifest:
         if not isinstance(provenance, Mapping):
             raise EnvelopeError("artifact bundle manifest provenance must be an object")
         if not isinstance(artifacts, list) or not artifacts:
-            raise EnvelopeError("artifact bundle manifest artifacts must be a non-empty array")
+            raise EnvelopeError(
+                "artifact bundle manifest artifacts must be a non-empty array"
+            )
 
         known_fields = {
             "bundle_manifest_id",
@@ -363,20 +383,28 @@ class ArtifactBundleManifest:
             source_defaults=_copy_dict(data.get("source_defaults"), "source_defaults"),
             parser_hints=_copy_dict(data.get("parser_hints"), "parser_hints"),
             di_overrides=_copy_dict(data.get("di_overrides") or {}, "di_overrides"),
-            reference_context=_copy_dict(data.get("reference_context"), "reference_context"),
+            reference_context=_copy_dict(
+                data.get("reference_context"), "reference_context"
+            ),
             artifacts=[
                 ArtifactBundleManifestArtifact.from_dict(artifact)
                 for artifact in artifacts
                 if isinstance(artifact, Mapping)
             ],
-            bundle_metadata=_copy_dict(data.get("bundle_metadata") or {}, "bundle_metadata"),
-            extra_fields={key: value for key, value in data.items() if key not in known_fields},
+            bundle_metadata=_copy_dict(
+                data.get("bundle_metadata") or {}, "bundle_metadata"
+            ),
+            extra_fields={
+                key: value for key, value in data.items() if key not in known_fields
+            },
         )
 
 
 def _copy_dict(value: Any, field_name: str) -> Dict[str, Any]:
     if not isinstance(value, Mapping):
-        raise EnvelopeError("{field_name} must be an object".format(field_name=field_name))
+        raise EnvelopeError(
+            "{field_name} must be an object".format(field_name=field_name)
+        )
     return dict(value)
 
 

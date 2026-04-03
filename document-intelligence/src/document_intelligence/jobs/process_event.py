@@ -5,6 +5,7 @@ import os
 import sys
 
 from document_intelligence.config.runtime import RuntimeSettings
+from document_intelligence.ingest import load_artifact_bundle_event
 from document_intelligence.pipeline import ProcessingPipeline
 from document_intelligence.persist.sinks import (
     DeltaCanonicalSink,
@@ -19,8 +20,7 @@ def main(argv=None) -> int:
         return 1
 
     event_path = args[0]
-    with open(event_path, "r", encoding="utf-8") as event_file:
-        event_payload = json.load(event_file)
+    event_payload = load_artifact_bundle_event(event_path)
 
     result = ProcessingPipeline(
         sink=_build_sink_from_environment(),
@@ -35,6 +35,7 @@ def main(argv=None) -> int:
     }
     print(json.dumps(output, indent=2, sort_keys=True))
     return 0
+
 
 def _build_sink_from_environment():
     runtime_settings = RuntimeSettings.from_environment()
