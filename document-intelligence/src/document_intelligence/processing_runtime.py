@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from document_intelligence.config.runtime import RuntimeSettings
 from document_intelligence.contracts.envelope import ArtifactBundleAvailableEvent
+from document_intelligence.errors import ProcessingError
 from document_intelligence.ingest import resolve_artifact_bundle_event
 from document_intelligence.ingest.loaders import BundleLoader
 from document_intelligence.persist.sinks import (
@@ -37,10 +38,16 @@ def process_artifact_bundle_event(
     *,
     runtime_settings: Optional[RuntimeSettings] = None,
     bundle_loader: Optional[BundleLoader] = None,
+    require_surface_uris: bool = False,
 ) -> dict[str, Any]:
     resolved_event_payload = resolve_artifact_bundle_event(event_payload)
     event = ArtifactBundleAvailableEvent.from_dict(resolved_event_payload)
     effective_settings = runtime_settings or RuntimeSettings.from_environment()
+    if require_surface_uris and effective_settings.surface_uris is None:
+        raise ProcessingError(
+            "missing_runtime_surface_config",
+            "runtime ingestion requires DI_SURFACES_ROOT_URI or all three explicit published surface URIs",
+        )
     result = build_processing_pipeline(
         runtime_settings=effective_settings,
         bundle_loader=bundle_loader,

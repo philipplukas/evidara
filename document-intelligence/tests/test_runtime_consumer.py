@@ -46,11 +46,17 @@ class TestRuntimeConsumerHTTP(unittest.TestCase):
 
     def test_processes_raw_artifact_bundle_event(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            client = TestClient(create_app())
-            response = client.post(
-                "/internal/events/artifact-bundles:process",
-                json=self._build_event_payload(temp_dir),
+            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(
+                temp_dir, "delta_surfaces"
             )
+            try:
+                client = TestClient(create_app())
+                response = client.post(
+                    "/internal/events/artifact-bundles:process",
+                    json=self._build_event_payload(temp_dir),
+                )
+            finally:
+                del os.environ["DI_SURFACES_ROOT_URI"]
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "processed")
@@ -60,11 +66,19 @@ class TestRuntimeConsumerHTTP(unittest.TestCase):
 
     def test_processes_pubsub_push_envelope(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            client = TestClient(create_app())
-            response = client.post(
-                "/internal/events/artifact-bundles:process",
-                json=build_pubsub_push_envelope(self._build_event_payload(temp_dir)),
+            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(
+                temp_dir, "delta_surfaces"
             )
+            try:
+                client = TestClient(create_app())
+                response = client.post(
+                    "/internal/events/artifact-bundles:process",
+                    json=build_pubsub_push_envelope(
+                        self._build_event_payload(temp_dir)
+                    ),
+                )
+            finally:
+                del os.environ["DI_SURFACES_ROOT_URI"]
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "processed")
@@ -84,6 +98,9 @@ class TestRuntimeConsumerHTTP(unittest.TestCase):
             os.environ["DOCUMENT_INTELLIGENCE_INGEST_BEARER_TOKEN"] = (
                 "secret-ingest-token"
             )
+            os.environ["DI_SURFACES_ROOT_URI"] = os.path.join(
+                temp_dir, "delta_surfaces"
+            )
             try:
                 client = TestClient(create_app())
                 payload = self._build_event_payload(temp_dir)
@@ -98,6 +115,17 @@ class TestRuntimeConsumerHTTP(unittest.TestCase):
                 )
             finally:
                 del os.environ["DOCUMENT_INTELLIGENCE_INGEST_BEARER_TOKEN"]
+                del os.environ["DI_SURFACES_ROOT_URI"]
 
         self.assertEqual(unauthorized.status_code, 401)
         self.assertEqual(authorized.status_code, 200)
+
+    def test_requires_surface_configuration_for_default_processor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client = TestClient(create_app(), raise_server_exceptions=False)
+            response = client.post(
+                "/internal/events/artifact-bundles:process",
+                json=self._build_event_payload(temp_dir),
+            )
+
+        self.assertEqual(response.status_code, 500)

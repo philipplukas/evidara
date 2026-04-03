@@ -32,7 +32,10 @@ def verify_ingest_bearer(
 def create_app(
     event_processor: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> FastAPI:
-    processor = event_processor or process_artifact_bundle_event
+    def _default_event_processor(body: dict[str, Any]) -> dict[str, Any]:
+        return process_artifact_bundle_event(body, require_surface_uris=True)
+
+    processor = event_processor or _default_event_processor
 
     app = FastAPI(
         title="Document Intelligence — Runtime Ingress",
