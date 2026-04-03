@@ -22,7 +22,11 @@ def test_get_raw_artifact_publisher_defaults_to_noop() -> None:
     assert isinstance(publisher, NoopRawArtifactPublisher)
 
 
-def test_get_raw_artifact_publisher_requires_project_for_short_topic_names() -> None:
+def test_get_raw_artifact_publisher_requires_project_for_short_topic_names(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "platform_control.events.publisher.pubsub_v1.PublisherClient",
+        FakePublisherClient,
+    )
     settings = Settings(
         event_publisher_backend="pubsub",
         gcp_project_id=None,
