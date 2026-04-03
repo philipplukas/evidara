@@ -307,7 +307,7 @@ async function main() {
   // 5. Optionally index into OpenSearch
   if (shouldIndex) {
     const nodeUrl = process.env.OPENSEARCH_NODE ?? 'http://localhost:9200';
-    const indexName = process.env.OPENSEARCH_INDEX_DOCUMENTS ?? 'documents';
+    const indexName = process.env.OPENSEARCH_ALIAS_WRITE ?? 'documents-write';
 
     await ensureIndex(indexName, nodeUrl);
     await bulkIndex(projections, indexName, nodeUrl);

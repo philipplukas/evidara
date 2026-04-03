@@ -19,6 +19,24 @@ cloud_run_services = {
     image               = "europe-west6-docker.pkg.dev/evidara-staging/runtime/legal-search-api:latest"
     service_account_key = "legal_search_api"
     allow_unauthenticated = false
+    env_vars = {
+      OPENSEARCH_ALIAS_READ              = "evidara-documents-read-staging"
+      OPENSEARCH_ALIAS_WRITE             = "evidara-documents-write-staging"
+      OPENSEARCH_INDEX_SECTIONS           = "evidara-sections-read-staging"
+      OPENSEARCH_INDEX_CITATIONS          = "evidara-citations-read-staging"
+      OPENSEARCH_INDEX_PROJECTION_HISTORY = "evidara-projection-history-staging"
+    }
+    secret_env_vars = {
+      OPENSEARCH_NODE = {
+        secret_name = "opensearch_node"
+      }
+      OPENSEARCH_USERNAME = {
+        secret_name = "opensearch_username"
+      }
+      OPENSEARCH_PASSWORD = {
+        secret_name = "opensearch_password"
+      }
+    }
   }
 }
 

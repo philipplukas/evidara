@@ -11,7 +11,7 @@ import type {
 @Injectable()
 export class ProjectionOpenSearchAdapter implements ProjectionRepository {
   private readonly logger = new Logger(ProjectionOpenSearchAdapter.name);
-  private readonly indexDocuments: string;
+  private readonly indexDocumentsWrite: string;
   private readonly indexProjectionHistory: string;
 
   constructor(
@@ -20,7 +20,8 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
     @Inject(ConfigService)
     config: ConfigService,
   ) {
-    this.indexDocuments = config.get<string>('opensearch.indexDocuments') ?? 'documents';
+    this.indexDocumentsWrite =
+      config.get<string>('opensearch.indexDocumentsWrite') ?? 'documents-write';
     this.indexProjectionHistory =
       config.get<string>('opensearch.indexProjectionHistory') ?? 'projection-history';
   }
@@ -61,7 +62,7 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
 
   async upsertProjection(document: SearchProjectionDocument): Promise<void> {
     await this.client.index({
-      index: this.indexDocuments,
+      index: this.indexDocumentsWrite,
       id: document.document_id,
       body: document,
       refresh: 'wait_for',
@@ -71,7 +72,7 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
   async deleteProjection(documentId: string): Promise<void> {
     try {
       await this.client.delete({
-        index: this.indexDocuments,
+        index: this.indexDocumentsWrite,
         id: documentId,
         refresh: 'wait_for',
       });

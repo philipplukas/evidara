@@ -31,7 +31,7 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
     @Inject(ConfigService)
     config: ConfigService,
   ) {
-    this.indexDocuments = config.get<string>('opensearch.indexDocuments') ?? 'documents';
+    this.indexDocuments = config.get<string>('opensearch.indexDocumentsRead') ?? 'documents-read';
     this.indexSections = config.get<string>('opensearch.indexSections') ?? 'sections';
     this.indexCitations = config.get<string>('opensearch.indexCitations') ?? 'citations';
   }
