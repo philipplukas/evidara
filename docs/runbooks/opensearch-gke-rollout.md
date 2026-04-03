@@ -27,7 +27,7 @@ terraform plan -var-file=../../env/<env>/opensearch.gke.tfvars
 terraform apply -var-file=../../env/<env>/opensearch.gke.tfvars
 ```
 
-2. Sync OpenSearch endpoint and credentials into Secret Manager:
+1. Sync OpenSearch endpoint and credentials into Secret Manager:
 
 ```bash
 python3 scripts/sync_opensearch_secrets.py \
@@ -36,9 +36,9 @@ python3 scripts/sync_opensearch_secrets.py \
   --opensearch-stack-dir infra/terraform/opensearch/gke_stack
 ```
 
-3. Update runtime Cloud Run services to use the VPC connector output (`vpc_connector_id`) in `runtime.gcp.tfvars` (`vpc_connector`, `vpc_egress`), then apply runtime stack.
+1. Update runtime Cloud Run services to use the VPC connector output (`vpc_connector_id`) in `runtime.gcp.tfvars` (`vpc_connector`, `vpc_egress`), then apply runtime stack.
 
-4. Roll runtime services and verify they can connect to OpenSearch.
+1. Roll runtime services and verify they can connect to OpenSearch.
 
 ## Validation gates
 
@@ -52,7 +52,7 @@ terraform -chdir=infra/terraform/opensearch/gke_stack validate
 terraform -chdir=infra/terraform/gcp/runtime_stack validate
 ```
 
-2. Endpoint/auth/alias check:
+1. Endpoint/auth/alias check:
 
 ```bash
 python3 scripts/verify_opensearch_runtime.py \
@@ -61,10 +61,11 @@ python3 scripts/verify_opensearch_runtime.py \
   --password "$(gcloud secrets versions access latest --secret=opensearch-password-<env> --project=<project-id>)"
 ```
 
-3. Application validation:
-- Run legal-search projection replay against the new endpoint.
-- Run alias cutover script in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
-- Verify search and detail API responses against expected documents.
+1. Application validation:
+
+   - Run legal-search projection replay against the new endpoint.
+   - Run alias cutover script in `legal-search/api/scripts/opensearch-alias-cutover.ts`.
+   - Verify search and detail API responses against expected documents.
 
 ## Rotation and recovery
 
