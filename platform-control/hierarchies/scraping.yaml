@@ -1,0 +1,22 @@
+version: 1
+items:
+  - scrape_target_id: stg_ch_fedlex_law
+    path: ch/federal/fedlex/law
+    authority_path: ch/federal/fedlex
+    enabled: true
+    selector:
+      source_type: website
+      mode: crawl
+      seed_url: https://www.fedlex.admin.ch
+      include_paths:
+        - /eli/cc/
+  - scrape_target_id: stg_at_ris_law
+    path: at/federal/ris/law
+    authority_path: at/federal/ris
+    enabled: true
+    selector:
+      source_type: website
+      mode: crawl
+      seed_url: https://www.ris.bka.gv.at
+      include_paths:
+        - /Dokumente/Bundesnormen/
