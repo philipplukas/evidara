@@ -46,10 +46,12 @@ def _setup_logging() -> None:
     root.addHandler(handler)
     root.setLevel(logging.INFO)
 
+
 # ---------------------------------------------------------------------------
 # Minimal HTTP health server for Cloud Run liveness / readiness probes.
 # Runs in a daemon thread so it doesn't block the async poll loop.
 # ---------------------------------------------------------------------------
+
 
 class _HealthHandler(BaseHTTPRequestHandler):
     """Return 200 on GET /health, 404 otherwise."""
@@ -72,7 +74,11 @@ class _HealthHandler(BaseHTTPRequestHandler):
 def _start_health_server() -> None:
     """Start the health HTTP server on $PORT (default 8080) in a daemon thread."""
     port = int(os.environ.get("PORT", "8080"))
-    server = HTTPServer(("", port), _HealthHandler)
+    try:
+        server = HTTPServer(("", port), _HealthHandler)
+    except OSError as e:
+        LOGGER.error("Failed to bind health server to port %d: %s", port, e)
+        raise
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     LOGGER.info("Health server listening on port %d", port)
