@@ -28,7 +28,7 @@ from document_intelligence.persist.sinks import (
     DeltaCanonicalSink,
     InMemoryCanonicalSink,
 )
-from document_intelligence.pipeline import DocumentProcessingPipeline
+from document_intelligence.pipeline import ProcessingPipeline
 
 LOGGER = logging.getLogger("document_intelligence.runtime_consumer")
 
@@ -76,13 +76,13 @@ def _start_health_server() -> None:
 
 def _build_pipeline(
     environment: Mapping[str, str],
-) -> tuple[DocumentProcessingPipeline, Any]:
+) -> tuple[ProcessingPipeline, Any]:
     settings = RuntimeSettings.from_mapping(environment)
     if settings.surface_uris is None:
         sink = InMemoryCanonicalSink()
     else:
         sink = DeltaCanonicalSink(settings.surface_uris.to_delta_sink_config())
-    pipeline = DocumentProcessingPipeline(
+    pipeline = ProcessingPipeline(
         bundle_loader=GcsBundleLoader(),
         sink=sink,
         processing_version=settings.processing_version,
@@ -110,7 +110,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _process_message(
     message: pubsub_v1.types.PubsubMessage,
-    pipeline: DocumentProcessingPipeline,
+    pipeline: ProcessingPipeline,
     publisher: PubSubEventPublisher | None,
 ) -> None:
     payload = json.loads(message.data.decode("utf-8"))
