@@ -152,6 +152,7 @@ variable "cloud_run_services" {
     timeout_seconds       = optional(number, 300)
     vpc_connector         = optional(string, null)
     vpc_egress            = optional(string, "PRIVATE_RANGES_ONLY")
+    cloud_sql_instances   = optional(list(string), [])
     env_vars              = optional(map(string), {})
     secret_env_vars = optional(map(object({
       secret_name = string

@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
   "aiosqlite>=0.21.0,<1",
   "alembic>=1.16.0,<2",
+  "asyncpg>=0.30.0,<1",
   "croniter>=6.2.2",
   "fastapi>=0.116.0,<1",
   "google-cloud-pubsub>=2.31.0,<3",
@@ -27,7 +28,6 @@ platform-control-connector-worker = "platform_control.connector_worker:main"
 
 [dependency-groups]
 dev = [
-  "asyncpg>=0.30.0,<1",
   "jsonschema>=4.25.0,<5",
   "psycopg[binary]>=3.2.0,<4",
   "pytest-asyncio>=1.1.0,<2",
