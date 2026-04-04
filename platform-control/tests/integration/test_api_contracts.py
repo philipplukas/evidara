@@ -2,7 +2,11 @@
 
 These tests verify that the API responds with correct status codes,
 content types, pagination, and error shapes across all major endpoints.
-They use the ASGI transport (no network, no external DB).
+
+Uses SQLite via ASGI transport (inherited from conftest.py) for fast,
+zero-dependency CI runs. For Postgres-specific behaviour (e.g. ON CONFLICT,
+advisory locks), see ``test_firecrawl_webhook_service_postgres.py`` which
+uses testcontainers.
 """
 
 from __future__ import annotations
@@ -15,7 +19,6 @@ from platform_control.main import create_app
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.routers.runs import get_firecrawl_provider
 from platform_control.services.firecrawl_provider import ProviderStartResult
-
 
 # ── Helpers ──────────────────────────────────────
 

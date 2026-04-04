@@ -2,6 +2,7 @@
 
 Owner: Platform Team
 Last reviewed: 2026-04-04
+Last verified: 2026-04-04
 Applies to: dev, prod
 
 ## Purpose
@@ -108,10 +109,10 @@ infra/
 # Plan (from repo root)
 cd infra/terraform/gcp/runtime_stack
 terraform init
-terraform plan -var-file="$REPO_ROOT/infra/env/dev/runtime.gcp.tfvars"
+terraform plan -var-file="../../../../infra/env/dev/runtime.gcp.tfvars"
 
 # Apply
-terraform apply -var-file="$REPO_ROOT/infra/env/dev/runtime.gcp.tfvars"
+terraform apply -var-file="../../../../infra/env/dev/runtime.gcp.tfvars"
 ```
 
 > **Note**: Terraform plan/apply is automated via CI (`.github/workflows/terraform.yml`).

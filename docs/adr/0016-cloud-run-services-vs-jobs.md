@@ -3,6 +3,7 @@
 Date: 2026-04-04
 Status: Accepted
 Deciders: Platform Team
+Applies to: platform-control-worker, document-intelligence-consumer
 
 ## Context
 
