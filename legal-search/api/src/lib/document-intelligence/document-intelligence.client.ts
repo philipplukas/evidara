@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { DocumentIntelligenceHttpError } from './document-intelligence-mutator';
 import { getDocumentLean } from './generated/api';
 
