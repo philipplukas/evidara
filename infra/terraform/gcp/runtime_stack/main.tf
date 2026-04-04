@@ -260,7 +260,11 @@ resource "google_secret_manager_secret_version" "platform_control_dsn" {
 }
 
 resource "google_project_iam_member" "runtime_cloudsql_client" {
-  for_each = var.enable_cloud_sql ? google_service_account.runtime : {}
+  for_each = var.enable_cloud_sql ? {
+    for key, svc in local.cloud_run_services :
+    svc.service_account_key => google_service_account.runtime[svc.service_account_key]
+    if length(svc.cloud_sql_instances) > 0
+  } : {}
 
   project = var.project_id
   role    = "roles/cloudsql.client"
