@@ -7,13 +7,15 @@ environments = ["dev", "prod"]
 
 # Repository-level variables used by CD workflows.
 repository_variables = {
-  GCP_REGION                   = "europe-west6"
-  GCP_PROJECT_ID_DEV           = "evidara-dev"
-  GCP_PROJECT_ID_PROD          = "evidara-prod"
-  GCP_ARTIFACT_PROJECT_ID      = "evidara-dev"
-  ARTIFACT_REGISTRY_REPOSITORY = "evidara-images"
-  PLATFORM_CONTROL_SERVICE_NAME = "platform-control-api"
-  LEGAL_SEARCH_API_SERVICE_NAME = "legal-search-api"
+  GCP_REGION                           = "europe-west6"
+  GCP_PROJECT_ID_DEV                   = "data-platform-dev-492214"
+  GCP_PROJECT_ID_PROD                  = "data-platform-prod-492214"
+  GCP_ARTIFACT_PROJECT_ID              = "data-platform-dev-492214"
+  ARTIFACT_REGISTRY_REPOSITORY         = "runtime"
+  PLATFORM_CONTROL_SERVICE_NAME        = "platform-control"
+  PLATFORM_CONTROL_WORKER_SERVICE_NAME = "platform-control-worker"
+  LEGAL_SEARCH_API_SERVICE_NAME        = "legal-search-api"
+  DI_CONSUMER_SERVICE_NAME             = "document-intelligence-consumer"
 }
 
 # Optional environment-scoped variables.

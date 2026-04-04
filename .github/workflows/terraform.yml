@@ -32,7 +32,7 @@ jobs:
     name: Terraform plan
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    environment: dev-readonly
+    environment: dev
 
     steps:
       - name: Checkout
