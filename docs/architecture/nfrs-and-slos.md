@@ -10,7 +10,7 @@ This page captures **platform-level** expectations for reliability and performan
 |---------|------------------|--------|
 | Search (`legal-search` BFF → OpenSearch) | p95 under 2s for typical queries | Depends on index size, query complexity, and region. |
 | Document detail (BFF → OpenSearch metadata + Document Service body) | p95 under 3s | Dominated by Docling payload size and Document Service implementation (SQL gateway vs dedicated service). |
-| platform-control operational APIs | p95 under 1s for CRUD-style actions | Retool-driven; avoid long work on the request thread. |
+| platform-control operational APIs | p95 under 1s for CRUD-style actions | Operator-facing (React Admin); avoid long work on the request thread. |
 
 ## Availability
 

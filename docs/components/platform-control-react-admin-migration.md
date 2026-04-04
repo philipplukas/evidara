@@ -184,11 +184,12 @@ Explicit non-goals for the first migration slice:
 - preview-summary review UX
 - links into Run Detail
 
-### Phase 7: Retool retirement
+### Phase 7: Retool retirement ✅
 
-- confirm parity for the main operator flows
-- keep Retool artifacts reference-only
-- delete the remaining Retool artifacts once they no longer provide migration value
+- Retool retirement decided (TAR-37 closed as Won't Do)
+- React Admin app is the sole operator UI
+- Retool artifacts kept in `platform-control/retool/` as historical reference only
+- No further Retool maintenance or development planned
 
 ## Testing
 

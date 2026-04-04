@@ -30,13 +30,6 @@ import type {
   UseQueryResult
 } from '@tanstack/react-query';
 
-import axios from 'axios';
-import type {
-  AxiosError,
-  AxiosRequestConfig,
-  AxiosResponse
-} from 'axios';
-
 import type {
   DetailView,
   GetDocumentSections200,
@@ -45,7 +38,10 @@ import type {
   SearchResponseView
 } from './model';
 
+import { customFetch } from '../custom-fetch';
 
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
@@ -56,17 +52,18 @@ Facet counts are live (computed from the same query via OpenSearch aggs).
  * @summary Search documents
  */
 export const searchDocuments = (
-    params: SearchDocumentsParams, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<SearchResponseView>> => {
-    
-    
-    return axios.get(
-      `/v1/search`,{
-    ...options,
-        params: {...params, ...options?.params},}
-    );
-  }
-
+    params: SearchDocumentsParams,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<SearchResponseView>(
+      {url: `/v1/search`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
 
 
@@ -77,16 +74,16 @@ export const getSearchDocumentsQueryKey = (params?: SearchDocumentsParams,) => {
     }
 
     
-export const getSearchDocumentsQueryOptions = <TData = Awaited<ReturnType<typeof searchDocuments>>, TError = AxiosError<void>>(params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, axios?: AxiosRequestConfig}
+export const getSearchDocumentsQueryOptions = <TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
-const {query: queryOptions, axios: axiosOptions} = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getSearchDocumentsQueryKey(params);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchDocuments>>> = ({ signal }) => searchDocuments(params, { signal, ...axiosOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchDocuments>>> = ({ signal }) => searchDocuments(params, requestOptions, signal);
 
       
 
@@ -96,39 +93,39 @@ const {query: queryOptions, axios: axiosOptions} = options ?? {};
 }
 
 export type SearchDocumentsQueryResult = NonNullable<Awaited<ReturnType<typeof searchDocuments>>>
-export type SearchDocumentsQueryError = AxiosError<void>
+export type SearchDocumentsQueryError = void
 
 
-export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = AxiosError<void>>(
+export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(
  params: SearchDocumentsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchDocuments>>,
           TError,
           Awaited<ReturnType<typeof searchDocuments>>
         > , 'initialData'
-      >, axios?: AxiosRequestConfig}
+      >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = AxiosError<void>>(
+export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(
  params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof searchDocuments>>,
           TError,
           Awaited<ReturnType<typeof searchDocuments>>
         > , 'initialData'
-      >, axios?: AxiosRequestConfig}
+      >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = AxiosError<void>>(
- params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, axios?: AxiosRequestConfig}
+export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(
+ params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Search documents
  */
 
-export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = AxiosError<void>>(
- params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, axios?: AxiosRequestConfig}
+export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(
+ params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
@@ -152,15 +149,17 @@ Query-independent and cacheable. Changes rarely.
  * @summary Get search context
  */
 export const getSearchContext = (
-     options?: AxiosRequestConfig
- ): Promise<AxiosResponse<SearchContextView>> => {
     
-    
-    return axios.get(
-      `/v1/search/context`,options
-    );
-  }
-
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<SearchContextView>(
+      {url: `/v1/search/context`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
 
 
@@ -171,16 +170,16 @@ export const getGetSearchContextQueryKey = () => {
     }
 
     
-export const getGetSearchContextQueryOptions = <TData = Awaited<ReturnType<typeof getSearchContext>>, TError = AxiosError<void>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, axios?: AxiosRequestConfig}
+export const getGetSearchContextQueryOptions = <TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
-const {query: queryOptions, axios: axiosOptions} = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetSearchContextQueryKey();
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSearchContext>>> = ({ signal }) => getSearchContext({ signal, ...axiosOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSearchContext>>> = ({ signal }) => getSearchContext(requestOptions, signal);
 
       
 
@@ -190,39 +189,39 @@ const {query: queryOptions, axios: axiosOptions} = options ?? {};
 }
 
 export type GetSearchContextQueryResult = NonNullable<Awaited<ReturnType<typeof getSearchContext>>>
-export type GetSearchContextQueryError = AxiosError<void>
+export type GetSearchContextQueryError = void
 
 
-export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = AxiosError<void>>(
+export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getSearchContext>>,
           TError,
           Awaited<ReturnType<typeof getSearchContext>>
         > , 'initialData'
-      >, axios?: AxiosRequestConfig}
+      >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = AxiosError<void>>(
+export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getSearchContext>>,
           TError,
           Awaited<ReturnType<typeof getSearchContext>>
         > , 'initialData'
-      >, axios?: AxiosRequestConfig}
+      >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = AxiosError<void>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, axios?: AxiosRequestConfig}
+export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get search context
  */
 
-export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = AxiosError<void>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, axios?: AxiosRequestConfig}
+export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
@@ -243,15 +242,17 @@ export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchC
  * @summary Get document detail
  */
 export const getDocument = (
-    documentId: string, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<DetailView>> => {
-    
-    
-    return axios.get(
-      `/v1/documents/${documentId}`,options
-    );
-  }
-
+    documentId: string,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<DetailView>(
+      {url: `/v1/documents/${documentId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
 
 
@@ -262,16 +263,16 @@ export const getGetDocumentQueryKey = (documentId?: string,) => {
     }
 
     
-export const getGetDocumentQueryOptions = <TData = Awaited<ReturnType<typeof getDocument>>, TError = AxiosError<void>>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, axios?: AxiosRequestConfig}
+export const getGetDocumentQueryOptions = <TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
-const {query: queryOptions, axios: axiosOptions} = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetDocumentQueryKey(documentId);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocument>>> = ({ signal }) => getDocument(documentId, { signal, ...axiosOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocument>>> = ({ signal }) => getDocument(documentId, requestOptions, signal);
 
       
 
@@ -281,39 +282,39 @@ const {query: queryOptions, axios: axiosOptions} = options ?? {};
 }
 
 export type GetDocumentQueryResult = NonNullable<Awaited<ReturnType<typeof getDocument>>>
-export type GetDocumentQueryError = AxiosError<void>
+export type GetDocumentQueryError = void
 
 
-export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = AxiosError<void>>(
+export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(
  documentId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDocument>>,
           TError,
           Awaited<ReturnType<typeof getDocument>>
         > , 'initialData'
-      >, axios?: AxiosRequestConfig}
+      >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = AxiosError<void>>(
+export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(
  documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDocument>>,
           TError,
           Awaited<ReturnType<typeof getDocument>>
         > , 'initialData'
-      >, axios?: AxiosRequestConfig}
+      >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = AxiosError<void>>(
- documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, axios?: AxiosRequestConfig}
+export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get document detail
  */
 
-export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = AxiosError<void>>(
- documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, axios?: AxiosRequestConfig}
+export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
@@ -334,15 +335,17 @@ export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, 
  * @summary Get sections of a document
  */
 export const getDocumentSections = (
-    documentId: string, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<GetDocumentSections200>> => {
-    
-    
-    return axios.get(
-      `/v1/documents/${documentId}/sections`,options
-    );
-  }
-
+    documentId: string,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<GetDocumentSections200>(
+      {url: `/v1/documents/${documentId}/sections`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
 
 
@@ -353,16 +356,16 @@ export const getGetDocumentSectionsQueryKey = (documentId?: string,) => {
     }
 
     
-export const getGetDocumentSectionsQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = AxiosError<void>>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, axios?: AxiosRequestConfig}
+export const getGetDocumentSectionsQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
-const {query: queryOptions, axios: axiosOptions} = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetDocumentSectionsQueryKey(documentId);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentSections>>> = ({ signal }) => getDocumentSections(documentId, { signal, ...axiosOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentSections>>> = ({ signal }) => getDocumentSections(documentId, requestOptions, signal);
 
       
 
@@ -372,39 +375,39 @@ const {query: queryOptions, axios: axiosOptions} = options ?? {};
 }
 
 export type GetDocumentSectionsQueryResult = NonNullable<Awaited<ReturnType<typeof getDocumentSections>>>
-export type GetDocumentSectionsQueryError = AxiosError<void>
+export type GetDocumentSectionsQueryError = void
 
 
-export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = AxiosError<void>>(
+export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(
  documentId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDocumentSections>>,
           TError,
           Awaited<ReturnType<typeof getDocumentSections>>
         > , 'initialData'
-      >, axios?: AxiosRequestConfig}
+      >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = AxiosError<void>>(
+export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(
  documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDocumentSections>>,
           TError,
           Awaited<ReturnType<typeof getDocumentSections>>
         > , 'initialData'
-      >, axios?: AxiosRequestConfig}
+      >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = AxiosError<void>>(
- documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, axios?: AxiosRequestConfig}
+export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get sections of a document
  */
 
-export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = AxiosError<void>>(
- documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, axios?: AxiosRequestConfig}
+export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 

@@ -13,6 +13,12 @@ export default defineConfig({
       schemas: "./src/lib/api/generated/model",
       client: "fetch",
       mode: "split",
+      override: {
+        mutator: {
+          path: "./src/lib/api/custom-fetch.ts",
+          name: "customFetch",
+        },
+      },
     },
   },
   legalSearchApiHooks: {
@@ -26,6 +32,12 @@ export default defineConfig({
       schemas: "./src/lib/api/generated/model",
       client: "react-query",
       mode: "split",
+      override: {
+        mutator: {
+          path: "./src/lib/api/custom-fetch.ts",
+          name: "customFetch",
+        },
+      },
     },
   },
 });

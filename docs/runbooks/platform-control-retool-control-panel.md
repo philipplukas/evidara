@@ -1,16 +1,19 @@
-# Platform-Control Retool Control Panel
+# Platform-Control Retool Control Panel (DEPRECATED)
 
 Owner: Platform team
-Last reviewed: 2026-04-03
+Last reviewed: 2026-04-04
 Last verified: 2026-04-03 (repo artifacts and local smoke tests)
 Applies to: dev, staging
+
+> **⚠️ DEPRECATED**: Retool is no longer the active operator UI. The React Admin
+> app at `platform-control/admin/` is the sole ops interface (see ADR-0015).
+> This runbook is retained as historical reference only.
 
 ## Purpose
 
 Document the repo-owned Retool artifacts for the `platform-control` control panel and how they map
-to the FastAPI service. This runbook now describes the Retool fallback/comparison path; the primary
-operator workflow for runs and preview review is the code-managed app in `platform-control/admin`.
-Do not use this runbook as the normal local setup or demo path.
+to the FastAPI service. The primary operator workflow is the code-managed React Admin app in
+`platform-control/admin`. This runbook is historical reference only.
 
 ## Source of truth
 
