@@ -23,6 +23,7 @@ from document_intelligence.events.document_processed import (
 from document_intelligence.events.status_updated import build_processing_status_event
 from document_intelligence.ingest.docling_adapter import normalize_with_docling
 from document_intelligence.ingest.loaders import BundleLoader, DispatchingBundleLoader
+from document_intelligence.nlp.citation_extractor import extract_citations
 from document_intelligence.nlp.spacy_pipeline import enrich_with_spacy
 from document_intelligence.normalize.html import (
     normalize_html_document,
@@ -165,6 +166,11 @@ class ProcessingPipeline:
                 batch_size=self._spacy_batch_size,
             )
 
+        # Citation extraction
+        citations = extract_citations(document.body_text or document.full_text)
+        if citations:
+            document.extensions["citations"] = [c.to_dict() for c in citations]
+
         manifest = _build_processing_manifest(
             manifest=selected_bundle.manifest,
             provenance=provenance,
@@ -175,6 +181,7 @@ class ProcessingPipeline:
             input_bundle_manifest_id=event.payload.bundle_manifest_id,
             input_bundle_manifest_ref=event.payload.bundle_manifest_ref.to_dict(),
             normalized_document=normalized_document,
+            citation_count=len(citations),
         )
 
         canonical_ready_event = build_processing_status_event(
@@ -348,6 +355,7 @@ def _build_processing_manifest(
     input_bundle_manifest_id: str,
     input_bundle_manifest_ref: dict[str, Any],
     normalized_document: NormalizedDocumentIR,
+    citation_count: int = 0,
 ) -> ProcessingManifest:
     published_document_ref = {
         "surface_name": "published_documents",
@@ -397,7 +405,7 @@ def _build_processing_manifest(
         supersedes_processing_manifest_id=None,
         document_count=1,
         section_count=len(sections),
-        citation_count=0,
+        citation_count=citation_count,
         failure=None,
     )
 
