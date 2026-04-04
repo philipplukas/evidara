@@ -340,7 +340,7 @@ resource "google_cloud_run_v2_service" "runtime" {
       }
 
       dynamic "startup_probe" {
-        for_each = each.value.startup_probe_path != null ? [1] : []
+        for_each = try(length(trimspace(each.value.startup_probe_path)), 0) > 0 ? [1] : []
         content {
           http_get {
             path = each.value.startup_probe_path
@@ -354,7 +354,7 @@ resource "google_cloud_run_v2_service" "runtime" {
       }
 
       dynamic "liveness_probe" {
-        for_each = each.value.liveness_probe_path != null ? [1] : []
+        for_each = try(length(trimspace(each.value.liveness_probe_path)), 0) > 0 ? [1] : []
         content {
           http_get {
             path = each.value.liveness_probe_path
