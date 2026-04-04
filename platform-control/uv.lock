@@ -839,6 +839,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "alembic" },
+    { name = "asyncpg" },
     { name = "croniter" },
     { name = "fastapi" },
     { name = "google-cloud-pubsub" },
@@ -854,7 +855,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "asyncpg" },
     { name = "jsonschema" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pytest" },
@@ -868,6 +868,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21.0,<1" },
     { name = "alembic", specifier = ">=1.16.0,<2" },
+    { name = "asyncpg", specifier = ">=0.30.0,<1" },
     { name = "croniter", specifier = ">=6.2.2" },
     { name = "fastapi", specifier = ">=0.116.0,<1" },
     { name = "google-cloud-pubsub", specifier = ">=2.31.0,<3" },
@@ -883,7 +884,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "asyncpg", specifier = ">=0.30.0,<1" },
     { name = "jsonschema", specifier = ">=4.25.0,<5" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0,<4" },
     { name = "pytest", specifier = ">=8.4.0,<9" },
