@@ -7,6 +7,7 @@ from platform_control.config import get_settings
 from platform_control.database import get_session
 from platform_control.domain import RunMode, RunStatus
 from platform_control.schemas.document_events import DocumentLifecycleEventListResponse
+from platform_control.schemas.lifecycle import RunLifecycleResponse
 from platform_control.schemas.processing_status import ProcessingStatusUpdateListResponse
 from platform_control.schemas.run import (
     CapturedResourceListResponse,
@@ -19,6 +20,7 @@ from platform_control.schemas.run import (
 )
 from platform_control.services.firecrawl_provider import FirecrawlProvider
 from platform_control.services.processing_status_service import ProcessingStatusService
+from platform_control.services.run_lifecycle_service import RunLifecycleService
 from platform_control.services.run_service import RunService
 
 router = APIRouter(prefix="/v1/runs", tags=["runs"])
@@ -144,3 +146,13 @@ async def list_run_document_lifecycle(
     service = ProcessingStatusService(session)
     events = await service.list_run_document_lifecycle(run_id)
     return DocumentLifecycleEventListResponse(data=events)
+
+
+@router.get("/{run_id}/lifecycle", response_model=RunLifecycleResponse)
+async def get_run_lifecycle(
+    run_id: str,
+    session: SessionDep,
+) -> RunLifecycleResponse:
+    """Aggregated timeline: run events, processing status, and document lifecycle."""
+    service = RunLifecycleService(session)
+    return await service.get_lifecycle(run_id)
