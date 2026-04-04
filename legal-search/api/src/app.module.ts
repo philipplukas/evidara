@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ApiKeyGuard } from './core/auth/api-key.guard';
 import documentIntelligenceConfig from './core/config/document-intelligence.config';
 import opensearchConfig from './core/config/opensearch.config';
 import { OpenSearchModule } from './core/opensearch/client';
@@ -19,6 +21,12 @@ import { SearchModule } from './modules/search/search.module';
     SearchModule,
     DocumentsModule,
     ProjectionsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ApiKeyGuard,
+    },
   ],
 })
 export class AppModule {}

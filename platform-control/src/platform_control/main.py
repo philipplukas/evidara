@@ -6,9 +6,10 @@ import time
 from uuid import uuid4
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from platform_control.auth import require_api_key
 from platform_control.config import get_settings
 from platform_control.errors import (
     InvalidStateTransitionError,
@@ -77,14 +78,18 @@ def create_app() -> FastAPI:
         )
         return response
 
+    # Health endpoints — unauthenticated
     app.include_router(health.router)
-    app.include_router(reference_data.router)
-    app.include_router(sources.router)
-    app.include_router(versions.router)
-    app.include_router(runs.router)
-    app.include_router(schedules.router)
-    app.include_router(firecrawl.router)
-    app.include_router(di_events.router)
+
+    # Protected endpoints — require API key when configured
+    _auth = [Depends(require_api_key)]
+    app.include_router(reference_data.router, dependencies=_auth)
+    app.include_router(sources.router, dependencies=_auth)
+    app.include_router(versions.router, dependencies=_auth)
+    app.include_router(runs.router, dependencies=_auth)
+    app.include_router(schedules.router, dependencies=_auth)
+    app.include_router(firecrawl.router, dependencies=_auth)
+    app.include_router(di_events.router, dependencies=_auth)
 
     @app.exception_handler(NotFoundError)
     async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:

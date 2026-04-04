@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
     run_dispatch_backend: Literal["inline", "worker"] = "inline"
 
+    # Auth — when set, all non-health endpoints require X-API-Key header
+    api_key: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

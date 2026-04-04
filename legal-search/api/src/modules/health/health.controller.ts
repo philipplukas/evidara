@@ -1,7 +1,9 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import type { Client } from '@opensearch-project/opensearch';
+import { Public } from '../../core/auth/public.decorator';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(@Inject(OPENSEARCH_CLIENT) private readonly opensearch: Client) {}
