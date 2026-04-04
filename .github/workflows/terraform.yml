@@ -1,0 +1,203 @@
+name: Terraform
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/terraform.yml"
+      - "infra/terraform/gcp/runtime_stack/**"
+      - "infra/env/dev/runtime.gcp.tfvars"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/terraform.yml"
+      - "infra/terraform/gcp/runtime_stack/**"
+      - "infra/env/dev/runtime.gcp.tfvars"
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write   # for posting plan output to PR
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TF_ROOT: infra/terraform/gcp/runtime_stack
+  TF_VAR_FILE: infra/env/dev/runtime.gcp.tfvars
+
+jobs:
+  # ── PR: fmt + validate + plan ───────────────────
+  plan:
+    name: Terraform plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform fmt check
+        id: fmt
+        run: terraform fmt -check -recursive -diff
+        working-directory: ${{ env.TF_ROOT }}
+        continue-on-error: true
+
+      - name: Terraform init
+        id: init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          set -o pipefail
+          terraform plan \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
+            -no-color \
+            -input=false \
+            -out=tfplan 2>&1 | tee plan_output.txt
+        working-directory: ${{ env.TF_ROOT }}
+        continue-on-error: true
+
+      - name: Post plan to PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const planPath = `${process.env.TF_ROOT}/plan_output.txt`;
+            let plan = '';
+            try {
+              plan = fs.readFileSync(planPath, 'utf8');
+            } catch {
+              plan = 'Plan output not available.';
+            }
+
+            // Truncate if too long for GitHub comment
+            const maxLen = 60000;
+            if (plan.length > maxLen) {
+              plan = plan.substring(0, maxLen) + '\n\n... (truncated)';
+            }
+
+            const fmtResult = '${{ steps.fmt.outcome }}';
+            const initResult = '${{ steps.init.outcome }}';
+            const validateResult = '${{ steps.validate.outcome }}';
+            const planResult = '${{ steps.plan.outcome }}';
+
+            const body = `### Terraform Plan 🏗️
+
+            | Step | Result |
+            |------|--------|
+            | 🖌 fmt | \`${fmtResult}\` |
+            | ⚙️ init | \`${initResult}\` |
+            | ✅ validate | \`${validateResult}\` |
+            | 📋 plan | \`${planResult}\` |
+
+            <details><summary>Plan output</summary>
+
+            \`\`\`
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            *Pushed by @${{ github.actor }}, commit \`${{ github.sha }}\`*`;
+
+            // Find and update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Terraform Plan')
+            );
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Fail if fmt failed
+        if: steps.fmt.outcome == 'failure'
+        run: |
+          echo "::error::Terraform formatting check failed. Run 'terraform fmt -recursive' locally."
+          exit 1
+
+  # ── Main: apply ─────────────────────────────────
+  apply:
+    name: Terraform apply
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform apply
+        run: |
+          terraform apply \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
+            -auto-approve \
+            -input=false \
+            -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Post apply summary
+        if: always()
+        run: |
+          echo "### Terraform Apply 🏗️" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | @${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"

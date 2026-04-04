@@ -7,6 +7,7 @@ on:
       - ".github/workflows/platform-control-cd.yml"
       - "platform-control/**"
       - "legal-search/api/**"
+      - "document-intelligence/**"
       - "infra/env/*/runtime.gcp.tfvars.example"
   workflow_dispatch:
 
@@ -30,10 +31,12 @@ jobs:
     env:
       REGION: ${{ vars.GCP_REGION }}
       ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      ARTIFACT_PROJECT_ID: ${{ vars.GCP_ARTIFACT_PROJECT_ID }}
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
       PLATFORM_CONTROL_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_SERVICE_NAME }}
       PLATFORM_CONTROL_WORKER_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_WORKER_SERVICE_NAME }}
       LEGAL_SEARCH_API_SERVICE_NAME: ${{ vars.LEGAL_SEARCH_API_SERVICE_NAME }}
+      DI_CONSUMER_SERVICE_NAME: ${{ vars.DI_CONSUMER_SERVICE_NAME }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,21 +55,28 @@ jobs:
           gcloud run services update "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
 
       - name: Deploy platform-control worker (dev)
         run: |
           gcloud run services update "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
 
       - name: Deploy legal-search API (dev)
         run: |
           gcloud run services update "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:${IMAGE_TAG}"
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:${IMAGE_TAG}"
+
+      - name: Deploy document-intelligence consumer (dev)
+        run: |
+          gcloud run services update "${DI_CONSUMER_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/di-consumer:${IMAGE_TAG}"
 
       - name: Verify deployed revisions (dev)
         id: verify-dev
@@ -131,6 +141,22 @@ jobs:
             echo "::warning::platform-control readiness is degraded"
           fi
 
+      - name: Smoke test — DI consumer health (dev)
+        run: |
+          DI_URL=$(gcloud run services describe "${DI_CONSUMER_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          echo "Checking ${DI_URL}/health ..."
+          TOKEN=$(gcloud auth print-identity-token --audiences="${DI_URL}")
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            -H "Authorization: Bearer ${TOKEN}" "${DI_URL}/health" || echo "000")
+          echo "HTTP ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::DI consumer health check failed (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
   # ── Promotion Gate ──────────────────────────────
   # The prod job requires the dev environment to pass.
   # GitHub environment protection rules can add manual approval.
@@ -143,10 +169,12 @@ jobs:
     env:
       REGION: ${{ vars.GCP_REGION }}
       ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      ARTIFACT_PROJECT_ID: ${{ vars.GCP_ARTIFACT_PROJECT_ID }}
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID_PROD }}
       PLATFORM_CONTROL_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_SERVICE_NAME }}
       PLATFORM_CONTROL_WORKER_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_WORKER_SERVICE_NAME }}
       LEGAL_SEARCH_API_SERVICE_NAME: ${{ vars.LEGAL_SEARCH_API_SERVICE_NAME }}
+      DI_CONSUMER_SERVICE_NAME: ${{ vars.DI_CONSUMER_SERVICE_NAME }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -166,21 +194,21 @@ jobs:
           gcloud run services update "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
 
       - name: Deploy platform-control worker (prod)
         run: |
           gcloud run services update "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
 
       - name: Deploy legal-search API (prod)
         run: |
           gcloud run services update "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:${IMAGE_TAG}"
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:${IMAGE_TAG}"
 
       - name: Verify deployed revisions (prod)
         run: |
