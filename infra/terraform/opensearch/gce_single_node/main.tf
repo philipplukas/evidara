@@ -88,8 +88,8 @@ resource "google_compute_instance" "opensearch" {
         --ulimit nofile=65536:65536 \
         -e "discovery.type=single-node" \
         -e "OPENSEARCH_JAVA_OPTS=-Xms${var.opensearch_heap_size} -Xmx${var.opensearch_heap_size}" \
-        -e "plugins.security.disabled=true" \
-        -e "OPENSEARCH_INITIAL_ADMIN_PASSWORD=admin" \
+        -e "DISABLE_INSTALL_DEMO_CONFIG=true" \
+        -e "DISABLE_SECURITY_PLUGIN=true" \
         -v "$DATA_DIR:/usr/share/opensearch/data" \
         -p 9200:9200 \
         opensearchproject/opensearch:${var.opensearch_version}
