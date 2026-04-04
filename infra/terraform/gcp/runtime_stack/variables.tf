@@ -153,6 +153,8 @@ variable "cloud_run_services" {
     vpc_connector         = optional(string, null)
     vpc_egress            = optional(string, "PRIVATE_RANGES_ONLY")
     cloud_sql_instances   = optional(list(string), [])
+    startup_probe_path    = optional(string, null)
+    liveness_probe_path   = optional(string, null)
     env_vars              = optional(map(string), {})
     secret_env_vars = optional(map(object({
       secret_name = string
