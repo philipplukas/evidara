@@ -99,8 +99,10 @@ resource "google_pubsub_subscription" "events" {
       push_endpoint = "${google_cloud_run_v2_service.runtime[push_config.value.target_service].uri}${push_config.value.endpoint_path}"
 
       oidc_token {
-        service_account_email = "service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
-        audience              = google_cloud_run_v2_service.runtime[push_config.value.target_service].uri
+        service_account_email = google_service_account.runtime[
+          local.cloud_run_services[push_config.value.target_service].service_account_key
+        ].email
+        audience = google_cloud_run_v2_service.runtime[push_config.value.target_service].uri
       }
     }
   }
@@ -164,8 +166,11 @@ resource "google_pubsub_subscription_iam_member" "dlq_subscriber" {
 }
 
 # --- Push subscription auth ---
-# Pub/Sub service agent needs invoker access on Cloud Run services
-# targeted by push subscriptions.
+# For OIDC-authenticated push, the target service's own SA is used
+# in the oidc_token block. The Pub/Sub service agent needs:
+#   1. roles/iam.serviceAccountTokenCreator on the SA (to mint OIDC tokens)
+# The SA itself needs:
+#   2. roles/run.invoker on the target Cloud Run service
 
 locals {
   push_target_services = toset([
@@ -173,8 +178,15 @@ locals {
     sub.push_config.target_service
     if sub.push_config != null
   ])
+
+  push_target_sa_keys = toset([
+    for sub in values(var.event_subscriptions) :
+    local.cloud_run_services[sub.push_config.target_service].service_account_key
+    if sub.push_config != null
+  ])
 }
 
+# Grant the target service's SA invoker access on its own Cloud Run service
 resource "google_cloud_run_v2_service_iam_member" "pubsub_invoker" {
   for_each = local.push_target_services
 
@@ -182,7 +194,16 @@ resource "google_cloud_run_v2_service_iam_member" "pubsub_invoker" {
   location = var.region
   name     = google_cloud_run_v2_service.runtime[each.value].name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member   = "serviceAccount:${google_service_account.runtime[local.cloud_run_services[each.value].service_account_key].email}"
+}
+
+# Allow Pub/Sub service agent to create OIDC tokens for push target SAs
+resource "google_service_account_iam_member" "pubsub_token_creator" {
+  for_each = local.push_target_sa_keys
+
+  service_account_id = google_service_account.runtime[each.value].name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_service_account" "runtime" {
