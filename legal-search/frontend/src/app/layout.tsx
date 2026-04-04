@@ -25,7 +25,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className={`${inter.variable} ${sourceSerif.variable} h-full antialiased`}>
+    <html
+      lang="de"
+      suppressHydrationWarning
+      className={`${inter.variable} ${sourceSerif.variable} h-full antialiased`}
+    >
       <body
         className="min-h-full flex flex-col font-[family-name:var(--font-inter)]"
         style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}

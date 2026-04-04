@@ -3,6 +3,7 @@
 import { Clock, MapPin, Search, SlidersHorizontal, User } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { type FormEvent, useEffect, useState } from "react";
+import { SUPPORTED_LOCALES, useLocale } from "@/lib/locale-context";
 import { useWorkspace } from "@/lib/workspace-store";
 
 interface AppHeaderProps {
@@ -12,6 +13,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
   const { state } = useWorkspace();
+  const { locale, setLocale } = useLocale();
   const [urlQuery, setUrlQuery] = useQueryState("q", parseAsString.withDefault(""));
   const storeQuery = state.resultSet.source.type === "search" ? state.resultSet.source.query : "";
 
@@ -94,6 +96,27 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
             count={state.pinned.length > 0 ? state.pinned.length : undefined}
           />
         </nav>
+
+        {/* Locale Switcher */}
+        {/* biome-ignore lint/a11y/useSemanticElements: fieldset would break flex layout styling */}
+        <div className="flex items-center shrink-0" role="group" aria-label="Language">
+          {SUPPORTED_LOCALES.map((loc) => (
+            <button
+              key={loc}
+              type="button"
+              aria-pressed={locale === loc}
+              onClick={() => setLocale(loc)}
+              className={`px-2.5 py-1 text-xs font-semibold uppercase tracking-wider rounded-md transition-colors
+                ${
+                  locale === loc
+                    ? "bg-brand text-white"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+            >
+              {loc}
+            </button>
+          ))}
+        </div>
 
         {/* User */}
         <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-border">

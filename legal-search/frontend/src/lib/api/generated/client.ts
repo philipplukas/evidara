@@ -23,6 +23,7 @@ import type {
   SearchResponseView
 } from './model';
 
+import { customFetch } from '../custom-fetch';
 
 /**
  * Returns search results as composed ViewModels with embedded facets.
@@ -66,20 +67,14 @@ export const getSearchDocumentsUrl = (params: SearchDocumentsParams,) => {
 
 export const searchDocuments = async (params: SearchDocumentsParams, options?: RequestInit): Promise<searchDocumentsResponse> => {
   
-  const res = await fetch(getSearchDocumentsUrl(params),
+  return customFetch<searchDocumentsResponse>(getSearchDocumentsUrl(params),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: searchDocumentsResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as searchDocumentsResponse
-}
+);}
 
 
 
@@ -118,20 +113,14 @@ export const getGetSearchContextUrl = () => {
 
 export const getSearchContext = async ( options?: RequestInit): Promise<getSearchContextResponse> => {
   
-  const res = await fetch(getGetSearchContextUrl(),
+  return customFetch<getSearchContextResponse>(getGetSearchContextUrl(),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: getSearchContextResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getSearchContextResponse
-}
+);}
 
 
 
@@ -167,20 +156,14 @@ export const getGetDocumentUrl = (documentId: string,) => {
 
 export const getDocument = async (documentId: string, options?: RequestInit): Promise<getDocumentResponse> => {
   
-  const res = await fetch(getGetDocumentUrl(documentId),
+  return customFetch<getDocumentResponse>(getGetDocumentUrl(documentId),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: getDocumentResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getDocumentResponse
-}
+);}
 
 
 
@@ -216,20 +199,14 @@ export const getGetDocumentSectionsUrl = (documentId: string,) => {
 
 export const getDocumentSections = async (documentId: string, options?: RequestInit): Promise<getDocumentSectionsResponse> => {
   
-  const res = await fetch(getGetDocumentSectionsUrl(documentId),
+  return customFetch<getDocumentSectionsResponse>(getGetDocumentSectionsUrl(documentId),
   {      
     ...options,
     method: 'GET'
     
     
   }
-)
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
-  const data: getDocumentSectionsResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getDocumentSectionsResponse
-}
+);}
 
 
 
