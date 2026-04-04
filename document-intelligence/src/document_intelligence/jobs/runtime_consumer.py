@@ -8,8 +8,10 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from collections.abc import Mapping
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 from google.cloud import pubsub_v1
@@ -26,7 +28,7 @@ from document_intelligence.persist.sinks import (
     DeltaCanonicalSink,
     InMemoryCanonicalSink,
 )
-from document_intelligence.pipeline import DocumentProcessingPipeline
+from document_intelligence.pipeline import ProcessingPipeline
 
 LOGGER = logging.getLogger("document_intelligence.runtime_consumer")
 
@@ -35,15 +37,52 @@ LOGGER = logging.getLogger("document_intelligence.runtime_consumer")
 _PERMANENT_ERRORS = (EnvelopeError, json.JSONDecodeError, KeyError)
 
 
+# ---------------------------------------------------------------------------
+# Minimal HTTP health server for Cloud Run liveness / readiness probes.
+# Runs in a daemon thread so it doesn't block the synchronous poll loop.
+# ---------------------------------------------------------------------------
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    """Return 200 on GET /health, 404 otherwise."""
+
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/health":
+            body = json.dumps({"status": "ok", "service": "document-intelligence-consumer"}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_error(404)
+
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+        """Silence default stderr logging to avoid noise."""
+
+
+def _start_health_server() -> None:
+    """Start the health HTTP server on $PORT (default 8080) in a daemon thread."""
+    port = int(os.environ.get("PORT", "8080"))
+    try:
+        server = HTTPServer(("", port), _HealthHandler)
+    except OSError as e:
+        LOGGER.error("Failed to bind health server to port %d: %s", port, e)
+        raise
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    LOGGER.info("Health server listening on port %d", port)
+
+
 def _build_pipeline(
     environment: Mapping[str, str],
-) -> tuple[DocumentProcessingPipeline, Any]:
+) -> tuple[ProcessingPipeline, Any]:
     settings = RuntimeSettings.from_mapping(environment)
     if settings.surface_uris is None:
         sink = InMemoryCanonicalSink()
     else:
         sink = DeltaCanonicalSink(settings.surface_uris.to_delta_sink_config())
-    pipeline = DocumentProcessingPipeline(
+    pipeline = ProcessingPipeline(
         bundle_loader=GcsBundleLoader(),
         sink=sink,
         processing_version=settings.processing_version,
@@ -71,7 +110,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _process_message(
     message: pubsub_v1.types.PubsubMessage,
-    pipeline: DocumentProcessingPipeline,
+    pipeline: ProcessingPipeline,
     publisher: PubSubEventPublisher | None,
 ) -> None:
     payload = json.loads(message.data.decode("utf-8"))
@@ -101,6 +140,7 @@ def _extract_event_context(data: bytes) -> dict[str, str | None]:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    _start_health_server()
 
     pipeline, _ = _build_pipeline(os.environ)
     publisher = (

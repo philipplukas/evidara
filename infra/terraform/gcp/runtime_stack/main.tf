@@ -338,6 +338,33 @@ resource "google_cloud_run_v2_service" "runtime" {
           mount_path = "/cloudsql"
         }
       }
+
+      dynamic "startup_probe" {
+        for_each = try(length(trimspace(each.value.startup_probe_path)), 0) > 0 ? [1] : []
+        content {
+          http_get {
+            path = each.value.startup_probe_path
+            port = each.value.container_port
+          }
+          initial_delay_seconds = 2
+          period_seconds        = 3
+          failure_threshold     = 3
+          timeout_seconds       = 2
+        }
+      }
+
+      dynamic "liveness_probe" {
+        for_each = try(length(trimspace(each.value.liveness_probe_path)), 0) > 0 ? [1] : []
+        content {
+          http_get {
+            path = each.value.liveness_probe_path
+            port = each.value.container_port
+          }
+          period_seconds    = 15
+          failure_threshold = 3
+          timeout_seconds   = 2
+        }
+      }
     }
 
     dynamic "volumes" {
