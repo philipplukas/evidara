@@ -1,0 +1,13 @@
+environment = "dev"
+
+project_id = "evidara-dev"
+region     = "europe-west6"
+zone       = "europe-west6-a"
+
+machine_type = "e2-medium"
+disk_size_gb = 30
+
+opensearch_version   = "2.17.1"
+opensearch_heap_size = "1g"
+
+allowed_source_ranges = ["10.0.0.0/8"]
