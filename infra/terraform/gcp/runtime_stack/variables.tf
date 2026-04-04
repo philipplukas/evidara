@@ -70,6 +70,13 @@ variable "event_subscriptions" {
     dead_letter_policy = optional(object({
       max_delivery_attempts = optional(number, 10)
     }), null)
+    # Push subscription config (omit for pull subscriptions)
+    push_config = optional(object({
+      # Cloud Run service key (from cloud_run_services map) to push to
+      target_service = string
+      # Path on the target service (e.g. "/v1/projections/events/document-processed")
+      endpoint_path = string
+    }), null)
   }))
   default = {
     "document-intelligence-artifact-bundle-available" = {
@@ -87,11 +94,19 @@ variable "event_subscriptions" {
       topic_name         = "document-processed"
       retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
       dead_letter_policy = { max_delivery_attempts = 5 }
+      push_config = {
+        target_service = "legal-search-api"
+        endpoint_path  = "/v1/projections/events/document-processed"
+      }
     }
     "legal-search-document-withdrawn" = {
       topic_name         = "document-withdrawn"
       retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
       dead_letter_policy = { max_delivery_attempts = 5 }
+      push_config = {
+        target_service = "legal-search-api"
+        endpoint_path  = "/v1/projections/events/document-withdrawn"
+      }
     }
     "legal-search-index-update-requested" = {
       topic_name         = "index-update-requested"

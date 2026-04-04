@@ -9,8 +9,10 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { PubSubUnwrapInterceptor } from '../../core/interceptors/pubsub-unwrap.interceptor';
 // biome-ignore lint/style/useImportType: DTO classes are needed for runtime validation metadata.
 import { DocumentProcessedEventDto, DocumentWithdrawnEventDto } from './dto/projection-events.dto';
 import type { ProjectionHistoryStatus } from './projections.repository';
@@ -19,6 +21,7 @@ import { type ProjectionApplyResult, ProjectionsService } from './projections.se
 
 @ApiTags('projections')
 @Controller('/v1/projections/events')
+@UseInterceptors(PubSubUnwrapInterceptor)
 export class ProjectionsController {
   private readonly logger = new Logger(ProjectionsController.name);
 
