@@ -4,9 +4,12 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import signal
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from platform_control.config import get_settings
 from platform_control.database import get_session_maker
@@ -42,6 +45,43 @@ def _setup_logging() -> None:
     root.handlers.clear()
     root.addHandler(handler)
     root.setLevel(logging.INFO)
+
+
+# ---------------------------------------------------------------------------
+# Minimal HTTP health server for Cloud Run liveness / readiness probes.
+# Runs in a daemon thread so it doesn't block the async poll loop.
+# ---------------------------------------------------------------------------
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    """Return 200 on GET /health, 404 otherwise."""
+
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/health":
+            body = json.dumps({"status": "ok", "service": "platform-control-worker"}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_error(404)
+
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+        """Silence default stderr logging to avoid noise."""
+
+
+def _start_health_server() -> None:
+    """Start the health HTTP server on $PORT (default 8080) in a daemon thread."""
+    port = int(os.environ.get("PORT", "8080"))
+    try:
+        server = HTTPServer(("", port), _HealthHandler)
+    except OSError as e:
+        LOGGER.error("Failed to bind health server to port %d: %s", port, e)
+        raise
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    LOGGER.info("Health server listening on port %d", port)
 
 
 class _GracefulShutdown:
@@ -164,6 +204,7 @@ def main() -> None:
     args = parser.parse_args()
 
     _setup_logging()
+    _start_health_server()
     enable_schedules = not args.no_schedules
 
     if args.once:

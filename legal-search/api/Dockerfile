@@ -20,6 +20,9 @@ RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
 
+# Vocabularies needed at runtime (/contracts/vocabularies/*)
+COPY contracts /contracts
+
 EXPOSE 8080
 
 CMD ["node", "dist/main.js"]
