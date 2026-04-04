@@ -275,4 +275,4 @@ git push origin main
 
 - [ADR-0014: Document Intelligence Pipeline Integration](../adr/0014-document-intelligence-pipeline-integration.md)
 - [GitHub Repo Settings README](../../infra/terraform/github/repo_settings/README.md)
-- [Runtime GCP tfvars](../../infra/env/dev/runtime.gcp.tfvars)
+- Runtime GCP tfvars: `infra/env/dev/runtime.gcp.tfvars` (gitignored — copy from `infra/env/dev/runtime.gcp.tfvars.example`)
