@@ -169,11 +169,11 @@ for i in $(seq 1 ${MAX_POLLS}); do
   run_status=$(echo "${run_status_response}" | jq -r '.status')
   echo "  [${i}/${MAX_POLLS}] Run status: ${run_status}"
 
-  if [ "${run_status}" = "completed" ] || [ "${run_status}" = "done" ]; then
+  if [ "${run_status}" = "completed" ]; then
     echo "  ✅ Run completed!"
     break
-  elif [ "${run_status}" = "failed" ] || [ "${run_status}" = "error" ]; then
-    echo "  ❌ Run failed!"
+  elif [ "${run_status}" = "failed" ] || [ "${run_status}" = "cancelled" ]; then
+    echo "  ❌ Run ${run_status}!"
     echo "  ${run_status_response}" | jq .
     exit 1
   fi
