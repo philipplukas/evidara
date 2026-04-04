@@ -93,6 +93,18 @@ resource "google_pubsub_subscription" "events" {
     }
   }
 
+  dynamic "push_config" {
+    for_each = each.value.push_config != null ? [each.value.push_config] : []
+    content {
+      push_endpoint = "${google_cloud_run_v2_service.runtime[push_config.value.target_service].uri}${push_config.value.endpoint_path}"
+
+      oidc_token {
+        service_account_email = "service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+        audience              = google_cloud_run_v2_service.runtime[push_config.value.target_service].uri
+      }
+    }
+  }
+
   dynamic "dead_letter_policy" {
     for_each = each.value.dead_letter_policy != null ? [each.value.dead_letter_policy] : []
     content {
@@ -149,6 +161,28 @@ resource "google_pubsub_subscription_iam_member" "dlq_subscriber" {
   subscription = google_pubsub_subscription.events[each.key].name
   role         = "roles/pubsub.subscriber"
   member       = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+# --- Push subscription auth ---
+# Pub/Sub service agent needs invoker access on Cloud Run services
+# targeted by push subscriptions.
+
+locals {
+  push_target_services = toset([
+    for sub in values(var.event_subscriptions) :
+    sub.push_config.target_service
+    if sub.push_config != null
+  ])
+}
+
+resource "google_cloud_run_v2_service_iam_member" "pubsub_invoker" {
+  for_each = local.push_target_services
+
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.runtime[each.value].name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_service_account" "runtime" {
