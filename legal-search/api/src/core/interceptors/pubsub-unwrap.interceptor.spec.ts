@@ -65,14 +65,12 @@ describe('PubSubUnwrapInterceptor', () => {
     expect(req.body).toEqual(badEnvelope);
   });
 
-  it('keeps original body if base64 decode fails', () => {
+  it('keeps original body if payload cannot be parsed', () => {
     const badEnvelope = { message: { data: '!!!not-base64' } };
     const ctx = createMockContext(badEnvelope);
     interceptor.intercept(ctx, nextHandler);
 
-    // If base64 decodes to garbage, JSON.parse should fail
-    // and the interceptor keeps the original body
     const req = ctx.switchToHttp().getRequest();
-    expect(req.body).toBeDefined();
+    expect(req.body).toEqual(badEnvelope);
   });
 });
