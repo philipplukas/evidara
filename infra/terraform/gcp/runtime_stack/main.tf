@@ -235,8 +235,36 @@ resource "google_sql_database" "platform_control" {
   instance = google_sql_database_instance.platform_control[0].name
 }
 
+resource "random_password" "sql_user" {
+  count = var.enable_cloud_sql ? 1 : 0
+
+  length  = 32
+  special = false
+}
+
+resource "google_sql_user" "platform_control" {
+  count = var.enable_cloud_sql ? 1 : 0
+
+  name     = "platform_control"
+  instance = google_sql_database_instance.platform_control[0].name
+  password = random_password.sql_user[0].result
+}
+
+# Write the async Postgres DSN into the existing secret so Cloud Run
+# services pick it up automatically via secret_env_vars.
+resource "google_secret_manager_secret_version" "platform_control_dsn" {
+  count = var.enable_cloud_sql ? 1 : 0
+
+  secret      = google_secret_manager_secret.runtime["platform_control_dsn"].id
+  secret_data = "postgresql+asyncpg://platform_control:${random_password.sql_user[0].result}@/${var.platform_control_database_name}?host=/cloudsql/${google_sql_database_instance.platform_control[0].connection_name}"
+}
+
 resource "google_project_iam_member" "runtime_cloudsql_client" {
-  for_each = var.enable_cloud_sql ? google_service_account.runtime : {}
+  for_each = var.enable_cloud_sql ? {
+    for key, svc in local.cloud_run_services :
+    svc.service_account_key => google_service_account.runtime[svc.service_account_key]
+    if length(svc.cloud_sql_instances) > 0
+  } : {}
 
   project = var.project_id
   role    = "roles/cloudsql.client"
@@ -246,9 +274,10 @@ resource "google_project_iam_member" "runtime_cloudsql_client" {
 resource "google_cloud_run_v2_service" "runtime" {
   for_each = local.cloud_run_services
 
-  name     = each.value.prefixed_name
-  location = var.region
-  ingress  = each.value.ingress
+  name                = each.value.prefixed_name
+  location            = var.region
+  ingress             = each.value.ingress
+  deletion_protection = false
 
   template {
     service_account = google_service_account.runtime[each.value.service_account_key].email
@@ -299,6 +328,24 @@ resource "google_cloud_run_v2_service" "runtime" {
               version = env.value.version
             }
           }
+        }
+      }
+
+      dynamic "volume_mounts" {
+        for_each = length(each.value.cloud_sql_instances) > 0 ? [1] : []
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
+      }
+    }
+
+    dynamic "volumes" {
+      for_each = length(each.value.cloud_sql_instances) > 0 ? [1] : []
+      content {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = each.value.cloud_sql_instances
         }
       }
     }
