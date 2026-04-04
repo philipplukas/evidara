@@ -43,6 +43,7 @@ without credentials.
 | legal-search API | `API_KEY` | `ApiKeyGuard` (NestJS global APP_GUARD) |
 
 **Behavior:**
+
 - When the env var is **set**: All non-health endpoints reject requests
   without a valid `X-API-Key` header (401 Unauthorized).
 - When the env var is **unset**: Authentication is disabled (development mode).

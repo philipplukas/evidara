@@ -1,12 +1,11 @@
-import type {
-  CanActivate,
-  ExecutionContext,
-} from '@nestjs/common';
+import { timingSafeEqual } from 'node:crypto';
+import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+// biome-ignore lint/style/useImportType: value import so NestJS DI resolves ConfigService at runtime
 import { ConfigService } from '@nestjs/config';
+// biome-ignore lint/style/useImportType: value import so NestJS DI resolves Reflector at runtime
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import { timingSafeEqual } from 'node:crypto';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 /**
