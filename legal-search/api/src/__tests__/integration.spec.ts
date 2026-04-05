@@ -28,7 +28,11 @@ let documentsRepo: DocumentsRepository;
 let projectionsRepo: ProjectionRepository;
 
 beforeAll(async () => {
-  const testApp = await createTestApp();
+  const testApp = await createTestApp({
+    documentIntelligenceClient: {
+      fetchLeanDocument: vi.fn().mockResolvedValue({ title: 'Lean projection title' }),
+    },
+  });
   app = testApp.app;
   searchRepo = testApp.searchRepo;
   documentsRepo = testApp.documentsRepo;

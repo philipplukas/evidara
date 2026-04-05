@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+// biome-ignore lint/style/useImportType: ConfigService is injected by Nest at runtime
 import { ConfigService } from '@nestjs/config';
 import { DocumentIntelligenceHttpError } from './document-intelligence-mutator';
 import { getDocumentLean } from './generated/api';
