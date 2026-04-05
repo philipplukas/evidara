@@ -1,0 +1,51 @@
+{
+  "bundle_manifest_id": "abm_01jq7hb8x4nm7m3qz3b8e9q2fk",
+  "source_snapshot_id": "snap_01jq7h7n3nbzj6sk7v95p9frz1",
+  "source_id": "src_01jq7hxv3wdd6yr8q5bn0m3zfk",
+  "source_version_id": "sv_01jq7hzcskf4m3m4gm3t5s59xq",
+  "run_id": "run_01jq7h3s9b7j4dndd9sgv6pb9d",
+  "tenant_id": "tenant_public",
+  "corpus_id": "corpus_public_ch_mixed_publications",
+  "scope_type": "global_public",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "jurisdiction_id": "jur_ch",
+  "authority_id": "auth_federal_admin",
+  "language_codes": ["de"],
+  "document_type_hint": "report",
+  "upstream_locator": "https://example.org/reports/annual-2026",
+  "artifacts": [
+    {
+      "artifact_id": "art_01jq7hf3f8qqc46zc6xvkf9y4x",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01jq7h3s9b7j4dndd9sgv6pb9d/report.html",
+        "content_type": "text/html",
+        "byte_size": 30000,
+        "checksum": "abababababababababababababababababababababababababababababababab",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-05T11:07:00Z"
+      }
+    },
+    {
+      "artifact_id": "art_01jq7hf3f8qqc46zc6xvkf9y4y",
+      "artifact_role": "attachment",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01jq7h3s9b7j4dndd9sgv6pb9d/report-annex.pdf",
+        "content_type": "application/pdf",
+        "byte_size": 222000,
+        "checksum": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-05T11:07:01Z"
+      }
+    }
+  ],
+  "manifest_storage_ref": {
+    "uri": "gs://bucket/runs/run_01jq7h3s9b7j4dndd9sgv6pb9d/abm_01jq7hb8x4nm7m3qz3b8e9q2fk.json",
+    "content_type": "application/json",
+    "byte_size": 5200,
+    "checksum": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "checksum_algorithm": "sha256",
+    "created_at": "2026-04-05T11:07:05Z"
+  }
+}

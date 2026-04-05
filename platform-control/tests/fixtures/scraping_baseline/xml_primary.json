@@ -1,0 +1,39 @@
+{
+  "bundle_manifest_id": "abm_01jq7fb8x4nm7m3qz3b8e9q2fk",
+  "source_snapshot_id": "snap_01jq7f7n3nbzj6sk7v95p9frz1",
+  "source_id": "src_01jq7fxv3wdd6yr8q5bn0m3zfk",
+  "source_version_id": "sv_01jq7fzcskf4m3m4gm3t5s59xq",
+  "run_id": "run_01jq7f3s9b7j4dndd9sgv6pb9d",
+  "tenant_id": "tenant_public",
+  "corpus_id": "corpus_public_ch_structured_law",
+  "scope_type": "global_public",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "jurisdiction_id": "jur_ch",
+  "authority_id": "auth_federal_assembly",
+  "language_codes": ["de", "fr", "it"],
+  "document_type_hint": "law",
+  "upstream_locator": "https://example.org/structured/law-123.xml",
+  "artifacts": [
+    {
+      "artifact_id": "art_01jq7ff3f8qqc46zc6xvkf9y4x",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01jq7f3s9b7j4dndd9sgv6pb9d/law.xml",
+        "content_type": "application/xml",
+        "byte_size": 65432,
+        "checksum": "6666666666666666666666666666666666666666666666666666666666666666",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-05T11:05:00Z"
+      }
+    }
+  ],
+  "manifest_storage_ref": {
+    "uri": "gs://bucket/runs/run_01jq7f3s9b7j4dndd9sgv6pb9d/abm_01jq7fb8x4nm7m3qz3b8e9q2fk.json",
+    "content_type": "application/json",
+    "byte_size": 4000,
+    "checksum": "7777777777777777777777777777777777777777777777777777777777777777",
+    "checksum_algorithm": "sha256",
+    "created_at": "2026-04-05T11:05:05Z"
+  }
+}
