@@ -1,0 +1,21 @@
+{
+  "header": {
+    "searchPlaceholder": "Nach Artikel, Urteil, Kommentar oder Zitat suchen…",
+    "filters": "Filter",
+    "trail": "Verlauf",
+    "pinned": "Merkliste",
+    "languageGroup": "Sprache",
+    "openUserMenu": "Benutzermenü öffnen"
+  },
+  "filter": {
+    "filtersTitle": "Filter",
+    "searchPlaceholder": "Suchen...",
+    "yes": "Ja"
+  },
+  "context": {
+    "officialSourcesOnly": "Nur offizielle Quellen"
+  },
+  "workspace": {
+    "detailLoadFailed": "Dokumentdetails konnten nicht geladen werden."
+  }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Shield } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { getIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
@@ -15,6 +16,7 @@ interface ContextBarProps {
  */
 export function ContextBar({ context }: ContextBarProps) {
   const { state: constraints, dispatch } = useSearchConstraints();
+  const t = useTranslations();
 
   return (
     <div className="border-b border-border bg-surface-panel px-6 py-2 flex items-center gap-6 text-sm">
@@ -75,7 +77,7 @@ export function ContextBar({ context }: ContextBarProps) {
           }`}
       >
         <Shield className="w-3.5 h-3.5" />
-        Official sources only
+        {t("context.officialSourcesOnly")}
       </button>
     </div>
   );

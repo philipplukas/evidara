@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { getIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
@@ -12,10 +13,11 @@ interface FilterPanelProps {
 }
 
 export function FilterPanel({ filters }: FilterPanelProps) {
+  const t = useTranslations();
   return (
     <div className="py-4 space-y-1">
       <div className="px-4 pb-3">
-        <SectionLabel>Filters</SectionLabel>
+        <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
       </div>
       {filters.map((filter) => (
         <FilterGroup key={filter.key} filter={filter} />
@@ -26,6 +28,7 @@ export function FilterPanel({ filters }: FilterPanelProps) {
 
 function FilterGroup({ filter }: { filter: FilterViewModel }) {
   const { state: constraints, dispatch } = useSearchConstraints();
+  const t = useTranslations();
   const [expanded, setExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -96,7 +99,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder={t("filter.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full h-7 pl-7 pr-2 text-xs rounded border border-border bg-surface-panel
@@ -216,7 +219,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                 />
               </div>
               <span className="text-xs text-foreground/80">
-                {filter.options[0]?.label || "Yes"}
+                {filter.options[0]?.label || t("filter.yes")}
               </span>
             </label>
           )}

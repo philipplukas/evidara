@@ -22,7 +22,9 @@ describe("High-impact interaction controls", () => {
     fireEvent.click(decisionsTab);
     expect(decisionsTab.className).toContain("text-brand");
 
-    const officialToggle = screen.getByRole("button", { name: "Official sources only" });
+    const officialToggle = screen.getByRole("button", {
+      name: /Official sources only|Nur offizielle Quellen/,
+    });
     fireEvent.click(officialToggle);
     expect(officialToggle.className).toContain("text-brand");
   });
