@@ -64,13 +64,19 @@ jobs:
             --project "${GCP_PROJECT_ID}" \
             --region "${GCP_REGION}" \
             --format='value(status.url)')
-          PC_ID_TOKEN=$(gcloud auth print-identity-token --audiences="${PC_URL}")
-          LS_ID_TOKEN=$(gcloud auth print-identity-token --audiences="${LS_URL}")
+          PC_ID_TOKEN=$(gcloud auth print-identity-token \
+            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
+            --audiences="${PC_URL}")
+          LS_ID_TOKEN=$(gcloud auth print-identity-token \
+            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
+            --audiences="${LS_URL}")
 
           echo "::add-mask::${PC_ID_TOKEN}"
           echo "::add-mask::${LS_ID_TOKEN}"
           echo "E2E_PC_ID_TOKEN=${PC_ID_TOKEN}" >> "${GITHUB_ENV}"
           echo "E2E_LS_ID_TOKEN=${LS_ID_TOKEN}" >> "${GITHUB_ENV}"
+        env:
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
 
       - name: Run E2E smoke test (dev)
         id: smoke
