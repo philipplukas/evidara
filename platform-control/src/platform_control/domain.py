@@ -55,6 +55,11 @@ class FirecrawlMode(StrEnum):
     BATCH_SCRAPE = "batch_scrape"
 
 
+class AcquisitionProvider(StrEnum):
+    FIRECRAWL = "firecrawl"
+    DETERMINISTIC_HTTP = "deterministic_http"
+
+
 class ProcessingStatus(StrEnum):
     ACCEPTED = "accepted"
     PROCESSING = "processing"

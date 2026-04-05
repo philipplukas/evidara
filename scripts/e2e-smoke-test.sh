@@ -34,9 +34,19 @@ done
 # GCP project — override via env var if needed
 PROJECT_ID="${GCP_PROJECT_ID:-data-platform-dev-492214}"
 
+# Auto-auth for private Cloud Run services.
+CURL_AUTH_ARGS=()
+if command -v gcloud >/dev/null 2>&1; then
+  ID_TOKEN="$(gcloud auth print-identity-token 2>/dev/null || true)"
+  if [[ -n "${ID_TOKEN}" ]]; then
+    CURL_AUTH_ARGS=(-H "Authorization: Bearer ${ID_TOKEN}")
+    echo "🔐 Using gcloud identity token for Cloud Run requests."
+  fi
+fi
+
 # ── Shared curl wrapper: fail on HTTP errors, with sane timeouts ──────
 curl_json() {
-  curl -fsS --connect-timeout 5 --max-time 30 "$@"
+  curl -fsS --connect-timeout 5 --max-time 30 "${CURL_AUTH_ARGS[@]}" "$@"
 }
 
 echo "╔══════════════════════════════════════════════════════════╗"
@@ -85,11 +95,21 @@ echo ""
 # ── 3. Create source ────────────────────────────────────────────────
 
 echo "🔍 Step 3: Create source..."
-source_body=$(cat <<'JSON'
+authorities_response=$(curl_json "${PC_URL}/v1/reference-data/authorities")
+JURISDICTION_ID=$(echo "${authorities_response}" | jq -r '.data[0].jurisdiction_id // empty')
+AUTHORITY_ID=$(echo "${authorities_response}" | jq -r '.data[0].authority_id // empty')
+if [[ -z "${JURISDICTION_ID}" || -z "${AUTHORITY_ID}" ]]; then
+  echo "  ❌ Could not determine a valid jurisdiction/authority pair"
+  echo "  ${authorities_response}" | jq .
+  exit 1
+fi
+echo "  ℹ️  Using jurisdiction=${JURISDICTION_ID}, authority=${AUTHORITY_ID}"
+
+source_body=$(cat <<JSON
 {
-  "name": "E2E Smoke Test Source",
-  "jurisdiction_id": "jur_ch",
-  "authority_id": "auth_bger"
+  "name": "E2E Smoke Test Source $(date +%s)",
+  "jurisdiction_id": "${JURISDICTION_ID}",
+  "authority_id": "${AUTHORITY_ID}"
 }
 JSON
 )
@@ -113,8 +133,10 @@ version_body=$(cat <<JSON
 {
   "version_label": "v1-e2e-$(date +%s)",
   "acquisition_spec": {
-    "seed_url": "https://www.bger.ch/ext/eurospider/live/de/php/aza/http/index.php?lang=de&type=show_document&highlight_docid=aza://06-11-2024-4A_400-2024",
-    "mode": "scrape",
+    "provider": "deterministic_http",
+    "seed_url": "http://metadata.google.internal",
+    "request_timeout_seconds": 5,
+    "mode": "crawl",
     "limit": 1,
     "tenant_id": "tenant_public",
     "corpus_id": "corpus_ch_de",
@@ -188,9 +210,37 @@ for i in $(seq 1 ${MAX_POLLS}); do
 done
 echo ""
 
-# ── 7. Check projection history ────────────────────────────────────
+# ── 7. Wait for DI signals ─────────────────────────────────────────
 
-echo "🔍 Step 7: Checking projection history..."
+echo "🔍 Step 7: Verifying DI processing signals..."
+MAX_DI_POLLS=12
+DI_INTERVAL=5
+for i in $(seq 1 ${MAX_DI_POLLS}); do
+  status_response=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}/processing-status")
+  lifecycle_response=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}/document-lifecycle")
+
+  status_count=$(echo "${status_response}" | jq -r '.data | length')
+  canonical_ready_count=$(echo "${status_response}" | jq -r '[.data[] | select(.status=="canonical_ready")] | length')
+  processed_count=$(echo "${lifecycle_response}" | jq -r '[.data[] | select(.event_type=="document.processed")] | length')
+  echo "  [${i}/${MAX_DI_POLLS}] statuses=${status_count}, canonical_ready=${canonical_ready_count}, processed=${processed_count}"
+
+  if [ "${canonical_ready_count}" -gt 0 ] && [ "${processed_count}" -gt 0 ]; then
+    echo "  ✅ DI signals observed"
+    break
+  fi
+
+  if [ "${i}" -eq "${MAX_DI_POLLS}" ]; then
+    echo "  ❌ Timed out waiting for DI canonical_ready and document.processed signals"
+    exit 1
+  fi
+
+  sleep ${DI_INTERVAL}
+done
+echo ""
+
+# ── 8. Check projection history ────────────────────────────────────
+
+echo "🔍 Step 8: Checking projection history..."
 projection_stats=$(curl_json "${LS_URL}/v1/projections/events/history/stats")
 total_events=$(echo "${projection_stats}" | jq -r '.totalEvents // 0')
 applied=$(echo "${projection_stats}" | jq -r '.applied // 0')
@@ -204,9 +254,9 @@ else
 fi
 echo ""
 
-# ── 8. Search for indexed document ──────────────────────────────────
+# ── 9. Search for indexed document ──────────────────────────────────
 
-echo "🔍 Step 8: Searching for indexed documents..."
+echo "🔍 Step 9: Searching for indexed documents..."
 search_response=$(curl_json "${LS_URL}/v1/search?q=Verantwortlichkeit")
 result_count=$(echo "${search_response}" | jq -r '.results | length')
 echo "  📊 Search results: ${result_count}"

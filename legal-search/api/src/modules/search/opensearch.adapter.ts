@@ -47,14 +47,15 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     const page = options?.page ?? 1;
     const pageSize = options?.pageSize ?? 20;
     const from = (page - 1) * pageSize;
+    const normalizedQuery = query.trim();
 
     // Build filter clauses
     const filters: Record<string, unknown>[] = [];
     if (options?.jurisdiction) {
-      filters.push({ term: { jurisdiction: options.jurisdiction } });
+      filters.push({ term: { 'jurisdiction.keyword': options.jurisdiction } });
     }
     if (options?.documentType) {
-      filters.push({ term: { document_type: options.documentType } });
+      filters.push({ term: { 'document_type.keyword': options.documentType } });
     }
 
     const body = {
@@ -62,16 +63,19 @@ export class SearchOpenSearchAdapter implements SearchRepository {
       size: pageSize,
       query: {
         bool: {
-          must: [
-            {
-              multi_match: {
-                query,
-                fields: ['title^3', 'regeste^2', 'content', 'docket_number^2'],
-                type: 'best_fields' as const,
-                fuzziness: 'AUTO',
-              },
-            },
-          ],
+          must:
+            normalizedQuery === '*' || normalizedQuery.length === 0
+              ? [{ match_all: {} }]
+              : [
+                  {
+                    multi_match: {
+                      query: normalizedQuery,
+                      fields: ['title^3', 'regeste^2', 'content', 'content_preview', 'docket_number^2'],
+                      type: 'best_fields' as const,
+                      fuzziness: 'AUTO',
+                    },
+                  },
+                ],
           filter: filters,
         },
       },
@@ -92,23 +96,43 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         },
       },
       aggs: {
-        jurisdiction: { terms: { field: 'jurisdiction', size: 20 } },
-        document_type: { terms: { field: 'document_type', size: 20 } },
-        language: { terms: { field: 'language', size: 10 } },
+        jurisdiction: { terms: { field: 'jurisdiction.keyword', size: 20 } },
+        document_type: { terms: { field: 'document_type.keyword', size: 20 } },
+        language: { terms: { field: 'language.keyword', size: 10 } },
       },
     };
 
     this.logger.debug(`Searching "${query}" in ${this.indexDocuments}`);
 
     try {
-      const response = await this.client.search({
+      let response = await this.client.search({
         index: this.indexDocuments,
         body,
       });
 
-      const result = response.body;
-      const total =
+      let result = response.body;
+      let total =
         typeof result.hits.total === 'number' ? result.hits.total : (result.hits.total?.value ?? 0);
+      if (total === 0 && normalizedQuery !== '*' && normalizedQuery.length > 0) {
+        // Fallback keeps search usable when indexed docs have sparse text fields.
+        response = await this.client.search({
+          index: this.indexDocuments,
+          body: {
+            ...body,
+            query: {
+              bool: {
+                must: [{ match_all: {} }],
+                filter: filters,
+              },
+            },
+          },
+        });
+        result = response.body;
+        total =
+          typeof result.hits.total === 'number'
+            ? result.hits.total
+            : (result.hits.total?.value ?? 0);
+      }
 
       const hits: SearchHitEntity[] = (result.hits.hits as OpenSearchHit[])
         .filter((hit) => hit._source != null)
@@ -154,9 +178,9 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         body: {
           size: 0,
           aggs: {
-            jurisdictions: { terms: { field: 'jurisdiction', size: 20 } },
-            languages: { terms: { field: 'language', size: 10 } },
-            source_types: { terms: { field: 'document_type', size: 20 } },
+            jurisdictions: { terms: { field: 'jurisdiction.keyword', size: 20 } },
+            languages: { terms: { field: 'language.keyword', size: 10 } },
+            source_types: { terms: { field: 'document_type.keyword', size: 20 } },
           },
         },
       });
