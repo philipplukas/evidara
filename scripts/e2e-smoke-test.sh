@@ -134,7 +134,7 @@ version_body=$(cat <<JSON
   "version_label": "v1-e2e-$(date +%s)",
   "acquisition_spec": {
     "provider": "deterministic_http",
-    "seed_url": "http://metadata.google.internal",
+    "seed_url": "https://example.com",
     "request_timeout_seconds": 5,
     "mode": "crawl",
     "limit": 1,
