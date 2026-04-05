@@ -165,4 +165,5 @@ These are not actively alerted but should be checked in daily standups:
 - [SLI/SLO definitions](../adr/sli-slo-definitions.md)
 - [DLQ triage runbook](./dlq-triage-and-replay.md)
 - [Connector worker runbook](./connector-worker-operations.md)
+- [Scraping run health dashboard](./scraping-run-health-dashboard.md)
 - [Terraform alert policies](../../infra/terraform/gcp/runtime_stack/monitoring.tf)
