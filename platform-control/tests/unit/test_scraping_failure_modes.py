@@ -183,7 +183,9 @@ async def test_malformed_crawl_page_entries_are_ignored_without_failing_webhook_
 
     await service.process(payload=payload, raw_body=body, signature=signature)
 
-    artifacts = list(await session.scalars(select(RawArtifact).where(RawArtifact.run_id == "run_failure_seed")))
+    artifacts = list(
+        await session.scalars(select(RawArtifact).where(RawArtifact.run_id == "run_failure_seed"))
+    )
     resources = list(
         await session.scalars(
             select(CapturedResource).where(CapturedResource.run_id == "run_failure_seed")
@@ -201,7 +203,9 @@ async def test_malformed_crawl_page_entries_are_ignored_without_failing_webhook_
 
 
 @pytest.mark.asyncio
-async def test_crawl_failed_without_error_uses_default_failure_reason(session, tmp_path: Path) -> None:
+async def test_crawl_failed_without_error_uses_default_failure_reason(
+    session, tmp_path: Path
+) -> None:
     await _seed_run_graph(session)
     publisher = CollectingPublisher()
     service = FirecrawlWebhookService(
