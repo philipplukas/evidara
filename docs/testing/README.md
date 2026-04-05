@@ -19,6 +19,7 @@ This directory contains Evidara's testing strategy, principles, and guides. Test
 | [Minimal Test Matrix](minimal-test-matrix.md) | Smallest credible test set for the whole platform |
 | [First End-to-End Slice](first-end-to-end-slice.md) | The first full-path E2E test |
 | [Scraping QA Standard](scraping-qa-standard.md) | Team-realistic quality gate for acquisition/scraping, including temporary manual merge enforcement when required checks are unavailable |
+| [First Vertical Slice Exit Gates](../runbooks/first-vertical-slice-exit-gates.md) | Runtime pass/fail gate and latest evidence for source -> DI -> search |
 
 ## Component Testing Guides
 
@@ -37,6 +38,7 @@ This directory contains Evidara's testing strategy, principles, and guides. Test
 3. **Check the [Minimal Test Matrix](minimal-test-matrix.md)** to see what the MVP requires.
 4. **Open the component guide** for the area you are working on.
 5. **Refer to [CI Testing Strategy](ci-testing-strategy.md)** when configuring pipelines.
+6. **Use run-scoped runtime smoke checks** from the first vertical slice runbook when validating live environments.
 
 ## Design Principles
 

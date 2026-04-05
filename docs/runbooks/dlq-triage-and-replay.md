@@ -1,7 +1,7 @@
 # Dead-Letter Queue Triage and Replay Runbook
 
 Owner: Platform team
-Last reviewed: 2026-04-03
+Last reviewed: 2026-04-05
 Last verified: Not yet verified
 Applies to: dev, staging, prod
 
@@ -9,6 +9,12 @@ Applies to: dev, staging, prod
 
 This runbook covers inspecting, triaging, and replaying messages that have been
 forwarded to dead-letter queues (DLQs) after exhausting their retry budget.
+
+## Ownership
+
+- **Primary owner**: Platform on-call (runtime messaging health)
+- **Escalation owner**: Document-intelligence owner when DLQ root cause is canonicalization/surface write failures
+- **Search owner**: Legal-search owner when DLQ root cause is projection ingestion
 
 ## Prerequisites
 
@@ -44,6 +50,15 @@ gcloud pubsub subscriptions describe \
   document-intelligence-artifact-bundle-available-dlq-sub \
   --project=PROJECT_ID \
   --format="json(pushConfig, ackDeadlineSeconds)"
+```
+
+Also inspect undelivered counts on primary subscriptions (not only DLQs), because
+backlog buildup can predate dead-lettering:
+
+```bash
+gcloud pubsub subscriptions list \
+  --project=PROJECT_ID \
+  --format="table(name, topic, pushConfig.pushEndpoint)"
 ```
 
 ## Step 2: Inspect Messages
