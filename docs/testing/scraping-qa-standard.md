@@ -90,6 +90,8 @@ Also maintain one run drill-down view (or query playbook) showing:
 - published bundle-manifest ref
 - emitted event IDs
 
+See [Scraping Run Health Dashboard & Drill-Down](../runbooks/scraping-run-health-dashboard.md) for the baseline panel set and triage workflow.
+
 ## CI and Cadence Recommendation
 
 For a 1-3 person team:
