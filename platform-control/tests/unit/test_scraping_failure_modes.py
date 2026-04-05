@@ -224,4 +224,3 @@ async def test_crawl_failed_without_error_uses_default_failure_reason(
     assert run.status is RunStatus.FAILED
     assert run.failure_reason == "Firecrawl job failed."
     assert run.completed_at is not None
-
