@@ -3,6 +3,7 @@ import type {
   DocumentProcessedEventDto,
   DocumentWithdrawnEventDto,
 } from './dto/projection-events.dto';
+import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
 import type { ProjectionRepository } from './projections.repository';
 import { ProjectionsService } from './projections.service';
 
@@ -21,6 +22,12 @@ function createRepositoryMock(): ProjectionRepository {
       ignoredDuplicate: 0,
       uniqueDocuments: 0,
     }),
+  };
+}
+
+function createDocumentIntelligenceMock(): DocumentIntelligenceClient {
+  return {
+    fetchLeanDocument: vi.fn().mockResolvedValue(null),
   };
 }
 
@@ -74,7 +81,8 @@ const baseWithdrawnEvent: DocumentWithdrawnEventDto = {
 describe('ProjectionsService', () => {
   it('applies a fresh processed event and writes history', async () => {
     const repository = createRepositoryMock();
-    const service = new ProjectionsService(repository);
+    const diClient = createDocumentIntelligenceMock();
+    const service = new ProjectionsService(repository, diClient);
 
     const result = await service.applyDocumentProcessed(baseProcessedEvent);
 
@@ -86,7 +94,8 @@ describe('ProjectionsService', () => {
   it('ignores duplicate events by event_id', async () => {
     const repository = createRepositoryMock();
     (repository.hasHistoryEvent as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-    const service = new ProjectionsService(repository);
+    const diClient = createDocumentIntelligenceMock();
+    const service = new ProjectionsService(repository, diClient);
 
     const result = await service.applyDocumentProcessed(baseProcessedEvent);
 
@@ -98,7 +107,8 @@ describe('ProjectionsService', () => {
   it('marks stale processed events when revision regresses', async () => {
     const repository = createRepositoryMock();
     (repository.getLatestRevision as ReturnType<typeof vi.fn>).mockResolvedValue(5);
-    const service = new ProjectionsService(repository);
+    const diClient = createDocumentIntelligenceMock();
+    const service = new ProjectionsService(repository, diClient);
 
     const event = {
       ...baseProcessedEvent,
@@ -115,7 +125,8 @@ describe('ProjectionsService', () => {
 
   it('removes projection for withdrawn event and writes history', async () => {
     const repository = createRepositoryMock();
-    const service = new ProjectionsService(repository);
+    const diClient = createDocumentIntelligenceMock();
+    const service = new ProjectionsService(repository, diClient);
 
     const result = await service.applyDocumentWithdrawn(baseWithdrawnEvent);
 
@@ -124,5 +135,32 @@ describe('ProjectionsService', () => {
       baseWithdrawnEvent.payload.document_id,
     );
     expect(repository.appendHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses lean document fields when available', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (
+      diClient.fetchLeanDocument as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      title: 'Bundesgerichtsurteil 9C_100/2025',
+      language: 'de',
+      sections: [{ id: 's1' }, { id: 's2' }],
+      citations: [{ id: 'c1' }],
+      content_text: 'Leitsatz und Sachverhalt...',
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Bundesgerichtsurteil 9C_100/2025',
+        sections_count: 2,
+        citations_count: 1,
+        language: 'de',
+        content_preview: 'Leitsatz und Sachverhalt...',
+      }),
+    );
   });
 });

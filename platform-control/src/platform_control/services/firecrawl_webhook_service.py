@@ -266,6 +266,22 @@ class FirecrawlWebhookService:
             document_type_hint=acquisition_spec.get("document_type_hint"),
             snapshot_captured_at=run.completed_at or datetime.now(UTC),
         )
+        reference_snapshot_set = self._build_reference_snapshot_set(
+            source=source,
+            source_version=source_version,
+            run=run,
+            manifest_provenance=manifest["provenance"],
+        )
+        reference_snapshot_set_id = str(reference_snapshot_set["reference_snapshot_set_id"])
+        reference_snapshot_storage_ref = await self.artifact_store.store_bundle_manifest(
+            run_id=run.run_id,
+            bundle_manifest_id=reference_snapshot_set_id,
+            payload=reference_snapshot_set,
+        )
+        manifest["reference_context"]["reference_snapshot_set_ref"] = {
+            "reference_snapshot_set_id": reference_snapshot_set_id,
+            "storage_ref": reference_snapshot_storage_ref,
+        }
         manifest_storage_ref = await self.artifact_store.store_bundle_manifest(
             run_id=run.run_id,
             bundle_manifest_id=bundle_manifest_id,
@@ -330,4 +346,33 @@ class FirecrawlWebhookService:
             "checksum": checksum,
             "checksum_algorithm": checksum_algorithm,
             "created_at": artifact.created_at.isoformat(),
+        }
+
+    @staticmethod
+    def _build_reference_snapshot_set(
+        *,
+        source: Source,
+        source_version: SourceVersion,
+        run: Run,
+        manifest_provenance: dict[str, Any],
+    ) -> dict[str, Any]:
+        acquisition_spec = source_version.acquisition_spec or {}
+        return {
+            "reference_snapshot_set_id": generate_prefixed_id("exp"),
+            "generated_at": (run.completed_at or datetime.now(UTC)).isoformat(),
+            "provenance": {
+                "run_id": run.run_id,
+                "source_id": source.source_id,
+                "source_version_id": source_version.source_version_id,
+                "tenant_id": manifest_provenance.get("tenant_id"),
+                "corpus_id": manifest_provenance.get("corpus_id"),
+                "scope_type": manifest_provenance.get("scope_type"),
+            },
+            "jurisdictions": [{"jurisdiction_id": source.jurisdiction_id}],
+            "authorities": (
+                [{"authority_id": source.authority_id}] if source.authority_id else []
+            ),
+            "extractor_profile_hint": acquisition_spec.get("extractor_profile_hint"),
+            "language_codes": acquisition_spec.get("language_codes") or [],
+            "document_type_hint": acquisition_spec.get("document_type_hint"),
         }

@@ -87,6 +87,17 @@ python3 scripts/configure_firecrawl_runtime.py \
   --verify-callback
 ```
 
+## First-slice runtime service set
+
+For the first end-to-end slice, keep these Cloud Run services present in each environment tfvars:
+
+- `platform-control-api`
+- `platform-control-worker`
+- `document-intelligence-consumer`
+- `legal-search-api`
+
+The runtime stack defaults already include Pub/Sub subscription wiring for DI ingestion and legal-search projection push callbacks; do not remove those subscriptions unless replacing them with an equivalent delivery path.
+
 ### GKE OpenSearch secret sync
 
 After applying the self-managed OpenSearch GKE stack, sync stack outputs into GCP Secret Manager:

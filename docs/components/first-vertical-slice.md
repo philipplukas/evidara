@@ -4,6 +4,10 @@
 
 The smallest end-to-end flow that proves the architecture works: a single source can be configured, run, bundled, processed, indexed, and searched.
 
+## Status source of truth
+
+Use this document as the authoritative release-gate checklist for the first vertical slice. If status differs from component-specific docs, reconcile those docs to this checklist during the same PR.
+
 ## Frozen scope
 
 For `ws-00-contract-sync`, the first slice is frozen to the narrowest currently credible path:
@@ -65,7 +69,7 @@ The vertical slice can progress in parallel with clear handoff boundaries:
 
 ### document-intelligence
 
-- [~] `artifact_bundle.available` processing entrypoints exist, with runtime consumer scaffolding landed; deployment wiring is still pending
+- [x] `artifact_bundle.available` processing entrypoints and always-on runtime consumer
 - [x] Bundle-manifest and raw-artifact reader
 - [x] Canonical `Document` and `Section` writers
 - [x] Published surfaces for documents, sections, and processing manifests
@@ -74,12 +78,12 @@ The vertical slice can progress in parallel with clear handoff boundaries:
 
 ### legal-search
 
-- [~] `document.processed` consumer
-- [ ] Projection builder from published DI surfaces
+- [x] `document.processed` consumer
+- [x] Projection builder from published DI surfaces
 - [x] OpenSearch index and alias setup
 - [x] Minimal projection manifest/history record
 - [x] Search and detail API
-- [~] Minimal frontend exists, but it is still mock-backed rather than connected to the live BFF
+- [x] Frontend wired to live BFF generated client
 
 ### contracts
 
@@ -93,10 +97,10 @@ The vertical slice can progress in parallel with clear handoff boundaries:
 
 - [x] GCS bucket for raw artifacts and bundle manifests
 - [x] Pub/Sub topics and subscriptions
-- [~] Databricks workspace and published-surface scaffolding exists in Terraform and bundle files, but deployment/runtime wiring is still pending
-- [ ] OpenSearch cluster
+- [~] Databricks workspace and published-surface deployment automation is partially wired
+- [x] OpenSearch runtime target and alias cutover automation are defined
 - [x] OpenSearch alias cutover path
-- [~] Cloud Run services
+- [x] Cloud Run services and worker/runtime health endpoints are defined
 
 ## Success criteria
 

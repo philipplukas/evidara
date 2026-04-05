@@ -4,6 +4,10 @@ import type {
   DocumentWithdrawnEventDto,
 } from './dto/projection-events.dto';
 import {
+  DOCUMENT_INTELLIGENCE_CLIENT,
+  type DocumentIntelligenceClient,
+} from '../../lib/document-intelligence/document-intelligence.client';
+import {
   PROJECTION_REPOSITORY,
   type ProjectionHistoryEntry,
   type ProjectionHistoryPage,
@@ -25,6 +29,8 @@ export class ProjectionsService {
   constructor(
     @Inject(PROJECTION_REPOSITORY)
     private readonly repository: ProjectionRepository,
+    @Inject(DOCUMENT_INTELLIGENCE_CLIENT)
+    private readonly documentIntelligence: DocumentIntelligenceClient,
   ) {}
 
   async applyDocumentProcessed(event: DocumentProcessedEventDto): Promise<ProjectionApplyResult> {
@@ -38,7 +44,11 @@ export class ProjectionsService {
       return { eventId: event.event_id, status: 'stale' };
     }
 
-    const projection = this.buildProjection(event);
+    const leanDocument = await this.documentIntelligence.fetchLeanDocument(event.payload.document_id, {
+      correlationId: event.correlation_id,
+      documentRevision: event.payload.document_revision,
+    });
+    const projection = this.buildProjection(event, leanDocument);
     await this.repository.upsertProjection(projection);
     await this.appendHistory(event, 'applied');
     return { eventId: event.event_id, status: 'applied' };
@@ -69,13 +79,21 @@ export class ProjectionsService {
     return this.repository.getHistoryStats();
   }
 
-  private buildProjection(event: DocumentProcessedEventDto): SearchProjectionDocument {
+  private buildProjection(
+    event: DocumentProcessedEventDto,
+    leanDocument: unknown | null,
+  ): SearchProjectionDocument {
     const provenance = event.payload.provenance;
+    const extracted = this.extractLeanDocumentFields(leanDocument);
+    const title = extracted.title ?? `Document ${event.payload.document_id}`;
+    const preview =
+      extracted.previewText ??
+      event.payload.processing_version;
     return {
       document_id: event.payload.document_id,
-      title: `Document ${event.payload.document_id}`,
-      sections_count: 0,
-      citations_count: 0,
+      title,
+      sections_count: extracted.sectionsCount,
+      citations_count: extracted.citationsCount,
       source_id: provenance.source_id,
       source_version_id: provenance.source_version_id,
       run_id: provenance.run_id,
@@ -84,9 +102,61 @@ export class ProjectionsService {
       lifecycle_status: event.payload.lifecycle_status,
       processed_at: event.occurred_at,
       jurisdiction: this.inferJurisdiction(provenance.corpus_id),
-      language: this.inferLanguage(provenance.corpus_id),
-      content_preview: event.payload.processing_version,
+      language: extracted.language ?? this.inferLanguage(provenance.corpus_id),
+      content_preview: preview,
     };
+  }
+
+  private extractLeanDocumentFields(leanDocument: unknown): {
+    title?: string;
+    language?: string;
+    previewText?: string;
+    sectionsCount: number;
+    citationsCount: number;
+  } {
+    if (!leanDocument || typeof leanDocument !== 'object') {
+      return { sectionsCount: 0, citationsCount: 0 };
+    }
+    const doc = leanDocument as Record<string, unknown>;
+    const title = typeof doc.title === 'string' && doc.title.trim() ? doc.title.trim() : undefined;
+    const language =
+      typeof doc.language === 'string' && doc.language.trim() ? doc.language.trim() : undefined;
+    const sectionCandidates = [
+      doc.sections,
+      doc.document_sections,
+      doc.body_sections,
+    ];
+    const citationCandidates = [
+      doc.citations,
+      doc.document_citations,
+    ];
+    const textCandidates = [
+      doc.content_text,
+      doc.text,
+      doc.summary,
+    ];
+    const sectionsCount = this.countArrayLike(sectionCandidates);
+    const citationsCount = this.countArrayLike(citationCandidates);
+    const previewText = this.firstString(textCandidates);
+    return { title, language, previewText, sectionsCount, citationsCount };
+  }
+
+  private countArrayLike(values: unknown[]): number {
+    for (const value of values) {
+      if (Array.isArray(value)) {
+        return value.length;
+      }
+    }
+    return 0;
+  }
+
+  private firstString(values: unknown[]): string | undefined {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+    return undefined;
   }
 
   private inferJurisdiction(corpusId: string): string | undefined {

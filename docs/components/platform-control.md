@@ -43,12 +43,14 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 - [x] Define OpenAPI spec (`contracts/api/platform-control.openapi.yaml`)
 - [x] Define `ArtifactBundleManifest` schema
 - [x] Create the initial `platform-control/` API scaffold
-- [ ] Create the connector-worker scaffold under `platform-control/`
+- [x] Create the connector-worker scaffold under `platform-control/`
 - [~] Define run lifecycle and replay modes
   Current API support exists for `scope` and `replay` metadata on run creation, but resumable checkpoints/frontier orchestration are not implemented yet.
 - [x] Define approval states and transitions
-- [~] Define reference snapshot export mechanics for DI
-- [ ] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
+- [x] Define reference snapshot export mechanics for DI
+- [x] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
+
+Replay/checkpoint constraint: checkpoint/frontier state is not yet persisted as a first-class model. Operators should treat replay as run-scoped metadata plus provider-side reruns until dedicated checkpoint orchestration lands.
 
 ## Minimal v1 Outcome
 
