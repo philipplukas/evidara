@@ -46,7 +46,16 @@ fi
 
 # ── Shared curl wrapper: fail on HTTP errors, with sane timeouts ──────
 curl_json() {
-  local request_url="${!#}"
+  local request_url=""
+  local arg
+  for arg in "$@"; do
+    if [[ "${arg}" =~ ^https?:// ]]; then
+      request_url="${arg}"
+    fi
+  done
+  if [[ -z "${request_url}" ]]; then
+    request_url="${!#}"
+  fi
   local auth_args=("${CURL_AUTH_ARGS[@]}")
   if [[ "${request_url}" =~ ^https?://[^/]+ ]]; then
     if [[ -n "${E2E_PC_ID_TOKEN:-}" && -n "${PC_URL:-}" && "${request_url}" == "${PC_URL}"* ]]; then
