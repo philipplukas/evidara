@@ -15,7 +15,7 @@ set -euo pipefail
 # ───────────────────────────────────────────────────────────────────────
 
 ENVIRONMENT="dev"
-REGION="europe-west6"
+REGION="${GCP_REGION:-europe-west6}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
