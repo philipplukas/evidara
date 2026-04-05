@@ -27,6 +27,7 @@ jobs:
     env:
       TARGET_ENV: dev
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
       SMOKE_SEED_URL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.smoke_seed_url || vars.SMOKE_SEED_URL_DEV || 'http://example.org' }}
       SMOKE_REQUEST_TIMEOUT_SECONDS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.smoke_request_timeout_seconds || vars.SMOKE_REQUEST_TIMEOUT_SECONDS_DEV || '10' }}
       DI_SURFACES_ROOT_URI: ${{ vars.DI_SURFACES_ROOT_URI_DEV || 'gs://evidara-document-intelligence-surfaces-dev/published' }}
@@ -52,6 +53,24 @@ jobs:
           PROJECT_ID="${GCP_PROJECT_ID}" \
           DI_SURFACES_ROOT_URI="${DI_SURFACES_ROOT_URI}" \
           bash scripts/check-di-surface-schema-drift.sh
+
+      - name: Mint audience-scoped Cloud Run ID tokens
+        run: |
+          PC_URL=$(gcloud run services describe "platform-control-api-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+          LS_URL=$(gcloud run services describe "legal-search-api-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+          PC_ID_TOKEN=$(gcloud auth print-identity-token --audiences="${PC_URL}")
+          LS_ID_TOKEN=$(gcloud auth print-identity-token --audiences="${LS_URL}")
+
+          echo "::add-mask::${PC_ID_TOKEN}"
+          echo "::add-mask::${LS_ID_TOKEN}"
+          echo "E2E_PC_ID_TOKEN=${PC_ID_TOKEN}" >> "${GITHUB_ENV}"
+          echo "E2E_LS_ID_TOKEN=${LS_ID_TOKEN}" >> "${GITHUB_ENV}"
 
       - name: Run E2E smoke test (dev)
         id: smoke

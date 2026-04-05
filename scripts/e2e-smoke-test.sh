@@ -46,10 +46,17 @@ fi
 
 # ── Shared curl wrapper: fail on HTTP errors, with sane timeouts ──────
 curl_json() {
+  local request_url="${!#}"
   local auth_args=("${CURL_AUTH_ARGS[@]}")
+  if [[ "${request_url}" =~ ^https?://[^/]+ ]]; then
+    if [[ -n "${E2E_PC_ID_TOKEN:-}" && -n "${PC_URL:-}" && "${request_url}" == "${PC_URL}"* ]]; then
+      auth_args=(-H "Authorization: Bearer ${E2E_PC_ID_TOKEN}")
+    elif [[ -n "${E2E_LS_ID_TOKEN:-}" && -n "${LS_URL:-}" && "${request_url}" == "${LS_URL}"* ]]; then
+      auth_args=(-H "Authorization: Bearer ${E2E_LS_ID_TOKEN}")
+    fi
+  fi
   if [[ ${#auth_args[@]} -eq 0 ]] && command -v gcloud >/dev/null 2>&1; then
     # GitHub OIDC + service-account auth often requires audience-scoped ID tokens.
-    local request_url="${!#}"
     if [[ "${request_url}" =~ ^https?://[^/]+ ]]; then
       local audience
       audience="$(echo "${request_url}" | sed -E 's#(https?://[^/]+).*#\1#')"
