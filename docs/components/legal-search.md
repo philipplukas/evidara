@@ -48,7 +48,7 @@ The frontend is connected to the live BFF using generated API clients. Projectio
 - [x] Implement `document.processed` ingestion and projection writer (consume events, read published refs, transform to projection schema, upsert to OpenSearch)
 - [x] Implement `document.withdrawn` ingestion and deindex/tombstone behavior, including replay ordering tests
 - [x] Define reindex workflow
-- [ ] Internationalization: BFF locale-awareness and frontend `next-intl` (ADR-0013, Phases 1–2)
+- [x] Internationalization: BFF locale-awareness and frontend `next-intl` (ADR-0013, Phases 1–2)
 
 ## Minimal v1 Outcome
 

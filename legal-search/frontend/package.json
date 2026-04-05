@@ -21,6 +21,7 @@
     "openapi:check": "npm run openapi:generate && git diff --exit-code src/lib/api/generated/"
   },
   "dependencies": {
+    "@swc/helpers": "^0.5.21",
     "@tanstack/react-query": "^5.95.2",
     "@tanstack/react-query-devtools": "^5.95.2",
     "axios": "^1.14.0",
@@ -29,6 +30,7 @@
     "cmdk": "^1.1.1",
     "lucide-react": "^1.7.0",
     "next": "16.2.1",
+    "next-intl": "^4.9.0",
     "nuqs": "^2.8.9",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",

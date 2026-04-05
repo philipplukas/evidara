@@ -1,0 +1,21 @@
+{
+  "header": {
+    "searchPlaceholder": "Rechercher un article, un arrêt, un commentaire ou une citation…",
+    "filters": "Filtres",
+    "trail": "Historique",
+    "pinned": "Épinglés",
+    "languageGroup": "Langue",
+    "openUserMenu": "Ouvrir le menu utilisateur"
+  },
+  "filter": {
+    "filtersTitle": "Filtres",
+    "searchPlaceholder": "Rechercher...",
+    "yes": "Oui"
+  },
+  "context": {
+    "officialSourcesOnly": "Sources officielles uniquement"
+  },
+  "workspace": {
+    "detailLoadFailed": "Impossible de charger les détails du document."
+  }
+}

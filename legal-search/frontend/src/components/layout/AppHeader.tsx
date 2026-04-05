@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock, MapPin, Search, SlidersHorizontal, User } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { parseAsString, useQueryState } from "nuqs";
 import { type FormEvent, useEffect, useState } from "react";
 import { SUPPORTED_LOCALES, useLocale } from "@/lib/locale-context";
@@ -14,6 +15,7 @@ interface AppHeaderProps {
 export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
   const { state } = useWorkspace();
   const { locale, setLocale } = useLocale();
+  const t = useTranslations();
   const [urlQuery, setUrlQuery] = useQueryState("q", parseAsString.withDefault(""));
   const storeQuery = state.resultSet.source.type === "search" ? state.resultSet.source.query : "";
 
@@ -64,7 +66,7 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Search article, case, commentary, citation…"
+              placeholder={t("header.searchPlaceholder")}
               className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-surface-input text-sm
                 focus:outline-none focus:ring-2 focus:ring-focus-ring focus:border-brand
                 placeholder:text-muted-foreground/60 transition-all"
@@ -82,24 +84,28 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
                 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors lg:hidden"
             >
               <SlidersHorizontal className="w-4 h-4" />
-              Filters
+              {t("header.filters")}
             </button>
           )}
           <NavLink
             icon={<Clock className="w-4 h-4" />}
-            label="Trail"
+            label={t("header.trail")}
             count={state.trail.length > 0 ? state.trail.length : undefined}
           />
           <NavLink
             icon={<MapPin className="w-4 h-4" />}
-            label="Pinned"
+            label={t("header.pinned")}
             count={state.pinned.length > 0 ? state.pinned.length : undefined}
           />
         </nav>
 
         {/* Locale Switcher */}
         {/* biome-ignore lint/a11y/useSemanticElements: fieldset would break flex layout styling */}
-        <div className="flex items-center shrink-0" role="group" aria-label="Language">
+        <div
+          className="flex items-center shrink-0"
+          role="group"
+          aria-label={t("header.languageGroup")}
+        >
           {SUPPORTED_LOCALES.map((loc) => (
             <button
               key={loc}
@@ -122,7 +128,7 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
         <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-border">
           <button
             type="button"
-            aria-label="Open user menu"
+            aria-label={t("header.openUserMenu")}
             className="w-8 h-8 rounded-full bg-interactive-accent-muted flex items-center justify-center
             hover:bg-brand/20 transition-colors"
           >

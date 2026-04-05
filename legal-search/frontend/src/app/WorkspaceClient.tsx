@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DetailPanel } from "@/components/detail/DetailPanel";
@@ -30,6 +31,7 @@ interface WorkspaceClientProps {
 }
 
 export default function WorkspaceClient({ searchContext, filters }: WorkspaceClientProps) {
+  const t = useTranslations();
   const isDesktop = useDesktop();
   const { state, dispatch } = useWorkspace();
   const { state: constraints } = useSearchConstraints();
@@ -138,7 +140,7 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
     <DetailPanelSkeleton />
   ) : isDetailError ? (
     <div className="flex flex-col items-center justify-center h-full text-center px-6">
-      <p className="text-sm text-destructive">Failed to load document details.</p>
+      <p className="text-sm text-destructive">{t("workspace.detailLoadFailed")}</p>
     </div>
   ) : (
     <DetailPanel

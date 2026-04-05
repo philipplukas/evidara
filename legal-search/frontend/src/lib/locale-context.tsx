@@ -1,7 +1,9 @@
 "use client";
 
+import { NextIntlClientProvider } from "next-intl";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo } from "react";
+import { MESSAGES } from "@/i18n/messages";
 
 // ─── Types ───
 
@@ -94,5 +96,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ locale, setLocale }), [locale, setLocale]);
 
-  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
+  return (
+    <LocaleContext.Provider value={value}>
+      <NextIntlClientProvider locale={locale} messages={MESSAGES[locale]}>
+        {children}
+      </NextIntlClientProvider>
+    </LocaleContext.Provider>
+  );
 }
