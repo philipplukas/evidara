@@ -54,6 +54,7 @@ jobs:
 
       - name: Mint audience-scoped Cloud Run ID tokens
         run: |
+          set -euo pipefail
           PC_URL=$(gcloud run services describe "platform-control-api-${TARGET_ENV}" \
             --project "${GCP_PROJECT_ID}" \
             --region "${GCP_REGION}" \
@@ -62,12 +63,31 @@ jobs:
             --project "${GCP_PROJECT_ID}" \
             --region "${GCP_REGION}" \
             --format='value(status.url)')
+
+          if [[ -z "${PC_URL}" ]]; then
+            echo "::error::Failed to resolve platform-control-api URL for ${TARGET_ENV}"
+            exit 1
+          fi
+          if [[ -z "${LS_URL}" ]]; then
+            echo "::error::Failed to resolve legal-search-api URL for ${TARGET_ENV}"
+            exit 1
+          fi
+
           PC_ID_TOKEN=$(gcloud auth print-identity-token \
             --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
             --audiences="${PC_URL}")
           LS_ID_TOKEN=$(gcloud auth print-identity-token \
             --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
             --audiences="${LS_URL}")
+
+          if [[ -z "${PC_ID_TOKEN}" ]]; then
+            echo "::error::Failed to mint ID token for platform-control-api audience"
+            exit 1
+          fi
+          if [[ -z "${LS_ID_TOKEN}" ]]; then
+            echo "::error::Failed to mint ID token for legal-search-api audience"
+            exit 1
+          fi
 
           echo "::add-mask::${PC_ID_TOKEN}"
           echo "::add-mask::${LS_ID_TOKEN}"
