@@ -263,16 +263,38 @@ echo ""
 # ── 9. Search for indexed document ──────────────────────────────────
 
 echo "🔍 Step 9: Searching for indexed documents..."
-search_response=$(curl_json --get --data-urlencode "q=${RUN_DOCUMENT_ID}" "${LS_URL}/v1/search")
-result_count=$(echo "${search_response}" | jq -r '.results | length')
-matching_result_count=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '[.results[] | select(.id == $doc)] | length')
-echo "  📊 Search results: ${result_count} (matching run document=${matching_result_count})"
+MAX_SEARCH_PAGES=10
+SEARCH_PAGE_SIZE=100
+found_document=0
+matched_title=""
+result_count=0
 
-if [ "${matching_result_count}" -gt 0 ]; then
-  first_title=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | head -n 1)
-  echo "  ✅ Found run-scoped indexed document: ${first_title}"
+for page in $(seq 1 ${MAX_SEARCH_PAGES}); do
+  search_response=$(curl_json --get \
+    --data-urlencode "q=*" \
+    --data-urlencode "page=${page}" \
+    --data-urlencode "page_size=${SEARCH_PAGE_SIZE}" \
+    "${LS_URL}/v1/search")
+  result_count=$(echo "${search_response}" | jq -r '.results | length')
+  matching_result_count=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '[.results[] | select(.id == $doc)] | length')
+  echo "  [${page}/${MAX_SEARCH_PAGES}] Search results: ${result_count} (matching run document=${matching_result_count})"
+
+  if [ "${matching_result_count}" -gt 0 ]; then
+    found_document=1
+    matched_title=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | jq -r 'first // empty')
+    break
+  fi
+
+  if [ "${result_count}" -lt "${SEARCH_PAGE_SIZE}" ]; then
+    break
+  fi
+done
+
+if [ "${found_document}" -eq 1 ]; then
+  echo "  ✅ Found run-scoped indexed document: ${matched_title}"
 else
   echo "  ❌ Run-scoped search failed for document ${RUN_DOCUMENT_ID}."
+  echo "  Last search page payload:"
   echo "  ${search_response}" | jq .
   exit 1
 fi
