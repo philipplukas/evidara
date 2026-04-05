@@ -241,15 +241,21 @@ echo ""
 # ── 8. Check projection history ────────────────────────────────────
 
 echo "🔍 Step 8: Checking projection history..."
-projection_stats=$(curl_json "${LS_URL}/v1/projections/events/history/stats")
-total_events=$(echo "${projection_stats}" | jq -r '.totalEvents // 0')
-applied=$(echo "${projection_stats}" | jq -r '.applied // 0')
-echo "  📊 Projection stats: total=${total_events}, applied=${applied}"
+projection_history=$(curl_json --get \
+  --data-urlencode "run_id=${RUN_ID}" \
+  --data-urlencode "limit=50" \
+  --data-urlencode "offset=0" \
+  "${LS_URL}/v1/projections/events/history")
+run_total_events=$(echo "${projection_history}" | jq -r '.total // 0')
+applied=$(echo "${projection_history}" | jq -r '[.data[] | select(.status=="applied")] | length')
+RUN_DOCUMENT_ID=$(echo "${projection_history}" | jq -r '([.data[] | select(.status=="applied")][0].documentId // empty)')
+echo "  📊 Projection stats (run-scoped): total=${run_total_events}, applied=${applied}"
 
-if [ "${applied}" -gt 0 ]; then
-  echo "  ✅ Projections applied successfully!"
+if [ "${applied}" -gt 0 ] && [[ -n "${RUN_DOCUMENT_ID}" ]]; then
+  echo "  ✅ Projections applied for run ${RUN_ID} (document_id=${RUN_DOCUMENT_ID})"
 else
-  echo "  ❌ No projections applied — push subscription may not be wired."
+  echo "  ❌ No run-scoped projections applied for run ${RUN_ID}."
+  echo "  ${projection_history}" | jq .
   exit 1
 fi
 echo ""
@@ -257,15 +263,17 @@ echo ""
 # ── 9. Search for indexed document ──────────────────────────────────
 
 echo "🔍 Step 9: Searching for indexed documents..."
-search_response=$(curl_json "${LS_URL}/v1/search?q=Verantwortlichkeit")
+search_response=$(curl_json --get --data-urlencode "q=${RUN_DOCUMENT_ID}" "${LS_URL}/v1/search")
 result_count=$(echo "${search_response}" | jq -r '.results | length')
-echo "  📊 Search results: ${result_count}"
+matching_result_count=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '[.results[] | select(.id == $doc)] | length')
+echo "  📊 Search results: ${result_count} (matching run document=${matching_result_count})"
 
-if [ "${result_count}" -gt 0 ]; then
-  first_title=$(echo "${search_response}" | jq -r '.results[0].title')
-  echo "  ✅ Found indexed document: ${first_title}"
+if [ "${matching_result_count}" -gt 0 ]; then
+  first_title=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | head -n 1)
+  echo "  ✅ Found run-scoped indexed document: ${first_title}"
 else
-  echo "  ❌ No search results — documents may not have been indexed correctly."
+  echo "  ❌ Run-scoped search failed for document ${RUN_DOCUMENT_ID}."
+  echo "  ${search_response}" | jq .
   exit 1
 fi
 echo ""
