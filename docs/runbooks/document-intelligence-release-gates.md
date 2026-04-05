@@ -35,6 +35,10 @@ Exercised by `scripts/check-document-intelligence-runtime.sh` in the
 | Terraform validate | `terraform validate` | Invalid Terraform config for DI modules |
 | DI surface schema preflight (dev smoke) | `scripts/check-di-surface-schema-drift.sh` | Delta surface required-column drift before smoke execution |
 
+Cloud Run calls in `E2E Smoke Dev` use audience-scoped ID tokens minted via
+service-account impersonation. This is required for reliable invocation under
+GitHub Workload Identity Federation credentials.
+
 ## Container Image Build (CI only)
 
 Exercised by `.github/workflows/runtime-images.yml`.
