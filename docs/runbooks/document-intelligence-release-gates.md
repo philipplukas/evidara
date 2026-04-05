@@ -1,8 +1,8 @@
 # Document Intelligence Release Gates
 
 Owner: Platform team
-Last reviewed: 2026-04-03
-Last verified: 2026-04-03
+Last reviewed: 2026-04-05
+Last verified: 2026-04-05
 Applies to: dev, staging, prod
 
 ## Scope
@@ -33,6 +33,7 @@ Exercised by `scripts/check-document-intelligence-runtime.sh` in the
 |------|------|-----------------|
 | Terraform fmt | `terraform fmt -check` | Inconsistent HCL formatting |
 | Terraform validate | `terraform validate` | Invalid Terraform config for DI modules |
+| DI surface schema preflight (dev smoke) | `scripts/check-di-surface-schema-drift.sh` | Delta surface required-column drift before smoke execution |
 
 ## Container Image Build (CI only)
 
@@ -62,12 +63,37 @@ Before promoting a document-intelligence change to production:
 2. Container image builds successfully
 3. DAB dev deployment succeeds
 4. DAB prod deployment succeeds (requires manual approval via GitHub environment)
-5. Smoke-test ingestion flow in dev environment
+5. DI schema preflight passes in dev (`published_*` surfaces)
+6. Smoke-test ingestion flow in dev environment
+
+## Dev Runtime Verification Commands
+
+Run preflight and smoke together:
+
+```bash
+cd evidara
+PROJECT_ID=project-dacd6b7b-dc96-4534-b82 \
+DI_SURFACES_ROOT_URI=gs://evidara-document-intelligence-surfaces-dev/published \
+bash scripts/check-di-surface-schema-drift.sh
+
+GCP_PROJECT_ID=project-dacd6b7b-dc96-4534-b82 \
+SMOKE_SEED_URL=http://example.org \
+SMOKE_REQUEST_TIMEOUT_SECONDS=10 \
+scripts/e2e-smoke-test.sh --env dev
+```
+
+If preflight fails with a hard drift error in dev, reset surfaces and rerun:
+
+```bash
+gcloud storage rm --recursive "gs://evidara-document-intelligence-surfaces-dev/published/**"
+```
 
 ## Related Files
 
 - [`scripts/check-document-intelligence.sh`](../../scripts/check-document-intelligence.sh)
 - [`scripts/check-document-intelligence-runtime.sh`](../../scripts/check-document-intelligence-runtime.sh)
+- [`scripts/check-di-surface-schema-drift.sh`](../../scripts/check-di-surface-schema-drift.sh)
 - [`.github/workflows/document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
 - [`.github/workflows/document-intelligence-cd.yml`](../../.github/workflows/document-intelligence-cd.yml)
 - [`.github/workflows/runtime-images.yml`](../../.github/workflows/runtime-images.yml)
+- [`.github/workflows/e2e-smoke-dev.yml`](../../.github/workflows/e2e-smoke-dev.yml)

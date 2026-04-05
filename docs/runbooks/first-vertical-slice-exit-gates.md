@@ -52,6 +52,13 @@ The gate covers:
 - Projection history tracks idempotency and stale revision handling.
 - Search/detail queries return the indexed document through alias-backed indices.
 
+### Gate D: Run-Scoped Smoke Assertions
+
+- Smoke verification must use run-scoped assertions, not global stats.
+- Projection verification must query `GET /v1/projections/events/history?run_id=<run_id>`.
+- Search verification must confirm the exact `document_id` from the run-scoped
+  projection history appears in `/v1/search` results.
+
 ## Local Verification Commands
 
 Run these checks before marking a slice validation complete:
@@ -74,6 +81,34 @@ bash scripts/check-platform-control.sh
 bash scripts/check-document-intelligence.sh
 bash scripts/check-legal-search.sh
 ```
+
+For vertical-slice runtime verification in dev, use:
+
+```bash
+cd evidara
+GCP_PROJECT_ID=project-dacd6b7b-dc96-4534-b82 \
+SMOKE_SEED_URL=http://example.org \
+SMOKE_REQUEST_TIMEOUT_SECONDS=10 \
+scripts/e2e-smoke-test.sh --env dev
+```
+
+## Verification Log
+
+Recent closure evidence for this slice:
+
+| Date | Change | Evidence |
+|------|--------|----------|
+| 2026-04-05 | PR [#90](https://github.com/philipplukas/evidara/pull/90) merged (`test: make e2e smoke assertions run-scoped`) | Run-scoped projection + search assertions active in smoke script |
+| 2026-04-05 | PR [#91](https://github.com/philipplukas/evidara/pull/91) merged (`test: stabilize e2e smoke seed configuration`) | Configurable smoke seed/timeout and Step 9 parse fix |
+| 2026-04-05 | Post-merge smoke pass | `run_01knfh2154as7wng98e92nf4z3` with `canonical_ready=1`, `processed=1`, projection applied, and matching search hit |
+
+## Ownership Handoff
+
+| Area | Primary owner | Backup owner | Trigger |
+|------|---------------|--------------|---------|
+| Dev smoke workflow failures (`.github/workflows/e2e-smoke-dev.yml`) | Platform team | Document-intelligence team | Any failed scheduled/manual smoke run |
+| DI surface schema drift preflight (`scripts/check-di-surface-schema-drift.sh`) | Document-intelligence team | Platform team | Preflight fail or repeated optional-column warnings followed by write errors |
+| Pub/Sub backlog and DLQ hygiene | Platform team | Legal-search team | Undelivered backlog growth, DLQ accumulation, replay required |
 
 ## Replay / Recovery Note
 
