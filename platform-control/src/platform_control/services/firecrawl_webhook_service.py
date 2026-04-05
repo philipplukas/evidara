@@ -370,9 +370,7 @@ class FirecrawlWebhookService:
                 "scope_type": manifest_provenance.get("scope_type"),
             },
             "jurisdictions": [{"jurisdiction_id": source.jurisdiction_id}],
-            "authorities": (
-                [{"authority_id": source.authority_id}] if source.authority_id else []
-            ),
+            "authorities": ([{"authority_id": source.authority_id}] if source.authority_id else []),
             "extractor_profile_hint": acquisition_spec.get("extractor_profile_hint"),
             "language_codes": acquisition_spec.get("language_codes") or [],
             "document_type_hint": acquisition_spec.get("document_type_hint"),

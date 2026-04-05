@@ -78,4 +78,3 @@ bash scripts/check-legal-search.sh
 ## Replay / Recovery Note
 
 Current replay support is request-model based (`scope` + `replay` metadata on runs). Resumable frontier/checkpoint orchestration remains follow-on work and must be treated as an operational constraint during incident response.
-

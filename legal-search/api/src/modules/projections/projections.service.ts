@@ -1,12 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type {
-  DocumentProcessedEventDto,
-  DocumentWithdrawnEventDto,
-} from './dto/projection-events.dto';
 import {
   DOCUMENT_INTELLIGENCE_CLIENT,
   type DocumentIntelligenceClient,
 } from '../../lib/document-intelligence/document-intelligence.client';
+import type {
+  DocumentProcessedEventDto,
+  DocumentWithdrawnEventDto,
+} from './dto/projection-events.dto';
 import {
   PROJECTION_REPOSITORY,
   type ProjectionHistoryEntry,
@@ -51,10 +51,13 @@ export class ProjectionsService {
       return { eventId: event.event_id, status: 'stale' };
     }
 
-    const leanDocument = await this.documentIntelligence.fetchLeanDocument(event.payload.document_id, {
-      correlationId: event.correlation_id,
-      documentRevision: event.payload.document_revision,
-    });
+    const leanDocument = await this.documentIntelligence.fetchLeanDocument(
+      event.payload.document_id,
+      {
+        correlationId: event.correlation_id,
+        documentRevision: event.payload.document_revision,
+      },
+    );
     if (leanDocument === null) {
       // Preserve at-least-once semantics: don't mark the event applied if DI enrichment is unavailable.
       throw new RetryableProjectionEnrichmentError(event.payload.document_id);
@@ -97,9 +100,7 @@ export class ProjectionsService {
     const provenance = event.payload.provenance;
     const extracted = this.extractLeanDocumentFields(leanDocument);
     const title = extracted.title ?? `Document ${event.payload.document_id}`;
-    const preview =
-      extracted.previewText ??
-      event.payload.processing_version;
+    const preview = extracted.previewText ?? event.payload.processing_version;
     return {
       document_id: event.payload.document_id,
       title,
@@ -132,20 +133,9 @@ export class ProjectionsService {
     const title = typeof doc.title === 'string' && doc.title.trim() ? doc.title.trim() : undefined;
     const language =
       typeof doc.language === 'string' && doc.language.trim() ? doc.language.trim() : undefined;
-    const sectionCandidates = [
-      doc.sections,
-      doc.document_sections,
-      doc.body_sections,
-    ];
-    const citationCandidates = [
-      doc.citations,
-      doc.document_citations,
-    ];
-    const textCandidates = [
-      doc.content_text,
-      doc.text,
-      doc.summary,
-    ];
+    const sectionCandidates = [doc.sections, doc.document_sections, doc.body_sections];
+    const citationCandidates = [doc.citations, doc.document_citations];
+    const textCandidates = [doc.content_text, doc.text, doc.summary];
     const sectionsCount = this.countArrayLike(sectionCandidates);
     const citationsCount = this.countArrayLike(citationCandidates);
     const previewText = this.firstString(textCandidates);

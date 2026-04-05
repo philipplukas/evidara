@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
 import type {
   DocumentProcessedEventDto,
   DocumentWithdrawnEventDto,
 } from './dto/projection-events.dto';
-import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
 import type { ProjectionRepository } from './projections.repository';
 import { ProjectionsService, RetryableProjectionEnrichmentError } from './projections.service';
 
@@ -140,9 +140,7 @@ describe('ProjectionsService', () => {
   it('uses lean document fields when available', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
-    (
-      diClient.fetchLeanDocument as ReturnType<typeof vi.fn>
-    ).mockResolvedValue({
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
       title: 'Bundesgerichtsurteil 9C_100/2025',
       language: 'de',
       sections: [{ id: 's1' }, { id: 's2' }],
