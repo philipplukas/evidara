@@ -14,6 +14,8 @@ Testing strategy for the platform-control component, which owns:
 - Bundle-manifest publication
 - DI status and lifecycle event ingest
 
+For the small-team scraping/acquisition quality bar and release-gate expectations, see [Scraping QA Standard](../../testing/scraping-qa-standard.md).
+
 ---
 
 ## Minimal Tests for MVP

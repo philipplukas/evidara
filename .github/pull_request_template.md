@@ -49,6 +49,18 @@ N/A
 - [ ] CI should pass
 - [ ] Backwards compatible (or breaking changes documented above)
 
+## Scraping / Acquisition QA (Platform-Control Only)
+
+<!-- Complete this section when scraping/acquisition behavior changes. See docs/testing/scraping-qa-standard.md -->
+
+- [ ] Not applicable (no scraping/acquisition behavior change)
+- [ ] Contract validation updated/passing for bundle + `artifact_bundle.available` boundary
+- [ ] Golden fixture updated/added, or explicitly unchanged and verified
+- [ ] Provider canary/integration path covered by tests
+- [ ] Idempotency behavior covered (duplicate webhook/event path)
+- [ ] Failure-mode test added/updated or explicitly not impacted
+- [ ] Staging smoke impact considered (or follow-up tracked)
+
 ## Reviewer Notes
 
 <!-- Anything the reviewer should pay special attention to. -->
