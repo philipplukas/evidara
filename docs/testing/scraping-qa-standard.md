@@ -98,6 +98,7 @@ For a 1-3 person team:
 - On merge to main: same checks plus runtime image build checks.
 - Nightly: staging smoke pack and drift checks.
 - Recommended CI gate command: `bash scripts/check-scraping-qa.sh`.
+- Nightly canary operational runbook: `docs/runbooks/scraping-nightly-canary.md`.
 
 Target PR check duration for scraping-focused changes: keep under 10 minutes.
 
