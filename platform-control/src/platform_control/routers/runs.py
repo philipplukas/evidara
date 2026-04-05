@@ -19,6 +19,8 @@ from platform_control.schemas.run import (
     RunResponse,
 )
 from platform_control.services.firecrawl_provider import FirecrawlProvider
+from platform_control.services.provider_registry import ProviderRegistry
+from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.processing_status_service import ProcessingStatusService
 from platform_control.services.run_lifecycle_service import RunLifecycleService
 from platform_control.services.run_service import RunService
@@ -32,6 +34,24 @@ def get_firecrawl_provider() -> FirecrawlProvider:
 
 
 ProviderDep = Annotated[FirecrawlProvider, Depends(get_firecrawl_provider)]
+
+
+def get_provider_registry(provider: ProviderDep) -> ProviderRegistry:
+    registry = build_provider_registry(get_settings())
+    # Preserve test override compatibility for get_firecrawl_provider().
+    provider_name = getattr(provider, "provider_name", None)
+    if isinstance(provider_name, str) and provider_name.strip():
+        registry.register(provider)
+        return registry
+
+    class _ProviderAdapter:
+        provider_name = "firecrawl"
+
+        async def start_run(self, source, source_version, run):
+            return await provider.start_run(source, source_version, run)
+
+    registry.register(_ProviderAdapter())
+    return registry
 
 
 @router.get("", response_model=RunListResponse)
@@ -48,12 +68,13 @@ async def list_runs(
 async def create_run(
     request: CreateRunRequest,
     session: SessionDep,
-    provider: ProviderDep,
+    provider_registry: Annotated[ProviderRegistry, Depends(get_provider_registry)],
 ) -> RunResponse:
+    settings = get_settings()
     service = RunService(
         session,
-        provider,
-        run_dispatch_backend=get_settings().run_dispatch_backend,
+        provider_registry=provider_registry,
+        run_dispatch_backend=settings.run_dispatch_backend,
     )
     return await service.create_run(request)
 

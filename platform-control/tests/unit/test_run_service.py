@@ -64,6 +64,35 @@ class InlineDeterministicProvider:
 
 
 @dataclass
+class FlakyInlineDeterministicProvider:
+    provider_name: str = "deterministic_http"
+    calls: int = 0
+
+    async def start_run(self, source, source_version, run) -> ProviderStartResult:
+        del source, source_version, run
+        self.calls += 1
+        if self.calls >= 2:
+            raise RuntimeError("simulated provider failure after first inline run")
+        return ProviderStartResult(
+            provider=self.provider_name,
+            external_job_id="det_job_flaky_1",
+            request_payload={"seed_urls": ["https://example.com/decisions/2026-01"]},
+            response_payload={"captured": 1},
+            inline_resources=[
+                ProviderResource(
+                    source_url="https://example.com/decisions/2026-01?utm_source=test",
+                    final_url="https://example.com/decisions/2026-01?utm_source=test",
+                    content_type="text/html",
+                    body="<html><title>Decision 2026/01</title><body>Hello</body></html>",
+                    title="Decision 2026/01",
+                    http_status=200,
+                    discovery_depth=0,
+                )
+            ],
+        )
+
+
+@dataclass
 class InMemoryArtifactStore:
     stored_pages: dict[str, dict] | None = None
 
@@ -623,3 +652,49 @@ async def test_provider_registry_dispatches_deterministic_inline_runs(session) -
     assert len(publisher.bundle_events) == 1
     assert publisher.bundle_events[0]["event_type"] == "artifact_bundle.available"
     assert publisher.bundle_events[0]["payload"]["provenance"]["run_id"] == run.run_id
+
+
+@pytest.mark.asyncio
+async def test_dispatch_pending_runs_does_not_publish_before_commit(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "deterministic_http",
+        "seed_url": "https://example.com/decisions/2026-01?utm_source=test",
+        "mode": "crawl",
+    }
+    await session.commit()
+
+    registry = ProviderRegistry()
+    registry.register(FlakyInlineDeterministicProvider())
+
+    artifact_store = InMemoryArtifactStore()
+    publisher = RecordingPublisher()
+    run_service = RunService(
+        session,
+        provider_registry=registry,
+        artifact_store=artifact_store,
+        publisher=publisher,
+        run_dispatch_backend="worker",
+    )
+    await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+    await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="simulated provider failure"):
+        await run_service.dispatch_pending_runs(limit=10)
+    await session.rollback()
+
+    assert publisher.raw_artifact_ids == []
+    assert publisher.bundle_events == []

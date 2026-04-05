@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import hashlib
 import json
 import re
@@ -46,6 +47,12 @@ from platform_control.schemas.run import (
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
 from platform_control.services.provider_registry import ProviderRegistry
+
+
+@dataclass(slots=True)
+class PendingDispatchPublications:
+    raw_artifact_ids: list[str] = field(default_factory=list)
+    bundle_events: list[dict[str, Any]] = field(default_factory=list)
 
 
 class RunService:
@@ -143,9 +150,10 @@ class RunService:
             await self.session.refresh(run)
             return run
 
-        await self._dispatch_run(source, source_version, run)
+        pending_publications = await self._dispatch_run(source, source_version, run)
         await self.session.commit()
         await self.session.refresh(run)
+        await self._publish_pending_dispatch_events([pending_publications])
         return run
 
     async def dispatch_pending_runs(self, limit: int = 10) -> int:
@@ -163,16 +171,18 @@ class RunService:
             )
         )
         dispatched = 0
+        pending_publications: list[PendingDispatchPublications] = []
         for run in pending_runs:
             source = await self.session.get(Source, run.source_id)
             source_version = await self.session.get(SourceVersion, run.source_version_id)
             if source is None or source_version is None:
                 continue
-            await self._dispatch_run(source, source_version, run)
+            pending_publications.append(await self._dispatch_run(source, source_version, run))
             dispatched += 1
 
         if dispatched > 0:
             await self.session.commit()
+            await self._publish_pending_dispatch_events(pending_publications)
         return dispatched
 
     async def get_run(self, run_id: str) -> Run:
@@ -435,7 +445,7 @@ class RunService:
         source: Source,
         source_version: SourceVersion,
         run: Run,
-    ) -> None:
+    ) -> PendingDispatchPublications:
         provider = self.provider
         if provider is None and self.provider_registry is not None:
             provider = self.provider_registry.resolve_for_spec(source_version.acquisition_spec)
@@ -456,24 +466,29 @@ class RunService:
         self.session.add(provider_job)
         run.status = RunStatus.RUNNING
         run.started_at = datetime.now(UTC)
+        pending_publications = PendingDispatchPublications()
 
         if provider_result.inline_resources:
-            await self._persist_inline_resources(
+            pending_publications.raw_artifact_ids.extend(
+                await self._persist_inline_resources(
+                    run=run,
+                    source=source,
+                    source_version=source_version,
+                    provider_job=provider_job,
+                    resources=provider_result.inline_resources,
+                )
+            )
+            bundle_event = await self._build_bundle_manifest_event(
                 run=run,
                 source=source,
                 source_version=source_version,
-                provider_job=provider_job,
-                resources=provider_result.inline_resources,
             )
+            if bundle_event is not None:
+                pending_publications.bundle_events.append(bundle_event)
             provider_job.status = ProviderJobStatus.COMPLETED
             provider_job.last_event_type = "inline.completed"
             run.status = RunStatus.COMPLETED
             run.completed_at = datetime.now(UTC)
-            await self._publish_bundle_manifest(
-                run=run,
-                source=source,
-                source_version=source_version,
-            )
 
         if provider_result.inline_failure_reason:
             provider_job.status = ProviderJobStatus.FAILED
@@ -481,6 +496,7 @@ class RunService:
             run.status = RunStatus.FAILED
             run.completed_at = datetime.now(UTC)
             run.failure_reason = provider_result.inline_failure_reason
+        return pending_publications
 
     async def _persist_inline_resources(
         self,
@@ -490,9 +506,10 @@ class RunService:
         source_version: SourceVersion,
         provider_job: ProviderJob,
         resources: list[ProviderResource],
-    ) -> None:
+    ) -> list[str]:
         pipeline = ArtifactPipeline()
         normalized_pairs = pipeline.normalize(run_id=run.run_id, resources=resources)
+        artifact_ids: list[str] = []
         for raw_record, captured_record in normalized_pairs:
             artifact = RawArtifact(
                 run_id=run.run_id,
@@ -537,15 +554,16 @@ class RunService:
             )
             run.artifacts_count += 1
             run.captured_resources_count += 1
-            await self.publisher.publish_raw_artifact_available(artifact)
+            artifact_ids.append(artifact.artifact_id)
+        return artifact_ids
 
-    async def _publish_bundle_manifest(
+    async def _build_bundle_manifest_event(
         self,
         *,
         run: Run,
         source: Source,
         source_version: SourceVersion,
-    ) -> None:
+    ) -> dict[str, Any] | None:
         artifacts = list(
             await self.session.scalars(
                 select(RawArtifact)
@@ -554,7 +572,7 @@ class RunService:
             )
         )
         if not artifacts:
-            return
+            return None
 
         source_snapshot_id = generate_prefixed_id("snap")
         bundle_manifest_id = generate_prefixed_id("abm")
@@ -640,7 +658,19 @@ class RunService:
             correlation_id=run.run_id,
             occurred_at=run.completed_at or datetime.now(UTC),
         )
-        await self.publisher.publish_artifact_bundle_available(event)
+        return event
+
+    async def _publish_pending_dispatch_events(
+        self, pending_publications: list[PendingDispatchPublications]
+    ) -> None:
+        for pending in pending_publications:
+            for artifact_id in pending.raw_artifact_ids:
+                artifact = await self.session.get(RawArtifact, artifact_id)
+                if artifact is None:  # pragma: no cover - defensive guard
+                    continue
+                await self.publisher.publish_raw_artifact_available(artifact)
+            for event in pending.bundle_events:
+                await self.publisher.publish_artifact_bundle_available(event)
 
     @staticmethod
     def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:
