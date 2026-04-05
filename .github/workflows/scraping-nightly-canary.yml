@@ -1,0 +1,86 @@
+name: Scraping Nightly Canary
+
+on:
+  schedule:
+    - cron: "15 2 * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target runtime environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - staging
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'dev' }}
+    env:
+      GCP_PROJECT_ID: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging') && vars.GCP_PROJECT_ID_STAGING || vars.GCP_PROJECT_ID_DEV }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      TARGET_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'dev' }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SCRAPING_CANARY_SLACK_WEBHOOK }}
+      EVIDENCE_PATH: tmp/evidence/scraping-canary-${{ github.run_id }}.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging') && secrets.GCP_SERVICE_ACCOUNT_STAGING || secrets.GCP_SERVICE_ACCOUNT_DEV }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Run nightly scraping canary
+        run: |
+          bash scripts/e2e-smoke-test.sh \
+            --env "${TARGET_ENV}" \
+            --auth auto \
+            --evidence-out "${EVIDENCE_PATH}"
+
+      - name: Upload canary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraping-canary-evidence-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_PATH }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Summarize canary outcome
+        if: always()
+        run: |
+          if [ -f "${EVIDENCE_PATH}" ]; then
+            echo "### Scraping Nightly Canary" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            jq --arg run_id "${GITHUB_RUN_ID}" -r '
+              "- Status: **\(.metadata.status)**\n- Environment: \(.metadata.environment)\n- Run ID: \(.entities.run_id // "n/a")\n- Source ID: \(.entities.source_id // "n/a")\n- Projection applied events: \(.observed.projection_applied_events // 0)\n- Search result count: \(.observed.search_result_count // 0)\n- Evidence artifact: scraping-canary-evidence-\($run_id)"
+            ' "${EVIDENCE_PATH}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No canary evidence file found at ${EVIDENCE_PATH}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Notify Slack on failure
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "Evidara scraping nightly canary failed for ${TARGET_ENV}. Run: ${RUN_URL}"
+          }
+          EOF
+          )
+          curl -sS -X POST -H "Content-Type: application/json" \
+            --data "${PAYLOAD}" \
+            "${SLACK_WEBHOOK_URL}"
