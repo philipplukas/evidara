@@ -138,6 +138,10 @@ class FirecrawlWebhookService:
             if isinstance(pages, dict):
                 pages = [pages]
             for page in pages:
+                if not isinstance(page, dict):
+                    # Ignore malformed page entries so one bad payload item
+                    # does not fail processing for the entire webhook.
+                    continue
                 page_metadata = page.get("metadata", {})
                 source_url = str(page.get("url") or page_metadata.get("sourceURL") or "")
                 final_url = str(page_metadata.get("sourceURL") or page.get("url") or "")
