@@ -71,6 +71,10 @@ echo "📡 platform-control-api: ${PC_URL}"
 echo "📡 legal-search-api:     ${LS_URL}"
 echo ""
 
+# Deterministic acquisition seed URL; can be overridden per environment/run.
+SMOKE_SEED_URL="${SMOKE_SEED_URL:-https://example.com}"
+SMOKE_REQUEST_TIMEOUT_SECONDS="${SMOKE_REQUEST_TIMEOUT_SECONDS:-10}"
+
 # ── 1. Health checks ─────────────────────────────────────────────────
 
 echo "🔍 Step 1: Health checks..."
@@ -134,8 +138,8 @@ version_body=$(cat <<JSON
   "version_label": "v1-e2e-$(date +%s)",
   "acquisition_spec": {
     "provider": "deterministic_http",
-    "seed_url": "https://example.com",
-    "request_timeout_seconds": 5,
+    "seed_url": "${SMOKE_SEED_URL}",
+    "request_timeout_seconds": ${SMOKE_REQUEST_TIMEOUT_SECONDS},
     "mode": "crawl",
     "limit": 1,
     "tenant_id": "tenant_public",
@@ -281,7 +285,7 @@ for page in $(seq 1 ${MAX_SEARCH_PAGES}); do
 
   if [ "${matching_result_count}" -gt 0 ]; then
     found_document=1
-    matched_title=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | jq -r 'first // empty')
+    matched_title=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | head -n 1)
     break
   fi
 
