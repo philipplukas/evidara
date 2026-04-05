@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from importlib import resources as importlib_resources
 from pathlib import Path
 
 from platform_control.database import get_session_maker
 from platform_control.services.hierarchy_sync_service import HierarchySyncService
 
-DEFAULT_HIERARCHY_DIR = Path(__file__).resolve().parents[2] / "hierarchies"
+DEFAULT_HIERARCHY_DIR = Path(
+    str(importlib_resources.files("platform_control").joinpath("hierarchies"))
+)
 
 
 def parse_args() -> argparse.Namespace:

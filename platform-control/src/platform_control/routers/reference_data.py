@@ -1,3 +1,4 @@
+from importlib import resources as importlib_resources
 from pathlib import Path
 from typing import Annotated
 
@@ -22,7 +23,9 @@ from platform_control.services.reference_data_service import ReferenceDataServic
 
 router = APIRouter(prefix="/v1/reference-data", tags=["reference-data"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-DEFAULT_HIERARCHY_DIR = Path(__file__).resolve().parents[3] / "hierarchies"
+DEFAULT_HIERARCHY_DIR = Path(
+    str(importlib_resources.files("platform_control").joinpath("hierarchies"))
+)
 
 
 @router.get("/jurisdictions", response_model=JurisdictionListResponse)
