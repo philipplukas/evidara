@@ -165,9 +165,11 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["source_defaults"]["language_codes"] == ["de"]
     assert manifest["source_defaults"]["document_type_hint"] == "decision"
-    reference_snapshot_set_ref = manifest["reference_context"]["reference_snapshot_set_ref"]
-    assert reference_snapshot_set_ref is not None
-    snapshot_uri = str(reference_snapshot_set_ref["storage_ref"]["uri"])
+    # Contract uses latest_approved policy => pinned ref must remain null.
+    assert manifest["reference_context"]["reference_snapshot_set_ref"] is None
+    reference_snapshot_export = manifest["bundle_metadata"]["reference_snapshot_export"]
+    assert str(reference_snapshot_export["reference_snapshot_set_id"]).startswith("rss_")
+    snapshot_uri = str(reference_snapshot_export["storage_ref"]["uri"])
     assert snapshot_uri.startswith("file://")
     snapshot_path = Path(snapshot_uri.removeprefix("file://"))
     snapshot_payload = json.loads(snapshot_path.read_text(encoding="utf-8"))

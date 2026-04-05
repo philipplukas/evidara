@@ -278,7 +278,8 @@ class FirecrawlWebhookService:
             bundle_manifest_id=reference_snapshot_set_id,
             payload=reference_snapshot_set,
         )
-        manifest["reference_context"]["reference_snapshot_set_ref"] = {
+        manifest.setdefault("bundle_metadata", {})
+        manifest["bundle_metadata"]["reference_snapshot_export"] = {
             "reference_snapshot_set_id": reference_snapshot_set_id,
             "storage_ref": reference_snapshot_storage_ref,
         }
@@ -358,7 +359,7 @@ class FirecrawlWebhookService:
     ) -> dict[str, Any]:
         acquisition_spec = source_version.acquisition_spec or {}
         return {
-            "reference_snapshot_set_id": generate_prefixed_id("exp"),
+            "reference_snapshot_set_id": generate_prefixed_id("rss"),
             "generated_at": (run.completed_at or datetime.now(UTC)).isoformat(),
             "provenance": {
                 "run_id": run.run_id,
