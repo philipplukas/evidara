@@ -1,0 +1,179 @@
+name: E2E Smoke Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      smoke_seed_url:
+        description: "Override deterministic acquisition seed URL"
+        required: false
+        default: "http://example.org"
+        type: string
+      smoke_request_timeout_seconds:
+        description: "Override deterministic HTTP request timeout"
+        required: false
+        default: "10"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  smoke-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      TARGET_ENV: staging
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
+      SMOKE_SEED_URL: ${{ github.event.inputs.smoke_seed_url || vars.SMOKE_SEED_URL_STAGING || 'http://example.org' }}
+      SMOKE_REQUEST_TIMEOUT_SECONDS: ${{ github.event.inputs.smoke_request_timeout_seconds || vars.SMOKE_REQUEST_TIMEOUT_SECONDS_STAGING || '10' }}
+      DI_SURFACES_ROOT_URI: ${{ vars.DI_SURFACES_ROOT_URI_STAGING }}
+      SLACK_WEBHOOK_URL: ${{ secrets.E2E_SMOKE_STAGING_SLACK_WEBHOOK }}
+      EVIDENCE_DIR: tmp/evidence
+      LOG_PATH: tmp/evidence/e2e-smoke-staging-${{ github.run_id }}.log
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Preflight DI surface schema drift
+        run: |
+          PROJECT_ID="${GCP_PROJECT_ID}" \
+          DI_SURFACES_ROOT_URI="${DI_SURFACES_ROOT_URI}" \
+          bash scripts/check-di-surface-schema-drift.sh
+
+      - name: Mint audience-scoped Cloud Run ID tokens
+        run: |
+          set -euo pipefail
+          PC_URL=$(gcloud run services describe "platform-control-api-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+          LS_URL=$(gcloud run services describe "legal-search-api-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+
+          if [[ -z "${PC_URL}" ]]; then
+            echo "::error::Failed to resolve platform-control-api URL for ${TARGET_ENV}"
+            exit 1
+          fi
+          if [[ -z "${LS_URL}" ]]; then
+            echo "::error::Failed to resolve legal-search-api URL for ${TARGET_ENV}"
+            exit 1
+          fi
+
+          PC_ID_TOKEN=$(gcloud auth print-identity-token \
+            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
+            --audiences="${PC_URL}")
+          LS_ID_TOKEN=$(gcloud auth print-identity-token \
+            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
+            --audiences="${LS_URL}")
+
+          if [[ -z "${PC_ID_TOKEN}" ]]; then
+            echo "::error::Failed to mint ID token for platform-control-api audience"
+            exit 1
+          fi
+          if [[ -z "${LS_ID_TOKEN}" ]]; then
+            echo "::error::Failed to mint ID token for legal-search-api audience"
+            exit 1
+          fi
+
+          echo "::add-mask::${PC_ID_TOKEN}"
+          echo "::add-mask::${LS_ID_TOKEN}"
+          echo "E2E_PC_ID_TOKEN=${PC_ID_TOKEN}" >> "${GITHUB_ENV}"
+          echo "E2E_LS_ID_TOKEN=${LS_ID_TOKEN}" >> "${GITHUB_ENV}"
+        env:
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+
+      - name: Run E2E smoke test (staging)
+        id: smoke
+        run: |
+          mkdir -p "${EVIDENCE_DIR}"
+          set +e
+          GCP_PROJECT_ID="${GCP_PROJECT_ID}" \
+          GCP_REGION="${GCP_REGION}" \
+          SMOKE_SEED_URL="${SMOKE_SEED_URL}" \
+          SMOKE_REQUEST_TIMEOUT_SECONDS="${SMOKE_REQUEST_TIMEOUT_SECONDS}" \
+          scripts/e2e-smoke-test.sh --env "${TARGET_ENV}" 2>&1 | tee "${LOG_PATH}"
+          exit_code=${PIPESTATUS[0]}
+          echo "exit_code=${exit_code}" >> "${GITHUB_OUTPUT}"
+          exit "${exit_code}"
+
+      - name: Upload smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-smoke-staging-log-${{ github.run_id }}
+          path: ${{ env.LOG_PATH }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Summarize smoke result
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          log_path = Path(os.environ["LOG_PATH"])
+          status = "passed" if os.environ.get("SMOKE_STEP_OUTCOME") == "success" else "failed"
+
+          text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+
+          def capture(pattern: str) -> str:
+              m = re.search(pattern, text)
+              return m.group(1) if m else "n/a"
+
+          source_id = capture(r"Source created:\s+([a-z0-9_]+)")
+          version_id = capture(r"Version created:\s+([a-z0-9_]+)")
+          run_id = capture(r"Run triggered:\s+([a-z0-9_]+)")
+          document_id = capture(r"document_id=([a-z0-9_]+)")
+          projection_applied = "yes" if "Projections applied for run" in text else "no"
+          search_matched = "yes" if "Found run-scoped indexed document" in text else "no"
+
+          lines = [
+              "### E2E Smoke Staging",
+              "",
+              f"- Status: **{status}**",
+              f"- Environment: {os.environ.get('TARGET_ENV', 'staging')}",
+              f"- Project: {os.environ.get('GCP_PROJECT_ID', 'n/a')}",
+              f"- Seed URL: {os.environ.get('SMOKE_SEED_URL', 'n/a')}",
+              f"- Source ID: {source_id}",
+              f"- Version ID: {version_id}",
+              f"- Run ID: {run_id}",
+              f"- Document ID: {document_id}",
+              f"- Projection applied: {projection_applied}",
+              f"- Search match: {search_matched}",
+              f"- Log artifact: e2e-smoke-staging-log-{os.environ.get('GITHUB_RUN_ID', 'n/a')}",
+          ]
+          summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+        env:
+          SMOKE_STEP_OUTCOME: ${{ steps.smoke.outcome }}
+
+      - name: Notify Slack on failure
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "E2E Smoke Staging failed. Environment: ${TARGET_ENV}. Run: ${RUN_URL}"
+          }
+          EOF
+          )
+          curl -sS -X POST -H "Content-Type: application/json" \
+            --data "${PAYLOAD}" \
+            "${SLACK_WEBHOOK_URL}"
