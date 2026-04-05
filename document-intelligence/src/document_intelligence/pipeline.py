@@ -32,6 +32,7 @@ from document_intelligence.normalize.html import (
 from document_intelligence.normalize.ir import NormalizedDocumentIR
 from document_intelligence.normalize.xml import normalize_xml_document
 from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
+from document_intelligence.profiles.registry import resolve_selected_profiles
 from document_intelligence.quality.invariants import validate_document_and_sections
 from document_intelligence.sectionize.html import (
     SectionCandidate,
@@ -373,20 +374,13 @@ def _build_processing_manifest(
             "processing_manifest_id": processing_manifest_id,
         },
     }
-    selected_profiles = {
-        "source_profile_ref": manifest.di_overrides.get(
-            "source_profile_ref",
-            normalized_document.metadata.get("source_profile_ref", "default_html_v1"),
-        ),
-        "jurisdiction_profile_ref": manifest.di_overrides.get("jurisdiction_profile_ref", "default_jurisdiction_v1"),
-        "resolution_policy_ref": manifest.di_overrides.get("resolution_policy_ref", "default_resolution_v1"),
-    }
-    normalization_profile_ref = manifest.di_overrides.get(
-        "normalization_profile_ref",
-        normalized_document.metadata.get("normalization_profile_ref"),
+    selected_profiles = resolve_selected_profiles(
+        source_origin_kind=manifest.source_origin_kind,
+        trust_tier=manifest.trust_tier,
+        source_defaults=manifest.source_defaults,
+        di_overrides=manifest.di_overrides,
+        normalized_metadata=normalized_document.metadata,
     )
-    if normalization_profile_ref:
-        selected_profiles["normalization_profile_ref"] = normalization_profile_ref
 
     return ProcessingManifest(
         processing_manifest_id=processing_manifest_id,
@@ -397,7 +391,7 @@ def _build_processing_manifest(
         status="canonical_ready",
         provenance=provenance,
         input_bundle_manifest_ref=_manifest_ref_from_dict(input_bundle_manifest_ref),
-        selected_profiles=selected_profiles,
+        selected_profiles=selected_profiles.to_dict(),
         reference_snapshot_set_ref=manifest.reference_context.get("reference_snapshot_set_ref"),
         published_document_ref=published_document_ref,
         published_sections_ref=published_sections_ref,
