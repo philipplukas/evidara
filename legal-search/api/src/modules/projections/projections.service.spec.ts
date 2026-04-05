@@ -5,7 +5,7 @@ import type {
 } from './dto/projection-events.dto';
 import type { DocumentIntelligenceClient } from '../../lib/document-intelligence/document-intelligence.client';
 import type { ProjectionRepository } from './projections.repository';
-import { ProjectionsService } from './projections.service';
+import { ProjectionsService, RetryableProjectionEnrichmentError } from './projections.service';
 
 function createRepositoryMock(): ProjectionRepository {
   return {
@@ -27,7 +27,7 @@ function createRepositoryMock(): ProjectionRepository {
 
 function createDocumentIntelligenceMock(): DocumentIntelligenceClient {
   return {
-    fetchLeanDocument: vi.fn().mockResolvedValue(null),
+    fetchLeanDocument: vi.fn().mockResolvedValue({}),
   };
 }
 
@@ -162,5 +162,18 @@ describe('ProjectionsService', () => {
         content_preview: 'Leitsatz und Sachverhalt...',
       }),
     );
+  });
+
+  it('throws retryable error when DI enrichment is unavailable', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    const service = new ProjectionsService(repository, diClient);
+
+    await expect(service.applyDocumentProcessed(baseProcessedEvent)).rejects.toBeInstanceOf(
+      RetryableProjectionEnrichmentError,
+    );
+    expect(repository.upsertProjection).not.toHaveBeenCalled();
+    expect(repository.appendHistory).not.toHaveBeenCalled();
   });
 });

@@ -22,6 +22,13 @@ export type ProjectionApplyResult = {
   status: 'applied' | 'stale' | 'ignored_duplicate';
 };
 
+export class RetryableProjectionEnrichmentError extends Error {
+  constructor(documentId: string) {
+    super(`Lean document enrichment unavailable for ${documentId}`);
+    this.name = 'RetryableProjectionEnrichmentError';
+  }
+}
+
 @Injectable()
 export class ProjectionsService {
   private readonly logger = new Logger(ProjectionsService.name);
@@ -48,6 +55,10 @@ export class ProjectionsService {
       correlationId: event.correlation_id,
       documentRevision: event.payload.document_revision,
     });
+    if (leanDocument === null) {
+      // Preserve at-least-once semantics: don't mark the event applied if DI enrichment is unavailable.
+      throw new RetryableProjectionEnrichmentError(event.payload.document_id);
+    }
     const projection = this.buildProjection(event, leanDocument);
     await this.repository.upsertProjection(projection);
     await this.appendHistory(event, 'applied');
