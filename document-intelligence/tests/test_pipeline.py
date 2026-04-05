@@ -53,6 +53,17 @@ SAMPLE_RIS_XML = """
 </dokument>
 """
 
+SAMPLE_MARKDOWN = """
+# Datenschutzgesetz
+
+## Art. 1 Zweck
+Dieses Gesetz schützt personenbezogene Daten.
+
+## Art. 2 Geltungsbereich
+- Es gilt für Bundesstellen.
+- Es gilt für beauftragte Dritte.
+"""
+
 
 class ProcessingPipelineTests(unittest.TestCase):
     def test_processes_local_html_bundle_into_contract_valid_outputs(self) -> None:
@@ -335,6 +346,67 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(result.document.metadata["nlp"]["model_name"], "xx_sent_ud_sm")
             self.assertEqual(result.document.metadata["nlp"]["max_chars_per_section"], 100000)
             self.assertEqual(result.document.metadata["nlp"]["batch_size"], 32)
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_plain_text_content_type_with_html_payload_is_normalized_as_html(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as text_handle:
+            text_handle.write(SAMPLE_HTML)
+            artifact_path = text_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(
+                build_manifest_payload(
+                    artifact_path,
+                    artifact_role="primary_document",
+                    content_type="text/plain",
+                ),
+                manifest_handle,
+            )
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_2026_04_05").process_event(
+                build_bundle_event(manifest_path)
+            )
+            self.assertEqual(result.document.title, "Sample Statute")
+            self.assertEqual(result.document.metadata["normalizer"], "html_v1")
+            self.assertEqual(result.document.metadata["source_flavor"], "structured_html")
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_processes_markdown_source_family(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as markdown_handle:
+            markdown_handle.write(SAMPLE_MARKDOWN)
+            artifact_path = markdown_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(
+                build_manifest_payload(
+                    artifact_path,
+                    artifact_role="primary_document",
+                    content_type="text/markdown",
+                ),
+                manifest_handle,
+            )
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_2026_04_05").process_event(
+                build_bundle_event(manifest_path)
+            )
+            self.assertEqual(result.document.title, "Datenschutzgesetz")
+            self.assertEqual(result.document.metadata["normalizer"], "markdown_v1")
+            self.assertEqual(
+                result.manifest.selected_profiles["source_profile_ref"],
+                "default_markdown_v1",
+            )
+            self.assertEqual(len(result.sections), 2)
+            self.assertEqual(result.sections[0].title, "Art. 1 Zweck")
+            self.assertIn("personenbezogene Daten", result.sections[0].content)
+            self.assertEqual(result.sections[1].title, "Art. 2 Geltungsbereich")
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)

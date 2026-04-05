@@ -27,6 +27,7 @@ from document_intelligence.nlp.citation_extractor import extract_citations
 from document_intelligence.nlp.spacy_pipeline import enrich_with_spacy
 from document_intelligence.normalize.html import (
     normalize_html_document,
+    normalize_markdown_document,
     normalize_plain_text_document,
 )
 from document_intelligence.normalize.ir import NormalizedDocumentIR
@@ -240,8 +241,24 @@ class ProcessingPipeline:
             return normalize_html_document(artifact_text, artifact.artifact_id)
         if content_type in {"application/xml", "text/xml"}:
             return normalize_xml_document(artifact_text, artifact.artifact_id)
+        if content_type in {"text/markdown", "text/x-markdown", "application/markdown"}:
+            return normalize_markdown_document(artifact_text, artifact.artifact_id)
         if content_type.startswith("text/plain"):
+            detected = _detect_text_modality(artifact_text)
+            if detected == "html":
+                return normalize_html_document(artifact_text, artifact.artifact_id)
+            if detected == "xml":
+                return normalize_xml_document(artifact_text, artifact.artifact_id)
+            if detected == "markdown":
+                return normalize_markdown_document(artifact_text, artifact.artifact_id)
             return normalize_plain_text_document(artifact_text, artifact.artifact_id)
+        detected = _detect_text_modality(artifact_text)
+        if detected == "html":
+            return normalize_html_document(artifact_text, artifact.artifact_id)
+        if detected == "xml":
+            return normalize_xml_document(artifact_text, artifact.artifact_id)
+        if detected == "markdown":
+            return normalize_markdown_document(artifact_text, artifact.artifact_id)
         raise ProcessingError(
             "unsupported_primary_artifact",
             f"unsupported primary artifact content type: {artifact.storage_ref.content_type}",
@@ -437,6 +454,19 @@ def _choose_document_title(normalized_document: NormalizedDocumentIR) -> str:
 
 def _normalized_content_type(content_type: str) -> str:
     return (content_type or "").split(";", 1)[0].strip().lower()
+
+
+def _detect_text_modality(text: str) -> str | None:
+    snippet = text.lstrip()[:500].lower()
+    if not snippet:
+        return None
+    if snippet.startswith("<!doctype html") or "<html" in snippet or "<body" in snippet:
+        return "html"
+    if snippet.startswith("<?xml") or snippet.startswith("<dokument") or snippet.startswith("<article"):
+        return "xml"
+    if snippet.startswith("#") or "\n#" in snippet or "\n- " in snippet or "\n* " in snippet:
+        return "markdown"
+    return None
 
 
 def _normalize_document_type(document_type: str | None) -> str | None:

@@ -56,7 +56,7 @@ Document-intelligence should lean on Databricks-native lineage for internal trac
 - [x] Add an XML-first second source family with RIS-style fixture coverage
 - [x] Add always-on runtime wiring for `artifact_bundle.available` consumption
 - [x] Define source/jurisdiction profile registry
-- [ ] Harden HTML parsing and broaden source-family support deliberately
+- [x] Harden HTML parsing and broaden source-family support deliberately
 
 ## Minimal v1 Outcome
 
