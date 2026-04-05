@@ -13,6 +13,7 @@ echo "==> Run scraping/acquisition unit tests"
   uv run pytest -q \
     tests/unit/test_artifact_bundle.py \
     tests/unit/test_artifact_bundle_contracts.py \
+    tests/unit/test_scraping_fixture_baseline.py \
     tests/unit/test_firecrawl_provider.py \
     tests/unit/test_firecrawl_webhook_service.py
 )

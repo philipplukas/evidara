@@ -1,0 +1,51 @@
+{
+  "bundle_manifest_id": "abm_01jq7cb8x4nm7m3qz3b8e9q2fk",
+  "source_snapshot_id": "snap_01jq7c7n3nbzj6sk7v95p9frz1",
+  "source_id": "src_01jq79zv3wdd6yr8q5bn0m3zfk",
+  "source_version_id": "sv_01jq79zfskf4m3m4gm3t5s59xq",
+  "run_id": "run_01jq7c3s9b7j4dndd9sgv6pb9d",
+  "tenant_id": "tenant_public",
+  "corpus_id": "corpus_public_ch_procurement",
+  "scope_type": "global_public",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "jurisdiction_id": "jur_ch",
+  "authority_id": "auth_federal_procurement",
+  "language_codes": ["de", "fr"],
+  "document_type_hint": "notice",
+  "upstream_locator": "https://example.org/procurement/start",
+  "artifacts": [
+    {
+      "artifact_id": "art_01jq7cf3f8qqc46zc6xvkf9y4x",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01jq7c3s9b7j4dndd9sgv6pb9d/discovery-primary.html",
+        "content_type": "text/html",
+        "byte_size": 21000,
+        "checksum": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-05T11:02:00Z"
+      }
+    },
+    {
+      "artifact_id": "art_01jq7cf3f8qqc46zc6xvkf9y4y",
+      "artifact_role": "attachment",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01jq7c3s9b7j4dndd9sgv6pb9d/discovery-attachment.html",
+        "content_type": "text/html",
+        "byte_size": 9000,
+        "checksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-05T11:02:01Z"
+      }
+    }
+  ],
+  "manifest_storage_ref": {
+    "uri": "gs://bucket/runs/run_01jq7c3s9b7j4dndd9sgv6pb9d/abm_01jq7cb8x4nm7m3qz3b8e9q2fk.json",
+    "content_type": "application/json",
+    "byte_size": 5000,
+    "checksum": "1111111111111111111111111111111111111111111111111111111111111111",
+    "checksum_algorithm": "sha256",
+    "created_at": "2026-04-05T11:02:05Z"
+  }
+}

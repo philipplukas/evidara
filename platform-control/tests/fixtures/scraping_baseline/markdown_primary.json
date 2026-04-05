@@ -1,0 +1,39 @@
+{
+  "bundle_manifest_id": "abm_01jq7gb8x4nm7m3qz3b8e9q2fk",
+  "source_snapshot_id": "snap_01jq7g7n3nbzj6sk7v95p9frz1",
+  "source_id": "src_01jq7gxv3wdd6yr8q5bn0m3zfk",
+  "source_version_id": "sv_01jq7gzcskf4m3m4gm3t5s59xq",
+  "run_id": "run_01jq7g3s9b7j4dndd9sgv6pb9d",
+  "tenant_id": "tenant_public",
+  "corpus_id": "corpus_public_ch_parliament_notes",
+  "scope_type": "global_public",
+  "source_origin_kind": "official_mirror",
+  "trust_tier": "preferred",
+  "jurisdiction_id": "jur_ch",
+  "authority_id": "auth_parliament",
+  "language_codes": ["fr"],
+  "document_type_hint": "commentary",
+  "upstream_locator": "https://example.org/parliament/note-42",
+  "artifacts": [
+    {
+      "artifact_id": "art_01jq7gf3f8qqc46zc6xvkf9y4x",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01jq7g3s9b7j4dndd9sgv6pb9d/note.md",
+        "content_type": "text/markdown",
+        "byte_size": 12345,
+        "checksum": "8888888888888888888888888888888888888888888888888888888888888888",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-05T11:06:00Z"
+      }
+    }
+  ],
+  "manifest_storage_ref": {
+    "uri": "gs://bucket/runs/run_01jq7g3s9b7j4dndd9sgv6pb9d/abm_01jq7gb8x4nm7m3qz3b8e9q2fk.json",
+    "content_type": "application/json",
+    "byte_size": 4050,
+    "checksum": "9999999999999999999999999999999999999999999999999999999999999999",
+    "checksum_algorithm": "sha256",
+    "created_at": "2026-04-05T11:06:05Z"
+  }
+}

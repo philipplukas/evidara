@@ -1,0 +1,39 @@
+{
+  "bundle_manifest_id": "abm_01jq7bb8x4nm7m3qz3b8e9q2fk",
+  "source_snapshot_id": "snap_01jq7b7n3nbzj6sk7v95p9frz1",
+  "source_id": "src_01jq79yv3wdd6yr8q5bn0m3zfk",
+  "source_version_id": "sv_01jq79ydskf4m3m4gm3t5s59xq",
+  "run_id": "run_01jq7b3s9b7j4dndd9sgv6pb9d",
+  "tenant_id": "tenant_public",
+  "corpus_id": "corpus_public_ch_admin_decisions",
+  "scope_type": "global_public",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "jurisdiction_id": "jur_ch",
+  "authority_id": "auth_zh_admin",
+  "language_codes": ["de"],
+  "document_type_hint": "decision",
+  "upstream_locator": "https://example.org/decisions/noisy",
+  "artifacts": [
+    {
+      "artifact_id": "art_01jq7bf3f8qqc46zc6xvkf9y4x",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01jq7b3s9b7j4dndd9sgv6pb9d/noisy.html",
+        "content_type": "text/html",
+        "byte_size": 54321,
+        "checksum": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-05T11:01:00Z"
+      }
+    }
+  ],
+  "manifest_storage_ref": {
+    "uri": "gs://bucket/runs/run_01jq7b3s9b7j4dndd9sgv6pb9d/abm_01jq7bb8x4nm7m3qz3b8e9q2fk.json",
+    "content_type": "application/json",
+    "byte_size": 4600,
+    "checksum": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "checksum_algorithm": "sha256",
+    "created_at": "2026-04-05T11:01:05Z"
+  }
+}
