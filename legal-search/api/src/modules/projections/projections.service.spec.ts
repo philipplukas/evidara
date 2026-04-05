@@ -5,7 +5,7 @@ import type {
   DocumentWithdrawnEventDto,
 } from './dto/projection-events.dto';
 import type { ProjectionRepository } from './projections.repository';
-import { ProjectionsService, RetryableProjectionEnrichmentError } from './projections.service';
+import { ProjectionsService } from './projections.service';
 
 function createRepositoryMock(): ProjectionRepository {
   return {
@@ -162,16 +162,22 @@ describe('ProjectionsService', () => {
     );
   });
 
-  it('throws retryable error when DI enrichment is unavailable', async () => {
+  it('applies projection with fallback fields when DI enrichment is unavailable', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
     (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     const service = new ProjectionsService(repository, diClient);
 
-    await expect(service.applyDocumentProcessed(baseProcessedEvent)).rejects.toBeInstanceOf(
-      RetryableProjectionEnrichmentError,
+    const result = await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(result.status).toBe('applied');
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: `Document ${baseProcessedEvent.payload.document_id}`,
+        sections_count: 0,
+        citations_count: 0,
+      }),
     );
-    expect(repository.upsertProjection).not.toHaveBeenCalled();
-    expect(repository.appendHistory).not.toHaveBeenCalled();
+    expect(repository.appendHistory).toHaveBeenCalledTimes(1);
   });
 });

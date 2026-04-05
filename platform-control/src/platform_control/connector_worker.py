@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from platform_control.config import get_settings
 from platform_control.database import get_session_maker
-from platform_control.services.firecrawl_provider import FirecrawlProvider
+from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.run_service import RunService
 from platform_control.services.schedule_evaluator import evaluate_due_schedules
 
@@ -102,7 +102,7 @@ class _GracefulShutdown:
 
 async def _run_once(limit: int, *, enable_schedules: bool = True) -> int:
     settings = get_settings()
-    provider = FirecrawlProvider(settings)
+    provider_registry = build_provider_registry(settings)
     session_maker = get_session_maker()
     async with session_maker() as session:
         # Evaluate due schedules first — creates PENDING runs
@@ -127,7 +127,11 @@ async def _run_once(limit: int, *, enable_schedules: bool = True) -> int:
                 await session.rollback()
 
         # Then dispatch pending runs (including any just created)
-        service = RunService(session, provider, run_dispatch_backend="worker")
+        service = RunService(
+            session,
+            provider_registry=provider_registry,
+            run_dispatch_backend="worker",
+        )
         return await service.dispatch_pending_runs(limit=limit)
 
 
