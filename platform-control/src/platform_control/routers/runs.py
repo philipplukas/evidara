@@ -19,9 +19,9 @@ from platform_control.schemas.run import (
     RunResponse,
 )
 from platform_control.services.firecrawl_provider import FirecrawlProvider
+from platform_control.services.processing_status_service import ProcessingStatusService
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.provider_registry_factory import build_provider_registry
-from platform_control.services.processing_status_service import ProcessingStatusService
 from platform_control.services.run_lifecycle_service import RunLifecycleService
 from platform_control.services.run_service import RunService
 
