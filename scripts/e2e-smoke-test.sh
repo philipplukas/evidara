@@ -46,7 +46,21 @@ fi
 
 # ── Shared curl wrapper: fail on HTTP errors, with sane timeouts ──────
 curl_json() {
-  curl -fsS --connect-timeout 5 --max-time 30 "${CURL_AUTH_ARGS[@]}" "$@"
+  local auth_args=("${CURL_AUTH_ARGS[@]}")
+  if [[ ${#auth_args[@]} -eq 0 ]] && command -v gcloud >/dev/null 2>&1; then
+    # GitHub OIDC + service-account auth often requires audience-scoped ID tokens.
+    local request_url="${!#}"
+    if [[ "${request_url}" =~ ^https?://[^/]+ ]]; then
+      local audience
+      audience="$(echo "${request_url}" | sed -E 's#(https?://[^/]+).*#\1#')"
+      local audience_token
+      audience_token="$(gcloud auth print-identity-token --audiences="${audience}" 2>/dev/null || true)"
+      if [[ -n "${audience_token}" ]]; then
+        auth_args=(-H "Authorization: Bearer ${audience_token}")
+      fi
+    fi
+  fi
+  curl -fsS --connect-timeout 5 --max-time 30 "${auth_args[@]}" "$@"
 }
 
 echo "╔══════════════════════════════════════════════════════════╗"
