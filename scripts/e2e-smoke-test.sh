@@ -241,15 +241,21 @@ echo ""
 # ── 8. Check projection history ────────────────────────────────────
 
 echo "🔍 Step 8: Checking projection history..."
-projection_stats=$(curl_json "${LS_URL}/v1/projections/events/history/stats")
-total_events=$(echo "${projection_stats}" | jq -r '.totalEvents // 0')
-applied=$(echo "${projection_stats}" | jq -r '.applied // 0')
-echo "  📊 Projection stats: total=${total_events}, applied=${applied}"
+projection_history=$(curl_json --get \
+  --data-urlencode "run_id=${RUN_ID}" \
+  --data-urlencode "limit=50" \
+  --data-urlencode "offset=0" \
+  "${LS_URL}/v1/projections/events/history")
+run_total_events=$(echo "${projection_history}" | jq -r '.total // 0')
+applied=$(echo "${projection_history}" | jq -r '[.data[] | select(.status=="applied")] | length')
+RUN_DOCUMENT_ID=$(echo "${projection_history}" | jq -r '([.data[] | select(.status=="applied")][0].documentId // empty)')
+echo "  📊 Projection stats (run-scoped): total=${run_total_events}, applied=${applied}"
 
-if [ "${applied}" -gt 0 ]; then
-  echo "  ✅ Projections applied successfully!"
+if [ "${applied}" -gt 0 ] && [[ -n "${RUN_DOCUMENT_ID}" ]]; then
+  echo "  ✅ Projections applied for run ${RUN_ID} (document_id=${RUN_DOCUMENT_ID})"
 else
-  echo "  ❌ No projections applied — push subscription may not be wired."
+  echo "  ❌ No run-scoped projections applied for run ${RUN_ID}."
+  echo "  ${projection_history}" | jq .
   exit 1
 fi
 echo ""
@@ -257,15 +263,39 @@ echo ""
 # ── 9. Search for indexed document ──────────────────────────────────
 
 echo "🔍 Step 9: Searching for indexed documents..."
-search_response=$(curl_json "${LS_URL}/v1/search?q=Verantwortlichkeit")
-result_count=$(echo "${search_response}" | jq -r '.results | length')
-echo "  📊 Search results: ${result_count}"
+MAX_SEARCH_PAGES=10
+SEARCH_PAGE_SIZE=100
+found_document=0
+matched_title=""
+result_count=0
 
-if [ "${result_count}" -gt 0 ]; then
-  first_title=$(echo "${search_response}" | jq -r '.results[0].title')
-  echo "  ✅ Found indexed document: ${first_title}"
+for page in $(seq 1 ${MAX_SEARCH_PAGES}); do
+  search_response=$(curl_json --get \
+    --data-urlencode "q=*" \
+    --data-urlencode "page=${page}" \
+    --data-urlencode "page_size=${SEARCH_PAGE_SIZE}" \
+    "${LS_URL}/v1/search")
+  result_count=$(echo "${search_response}" | jq -r '.results | length')
+  matching_result_count=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '[.results[] | select(.id == $doc)] | length')
+  echo "  [${page}/${MAX_SEARCH_PAGES}] Search results: ${result_count} (matching run document=${matching_result_count})"
+
+  if [ "${matching_result_count}" -gt 0 ]; then
+    found_document=1
+    matched_title=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | jq -r 'first // empty')
+    break
+  fi
+
+  if [ "${result_count}" -lt "${SEARCH_PAGE_SIZE}" ]; then
+    break
+  fi
+done
+
+if [ "${found_document}" -eq 1 ]; then
+  echo "  ✅ Found run-scoped indexed document: ${matched_title}"
 else
-  echo "  ❌ No search results — documents may not have been indexed correctly."
+  echo "  ❌ Run-scoped search failed for document ${RUN_DOCUMENT_ID}."
+  echo "  Last search page payload:"
+  echo "  ${search_response}" | jq .
   exit 1
 fi
 echo ""
