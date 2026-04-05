@@ -91,6 +91,14 @@ class ProcessingPipelineTests(unittest.TestCase):
                 [event["payload"]["status"] for event in result.status_events],
                 ["accepted", "processing", "canonical_ready"],
             )
+            self.assertEqual(
+                result.manifest.selected_profiles["jurisdiction_profile_ref"],
+                "ch_jurisdiction_v1",
+            )
+            self.assertEqual(
+                result.manifest.selected_profiles["resolution_policy_ref"],
+                "official_primary_resolution_v1",
+            )
             self.assertEqual(result.manifest.status, "canonical_ready")
             self.assertLess(result.sections[0].ordinal, result.sections[1].ordinal)
             self.assertEqual(result.sections[0].document_id, result.sections[1].document_id)
@@ -209,6 +217,10 @@ class ProcessingPipelineTests(unittest.TestCase):
                 "default_xml_v1",
             )
             self.assertEqual(
+                result.manifest.selected_profiles["jurisdiction_profile_ref"],
+                "ch_jurisdiction_v1",
+            )
+            self.assertEqual(
                 result.manifest.selected_profiles["normalization_profile_ref"],
                 "xml_v1",
             )
@@ -250,6 +262,46 @@ class ProcessingPipelineTests(unittest.TestCase):
         pipeline = ProcessingPipeline()
         with self.assertRaises(Exception):
             pipeline.process_event(build_bundle_event("/tmp/does-not-exist.json"))
+
+    def test_manifest_overrides_take_precedence_for_profile_refs(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(SAMPLE_HTML)
+            artifact_path = html_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            payload = build_manifest_payload(
+                artifact_path,
+                artifact_role="primary_document",
+            )
+            payload["di_overrides"] = {
+                "source_profile_ref": "custom_source_v2",
+                "jurisdiction_profile_ref": "custom_jurisdiction_v2",
+                "resolution_policy_ref": "custom_resolution_v2",
+                "normalization_profile_ref": "custom_norm_v2",
+            }
+            json.dump(payload, manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_2026_04_05").process_event(
+                build_bundle_event(manifest_path)
+            )
+            self.assertEqual(result.manifest.selected_profiles["source_profile_ref"], "custom_source_v2")
+            self.assertEqual(
+                result.manifest.selected_profiles["jurisdiction_profile_ref"],
+                "custom_jurisdiction_v2",
+            )
+            self.assertEqual(
+                result.manifest.selected_profiles["resolution_policy_ref"],
+                "custom_resolution_v2",
+            )
+            self.assertEqual(
+                result.manifest.selected_profiles["normalization_profile_ref"],
+                "custom_norm_v2",
+            )
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
 
     def test_docling_backend_and_spacy_toggle_add_metadata_scaffolding(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
