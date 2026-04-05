@@ -100,8 +100,8 @@ async def test_start_run_enforces_max_content_bytes(monkeypatch: pytest.MonkeyPa
 
     assert result.response_payload["captured"] == 0
     assert result.response_payload["failed"] == 1
-    assert "response exceeded max_content_bytes=1" in (
-        result.response_payload["failures"][0]["error"]
+    assert (
+        "response exceeded max_content_bytes=1" in (result.response_payload["failures"][0]["error"])
     )
 
 
