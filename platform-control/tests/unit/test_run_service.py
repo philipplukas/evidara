@@ -17,22 +17,99 @@ from platform_control.schemas.source import (
     CreateSourceVersionRequest,
     FirecrawlAcquisitionSpec,
 )
-from platform_control.services.firecrawl_provider import ProviderStartResult
+from platform_control.services.acquisition_provider import ProviderResource, ProviderStartResult
+from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.run_service import RunService
 from platform_control.services.source_service import SourceService
 
 
 @dataclass
 class StubProvider:
+    provider_name: str = "firecrawl"
     external_job_id: str = "crawl_job_123"
 
     async def start_run(self, source, source_version, run) -> ProviderStartResult:
         del source, source_version, run
         return ProviderStartResult(
+            provider=self.provider_name,
             external_job_id=self.external_job_id,
             request_payload={"url": "https://example.com"},
             response_payload={"id": self.external_job_id, "success": True},
         )
+
+
+@dataclass
+class InlineDeterministicProvider:
+    provider_name: str = "deterministic_http"
+
+    async def start_run(self, source, source_version, run) -> ProviderStartResult:
+        del source, source_version, run
+        return ProviderStartResult(
+            provider=self.provider_name,
+            external_job_id="det_job_123",
+            request_payload={"seed_urls": ["https://example.com/decisions/2026-01"]},
+            response_payload={"captured": 1},
+            inline_resources=[
+                ProviderResource(
+                    source_url="https://example.com/decisions/2026-01?utm_source=test",
+                    final_url="https://example.com/decisions/2026-01?utm_source=test",
+                    content_type="text/html",
+                    body="<html><title>Decision 2026/01</title><body>Hello</body></html>",
+                    title="Decision 2026/01",
+                    http_status=200,
+                    discovery_depth=0,
+                )
+            ],
+        )
+
+
+@dataclass
+class InMemoryArtifactStore:
+    stored_pages: dict[str, dict] | None = None
+
+    def __post_init__(self) -> None:
+        if self.stored_pages is None:
+            self.stored_pages = {}
+
+    async def store_page_payload(self, run_id: str, artifact_id: str, payload: dict) -> str:
+        assert self.stored_pages is not None
+        self.stored_pages[artifact_id] = payload
+        return f"gs://test-artifacts/{run_id}/{artifact_id}.json"
+
+    async def store_bundle_manifest(
+        self,
+        run_id: str,
+        bundle_manifest_id: str,
+        payload: dict,
+    ) -> dict:
+        del payload
+        return {
+            "uri": f"gs://test-manifests/{run_id}/{bundle_manifest_id}.json",
+            "content_type": "application/json",
+            "byte_size": 1,
+            "checksum": "a" * 64,
+            "checksum_algorithm": "sha256",
+        }
+
+
+@dataclass
+class RecordingPublisher:
+    raw_artifact_ids: list[str] | None = None
+    bundle_events: list[dict] | None = None
+
+    def __post_init__(self) -> None:
+        if self.raw_artifact_ids is None:
+            self.raw_artifact_ids = []
+        if self.bundle_events is None:
+            self.bundle_events = []
+
+    async def publish_raw_artifact_available(self, artifact: RawArtifact) -> None:
+        assert self.raw_artifact_ids is not None
+        self.raw_artifact_ids.append(artifact.artifact_id)
+
+    async def publish_artifact_bundle_available(self, event: dict) -> None:
+        assert self.bundle_events is not None
+        self.bundle_events.append(event)
 
 
 async def _seed_source_version(session):
@@ -325,6 +402,48 @@ async def test_cancel_run_marks_it_cancelled(session) -> None:
 
 
 @pytest.mark.asyncio
+async def test_retry_run_resets_failed_run_to_pending(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    run.status = RunStatus.FAILED
+    run.failure_reason = "provider timeout"
+    run.completed_at = run.created_at
+    await session.commit()
+
+    retried = await run_service.retry_run(run.run_id)
+
+    assert retried.status is RunStatus.PENDING
+    assert retried.failure_reason is None
+    assert retried.started_at is None
+    assert retried.completed_at is None
+
+
+@pytest.mark.asyncio
+async def test_retry_run_rejects_non_terminal_states(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+
+    with pytest.raises(InvalidStateTransitionError):
+        await run_service.retry_run(run.run_id)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "terminal_status",
     [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED],
@@ -458,3 +577,49 @@ async def test_dispatch_pending_runs_promotes_runs_to_running(session) -> None:
     assert dispatched == 1
     assert refreshed.status is RunStatus.RUNNING
     assert provider_job is not None
+
+
+@pytest.mark.asyncio
+async def test_provider_registry_dispatches_deterministic_inline_runs(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "deterministic_http",
+        "seed_url": "https://example.com/decisions/2026-01?utm_source=test",
+        "mode": "crawl",
+    }
+    await session.commit()
+
+    registry = ProviderRegistry()
+    registry.register(StubProvider())
+    registry.register(InlineDeterministicProvider())
+
+    artifact_store = InMemoryArtifactStore()
+    publisher = RecordingPublisher()
+    run_service = RunService(
+        session,
+        provider_registry=registry,
+        artifact_store=artifact_store,
+        publisher=publisher,
+    )
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+
+    assert run.status is RunStatus.COMPLETED
+    assert run.artifacts_count == 1
+    assert run.captured_resources_count == 1
+    assert provider_job is not None
+    assert provider_job.provider == "deterministic_http"
+    assert provider_job.status is ProviderJobStatus.COMPLETED
+    assert publisher.raw_artifact_ids is not None
+    assert len(publisher.raw_artifact_ids) == 1
+    assert publisher.bundle_events is not None
+    assert len(publisher.bundle_events) == 1
+    assert publisher.bundle_events[0]["event_type"] == "artifact_bundle.available"
+    assert publisher.bundle_events[0]["payload"]["provenance"]["run_id"] == run.run_id

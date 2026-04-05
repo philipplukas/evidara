@@ -5,12 +5,18 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from platform_control.domain import FirecrawlMode, SourceStatus, SourceVersionStatus
+from platform_control.domain import (
+    AcquisitionProvider,
+    FirecrawlMode,
+    SourceStatus,
+    SourceVersionStatus,
+)
 
 LanguageCode = Annotated[str, Field(pattern=r"^[a-z]{2}(?:-[A-Z]{2})?$")]
 
 
 class FirecrawlAcquisitionSpec(BaseModel):
+    provider: AcquisitionProvider = AcquisitionProvider.FIRECRAWL
     seed_url: HttpUrl | None = None
     seed_urls: list[HttpUrl] = Field(default_factory=list)
     mode: FirecrawlMode = FirecrawlMode.CRAWL
@@ -33,8 +39,26 @@ class FirecrawlAcquisitionSpec(BaseModel):
     trust_tier: Literal["authoritative", "preferred", "supplemental", "untrusted"] = "authoritative"
     language_codes: list[LanguageCode] = Field(default_factory=list)
     document_type_hint: str | None = None
+    request_timeout_seconds: float = Field(default=30.0, ge=1.0, le=120.0)
+    user_agent: str | None = None
+    max_content_bytes: int = Field(default=2_000_000, ge=50_000, le=10_000_000)
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_provider_config(self) -> FirecrawlAcquisitionSpec:
+        if self.provider is AcquisitionProvider.FIRECRAWL:
+            if self.mode is FirecrawlMode.CRAWL and self.seed_url is None:
+                raise ValueError("firecrawl crawl mode requires seed_url")
+            if self.mode is FirecrawlMode.BATCH_SCRAPE and not self.seed_urls:
+                raise ValueError("firecrawl batch_scrape mode requires seed_urls")
+            return self
+
+        if self.provider is AcquisitionProvider.DETERMINISTIC_HTTP:
+            if self.seed_url is None and not self.seed_urls:
+                raise ValueError("deterministic_http provider requires seed_url or seed_urls")
+            return self
+        return self
 
 
 class CreateSourceRequest(BaseModel):

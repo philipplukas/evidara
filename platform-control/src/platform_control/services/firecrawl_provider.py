@@ -1,26 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from platform_control.config import Settings
-from platform_control.domain import FirecrawlMode, RunMode
+from platform_control.domain import AcquisitionProvider, FirecrawlMode, RunMode
 from platform_control.errors import ProviderConfigurationError
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
-
-
-@dataclass(slots=True)
-class ProviderStartResult:
-    external_job_id: str
-    request_payload: dict[str, Any]
-    response_payload: dict[str, Any]
+from platform_control.services.acquisition_provider import ProviderStartResult
 
 
 class FirecrawlProvider:
+    provider_name = "firecrawl"
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
@@ -51,6 +46,7 @@ class FirecrawlProvider:
             raise ProviderConfigurationError("Firecrawl response did not include a job ID.")
 
         return ProviderStartResult(
+            provider=self.provider_name,
             external_job_id=external_job_id,
             request_payload=payload,
             response_payload=response_payload,
@@ -63,6 +59,11 @@ class FirecrawlProvider:
         run: Run,
     ) -> tuple[dict[str, Any], str]:
         acquisition_spec = source_version.acquisition_spec
+        provider_name = str(acquisition_spec.get("provider") or AcquisitionProvider.FIRECRAWL.value)
+        if provider_name != "firecrawl":
+            raise ProviderConfigurationError(
+                "Firecrawl provider cannot dispatch non-firecrawl acquisition specs."
+            )
         mode = FirecrawlMode(acquisition_spec["mode"])
 
         webhook_config: dict[str, Any] | None = None
