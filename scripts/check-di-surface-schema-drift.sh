@@ -16,6 +16,7 @@ set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-${GCP_PROJECT_ID:-}}"
 SURFACES_ROOT_URI="${DI_SURFACES_ROOT_URI:-}"
+SURFACE_DEFINITIONS_FILE="${SURFACE_DEFINITIONS_FILE:-document-intelligence/src/document_intelligence/persist/surfaces.py}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -27,9 +28,13 @@ while [[ $# -gt 0 ]]; do
       SURFACES_ROOT_URI="${2:?missing value for --surfaces-root-uri}"
       shift 2
       ;;
+    --surface-definitions-file)
+      SURFACE_DEFINITIONS_FILE="${2:?missing value for --surface-definitions-file}"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1" >&2
-      echo "Usage: $0 [--project PROJECT_ID] [--surfaces-root-uri gs://bucket/published]" >&2
+      echo "Usage: $0 [--project PROJECT_ID] [--surfaces-root-uri gs://bucket/published] [--surface-definitions-file path]" >&2
       exit 1
       ;;
   esac
@@ -45,6 +50,11 @@ if [[ -z "${SURFACES_ROOT_URI}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${SURFACE_DEFINITIONS_FILE}" ]]; then
+  echo "Surface definitions file not found: ${SURFACE_DEFINITIONS_FILE}" >&2
+  exit 1
+fi
+
 if ! command -v gcloud >/dev/null 2>&1; then
   echo "gcloud CLI is required for schema drift check." >&2
   exit 1
@@ -53,10 +63,12 @@ fi
 echo "Checking DI published surface schema drift..."
 echo "  project: ${PROJECT_ID}"
 echo "  root:    ${SURFACES_ROOT_URI}"
+echo "  defs:    ${SURFACE_DEFINITIONS_FILE}"
 
-PROJECT_ID="${PROJECT_ID}" SURFACES_ROOT_URI="${SURFACES_ROOT_URI}" python3 - <<'PY'
+PROJECT_ID="${PROJECT_ID}" SURFACES_ROOT_URI="${SURFACES_ROOT_URI}" SURFACE_DEFINITIONS_FILE="${SURFACE_DEFINITIONS_FILE}" python3 - <<'PY'
 from __future__ import annotations
 
+import ast
 import json
 import os
 import subprocess
@@ -64,74 +76,74 @@ import sys
 
 project_id = os.environ["PROJECT_ID"]
 surfaces_root_uri = os.environ["SURFACES_ROOT_URI"].rstrip("/")
+surface_definitions_file = os.environ["SURFACE_DEFINITIONS_FILE"]
 
-SURFACE_COLUMNS = {
-    "published_documents": {
-        "required": [
-        "document_id",
-        "document_revision",
-        "processing_manifest_id",
-        "provenance",
-        "primary_artifact_id",
-        "title",
-        "processed_at",
-        "processing_version",
-        "lifecycle_status",
-        "full_text",
-        "body_text",
-    ],
-        "optional": [
-            "jurisdiction_id",
-            "authority_id",
-            "document_type",
-            "effective_date",
-            "metadata",
-            "extensions",
-        ],
-    },
-    "published_sections": {
-        "required": [
-        "section_id",
-        "document_id",
-        "document_revision",
-        "processing_manifest_id",
-        "provenance",
-        "ordinal",
-        "depth",
-        "content",
-    ],
-        "optional": [
-            "parent_section_id",
-            "title",
-            "section_type",
-            "metadata",
-        ],
-    },
-    "processing_manifests": {
-        "required": [
-        "processing_manifest_id",
-        "manifest_version",
-        "document_id",
-        "document_revision",
-        "processing_version",
-        "status",
-        "provenance",
-        "input_bundle_manifest_ref",
-        "selected_profiles",
-        "document_count",
-        "section_count",
-        "citation_count",
-    ],
-        "optional": [
-            "reference_snapshot_set_ref",
-            "published_document_ref",
-            "published_sections_ref",
-            "canonical_ready_at",
-            "supersedes_processing_manifest_id",
-            "failure",
-        ],
-    },
-}
+
+def load_surface_columns(path: str) -> dict[str, dict[str, list[str]]]:
+    source = open(path, "r", encoding="utf-8").read()
+    tree = ast.parse(source, filename=path)
+
+    surface_var_to_name: dict[str, str] = {}
+    columns_by_var: dict[str, dict[str, list[str]]] = {}
+
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Name) or not isinstance(node.value, ast.Call):
+            continue
+        call = node.value
+        if not isinstance(call.func, ast.Name) or call.func.id != "PublishedSurfaceDefinition":
+            continue
+        var_name = target.id
+        surface_name = None
+        for kw in call.keywords:
+            if kw.arg == "surface_name" and isinstance(kw.value, ast.Constant) and isinstance(
+                kw.value.value, str
+            ):
+                surface_name = kw.value.value
+                break
+        if not surface_name:
+            continue
+        surface_var_to_name[var_name] = surface_name
+        columns_by_var[var_name] = {"required": [], "optional": []}
+
+        for kw in call.keywords:
+            if kw.arg != "columns" or not isinstance(kw.value, ast.Tuple):
+                continue
+            for elt in kw.value.elts:
+                if not isinstance(elt, ast.Call):
+                    continue
+                if not isinstance(elt.func, ast.Name) or elt.func.id != "SurfaceColumn":
+                    continue
+                if len(elt.args) < 3:
+                    continue
+                name_node = elt.args[0]
+                nullable_node = elt.args[2]
+                if not isinstance(name_node, ast.Constant) or not isinstance(name_node.value, str):
+                    continue
+                if not isinstance(nullable_node, ast.Constant) or not isinstance(
+                    nullable_node.value, bool
+                ):
+                    continue
+                if nullable_node.value:
+                    columns_by_var[var_name]["optional"].append(name_node.value)
+                else:
+                    columns_by_var[var_name]["required"].append(name_node.value)
+
+    result: dict[str, dict[str, list[str]]] = {}
+    for var_name, surface_name in surface_var_to_name.items():
+        result[surface_name] = columns_by_var[var_name]
+    return result
+
+
+SURFACE_COLUMNS = load_surface_columns(surface_definitions_file)
+if not SURFACE_COLUMNS:
+    print(
+        f"Failed to parse surface definitions from {surface_definitions_file}.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
