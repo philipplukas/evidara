@@ -70,7 +70,13 @@ export class SearchOpenSearchAdapter implements SearchRepository {
                   {
                     multi_match: {
                       query: normalizedQuery,
-                      fields: ['title^3', 'regeste^2', 'content', 'content_preview', 'docket_number^2'],
+                      fields: [
+                        'title^3',
+                        'regeste^2',
+                        'content',
+                        'content_preview',
+                        'docket_number^2',
+                      ],
                       type: 'best_fields' as const,
                       fuzziness: 'AUTO',
                     },
