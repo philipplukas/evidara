@@ -1,0 +1,44 @@
+name: Interaction Flow Weekly KPIs
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Lookback window in days"
+        required: false
+        default: "7"
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  weekly-kpis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Generate weekly interaction-flow KPI report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DAYS_INPUT="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.days || '7' }}"
+          scripts/weekly-interaction-flow-kpis.sh \
+            --days "${DAYS_INPUT}" \
+            --output tmp/interaction-flow-kpis/weekly-kpis.md
+
+      - name: Append KPI report to step summary
+        run: |
+          set -euo pipefail
+          cat tmp/interaction-flow-kpis/weekly-kpis.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload KPI artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: interaction-flow-weekly-kpis-${{ github.run_id }}
+          path: tmp/interaction-flow-kpis/weekly-kpis.md

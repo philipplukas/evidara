@@ -91,6 +91,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SCREENSHOT_PACK_STATUS: not_run
+      SCREENSHOT_PACK_RETRY_COUNT: "0"
+      SCREENSHOT_PACK_FAILURE_REASON: "none"
+      SCREENSHOT_CHECKLIST_COVERAGE: "unknown"
     defaults:
       run:
         working-directory: legal-search/frontend
@@ -128,6 +131,8 @@ jobs:
           for attempt in 1 2; do
             if npm run e2e:screenshot-pack; then
               echo "SCREENSHOT_PACK_STATUS=passed" >> "${GITHUB_ENV}"
+              echo "SCREENSHOT_PACK_RETRY_COUNT=$((attempt - 1))" >> "${GITHUB_ENV}"
+              echo "SCREENSHOT_PACK_FAILURE_REASON=none" >> "${GITHUB_ENV}"
               exit 0
             fi
             if [[ "${attempt}" -lt 2 ]]; then
@@ -136,13 +141,43 @@ jobs:
             fi
           done
           echo "SCREENSHOT_PACK_STATUS=failed_after_retry" >> "${GITHUB_ENV}"
+          echo "SCREENSHOT_PACK_RETRY_COUNT=1" >> "${GITHUB_ENV}"
+          echo "SCREENSHOT_PACK_FAILURE_REASON=playwright_screenshot_pack_failed" >> "${GITHUB_ENV}"
           echo "::error::Screenshot evidence pack failed after 2 attempts"
           exit 1
+
+      - name: Validate screenshot checklist coverage
+        if: always()
+        run: |
+          set -euo pipefail
+          required=(
+            "screenshot-pack/cross-surface-header-navigation.png"
+            "screenshot-pack/legal-search-result-list.png"
+            "screenshot-pack/legal-search-detail-panel.png"
+            "screenshot-pack/admin-run-launch-preflight.png"
+            "screenshot-pack/admin-run-lifecycle-visibility.png"
+            "screenshot-pack/operator-journey-events.json"
+          )
+          missing=0
+          for file in "${required[@]}"; do
+            if [[ ! -f "${file}" ]]; then
+              echo "::warning::Missing screenshot checklist file: ${file}"
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -eq 0 ]]; then
+            echo "SCREENSHOT_CHECKLIST_COVERAGE=complete" >> "${GITHUB_ENV}"
+          else
+            echo "SCREENSHOT_CHECKLIST_COVERAGE=incomplete" >> "${GITHUB_ENV}"
+            if [[ "${SCREENSHOT_PACK_FAILURE_REASON}" == "none" ]]; then
+              echo "SCREENSHOT_PACK_FAILURE_REASON=missing_required_capture" >> "${GITHUB_ENV}"
+            fi
+          fi
 
       - name: Generate evidence manifest
         if: always()
         run: |
-          cat <<'EOF' > interaction-flow-evidence.md
+          cat <<EOF > interaction-flow-evidence.md
           # Interaction Flow Evidence
 
           Source runbook: `docs/runbooks/interaction-flow-validation.md`
@@ -156,7 +191,10 @@ jobs:
 
           Screenshot pack status:
           - `${SCREENSHOT_PACK_STATUS}`
-          - if `failed_after_retry`, inspect `test-results` traces and retry logs in this run.
+          - retry_count: `${SCREENSHOT_PACK_RETRY_COUNT}`
+          - failure_reason: `${SCREENSHOT_PACK_FAILURE_REASON}`
+          - checklist_coverage: `${SCREENSHOT_CHECKLIST_COVERAGE}`
+          - if failed, inspect `test-results` traces and retry logs in this run.
 
           Evidence artifacts in this upload:
           - `legal-search/frontend/playwright-report`

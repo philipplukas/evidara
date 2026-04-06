@@ -298,6 +298,13 @@ jobs:
             fi
             echo "| Interaction-flow artifact completeness | ${interaction_flow_artifact_status} | \`scripts/check-latest-interaction-flow-evidence.sh --mode staging\` |"
 
+            if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+              evidence_quality_score="PASS"
+            else
+              evidence_quality_score="FAIL"
+            fi
+            echo "| Evidence quality score | ${evidence_quality_score} | Composite of latest interaction-flow run + artifact completeness gate |"
+
             if [[ "${{ steps.tf_gate.outcome }}" == "success" ]]; then
               tf_status="PASS"
             else
