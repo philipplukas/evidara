@@ -3,9 +3,12 @@ import { mockSearchApi } from "./helpers/mock-api";
 
 const SEARCH_PLACEHOLDER = /search article, case, commentary, citation|nach artikel, urteil, kommentar oder zitat|rechercher un article, un arrêt, un commentaire ou une citation/i;
 const FILTERS_LABEL = /filters|filter|filtres/i;
-const CONTROL_PANEL_LABEL = /control panel|kontrollbereich|panneau de controle/i;
+const CONTROL_PANEL_LABEL = /control panel|kontrollbereich|panneau de contr[oô]le/i;
 const EXPECTED_CONTROL_PANEL_URL =
   process.env.PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL?.trim() || "http://localhost:3100";
+const LEGAL_SEARCH_BASE_URL =
+  process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3000";
+const UI_PROFILE_COOKIE = "evidara-ui-profile";
 
 test.describe("Frontend smoke journeys", () => {
   test.beforeEach(async ({ page }) => {
@@ -46,7 +49,16 @@ test.describe("Frontend smoke journeys", () => {
     await expect(page.getByText("Select a result")).toBeVisible();
   });
 
-  test("@smoke exposes control panel entrypoint in header", async ({ page }) => {
+  test("@smoke exposes control panel entrypoint in header", async ({ page, context }) => {
+    await context.addCookies([
+      {
+        name: UI_PROFILE_COOKIE,
+        value: "admin",
+        url: new URL(LEGAL_SEARCH_BASE_URL).origin,
+      },
+    ]);
+    await page.goto("/");
+
     const controlPanelLink = page.getByRole("link", { name: CONTROL_PANEL_LABEL });
     await expect(controlPanelLink).toBeVisible();
     await expect(controlPanelLink).toHaveAttribute("href", EXPECTED_CONTROL_PANEL_URL);
