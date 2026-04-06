@@ -23,6 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   TF_ROOT: infra/terraform/gcp/runtime_stack
   TF_VAR_FILE: infra/env/dev/runtime.gcp.tfvars.example
   GCP_PROJECT_ID: data-platform-dev-492214
