@@ -70,3 +70,10 @@ output "cloud_run_service_urls" {
     key => service.uri
   }
 }
+
+output "cloud_run_job_names" {
+  value = {
+    for key, job in google_cloud_run_v2_job.runtime :
+    key => job.name
+  }
+}

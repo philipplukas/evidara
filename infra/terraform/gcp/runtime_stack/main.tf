@@ -30,6 +30,13 @@ locals {
     })
   }
 
+  cloud_run_jobs = {
+    for job_name, job in var.cloud_run_jobs :
+    job_name => merge(job, {
+      prefixed_name = "${job_name}-${local.environment}"
+    })
+  }
+
   cloud_sql_instance_name = "evidara-control-${local.environment}"
 }
 
@@ -146,7 +153,12 @@ resource "google_pubsub_subscription" "dead_letter" {
 # failed messages, and subscriber access on source subscriptions to modify
 # ack deadlines during dead-lettering.
 data "google_project" "current" {
+  count      = var.project_number == null ? 1 : 0
   project_id = var.project_id
+}
+
+locals {
+  effective_project_number = var.project_number != null ? var.project_number : data.google_project.current[0].number
 }
 
 resource "google_pubsub_topic_iam_member" "dlq_publisher" {
@@ -154,7 +166,7 @@ resource "google_pubsub_topic_iam_member" "dlq_publisher" {
 
   topic  = google_pubsub_topic.dead_letter[each.key].name
   role   = "roles/pubsub.publisher"
-  member = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member = "serviceAccount:service-${local.effective_project_number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_pubsub_subscription_iam_member" "dlq_subscriber" {
@@ -162,7 +174,7 @@ resource "google_pubsub_subscription_iam_member" "dlq_subscriber" {
 
   subscription = google_pubsub_subscription.events[each.key].name
   role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member       = "serviceAccount:service-${local.effective_project_number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 # --- Push subscription auth ---
@@ -203,7 +215,7 @@ resource "google_service_account_iam_member" "pubsub_token_creator" {
 
   service_account_id = google_service_account.runtime[each.value].name
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member             = "serviceAccount:service-${local.effective_project_number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_service_account" "runtime" {
@@ -214,27 +226,27 @@ resource "google_service_account" "runtime" {
 }
 
 resource "google_project_iam_member" "runtime_pubsub_publisher" {
-  for_each = google_service_account.runtime
+  for_each = local.prefixed_service_account_ids
 
   project = var.project_id
   role    = "roles/pubsub.publisher"
-  member  = "serviceAccount:${each.value.email}"
+  member  = "serviceAccount:${google_service_account.runtime[each.key].email}"
 }
 
 resource "google_project_iam_member" "runtime_pubsub_subscriber" {
-  for_each = google_service_account.runtime
+  for_each = local.prefixed_service_account_ids
 
   project = var.project_id
   role    = "roles/pubsub.subscriber"
-  member  = "serviceAccount:${each.value.email}"
+  member  = "serviceAccount:${google_service_account.runtime[each.key].email}"
 }
 
 resource "google_project_iam_member" "runtime_storage_object_admin" {
-  for_each = google_service_account.runtime
+  for_each = local.prefixed_service_account_ids
 
   project = var.project_id
   role    = "roles/storage.objectAdmin"
-  member  = "serviceAccount:${each.value.email}"
+  member  = "serviceAccount:${google_service_account.runtime[each.key].email}"
 }
 
 resource "google_secret_manager_secret" "runtime" {
@@ -249,11 +261,11 @@ resource "google_secret_manager_secret" "runtime" {
 }
 
 resource "google_project_iam_member" "runtime_secret_accessor" {
-  for_each = google_service_account.runtime
+  for_each = local.prefixed_service_account_ids
 
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${each.value.email}"
+  member  = "serviceAccount:${google_service_account.runtime[each.key].email}"
 }
 
 resource "google_sql_database_instance" "platform_control" {
@@ -316,14 +328,24 @@ resource "google_secret_manager_secret_version" "platform_control_dsn" {
 
 resource "google_project_iam_member" "runtime_cloudsql_client" {
   for_each = var.enable_cloud_sql ? {
-    for key, svc in local.cloud_run_services :
-    svc.service_account_key => google_service_account.runtime[svc.service_account_key]
-    if length(svc.cloud_sql_instances) > 0
+    for key in distinct(concat(
+      [
+        for _, svc in local.cloud_run_services :
+        svc.service_account_key
+        if length(svc.cloud_sql_instances) > 0
+      ],
+      [
+        for _, job in local.cloud_run_jobs :
+        job.service_account_key
+        if length(job.cloud_sql_instances) > 0
+      ]
+    )) :
+    key => key
   } : {}
 
   project = var.project_id
   role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${each.value.email}"
+  member  = "serviceAccount:${google_service_account.runtime[each.key].email}"
 }
 
 resource "google_cloud_run_v2_service" "runtime" {
@@ -438,6 +460,81 @@ resource "google_cloud_run_v2_service" "runtime" {
   depends_on = [
     google_project_iam_member.runtime_secret_accessor,
     google_project_iam_member.runtime_storage_object_admin,
+  ]
+}
+
+resource "google_cloud_run_v2_job" "runtime" {
+  for_each = local.cloud_run_jobs
+
+  name                = each.value.prefixed_name
+  location            = var.region
+  deletion_protection = false
+
+  template {
+    template {
+      service_account = google_service_account.runtime[each.value.service_account_key].email
+      timeout         = "${each.value.timeout_seconds}s"
+      max_retries     = each.value.max_retries
+
+      dynamic "vpc_access" {
+        for_each = each.value.vpc_connector == null ? [] : [each.value.vpc_connector]
+        content {
+          connector = vpc_access.value
+          egress    = each.value.vpc_egress
+        }
+      }
+
+      containers {
+        image   = each.value.image
+        command = each.value.command
+        args    = each.value.args
+
+        dynamic "env" {
+          for_each = each.value.env_vars
+          content {
+            name  = env.key
+            value = env.value
+          }
+        }
+
+        dynamic "env" {
+          for_each = each.value.secret_env_vars
+          content {
+            name = env.key
+            value_source {
+              secret_key_ref {
+                secret  = google_secret_manager_secret.runtime[env.value.secret_name].secret_id
+                version = env.value.version
+              }
+            }
+          }
+        }
+
+        dynamic "volume_mounts" {
+          for_each = length(each.value.cloud_sql_instances) > 0 ? [1] : []
+          content {
+            name       = "cloudsql"
+            mount_path = "/cloudsql"
+          }
+        }
+      }
+
+      dynamic "volumes" {
+        for_each = length(each.value.cloud_sql_instances) > 0 ? [1] : []
+        content {
+          name = "cloudsql"
+          cloud_sql_instance {
+            instances = each.value.cloud_sql_instances
+          }
+        }
+      }
+    }
+  }
+
+  labels = local.labels
+
+  depends_on = [
+    google_project_iam_member.runtime_secret_accessor,
   ]
 }
 

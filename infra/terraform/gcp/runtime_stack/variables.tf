@@ -13,6 +13,13 @@ variable "project_id" {
   type        = string
 }
 
+variable "project_number" {
+  description = "Optional GCP project number; set to avoid project data-source lookup during plan."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "region" {
   description = "Default region for Pub/Sub and any regionalized runtime resources."
   type        = string
@@ -171,6 +178,27 @@ variable "cloud_run_services" {
     startup_probe_path    = optional(string, null)
     liveness_probe_path   = optional(string, null)
     env_vars              = optional(map(string), {})
+    secret_env_vars = optional(map(object({
+      secret_name = string
+      version     = optional(string, "latest")
+    })), {})
+  }))
+  default = {}
+}
+
+variable "cloud_run_jobs" {
+  description = "Cloud Run job configuration keyed by job name."
+  type = map(object({
+    image               = string
+    service_account_key = string
+    command             = optional(list(string), [])
+    args                = optional(list(string), [])
+    timeout_seconds     = optional(number, 900)
+    max_retries         = optional(number, 1)
+    vpc_connector       = optional(string, null)
+    vpc_egress          = optional(string, "PRIVATE_RANGES_ONLY")
+    cloud_sql_instances = optional(list(string), [])
+    env_vars            = optional(map(string), {})
     secret_env_vars = optional(map(object({
       secret_name = string
       version     = optional(string, "latest")
