@@ -91,6 +91,21 @@ before adding lower-priority flow coverage.
 | RBAC: admin vs standard header       | `legal-search/frontend/e2e/rbac-cross-surface.spec.ts` (`@contract`)                            | Admin sees link; standard cookie hides link                   |
 | RBAC: admin surface denial           | `legal-search/frontend/e2e/rbac-cross-surface.spec.ts` (`@contract`)                            | Non-admin env shows denial copy + recovery link               |
 | Admin access helpers                 | `platform-control/admin/src/lib/admin/accessControl.test.ts`                                     | Role parsing and allow-list logic                             |
+| CI evidence pack                     | `.github/workflows/legal-search.yml` (`interaction-flow-evidence` job)                           | Uploaded Playwright reports/results + evidence manifest        |
+
+## CI Evidence Automation
+
+- Workflow: `.github/workflows/legal-search.yml`
+- Job: `interaction-flow-evidence`
+- Trigger paths include this runbook (`docs/runbooks/interaction-flow-validation.md`) plus legal-search/admin surfaces
+- Executed suites:
+  - `npm run e2e:smoke`
+  - `npm run e2e:contract`
+- Published artifact: `interaction-flow-evidence-${run_id}` containing:
+  - `legal-search/frontend/playwright-report`
+  - `legal-search/frontend/test-results`
+  - `legal-search/frontend/interaction-flow-evidence.md`
+  - `docs/runbooks/interaction-flow-validation.md`
 
 ## Triage Categories
 
