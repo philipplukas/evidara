@@ -54,6 +54,17 @@ jobs:
           DI_SURFACES_ROOT_URI="${DI_SURFACES_ROOT_URI}" \
           bash scripts/check-di-surface-schema-drift.sh
 
+      - name: Preflight OpenSearch alias wiring
+        run: |
+          set -euo pipefail
+          if ! gcloud run jobs execute "os-alias-check-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --wait; then
+            echo "::error::OpenSearch alias preflight failed. Run job os-alias-bootstrap-${TARGET_ENV} and retry smoke."
+            exit 1
+          fi
+
       - name: Mint audience-scoped Cloud Run ID tokens
         run: |
           set -euo pipefail
