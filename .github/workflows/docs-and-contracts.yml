@@ -50,6 +50,10 @@ jobs:
         run: |
           python scripts/validate_json_schemas.py
 
+      - name: Check staging smoke workflow isolation
+        run: |
+          python scripts/check-staging-smoke-workflow-isolation.py
+
       - name: Check component doc headings
         run: |
           python scripts/check_component_docs.py

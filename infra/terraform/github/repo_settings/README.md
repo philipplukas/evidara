@@ -27,6 +27,11 @@ export TF_VAR_environment_secrets='{
     "DATABRICKS_HOST": "https://dbc-xxxx.cloud.databricks.com",
     "DATABRICKS_TOKEN": "..."
   },
+  "staging": {
+    "GCP_WORKLOAD_IDENTITY_PROVIDER": "projects/123/locations/global/workloadIdentityPools/github/providers/evidara",
+    "GCP_SERVICE_ACCOUNT_STAGING": "gha-deployer-staging@project-dacd6b7b-dc96-4534-b82.iam.gserviceaccount.com",
+    "E2E_SMOKE_STAGING_SLACK_WEBHOOK": "https://hooks.slack.com/services/..."
+  },
   "prod": {
     "GCP_WORKLOAD_IDENTITY_PROVIDER": "projects/123/locations/global/workloadIdentityPools/github/providers/evidara",
     "GCP_SERVICE_ACCOUNT_PROD": "gha-deployer-prod@evidara-prod.iam.gserviceaccount.com",
@@ -37,6 +42,18 @@ export TF_VAR_environment_secrets='{
 
 terraform apply -var-file="../../../env/github.repo_settings.tfvars.example"
 ```
+
+For the staging smoke workflow, ensure these GitHub settings are present:
+
+- Repository variables:
+  - `GCP_PROJECT_ID_STAGING`
+  - `DI_SURFACES_ROOT_URI_STAGING`
+  - `SMOKE_SEED_URL_STAGING` (optional)
+  - `SMOKE_REQUEST_TIMEOUT_SECONDS_STAGING` (optional)
+- Environment `staging` secrets:
+  - `GCP_WORKLOAD_IDENTITY_PROVIDER`
+  - `GCP_SERVICE_ACCOUNT_STAGING`
+  - `E2E_SMOKE_STAGING_SLACK_WEBHOOK` (optional)
 
 ## Notes
 
