@@ -113,6 +113,14 @@ before adding lower-priority flow coverage.
   - local evidence: `scripts/fetch-interaction-flow-evidence.sh`
   - staging evidence: `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence`
 
+## Control Panel Testing Policy
+
+- Keep this behavior under test; cross-surface navigation is a user-facing contract, not an optional convenience.
+- Treat legal-search header visibility + href as `@contract` coverage (`rbac-cross-surface.spec.ts`), because profile/session wiring can vary by environment.
+- Keep admin denial UX (`403` + recovery link) in `@contract` as the minimum cross-surface safety check.
+- Reserve `@smoke` for stable app-shell/search journeys and avoid role-dependent assertions unless staging auth/session parity is guaranteed.
+- Promote admin-visible link assertions back into staging smoke once cookie/session parity is fully stable in staging.
+
 ## Triage Categories
 
 - `broken-implementation`: actual behavior violates expected transition/outcome.
