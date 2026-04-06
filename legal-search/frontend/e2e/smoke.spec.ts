@@ -11,7 +11,14 @@ const LEGAL_SEARCH_BASE_URL =
 const UI_PROFILE_COOKIE = "evidara-ui-profile";
 
 test.describe("Frontend smoke journeys", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([
+      {
+        name: UI_PROFILE_COOKIE,
+        value: "admin",
+        url: new URL(LEGAL_SEARCH_BASE_URL).origin,
+      },
+    ]);
     await mockSearchApi(page);
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
@@ -49,16 +56,7 @@ test.describe("Frontend smoke journeys", () => {
     await expect(page.getByText("Select a result")).toBeVisible();
   });
 
-  test("@smoke exposes control panel entrypoint in header", async ({ page, context }) => {
-    await context.addCookies([
-      {
-        name: UI_PROFILE_COOKIE,
-        value: "admin",
-        url: new URL(LEGAL_SEARCH_BASE_URL).origin,
-      },
-    ]);
-    await page.goto("/");
-
+  test("@smoke exposes control panel entrypoint in header", async ({ page }) => {
     const controlPanelLink = page.getByRole("link", { name: CONTROL_PANEL_LABEL });
     await expect(controlPanelLink).toBeVisible();
     await expect(controlPanelLink).toHaveAttribute("href", EXPECTED_CONTROL_PANEL_URL);
