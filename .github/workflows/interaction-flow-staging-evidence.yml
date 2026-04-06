@@ -1,0 +1,118 @@
+name: Interaction Flow Staging Evidence
+
+on:
+  schedule:
+    - cron: "45 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  interaction-flow-staging-evidence:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
+      LEGAL_SEARCH_FRONTEND_SERVICE: ${{ vars.LEGAL_SEARCH_FRONTEND_SERVICE_STAGING || 'legal-search-frontend-staging' }}
+      PLATFORM_CONTROL_ADMIN_SERVICE: ${{ vars.PLATFORM_CONTROL_ADMIN_SERVICE_STAGING || 'platform-control-admin-staging' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Resolve staging frontend/admin URLs
+        run: |
+          set -euo pipefail
+          LS_UI_URL=$(gcloud run services describe "${LEGAL_SEARCH_FRONTEND_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+          PC_ADMIN_URL=$(gcloud run services describe "${PLATFORM_CONTROL_ADMIN_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+
+          if [[ -z "${LS_UI_URL}" || -z "${PC_ADMIN_URL}" ]]; then
+            echo "::error::Failed to resolve staging frontend/admin URLs"
+            exit 1
+          fi
+
+          echo "PLAYWRIGHT_EXTERNAL_BASE_URL=${LS_UI_URL}" >> "${GITHUB_ENV}"
+          echo "PLAYWRIGHT_ADMIN_BASE_URL=${PC_ADMIN_URL}" >> "${GITHUB_ENV}"
+          echo "PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL=${PC_ADMIN_URL}" >> "${GITHUB_ENV}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: legal-search/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: legal-search/frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: legal-search/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run staging smoke suite
+        working-directory: legal-search/frontend
+        run: npm run e2e:smoke
+
+      - name: Run staging cross-surface contract suite
+        working-directory: legal-search/frontend
+        run: npm run e2e:contract
+
+      - name: Generate staging evidence manifest
+        if: always()
+        working-directory: legal-search/frontend
+        run: |
+          cat <<'EOF' > interaction-flow-staging-evidence.md
+          # Interaction Flow Staging Evidence
+
+          Source runbook: `docs/runbooks/interaction-flow-validation.md`
+          Source workflow: `.github/workflows/interaction-flow-staging-evidence.yml`
+          Source job: `interaction-flow-staging-evidence`
+
+          Executed suites:
+          - `npm run e2e:smoke`
+          - `npm run e2e:contract`
+
+          Target URLs:
+          - `PLAYWRIGHT_EXTERNAL_BASE_URL` (legal-search frontend)
+          - `PLAYWRIGHT_ADMIN_BASE_URL` (platform-control admin)
+
+          Evidence artifacts in this upload:
+          - `legal-search/frontend/playwright-report`
+          - `legal-search/frontend/test-results`
+          - `legal-search/frontend/interaction-flow-staging-evidence.md`
+          EOF
+
+      - name: Upload staging interaction-flow evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interaction-flow-staging-evidence-${{ github.run_id }}
+          path: |
+            legal-search/frontend/playwright-report
+            legal-search/frontend/test-results
+            legal-search/frontend/interaction-flow-staging-evidence.md
+            docs/runbooks/interaction-flow-validation.md
+          if-no-files-found: warn

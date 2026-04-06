@@ -7,9 +7,14 @@ const UI_PROFILE_COOKIE = "evidara-ui-profile";
 const SEARCH_PLACEHOLDER =
   /search article, case, commentary, citation|nach artikel, urteil, kommentar oder zitat|rechercher un article, un arrêt, un commentaire ou une citation/i;
 const CONTROL_PANEL_LABEL = /control panel|kontrollbereich|panneau de contr[oô]le/i;
+const LEGAL_SEARCH_BASE_URL =
+  process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3000";
+const EXPECTED_CONTROL_PANEL_URL =
+  process.env.PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL?.trim() || "http://localhost:3100";
 
 /** Playwright `webServer`: admin dev server with non-admin role (`playwright.config.ts`). */
-const ADMIN_CONTRACT_BASE_URL = "http://localhost:3102";
+const ADMIN_CONTRACT_BASE_URL =
+  process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://localhost:3102";
 
 test.describe("@contract RBAC cross-surface (legal-search header + admin denial)", () => {
   test.beforeEach(async ({ context }) => {
@@ -23,7 +28,7 @@ test.describe("@contract RBAC cross-surface (legal-search header + admin denial)
 
     const controlPanelLink = page.getByRole("link", { name: CONTROL_PANEL_LABEL });
     await expect(controlPanelLink).toBeVisible();
-    await expect(controlPanelLink).toHaveAttribute("href", "http://localhost:3100");
+    await expect(controlPanelLink).toHaveAttribute("href", EXPECTED_CONTROL_PANEL_URL);
   });
 
   test("standard profile does not show control panel entry when URL is configured", async ({
@@ -34,7 +39,7 @@ test.describe("@contract RBAC cross-surface (legal-search header + admin denial)
       {
         name: UI_PROFILE_COOKIE,
         value: "standard",
-        url: "http://localhost:3000",
+        url: new URL(LEGAL_SEARCH_BASE_URL).origin,
       },
     ]);
     await mockSearchApi(page);
