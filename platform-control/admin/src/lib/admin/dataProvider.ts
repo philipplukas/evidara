@@ -110,6 +110,20 @@ export type RunCreateInput = {
   mode: "preview" | "production";
 };
 
+export type RunReadinessCheck = {
+  code: string;
+  ok: boolean;
+  detail: string;
+};
+
+export type RunReadiness = {
+  source_id: string;
+  source_version_id: string;
+  mode: "preview" | "production";
+  ready: boolean;
+  checks: RunReadinessCheck[];
+};
+
 type CapturedResource = {
   captured_resource_id: string;
   run_id: string;
@@ -556,6 +570,15 @@ export const controlPlaneActions = {
   async getRunPreviewSummary(runId: string): Promise<RunPreviewSummary> {
     const raw = await requestJson<RunPreviewSummary>(`/v1/runs/${runId}/preview-summary`);
     return normalizeRunPreviewSummary(raw);
+  },
+
+  async getRunReadiness(input: RunCreateInput): Promise<RunReadiness> {
+    const query = new URLSearchParams({
+      source_id: input.source_id,
+      source_version_id: input.source_version_id,
+      mode: input.mode,
+    });
+    return requestJson<RunReadiness>(`/v1/runs/readiness?${query.toString()}`);
   },
 
   async approveSourceVersion(sourceVersionId: string): Promise<SourceVersionRecord> {

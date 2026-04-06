@@ -650,6 +650,51 @@ describe("controlPlaneDataProvider", () => {
     });
   });
 
+  it("loads run readiness through the readiness endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          source_id: "src_01",
+          source_version_id: "sv_01",
+          mode: "production",
+          ready: false,
+          checks: [
+            {
+              code: "acquisition_seed_present",
+              ok: false,
+              detail: "Acquisition spec must define seed_url or seed_urls.",
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneActions.getRunReadiness({
+      source_id: "src_01",
+      source_version_id: "sv_01",
+      mode: "production",
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/runs/readiness?source_id=src_01&source_version_id=sv_01&mode=production",
+      expect.objectContaining({
+        headers: {
+          Accept: "application/json",
+        },
+      }),
+    );
+    expect(result).toMatchObject({
+      ready: false,
+      checks: [{ code: "acquisition_seed_present", ok: false }],
+    });
+  });
+
   it("fills missing preview summary collections and normalizes drift status", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(
