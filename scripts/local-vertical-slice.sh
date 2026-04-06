@@ -5,51 +5,217 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: bash scripts/local-vertical-slice.sh <command>
+Usage: bash scripts/local-vertical-slice.sh <command> [mode]
 
 Commands:
-  up        Start local runtime dependencies (postgres, opensearch, pubsub emulator)
+  up        Start local runtime dependencies
+  up-all    Start local runtime dependencies plus app services via Compose
   down      Stop local runtime dependencies
+  down-all  Stop app services and local runtime dependencies started via Compose
   status    Show dependency container status
+  status-all Show app + dependency container status from local Compose setup
+  check-all Validate full local compose stack endpoints
   env       Print local env variables used by runtime services
   help      Show this message
+
+Modes:
+  lite      postgres only (lowest RAM)
+  search    postgres + opensearch (default; recommended for search API work)
+  full      postgres + opensearch + pubsub emulator
 EOF
 }
 
+normalize_mode() {
+  local mode="${1:-search}"
+  case "$mode" in
+    lite|search|full)
+      echo "$mode"
+      ;;
+    *)
+      echo "Invalid mode: $mode" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+}
+
 compose_up() {
-  (cd "$ROOT_DIR" && docker compose up -d postgres opensearch pubsub)
+  local mode
+  mode="$(normalize_mode "${1:-search}")"
+  case "$mode" in
+    lite)
+      (cd "$ROOT_DIR" && docker compose up -d postgres)
+      ;;
+    search)
+      (cd "$ROOT_DIR" && docker compose --profile search up -d)
+      ;;
+    full)
+      (cd "$ROOT_DIR" && docker compose --profile full up -d)
+      ;;
+  esac
+}
+
+compose_up_all() {
+  local mode
+  mode="$(normalize_mode "${1:-search}")"
+  case "$mode" in
+    lite)
+      echo "up-all requires search or full mode (OpenSearch is required)." >&2
+      exit 1
+      ;;
+    search)
+      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps up -d --build)
+      ;;
+    full)
+      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps up -d --build)
+      ;;
+  esac
 }
 
 compose_down() {
-  (cd "$ROOT_DIR" && docker compose stop postgres opensearch pubsub)
+  local mode
+  mode="$(normalize_mode "${1:-search}")"
+  case "$mode" in
+    lite)
+      (cd "$ROOT_DIR" && docker compose stop postgres)
+      ;;
+    search)
+      (cd "$ROOT_DIR" && docker compose stop postgres opensearch)
+      ;;
+    full)
+      (cd "$ROOT_DIR" && docker compose stop postgres opensearch pubsub)
+      ;;
+  esac
+}
+
+compose_down_all() {
+  local mode
+  mode="$(normalize_mode "${1:-search}")"
+  case "$mode" in
+    lite)
+      echo "down-all is only applicable to search/full app compose mode." >&2
+      exit 1
+      ;;
+    search)
+      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps stop)
+      ;;
+    full)
+      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps stop)
+      ;;
+  esac
 }
 
 compose_status() {
-  (cd "$ROOT_DIR" && docker compose ps postgres opensearch pubsub)
+  local mode
+  mode="$(normalize_mode "${1:-search}")"
+  case "$mode" in
+    lite)
+      (cd "$ROOT_DIR" && docker compose ps postgres)
+      ;;
+    search)
+      (cd "$ROOT_DIR" && docker compose ps postgres opensearch)
+      ;;
+    full)
+      (cd "$ROOT_DIR" && docker compose ps postgres opensearch pubsub)
+      ;;
+  esac
+}
+
+compose_status_all() {
+  local mode
+  mode="$(normalize_mode "${1:-search}")"
+  case "$mode" in
+    lite)
+      echo "status-all is only applicable to search/full app compose mode." >&2
+      exit 1
+      ;;
+    search)
+      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps ps)
+      ;;
+    full)
+      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps ps)
+      ;;
+  esac
 }
 
 print_env() {
+  local mode
+  mode="$(normalize_mode "${1:-search}")"
   cat <<'EOF'
 export OPENSEARCH_NODE="http://127.0.0.1:9200"
 export PLATFORM_CONTROL_DATABASE_URL="postgresql+asyncpg://platform_control:platform_control@127.0.0.1:5432/platform_control"
 export PUBSUB_EMULATOR_HOST="127.0.0.1:8681"
 export PUBSUB_PROJECT_ID="evidara-local"
 EOF
+  if [[ "$mode" == "lite" ]]; then
+    echo "# lite mode: OPENSEARCH_NODE and PUBSUB_* are optional/not required."
+  elif [[ "$mode" == "search" ]]; then
+    echo "# search mode: PUBSUB_* is optional."
+  fi
+}
+
+check_all() {
+  local mode
+  mode="$(normalize_mode "${1:-search}")"
+  if [[ "$mode" == "lite" ]]; then
+    echo "check-all requires search or full mode (search API/frontend are required)." >&2
+    exit 1
+  fi
+
+  echo "Checking local stack endpoints..."
+
+  local pc_api
+  local pc_admin
+  local ls_api
+  local ls_ui
+  local ls_query
+
+  pc_api="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health || true)"
+  pc_admin="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3100 || true)"
+  ls_api="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/health || true)"
+  ls_ui="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000 || true)"
+  ls_query="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" "http://127.0.0.1:3001/v1/search?q=art%20754" || true)"
+
+  echo "platform-control API /health: ${pc_api}"
+  echo "platform-control admin /:     ${pc_admin}"
+  echo "legal-search API /health:      ${ls_api}"
+  echo "legal-search frontend /:       ${ls_ui}"
+  echo "legal-search API /v1/search:   ${ls_query}"
+
+  if [[ "$pc_api" != "200" || "$pc_admin" != "200" || "$ls_api" != "200" || "$ls_ui" != "200" || "$ls_query" != "200" ]]; then
+    echo "One or more checks failed." >&2
+    exit 1
+  fi
+
+  echo "All checks passed."
 }
 
 COMMAND="${1:-help}"
+MODE="${2:-search}"
 case "$COMMAND" in
   up)
-    compose_up
+    compose_up "$MODE"
+    ;;
+  up-all)
+    compose_up_all "$MODE"
     ;;
   down)
-    compose_down
+    compose_down "$MODE"
+    ;;
+  down-all)
+    compose_down_all "$MODE"
     ;;
   status)
-    compose_status
+    compose_status "$MODE"
+    ;;
+  status-all)
+    compose_status_all "$MODE"
+    ;;
+  check-all)
+    check_all "$MODE"
     ;;
   env)
-    print_env
+    print_env "$MODE"
     ;;
   help|-h|--help)
     usage
