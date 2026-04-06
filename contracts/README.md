@@ -51,6 +51,26 @@ contracts/
 - Manifest contracts carry `manifest_version`.
 - Published dataset refs carry `surface_version`.
 
+## MVP Contract Lock File
+
+`contracts/manifest.yaml` is the machine-checked lock file for the current
+MVP ingest-to-search product flow:
+
+- source create -> version create/approve -> run -> DI outputs -> searchable detail
+- locked API spec files and versions for platform-control, document-intelligence, and legal-search
+- locked event schemas and `event_version` values for core pipeline events
+
+CI validates this file via `scripts/check_contract_manifest.py`.
+
+### Version Bump Guard
+
+CI also enforces a manifest bump rule via `scripts/check_contract_version_bump.py`:
+
+- If any file under `contracts/api/` or `contracts/events/` changes, `contracts/manifest.yaml` must be updated in the same PR.
+- The `version` value in `contracts/manifest.yaml` must change relative to the base branch.
+
+Use this as the release signal that locked cross-service contract surfaces changed.
+
 ## Field Suffix Conventions
 
 - `*_id`: stable identity
