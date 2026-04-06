@@ -25,6 +25,7 @@ concurrency:
 env:
   TF_ROOT: infra/terraform/gcp/runtime_stack
   TF_VAR_FILE: infra/env/dev/runtime.gcp.tfvars.example
+  GCP_PROJECT_ID: data-platform-dev-492214
 
 jobs:
   # ── PR: fmt + validate + plan ───────────────────
@@ -71,6 +72,8 @@ jobs:
           set -o pipefail
           terraform plan \
             -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
+            -var="project_id=${{ env.GCP_PROJECT_ID }}" \
+            -var='runtime_service_account_ids={platform_control_api="evd-pc-api",platform_control_worker="evd-pc-worker",legal_search_api="evd-ls-api",legal_search_frontend="evd-ls-frontend",document_intelligence="evd-di-consumer"}' \
             -no-color \
             -input=false \
             -out=tfplan 2>&1 | tee plan_output.txt
@@ -78,7 +81,7 @@ jobs:
         continue-on-error: true
 
       - name: Post plan to PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -187,6 +190,8 @@ jobs:
         run: |
           terraform apply \
             -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
+            -var="project_id=${{ env.GCP_PROJECT_ID }}" \
+            -var='runtime_service_account_ids={platform_control_api="evd-pc-api",platform_control_worker="evd-pc-worker",legal_search_api="evd-ls-api",legal_search_frontend="evd-ls-frontend",document_intelligence="evd-di-consumer"}' \
             -auto-approve \
             -input=false \
             -no-color
