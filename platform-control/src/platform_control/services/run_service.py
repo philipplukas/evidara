@@ -436,9 +436,7 @@ class RunService:
                 code="source_exists",
                 ok=source is not None,
                 detail=(
-                    "Source exists."
-                    if source is not None
-                    else f"Source not found: {source_id}."
+                    "Source exists." if source is not None else f"Source not found: {source_id}."
                 ),
             )
         )
@@ -494,11 +492,7 @@ class RunService:
             acquisition_spec = source_version.acquisition_spec or {}
             seed_url = acquisition_spec.get("seed_url")
             seed_urls = acquisition_spec.get("seed_urls")
-            normalized_seed_url = (
-                seed_url.strip()
-                if isinstance(seed_url, str)
-                else ""
-            )
+            normalized_seed_url = seed_url.strip() if isinstance(seed_url, str) else ""
             normalized_seed_urls = (
                 [url.strip() for url in seed_urls if isinstance(url, str) and url.strip()]
                 if isinstance(seed_urls, list)
