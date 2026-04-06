@@ -60,5 +60,24 @@ describe("deriveOperatorChecklist", () => {
       key: "pipeline_visibility",
       state: "pending",
     });
+    expect(items[0].detail).toContain("mode_compatible_with_version_status");
+    expect(items[0].detail).toContain("approve the selected version before launch");
+  });
+
+  it("includes actionable fallback guidance for unknown readiness codes", () => {
+    const items = deriveOperatorChecklist({
+      run: { ...baseRun, status: "pending", started_at: null },
+      health: null,
+      readinessConfirmed: false,
+      readinessBlockedCodes: ["custom_readiness_code"],
+      verificationOpened: false,
+    });
+
+    expect(items[0]).toMatchObject({
+      key: "readiness",
+      state: "blocked",
+    });
+    expect(items[0].detail).toContain("custom_readiness_code");
+    expect(items[0].detail).toContain("Review source/version configuration and retry.");
   });
 });
