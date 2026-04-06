@@ -153,7 +153,12 @@ resource "google_pubsub_subscription" "dead_letter" {
 # failed messages, and subscriber access on source subscriptions to modify
 # ack deadlines during dead-lettering.
 data "google_project" "current" {
+  count      = var.project_number == null ? 1 : 0
   project_id = var.project_id
+}
+
+locals {
+  effective_project_number = var.project_number != null ? var.project_number : data.google_project.current[0].number
 }
 
 resource "google_pubsub_topic_iam_member" "dlq_publisher" {
@@ -161,7 +166,7 @@ resource "google_pubsub_topic_iam_member" "dlq_publisher" {
 
   topic  = google_pubsub_topic.dead_letter[each.key].name
   role   = "roles/pubsub.publisher"
-  member = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member = "serviceAccount:service-${local.effective_project_number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_pubsub_subscription_iam_member" "dlq_subscriber" {
@@ -169,7 +174,7 @@ resource "google_pubsub_subscription_iam_member" "dlq_subscriber" {
 
   subscription = google_pubsub_subscription.events[each.key].name
   role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member       = "serviceAccount:service-${local.effective_project_number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 # --- Push subscription auth ---
@@ -210,7 +215,7 @@ resource "google_service_account_iam_member" "pubsub_token_creator" {
 
   service_account_id = google_service_account.runtime[each.value].name
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member             = "serviceAccount:service-${local.effective_project_number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_service_account" "runtime" {

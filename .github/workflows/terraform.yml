@@ -26,6 +26,7 @@ env:
   TF_ROOT: infra/terraform/gcp/runtime_stack
   TF_VAR_FILE: infra/env/dev/runtime.gcp.tfvars.example
   GCP_PROJECT_ID: data-platform-dev-492214
+  GCP_PROJECT_NUMBER: "585502170445"
 
 jobs:
   # ── PR: fmt + validate + plan ───────────────────
@@ -73,6 +74,7 @@ jobs:
           terraform plan \
             -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
             -var="project_id=${{ env.GCP_PROJECT_ID }}" \
+            -var="project_number=${{ env.GCP_PROJECT_NUMBER }}" \
             -var='runtime_service_account_ids={platform_control_api="evd-pc-api",platform_control_worker="evd-pc-worker",legal_search_api="evd-ls-api",legal_search_frontend="evd-ls-frontend",document_intelligence="evd-di-consumer"}' \
             -no-color \
             -input=false \
@@ -191,6 +193,7 @@ jobs:
           terraform apply \
             -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
             -var="project_id=${{ env.GCP_PROJECT_ID }}" \
+            -var="project_number=${{ env.GCP_PROJECT_NUMBER }}" \
             -var='runtime_service_account_ids={platform_control_api="evd-pc-api",platform_control_worker="evd-pc-worker",legal_search_api="evd-ls-api",legal_search_frontend="evd-ls-frontend",document_intelligence="evd-di-consumer"}' \
             -auto-approve \
             -input=false \

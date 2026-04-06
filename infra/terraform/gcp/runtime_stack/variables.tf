@@ -13,6 +13,13 @@ variable "project_id" {
   type        = string
 }
 
+variable "project_number" {
+  description = "Optional GCP project number; set to avoid project data-source lookup during plan."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "region" {
   description = "Default region for Pub/Sub and any regionalized runtime resources."
   type        = string
