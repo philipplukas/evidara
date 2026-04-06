@@ -79,12 +79,12 @@ jobs:
         working-directory: legal-search/frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Run staging smoke suite (core journeys)
+      - name: Run staging smoke suite
         working-directory: legal-search/frontend
         run: |
           set -euo pipefail
           for attempt in 1 2; do
-            if npm run e2e:smoke -- --grep-invert "control panel entrypoint"; then
+            if npm run e2e:smoke; then
               echo "SMOKE_RETRY_COUNT=$((attempt - 1))" >> "${GITHUB_ENV}"
               exit 0
             fi
@@ -96,12 +96,12 @@ jobs:
           echo "::error::Staging smoke suite failed after 2 attempts"
           exit 1
 
-      - name: Run staging cross-surface contract suite (stable subset)
+      - name: Run staging cross-surface contract suite
         working-directory: legal-search/frontend
         run: |
           set -euo pipefail
           for attempt in 1 2; do
-            if npm run e2e:contract -- --grep "standard profile does not show control panel entry when URL is configured"; then
+            if npm run e2e:contract; then
               echo "CONTRACT_RETRY_COUNT=$((attempt - 1))" >> "${GITHUB_ENV}"
               exit 0
             fi
@@ -176,8 +176,8 @@ jobs:
           Source job: `interaction-flow-staging-evidence`
 
           Executed suites:
-          - `npm run e2e:smoke -- --grep-invert "control panel entrypoint"`
-          - `npm run e2e:contract -- --grep "standard profile does not show control panel entry when URL is configured"`
+          - `npm run e2e:smoke`
+          - `npm run e2e:contract`
           - `npm run e2e:screenshot-pack`
           - smoke_retry_count: `${SMOKE_RETRY_COUNT}`
           - contract_retry_count: `${CONTRACT_RETRY_COUNT}`
@@ -189,9 +189,13 @@ jobs:
           - checklist_coverage: `${SCREENSHOT_CHECKLIST_COVERAGE}`
           - if failed, inspect `test-results` traces and retry logs in this run.
 
-          Target URLs:
+          Target URLs and expected contracts:
           - `PLAYWRIGHT_EXTERNAL_BASE_URL` (legal-search frontend)
           - `PLAYWRIGHT_ADMIN_BASE_URL` (platform-control admin)
+          - full cross-surface RBAC contract includes:
+            - admin profile sees control panel entry and expected href
+            - standard profile does not see control panel entry
+            - non-admin direct admin access shows denial + recovery
 
           Evidence artifacts in this upload:
           - `legal-search/frontend/playwright-report`

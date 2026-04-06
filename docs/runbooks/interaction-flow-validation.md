@@ -105,8 +105,8 @@ before adding lower-priority flow coverage.
   - `npm run e2e:contract`
   - `npm run e2e:screenshot-pack`
 - Current staging parity scope:
-  - runs stable smoke core journeys and the non-admin hide-link RBAC contract subset
-  - full admin-visible link + admin denial UX assertions remain covered in local/PR CI until staging auth/session parity is aligned
+  - runs full smoke and full cross-surface RBAC contract suite in staging
+  - validates admin-visible link, standard hidden link, and admin denial/recovery UX on staging surfaces
 - Published artifacts:
   - local: `interaction-flow-evidence-${run_id}`
   - staging: `interaction-flow-staging-evidence-${run_id}`
@@ -141,7 +141,7 @@ Automation baseline:
 - Treat legal-search header visibility + href as `@contract` coverage (`rbac-cross-surface.spec.ts`), because profile/session wiring can vary by environment.
 - Keep admin denial UX (`403` + recovery link) in `@contract` as the minimum cross-surface safety check.
 - Reserve `@smoke` for stable app-shell/search journeys and avoid role-dependent assertions unless staging auth/session parity is guaranteed.
-- Promote admin-visible link assertions back into staging smoke once cookie/session parity is fully stable in staging.
+- Keep staging evidence flow on full RBAC contract coverage; treat any downgrade to subset-only assertions as temporary mitigation and document it in this runbook.
 
 ## Triage Categories
 
