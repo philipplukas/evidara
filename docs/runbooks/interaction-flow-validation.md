@@ -79,7 +79,6 @@ before adding lower-priority flow coverage.
 
 ## Repeatable Test Scenarios
 
-
 | Scenario                             | Test artifact                                                                                   | Pass criteria                                                 |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | Source lifecycle + run + DI ingest   | `platform-control/tests/smoke/test_app.py::test_create_source_approve_and_trigger_run`          | Full workflow passes with expected state and event assertions |
@@ -87,7 +86,6 @@ before adding lower-priority flow coverage.
 | Preview flow path                    | `platform-control/tests/smoke/test_preview_workflow.py`                                         | Preview mode reaches terminal path with expected records      |
 | UI app-shell and search interactions | `legal-search/frontend/e2e/smoke.spec.ts`                                                       | Existing smoke cases pass                                     |
 | UI control-panel entrypoint          | `legal-search/frontend/e2e/smoke.spec.ts` (`@smoke exposes control panel entrypoint in header`) | Header link exists and targets configured URL                 |
-
 
 ## Triage Categories
 
