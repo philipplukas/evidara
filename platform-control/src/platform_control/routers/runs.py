@@ -15,6 +15,7 @@ from platform_control.schemas.run import (
     ProviderJobListResponse,
     RawArtifactListResponse,
     RunListResponse,
+    RunPipelineHealthResponse,
     RunPreviewSummaryResponse,
     RunReadinessResponse,
     RunResponse,
@@ -163,6 +164,15 @@ async def get_run_preview_summary(
 ) -> RunPreviewSummaryResponse:
     service = RunService(session)
     return await service.get_preview_summary(run_id)
+
+
+@router.get("/{run_id}/pipeline-health", response_model=RunPipelineHealthResponse)
+async def get_run_pipeline_health(
+    run_id: str,
+    session: SessionDep,
+) -> RunPipelineHealthResponse:
+    service = RunService(session)
+    return await service.get_pipeline_health(run_id)
 
 
 @router.get("/{run_id}/processing-status", response_model=ProcessingStatusUpdateListResponse)

@@ -25,6 +25,8 @@ from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.ids import generate_prefixed_id
 from platform_control.integrations import get_artifact_store, get_raw_artifact_publisher
 from platform_control.models.captured_resource import CapturedResource
+from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
+from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
@@ -39,6 +41,8 @@ from platform_control.schemas.run import (
     RawArtifactListResponse,
     RawArtifactResponse,
     RunListItemResponse,
+    RunPipelineHealthResponse,
+    RunPipelineHealthStage,
     RunPreviewSummaryBreakdownEntry,
     RunPreviewSummaryDriftCheck,
     RunPreviewSummaryResponse,
@@ -399,6 +403,45 @@ class RunService:
             drift_checks=drift_checks,
         )
 
+    async def get_pipeline_health(self, run_id: str) -> RunPipelineHealthResponse:
+        run = await self.get_run(run_id)
+        processing_updates = list(
+            await self.session.scalars(
+                select(ProcessingStatusUpdate)
+                .where(ProcessingStatusUpdate.run_id == run_id)
+                .order_by(ProcessingStatusUpdate.occurred_at.desc())
+            )
+        )
+        lifecycle_events = list(
+            await self.session.scalars(
+                select(DocumentLifecycleEvent)
+                .where(DocumentLifecycleEvent.run_id == run_id)
+                .order_by(DocumentLifecycleEvent.occurred_at.desc())
+            )
+        )
+        latest_processing = processing_updates[0] if processing_updates else None
+        latest_lifecycle = lifecycle_events[0] if lifecycle_events else None
+
+        acquisition_stage = self._resolve_acquisition_stage(run)
+        di_stage = self._resolve_di_stage(run, latest_processing)
+        projection_stage = self._resolve_projection_stage(latest_processing, latest_lifecycle)
+        search_stage = self._resolve_search_stage(latest_lifecycle)
+
+        stages = [acquisition_stage, di_stage, projection_stage, search_stage]
+        overall_status = self._resolve_overall_pipeline_status(stages)
+
+        return RunPipelineHealthResponse(
+            run_id=run.run_id,
+            source_id=run.source_id,
+            source_version_id=run.source_version_id,
+            mode=run.mode,
+            run_status=run.status,
+            overall_status=overall_status,
+            stages=stages,
+            processing_status_event_count=len(processing_updates),
+            document_lifecycle_event_count=len(lifecycle_events),
+        )
+
     async def get_provider_job_by_external_id(self, external_job_id: str) -> ProviderJob | None:
         return await self.session.scalar(
             select(ProviderJob).where(ProviderJob.external_job_id == external_job_id)
@@ -559,6 +602,135 @@ class RunService:
             status="ok" if ok else "warn",
             detail=success if ok else failure,
         )
+
+    @staticmethod
+    def _resolve_acquisition_stage(run: Run) -> RunPipelineHealthStage:
+        status_map = {
+            RunStatus.PENDING: ("pending", "Run accepted and waiting for acquisition dispatch."),
+            RunStatus.RUNNING: ("in_progress", "Acquisition provider run is in progress."),
+            RunStatus.COMPLETED: ("ok", "Acquisition/provider stage completed."),
+            RunStatus.FAILED: ("failed", run.failure_reason or "Run failed during acquisition."),
+            RunStatus.CANCELLED: (
+                "blocked",
+                run.failure_reason or "Run was cancelled before pipeline completion.",
+            ),
+        }
+        stage_status, detail = status_map[run.status]
+        updated_at = run.completed_at or run.started_at or run.updated_at
+        return RunPipelineHealthStage(
+            stage="acquisition",
+            status=stage_status,
+            detail=detail,
+            updated_at=updated_at,
+        )
+
+    @staticmethod
+    def _resolve_di_stage(
+        run: Run, latest_processing: ProcessingStatusUpdate | None
+    ) -> RunPipelineHealthStage:
+        if latest_processing is None:
+            if run.status in {RunStatus.FAILED, RunStatus.CANCELLED}:
+                return RunPipelineHealthStage(
+                    stage="document_intelligence",
+                    status="blocked",
+                    detail="No processing status events were received after terminal run status.",
+                    updated_at=run.completed_at or run.updated_at,
+                )
+            return RunPipelineHealthStage(
+                stage="document_intelligence",
+                status="pending",
+                detail="Awaiting first document-intelligence processing status event.",
+                updated_at=None,
+            )
+
+        if latest_processing.status.value == "failed":
+            status = "failed"
+            detail = latest_processing.error_summary or "Document-intelligence processing failed."
+        elif latest_processing.status.value in {"accepted", "processing"}:
+            status = "in_progress"
+            detail = f"Latest processing status is {latest_processing.status.value}."
+        else:
+            status = "ok"
+            detail = f"Latest processing status is {latest_processing.status.value}."
+        return RunPipelineHealthStage(
+            stage="document_intelligence",
+            status=status,
+            detail=detail,
+            updated_at=latest_processing.occurred_at,
+        )
+
+    @staticmethod
+    def _resolve_projection_stage(
+        latest_processing: ProcessingStatusUpdate | None,
+        latest_lifecycle: DocumentLifecycleEvent | None,
+    ) -> RunPipelineHealthStage:
+        if latest_lifecycle is not None:
+            return RunPipelineHealthStage(
+                stage="projection",
+                status="ok",
+                detail=(
+                    f"Latest lifecycle event `{latest_lifecycle.event_type}`"
+                    f" (status={latest_lifecycle.lifecycle_status or 'n/a'})."
+                ),
+                updated_at=latest_lifecycle.occurred_at,
+            )
+        if latest_processing is None:
+            return RunPipelineHealthStage(
+                stage="projection",
+                status="pending",
+                detail="Awaiting DI processing signal before projection stage starts.",
+                updated_at=None,
+            )
+        if latest_processing.status.value == "failed":
+            return RunPipelineHealthStage(
+                stage="projection",
+                status="blocked",
+                detail="Projection blocked because DI reported a failed status.",
+                updated_at=latest_processing.occurred_at,
+            )
+        return RunPipelineHealthStage(
+            stage="projection",
+            status="in_progress",
+            detail=(
+                "DI has emitted status updates; waiting for document lifecycle projection events."
+            ),
+            updated_at=latest_processing.occurred_at,
+        )
+
+    @staticmethod
+    def _resolve_search_stage(
+        latest_lifecycle: DocumentLifecycleEvent | None,
+    ) -> RunPipelineHealthStage:
+        if latest_lifecycle is None:
+            return RunPipelineHealthStage(
+                stage="search",
+                status="pending",
+                detail=(
+                    "Awaiting projection lifecycle events before search indexing/disposition is "
+                    "confirmed."
+                ),
+                updated_at=None,
+            )
+        if latest_lifecycle.search_disposition == "remove":
+            detail = "Latest lifecycle indicates search removal/de-index disposition."
+        else:
+            detail = "Latest lifecycle indicates searchable projection path is active."
+        return RunPipelineHealthStage(
+            stage="search",
+            status="ok",
+            detail=detail,
+            updated_at=latest_lifecycle.occurred_at,
+        )
+
+    @staticmethod
+    def _resolve_overall_pipeline_status(stages: list[RunPipelineHealthStage]) -> str:
+        if any(stage.status == "failed" for stage in stages):
+            return "failed"
+        if any(stage.status == "blocked" for stage in stages):
+            return "blocked"
+        if any(stage.status in {"pending", "in_progress"} for stage in stages):
+            return "in_progress"
+        return "ok"
 
     async def _dispatch_run(
         self,
