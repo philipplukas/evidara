@@ -1,0 +1,65 @@
+version: "1.0.0"
+last_reviewed: "2026-04-06"
+owner: "Platform Team"
+
+mvp_flow:
+  name: "ingest_to_searchable_detail"
+  description: "source create -> version approve -> run -> DI outputs -> searchable document detail"
+  sequence:
+    - platform_control.create_source
+    - platform_control.create_version
+    - platform_control.approve_version
+    - platform_control.create_run
+    - document_intelligence.publish_status
+    - document_intelligence.publish_processed
+    - legal_search.project_document
+    - legal_search.search_document_detail
+
+apis:
+  platform_control:
+    file: "contracts/api/platform-control.openapi.yaml"
+    version: "0.1.0"
+    locked_paths:
+      - "/v1/sources"
+      - "/v1/sources/{source_id}/versions"
+      - "/v1/versions/{source_version_id}/approve"
+      - "/v1/runs"
+      - "/v1/runs/{run_id}"
+      - "/v1/runs/{run_id}/processing-status"
+      - "/v1/runs/{run_id}/document-lifecycle"
+  document_intelligence:
+    file: "contracts/api/document-intelligence-runtime.openapi.yaml"
+    version: "0.1.0"
+  legal_search:
+    file: "contracts/api/legal-search.openapi.yaml"
+    version: "0.1.0"
+    locked_paths:
+      - "/v1/search"
+      - "/v1/documents/{id}"
+      - "/v1/projections/events/history"
+
+events:
+  - name: "artifact_bundle.available"
+    schema: "contracts/events/artifact-bundle-available.schema.json"
+    event_version: "1.0.0"
+    producer: "platform-control"
+    consumers:
+      - "document-intelligence"
+  - name: "document.processing_status.updated"
+    schema: "contracts/events/document-processing-status-updated.schema.json"
+    event_version: "1.0.0"
+    producer: "document-intelligence"
+    consumers:
+      - "platform-control"
+  - name: "document.processed"
+    schema: "contracts/events/document-processed.schema.json"
+    event_version: "1.0.0"
+    producer: "document-intelligence"
+    consumers:
+      - "platform-control"
+      - "legal-search"
+
+compatibility_policy:
+  additive_change: "minor"
+  breaking_change: "major"
+  enforcement: "fail-ci-on-breaking-without-version-bump"

@@ -268,6 +268,50 @@ gcloud run jobs execute os-alias-check-staging \
   --wait
 ```
 
+### 7. Release Readiness Go/No-Go Operation
+
+`Release Readiness` is the release-lane gate of truth for `staging`. It
+evaluates four signals together:
+
+1. Latest `E2E Smoke Staging` result
+2. Latest `Terraform` workflow result
+3. DI schema drift preflight
+4. DLQ depth (15-minute max undelivered messages)
+
+Manual trigger options:
+
+```bash
+# Strict blocking mode (default)
+gh workflow run "Release Readiness" -f strict=true
+
+# Investigation mode (non-blocking run, still reports GO/NO-GO)
+gh workflow run "Release Readiness" -f strict=false
+```
+
+Interpretation:
+
+- `GO`: all four signals pass in the generated report.
+- `NO-GO`: at least one signal failed; follow owner-first remediation below
+  before attempting release.
+
+### 8. NO-GO Owner Matrix (first response)
+
+| Signal | Primary owner | Backup owner | First response |
+|--------|---------------|--------------|----------------|
+| E2E Smoke Staging failed | Platform Team | Document-Intelligence Team | Inspect latest smoke logs/artifacts, rerun after fix |
+| Terraform workflow failed/drifted | Platform Team | Repo Maintainer on duty | Resolve plan/apply failure and rerun Terraform workflow |
+| DI schema drift preflight failed | Document-Intelligence Team | Platform Team | Investigate surface schema drift, remediate per DI runbook, rerun gate |
+| DLQ depth non-zero | Platform Team | Legal-Search Team | Triage DLQ root cause and replay per DLQ runbook |
+
+### 9. Weekly Readiness Review Cadence
+
+- Frequency: once per week (recommended Monday morning UTC).
+- Inputs: latest `Release Readiness` artifact + previous week incident notes.
+- Output: short checkpoint note with current `GO/NO-GO`, open risks, and
+  remediation owners.
+- Tracking: attach checkpoint note link to the active release-hardening Linear
+  issue.
+
 ## Rollback
 
 ### Rollback to Previous Revision
