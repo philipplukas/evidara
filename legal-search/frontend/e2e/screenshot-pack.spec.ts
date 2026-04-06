@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { mockAdminRunFlowApi } from "./helpers/mock-admin-api";
@@ -20,6 +20,15 @@ async function saveScreenshot(page: Page, name: string) {
     fullPage: true,
     animations: "disabled",
   });
+}
+
+async function saveOperatorJourneyEvents(page: Page) {
+  const events = await page.evaluate(() => {
+    const w = window as unknown as { __EVIDARA_OPERATOR_JOURNEY_EVENTS__?: unknown[] };
+    return w.__EVIDARA_OPERATOR_JOURNEY_EVENTS__ ?? [];
+  });
+  await mkdir(OUTPUT_DIR, { recursive: true });
+  await writeFile(join(OUTPUT_DIR, "operator-journey-events.json"), JSON.stringify(events, null, 2));
 }
 
 test.describe("Canonical screenshot evidence pack", () => {
@@ -66,7 +75,10 @@ test.describe("Canonical screenshot evidence pack", () => {
 
     await page.goto(`${ADMIN_BASE_URL}/#/runs/run_01/show`);
     await expect(page.getByRole("heading", { name: "Pipeline Health" })).toBeVisible();
+    await expect(page.getByText("Operator Checklist")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open DI processing status" })).toBeVisible();
     await expect(page.getByText("Operational status contract", { exact: false })).toBeVisible();
     await saveScreenshot(page, "admin-run-lifecycle-visibility.png");
+    await saveOperatorJourneyEvents(page);
   });
 });

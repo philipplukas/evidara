@@ -13,7 +13,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDataProvider, useGetList, useNotify, useRedirect } from "react-admin";
 import type {
   RunCreateInput,
@@ -23,6 +23,7 @@ import type {
   SourceVersionRecord,
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 250 },
@@ -80,6 +81,9 @@ const readinessActionByCode: Record<string, string> = {
     "Update acquisition spec with at least one seed_url or seed_urls entry.",
 };
 
+const RUN_READINESS_CONFIRMED_KEY_PREFIX = "evidara_run_readiness_confirmed:";
+const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_codes:";
+
 export function RunLaunchButton({
   label,
   buttonVariant = "contained",
@@ -99,6 +103,7 @@ export function RunLaunchButton({
   const [readinessError, setReadinessError] = useState<string | null>(null);
   const initialMode = resolveInitialMode(defaultMode, allowedModes);
   const [formState, setFormState] = useState<RunLaunchFormState>(createInitialState(initialMode));
+  const readinessCheckStartedAtRef = useRef<number | null>(null);
 
   const sources = useGetList<SourceRecord>("sources", {
     ...LIST_PARAMS,
@@ -153,6 +158,19 @@ export function RunLaunchButton({
       const result = await dataProvider.create<RunRecord>("runs", {
         data: formState as RunCreateInput,
       });
+      if (typeof window !== "undefined") {
+        const runId = String(result.data.run_id);
+        if (readiness?.ready) {
+          window.localStorage.setItem(`${RUN_READINESS_CONFIRMED_KEY_PREFIX}${runId}`, "true");
+          window.localStorage.removeItem(`${RUN_READINESS_BLOCKED_CODES_KEY_PREFIX}${runId}`);
+        } else if (failingChecks.length > 0) {
+          window.localStorage.setItem(
+            `${RUN_READINESS_BLOCKED_CODES_KEY_PREFIX}${runId}`,
+            JSON.stringify(failingChecks.map((check) => check.code)),
+          );
+          window.localStorage.removeItem(`${RUN_READINESS_CONFIRMED_KEY_PREFIX}${runId}`);
+        }
+      }
       notify(`${formState.mode === "preview" ? "Preview" : "Production"} run created.`, {
         type: "success",
       });
@@ -180,12 +198,33 @@ export function RunLaunchButton({
     let active = true;
     setIsCheckingReadiness(true);
     setReadinessError(null);
+    readinessCheckStartedAtRef.current = Date.now();
 
     void controlPlaneActions
       .getRunReadiness(formState)
       .then((result) => {
         if (!active) return;
         setReadiness(result);
+        const elapsedMs =
+          readinessCheckStartedAtRef.current != null
+            ? Date.now() - readinessCheckStartedAtRef.current
+            : undefined;
+        if (result.ready) {
+          emitOperatorJourneyEvent("preflight_ready", {
+            source_id: formState.source_id,
+            source_version_id: formState.source_version_id,
+            mode: formState.mode,
+            duration_ms: elapsedMs,
+          });
+        } else {
+          emitOperatorJourneyEvent("preflight_blocked", {
+            source_id: formState.source_id,
+            source_version_id: formState.source_version_id,
+            mode: formState.mode,
+            readiness_codes: result.checks.filter((check) => !check.ok).map((check) => check.code),
+            duration_ms: elapsedMs,
+          });
+        }
       })
       .catch((error: unknown) => {
         if (!active) return;

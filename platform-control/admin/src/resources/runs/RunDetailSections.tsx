@@ -17,7 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type Identifier, useGetList, useRecordContext } from "react-admin";
 import type {
   CapturedResourceRecord,
@@ -30,11 +30,21 @@ import type {
   RunRecord,
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
+import {
+  type ChecklistItem,
+  type ChecklistState,
+  deriveOperatorChecklist,
+} from "./operatorChecklist";
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 100 },
   sort: { field: "created_at", order: "DESC" as const },
 };
+
+const RUN_READINESS_CONFIRMED_KEY_PREFIX = "evidara_run_readiness_confirmed:";
+const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_codes:";
+const RUN_VERIFICATION_OPENED_KEY_PREFIX = "evidara_run_verification_opened:";
 
 type SectionColumn<TRecord extends { id: Identifier }> = {
   header: string;
@@ -323,24 +333,87 @@ function stageActionTarget(
   return { label: "Open evidence runbook", href: options.evidenceRunbookPath };
 }
 
+function checklistChipColor(state: ChecklistState): "default" | "info" | "warning" | "success" {
+  if (state === "ok") return "success";
+  if (state === "blocked") return "warning";
+  if (state === "in_progress") return "info";
+  return "default";
+}
+
 function PipelineHealthSection({ run }: { run: RunRecord }) {
   const [health, setHealth] = useState<RunPipelineHealth | null>(null);
   const [isPending, setIsPending] = useState(true);
   const [error, setError] = useState<unknown>(null);
+  const [readinessConfirmed, setReadinessConfirmed] = useState(false);
+  const [readinessBlockedCodes, setReadinessBlockedCodes] = useState<string[]>([]);
+  const [verificationOpened, setVerificationOpened] = useState(false);
   const legalSearchUrl = process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim();
   const evidenceRunbookPath =
     "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
+  const healthLoadStartedAtRef = useRef<number | null>(null);
+  const firstRemediationEventEmittedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const readiness = window.localStorage.getItem(
+      `${RUN_READINESS_CONFIRMED_KEY_PREFIX}${run.run_id}`,
+    );
+    const blockedRaw = window.localStorage.getItem(
+      `${RUN_READINESS_BLOCKED_CODES_KEY_PREFIX}${run.run_id}`,
+    );
+    const verification = window.localStorage.getItem(
+      `${RUN_VERIFICATION_OPENED_KEY_PREFIX}${run.run_id}`,
+    );
+    setReadinessConfirmed(readiness === "true");
+    setVerificationOpened(verification === "true");
+    if (blockedRaw) {
+      try {
+        const parsed = JSON.parse(blockedRaw);
+        setReadinessBlockedCodes(Array.isArray(parsed) ? parsed.map(String) : []);
+      } catch {
+        setReadinessBlockedCodes([]);
+      }
+    } else {
+      setReadinessBlockedCodes([]);
+    }
+  }, [run.run_id]);
+
+  const checklistItems = useMemo<ChecklistItem[]>(
+    () =>
+      deriveOperatorChecklist({
+        run,
+        health,
+        readinessConfirmed,
+        readinessBlockedCodes,
+        verificationOpened,
+      }),
+    [run, health, readinessConfirmed, readinessBlockedCodes, verificationOpened],
+  );
 
   useEffect(() => {
     let cancelled = false;
     setIsPending(true);
     setError(null);
+    healthLoadStartedAtRef.current = Date.now();
+    firstRemediationEventEmittedRef.current = false;
 
     void controlPlaneActions
       .getRunPipelineHealth(run.run_id)
       .then((response) => {
         if (!cancelled) {
           setHealth(response);
+          emitOperatorJourneyEvent("pipeline_health_loaded", {
+            run_id: run.run_id,
+            source_id: run.source_id,
+            source_version_id: run.source_version_id,
+            mode: run.mode,
+            duration_ms:
+              healthLoadStartedAtRef.current != null
+                ? Date.now() - healthLoadStartedAtRef.current
+                : undefined,
+          });
         }
       })
       .catch((reason) => {
@@ -358,7 +431,7 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
     return () => {
       cancelled = true;
     };
-  }, [run.run_id]);
+  }, [run.mode, run.run_id, run.source_id, run.source_version_id]);
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -387,6 +460,57 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
 
         {!isPending && !error && health ? (
           <Stack spacing={2}>
+            <Paper variant="outlined" sx={{ p: 1.5 }}>
+              <Stack spacing={1}>
+                <Typography variant="subtitle2">Operator Checklist</Typography>
+                {checklistItems.map((item) => (
+                  <Stack
+                    key={item.key}
+                    direction={{ xs: "column", md: "row" }}
+                    spacing={1}
+                    alignItems="start"
+                  >
+                    <Chip size="small" label={item.state} color={checklistChipColor(item.state)} />
+                    <Box>
+                      <Typography variant="body2">{item.label}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.detail}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ))}
+                {!verificationOpened && legalSearchUrl ? (
+                  <Button
+                    component="a"
+                    href={legalSearchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.localStorage.setItem(
+                          `${RUN_VERIFICATION_OPENED_KEY_PREFIX}${run.run_id}`,
+                          "true",
+                        );
+                      }
+                      setVerificationOpened(true);
+                      emitOperatorJourneyEvent("legal_search_verification_opened", {
+                        run_id: run.run_id,
+                        source_id: run.source_id,
+                        source_version_id: run.source_version_id,
+                        mode: run.mode,
+                        action_label: "Operator checklist legal-search verification",
+                        action_href: legalSearchUrl,
+                      });
+                    }}
+                  >
+                    Open legal-search verification
+                  </Button>
+                ) : null}
+              </Stack>
+            </Paper>
+
             <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} flexWrap="wrap">
               <Chip
                 label={`Overall ${health.overall_status}`}
@@ -437,6 +561,20 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                             rel={isInPageAnchor ? undefined : "noreferrer"}
                             size="small"
                             variant="text"
+                            onClick={() => {
+                              if (!firstRemediationEventEmittedRef.current) {
+                                emitOperatorJourneyEvent("remediation_action_clicked", {
+                                  run_id: run.run_id,
+                                  source_id: run.source_id,
+                                  source_version_id: run.source_version_id,
+                                  mode: run.mode,
+                                  stage: stage.stage,
+                                  action_label: actionTarget.label,
+                                  action_href: actionTarget.href,
+                                });
+                                firstRemediationEventEmittedRef.current = true;
+                              }
+                            }}
                           >
                             {actionTarget.label}
                           </Button>
@@ -460,6 +598,23 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                   rel="noreferrer"
                   variant="outlined"
                   size="small"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.localStorage.setItem(
+                        `${RUN_VERIFICATION_OPENED_KEY_PREFIX}${run.run_id}`,
+                        "true",
+                      );
+                    }
+                    setVerificationOpened(true);
+                    emitOperatorJourneyEvent("legal_search_verification_opened", {
+                      run_id: run.run_id,
+                      source_id: run.source_id,
+                      source_version_id: run.source_version_id,
+                      mode: run.mode,
+                      action_label: "Pipeline section legal-search verification",
+                      action_href: legalSearchUrl,
+                    });
+                  }}
                 >
                   Open legal-search verification
                 </Button>
