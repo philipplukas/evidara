@@ -47,7 +47,7 @@ Rationale:
 
 ## Active Quality Stream
 
-- `TAR-89`: improve search/detail metadata quality for user trust
+- See `TAR-89` in Remaining Risks.
 
 ## Final Release Gate For Product Sign-off
 

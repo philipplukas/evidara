@@ -20,6 +20,8 @@ ENV NODE_ENV=production
 ENV PORT=8080
 
 COPY --from=builder /app ./
+RUN addgroup -g 1001 -S app && adduser -S -u 1001 -G app app && chown -R app:app /app
+USER app
 
 EXPOSE 8080
 CMD ["npm", "run", "start", "--", "-p", "8080", "-H", "0.0.0.0"]
