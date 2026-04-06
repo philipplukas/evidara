@@ -66,6 +66,7 @@ The gate covers:
   - expected files:
     - `legal-search/frontend/interaction-flow-staging-evidence.md`
     - `legal-search/frontend/playwright-report`
+    - `legal-search/frontend/screenshot-pack`
     - `docs/runbooks/interaction-flow-validation.md`
 
 ## Local Verification Commands

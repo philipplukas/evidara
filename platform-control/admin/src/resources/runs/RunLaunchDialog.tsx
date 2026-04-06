@@ -3,6 +3,7 @@
 import {
   Alert,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -10,6 +11,7 @@ import {
   MenuItem,
   Stack,
   TextField,
+  Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { useDataProvider, useGetList, useNotify, useRedirect } from "react-admin";
@@ -66,6 +68,16 @@ const versionAllowedForMode = (
     return status === "approved";
   }
   return status !== "rejected" && status !== "superseded";
+};
+
+const readinessActionByCode: Record<string, string> = {
+  source_exists: "Select an existing source from the catalog.",
+  source_version_exists: "Select an existing source version for the selected source.",
+  source_version_belongs_to_source: "Use a source/version pair from the same source.",
+  mode_compatible_with_version_status:
+    "For production runs, approve the selected version before launch.",
+  acquisition_seed_present:
+    "Update acquisition spec with at least one seed_url or seed_urls entry.",
 };
 
 export function RunLaunchButton({
@@ -290,20 +302,48 @@ export function RunLaunchButton({
             </TextField>
 
             {isCheckingReadiness ? (
-              <Alert severity="info">Running run preflight checks...</Alert>
+              <Alert
+                severity="info"
+                icon={false}
+                action={<Chip size="small" color="info" variant="outlined" label="in_progress" />}
+              >
+                Running run preflight checks...
+              </Alert>
             ) : null}
             {readinessError ? <Alert severity="error">{readinessError}</Alert> : null}
             {readiness && !readiness.ready ? (
-              <Alert severity="warning">
+              <Alert
+                severity="warning"
+                icon={false}
+                action={<Chip size="small" color="warning" variant="outlined" label="blocked" />}
+              >
                 Run is blocked until preflight checks pass:
                 <ul style={{ margin: "8px 0 0", paddingInlineStart: "20px" }}>
                   {failingChecks.map((check) => (
-                    <li key={check.code}>{check.detail}</li>
+                    <li key={check.code}>
+                      <Typography component="span" sx={{ fontWeight: 600 }}>
+                        {check.detail}
+                      </Typography>
+                      <Typography component="span" sx={{ color: "text.secondary" }}>
+                        {" "}
+                        Next action:{" "}
+                        {readinessActionByCode[check.code] ??
+                          "Review source/version configuration and retry."}
+                      </Typography>
+                    </li>
                   ))}
                 </ul>
               </Alert>
             ) : null}
-            {readiness?.ready ? <Alert severity="success">Preflight checks passed.</Alert> : null}
+            {readiness?.ready ? (
+              <Alert
+                severity="success"
+                icon={false}
+                action={<Chip size="small" color="success" variant="outlined" label="ok" />}
+              >
+                Preflight checks passed.
+              </Alert>
+            ) : null}
           </Stack>
         </DialogContent>
         <DialogActions>

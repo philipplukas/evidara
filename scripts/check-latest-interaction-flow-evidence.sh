@@ -75,6 +75,7 @@ if [[ "${MODE}" == "staging" ]]; then
 fi
 
 report_dir="${latest_dir}/legal-search/frontend/playwright-report"
+screenshot_pack_dir="${latest_dir}/legal-search/frontend/screenshot-pack"
 runbook_path="${latest_dir}/docs/runbooks/interaction-flow-validation.md"
 
 if [[ ! -f "${manifest_path}" ]]; then
@@ -83,6 +84,10 @@ if [[ ! -f "${manifest_path}" ]]; then
 fi
 if [[ ! -d "${report_dir}" ]]; then
   echo "Missing playwright report directory: ${report_dir}" >&2
+  exit 2
+fi
+if [[ ! -d "${screenshot_pack_dir}" ]]; then
+  echo "Missing screenshot evidence pack directory: ${screenshot_pack_dir}" >&2
   exit 2
 fi
 if [[ ! -f "${runbook_path}" ]]; then
@@ -95,4 +100,5 @@ echo "Mode: ${MODE}"
 echo "Run dir: ${latest_dir}"
 echo "Manifest: ${manifest_path}"
 echo "Playwright report: ${report_dir}"
+echo "Screenshot pack: ${screenshot_pack_dir}"
 echo "Runbook snapshot: ${runbook_path}"

@@ -35,11 +35,11 @@ export function ResultCard({
   return (
     <article
       onClick={() => onFocus(result.id)}
-      className={`group px-5 py-4 border-b border-border/60 cursor-pointer transition-all
+      className={`group px-5 py-4 border-b border-border/60 cursor-pointer transition-all rounded-sm
         ${
           isSelected
-            ? "bg-brand/[0.03] border-l-2 border-l-brand"
-            : "hover:bg-muted/30 border-l-2 border-l-transparent"
+            ? "bg-brand/[0.04] border-l-2 border-l-brand shadow-[inset_0_0_0_1px_rgba(15,76,129,0.18)]"
+            : "hover:bg-muted/30 border-l-2 border-l-transparent hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]"
         }`}
     >
       {/* Title row */}
@@ -117,7 +117,7 @@ export function ResultCard({
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
           {onPin && (
             <AccentButton
               onClick={(e) => {

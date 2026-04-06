@@ -136,6 +136,17 @@ jobs:
               sys.exit(2)
           PY
 
+      - name: Verify interaction-flow evidence artifact completeness
+        id: interaction_flow_artifact_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          scripts/check-latest-interaction-flow-evidence.sh \
+            --mode staging \
+            --output-dir tmp/release-readiness/interaction-flow-evidence-quickcheck
+
       - name: Verify latest Terraform run
         id: tf_gate
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
@@ -280,6 +291,13 @@ jobs:
             fi
             echo "| Latest interaction-flow staging evidence | ${interaction_flow_status} | [run](${{ steps.interaction_flow_gate.outputs.interaction_flow_url }}) @ ${{ steps.interaction_flow_gate.outputs.interaction_flow_created_at }} |"
 
+            if [[ "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+              interaction_flow_artifact_status="PASS"
+            else
+              interaction_flow_artifact_status="FAIL"
+            fi
+            echo "| Interaction-flow artifact completeness | ${interaction_flow_artifact_status} | \`scripts/check-latest-interaction-flow-evidence.sh --mode staging\` |"
+
             if [[ "${{ steps.tf_gate.outcome }}" == "success" ]]; then
               tf_status="PASS"
             else
@@ -301,7 +319,7 @@ jobs:
             fi
             echo "| DLQ depth (15m max) | ${dlq_status} | max=\`${{ steps.dlq_gate.outputs.dlq_max_depth }}\`, subs=\`${{ steps.dlq_gate.outputs.dlq_subscription_count }}\` |"
             echo
-            if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
+            if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
               overall="GO"
             else
               overall="NO-GO"
