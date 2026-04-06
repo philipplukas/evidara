@@ -30,6 +30,7 @@ jobs:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}
       GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
       DI_SURFACES_ROOT_URI: ${{ vars.DI_SURFACES_ROOT_URI_STAGING }}
+      TERRAFORM_APPLY_ENABLED: ${{ vars.TERRAFORM_APPLY_ENABLED || 'false' }}
       REPORT_PATH: tmp/release-readiness/report.md
     steps:
       - name: Checkout
@@ -95,7 +96,7 @@ jobs:
             --workflow "Terraform" \
             --branch main \
             --limit 1 \
-            --json databaseId,createdAt,conclusion,url \
+            --json databaseId,createdAt,status,conclusion,url \
             > tmp/release-readiness/terraform.json
 
           python3 - <<'PY'
@@ -109,17 +110,27 @@ jobs:
               sys.exit(2)
 
           latest = runs[0]
+          status = latest.get("status") or "unknown"
           conclusion = latest.get("conclusion") or "unknown"
           created_at = latest.get("createdAt") or "unknown"
           url = latest.get("url") or ""
+          terraform_apply_enabled = os.environ.get("TERRAFORM_APPLY_ENABLED", "false").lower() == "true"
+          accepted = conclusion == "success" or (
+              conclusion == "skipped" and not terraform_apply_enabled
+          )
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"tf_status={status}\n")
               fh.write(f"tf_conclusion={conclusion}\n")
               fh.write(f"tf_created_at={created_at}\n")
               fh.write(f"tf_url={url}\n")
+              fh.write(f"tf_accepted={'true' if accepted else 'false'}\n")
 
-          if conclusion != "success":
-              print(f"Latest Terraform run is not successful: {conclusion}", file=sys.stderr)
+          if not accepted:
+              print(
+                  f"Latest Terraform run is not accepted for gate: status={status}, conclusion={conclusion}",
+                  file=sys.stderr,
+              )
               sys.exit(2)
           PY
 
@@ -216,7 +227,7 @@ jobs:
             else
               tf_status="FAIL"
             fi
-            echo "| Latest Terraform workflow | ${tf_status} | [run](${{ steps.tf_gate.outputs.tf_url }}) @ ${{ steps.tf_gate.outputs.tf_created_at }} |"
+            echo "| Latest Terraform workflow | ${tf_status} | [run](${{ steps.tf_gate.outputs.tf_url }}) @ ${{ steps.tf_gate.outputs.tf_created_at }} (status=\`${{ steps.tf_gate.outputs.tf_status }}\`, conclusion=\`${{ steps.tf_gate.outputs.tf_conclusion }}\`, accepted=\`${{ steps.tf_gate.outputs.tf_accepted }}\`) |"
 
             if [[ "${{ steps.di_drift.outcome }}" == "success" ]]; then
               di_status="PASS"
