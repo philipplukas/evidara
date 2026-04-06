@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import {
   isRoleAuthorized,
   normalizeRole,
@@ -15,10 +16,20 @@ const AdminApp = dynamic(() => import("./AdminApp"), {
 
 export default function AdminShell() {
   const fallbackRole = normalizeRole(process.env.NEXT_PUBLIC_USER_ROLE);
-  const userRole = resolveUserRole(fallbackRole);
+  const [userRole, setUserRole] = useState(fallbackRole);
+  const [isRoleResolved, setIsRoleResolved] = useState(false);
   const allowedRoles = parseAllowedRoles(process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES ?? "admin");
   const legalSearchUrl =
     process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3000";
+
+  useEffect(() => {
+    setUserRole(resolveUserRole(fallbackRole));
+    setIsRoleResolved(true);
+  }, [fallbackRole]);
+
+  if (!isRoleResolved) {
+    return null;
+  }
 
   if (!isRoleAuthorized(userRole, allowedRoles)) {
     return (
