@@ -13,12 +13,14 @@ on:
       - 'legal-search/**'
       - 'contracts/api/legal-search.openapi.yaml'
       - 'platform-control/admin/**'
+      - 'docs/runbooks/interaction-flow-validation.md'
   push:
     branches: [main]
     paths:
       - 'legal-search/**'
       - 'contracts/api/legal-search.openapi.yaml'
       - 'platform-control/admin/**'
+      - 'docs/runbooks/interaction-flow-validation.md'
 
 jobs:
   # ─── API quality gate ───
@@ -67,10 +69,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install platform-control admin dependencies (Playwright webServer)
-        working-directory: platform-control/admin
-        run: npm ci
-
       # typecheck → lint → test
       - name: Check (typecheck + lint + test)
         run: npm run check
@@ -78,25 +76,6 @@ jobs:
       # Build separately — catches SSR issues tsc misses.
       - name: Build
         run: npm run build
-
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
-
-      - name: E2E smoke tests
-        run: npm run e2e:smoke
-
-      - name: E2E RBAC contract tests
-        run: npm run e2e:contract
-
-      - name: Upload Playwright artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-playwright-artifacts
-          path: |
-            legal-search/frontend/test-results
-            legal-search/frontend/playwright-report
-          if-no-files-found: ignore
 
       # Contract lint — validates the OpenAPI spec.
       - name: Contract lint
@@ -106,3 +85,69 @@ jobs:
       # fails if the committed output differs.
       - name: Contract drift check
         run: npm run openapi:check
+
+  # ─── Interaction-flow evidence (Playwright smoke + contract) ───
+  interaction-flow-evidence:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legal-search/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: legal-search/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install platform-control admin dependencies (Playwright webServer)
+        working-directory: platform-control/admin
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke suite
+        run: npm run e2e:smoke
+
+      - name: Run cross-surface contract suite
+        run: npm run e2e:contract
+
+      - name: Generate evidence manifest
+        if: always()
+        run: |
+          cat <<'EOF' > interaction-flow-evidence.md
+          # Interaction Flow Evidence
+
+          Source runbook: `docs/runbooks/interaction-flow-validation.md`
+          Source workflow: `.github/workflows/legal-search.yml`
+          Source job: `interaction-flow-evidence`
+
+          Executed suites:
+          - `npm run e2e:smoke`
+          - `npm run e2e:contract`
+
+          Evidence artifacts in this upload:
+          - `legal-search/frontend/playwright-report`
+          - `legal-search/frontend/test-results`
+          - `legal-search/frontend/interaction-flow-evidence.md`
+          EOF
+
+      - name: Upload interaction-flow evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interaction-flow-evidence-${{ github.run_id }}
+          path: |
+            legal-search/frontend/playwright-report
+            legal-search/frontend/test-results
+            legal-search/frontend/interaction-flow-evidence.md
+            docs/runbooks/interaction-flow-validation.md
+          if-no-files-found: warn
