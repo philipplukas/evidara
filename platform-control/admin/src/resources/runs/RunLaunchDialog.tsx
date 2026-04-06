@@ -178,7 +178,9 @@ export function RunLaunchButton({
       .catch((error: unknown) => {
         if (!active) return;
         setReadiness(null);
-        setReadinessError(error instanceof Error ? error.message : "Unable to run preflight checks.");
+        setReadinessError(
+          error instanceof Error ? error.message : "Unable to run preflight checks.",
+        );
       })
       .finally(() => {
         if (!active) return;
@@ -287,7 +289,9 @@ export function RunLaunchButton({
               ))}
             </TextField>
 
-            {isCheckingReadiness ? <Alert severity="info">Running run preflight checks...</Alert> : null}
+            {isCheckingReadiness ? (
+              <Alert severity="info">Running run preflight checks...</Alert>
+            ) : null}
             {readinessError ? <Alert severity="error">{readinessError}</Alert> : null}
             {readiness && !readiness.ready ? (
               <Alert severity="warning">
@@ -306,11 +310,7 @@ export function RunLaunchButton({
           <Button onClick={closeDialog} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button
-            variant="contained"
-            onClick={submit}
-            disabled={!isReadyToCreate}
-          >
+          <Button variant="contained" onClick={submit} disabled={!isReadyToCreate}>
             {isSubmitting ? "Creating..." : "Create Run"}
           </Button>
         </DialogActions>
