@@ -124,7 +124,7 @@ Automation baseline:
 
 - CI now publishes `legal-search/frontend/screenshot-pack` in both local/PR and staging evidence artifacts.
 - Run `scripts/check-latest-interaction-flow-evidence.sh --mode staging` to verify manifest, Playwright report, runbook snapshot, and screenshot pack presence.
-- Add the two admin-only captures manually (run launch preflight + run lifecycle visibility) when preparing release candidate sign-off.
+- Screenshot pack now includes admin captures for run launch preflight and run lifecycle visibility in addition to legal-search captures.
 
 | Capture point | Target surface | What to capture |
 | --- | --- | --- |
@@ -168,8 +168,11 @@ Executed checks:
 
 - `uv run pytest tests/smoke/test_app.py tests/smoke/test_preview_workflow.py` -> 7 passed
 - `npm run e2e:smoke` (`legal-search/frontend`) -> 4 passed
-- `Interaction Flow Staging Evidence` workflow run [24043317173](https://github.com/philipplukas/evidara/actions/runs/24043317173) -> passed
-- staging artifact retrieved: `interaction-flow-staging-evidence-24043317173` via `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence --run-id 24043317173`
+- `npm run e2e:screenshot-pack` (`legal-search/frontend`) -> passed with legal-search + admin captures
+- `npm run e2e:visual` (`legal-search/frontend`) -> passed after initializing baseline snapshots
+- `Interaction Flow Staging Evidence` workflow run [24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493) -> passed (smoke + contract subset + screenshot pack)
+- evidence quick-check: `scripts/check-latest-interaction-flow-evidence.sh --mode staging --branch main` -> passed (manifest + playwright report + screenshot pack + runbook snapshot)
+- `Release Readiness` workflow run [24046126662](https://github.com/philipplukas/evidara/actions/runs/24046126662) -> passed including interaction-flow artifact completeness gate
 
 Classification outcome:
 
@@ -177,7 +180,7 @@ Classification outcome:
 - `ambiguous-requirement`:
   - none remaining for non-admin denial UX behavior at admin entry.
 - `missing-functionality`:
-  - none open; canonical screenshot evidence pack checklist is now defined in this runbook.
+  - none open; screenshot evidence pack checklist is defined and automated in CI.
 
 ## Initial Prioritization Rules
 
@@ -188,10 +191,25 @@ Classification outcome:
 ## Current Prioritized Follow-ups
 
 1. P1: run and attach staging parity evidence after each release candidate.
-2. P2: automate screenshot capture packaging so release evidence is generated, not manual.
+2. P2: keep screenshot pack deterministic and monitor flaky retries in staging evidence runs.
 3. P2: align legal-search API docs discoverability expectations (`/docs`) with operator needs.
+
+## RC Dry-Run Procedure (Validated)
+
+Use this sequence for release-candidate confidence:
+
+1. `npm run e2e:screenshot-pack` in `legal-search/frontend`
+2. `npm run e2e:visual` in `legal-search/frontend`
+3. `scripts/check-latest-interaction-flow-evidence.sh --mode staging --branch main`
+4. Trigger `Release Readiness` workflow (`strict=true`) and confirm GO
+
+Latest dry-run evidence:
+
+- screenshot pack + visual checks: local pass on 2026-04-06
+- staging evidence workflow: run [24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493)
+- strict release readiness: run [24046126662](https://github.com/philipplukas/evidara/actions/runs/24046126662)
 
 ## Recommended Next Expansions (after critical flows are green)
 
-- Add screenshot evidence pack for the operator walkthrough.
+- Expand screenshot evidence pack assertions to include visual diff checks for admin captures.
 - Add staging parity run evidence in this file after each release candidate.

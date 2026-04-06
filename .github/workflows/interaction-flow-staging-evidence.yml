@@ -23,6 +23,7 @@ jobs:
       LEGAL_SEARCH_FRONTEND_SERVICE: ${{ vars.LEGAL_SEARCH_FRONTEND_SERVICE_STAGING || 'legal-search-frontend-staging' }}
       PLATFORM_CONTROL_ADMIN_SERVICE: ${{ vars.PLATFORM_CONTROL_ADMIN_SERVICE_STAGING || 'platform-control-admin-staging' }}
       SLACK_WEBHOOK_URL: ${{ secrets.INTERACTION_FLOW_STAGING_SLACK_WEBHOOK }}
+      SCREENSHOT_PACK_STATUS: not_run
 
     steps:
       - name: Checkout
@@ -107,7 +108,21 @@ jobs:
 
       - name: Capture staging canonical screenshot evidence pack
         working-directory: legal-search/frontend
-        run: npm run e2e:screenshot-pack
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            if npm run e2e:screenshot-pack; then
+              echo "SCREENSHOT_PACK_STATUS=passed" >> "${GITHUB_ENV}"
+              exit 0
+            fi
+            if [[ "${attempt}" -lt 2 ]]; then
+              echo "Screenshot pack failed on attempt ${attempt}; retrying once after 20s..."
+              sleep 20
+            fi
+          done
+          echo "SCREENSHOT_PACK_STATUS=failed_after_retry" >> "${GITHUB_ENV}"
+          echo "::error::Staging screenshot evidence pack failed after 2 attempts"
+          exit 1
 
       - name: Generate staging evidence manifest
         if: always()
@@ -124,6 +139,10 @@ jobs:
           - `npm run e2e:smoke -- --grep-invert "control panel entrypoint"`
           - `npm run e2e:contract -- --grep "standard profile does not show control panel entry when URL is configured"`
           - `npm run e2e:screenshot-pack`
+
+          Screenshot pack status:
+          - `${SCREENSHOT_PACK_STATUS}`
+          - if `failed_after_retry`, inspect `test-results` traces and retry logs in this run.
 
           Target URLs:
           - `PLAYWRIGHT_EXTERNAL_BASE_URL` (legal-search frontend)
