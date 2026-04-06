@@ -153,4 +153,3 @@ If you started the full compose app stack:
 ```bash
 bash scripts/local-vertical-slice.sh down-all search
 ```
-
