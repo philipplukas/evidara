@@ -3,12 +3,13 @@ github_owner    = "philipplukas"
 repository_name = "evidara"
 
 # Default environment model for current CD strategy.
-environments = ["dev", "prod"]
+environments = ["dev", "staging", "prod"]
 
 # Repository-level variables used by CD workflows.
 repository_variables = {
   GCP_REGION                           = "europe-west6"
-  GCP_PROJECT_ID_DEV                   = "data-platform-dev-492214"
+  GCP_PROJECT_ID_DEV                   = "project-dacd6b7b-dc96-4534-b82"
+  GCP_PROJECT_ID_STAGING               = "project-dacd6b7b-dc96-4534-b82"
   GCP_PROJECT_ID_PROD                  = "data-platform-prod-492214"
   GCP_ARTIFACT_PROJECT_ID              = "data-platform-dev-492214"
   ARTIFACT_REGISTRY_REPOSITORY         = "runtime"
@@ -16,12 +17,19 @@ repository_variables = {
   PLATFORM_CONTROL_WORKER_SERVICE_NAME = "platform-control-worker"
   LEGAL_SEARCH_API_SERVICE_NAME        = "legal-search-api"
   DI_CONSUMER_SERVICE_NAME             = "document-intelligence-consumer"
+  DI_SURFACES_ROOT_URI_DEV             = "gs://evidara-document-intelligence-surfaces-dev/published"
+  DI_SURFACES_ROOT_URI_STAGING         = "gs://evidara-document-intelligence-surfaces-staging/published"
+  SMOKE_SEED_URL_DEV                   = "http://example.org"
+  SMOKE_SEED_URL_STAGING               = "http://example.org"
+  SMOKE_REQUEST_TIMEOUT_SECONDS_DEV    = "10"
+  SMOKE_REQUEST_TIMEOUT_SECONDS_STAGING = "10"
 }
 
 # Optional environment-scoped variables.
 environment_variables = {
-  dev  = {}
-  prod = {}
+  dev     = {}
+  staging = {}
+  prod    = {}
 }
 
 # Do not commit real secret values.
@@ -34,6 +42,11 @@ environment_variables = {
 #     GCP_SERVICE_ACCOUNT_DEV        = "gha-deployer-dev@evidara-dev.iam.gserviceaccount.com"
 #     DATABRICKS_HOST                = "https://dbc-xxxxxxxx.cloud.databricks.com"
 #     DATABRICKS_TOKEN               = "..."
+#   }
+#   staging = {
+#     GCP_WORKLOAD_IDENTITY_PROVIDER = "projects/123456/locations/global/workloadIdentityPools/github/providers/evidara"
+#     GCP_SERVICE_ACCOUNT_STAGING    = "gha-deployer-staging@project-dacd6b7b-dc96-4534-b82.iam.gserviceaccount.com"
+#     E2E_SMOKE_STAGING_SLACK_WEBHOOK = "https://hooks.slack.com/services/..."
 #   }
 #   prod = {
 #     GCP_WORKLOAD_IDENTITY_PROVIDER = "projects/123456/locations/global/workloadIdentityPools/github/providers/evidara"

@@ -1,6 +1,8 @@
 name: E2E Smoke Staging
 
 on:
+  schedule:
+    - cron: "15 3 * * *"
   workflow_dispatch:
     inputs:
       smoke_seed_url:

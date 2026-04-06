@@ -1,32 +1,109 @@
 environment = "staging"
 
-project_id = "evidara-staging"
+project_id = "project-dacd6b7b-dc96-4534-b82"
 region     = "europe-west6"
 
 raw_artifact_bucket_name = "evidara-raw-artifacts-staging"
 manifest_bucket_name     = "evidara-manifests-staging"
 
-enable_cloud_sql = true
+enable_cloud_sql       = true
+cloud_sql_tier         = "db-f1-micro"
+cloud_sql_disk_size_gb = 10
+
+event_topic_names = [
+  "artifact-bundle-available-staging",
+  "raw-artifact-available-staging",
+  "document-processing-status-updated-staging",
+  "document-processed-staging",
+  "document-withdrawn-staging",
+  "index-update-requested-staging",
+]
+
+event_subscriptions = {
+  "document-intelligence-artifact-bundle-available-staging" = {
+    topic_name           = "artifact-bundle-available-staging"
+    ack_deadline_seconds = 120
+    retry_policy         = { minimum_backoff = "30s", maximum_backoff = "600s" }
+    dead_letter_policy   = { max_delivery_attempts = 10 }
+  }
+  "platform-control-document-processing-status-updated-staging" = {
+    topic_name         = "document-processing-status-updated-staging"
+    retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+    dead_letter_policy = { max_delivery_attempts = 5 }
+    push_config = {
+      target_service = "platform-control-api"
+      endpoint_path  = "/v1/di/events/document-processing-status-updated"
+    }
+  }
+  "platform-control-document-processed-staging" = {
+    topic_name = "document-processed-staging"
+    push_config = {
+      target_service = "platform-control-api"
+      endpoint_path  = "/v1/di/events/document-processed"
+    }
+  }
+  "legal-search-document-processed-staging" = {
+    topic_name         = "document-processed-staging"
+    retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+    dead_letter_policy = { max_delivery_attempts = 5 }
+    push_config = {
+      target_service = "legal-search-api"
+      endpoint_path  = "/v1/projections/events/document-processed"
+    }
+  }
+  "legal-search-document-withdrawn-staging" = {
+    topic_name         = "document-withdrawn-staging"
+    retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+    dead_letter_policy = { max_delivery_attempts = 5 }
+    push_config = {
+      target_service = "legal-search-api"
+      endpoint_path  = "/v1/projections/events/document-withdrawn"
+    }
+  }
+  "legal-search-index-update-requested-staging" = {
+    topic_name         = "index-update-requested-staging"
+    retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+    dead_letter_policy = { max_delivery_attempts = 5 }
+  }
+}
 
 cloud_run_services = {
   "platform-control-api" = {
-    image               = "europe-west6-docker.pkg.dev/evidara-staging/runtime/platform-control:latest"
+    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/platform-control-api-dev:latest"
     service_account_key = "platform_control_api"
     allow_unauthenticated = false
-    vpc_connector = "projects/evidara-staging/locations/europe-west6/connectors/evidara-search-staging-connector"
+    vpc_connector = "projects/project-dacd6b7b-dc96-4534-b82/locations/europe-west6/connectors/evidara-connector"
     vpc_egress    = "PRIVATE_RANGES_ONLY"
+    cloud_sql_instances = ["project-dacd6b7b-dc96-4534-b82:europe-west6:evidara-control-staging"]
+    env_vars = {
+      PLATFORM_CONTROL_GCP_PROJECT_ID                = "project-dacd6b7b-dc96-4534-b82"
+      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND        = "gcs"
+      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND       = "pubsub"
+      PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET           = "evidara-raw-artifacts-staging"
+      PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC     = "raw-artifact-available-staging"
+      PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC  = "artifact-bundle-available-staging"
+    }
+    secret_env_vars = {
+      PLATFORM_CONTROL_DATABASE_URL = {
+        secret_name = "platform_control_dsn"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_API_KEY = {
+        secret_name = "firecrawl_api_key"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_WEBHOOK_SECRET = {
+        secret_name = "firecrawl_webhook"
+      }
+    }
   }
 
   "legal-search-api" = {
-    image               = "europe-west6-docker.pkg.dev/evidara-staging/runtime/legal-search-api:latest"
+    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/legal-search-api-dev:latest"
     service_account_key = "legal_search_api"
     allow_unauthenticated = false
     env_vars = {
       OPENSEARCH_ALIAS_READ              = "evidara-documents-read-staging"
       OPENSEARCH_ALIAS_WRITE             = "evidara-documents-write-staging"
-      OPENSEARCH_INDEX_SECTIONS           = "evidara-sections-read-staging"
-      OPENSEARCH_INDEX_CITATIONS          = "evidara-citations-read-staging"
-      OPENSEARCH_INDEX_PROJECTION_HISTORY = "evidara-projection-history-staging"
+      DOCUMENT_INTELLIGENCE_BASE_URL     = ""
     }
     secret_env_vars = {
       OPENSEARCH_NODE = {
@@ -39,21 +116,54 @@ cloud_run_services = {
         secret_name = "opensearch_password"
       }
     }
-    vpc_connector = "projects/evidara-staging/locations/europe-west6/connectors/evidara-search-staging-connector"
+    vpc_connector = "projects/project-dacd6b7b-dc96-4534-b82/locations/europe-west6/connectors/evidara-connector"
     vpc_egress    = "PRIVATE_RANGES_ONLY"
   }
 
+  "platform-control-worker" = {
+    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/platform-control-worker-dev:latest"
+    service_account_key = "platform_control_worker"
+    allow_unauthenticated = false
+    startup_probe_path  = "/health"
+    liveness_probe_path = "/health"
+    vpc_connector = "projects/project-dacd6b7b-dc96-4534-b82/locations/europe-west6/connectors/evidara-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
+    cloud_sql_instances = ["project-dacd6b7b-dc96-4534-b82:europe-west6:evidara-control-staging"]
+    env_vars = {
+      PLATFORM_CONTROL_RUN_DISPATCH_BACKEND = "worker"
+    }
+    secret_env_vars = {
+      PLATFORM_CONTROL_DATABASE_URL = {
+        secret_name = "platform_control_dsn"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_API_KEY = {
+        secret_name = "firecrawl_api_key"
+      }
+    }
+  }
+
   "document-intelligence-consumer" = {
-    image                 = "europe-west6-docker.pkg.dev/evidara-staging/runtime/document-intelligence-consumer:latest"
+    image                 = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/di-consumer-dev:latest"
     service_account_key   = "document_intelligence"
     allow_unauthenticated = false
+    min_instance_count    = 1
+    startup_probe_path    = "/health"
+    liveness_probe_path   = "/health"
     env_vars = {
-      DI_GCP_PROJECT_ID       = "evidara-staging"
-      DI_SUBSCRIPTION_NAME    = "document-intelligence-artifact-bundle-available"
-      DI_STATUS_TOPIC_NAME    = "document-processing-status-updated"
-      DI_PROCESSED_TOPIC_NAME = "document-processed"
+      DI_GCP_PROJECT_ID       = "project-dacd6b7b-dc96-4534-b82"
+      DI_SUBSCRIPTION_NAME    = "document-intelligence-artifact-bundle-available-staging"
+      DI_STATUS_TOPIC_NAME    = "document-processing-status-updated-staging"
+      DI_PROCESSED_TOPIC_NAME = "document-processed-staging"
       DI_SURFACES_ROOT_URI    = "gs://evidara-document-intelligence-surfaces-staging/published"
       DI_PROCESSING_VERSION   = "0.1.0-staging"
     }
   }
+}
+
+runtime_service_account_ids = {
+  platform_control_api    = "evd-pc-api"
+  platform_control_worker = "evd-pc-worker"
+  legal_search_api        = "evd-ls-api"
+  legal_search_frontend   = "evd-ls-frontend"
+  document_intelligence   = "evd-di-consumer"
 }
