@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, MapPin, Search, SlidersHorizontal, User } from "lucide-react";
+import { Clock, MapPin, Search, Settings2, SlidersHorizontal, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { parseAsString, useQueryState } from "nuqs";
 import { type FormEvent, useEffect, useState } from "react";
@@ -21,6 +21,7 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
 
   // Local input state — syncs with store query but allows free typing
   const [inputValue, setInputValue] = useState(storeQuery);
+  const controlPanelUrl = process.env.NEXT_PUBLIC_CONTROL_PANEL_URL?.trim();
 
   // Sync input when store query changes (e.g., from URL navigation)
   useEffect(() => {
@@ -97,6 +98,18 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
             label={t("header.pinned")}
             count={state.pinned.length > 0 ? state.pinned.length : undefined}
           />
+          {controlPanelUrl ? (
+            <a
+              href={controlPanelUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                text-muted-foreground hover:text-foreground hover:bg-muted"
+            >
+              <Settings2 className="w-4 h-4" />
+              {t("header.controlPanel")}
+            </a>
+          ) : null}
         </nav>
 
         {/* Locale Switcher */}
