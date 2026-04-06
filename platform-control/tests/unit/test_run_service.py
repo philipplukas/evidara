@@ -187,6 +187,40 @@ async def test_production_runs_require_approved_versions(session) -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_run_readiness_reports_pass_for_valid_configuration(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    assert readiness.ready is True
+    assert all(check.ok for check in readiness.checks)
+
+
+@pytest.mark.asyncio
+async def test_create_run_fails_preflight_when_seed_urls_are_missing(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {"mode": "crawl"}
+    await session.commit()
+    run_service = RunService(session, StubProvider())
+
+    with pytest.raises(InvalidStateTransitionError, match="Acquisition spec must define seed_url"):
+        await run_service.create_run(
+            CreateRunRequest(
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                mode=RunMode.PRODUCTION,
+            )
+        )
+
+
+@pytest.mark.asyncio
 async def test_create_run_persists_provider_job(session) -> None:
     source, version, source_service = await _seed_source_version(session)
     await source_service.approve_source_version(version.source_version_id)

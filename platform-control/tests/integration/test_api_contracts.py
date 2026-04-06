@@ -250,6 +250,51 @@ async def test_create_run_with_valid_version(client, seed_reference_data) -> Non
     assert body["status"] == "running"
 
 
+@pytest.mark.asyncio
+async def test_run_readiness_endpoint_returns_checks(client, seed_reference_data) -> None:
+    source = await client.post(
+        "/v1/sources",
+        json={"name": "Readiness Test", "jurisdiction_id": "jur_ch", "authority_id": "auth_bger"},
+    )
+    source_id = source.json()["source_id"]
+
+    version = await client.post(
+        f"/v1/sources/{source_id}/versions",
+        json={
+            "version_label": "v1",
+            "acquisition_spec": {
+                "seed_url": "https://example.com",
+                "mode": "crawl",
+                "limit": 10,
+                "tenant_id": "tenant_public",
+                "corpus_id": "corpus_test",
+                "scope_type": "global_public",
+                "source_origin_kind": "official_primary",
+                "trust_tier": "authoritative",
+                "language_codes": ["de"],
+                "document_type_hint": "decision",
+            },
+        },
+    )
+    version_id = version.json()["source_version_id"]
+
+    await client.post(f"/v1/versions/{version_id}/approve")
+
+    readiness = await client.get(
+        "/v1/runs/readiness",
+        params={
+            "source_id": source_id,
+            "source_version_id": version_id,
+            "mode": "production",
+        },
+    )
+    assert readiness.status_code == 200
+    body = readiness.json()
+    assert body["ready"] is True
+    assert isinstance(body["checks"], list)
+    assert any(check["code"] == "source_exists" for check in body["checks"])
+
+
 # ── DI Events ────────────────────────────────────
 
 

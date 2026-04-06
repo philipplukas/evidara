@@ -16,6 +16,7 @@ from platform_control.schemas.run import (
     RawArtifactListResponse,
     RunListResponse,
     RunPreviewSummaryResponse,
+    RunReadinessResponse,
     RunResponse,
 )
 from platform_control.services.firecrawl_provider import FirecrawlProvider
@@ -77,6 +78,21 @@ async def create_run(
         run_dispatch_backend=settings.run_dispatch_backend,
     )
     return await service.create_run(request)
+
+
+@router.get("/readiness", response_model=RunReadinessResponse)
+async def get_run_readiness(
+    source_id: str,
+    source_version_id: str,
+    session: SessionDep,
+    mode: RunMode = RunMode.PREVIEW,
+) -> RunReadinessResponse:
+    service = RunService(session)
+    return await service.get_run_readiness(
+        source_id=source_id,
+        source_version_id=source_version_id,
+        mode=mode,
+    )
 
 
 @router.get("/{run_id}", response_model=RunResponse)

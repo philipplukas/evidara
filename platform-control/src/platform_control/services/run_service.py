@@ -43,6 +43,8 @@ from platform_control.schemas.run import (
     RunPreviewSummaryDriftCheck,
     RunPreviewSummaryResponse,
     RunPreviewSummarySample,
+    RunReadinessCheck,
+    RunReadinessResponse,
 )
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
@@ -121,16 +123,20 @@ class RunService:
         source = await self.session.get(Source, request.source_id)
         if source is None:
             raise NotFoundError(f"Source not found: {request.source_id}")
-
         source_version = await self.session.get(SourceVersion, request.source_version_id)
         if source_version is None:
             raise NotFoundError(f"Source version not found: {request.source_version_id}")
-        if source_version.source_id != source.source_id:
-            raise InvalidStateTransitionError(
-                "Source version does not belong to the requested source."
-            )
 
-        self._validate_version_for_run_mode(source_version, request.mode)
+        readiness = self.assess_run_readiness(
+            source=source,
+            source_version=source_version,
+            source_id=request.source_id,
+            source_version_id=request.source_version_id,
+            mode=request.mode,
+        )
+        if not readiness.ready:
+            details = "; ".join(check.detail for check in readiness.checks if not check.ok)
+            raise InvalidStateTransitionError(f"Run preflight failed: {details}")
 
         run = Run(
             source_id=source.source_id,
@@ -155,6 +161,19 @@ class RunService:
         await self.session.refresh(run)
         await self._publish_pending_dispatch_events([pending_publications])
         return run
+
+    async def get_run_readiness(
+        self, *, source_id: str, source_version_id: str, mode: RunMode
+    ) -> RunReadinessResponse:
+        source = await self.session.get(Source, source_id)
+        source_version = await self.session.get(SourceVersion, source_version_id)
+        return self.assess_run_readiness(
+            source=source,
+            source_version=source_version,
+            source_id=source_id,
+            source_version_id=source_version_id,
+            mode=mode,
+        )
 
     async def dispatch_pending_runs(self, limit: int = 10) -> int:
         if self.provider is None and self.provider_registry is None:
@@ -399,6 +418,107 @@ class RunService:
             raise InvalidStateTransitionError(
                 f"Cannot create runs from source versions in status {source_version.status}."
             )
+
+    @classmethod
+    def assess_run_readiness(
+        cls,
+        *,
+        source: Source | None,
+        source_version: SourceVersion | None,
+        source_id: str,
+        source_version_id: str,
+        mode: RunMode,
+    ) -> RunReadinessResponse:
+        checks: list[RunReadinessCheck] = []
+
+        checks.append(
+            RunReadinessCheck(
+                code="source_exists",
+                ok=source is not None,
+                detail=(
+                    "Source exists." if source is not None else f"Source not found: {source_id}."
+                ),
+            )
+        )
+        checks.append(
+            RunReadinessCheck(
+                code="source_version_exists",
+                ok=source_version is not None,
+                detail=(
+                    "Source version exists."
+                    if source_version is not None
+                    else f"Source version not found: {source_version_id}."
+                ),
+            )
+        )
+
+        belongs_to_source = (
+            source is not None
+            and source_version is not None
+            and source_version.source_id == source.source_id
+        )
+        checks.append(
+            RunReadinessCheck(
+                code="source_version_belongs_to_source",
+                ok=belongs_to_source,
+                detail=(
+                    "Source version belongs to source."
+                    if belongs_to_source
+                    else "Source version does not belong to the requested source."
+                ),
+            )
+        )
+
+        mode_compatible = False
+        mode_detail = "Cannot determine mode compatibility before source/version checks pass."
+        if belongs_to_source and source_version is not None:
+            try:
+                cls._validate_version_for_run_mode(source_version, mode)
+                mode_compatible = True
+                mode_detail = "Version status is compatible with requested run mode."
+            except InvalidStateTransitionError as exc:
+                mode_detail = str(exc)
+        checks.append(
+            RunReadinessCheck(
+                code="mode_compatible_with_version_status",
+                ok=mode_compatible,
+                detail=mode_detail,
+            )
+        )
+
+        has_seed = False
+        seed_detail = "Cannot determine acquisition seeds before source/version checks pass."
+        if belongs_to_source and source_version is not None:
+            acquisition_spec = source_version.acquisition_spec or {}
+            seed_url = acquisition_spec.get("seed_url")
+            seed_urls = acquisition_spec.get("seed_urls")
+            normalized_seed_url = seed_url.strip() if isinstance(seed_url, str) else ""
+            normalized_seed_urls = (
+                [url.strip() for url in seed_urls if isinstance(url, str) and url.strip()]
+                if isinstance(seed_urls, list)
+                else []
+            )
+            has_seed = bool(normalized_seed_url or normalized_seed_urls)
+            seed_detail = (
+                "Acquisition spec has at least one seed URL."
+                if has_seed
+                else "Acquisition spec must define seed_url or seed_urls."
+            )
+        checks.append(
+            RunReadinessCheck(
+                code="acquisition_seed_present",
+                ok=has_seed,
+                detail=seed_detail,
+            )
+        )
+
+        return RunReadinessResponse(
+            source_id=source_id,
+            source_version_id=source_version_id,
+            mode=mode,
+            ready=all(check.ok for check in checks),
+            checks=checks,
+        )
 
     @staticmethod
     def _to_summary_sample(resource: CapturedResource, reason: str) -> RunPreviewSummarySample:
