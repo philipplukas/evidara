@@ -39,4 +39,5 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 - Container image: `legal-search/frontend/Dockerfile`
 - Required runtime env var: `NEXT_PUBLIC_API_URL`
+- Optional runtime env var: `NEXT_PUBLIC_CONTROL_PANEL_URL` (shows a header link to platform-control admin)
 - Cloud Run service key: `legal-search-frontend` (dev/staging tfvars)

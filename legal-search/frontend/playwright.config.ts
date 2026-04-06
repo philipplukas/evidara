@@ -16,5 +16,8 @@ export default defineConfig({
     port: 3000,
     timeout: 30_000,
     reuseExistingServer: true,
+    env: {
+      NEXT_PUBLIC_CONTROL_PANEL_URL: "http://localhost:3100",
+    },
   },
 });

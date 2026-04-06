@@ -52,6 +52,12 @@ with parity evidence.
 - Call admin frontend root (`/`) -> expected `200`
 - Call admin frontend proxied sources (`/api/platform-control/v1/sources`) -> expected `200`
 
+### Scenario 5: Legal-search header exposes admin entrypoint
+
+- Load legal-search frontend root (`/`) with `NEXT_PUBLIC_CONTROL_PANEL_URL` configured
+- Verify header shows control-panel link label
+- Verify link target equals configured admin URL
+
 ## Latest Verification Evidence (2026-04-06)
 
 ### Environment health
@@ -83,6 +89,13 @@ with parity evidence.
 |---|---:|---:|---:|---:|
 | dev | 200 | 200 | 200 | 200 |
 | staging | 200 | 200 | 200 | 200 |
+
+### UI to admin navigation validation
+
+| Environment | legal-search header link visible | link target configured |
+|---|---:|---:|
+| dev | pending | pending |
+| staging | pending | pending |
 
 ### Release readiness parity
 

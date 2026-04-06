@@ -48,6 +48,7 @@ Published website surfaces:
 - [x] `GET /v1/documents/{id}` returns 200 in dev and staging
 - [x] Deployed browser UI (`legal-search/frontend`) is accessible in dev and staging
 - [x] Frontend proxied search path (`/v1/search`) returns 200 in dev and staging
+- [ ] Header exposes configured control-panel entrypoint (`NEXT_PUBLIC_CONTROL_PANEL_URL`)
 
 ### C. Platform Control Admin Surface
 
@@ -88,3 +89,4 @@ Suggested mapping for this run:
 - Generic document metadata/titles in result/detail payloads -> `severity:high`
 - Missing legal-search docs surface -> `severity:medium`
 - Missing screenshot evidence pack for operator walkthrough -> `severity:medium`
+- Missing or misconfigured UI-to-admin link -> `severity:medium`
