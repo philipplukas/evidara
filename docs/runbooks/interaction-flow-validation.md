@@ -103,6 +103,9 @@ before adding lower-priority flow coverage.
 - Executed suites in both:
   - `npm run e2e:smoke`
   - `npm run e2e:contract`
+- Current staging parity scope:
+  - runs stable smoke core journeys and the non-admin hide-link RBAC contract subset
+  - full admin-visible link + admin denial UX assertions remain covered in local/PR CI until staging auth/session parity is aligned
 - Published artifacts:
   - local: `interaction-flow-evidence-${run_id}`
   - staging: `interaction-flow-staging-evidence-${run_id}`

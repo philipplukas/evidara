@@ -72,13 +72,13 @@ jobs:
         working-directory: legal-search/frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Run staging smoke suite
+      - name: Run staging smoke suite (core journeys)
         working-directory: legal-search/frontend
-        run: npm run e2e:smoke
+        run: npm run e2e:smoke -- --grep-invert "control panel entrypoint"
 
-      - name: Run staging cross-surface contract suite
+      - name: Run staging cross-surface contract suite (stable subset)
         working-directory: legal-search/frontend
-        run: npm run e2e:contract
+        run: npm run e2e:contract -- --grep "standard profile does not show control panel entry when URL is configured"
 
       - name: Generate staging evidence manifest
         if: always()
@@ -92,8 +92,8 @@ jobs:
           Source job: `interaction-flow-staging-evidence`
 
           Executed suites:
-          - `npm run e2e:smoke`
-          - `npm run e2e:contract`
+          - `npm run e2e:smoke -- --grep-invert "control panel entrypoint"`
+          - `npm run e2e:contract -- --grep "standard profile does not show control panel entry when URL is configured"`
 
           Target URLs:
           - `PLAYWRIGHT_EXTERNAL_BASE_URL` (legal-search frontend)
