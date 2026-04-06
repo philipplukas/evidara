@@ -65,6 +65,7 @@ before adding lower-priority flow coverage.
 - Trigger: open legal-search UI header
 - Expected transitions:
   - control panel link is visible when `NEXT_PUBLIC_CONTROL_PANEL_URL` is configured
+  - non-admin users who access admin directly see explicit `403` denial UX with recovery link
   - link points to configured admin surface URL
 - Evidence: browser-visible header link with expected href
 
@@ -87,6 +88,7 @@ before adding lower-priority flow coverage.
 | Preview flow path                    | `platform-control/tests/smoke/test_preview_workflow.py`                                         | Preview mode reaches terminal path with expected records      |
 | UI app-shell and search interactions | `legal-search/frontend/e2e/smoke.spec.ts`                                                       | Existing smoke cases pass                                     |
 | UI control-panel entrypoint          | `legal-search/frontend/e2e/smoke.spec.ts` (`@smoke exposes control panel entrypoint in header`) | Header link exists and targets configured URL                 |
+| Admin denial UX (non-admin)          | `platform-control/admin/src/lib/admin/accessControl.test.ts` and manual `/` check in admin UI   | Non-admin role receives explicit `403` with legal-search recovery link |
 
 ## Triage Categories
 
@@ -105,9 +107,9 @@ Classification outcome:
 
 - `broken-implementation`: none observed in critical-path smoke coverage.
 - `ambiguous-requirement`:
-  - role model for UI-to-admin navigation is not yet captured as a runnable acceptance scenario.
+  - none remaining for non-admin denial UX behavior at admin entry.
 - `missing-functionality`:
-  - explicit non-admin denial scenario (UI entrypoint shown/hidden plus admin access denial path).
+  - backend-enforced authorization parity for admin endpoints (in addition to UI denial UX).
   - canonical screenshot evidence pack for operator walkthrough.
 
 ## Initial Prioritization Rules
@@ -118,12 +120,12 @@ Classification outcome:
 
 ## Current Prioritized Follow-ups
 
-1. P1: add auth-aware cross-surface scenario for admin vs non-admin navigation.
+1. P1: enforce backend authorization parity for admin surface and APIs.
 2. P2: capture and store screenshot evidence pack for walkthrough parity.
 3. P2: align legal-search API docs discoverability expectations (`/docs`) with operator needs.
 
 ## Recommended Next Expansions (after critical flows are green)
 
-- Add authenticated role-based denial scenario for non-admin users attempting admin navigation.
+- Add backend-enforced role denial scenario for non-admin users attempting admin navigation.
 - Add screenshot evidence pack for the operator walkthrough.
 - Add staging parity run evidence in this file after each release candidate.
