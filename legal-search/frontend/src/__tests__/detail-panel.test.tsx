@@ -11,7 +11,7 @@
  * - A11y: no violations
  */
 
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
 import { describe, expect, it, vi } from "vitest";
 import { DetailPanel } from "@/components/detail/DetailPanel";
@@ -21,6 +21,60 @@ import { renderWithProviders } from "./helpers/render-with-providers";
 expect.extend(toHaveNoViolations);
 
 describe("DetailPanel", () => {
+  it("falls back to safe title/subtitle and copy text for sparse detail", () => {
+    const writeText = vi.fn();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const sparseDetail = {
+      ...articleDetail,
+      title: "",
+      subtitle: "",
+    };
+
+    renderWithProviders(
+      <DetailPanel
+        detail={sparseDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+    );
+
+    expect(screen.getByText("Untitled document")).toBeInTheDocument();
+    expect(screen.getByText("No summary available")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle("Copy citation"));
+    expect(writeText).toHaveBeenCalledWith("Untitled document");
+  });
+
+  it("shows a fallback translation badge label when translation label is missing", () => {
+    const translatedSparseDetail = {
+      ...articleDetail,
+      contentLanguage: {
+        display: "en",
+        original: "de",
+        isTranslation: true,
+        label: "",
+      },
+    };
+
+    renderWithProviders(
+      <DetailPanel
+        detail={translatedSparseDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+    );
+
+    expect(screen.getByText("Translated content")).toBeInTheDocument();
+  });
+
   it("shows empty state when detail is null", () => {
     renderWithProviders(<DetailPanel detail={null} />);
 
