@@ -29,12 +29,14 @@ interface WorkspaceClientProps {
   searchContext: SearchContextViewModel;
   filters: FilterViewModel[];
   showControlPlaneEntry?: boolean;
+  controlPanelUrl?: string;
 }
 
 export default function WorkspaceClient({
   searchContext,
   filters,
   showControlPlaneEntry = true,
+  controlPanelUrl,
 }: WorkspaceClientProps) {
   const t = useTranslations();
   const isDesktop = useDesktop();
@@ -172,6 +174,7 @@ export default function WorkspaceClient({
         pinnedIds={pinnedIds}
         onCloseDetail={() => setSelectedId(null)}
         showControlPlaneEntry={showControlPlaneEntry}
+        controlPanelUrl={controlPanelUrl}
       />
     );
   }
@@ -179,7 +182,11 @@ export default function WorkspaceClient({
   // Desktop
   return (
     <div className="flex flex-col h-screen bg-surface-page">
-      <AppHeader onSearch={handleSearch} showControlPlaneEntry={showControlPlaneEntry} />
+      <AppHeader
+        onSearch={handleSearch}
+        showControlPlaneEntry={showControlPlaneEntry}
+        controlPanelUrl={controlPanelUrl}
+      />
       <ContextBar context={searchContext} />
 
       <div className="flex-1 min-h-0">

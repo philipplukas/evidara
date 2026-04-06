@@ -19,6 +19,7 @@ export default function AdminShell() {
   const [userRole, setUserRole] = useState(fallbackRole);
   const [isRoleResolved, setIsRoleResolved] = useState(false);
   const allowedRoles = parseAllowedRoles(process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES ?? "admin");
+  const effectiveAllowedRoles = allowedRoles.length > 0 ? allowedRoles : ["admin"];
   const legalSearchUrl =
     process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3000";
 
@@ -31,7 +32,7 @@ export default function AdminShell() {
     return null;
   }
 
-  if (!isRoleAuthorized(userRole, allowedRoles)) {
+  if (!isRoleAuthorized(userRole, effectiveAllowedRoles)) {
     return (
       <main className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-6">
         <section className="max-w-xl w-full rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
