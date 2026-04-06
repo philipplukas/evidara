@@ -86,8 +86,8 @@ with parity evidence.
 
 ### Release readiness parity
 
-- Strict `GO`: https://github.com/philipplukas/evidara/actions/runs/24028370655
-- Investigation `GO`: https://github.com/philipplukas/evidara/actions/runs/24028371278
+- Strict `GO`: [run 24028370655](https://github.com/philipplukas/evidara/actions/runs/24028370655)
+- Investigation `GO`: [run 24028371278](https://github.com/philipplukas/evidara/actions/runs/24028371278)
 
 ## Exit Criteria
 

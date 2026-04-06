@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 const DEV_API_URL = "https://platform-control-api-dev-kxc5agexna-oa.a.run.app";
 const STAGING_API_URL = "https://platform-control-api-staging-kxc5agexna-oa.a.run.app";
