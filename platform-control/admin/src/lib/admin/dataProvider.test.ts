@@ -695,6 +695,53 @@ describe("controlPlaneDataProvider", () => {
     });
   });
 
+  it("loads pipeline health through the run pipeline-health endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          run_id: "run_01",
+          source_id: "src_01",
+          source_version_id: "sv_01",
+          mode: "preview",
+          run_status: "running",
+          overall_status: "in_progress",
+          stages: [
+            {
+              stage: "acquisition",
+              status: "in_progress",
+              detail: "Acquisition provider run is in progress.",
+              updated_at: "2026-04-06T10:00:00Z",
+            },
+          ],
+          processing_status_event_count: 0,
+          document_lifecycle_event_count: 0,
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneActions.getRunPipelineHealth("run_01");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/runs/run_01/pipeline-health",
+      expect.objectContaining({
+        headers: {
+          Accept: "application/json",
+        },
+      }),
+    );
+    expect(result).toMatchObject({
+      run_id: "run_01",
+      overall_status: "in_progress",
+      stages: [{ stage: "acquisition", status: "in_progress" }],
+    });
+  });
+
   it("fills missing preview summary collections and normalizes drift status", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(

@@ -120,6 +120,9 @@ jobs:
       - name: Run cross-surface contract suite
         run: npm run e2e:contract
 
+      - name: Capture canonical screenshot evidence pack
+        run: npm run e2e:screenshot-pack
+
       - name: Generate evidence manifest
         if: always()
         run: |
@@ -133,10 +136,12 @@ jobs:
           Executed suites:
           - `npm run e2e:smoke`
           - `npm run e2e:contract`
+          - `npm run e2e:screenshot-pack`
 
           Evidence artifacts in this upload:
           - `legal-search/frontend/playwright-report`
           - `legal-search/frontend/test-results`
+          - `legal-search/frontend/screenshot-pack`
           - `legal-search/frontend/interaction-flow-evidence.md`
           EOF
 
@@ -148,6 +153,7 @@ jobs:
           path: |
             legal-search/frontend/playwright-report
             legal-search/frontend/test-results
+            legal-search/frontend/screenshot-pack
             legal-search/frontend/interaction-flow-evidence.md
             docs/runbooks/interaction-flow-validation.md
           if-no-files-found: warn

@@ -3,6 +3,7 @@
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Link,
@@ -24,6 +25,7 @@ import type {
   ProcessingStatusRecord,
   ProviderJobRecord,
   RawArtifactRecord,
+  RunPipelineHealth,
   RunPreviewSummary,
   RunRecord,
 } from "../../lib/admin/dataProvider";
@@ -279,6 +281,164 @@ function PreviewSummarySection({ run }: { run: RunRecord }) {
   );
 }
 
+function pipelineChipColor(status: string): "default" | "info" | "warning" | "error" | "success" {
+  if (status === "ok") return "success";
+  if (status === "failed") return "error";
+  if (status === "blocked") return "warning";
+  if (status === "in_progress") return "info";
+  return "default";
+}
+
+function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
+  if (stage.status === "ok") return "No action required.";
+  if (stage.stage === "acquisition") {
+    return "Check provider jobs for dispatch/crawl status and retry or cancel when stuck.";
+  }
+  if (stage.stage === "document_intelligence") {
+    return "Inspect DI processing status events and error summaries for remediation.";
+  }
+  if (stage.stage === "projection") {
+    return "Confirm document lifecycle events are being emitted for this run.";
+  }
+  return "Verify lifecycle search disposition and confirm indexed document visibility in legal-search.";
+}
+
+function PipelineHealthSection({ run }: { run: RunRecord }) {
+  const [health, setHealth] = useState<RunPipelineHealth | null>(null);
+  const [isPending, setIsPending] = useState(true);
+  const [error, setError] = useState<unknown>(null);
+  const legalSearchUrl = process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim();
+  const evidenceRunbookPath =
+    "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsPending(true);
+    setError(null);
+
+    void controlPlaneActions
+      .getRunPipelineHealth(run.run_id)
+      .then((response) => {
+        if (!cancelled) {
+          setHealth(response);
+        }
+      })
+      .catch((reason) => {
+        if (!cancelled) {
+          setError(reason);
+          setHealth(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsPending(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [run.run_id]);
+
+  return (
+    <Paper sx={{ p: 3 }}>
+      <Stack spacing={2}>
+        <Box>
+          <Typography variant="h6">Pipeline Health</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Operational status contract for acquisition, DI, projection, and search stages.
+          </Typography>
+        </Box>
+
+        {isPending ? (
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <CircularProgress size={18} />
+            <Typography variant="body2" color="text.secondary">
+              Loading pipeline health...
+            </Typography>
+          </Stack>
+        ) : null}
+
+        {!isPending && error ? (
+          <Alert severity="error">
+            {error instanceof Error ? error.message : "Unable to load pipeline health."}
+          </Alert>
+        ) : null}
+
+        {!isPending && !error && health ? (
+          <Stack spacing={2}>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} flexWrap="wrap">
+              <Chip
+                label={`Overall ${health.overall_status}`}
+                color={pipelineChipColor(health.overall_status)}
+                variant="outlined"
+              />
+              <Chip label={`Processing events ${health.processing_status_event_count}`} />
+              <Chip label={`Lifecycle events ${health.document_lifecycle_event_count}`} />
+            </Stack>
+
+            <Stack spacing={1.5}>
+              {health.stages.map((stage) => (
+                <Paper key={stage.stage} variant="outlined" sx={{ p: 1.5 }}>
+                  <Stack spacing={0.5}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
+                        {stage.stage.replace("_", " ")}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={stage.status}
+                        color={pipelineChipColor(stage.status)}
+                        variant="outlined"
+                      />
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      {stage.detail}
+                    </Typography>
+                    {stage.status !== "ok" ? (
+                      <Typography variant="caption" color="text.secondary">
+                        Recommended next action: {stageNextAction(stage)}
+                      </Typography>
+                    ) : null}
+                    <Typography variant="caption" color="text.secondary">
+                      Updated: {formatDateTime(stage.updated_at)}
+                    </Typography>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              {legalSearchUrl ? (
+                <Button
+                  component="a"
+                  href={legalSearchUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="outlined"
+                  size="small"
+                >
+                  Open legal-search verification
+                </Button>
+              ) : null}
+              <Button
+                component="a"
+                href={evidenceRunbookPath}
+                target="_blank"
+                rel="noreferrer"
+                variant="text"
+                size="small"
+              >
+                Open related evidence runbook
+              </Button>
+            </Stack>
+          </Stack>
+        ) : null}
+      </Stack>
+    </Paper>
+  );
+}
+
 function RunTableSection<TRecord extends { id: Identifier }>({
   title,
   description,
@@ -396,6 +556,7 @@ export function RunDetailSections() {
 
   return (
     <Stack spacing={3} sx={{ pt: 2 }}>
+      <PipelineHealthSection run={run} />
       <PreviewSummarySection run={run} />
 
       <RunTableSection

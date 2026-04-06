@@ -124,6 +124,25 @@ export type RunReadiness = {
   checks: RunReadinessCheck[];
 };
 
+export type RunPipelineHealthStage = {
+  stage: "acquisition" | "document_intelligence" | "projection" | "search";
+  status: "pending" | "in_progress" | "blocked" | "failed" | "ok";
+  detail: string;
+  updated_at: string | null;
+};
+
+export type RunPipelineHealth = {
+  run_id: string;
+  source_id: string;
+  source_version_id: string;
+  mode: "preview" | "production";
+  run_status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  overall_status: "in_progress" | "blocked" | "failed" | "ok";
+  stages: RunPipelineHealthStage[];
+  processing_status_event_count: number;
+  document_lifecycle_event_count: number;
+};
+
 type CapturedResource = {
   captured_resource_id: string;
   run_id: string;
@@ -579,6 +598,10 @@ export const controlPlaneActions = {
       mode: input.mode,
     });
     return requestJson<RunReadiness>(`/v1/runs/readiness?${query.toString()}`);
+  },
+
+  async getRunPipelineHealth(runId: string): Promise<RunPipelineHealth> {
+    return requestJson<RunPipelineHealth>(`/v1/runs/${runId}/pipeline-health`);
   },
 
   async approveSourceVersion(sourceVersionId: string): Promise<SourceVersionRecord> {

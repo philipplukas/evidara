@@ -103,6 +103,7 @@ before adding lower-priority flow coverage.
 - Executed suites in both:
   - `npm run e2e:smoke`
   - `npm run e2e:contract`
+  - `npm run e2e:screenshot-pack`
 - Current staging parity scope:
   - runs stable smoke core journeys and the non-admin hide-link RBAC contract subset
   - full admin-visible link + admin denial UX assertions remain covered in local/PR CI until staging auth/session parity is aligned
@@ -113,10 +114,17 @@ before adding lower-priority flow coverage.
   - local evidence: `scripts/fetch-interaction-flow-evidence.sh`
   - staging evidence: `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence`
   - quick-check (recommended): `scripts/check-latest-interaction-flow-evidence.sh --mode staging`
+  - screenshot pack output path: `legal-search/frontend/screenshot-pack`
 
 ## Canonical Screenshot Evidence Pack
 
 Capture this pack once per release candidate and store it alongside the evidence artifact link.
+
+Automation baseline:
+
+- CI now publishes `legal-search/frontend/screenshot-pack` in both local/PR and staging evidence artifacts.
+- Run `scripts/check-latest-interaction-flow-evidence.sh --mode staging` to verify manifest, Playwright report, runbook snapshot, and screenshot pack presence.
+- Add the two admin-only captures manually (run launch preflight + run lifecycle visibility) when preparing release candidate sign-off.
 
 | Capture point | Target surface | What to capture |
 | --- | --- | --- |

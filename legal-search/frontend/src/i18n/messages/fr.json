@@ -6,7 +6,12 @@
     "pinned": "Épinglés",
     "controlPanel": "Panneau de contrôle",
     "languageGroup": "Langue",
-    "openUserMenu": "Ouvrir le menu utilisateur"
+    "openUserMenu": "Ouvrir le menu utilisateur",
+    "controlPanelRestricted": "Le panneau de contrôle est réservé au profil administrateur.",
+    "controlPanelUnavailable": "L'URL du panneau de contrôle n'est pas configurée pour cet environnement.",
+    "profileLabel": "Profil",
+    "profileOperator": "Opérateur",
+    "profileStandard": "Standard"
   },
   "filter": {
     "filtersTitle": "Filtres",
