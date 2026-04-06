@@ -38,5 +38,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 - Container image: `legal-search/frontend/Dockerfile`
 - Required runtime env var: `NEXT_PUBLIC_API_URL`
-- Optional runtime env var: `NEXT_PUBLIC_CONTROL_PANEL_URL` (shows a header link to platform-control admin)
+- Optional runtime env var: `NEXT_PUBLIC_CONTROL_PANEL_URL` (base URL for the control-plane entrypoint when the user is allowed to see it)
+- Optional runtime env var: `NEXT_PUBLIC_DEFAULT_UI_PROFILE` (`admin` | `standard`) — default when no `evidara-ui-profile` cookie is present; unset behaves like `admin` for backward compatibility
+- Session integration: set the `evidara-ui-profile` cookie to `standard` to hide the control panel link for non-operator users even when `NEXT_PUBLIC_CONTROL_PANEL_URL` is configured
 - Cloud Run service key: `legal-search-frontend` (dev/staging tfvars)

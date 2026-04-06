@@ -12,11 +12,13 @@ on:
     paths:
       - 'legal-search/**'
       - 'contracts/api/legal-search.openapi.yaml'
+      - 'platform-control/admin/**'
   push:
     branches: [main]
     paths:
       - 'legal-search/**'
       - 'contracts/api/legal-search.openapi.yaml'
+      - 'platform-control/admin/**'
 
 jobs:
   # ─── API quality gate ───
@@ -65,6 +67,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install platform-control admin dependencies (Playwright webServer)
+        working-directory: platform-control/admin
+        run: npm ci
+
       # typecheck → lint → test
       - name: Check (typecheck + lint + test)
         run: npm run check
@@ -78,6 +84,9 @@ jobs:
 
       - name: E2E smoke tests
         run: npm run e2e:smoke
+
+      - name: E2E RBAC contract tests
+        run: npm run e2e:contract
 
       - name: Upload Playwright artifacts
         if: always()

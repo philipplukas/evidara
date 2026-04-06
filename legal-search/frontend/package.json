@@ -14,6 +14,7 @@
     "check": "npm run typecheck && npm run lint && npm run test",
     "e2e": "playwright test",
     "e2e:smoke": "playwright test -g @smoke",
+    "e2e:contract": "playwright test -g @contract",
     "e2e:visual": "playwright test e2e/visual.spec.ts",
     "e2e:headed": "playwright test --headed",
     "openapi:lint": "redocly lint ../../contracts/api/legal-search.openapi.yaml",
