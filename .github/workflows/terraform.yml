@@ -14,6 +14,13 @@ on:
       - "infra/terraform/gcp/runtime_stack/**"
       - "infra/env/dev/runtime.gcp.tfvars.example"
       - "infra/env/dev/runtime.gcp.ci.tfvars"
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: "Run terraform apply (default false)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -165,7 +172,7 @@ jobs:
   # ── Main: apply ─────────────────────────────────
   apply:
     name: Terraform apply
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
     runs-on: ubuntu-latest
     environment: dev
 

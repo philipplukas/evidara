@@ -128,7 +128,7 @@ jobs:
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
         run: |
           set -euo pipefail
-          ./scripts/check-di-surface-schema-drift.sh \
+          bash scripts/check-di-surface-schema-drift.sh \
             --project "${GCP_PROJECT_ID}" \
             --surfaces-root-uri "${DI_SURFACES_ROOT_URI}"
 
