@@ -203,11 +203,23 @@ Use this sequence for release-candidate confidence:
 3. `scripts/check-latest-interaction-flow-evidence.sh --mode staging --branch main`
 4. Trigger `Release Readiness` workflow (`strict=true`) and confirm GO
 
-Latest dry-run evidence:
+Latest strict rehearsal (2026-04-06):
 
-- screenshot pack + visual checks: local pass on 2026-04-06
-- staging evidence workflow: run [24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493)
-- strict release readiness: run [24046126662](https://github.com/philipplukas/evidara/actions/runs/24046126662)
+| Check | Command / Evidence | Result |
+| --- | --- | --- |
+| Screenshot pack | `npm run e2e:screenshot-pack` | PASS |
+| Visual regression | `npm run e2e:visual` | PASS |
+| Staging evidence artifact quick-check | `scripts/check-latest-interaction-flow-evidence.sh --mode staging --branch main` | PASS |
+| Latest staging parity evidence run | [Interaction Flow Staging Evidence #24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493) | PASS |
+| Strict release readiness gate | [Release Readiness #24048436324](https://github.com/philipplukas/evidara/actions/runs/24048436324) | PASS |
+
+Pass/fail checklist:
+
+- [x] Local screenshot capture remains deterministic.
+- [x] Local visual baselines pass without snapshot drift.
+- [x] Latest staging evidence artifact contains manifest, report, screenshot pack, and runbook snapshot.
+- [x] Strict release-readiness GO gate passes with interaction-flow artifact completeness.
+- Any failed row above requires remediation before RC promotion.
 
 ## Weekly KPI Rollup
 
@@ -222,6 +234,8 @@ Current KPI set:
 - failed staging evidence runs (windowed)
 - screenshot-pack retries invoked
 - blocked-launch frequency by readiness code (from `operator-journey-events.json`)
+- evidence confidence marker (`high`/`medium`/`low`) with reason and coverage rates
+- operator journey signal counts (`preflight_ready`, `preflight_blocked`, remediation clicks, verification opens)
 
 Latest KPI snapshot (7-day window, generated 2026-04-06):
 

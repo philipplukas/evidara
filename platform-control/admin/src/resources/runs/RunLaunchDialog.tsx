@@ -84,6 +84,9 @@ const readinessActionByCode: Record<string, string> = {
 const RUN_READINESS_CONFIRMED_KEY_PREFIX = "evidara_run_readiness_confirmed:";
 const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_codes:";
 
+const normalizeReadinessCodes = (checks: RunReadiness["checks"]): string[] =>
+  Array.from(new Set(checks.filter((check) => !check.ok).map((check) => check.code))).sort();
+
 export function RunLaunchButton({
   label,
   buttonVariant = "contained",
@@ -160,16 +163,8 @@ export function RunLaunchButton({
       });
       if (typeof window !== "undefined") {
         const runId = String(result.data.run_id);
-        if (readiness?.ready) {
-          window.localStorage.setItem(`${RUN_READINESS_CONFIRMED_KEY_PREFIX}${runId}`, "true");
-          window.localStorage.removeItem(`${RUN_READINESS_BLOCKED_CODES_KEY_PREFIX}${runId}`);
-        } else if (failingChecks.length > 0) {
-          window.localStorage.setItem(
-            `${RUN_READINESS_BLOCKED_CODES_KEY_PREFIX}${runId}`,
-            JSON.stringify(failingChecks.map((check) => check.code)),
-          );
-          window.localStorage.removeItem(`${RUN_READINESS_CONFIRMED_KEY_PREFIX}${runId}`);
-        }
+        window.localStorage.setItem(`${RUN_READINESS_CONFIRMED_KEY_PREFIX}${runId}`, "true");
+        window.localStorage.removeItem(`${RUN_READINESS_BLOCKED_CODES_KEY_PREFIX}${runId}`);
       }
       notify(`${formState.mode === "preview" ? "Preview" : "Production"} run created.`, {
         type: "success",
@@ -214,14 +209,16 @@ export function RunLaunchButton({
             source_id: formState.source_id,
             source_version_id: formState.source_version_id,
             mode: formState.mode,
+            readiness_codes: [],
             duration_ms: elapsedMs,
           });
         } else {
+          const readinessCodes = normalizeReadinessCodes(result.checks);
           emitOperatorJourneyEvent("preflight_blocked", {
             source_id: formState.source_id,
             source_version_id: formState.source_version_id,
             mode: formState.mode,
-            readiness_codes: result.checks.filter((check) => !check.ok).map((check) => check.code),
+            readiness_codes: readinessCodes,
             duration_ms: elapsedMs,
           });
         }
