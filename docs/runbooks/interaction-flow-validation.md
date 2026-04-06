@@ -125,6 +125,8 @@ Executed checks:
 
 - `uv run pytest tests/smoke/test_app.py tests/smoke/test_preview_workflow.py` -> 7 passed
 - `npm run e2e:smoke` (`legal-search/frontend`) -> 4 passed
+- `Interaction Flow Staging Evidence` workflow run [24043317173](https://github.com/philipplukas/evidara/actions/runs/24043317173) -> passed
+- staging artifact retrieved: `interaction-flow-staging-evidence-24043317173` via `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence --run-id 24043317173`
 
 Classification outcome:
 
