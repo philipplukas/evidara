@@ -27,6 +27,7 @@ interface MobileWorkspaceProps {
   pinnedIds: Set<string>;
   onCloseDetail: () => void;
   showControlPlaneEntry?: boolean;
+  controlPanelUrl?: string;
 }
 
 export function MobileWorkspace({
@@ -41,6 +42,7 @@ export function MobileWorkspace({
   pinnedIds,
   onCloseDetail,
   showControlPlaneEntry = true,
+  controlPanelUrl,
 }: MobileWorkspaceProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -49,6 +51,7 @@ export function MobileWorkspace({
       <AppHeader
         onOpenFilters={() => setFiltersOpen(true)}
         showControlPlaneEntry={showControlPlaneEntry}
+        controlPanelUrl={controlPanelUrl}
       />
       <ContextBar context={searchContext} />
 

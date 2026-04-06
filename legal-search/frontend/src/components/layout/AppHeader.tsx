@@ -12,12 +12,15 @@ interface AppHeaderProps {
   onSearch?: (query: string) => Promise<void>;
   /** Set from server (profile + configured control-plane URL). */
   showControlPlaneEntry?: boolean;
+  /** Set from server to avoid client-only build-time env coupling. */
+  controlPanelUrl?: string;
 }
 
 export function AppHeader({
   onOpenFilters,
   onSearch,
   showControlPlaneEntry = true,
+  controlPanelUrl,
 }: AppHeaderProps) {
   const { state } = useWorkspace();
   const { locale, setLocale } = useLocale();
@@ -27,8 +30,8 @@ export function AppHeader({
 
   // Local input state — syncs with store query but allows free typing
   const [inputValue, setInputValue] = useState(storeQuery);
-  const controlPanelUrl = process.env.NEXT_PUBLIC_CONTROL_PANEL_URL?.trim();
-  const hasControlPanelUrl = Boolean(controlPanelUrl);
+  const resolvedControlPanelUrl = controlPanelUrl?.trim();
+  const hasControlPanelUrl = Boolean(resolvedControlPanelUrl);
   const hasControlPanelAccess = hasControlPanelUrl && showControlPlaneEntry;
 
   // Sync input when store query changes (e.g., from URL navigation)
@@ -108,7 +111,7 @@ export function AppHeader({
           />
           {hasControlPanelAccess ? (
             <a
-              href={controlPanelUrl!}
+              href={resolvedControlPanelUrl!}
               target="_blank"
               rel="noreferrer noopener"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-transparent

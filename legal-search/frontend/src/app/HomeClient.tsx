@@ -13,9 +13,10 @@ const DEFAULT_QUERY = "Art. 754 OR Verantwortlichkeit";
 
 interface HomeClientProps {
   showControlPlaneEntry: boolean;
+  controlPanelUrl?: string;
 }
 
-export default function HomeClient({ showControlPlaneEntry }: HomeClientProps) {
+export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: HomeClientProps) {
   const [urlQuery] = useQueryState("q", parseAsString.withDefault(DEFAULT_QUERY));
   const [bootState, setBootState] = useState<{
     searchContext: SearchContextViewModel;
@@ -69,6 +70,7 @@ export default function HomeClient({ showControlPlaneEntry }: HomeClientProps) {
             searchContext={bootState.searchContext}
             filters={bootState.filters}
             showControlPlaneEntry={showControlPlaneEntry}
+            controlPanelUrl={controlPanelUrl}
           />
         </WorkspaceProvider>
       </SearchConstraintsProvider>
