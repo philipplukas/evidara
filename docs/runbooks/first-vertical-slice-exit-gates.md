@@ -58,6 +58,9 @@ The gate covers:
 - Projection verification must query `GET /v1/projections/events/history?run_id=<run_id>`.
 - Search verification must confirm the exact `document_id` from the run-scoped
   projection history appears in `/v1/search` results.
+- Release checklist must include the latest interaction-flow evidence artifact:
+  - local/PR evidence: `scripts/fetch-interaction-flow-evidence.sh`
+  - staging parity evidence: `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence`
 
 ## Local Verification Commands
 

@@ -85,6 +85,57 @@ jobs:
               sys.exit(2)
           PY
 
+      - name: Verify latest interaction-flow staging evidence run
+        id: interaction_flow_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run list \
+            --workflow "Interaction Flow Staging Evidence" \
+            --branch main \
+            --limit 1 \
+            --json databaseId,createdAt,conclusion,url \
+            > tmp/release-readiness/interaction-flow-staging.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          runs = json.loads(
+              open(
+                  "tmp/release-readiness/interaction-flow-staging.json",
+                  "r",
+                  encoding="utf-8",
+              ).read()
+          )
+          if not runs:
+              print(
+                  "No Interaction Flow Staging Evidence runs found on main.",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+
+          latest = runs[0]
+          conclusion = latest.get("conclusion") or "unknown"
+          created_at = latest.get("createdAt") or "unknown"
+          url = latest.get("url") or ""
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"interaction_flow_conclusion={conclusion}\n")
+              fh.write(f"interaction_flow_created_at={created_at}\n")
+              fh.write(f"interaction_flow_url={url}\n")
+
+          if conclusion != "success":
+              print(
+                  f"Latest interaction-flow staging evidence run is not successful: {conclusion}",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+          PY
+
       - name: Verify latest Terraform run
         id: tf_gate
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
@@ -222,6 +273,13 @@ jobs:
             fi
             echo "| Latest E2E Smoke Staging | ${smoke_status} | [run](${{ steps.smoke_gate.outputs.smoke_url }}) @ ${{ steps.smoke_gate.outputs.smoke_created_at }} |"
 
+            if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" ]]; then
+              interaction_flow_status="PASS"
+            else
+              interaction_flow_status="FAIL"
+            fi
+            echo "| Latest interaction-flow staging evidence | ${interaction_flow_status} | [run](${{ steps.interaction_flow_gate.outputs.interaction_flow_url }}) @ ${{ steps.interaction_flow_gate.outputs.interaction_flow_created_at }} |"
+
             if [[ "${{ steps.tf_gate.outcome }}" == "success" ]]; then
               tf_status="PASS"
             else
@@ -243,7 +301,7 @@ jobs:
             fi
             echo "| DLQ depth (15m max) | ${dlq_status} | max=\`${{ steps.dlq_gate.outputs.dlq_max_depth }}\`, subs=\`${{ steps.dlq_gate.outputs.dlq_subscription_count }}\` |"
             echo
-            if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
+            if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
               overall="GO"
             else
               overall="NO-GO"

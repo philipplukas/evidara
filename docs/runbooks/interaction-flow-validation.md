@@ -91,21 +91,24 @@ before adding lower-priority flow coverage.
 | RBAC: admin vs standard header       | `legal-search/frontend/e2e/rbac-cross-surface.spec.ts` (`@contract`)                            | Admin sees link; standard cookie hides link                   |
 | RBAC: admin surface denial           | `legal-search/frontend/e2e/rbac-cross-surface.spec.ts` (`@contract`)                            | Non-admin env shows denial copy + recovery link               |
 | Admin access helpers                 | `platform-control/admin/src/lib/admin/accessControl.test.ts`                                     | Role parsing and allow-list logic                             |
-| CI evidence pack                     | `.github/workflows/legal-search.yml` (`interaction-flow-evidence` job)                           | Uploaded Playwright reports/results + evidence manifest        |
+| Operator route auth denial parity    | `platform-control/tests/integration/test_auth_route_guards.py`                                   | Service key gets `403` on operator routes; operator key gets `200` |
+| Service route auth contract parity   | `platform-control/tests/integration/test_auth_route_guards.py`                                   | Missing/wrong key gets `401`; scoped keys reach handler (`422` with empty payload) |
+| CI evidence pack (local CI)          | `.github/workflows/legal-search.yml` (`interaction-flow-evidence` job)                           | Uploaded Playwright reports/results + evidence manifest        |
+| CI evidence pack (staging parity)    | `.github/workflows/interaction-flow-staging-evidence.yml`                                        | Smoke+contract suites run against staging frontend/admin URLs with artifacts |
 
 ## CI Evidence Automation
 
-- Workflow: `.github/workflows/legal-search.yml`
-- Job: `interaction-flow-evidence`
-- Trigger paths include this runbook (`docs/runbooks/interaction-flow-validation.md`) plus legal-search/admin surfaces
-- Executed suites:
+- Local/PR workflow: `.github/workflows/legal-search.yml` (`interaction-flow-evidence`)
+- Staging parity workflow: `.github/workflows/interaction-flow-staging-evidence.yml`
+- Executed suites in both:
   - `npm run e2e:smoke`
   - `npm run e2e:contract`
-- Published artifact: `interaction-flow-evidence-${run_id}` containing:
-  - `legal-search/frontend/playwright-report`
-  - `legal-search/frontend/test-results`
-  - `legal-search/frontend/interaction-flow-evidence.md`
-  - `docs/runbooks/interaction-flow-validation.md`
+- Published artifacts:
+  - local: `interaction-flow-evidence-${run_id}`
+  - staging: `interaction-flow-staging-evidence-${run_id}`
+- Download helper:
+  - local evidence: `scripts/fetch-interaction-flow-evidence.sh`
+  - staging evidence: `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence`
 
 ## Triage Categories
 
@@ -126,7 +129,6 @@ Classification outcome:
 - `ambiguous-requirement`:
   - none remaining for non-admin denial UX behavior at admin entry.
 - `missing-functionality`:
-  - backend-enforced authorization parity for admin endpoints (in addition to UI denial UX).
   - canonical screenshot evidence pack for operator walkthrough.
 
 ## Initial Prioritization Rules
@@ -137,12 +139,11 @@ Classification outcome:
 
 ## Current Prioritized Follow-ups
 
-1. P1: enforce backend authorization parity for admin surface and APIs.
+1. P1: run and attach staging parity evidence after each release candidate.
 2. P2: capture and store screenshot evidence pack for walkthrough parity.
 3. P2: align legal-search API docs discoverability expectations (`/docs`) with operator needs.
 
 ## Recommended Next Expansions (after critical flows are green)
 
-- Add backend-enforced role denial scenario for non-admin users attempting admin navigation.
 - Add screenshot evidence pack for the operator walkthrough.
 - Add staging parity run evidence in this file after each release candidate.
