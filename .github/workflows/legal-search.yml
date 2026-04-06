@@ -89,6 +89,8 @@ jobs:
   # ─── Interaction-flow evidence (Playwright smoke + contract) ───
   interaction-flow-evidence:
     runs-on: ubuntu-latest
+    env:
+      SCREENSHOT_PACK_STATUS: not_run
     defaults:
       run:
         working-directory: legal-search/frontend
@@ -121,7 +123,21 @@ jobs:
         run: npm run e2e:contract
 
       - name: Capture canonical screenshot evidence pack
-        run: npm run e2e:screenshot-pack
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            if npm run e2e:screenshot-pack; then
+              echo "SCREENSHOT_PACK_STATUS=passed" >> "${GITHUB_ENV}"
+              exit 0
+            fi
+            if [[ "${attempt}" -lt 2 ]]; then
+              echo "Screenshot pack failed on attempt ${attempt}; retrying once after 20s..."
+              sleep 20
+            fi
+          done
+          echo "SCREENSHOT_PACK_STATUS=failed_after_retry" >> "${GITHUB_ENV}"
+          echo "::error::Screenshot evidence pack failed after 2 attempts"
+          exit 1
 
       - name: Generate evidence manifest
         if: always()
@@ -137,6 +153,10 @@ jobs:
           - `npm run e2e:smoke`
           - `npm run e2e:contract`
           - `npm run e2e:screenshot-pack`
+
+          Screenshot pack status:
+          - `${SCREENSHOT_PACK_STATUS}`
+          - if `failed_after_retry`, inspect `test-results` traces and retry logs in this run.
 
           Evidence artifacts in this upload:
           - `legal-search/frontend/playwright-report`

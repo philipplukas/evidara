@@ -42,6 +42,7 @@ type SectionColumn<TRecord extends { id: Identifier }> = {
 };
 
 type RunTableSectionProps<TRecord extends { id: Identifier }> = {
+  sectionId?: string;
   title: string;
   description: string;
   rows: TRecord[] | undefined;
@@ -303,6 +304,25 @@ function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
   return "Verify lifecycle search disposition and confirm indexed document visibility in legal-search.";
 }
 
+function stageActionTarget(
+  stage: RunPipelineHealth["stages"][number],
+  options: { legalSearchUrl?: string; evidenceRunbookPath: string },
+): { label: string; href: string } {
+  if (stage.stage === "acquisition") {
+    return { label: "Open provider jobs", href: "#provider-jobs-section" };
+  }
+  if (stage.stage === "document_intelligence") {
+    return { label: "Open DI processing status", href: "#di-processing-status-section" };
+  }
+  if (stage.stage === "projection") {
+    return { label: "Open document lifecycle", href: "#document-lifecycle-section" };
+  }
+  if (options.legalSearchUrl) {
+    return { label: "Open legal-search verification", href: options.legalSearchUrl };
+  }
+  return { label: "Open evidence runbook", href: options.evidenceRunbookPath };
+}
+
 function PipelineHealthSection({ run }: { run: RunRecord }) {
   const [health, setHealth] = useState<RunPipelineHealth | null>(null);
   const [isPending, setIsPending] = useState(true);
@@ -378,34 +398,57 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
             </Stack>
 
             <Stack spacing={1.5}>
-              {health.stages.map((stage) => (
-                <Paper key={stage.stage} variant="outlined" sx={{ p: 1.5 }}>
-                  <Stack spacing={0.5}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
-                        {stage.stage.replace("_", " ")}
+              {health.stages.map((stage) => {
+                const actionTarget = stageActionTarget(stage, {
+                  legalSearchUrl,
+                  evidenceRunbookPath,
+                });
+                const isInPageAnchor = actionTarget.href.startsWith("#");
+                return (
+                  <Paper key={stage.stage} variant="outlined" sx={{ p: 1.5 }}>
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
+                          {stage.stage.replace("_", " ")}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={stage.status}
+                          color={pipelineChipColor(stage.status)}
+                          variant="outlined"
+                        />
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {stage.detail}
                       </Typography>
-                      <Chip
-                        size="small"
-                        label={stage.status}
-                        color={pipelineChipColor(stage.status)}
-                        variant="outlined"
-                      />
-                    </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                      {stage.detail}
-                    </Typography>
-                    {stage.status !== "ok" ? (
+                      {stage.status !== "ok" ? (
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1}
+                          alignItems="start"
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Recommended next action: {stageNextAction(stage)}
+                          </Typography>
+                          <Button
+                            component="a"
+                            href={actionTarget.href}
+                            target={isInPageAnchor ? undefined : "_blank"}
+                            rel={isInPageAnchor ? undefined : "noreferrer"}
+                            size="small"
+                            variant="text"
+                          >
+                            {actionTarget.label}
+                          </Button>
+                        </Stack>
+                      ) : null}
                       <Typography variant="caption" color="text.secondary">
-                        Recommended next action: {stageNextAction(stage)}
+                        Updated: {formatDateTime(stage.updated_at)}
                       </Typography>
-                    ) : null}
-                    <Typography variant="caption" color="text.secondary">
-                      Updated: {formatDateTime(stage.updated_at)}
-                    </Typography>
-                  </Stack>
-                </Paper>
-              ))}
+                    </Stack>
+                  </Paper>
+                );
+              })}
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
@@ -440,6 +483,7 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
 }
 
 function RunTableSection<TRecord extends { id: Identifier }>({
+  sectionId,
   title,
   description,
   rows,
@@ -449,7 +493,7 @@ function RunTableSection<TRecord extends { id: Identifier }>({
   columns,
 }: RunTableSectionProps<TRecord>) {
   return (
-    <Paper sx={{ p: 3 }}>
+    <Paper id={sectionId} sx={{ p: 3 }}>
       <Stack spacing={2}>
         <Box>
           <Typography variant="h6">{title}</Typography>
@@ -560,6 +604,7 @@ export function RunDetailSections() {
       <PreviewSummarySection run={run} />
 
       <RunTableSection
+        sectionId="provider-jobs-section"
         title="Provider Jobs"
         description="Provider-level crawl job state and webhook progression for this run."
         rows={providerJobs.data}
@@ -648,6 +693,7 @@ export function RunDetailSections() {
       />
 
       <RunTableSection
+        sectionId="di-processing-status-section"
         title="DI Processing Status"
         description="Document-intelligence processing updates correlated to this run."
         rows={processingStatus.data}
@@ -679,6 +725,7 @@ export function RunDetailSections() {
       />
 
       <RunTableSection
+        sectionId="document-lifecycle-section"
         title="Document Lifecycle"
         description="Published or withdrawn document lifecycle events emitted by document-intelligence."
         rows={documentLifecycle.data}

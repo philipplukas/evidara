@@ -114,6 +114,8 @@ Recent closure evidence for this slice:
 | 2026-04-05 | PR [#95](https://github.com/philipplukas/evidara/pull/95) merged (`fix: use SA impersonation for smoke OIDC tokens`) | Token minting switched to service-account impersonation to support WIF-based GitHub Actions credentials |
 | 2026-04-05 | Post-merge smoke pass | GitHub Actions run [24009644603](https://github.com/philipplukas/evidara/actions/runs/24009644603) passed all steps (DI preflight, token minting, smoke run, artifact upload) |
 | 2026-04-06 | Staging interaction-flow parity sanity rerun | GitHub Actions run [24043317173](https://github.com/philipplukas/evidara/actions/runs/24043317173) passed smoke subset + cross-surface contract subset and uploaded `interaction-flow-staging-evidence-24043317173` |
+| 2026-04-06 | Staging interaction-flow evidence with screenshot pack | GitHub Actions run [24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493) passed smoke subset + cross-surface contract subset + screenshot pack upload |
+| 2026-04-06 | Strict release-readiness verification | GitHub Actions run [24046126662](https://github.com/philipplukas/evidara/actions/runs/24046126662) passed including interaction-flow artifact completeness gate |
 
 ## Ownership Handoff
 
