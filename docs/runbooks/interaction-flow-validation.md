@@ -112,6 +112,20 @@ before adding lower-priority flow coverage.
 - Download helper:
   - local evidence: `scripts/fetch-interaction-flow-evidence.sh`
   - staging evidence: `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence`
+  - quick-check (recommended): `scripts/check-latest-interaction-flow-evidence.sh --mode staging`
+
+## Canonical Screenshot Evidence Pack
+
+Capture this pack once per release candidate and store it alongside the evidence artifact link.
+
+| Capture point | Target surface | What to capture |
+| --- | --- | --- |
+| Source + version setup | `platform-control/admin` | Source detail with approved source version selected for launch. |
+| Run launch preflight | `platform-control/admin` | Launch dialog readiness status (passed or blocked with remediation details). |
+| Run lifecycle visibility | `platform-control/admin` | Run detail showing pipeline health + latest processing/lifecycle timeline evidence. |
+| Search discoverability | `legal-search/frontend` | Search results containing the run-scoped indexed document ID. |
+| Detail validation | `legal-search/frontend` | Open detail panel for indexed document with metadata + content visible. |
+| Cross-surface safety | both | Admin profile link visibility and non-admin denial UX recovery state. |
 
 ## Control Panel Testing Policy
 
@@ -126,6 +140,19 @@ before adding lower-priority flow coverage.
 - `broken-implementation`: actual behavior violates expected transition/outcome.
 - `ambiguous-requirement`: expected behavior is unclear or contradictory.
 - `missing-functionality`: required behavior not implemented yet.
+
+## Run Readiness Remediation (Run/Config Guardrails)
+
+Use `GET /v1/runs/readiness?source_id=<id>&source_version_id=<id>&mode=<preview|production>`
+before launch to diagnose blocked runs from control panel preflight checks.
+
+| Readiness code | When it fails | Operator remediation |
+| --- | --- | --- |
+| `source_exists` | Source ID is missing or deleted | Re-select a valid source in admin; if missing unexpectedly, recreate source and re-link version workflow. |
+| `source_version_exists` | Source version ID not found | Re-select an existing source version; if recently removed/superseded, create a new version from the source. |
+| `source_version_belongs_to_source` | Version does not belong to selected source | Pick the matching source/version pair from the same source record; do not mix IDs across sources. |
+| `mode_compatible_with_version_status` | Mode invalid for current version status (e.g. production on non-approved) | For production runs, approve the version first; for preview, avoid rejected/superseded versions. |
+| `acquisition_seed_present` | Acquisition spec has no `seed_url` or `seed_urls` | Edit the source version acquisition spec and add at least one deterministic seed URL, then retry launch. |
 
 ## Latest Execution and Triage (2026-04-06)
 
@@ -142,7 +169,7 @@ Classification outcome:
 - `ambiguous-requirement`:
   - none remaining for non-admin denial UX behavior at admin entry.
 - `missing-functionality`:
-  - canonical screenshot evidence pack for operator walkthrough.
+  - none open; canonical screenshot evidence pack checklist is now defined in this runbook.
 
 ## Initial Prioritization Rules
 
@@ -153,7 +180,7 @@ Classification outcome:
 ## Current Prioritized Follow-ups
 
 1. P1: run and attach staging parity evidence after each release candidate.
-2. P2: capture and store screenshot evidence pack for walkthrough parity.
+2. P2: automate screenshot capture packaging so release evidence is generated, not manual.
 3. P2: align legal-search API docs discoverability expectations (`/docs`) with operator needs.
 
 ## Recommended Next Expansions (after critical flows are green)

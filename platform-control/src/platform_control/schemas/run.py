@@ -243,3 +243,22 @@ class RunPreviewSummaryResponse(BaseModel):
     likely_boilerplate_pages: list[RunPreviewSummarySample]
     likely_duplicate_pages: list[RunPreviewSummarySample]
     drift_checks: list[RunPreviewSummaryDriftCheck]
+
+
+class RunPipelineHealthStage(BaseModel):
+    stage: str
+    status: str
+    detail: str
+    updated_at: datetime | None
+
+
+class RunPipelineHealthResponse(BaseModel):
+    run_id: str
+    source_id: str
+    source_version_id: str
+    mode: RunMode
+    run_status: RunStatus
+    overall_status: str
+    stages: list[RunPipelineHealthStage]
+    processing_status_event_count: int
+    document_lifecycle_event_count: int
