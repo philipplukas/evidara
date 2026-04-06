@@ -190,7 +190,7 @@ Classification outcome:
 
 ## Current Prioritized Follow-ups
 
-1. P1: run and attach staging parity evidence after each release candidate.
+1. P1: use `Release Readiness` report's generated "Runbook Verification Log Row" to attach staging parity evidence after each release candidate.
 2. P2: keep screenshot pack deterministic and monitor flaky retries in staging evidence runs.
 3. P2: align legal-search API docs discoverability expectations (`/docs`) with operator needs.
 
