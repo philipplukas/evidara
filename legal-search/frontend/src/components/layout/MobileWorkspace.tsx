@@ -26,6 +26,7 @@ interface MobileWorkspaceProps {
   onPin: (id: string, title: string, type: string) => void;
   pinnedIds: Set<string>;
   onCloseDetail: () => void;
+  showControlPlaneEntry?: boolean;
 }
 
 export function MobileWorkspace({
@@ -39,12 +40,16 @@ export function MobileWorkspace({
   onPin,
   pinnedIds,
   onCloseDetail,
+  showControlPlaneEntry = true,
 }: MobileWorkspaceProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-screen bg-surface-page">
-      <AppHeader onOpenFilters={() => setFiltersOpen(true)} />
+      <AppHeader
+        onOpenFilters={() => setFiltersOpen(true)}
+        showControlPlaneEntry={showControlPlaneEntry}
+      />
       <ContextBar context={searchContext} />
 
       <div className="flex-1 min-h-0 overflow-y-auto bg-surface-panel">

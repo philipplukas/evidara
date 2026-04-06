@@ -10,9 +10,15 @@ import { useWorkspace } from "@/lib/workspace-store";
 interface AppHeaderProps {
   onOpenFilters?: () => void;
   onSearch?: (query: string) => Promise<void>;
+  /** Set from server (profile + configured control-plane URL). */
+  showControlPlaneEntry?: boolean;
 }
 
-export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
+export function AppHeader({
+  onOpenFilters,
+  onSearch,
+  showControlPlaneEntry = true,
+}: AppHeaderProps) {
   const { state } = useWorkspace();
   const { locale, setLocale } = useLocale();
   const t = useTranslations();
@@ -98,7 +104,7 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
             label={t("header.pinned")}
             count={state.pinned.length > 0 ? state.pinned.length : undefined}
           />
-          {controlPanelUrl ? (
+          {controlPanelUrl && showControlPlaneEntry ? (
             <a
               href={controlPanelUrl}
               target="_blank"

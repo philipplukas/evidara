@@ -28,9 +28,14 @@ import { useWorkspace } from "@/lib/workspace-store";
 interface WorkspaceClientProps {
   searchContext: SearchContextViewModel;
   filters: FilterViewModel[];
+  showControlPlaneEntry?: boolean;
 }
 
-export default function WorkspaceClient({ searchContext, filters }: WorkspaceClientProps) {
+export default function WorkspaceClient({
+  searchContext,
+  filters,
+  showControlPlaneEntry = true,
+}: WorkspaceClientProps) {
   const t = useTranslations();
   const isDesktop = useDesktop();
   const { state, dispatch } = useWorkspace();
@@ -166,6 +171,7 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
         onPin={handlePin}
         pinnedIds={pinnedIds}
         onCloseDetail={() => setSelectedId(null)}
+        showControlPlaneEntry={showControlPlaneEntry}
       />
     );
   }
@@ -173,7 +179,7 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
   // Desktop
   return (
     <div className="flex flex-col h-screen bg-surface-page">
-      <AppHeader onSearch={handleSearch} />
+      <AppHeader onSearch={handleSearch} showControlPlaneEntry={showControlPlaneEntry} />
       <ContextBar context={searchContext} />
 
       <div className="flex-1 min-h-0">

@@ -62,12 +62,12 @@ before adding lower-priority flow coverage.
 
 ### Journey 5: Cross-surface operator navigation
 
-- Trigger: open legal-search UI header
+- Trigger: open legal-search UI header; optionally open platform-control admin as a non-admin role
 - Expected transitions:
-  - control panel link is visible when `NEXT_PUBLIC_CONTROL_PANEL_URL` is configured
-  - non-admin users who access admin directly see explicit `403` denial UX with recovery link
-  - link points to configured admin surface URL
-- Evidence: browser-visible header link with expected href
+  - control panel link is visible when `NEXT_PUBLIC_CONTROL_PANEL_URL` is configured **and** the UI profile is `admin` (see `NEXT_PUBLIC_DEFAULT_UI_PROFILE` and `evidara-ui-profile` in `legal-search/frontend/README.md`)
+  - non-admin users who open admin directly see explicit **403-style** denial copy and a recovery link (`AdminShell`)
+  - link points to configured admin surface URL for authorized profiles
+- Evidence: browser-visible header link with expected href; Playwright `@contract` in `legal-search/frontend/e2e/rbac-cross-surface.spec.ts`
 
 ### Journey 6: Surface health checks
 
@@ -88,7 +88,9 @@ before adding lower-priority flow coverage.
 | Preview flow path                    | `platform-control/tests/smoke/test_preview_workflow.py`                                         | Preview mode reaches terminal path with expected records      |
 | UI app-shell and search interactions | `legal-search/frontend/e2e/smoke.spec.ts`                                                       | Existing smoke cases pass                                     |
 | UI control-panel entrypoint          | `legal-search/frontend/e2e/smoke.spec.ts` (`@smoke exposes control panel entrypoint in header`) | Header link exists and targets configured URL                 |
-| Admin denial UX (non-admin)          | `platform-control/admin/src/lib/admin/accessControl.test.ts` and manual `/` check in admin UI   | Non-admin role receives explicit `403` with legal-search recovery link |
+| RBAC: admin vs standard header       | `legal-search/frontend/e2e/rbac-cross-surface.spec.ts` (`@contract`)                            | Admin sees link; standard cookie hides link                   |
+| RBAC: admin surface denial           | `legal-search/frontend/e2e/rbac-cross-surface.spec.ts` (`@contract`)                            | Non-admin env shows denial copy + recovery link               |
+| Admin access helpers                 | `platform-control/admin/src/lib/admin/accessControl.test.ts`                                     | Role parsing and allow-list logic                             |
 
 ## Triage Categories
 
