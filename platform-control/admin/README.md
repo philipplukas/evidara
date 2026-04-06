@@ -33,6 +33,12 @@ Code-managed React-admin frontend for the Evidara control plane.
 The Next.js app proxies `/api/platform-control/*` to `PLATFORM_CONTROL_API_URL`, so the browser
 never needs direct database access or direct cross-origin calls to FastAPI.
 
+## Runtime deployment
+
+- Container image: `platform-control/admin/Dockerfile`
+- Required runtime env var: `PLATFORM_CONTROL_API_URL`
+- Cloud Run service key: `platform-control-admin` (dev/staging tfvars)
+
 ## Current coverage
 
 The current React-admin slice includes:
