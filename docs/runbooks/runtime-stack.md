@@ -1,9 +1,9 @@
 # Runtime Stack — Architecture & Operations Runbook
 
 Owner: Platform Team
-Last reviewed: 2026-04-04
-Last verified: 2026-04-04
-Applies to: dev, prod
+Last reviewed: 2026-04-06
+Last verified: 2026-04-06
+Applies to: dev, staging, prod
 
 ## Purpose
 
@@ -116,8 +116,10 @@ terraform apply -var-file="../../../../infra/env/dev/runtime.gcp.tfvars"
 ```
 
 > **Note**: Terraform plan/apply is automated via CI (`.github/workflows/terraform.yml`).
-> PRs touching `infra/terraform/gcp/runtime_stack/**` or `infra/env/dev/runtime.gcp.tfvars`
-> will receive an automatic plan comment. Merging to `main` triggers auto-apply.
+> PRs touching `infra/terraform/gcp/runtime_stack/**` or `infra/env/dev/runtime.gcp.tfvars.example`
+> will receive an automatic plan comment. CI uses `infra/env/dev/runtime.gcp.ci.tfvars`
+> as an overlay for plan-safe project/service-account overrides. Merging to `main`
+> triggers auto-apply.
 
 ### GitHub Actions Variables
 
@@ -232,6 +234,40 @@ gcloud run services update-traffic "${SERVICE}-dev" \
   --to-latest
 ```
 
+### 6. Bootstrap Runtime Schema & OpenSearch Aliases
+
+Use this after fresh environment bring-up (or when smoke preflight reports missing aliases):
+
+```bash
+export GCP_PROJECT_ID="data-platform-dev-492214"
+export GCP_REGION="europe-west6"
+bash scripts/run-runtime-bootstrap.sh staging
+```
+
+What it does:
+
+1. Executes `platform-control-db-migrate-{env}`
+2. Executes `os-alias-bootstrap-{env}`
+3. Executes `os-alias-check-{env}`
+
+If staging smoke fails with:
+
+`OpenSearch alias preflight failed. Run job os-alias-bootstrap-staging and retry smoke.`
+
+remediation is:
+
+```bash
+gcloud run jobs execute os-alias-bootstrap-staging \
+  --project "${GCP_PROJECT_ID}" \
+  --region "${GCP_REGION}" \
+  --wait
+
+gcloud run jobs execute os-alias-check-staging \
+  --project "${GCP_PROJECT_ID}" \
+  --region "${GCP_REGION}" \
+  --wait
+```
+
 ## Rollback
 
 ### Rollback to Previous Revision
@@ -270,6 +306,7 @@ git push origin main
 | Terraform plan drift | Manual changes outside Terraform | Run `terraform plan` to see drift, then `terraform apply` |
 | Image not found on deploy | Image not pushed to Artifact Registry | Check `runtime-images.yml` workflow run, verify AR tag exists |
 | Health check timeout | Service startup too slow | Increase `startup_probe.initial_delay_seconds` in tfvars |
+| OpenSearch alias preflight fails in smoke | Missing or broken read/write aliases | Run `scripts/run-runtime-bootstrap.sh <env>` or execute `os-alias-bootstrap-<env>` then `os-alias-check-<env>` |
 
 ## Related
 

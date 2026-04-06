@@ -6,12 +6,14 @@ on:
       - ".github/workflows/terraform.yml"
       - "infra/terraform/gcp/runtime_stack/**"
       - "infra/env/dev/runtime.gcp.tfvars.example"
+      - "infra/env/dev/runtime.gcp.ci.tfvars"
   push:
     branches: [main]
     paths:
       - ".github/workflows/terraform.yml"
       - "infra/terraform/gcp/runtime_stack/**"
       - "infra/env/dev/runtime.gcp.tfvars.example"
+      - "infra/env/dev/runtime.gcp.ci.tfvars"
 
 permissions:
   contents: read
@@ -25,9 +27,8 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   TF_ROOT: infra/terraform/gcp/runtime_stack
-  TF_VAR_FILE: infra/env/dev/runtime.gcp.tfvars.example
-  GCP_PROJECT_ID: data-platform-dev-492214
-  GCP_PROJECT_NUMBER: "585502170445"
+  TF_BASE_VAR_FILE: infra/env/dev/runtime.gcp.tfvars.example
+  TF_CI_VAR_FILE: infra/env/dev/runtime.gcp.ci.tfvars
 
 jobs:
   # ── PR: fmt + validate + plan ───────────────────
@@ -73,10 +74,8 @@ jobs:
         run: |
           set -o pipefail
           terraform plan \
-            -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
-            -var="project_id=${{ env.GCP_PROJECT_ID }}" \
-            -var="project_number=${{ env.GCP_PROJECT_NUMBER }}" \
-            -var='runtime_service_account_ids={platform_control_api="evd-pc-api",platform_control_worker="evd-pc-worker",legal_search_api="evd-ls-api",legal_search_frontend="evd-ls-frontend",document_intelligence="evd-di-consumer"}' \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_BASE_VAR_FILE }}" \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_CI_VAR_FILE }}" \
             -no-color \
             -input=false \
             -out=tfplan 2>&1 | tee plan_output.txt
@@ -192,10 +191,8 @@ jobs:
       - name: Terraform apply
         run: |
           terraform apply \
-            -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
-            -var="project_id=${{ env.GCP_PROJECT_ID }}" \
-            -var="project_number=${{ env.GCP_PROJECT_NUMBER }}" \
-            -var='runtime_service_account_ids={platform_control_api="evd-pc-api",platform_control_worker="evd-pc-worker",legal_search_api="evd-ls-api",legal_search_frontend="evd-ls-frontend",document_intelligence="evd-di-consumer"}' \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_BASE_VAR_FILE }}" \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_CI_VAR_FILE }}" \
             -auto-approve \
             -input=false \
             -no-color
