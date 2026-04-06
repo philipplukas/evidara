@@ -209,6 +209,29 @@ Latest dry-run evidence:
 - staging evidence workflow: run [24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493)
 - strict release readiness: run [24046126662](https://github.com/philipplukas/evidara/actions/runs/24046126662)
 
+## Weekly KPI Rollup
+
+Generate KPI rollups from recent interaction-flow workflow runs:
+
+- script: `scripts/weekly-interaction-flow-kpis.sh`
+- workflow: `.github/workflows/interaction-flow-weekly-kpis.yml`
+- output artifact: `interaction-flow-weekly-kpis-{run_id}`
+
+Current KPI set:
+
+- failed staging evidence runs (windowed)
+- screenshot-pack retries invoked
+- blocked-launch frequency by readiness code (from `operator-journey-events.json`)
+
+Latest KPI snapshot (7-day window, generated 2026-04-06):
+
+| KPI | Value |
+| --- | ---: |
+| Staging evidence runs inspected | 8 |
+| Failed staging evidence runs | 5 |
+| Screenshot-pack retries invoked | 0 |
+| Blocked-launch frequency (`readiness_codes`) | n/a |
+
 ## Recommended Next Expansions (after critical flows are green)
 
 - Expand screenshot evidence pack assertions to include visual diff checks for admin captures.
