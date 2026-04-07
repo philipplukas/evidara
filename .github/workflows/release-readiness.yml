@@ -93,8 +93,8 @@ jobs:
           gh run list \
             --workflow "Interaction Flow Staging Evidence" \
             --branch main \
-            --limit 1 \
-            --json databaseId,createdAt,conclusion,url \
+            --limit 20 \
+            --json databaseId,createdAt,status,conclusion,url \
             > tmp/release-readiness/interaction-flow-staging.json
 
           python3 - <<'PY'
@@ -116,22 +116,31 @@ jobs:
               )
               sys.exit(2)
 
-          latest = runs[0]
-          conclusion = latest.get("conclusion") or "unknown"
-          created_at = latest.get("createdAt") or "unknown"
-          url = latest.get("url") or ""
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-              fh.write(f"interaction_flow_conclusion={conclusion}\n")
-              fh.write(f"interaction_flow_created_at={created_at}\n")
-              fh.write(f"interaction_flow_url={url}\n")
-
-          if conclusion != "success":
+          latest_success = next(
+              (run for run in runs if (run.get("conclusion") or "") == "success"),
+              None,
+          )
+          if latest_success is None:
+              latest = runs[0]
+              latest_status = latest.get("status") or "unknown"
+              latest_conclusion = latest.get("conclusion") or "unknown"
               print(
-                  f"Latest interaction-flow staging evidence run is not successful: {conclusion}",
+                  "No successful Interaction Flow Staging Evidence runs found in the latest 20 runs. "
+                  f"Newest run status={latest_status}, conclusion={latest_conclusion}.",
                   file=sys.stderr,
               )
               sys.exit(2)
+
+          run_id = latest_success.get("databaseId") or ""
+          conclusion = latest_success.get("conclusion") or "unknown"
+          created_at = latest_success.get("createdAt") or "unknown"
+          url = latest_success.get("url") or ""
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"interaction_flow_run_id={run_id}\n")
+              fh.write(f"interaction_flow_conclusion={conclusion}\n")
+              fh.write(f"interaction_flow_created_at={created_at}\n")
+              fh.write(f"interaction_flow_url={url}\n")
           PY
 
       - name: Verify interaction-flow evidence artifact completeness

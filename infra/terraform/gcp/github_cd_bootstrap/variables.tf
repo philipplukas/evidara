@@ -57,6 +57,18 @@ variable "deployer_service_account_id_prod" {
   default     = "gha-deployer-prod"
 }
 
+variable "deployer_dev_storage_object_admin_buckets" {
+  description = "Bucket names where the dev deployer service account should have storage.objectAdmin."
+  type        = set(string)
+  default     = []
+}
+
+variable "deployer_prod_storage_object_admin_buckets" {
+  description = "Bucket names where the prod deployer service account should have storage.objectAdmin."
+  type        = set(string)
+  default     = []
+}
+
 variable "databricks_token_secret_name_dev" {
   description = "Secret Manager secret name for dev Databricks token."
   type        = string
