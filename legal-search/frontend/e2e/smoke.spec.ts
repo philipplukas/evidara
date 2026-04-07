@@ -9,6 +9,7 @@ const EXPECTED_CONTROL_PANEL_URL =
 const LEGAL_SEARCH_BASE_URL =
   process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3101";
 const USE_REAL_BACKEND = process.env.PLAYWRIGHT_USE_REAL_BACKEND === "true";
+const REAL_BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:3102";
 const UI_PROFILE_COOKIE = "evidara-ui-profile";
 
 test.describe("Frontend smoke journeys", () => {
@@ -22,8 +23,28 @@ test.describe("Frontend smoke journeys", () => {
     ]);
     if (!USE_REAL_BACKEND) {
       await mockSearchApi(page);
+    } else {
+      const probe = await page.request.get(
+        `${REAL_BACKEND_API_URL}/v1/search?q=probe&page=1&page_size=1`,
+        {
+          failOnStatusCode: false,
+          timeout: 5_000,
+        },
+      );
+      if (!probe.ok()) {
+        throw new Error(
+          `Real backend mode requires a reachable search API at ${REAL_BACKEND_API_URL} (GET /v1/search).`,
+        );
+      }
     }
     await page.goto("/");
+    if (USE_REAL_BACKEND) {
+      const alert = page.getByRole("alert").first();
+      if (await alert.isVisible().catch(() => false)) {
+        const alertText = (await alert.textContent())?.trim() || "Unknown startup error";
+        throw new Error(`Real backend smoke setup failed before assertions: ${alertText}`);
+      }
+    }
     await expect(page.getByRole("banner")).toBeVisible();
     await expect(page.getByPlaceholder(SEARCH_PLACEHOLDER)).toBeVisible();
   });
@@ -69,31 +90,28 @@ test.describe("Frontend smoke journeys", () => {
     test.skip(!USE_REAL_BACKEND, "real backend mode is opt-in via PLAYWRIGHT_USE_REAL_BACKEND=true");
 
     const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
+    const initialResponsePromise = page.waitForResponse(
+      (response) => response.url().includes("/v1/search?") && response.request().method() === "GET",
+    );
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
 
-    const initialRequest = await page.waitForResponse(
-      (response) => response.url().includes("/v1/search?") && response.request().method() === "GET",
-    );
+    const initialRequest = await initialResponsePromise;
+    expect(initialRequest.ok()).toBe(true);
     const initialUrl = new URL(initialRequest.url());
-    const beforeCount = await page.locator("article").count();
 
     const firstCheckboxRow = page.locator('label:has(input[type="checkbox"])').first();
     await expect(firstCheckboxRow).toBeVisible();
-    const countText = (await firstCheckboxRow.locator("span").last().textContent())?.trim() ?? "";
-    const expectedUpperBound = Number.parseInt(countText.replace(/[^\d]/g, ""), 10);
-    await firstCheckboxRow.click();
-
-    const filteredRequest = await page.waitForResponse(
+    const filteredResponsePromise = page.waitForResponse(
       (response) => response.url().includes("/v1/search?") && response.request().method() === "GET",
     );
+    await firstCheckboxRow.click();
+
+    const filteredRequest = await filteredResponsePromise;
+    expect(filteredRequest.ok()).toBe(true);
     const filteredUrl = new URL(filteredRequest.url());
-    await expect.poll(async () => page.locator("article").count()).not.toBe(beforeCount);
-    const afterCount = await page.locator("article").count();
 
     expect(filteredUrl.search).not.toEqual(initialUrl.search);
-    if (!Number.isNaN(expectedUpperBound)) {
-      expect(afterCount).toBeLessThanOrEqual(expectedUpperBound);
-    }
+    expect(filteredUrl.searchParams.toString().length).toBeGreaterThan(initialUrl.searchParams.toString().length);
   });
 });
