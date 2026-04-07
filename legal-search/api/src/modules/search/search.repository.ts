@@ -10,10 +10,22 @@ export interface SearchRepository {
 }
 
 export interface SearchOptions {
-  jurisdiction?: string;
-  documentType?: string;
+  jurisdictions?: string[];
+  languages?: string[];
+  documentTypes?: string[];
+  officialOnly?: boolean;
+  refinements?: SearchRefinement[];
   page?: number;
   pageSize?: number;
+}
+
+export interface SearchRefinement {
+  field: string;
+  type: 'terms' | 'date_range' | 'range' | 'toggle' | 'text';
+  values: string[];
+  from?: string;
+  to?: string;
+  value?: boolean | string;
 }
 
 export const SEARCH_REPOSITORY = Symbol('SEARCH_REPOSITORY');
