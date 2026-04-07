@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   smoke-dev:
-    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64","gcp-heavy"]') }}
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
     environment: dev
     env:
       TARGET_ENV: dev

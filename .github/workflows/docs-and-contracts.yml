@@ -8,7 +8,7 @@ on:
 
 jobs:
   contract-validation:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout
