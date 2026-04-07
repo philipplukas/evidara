@@ -27,6 +27,7 @@ jobs:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}
       GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
       DI_SURFACES_ROOT_URI: ${{ vars.DI_SURFACES_ROOT_URI_STAGING }}
+      INTERACTION_FLOW_EVIDENCE_GCS_ROOT: ${{ vars.INTERACTION_FLOW_EVIDENCE_GCS_ROOT_STAGING || vars.DI_SURFACES_ROOT_URI_STAGING }}
       TERRAFORM_APPLY_ENABLED: ${{ vars.TERRAFORM_APPLY_ENABLED || 'false' }}
       REPORT_PATH: tmp/release-readiness/report.md
     steps:
@@ -143,6 +144,7 @@ jobs:
           scripts/check-latest-interaction-flow-evidence.sh \
             --mode staging \
             --output-dir tmp/release-readiness/interaction-flow-evidence-quickcheck \
+            --gcs-root-uri "${INTERACTION_FLOW_EVIDENCE_GCS_ROOT}" \
             --github-output "${GITHUB_OUTPUT}"
 
       - name: Verify latest Terraform run
@@ -344,9 +346,15 @@ jobs:
 
           cat "${REPORT_PATH}" >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Upload release readiness artifact
+      - name: Upload release readiness report to GCS
+        id: release_report_upload
         if: ${{ always() }}
-        uses: actions/upload-artifact@v5
-        with:
-          name: release-readiness-report
-          path: ${{ env.REPORT_PATH }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${INTERACTION_FLOW_EVIDENCE_GCS_ROOT}" ]]; then
+            echo "::error::INTERACTION_FLOW_EVIDENCE_GCS_ROOT is not configured."
+            exit 1
+          fi
+          REPORT_GCS_PATH="${INTERACTION_FLOW_EVIDENCE_GCS_ROOT%/}/release-readiness/${GITHUB_RUN_ID}/report.md"
+          gcloud storage cp "${REPORT_PATH}" "${REPORT_GCS_PATH}"
+          echo "report_gcs_path=${REPORT_GCS_PATH}" >> "${GITHUB_OUTPUT}"

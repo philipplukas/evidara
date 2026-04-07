@@ -5,6 +5,7 @@ MODE="staging"
 BRANCH="main"
 OUTPUT_DIR="tmp/interaction-flow-evidence-quickcheck"
 GITHUB_OUTPUT_PATH=""
+GCS_ROOT_URI=""
 
 usage() {
   cat <<'EOF'
@@ -16,6 +17,7 @@ Options:
   --mode <staging|local>  Evidence source (default: staging)
   --branch <name>         Branch to inspect (default: main)
   --output-dir <path>     Output directory (default: tmp/interaction-flow-evidence-quickcheck)
+  --gcs-root-uri <uri>    Optional GCS root URI for staging evidence bundles
   --github-output <path>  Optional GitHub Actions output file path
   -h, --help              Show this help
 EOF
@@ -33,6 +35,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --output-dir)
       OUTPUT_DIR="${2:?missing value for --output-dir}"
+      shift 2
+      ;;
+    --gcs-root-uri)
+      GCS_ROOT_URI="${2:?missing value for --gcs-root-uri}"
       shift 2
       ;;
     --github-output)
@@ -63,11 +69,34 @@ if [[ "${MODE}" == "staging" ]]; then
   ARTIFACT_PREFIX="interaction-flow-staging-evidence"
 fi
 
-scripts/fetch-interaction-flow-evidence.sh \
-  --workflow "${WORKFLOW}" \
-  --artifact-prefix "${ARTIFACT_PREFIX}" \
-  --branch "${BRANCH}" \
-  --output-dir "${OUTPUT_DIR}"
+if [[ "${MODE}" == "staging" && -n "${GCS_ROOT_URI}" ]]; then
+  if ! command -v gcloud >/dev/null 2>&1; then
+    echo "gcloud CLI is required when --gcs-root-uri is provided." >&2
+    exit 1
+  fi
+  latest_run_id="$(gh run list \
+    --workflow "${WORKFLOW}" \
+    --branch "${BRANCH}" \
+    --limit 20 \
+    --json databaseId,conclusion \
+    --jq '.[] | select(.conclusion=="success") | .databaseId' | sed -n '1p')"
+  if [[ -z "${latest_run_id}" ]]; then
+    echo "No successful ${WORKFLOW} runs found on branch ${BRANCH}." >&2
+    exit 2
+  fi
+  latest_dir="${OUTPUT_DIR}/${latest_run_id}"
+  mkdir -p "${latest_dir}"
+  gcloud storage cp --recursive \
+    "${GCS_ROOT_URI%/}/interaction-flow-evidence/staging/${latest_run_id}/*" \
+    "${latest_dir}/"
+  echo "Downloaded staging evidence bundle from GCS for run ${latest_run_id}"
+else
+  scripts/fetch-interaction-flow-evidence.sh \
+    --workflow "${WORKFLOW}" \
+    --artifact-prefix "${ARTIFACT_PREFIX}" \
+    --branch "${BRANCH}" \
+    --output-dir "${OUTPUT_DIR}"
+fi
 
 latest_dir="$(ls -1d "${OUTPUT_DIR}"/* 2>/dev/null | sort | tail -n 1 || true)"
 if [[ -z "${latest_dir}" ]]; then
