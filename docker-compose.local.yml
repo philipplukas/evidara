@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: platform-control/Dockerfile
-    container_name: evidara-platform-control-init
     profiles: ["apps"]
     environment:
       PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
@@ -23,7 +22,6 @@ services:
     build:
       context: .
       dockerfile: platform-control/Dockerfile
-    container_name: evidara-platform-control-api
     profiles: ["apps"]
     environment:
       PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
@@ -54,7 +52,6 @@ services:
     build:
       context: ./platform-control/admin
       dockerfile: Dockerfile
-    container_name: evidara-platform-control-admin
     profiles: ["apps"]
     environment:
       PLATFORM_CONTROL_API_URL: http://platform-control-api:8000
@@ -72,7 +69,6 @@ services:
 
   legal-search-seed:
     image: node:22-alpine
-    container_name: evidara-legal-search-seed
     profiles: ["apps"]
     working_dir: /app
     volumes:
@@ -93,7 +89,6 @@ services:
     build:
       context: .
       dockerfile: legal-search/api/Dockerfile
-    container_name: evidara-legal-search-api
     profiles: ["apps"]
     environment:
       OPENSEARCH_NODE: http://opensearch:9200
@@ -117,7 +112,6 @@ services:
     build:
       context: ./legal-search/frontend
       dockerfile: Dockerfile
-    container_name: evidara-legal-search-frontend
     profiles: ["apps"]
     environment:
       NEXT_PUBLIC_API_URL: http://legal-search-api:3102

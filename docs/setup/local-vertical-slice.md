@@ -37,6 +37,14 @@ bash scripts/local-vertical-slice.sh up-all search
 bash scripts/local-vertical-slice.sh status-all search
 ```
 
+`up-all`/`status-all`/`down-all` use isolated host ports for infra by default to avoid
+collisions with existing local services:
+
+- Postgres host port: `15432` (`EVIDARA_POSTGRES_HOST_PORT`)
+- OpenSearch host HTTP port: `19200` (`EVIDARA_OPENSEARCH_HTTP_PORT`)
+- OpenSearch metrics port: `19600` (`EVIDARA_OPENSEARCH_METRICS_PORT`)
+- Pub/Sub host port (full mode): `18681` (`EVIDARA_PUBSUB_HOST_PORT`)
+
 For full runtime wiring (adds pubsub emulator):
 
 ```bash
