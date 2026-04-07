@@ -16,7 +16,8 @@ import { RunDetailSections } from "./RunDetailSections";
 
 function RunDurationField() {
   const record = useRecordContext<RunRecord>();
-  if (!record?.started_at || !record?.completed_at) return <Typography variant="body2">-</Typography>;
+  if (!record?.started_at || !record?.completed_at)
+    return <Typography variant="body2">-</Typography>;
   const ms = new Date(record.completed_at).getTime() - new Date(record.started_at).getTime();
   let display: string;
   if (ms < 1000) display = `${ms}ms`;

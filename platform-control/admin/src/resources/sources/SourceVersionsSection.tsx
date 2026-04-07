@@ -197,8 +197,12 @@ const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
     seeds.length > 0 ? `seeds: ${seeds.join(", ")}` : "seeds: none",
     `limit: ${spec.limit}`,
     `depth: ${spec.max_discovery_depth}`,
-    (spec.include_paths ?? []).length > 0 ? `include: ${spec.include_paths.join(", ")}` : "include: all",
-    (spec.exclude_paths ?? []).length > 0 ? `exclude: ${spec.exclude_paths.join(", ")}` : "exclude: none",
+    (spec.include_paths ?? []).length > 0
+      ? `include: ${spec.include_paths.join(", ")}`
+      : "include: all",
+    (spec.exclude_paths ?? []).length > 0
+      ? `exclude: ${spec.exclude_paths.join(", ")}`
+      : "exclude: none",
     `formats: ${(spec.scrape_formats ?? []).join(", ")}`,
     `zero retention: ${spec.zero_data_retention ? "yes" : "no"}`,
   ];

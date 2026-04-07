@@ -11,21 +11,28 @@ import {
 
 const AdminApp = dynamic(() => import("./AdminApp"), {
   loading: () => (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "100vh",
-      fontFamily: "system-ui, sans-serif",
-      color: "#64748b",
-    }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "100vh",
+        fontFamily: "system-ui, sans-serif",
+        color: "#64748b",
+      }}
+    >
       <div style={{ textAlign: "center" }}>
-        <div style={{
-          width: 40, height: 40, margin: "0 auto 16px",
-          border: "3px solid #e2e8f0", borderTopColor: "#0f4c81",
-          borderRadius: "50%",
-          animation: "spin 0.8s linear infinite",
-        }} />
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            margin: "0 auto 16px",
+            border: "3px solid #e2e8f0",
+            borderTopColor: "#0f4c81",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+          }}
+        />
         <p style={{ margin: 0, fontSize: 14 }}>Loading Control Plane...</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>

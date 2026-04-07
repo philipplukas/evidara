@@ -1,7 +1,14 @@
 "use client";
 
-import { Alert, MenuItem } from "@mui/material";
-import { Create, FormDataConsumer, required, SelectInput, SimpleForm, TextInput } from "react-admin";
+import { Alert } from "@mui/material";
+import {
+  Create,
+  FormDataConsumer,
+  required,
+  SelectInput,
+  SimpleForm,
+  TextInput,
+} from "react-admin";
 import { AuthoritySelectInput, JurisdictionSelectInput } from "../shared/ReferenceInputs";
 
 const SOURCE_TYPE_CHOICES = [
