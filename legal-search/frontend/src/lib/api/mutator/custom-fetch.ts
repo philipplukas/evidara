@@ -30,7 +30,7 @@ export async function customFetch<T>({
   headers,
   data,
 }: CustomFetchConfig): Promise<T> {
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3102";
   const response = await fetch(buildUrl(apiBase, url, params), {
     method,
     signal,

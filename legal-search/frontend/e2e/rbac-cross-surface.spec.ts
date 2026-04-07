@@ -9,13 +9,13 @@ const SEARCH_PLACEHOLDER =
   /search article, case, commentary, citation|nach artikel, urteil, kommentar oder zitat|rechercher un article, un arrêt, un commentaire ou une citation/i;
 const CONTROL_PANEL_LABEL = /control panel|kontrollbereich|panneau de contr[oô]le/i;
 const LEGAL_SEARCH_BASE_URL =
-  process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3000";
+  process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3101";
 const EXPECTED_CONTROL_PANEL_URL =
   process.env.PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL?.trim() || "http://localhost:3100";
 
 /** Playwright `webServer`: admin dev server with non-admin role (`playwright.config.ts`). */
 const ADMIN_CONTRACT_BASE_URL =
-  process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://localhost:3102";
+  process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://localhost:3100";
 const ADMIN_LOCAL_STORAGE_ROLE_KEY = "evidara_user_role";
 
 async function setUiProfileCookie(context: BrowserContext, profile: "admin" | "standard") {
