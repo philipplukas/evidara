@@ -147,4 +147,3 @@ jsonPayload.duration_ms>10000
 - [Scraping QA Standard](../testing/scraping-qa-standard.md)
 - [Scraping Nightly Canary](scraping-nightly-canary.md)
 - [Event Tracing Queries](event-tracing-queries.md)
-

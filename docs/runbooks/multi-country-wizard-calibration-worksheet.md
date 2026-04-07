@@ -64,21 +64,21 @@ Never demote below `country_jurisdiction` for countries with persistent dual-tra
 
 ## Threshold tuning rules
 
-### Raise `highThreshold` by +0.02 (max 0.95) when:
+### Raise `highThreshold` by +0.02 (max 0.95) when
 
 - audited error rate for auto-accepted records exceeds 2% for 2 weeks
 - reviewer edits concentrate in one or two critical fields
 
-### Lower `highThreshold` by -0.02 (min 0.85) when:
+### Lower `highThreshold` by -0.02 (min 0.85) when
 
 - audited auto-accepted error rate remains < 1% for 2 weeks
 - review backlog breaches freshness SLO while quality remains stable
 
-### Raise `lowThreshold` by +0.02 (max 0.80) when:
+### Raise `lowThreshold` by +0.02 (max 0.80) when
 
 - downstream incidents are linked to low-confidence accepted records
 
-### Lower `lowThreshold` by -0.02 (min 0.60) when:
+### Lower `lowThreshold` by -0.02 (min 0.60) when
 
 - mandatory review queue becomes persistent bottleneck with low disagreement rates
 

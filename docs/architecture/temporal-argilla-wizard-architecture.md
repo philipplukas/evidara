@@ -61,8 +61,6 @@ flowchart LR
   EventBus --> TemporalCluster
 ```
 
-
-
 ## Temporal Wizard Workflow
 
 The wizard is implemented as a single long-running workflow (`WizardRunWorkflow`) plus child workflows for parallelizable execution shards.
@@ -80,7 +78,6 @@ The wizard is implemented as a single long-running workflow (`WizardRunWorkflow`
 
 ### Transition contract
 
-
 | From                | To                  | Trigger                                  | Blocking checks                               |
 | ------------------- | ------------------- | ---------------------------------------- | --------------------------------------------- |
 | `DraftScope`        | `DiscoveryPlan`     | Operator submits scope draft             | Schema completeness, domain allowlist present |
@@ -92,7 +89,6 @@ The wizard is implemented as a single long-running workflow (`WizardRunWorkflow`
 | `ReviewRouting`     | `FinalizePublish`   | Review queue drains under target backlog | Required review coverage achieved             |
 | `FinalizePublish`   | `MonitorAndDrift`   | Publish succeeds                         | Versioned artifact and index write complete   |
 | `MonitorAndDrift`   | `DiscoveryPlan`     | Drift threshold exceeded                 | Drift signal includes affected source set     |
-
 
 ### Temporal-specific design
 
@@ -304,10 +300,7 @@ Each review task sent to Argilla should contain:
 1. Argilla webhook or polling exports completed annotations.
 2. API validates payload signature and schema.
 3. `ReviewTask` and `ExtractionRecord` are updated atomically.
-4. Corrections are emitted as learning signals for:
-  - prompt/rule refinements,
-  - extraction heuristics,
-  - optional model training sets.
+4. Corrections are emitted as learning signals for prompt/rule refinements, extraction heuristics, and optional model training sets.
 
 ## Minimal API Surface (v1)
 
