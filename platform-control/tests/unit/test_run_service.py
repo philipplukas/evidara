@@ -208,6 +208,48 @@ async def test_get_run_readiness_reports_pass_for_valid_configuration(session) -
 
 
 @pytest.mark.asyncio
+async def test_overlay_template_source_version_passes_readiness_checks(session) -> None:
+    session.add(Jurisdiction(jurisdiction_id="jur_at", name="Austria", slug="at"))
+    session.add(
+        Authority(
+            authority_id="auth_at_ris",
+            jurisdiction_id="jur_at",
+            name="RIS",
+            slug="ris",
+        )
+    )
+    await session.commit()
+
+    source_service = SourceService(session)
+    source = await source_service.create_source(
+        CreateSourceRequest(
+            name="AT RIS decisions",
+            jurisdiction_id="jur_at",
+            authority_id="auth_at_ris",
+        )
+    )
+    version = await source_service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="at-template-v1",
+            overlay_id="at",
+            provider_template_id="ris_ogd_bundesrecht",
+        ),
+    )
+    await source_service.approve_source_version(version.source_version_id)
+
+    run_service = RunService(session, StubProvider())
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    assert readiness.ready is True
+    assert all(check.ok for check in readiness.checks)
+
+
+@pytest.mark.asyncio
 async def test_create_run_fails_preflight_when_seed_urls_are_missing(session) -> None:
     source, version, source_service = await _seed_source_version(session)
     await source_service.approve_source_version(version.source_version_id)

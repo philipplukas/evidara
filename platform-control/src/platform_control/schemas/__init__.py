@@ -14,6 +14,12 @@ from platform_control.schemas.processing_status import (
 from platform_control.schemas.run import CreateRunRequest, RunResponse, WebhookAcceptedResponse
 from platform_control.schemas.source import (
     CreateSourceRequest,
+    SourceBlueprintPreviewRequest,
+    SourceBlueprintPreviewResponse,
+    SourceBlueprintTemplateListResponse,
+    SourceBlueprintTemplateResponse,
+    CreateSourceWithVersionRequest,
+    CreateSourceWithVersionResponse,
     CreateSourceVersionRequest,
     FirecrawlAcquisitionSpec,
     SourceListResponse,
@@ -25,6 +31,12 @@ from platform_control.schemas.source import (
 __all__ = [
     "CreateRunRequest",
     "CreateSourceRequest",
+    "SourceBlueprintPreviewRequest",
+    "SourceBlueprintPreviewResponse",
+    "SourceBlueprintTemplateListResponse",
+    "SourceBlueprintTemplateResponse",
+    "CreateSourceWithVersionRequest",
+    "CreateSourceWithVersionResponse",
     "CreateSourceVersionRequest",
     "DocumentLifecycleEventListResponse",
     "DocumentLifecycleEventResponse",

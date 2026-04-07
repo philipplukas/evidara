@@ -177,6 +177,65 @@ paths:
         "404":
           description: Reference data not found
 
+  /v1/sources/with-version:
+    post:
+      operationId: createSourceWithInitialVersion
+      summary: Create source and initial version in one transaction
+      tags: [sources, source-versions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSourceWithVersionRequest"
+      responses:
+        "201":
+          description: Source and initial version created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSourceWithVersionResponse"
+        "404":
+          description: Reference data, extractor profile, or blueprint key not found
+        "422":
+          description: Invalid request payload
+
+  /v1/sources/blueprint-preview:
+    post:
+      operationId: previewSourceBlueprint
+      summary: Expand overlay/template into validated acquisition spec
+      tags: [sources, source-versions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceBlueprintPreviewRequest"
+      responses:
+        "200":
+          description: Expanded acquisition spec preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceBlueprintPreviewResponse"
+        "404":
+          description: Unknown overlay or provider template
+        "422":
+          description: Invalid request payload
+
+  /v1/sources/blueprint-templates:
+    get:
+      operationId: listSourceBlueprintTemplates
+      summary: List available overlay/template combinations for source wizard
+      tags: [sources, source-versions]
+      responses:
+        "200":
+          description: Available blueprint templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceBlueprintTemplateListResponse"
+
   /v1/sources/{source_id}:
     get:
       operationId: getSource
@@ -231,6 +290,8 @@ paths:
                 $ref: "#/components/schemas/SourceVersion"
         "404":
           description: Source or extractor profile not found
+        "422":
+          description: Invalid request payload
 
   /v1/versions/{source_version_id}/approve:
     post:
@@ -798,7 +859,7 @@ components:
           pattern: "^auth_[a-z0-9]+$"
         source_type:
           type: string
-          enum: [website]
+          enum: [website, api]
         document_family:
           type: string
         status:
@@ -836,7 +897,7 @@ components:
           pattern: "^auth_[a-z0-9]+$"
         source_type:
           type: string
-          enum: [website]
+          enum: [website, api]
           default: website
         document_family:
           type: string
@@ -844,7 +905,11 @@ components:
     FirecrawlAcquisitionSpec:
       type: object
       additionalProperties: false
+      required: [provider]
       properties:
+        provider:
+          type: string
+          enum: [firecrawl]
         seed_url:
           type: string
           format: uri
@@ -919,6 +984,133 @@ components:
         document_type_hint:
           type: string
 
+    DeterministicHttpAcquisitionSpec:
+      type: object
+      additionalProperties: false
+      required: [provider]
+      properties:
+        provider:
+          type: string
+          enum: [deterministic_http]
+        seed_url:
+          oneOf:
+            - type: string
+              format: uri
+            - type: "null"
+        seed_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+        tenant_id:
+          type: string
+          pattern: "^tenant_[a-z0-9_]+$"
+          default: tenant_public
+        corpus_id:
+          type: string
+          pattern: "^corpus_[a-z0-9_]+$"
+          default: corpus_public_default
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+          default: global_public
+        source_origin_kind:
+          type: string
+          enum:
+            [
+              official_primary,
+              official_mirror,
+              licensed_provider,
+              community_curated,
+              tenant_internal,
+            ]
+          default: official_primary
+        trust_tier:
+          type: string
+          enum: [authoritative, preferred, supplemental, untrusted]
+          default: authoritative
+        language_codes:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-z]{2}(?:-[A-Z]{2})?$"
+          default: []
+        document_type_hint:
+          type: string
+
+    RisOgdAcquisitionSpec:
+      type: object
+      additionalProperties: false
+      required: [provider, base_url]
+      properties:
+        provider:
+          type: string
+          enum: [ris_ogd]
+        base_url:
+          type: string
+          format: uri
+        applikation:
+          oneOf:
+            - type: string
+            - type: "null"
+        preferred_formats:
+          type: array
+          items:
+            type: string
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        max_pages:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 50
+        tenant_id:
+          type: string
+          pattern: "^tenant_[a-z0-9_]+$"
+          default: tenant_public
+        corpus_id:
+          type: string
+          pattern: "^corpus_[a-z0-9_]+$"
+          default: corpus_public_default
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+          default: global_public
+        source_origin_kind:
+          type: string
+          enum:
+            [
+              official_primary,
+              official_mirror,
+              licensed_provider,
+              community_curated,
+              tenant_internal,
+            ]
+          default: official_primary
+        trust_tier:
+          type: string
+          enum: [authoritative, preferred, supplemental, untrusted]
+          default: authoritative
+        language_codes:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-z]{2}(?:-[A-Z]{2})?$"
+          default: []
+        document_type_hint:
+          type: string
+
+    AcquisitionSpec:
+      oneOf:
+        - $ref: "#/components/schemas/FirecrawlAcquisitionSpec"
+        - $ref: "#/components/schemas/DeterministicHttpAcquisitionSpec"
+        - $ref: "#/components/schemas/RisOgdAcquisitionSpec"
+      discriminator:
+        propertyName: provider
+
     SourceVersion:
       type: object
       required:
@@ -946,7 +1138,7 @@ components:
           type: string
           enum: [draft, pending_approval, approved, rejected, superseded]
         acquisition_spec:
-          $ref: "#/components/schemas/FirecrawlAcquisitionSpec"
+          $ref: "#/components/schemas/AcquisitionSpec"
         created_at:
           type: string
           format: date-time
@@ -965,7 +1157,7 @@ components:
 
     CreateSourceVersionRequest:
       type: object
-      required: [version_label, acquisition_spec]
+      required: [version_label]
       properties:
         version_label:
           type: string
@@ -973,7 +1165,11 @@ components:
           type: string
           pattern: "^exp_[a-z0-9]+$"
         acquisition_spec:
-          $ref: "#/components/schemas/FirecrawlAcquisitionSpec"
+          $ref: "#/components/schemas/AcquisitionSpec"
+        overlay_id:
+          type: string
+        provider_template_id:
+          type: string
 
     UpdateSourceVersionRequest:
       type: object
@@ -987,7 +1183,70 @@ components:
               pattern: "^exp_[a-z0-9]+$"
             - type: "null"
         acquisition_spec:
-          $ref: "#/components/schemas/FirecrawlAcquisitionSpec"
+          $ref: "#/components/schemas/AcquisitionSpec"
+        overlay_id:
+          type: string
+        provider_template_id:
+          type: string
+
+    CreateSourceWithVersionRequest:
+      type: object
+      required: [source, source_version]
+      properties:
+        source:
+          $ref: "#/components/schemas/CreateSourceRequest"
+        source_version:
+          $ref: "#/components/schemas/CreateSourceVersionRequest"
+
+    CreateSourceWithVersionResponse:
+      type: object
+      required: [source, source_version]
+      properties:
+        source:
+          $ref: "#/components/schemas/Source"
+        source_version:
+          $ref: "#/components/schemas/SourceVersion"
+
+    SourceBlueprintPreviewRequest:
+      type: object
+      required: [overlay_id, provider_template_id]
+      properties:
+        overlay_id:
+          type: string
+        provider_template_id:
+          type: string
+
+    SourceBlueprintPreviewResponse:
+      type: object
+      required: [overlay_id, provider_template_id, acquisition_spec]
+      properties:
+        overlay_id:
+          type: string
+        provider_template_id:
+          type: string
+        acquisition_spec:
+          $ref: "#/components/schemas/AcquisitionSpec"
+
+    SourceBlueprintTemplate:
+      type: object
+      required: [overlay_id, provider_template_id, provider]
+      properties:
+        overlay_id:
+          type: string
+        provider_template_id:
+          type: string
+        provider:
+          type: string
+          enum: [firecrawl, deterministic_http, ris_ogd]
+
+    SourceBlueprintTemplateListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceBlueprintTemplate"
 
     Run:
       type: object

@@ -33,6 +33,9 @@ import {
 } from "react-admin";
 import type {
   AcquisitionSpec,
+  DeterministicHttpAcquisitionSpec,
+  FirecrawlAcquisitionSpec,
+  RisOgdAcquisitionSpec,
   RunRecord,
   SourceRecord,
   SourceVersionRecord,
@@ -44,6 +47,9 @@ type ProviderType = "firecrawl" | "deterministic_http" | "ris_ogd";
 type SourceVersionFormState = {
   version_label: string;
   extractor_profile_id: string;
+  use_blueprint: boolean;
+  overlay_id: string;
+  provider_template_id: string;
   provider: ProviderType;
   seed_url: string;
   seed_urls_text: string;
@@ -69,6 +75,9 @@ const LIST_PARAMS = {
 const emptyFormState = (): SourceVersionFormState => ({
   version_label: "",
   extractor_profile_id: "",
+  use_blueprint: true,
+  overlay_id: "at",
+  provider_template_id: "ris_ogd_bundesrecht",
   provider: "firecrawl",
   seed_url: "",
   seed_urls_text: "",
@@ -85,6 +94,17 @@ const emptyFormState = (): SourceVersionFormState => ({
   page_size: "20",
   max_pages: "50",
 });
+
+const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: string }>> = {
+  at: [
+    { value: "ris_ogd_bundesrecht", label: "AT RIS OGD Bundesrecht" },
+    { value: "firecrawl_justice_portal", label: "AT Justice portal crawl" },
+  ],
+  de: [{ value: "deterministic_http_bundesrecht", label: "DE Bundesrecht deterministic HTTP" }],
+  ch: [],
+  fr: [],
+  it: [],
+};
 
 const listToText = (values: string[]): string => values.join("\n");
 
@@ -105,24 +125,54 @@ const toFormState = (version?: SourceVersionRecord | null): SourceVersionFormSta
     return emptyFormState();
   }
   const spec = version.acquisition_spec;
-  return {
+  const common = {
     version_label: version.version_label,
     extractor_profile_id: version.extractor_profile_id ?? "",
+    use_blueprint: false,
+    overlay_id: "at",
+    provider_template_id: "ris_ogd_bundesrecht",
     provider: spec.provider ?? "firecrawl",
-    seed_url: spec.seed_url ?? "",
-    seed_urls_text: listToText(spec.seed_urls ?? []),
-    mode: spec.mode ?? "crawl",
-    include_paths_text: listToText(spec.include_paths ?? []),
-    exclude_paths_text: listToText(spec.exclude_paths ?? []),
-    limit: String(spec.limit ?? 20),
-    max_discovery_depth: String(spec.max_discovery_depth ?? 2),
-    scrape_formats_text: listToText(spec.scrape_formats ?? []),
-    zero_data_retention: spec.zero_data_retention ?? false,
-    base_url: spec.base_url ?? "",
-    applikation: spec.applikation ?? "",
-    preferred_formats_text: listToText(spec.preferred_formats ?? []),
-    page_size: String(spec.page_size ?? 20),
-    max_pages: String(spec.max_pages ?? 50),
+  } as const;
+
+  if (spec.provider === "ris_ogd") {
+    const ris = spec as RisOgdAcquisitionSpec;
+    return {
+      ...emptyFormState(),
+      ...common,
+      provider: "ris_ogd",
+      base_url: ris.base_url ?? "",
+      applikation: ris.applikation ?? "",
+      preferred_formats_text: listToText(ris.preferred_formats ?? []),
+      page_size: String(ris.page_size ?? 20),
+      max_pages: String(ris.max_pages ?? 50),
+    };
+  }
+
+  if (spec.provider === "deterministic_http") {
+    const deterministic = spec as DeterministicHttpAcquisitionSpec;
+    return {
+      ...emptyFormState(),
+      ...common,
+      provider: "deterministic_http",
+      seed_url: deterministic.seed_url ?? "",
+      seed_urls_text: listToText(deterministic.seed_urls ?? []),
+    };
+  }
+
+  const firecrawl = spec as FirecrawlAcquisitionSpec;
+  return {
+    ...emptyFormState(),
+    ...common,
+    provider: "firecrawl",
+    seed_url: firecrawl.seed_url ?? "",
+    seed_urls_text: listToText(firecrawl.seed_urls ?? []),
+    mode: firecrawl.mode ?? "crawl",
+    include_paths_text: listToText(firecrawl.include_paths ?? []),
+    exclude_paths_text: listToText(firecrawl.exclude_paths ?? []),
+    limit: String(firecrawl.limit ?? 20),
+    max_discovery_depth: String(firecrawl.max_discovery_depth ?? 2),
+    scrape_formats_text: listToText(firecrawl.scrape_formats ?? []),
+    zero_data_retention: firecrawl.zero_data_retention ?? false,
   };
 };
 
@@ -151,11 +201,19 @@ const toAcquisitionSpec = (state: SourceVersionFormState): Partial<AcquisitionSp
   if (state.provider === "ris_ogd") {
     return {
       ...base,
-      base_url: state.base_url.trim() || null,
+      base_url: state.base_url.trim(),
       applikation: state.applikation.trim() || null,
       preferred_formats: textToList(state.preferred_formats_text),
       page_size: parseIntegerField(state.page_size, "Page size", { min: 1, max: 100 }),
       max_pages: parseIntegerField(state.max_pages, "Max pages", { min: 1, max: 500 }),
+    };
+  }
+
+  if (state.provider === "deterministic_http") {
+    return {
+      ...base,
+      seed_url: state.seed_url.trim().length > 0 ? state.seed_url.trim() : null,
+      seed_urls: textToList(state.seed_urls_text),
     };
   }
 
@@ -180,31 +238,46 @@ const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
   const provider = spec.provider ?? "firecrawl";
 
   if (provider === "ris_ogd") {
+    const ris = spec as RisOgdAcquisitionSpec;
     return [
       `provider: ${provider}`,
-      spec.base_url ? `base URL: ${spec.base_url}` : "base URL: not set",
-      spec.applikation ? `applikation: ${spec.applikation}` : "applikation: all",
-      `formats: ${(spec.preferred_formats ?? []).join(", ") || "Xml, Html"}`,
-      `page size: ${spec.page_size ?? 20}`,
-      `max pages: ${spec.max_pages ?? 50}`,
+      ris.base_url ? `base URL: ${ris.base_url}` : "base URL: not set",
+      ris.applikation ? `applikation: ${ris.applikation}` : "applikation: all",
+      `formats: ${(ris.preferred_formats ?? []).join(", ") || "Xml, Html"}`,
+      `page size: ${ris.page_size ?? 20}`,
+      `max pages: ${ris.max_pages ?? 50}`,
     ];
   }
 
-  const seeds = spec.seed_url ? [spec.seed_url, ...(spec.seed_urls ?? [])] : (spec.seed_urls ?? []);
+  if (provider === "deterministic_http") {
+    const deterministic = spec as DeterministicHttpAcquisitionSpec;
+    const seeds = deterministic.seed_url
+      ? [deterministic.seed_url, ...(deterministic.seed_urls ?? [])]
+      : (deterministic.seed_urls ?? []);
+    return [
+      `provider: ${provider}`,
+      seeds.length > 0 ? `seeds: ${seeds.join(", ")}` : "seeds: none",
+    ];
+  }
+
+  const firecrawl = spec as FirecrawlAcquisitionSpec;
+  const seeds = firecrawl.seed_url
+    ? [firecrawl.seed_url, ...(firecrawl.seed_urls ?? [])]
+    : (firecrawl.seed_urls ?? []);
   return [
     `provider: ${provider}`,
-    `mode: ${spec.mode}`,
+    `mode: ${firecrawl.mode}`,
     seeds.length > 0 ? `seeds: ${seeds.join(", ")}` : "seeds: none",
-    `limit: ${spec.limit}`,
-    `depth: ${spec.max_discovery_depth}`,
-    (spec.include_paths ?? []).length > 0
-      ? `include: ${spec.include_paths.join(", ")}`
+    `limit: ${firecrawl.limit}`,
+    `depth: ${firecrawl.max_discovery_depth}`,
+    (firecrawl.include_paths ?? []).length > 0
+      ? `include: ${firecrawl.include_paths.join(", ")}`
       : "include: all",
-    (spec.exclude_paths ?? []).length > 0
-      ? `exclude: ${spec.exclude_paths.join(", ")}`
+    (firecrawl.exclude_paths ?? []).length > 0
+      ? `exclude: ${firecrawl.exclude_paths.join(", ")}`
       : "exclude: none",
-    `formats: ${(spec.scrape_formats ?? []).join(", ")}`,
-    `zero retention: ${spec.zero_data_retention ? "yes" : "no"}`,
+    `formats: ${(firecrawl.scrape_formats ?? []).join(", ")}`,
+    `zero retention: ${firecrawl.zero_data_retention ? "yes" : "no"}`,
   ];
 };
 
@@ -244,159 +317,232 @@ function SourceVersionDialog({
             }
             fullWidth
           />
-          <TextField
-            select
-            label="Provider"
-            value={formState.provider}
-            onChange={(event) =>
-              onChange({
-                ...formState,
-                provider: event.target.value as ProviderType,
-              })
-            }
-            fullWidth
-          >
-            <MenuItem value="firecrawl">Firecrawl (website crawl)</MenuItem>
-            <MenuItem value="deterministic_http">Deterministic HTTP</MenuItem>
-            <MenuItem value="ris_ogd">RIS OGD API (Austrian law)</MenuItem>
-          </TextField>
-
-          {formState.provider === "ris_ogd" ? (
-            <>
-              <TextField
-                label="Base URL"
-                value={formState.base_url}
-                onChange={(event) => onChange({ ...formState, base_url: event.target.value })}
-                fullWidth
-                helperText="OGD-RIS API endpoint, e.g. https://data.bka.gv.at/ris/api/v2.6/Bundesrecht"
-              />
-              <TextField
-                label="Applikation"
-                value={formState.applikation}
-                onChange={(event) => onChange({ ...formState, applikation: event.target.value })}
-                fullWidth
-                helperText="Optional filter: Vfgh, Vwgh, Bvwg, Justiz, BrKons, BgblAuth"
-              />
-              <TextField
-                label="Preferred formats"
-                value={formState.preferred_formats_text}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={formState.use_blueprint}
                 onChange={(event) =>
-                  onChange({ ...formState, preferred_formats_text: event.target.value })
+                  onChange({ ...formState, use_blueprint: event.target.checked })
                 }
-                fullWidth
-                helperText="Comma separated. E.g. Xml, Html"
               />
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Page size"
-                  type="number"
-                  value={formState.page_size}
-                  onChange={(event) => onChange({ ...formState, page_size: event.target.value })}
-                  fullWidth
-                />
-                <TextField
-                  label="Max pages"
-                  type="number"
-                  value={formState.max_pages}
-                  onChange={(event) => onChange({ ...formState, max_pages: event.target.value })}
-                  fullWidth
-                />
-              </Stack>
-            </>
-          ) : (
+            }
+            label="Use country overlay + provider template"
+          />
+          {formState.use_blueprint ? (
             <>
-              <TextField
-                label="Seed URL"
-                value={formState.seed_url}
-                onChange={(event) => onChange({ ...formState, seed_url: event.target.value })}
-                fullWidth
-              />
-              <TextField
-                label="Additional seed URLs"
-                value={formState.seed_urls_text}
-                onChange={(event) => onChange({ ...formState, seed_urls_text: event.target.value })}
-                fullWidth
-                multiline
-                minRows={2}
-                helperText="Comma or newline separated."
-              />
               <TextField
                 select
-                label="Mode"
-                value={formState.mode}
+                label="Country overlay"
+                value={formState.overlay_id}
                 onChange={(event) =>
                   onChange({
                     ...formState,
-                    mode: event.target.value as SourceVersionFormState["mode"],
+                    overlay_id: event.target.value,
+                    provider_template_id:
+                      PROVIDER_TEMPLATE_CHOICES[event.target.value]?.[0]?.value ?? "",
                   })
                 }
                 fullWidth
               >
-                <MenuItem value="crawl">crawl</MenuItem>
-                <MenuItem value="batch_scrape">batch_scrape</MenuItem>
+                <MenuItem value="at">AT</MenuItem>
+                <MenuItem value="de">DE</MenuItem>
+                <MenuItem value="ch">CH</MenuItem>
+                <MenuItem value="fr">FR</MenuItem>
+                <MenuItem value="it">IT</MenuItem>
               </TextField>
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Limit"
-                  type="number"
-                  value={formState.limit}
-                  onChange={(event) => onChange({ ...formState, limit: event.target.value })}
-                  fullWidth
-                />
-                <TextField
-                  label="Max discovery depth"
-                  type="number"
-                  value={formState.max_discovery_depth}
-                  onChange={(event) =>
-                    onChange({ ...formState, max_discovery_depth: event.target.value })
-                  }
-                  fullWidth
-                />
-              </Stack>
               <TextField
-                label="Include paths"
-                value={formState.include_paths_text}
+                select
+                label="Provider template"
+                value={formState.provider_template_id}
                 onChange={(event) =>
-                  onChange({ ...formState, include_paths_text: event.target.value })
+                  onChange({ ...formState, provider_template_id: event.target.value })
                 }
                 fullWidth
-                multiline
-                minRows={2}
-                helperText="Comma or newline separated."
-              />
-              <TextField
-                label="Exclude paths"
-                value={formState.exclude_paths_text}
-                onChange={(event) =>
-                  onChange({ ...formState, exclude_paths_text: event.target.value })
-                }
-                fullWidth
-                multiline
-                minRows={2}
-                helperText="Comma or newline separated."
-              />
-              <TextField
-                label="Scrape formats"
-                value={formState.scrape_formats_text}
-                onChange={(event) =>
-                  onChange({ ...formState, scrape_formats_text: event.target.value })
-                }
-                fullWidth
-                helperText="Comma or newline separated."
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={formState.zero_data_retention}
-                    onChange={(event) =>
-                      onChange({ ...formState, zero_data_retention: event.target.checked })
-                    }
-                  />
-                }
-                label="Zero data retention"
-              />
+              >
+                {(PROVIDER_TEMPLATE_CHOICES[formState.overlay_id] ?? []).map((choice) => (
+                  <MenuItem key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </MenuItem>
+                ))}
+              </TextField>
             </>
+          ) : null}
+          {!formState.use_blueprint ? (
+            <Typography variant="body2" color="text.secondary">
+              Manual mode: provider-specific fields are sent directly as acquisition_spec.
+            </Typography>
+          ) : (
+            <Alert severity="info">
+              Wizard preview: source version will be created from overlay{" "}
+              <strong>{formState.overlay_id}</strong> and template{" "}
+              <strong>{formState.provider_template_id || "not selected"}</strong>.
+            </Alert>
           )}
+          {!formState.use_blueprint ? (
+            <>
+              <TextField
+                select
+                label="Provider"
+                value={formState.provider}
+                onChange={(event) =>
+                  onChange({
+                    ...formState,
+                    provider: event.target.value as ProviderType,
+                  })
+                }
+                fullWidth
+              >
+                <MenuItem value="firecrawl">Firecrawl (website crawl)</MenuItem>
+                <MenuItem value="deterministic_http">Deterministic HTTP</MenuItem>
+                <MenuItem value="ris_ogd">RIS OGD API (Austrian law)</MenuItem>
+              </TextField>
+
+              {formState.provider === "ris_ogd" ? (
+                <>
+                  <TextField
+                    label="Base URL"
+                    value={formState.base_url}
+                    onChange={(event) => onChange({ ...formState, base_url: event.target.value })}
+                    fullWidth
+                    helperText="OGD-RIS API endpoint, e.g. https://data.bka.gv.at/ris/api/v2.6/Bundesrecht"
+                  />
+                  <TextField
+                    label="Applikation"
+                    value={formState.applikation}
+                    onChange={(event) =>
+                      onChange({ ...formState, applikation: event.target.value })
+                    }
+                    fullWidth
+                    helperText="Optional filter: Vfgh, Vwgh, Bvwg, Justiz, BrKons, BgblAuth"
+                  />
+                  <TextField
+                    label="Preferred formats"
+                    value={formState.preferred_formats_text}
+                    onChange={(event) =>
+                      onChange({ ...formState, preferred_formats_text: event.target.value })
+                    }
+                    fullWidth
+                    helperText="Comma separated. E.g. Xml, Html"
+                  />
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField
+                      label="Page size"
+                      type="number"
+                      value={formState.page_size}
+                      onChange={(event) =>
+                        onChange({ ...formState, page_size: event.target.value })
+                      }
+                      fullWidth
+                    />
+                    <TextField
+                      label="Max pages"
+                      type="number"
+                      value={formState.max_pages}
+                      onChange={(event) =>
+                        onChange({ ...formState, max_pages: event.target.value })
+                      }
+                      fullWidth
+                    />
+                  </Stack>
+                </>
+              ) : (
+                <>
+                  <TextField
+                    label="Seed URL"
+                    value={formState.seed_url}
+                    onChange={(event) => onChange({ ...formState, seed_url: event.target.value })}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Additional seed URLs"
+                    value={formState.seed_urls_text}
+                    onChange={(event) =>
+                      onChange({ ...formState, seed_urls_text: event.target.value })
+                    }
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    helperText="Comma or newline separated."
+                  />
+                  <TextField
+                    select
+                    label="Mode"
+                    value={formState.mode}
+                    onChange={(event) =>
+                      onChange({
+                        ...formState,
+                        mode: event.target.value as SourceVersionFormState["mode"],
+                      })
+                    }
+                    fullWidth
+                  >
+                    <MenuItem value="crawl">crawl</MenuItem>
+                    <MenuItem value="batch_scrape">batch_scrape</MenuItem>
+                  </TextField>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField
+                      label="Limit"
+                      type="number"
+                      value={formState.limit}
+                      onChange={(event) => onChange({ ...formState, limit: event.target.value })}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Max discovery depth"
+                      type="number"
+                      value={formState.max_discovery_depth}
+                      onChange={(event) =>
+                        onChange({ ...formState, max_discovery_depth: event.target.value })
+                      }
+                      fullWidth
+                    />
+                  </Stack>
+                  <TextField
+                    label="Include paths"
+                    value={formState.include_paths_text}
+                    onChange={(event) =>
+                      onChange({ ...formState, include_paths_text: event.target.value })
+                    }
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    helperText="Comma or newline separated."
+                  />
+                  <TextField
+                    label="Exclude paths"
+                    value={formState.exclude_paths_text}
+                    onChange={(event) =>
+                      onChange({ ...formState, exclude_paths_text: event.target.value })
+                    }
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    helperText="Comma or newline separated."
+                  />
+                  <TextField
+                    label="Scrape formats"
+                    value={formState.scrape_formats_text}
+                    onChange={(event) =>
+                      onChange({ ...formState, scrape_formats_text: event.target.value })
+                    }
+                    fullWidth
+                    helperText="Comma or newline separated."
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formState.zero_data_retention}
+                        onChange={(event) =>
+                          onChange({ ...formState, zero_data_retention: event.target.checked })
+                        }
+                      />
+                    }
+                    label="Zero data retention"
+                  />
+                </>
+              )}
+            </>
+          ) : null}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -464,7 +610,14 @@ export function SourceVersionsSection() {
           data: {
             version_label: formState.version_label,
             extractor_profile_id: formState.extractor_profile_id,
-            acquisition_spec: toAcquisitionSpec(formState),
+            ...(formState.use_blueprint
+              ? {
+                  overlay_id: formState.overlay_id,
+                  provider_template_id: formState.provider_template_id,
+                }
+              : {
+                  acquisition_spec: toAcquisitionSpec(formState),
+                }),
           },
           previousData: editingVersion,
         });
@@ -475,7 +628,14 @@ export function SourceVersionsSection() {
             source_id: source.source_id,
             version_label: formState.version_label,
             extractor_profile_id: formState.extractor_profile_id,
-            acquisition_spec: toAcquisitionSpec(formState),
+            ...(formState.use_blueprint
+              ? {
+                  overlay_id: formState.overlay_id,
+                  provider_template_id: formState.provider_template_id,
+                }
+              : {
+                  acquisition_spec: toAcquisitionSpec(formState),
+                }),
           },
         });
         notify("Source version created.", { type: "success" });
