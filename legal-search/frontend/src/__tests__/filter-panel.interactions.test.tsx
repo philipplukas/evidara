@@ -57,11 +57,10 @@ describe("FilterPanel interaction matrix", () => {
     fireEvent.change(dateSelect, { target: { value: "1y" } });
     expect((dateSelect as HTMLSelectElement).value).toBe("1y");
 
-    const toggleLabel = screen.getByText("Yes").closest("label");
-    const toggleTrack = toggleLabel?.querySelector("div");
+    const toggleTrack = screen.getByRole("button", { name: "Has commentary toggle" });
     expect(toggleTrack).toBeTruthy();
-    fireEvent.click(toggleTrack!);
-    expect(toggleTrack?.className).toContain("bg-brand");
+    fireEvent.click(toggleTrack);
+    expect(toggleTrack.className).toContain("bg-brand");
   });
 
   it("supports clear refinements and reset all controls", () => {
