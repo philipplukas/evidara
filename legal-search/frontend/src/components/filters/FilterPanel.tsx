@@ -227,8 +227,17 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
 
           {filter.type === "toggle" && (
             <label className="flex items-center gap-2 cursor-pointer">
-              <div
+              <button
+                type="button"
+                aria-label={`${filter.label} toggle`}
+                aria-pressed={selected.length > 0}
                 onClick={() => setSelected(selected.length > 0 ? [] : ["true"])}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelected(selected.length > 0 ? [] : ["true"]);
+                  }
+                }}
                 className={`w-8 h-4.5 rounded-full relative transition-colors cursor-pointer
                   ${selected.length > 0 ? "bg-brand" : "bg-muted-foreground/20"}`}
               >
@@ -236,7 +245,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                   className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform
                     ${selected.length > 0 ? "translate-x-4" : "translate-x-0.5"}`}
                 />
-              </div>
+              </button>
               <span className="text-xs text-foreground/80">
                 {filter.options[0]?.label || t("filter.yes")}
               </span>
