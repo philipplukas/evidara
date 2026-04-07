@@ -26,7 +26,11 @@ permissions:
 
 jobs:
   interaction-flow-staging-evidence:
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - gcp-heavy
     environment: staging
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}

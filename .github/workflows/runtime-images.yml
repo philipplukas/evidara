@@ -27,7 +27,11 @@ permissions:
 jobs:
   platform-control:
     name: Build platform-control image
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - gcp-heavy
 
     steps:
       - name: Checkout
@@ -85,7 +89,11 @@ jobs:
 
   legal-search-api:
     name: Build legal-search API image
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - gcp-heavy
 
     steps:
       - name: Checkout
@@ -143,7 +151,11 @@ jobs:
 
   legal-search-frontend:
     name: Build legal-search frontend image
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - gcp-heavy
 
     steps:
       - name: Checkout
@@ -201,7 +213,11 @@ jobs:
 
   platform-control-admin:
     name: Build platform-control admin image
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - gcp-heavy
 
     steps:
       - name: Checkout
@@ -259,7 +275,11 @@ jobs:
 
   platform-control-worker:
     name: Build platform-control worker image
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - gcp-heavy
 
     steps:
       - name: Checkout
@@ -317,7 +337,11 @@ jobs:
 
   document-intelligence-consumer:
     name: Build document-intelligence consumer image
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - gcp-heavy
 
     steps:
       - name: Checkout

@@ -22,7 +22,11 @@ permissions:
 
 jobs:
   smoke-staging:
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - gcp-heavy
     environment: staging
     env:
       TARGET_ENV: staging
