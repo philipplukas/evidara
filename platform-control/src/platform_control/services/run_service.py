@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from acquisition_core.normalization import ArtifactPipeline
@@ -307,7 +307,12 @@ class RunService:
         return run
 
     async def retry_run(self, run_id: str) -> Run:
-        """Reset a failed or cancelled run and re-dispatch if backend is inline."""
+        """Reset a failed or cancelled run.
+
+        Drops provider jobs for the run (and clears resource FKs) so a new dispatch cannot hit
+        duplicate ``external_job_id``. Inline backend re-dispatches immediately (typically RUNNING);
+        worker backend leaves PENDING for ``dispatch_pending_runs``.
+        """
         run = await self.get_run(run_id)
         if run.status not in {RunStatus.FAILED, RunStatus.CANCELLED}:
             raise InvalidStateTransitionError(
@@ -319,6 +324,15 @@ class RunService:
         run.started_at = None
         run.completed_at = None
         run.failure_reason = None
+
+        await self.session.execute(
+            update(CapturedResource)
+            .where(CapturedResource.run_id == run.run_id)
+            .where(CapturedResource.provider_job_id.is_not(None))
+            .values(provider_job_id=None)
+        )
+        await self.session.execute(delete(ProviderJob).where(ProviderJob.run_id == run.run_id))
+        await self.session.flush()
 
         if self.run_dispatch_backend != "worker":
             source = await self.session.get(Source, run.source_id)

@@ -45,6 +45,7 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 | Area | Description |
 |---|---|
 | [Architecture](architecture/system-context.md) | System context, storage, communication |
+| [Temporal + Argilla Wizard](architecture/temporal-argilla-wizard-architecture.md) | Hybrid discovery/extraction workflow, contracts, and SLOs |
 | [ADRs](adr/0001-monorepo-structure.md) | Architecture decisions |
 | [Components](components/legal-search.md) | Domain component documentation |
 | [Testing](testing/README.md) | Testing strategy and guides |

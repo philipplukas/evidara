@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.3.1
+  version: 0.3.2
   contact:
     name: Evidara Team
 
@@ -22,6 +22,8 @@ tags:
   - name: sources
   - name: source-versions
   - name: runs
+  - name: wizard
+  - name: reviews
   - name: di-events
   - name: firecrawl
   - name: health
@@ -546,6 +548,271 @@ paths:
                 $ref: "#/components/schemas/DocumentLifecycleEventListResponse"
         "404":
           description: Run not found
+
+  /v1/wizard/projects:
+    post:
+      operationId: createWizardProject
+      summary: Create a wizard project
+      tags: [wizard]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWizardProjectRequest"
+      responses:
+        "201":
+          description: Wizard project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardProject"
+
+  /v1/wizard/projects/{project_id}:
+    get:
+      operationId: getWizardProject
+      summary: Get wizard project details
+      tags: [wizard]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wpr_[a-z0-9]+$"
+      responses:
+        "200":
+          description: Wizard project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardProject"
+        "404":
+          description: Wizard project not found
+
+  /v1/wizard/projects/{project_id}/scope:
+    post:
+      operationId: saveWizardScope
+      summary: Save wizard scope and advance to discovery planning
+      tags: [wizard]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wpr_[a-z0-9]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWizardScopeRequest"
+      responses:
+        "200":
+          description: Wizard project updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardProject"
+        "409":
+          description: Invalid wizard state transition
+
+  /v1/wizard/projects/{project_id}/discovery-plan:
+    post:
+      operationId: saveWizardDiscoveryPlan
+      summary: Save or update wizard discovery plan
+      tags: [wizard]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wpr_[a-z0-9]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWizardDiscoveryPlanRequest"
+      responses:
+        "200":
+          description: Wizard project updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardProject"
+
+  /v1/wizard/projects/{project_id}/pilot-run:
+    post:
+      operationId: startWizardPilotRun
+      summary: Start wizard pilot run
+      tags: [wizard]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wpr_[a-z0-9]+$"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartWizardPilotRunRequest"
+      responses:
+        "200":
+          description: Wizard run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardRunStatus"
+        "409":
+          description: Invalid wizard state transition
+
+  /v1/wizard/runs/{run_id}:
+    get:
+      operationId: getWizardRun
+      summary: Get wizard run status
+      tags: [wizard]
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wrn_[a-z0-9]+$"
+      responses:
+        "200":
+          description: Wizard run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardRunStatus"
+        "404":
+          description: Wizard run not found
+
+  /v1/wizard/runs/{run_id}/approve:
+    post:
+      operationId: approveWizardRun
+      summary: Approve wizard gate transition
+      tags: [wizard]
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wrn_[a-z0-9]+$"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardRunDecisionRequest"
+      responses:
+        "200":
+          description: Wizard run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardRunStatus"
+        "409":
+          description: Invalid wizard state transition
+
+  /v1/wizard/runs/{run_id}/reject:
+    post:
+      operationId: rejectWizardRun
+      summary: Reject wizard gate transition and return to discovery planning
+      tags: [wizard]
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wrn_[a-z0-9]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WizardRunDecisionRequest"
+      responses:
+        "200":
+          description: Wizard run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WizardRunStatus"
+        "409":
+          description: Invalid wizard state transition
+
+  /v1/reviews/sync-from-argilla:
+    post:
+      operationId: syncReviewsFromArgilla
+      summary: Ingest Argilla review outcomes
+      tags: [reviews]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArgillaReviewSyncRequest"
+      responses:
+        "200":
+          description: Sync summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArgillaReviewSyncResponse"
+
+  /v1/reviews/tasks:
+    post:
+      operationId: createReviewTask
+      summary: Create a review task and enqueue it to Argilla when configured
+      tags: [reviews]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewTaskRequest"
+      responses:
+        "201":
+          description: Review task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateReviewTaskResponse"
+        "404":
+          description: Wizard run not found
+        "409":
+          description: Duplicate Argilla external_id
+
+  /v1/reviews/tasks/{task_id}:
+    get:
+      operationId: getReviewTask
+      summary: Get a synced review task
+      tags: [reviews]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wrt_[a-z0-9]+$"
+      responses:
+        "200":
+          description: Review task details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTask"
+        "404":
+          description: Review task not found
 
   /v1/di/events/document-processing-status-updated:
     post:
@@ -2270,6 +2537,306 @@ components:
         status:
           type: string
           enum: [accepted]
+
+    CreateWizardProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    UpdateWizardScopeRequest:
+      type: object
+      additionalProperties: false
+      required: [scope]
+      properties:
+        scope:
+          type: object
+          additionalProperties: true
+
+    UpdateWizardDiscoveryPlanRequest:
+      type: object
+      additionalProperties: false
+      required: [discovery_plan]
+      properties:
+        discovery_plan:
+          type: object
+          additionalProperties: true
+
+    StartWizardPilotRunRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        sample_limit:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: "null"
+
+    WizardRunDecisionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          oneOf:
+            - type: string
+            - type: "null"
+
+    WizardProject:
+      type: object
+      required:
+        - wizard_project_id
+        - name
+        - status
+        - scope
+        - discovery_plan
+        - created_at
+        - updated_at
+      properties:
+        wizard_project_id:
+          type: string
+          pattern: "^wpr_[a-z0-9]+$"
+        name:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, archived]
+        scope:
+          type: object
+          additionalProperties: true
+        discovery_plan:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WizardRunProgress:
+      type: object
+      required: [total_nodes, processed_nodes, routed_to_review, accepted_records]
+      properties:
+        total_nodes:
+          type: integer
+        processed_nodes:
+          type: integer
+        routed_to_review:
+          type: integer
+        accepted_records:
+          type: integer
+
+    WizardRunQuality:
+      type: object
+      required: [confidence_distribution, conflict_count, review_backlog]
+      properties:
+        confidence_distribution:
+          type: object
+          additionalProperties: true
+        conflict_count:
+          type: integer
+        review_backlog:
+          type: integer
+
+    WizardRunHealth:
+      type: object
+      required: [retry_counters, last_errors]
+      properties:
+        retry_counters:
+          type: object
+          additionalProperties: true
+        last_errors:
+          type: array
+          items:
+            type: string
+        next_retry_window:
+          oneOf:
+            - type: string
+            - type: "null"
+
+    WizardRunStatus:
+      type: object
+      required:
+        - wizard_run_id
+        - wizard_project_id
+        - state
+        - state_entered_at
+        - progress
+        - quality
+        - health
+        - created_at
+        - updated_at
+      properties:
+        wizard_run_id:
+          type: string
+          pattern: "^wrn_[a-z0-9]+$"
+        wizard_project_id:
+          type: string
+          pattern: "^wpr_[a-z0-9]+$"
+        workflow_id:
+          oneOf:
+            - type: string
+            - type: "null"
+        state:
+          type: string
+          enum:
+            - DraftScope
+            - DiscoveryPlan
+            - PilotRun
+            - HumanGateApproval
+            - ScaledRun
+            - ReviewRouting
+            - FinalizePublish
+            - MonitorAndDrift
+        state_entered_at:
+          type: string
+          format: date-time
+        progress:
+          $ref: "#/components/schemas/WizardRunProgress"
+        quality:
+          $ref: "#/components/schemas/WizardRunQuality"
+        health:
+          $ref: "#/components/schemas/WizardRunHealth"
+        failure_reason:
+          oneOf:
+            - type: string
+            - type: "null"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateReviewTaskRequest:
+      type: object
+      additionalProperties: false
+      required: [wizard_run_id, argilla_external_id, payload]
+      properties:
+        wizard_run_id:
+          type: string
+          pattern: "^wrn_[a-z0-9]+$"
+        argilla_external_id:
+          type: string
+        record_id:
+          oneOf:
+            - type: string
+            - type: "null"
+        payload:
+          type: object
+          additionalProperties: true
+
+    CreateReviewTaskResponse:
+      allOf:
+        - $ref: "#/components/schemas/ReviewTask"
+        - type: object
+          required: [enqueue_outcome]
+          properties:
+            enqueue_outcome:
+              type: string
+              enum: [enqueued, skipped_not_configured, failed]
+            enqueue_detail:
+              oneOf:
+                - type: string
+                - type: "null"
+
+    ArgillaReviewSyncItem:
+      type: object
+      additionalProperties: false
+      required: [external_id, annotation_updated_at, decision, payload]
+      properties:
+        external_id:
+          type: string
+        annotation_updated_at:
+          type: string
+          format: date-time
+        decision:
+          type: string
+        reviewed_by:
+          oneOf:
+            - type: string
+            - type: "null"
+        payload:
+          type: object
+          additionalProperties: true
+
+    ArgillaReviewSyncRequest:
+      type: object
+      additionalProperties: false
+      required: [tasks]
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArgillaReviewSyncItem"
+
+    ArgillaReviewSyncResponse:
+      type: object
+      required: [accepted, duplicates, failed]
+      properties:
+        accepted:
+          type: integer
+        duplicates:
+          type: integer
+        failed:
+          type: integer
+
+    ReviewTask:
+      type: object
+      required:
+        - review_task_id
+        - wizard_run_id
+        - argilla_external_id
+        - status
+        - payload
+        - created_at
+        - updated_at
+      properties:
+        review_task_id:
+          type: string
+          pattern: "^wrt_[a-z0-9]+$"
+        wizard_run_id:
+          type: string
+          pattern: "^wrn_[a-z0-9]+$"
+        argilla_external_id:
+          type: string
+        record_id:
+          oneOf:
+            - type: string
+            - type: "null"
+        status:
+          type: string
+          enum: [pending, completed, failed]
+        payload:
+          type: object
+          additionalProperties: true
+        decision_payload:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        processed_at:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        argilla_enqueued_at:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        argilla_enqueue_last_error:
+          oneOf:
+            - type: string
+            - type: "null"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     HealthResponse:
       type: object

@@ -10,6 +10,10 @@ Platform-control now has a running FastAPI service with persisted entities and m
 
 For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope_type` are frozen through source-version acquisition config and copied into bundle/event provenance. Run creation now also accepts explicit `scope` and `replay` metadata so partial reruns and backfills can be recorded on the control-plane side even though resumable frontier orchestration is still follow-on work. First-class corpus CRUD is still follow-on work.
 
+Wizard API v1 foundation is available with persisted project/run/review/ledger entities plus orchestration abstraction wiring (`in_memory` default, `temporal` backend). With `PLATFORM_CONTROL_WIZARD_ORCHESTRATOR_BACKEND=temporal`, the API starts a `WizardRunWorkflow` execution (workflow id `wizard-run-{wizard_run_id}`) and sends approve/reject signals; run `platform-control-temporal-worker` against the same `PLATFORM_CONTROL_TEMPORAL_*` settings so workflows make progress. Temporal workers register `WizardRunWorkflow`, `ScopeShardWorkflow`, and `ReviewDrainWorkflow`. After operator approve, the parent runs a pilot scope-shard child and a review-drain child (stubs today; real activities and multi-shard fan-out are follow-on). Pilot-completion-driven `HUMAN_GATE_APPROVAL` persistence remains follow-on; see ADR-0021 and `docs/architecture/temporal-argilla-wizard-architecture.md`.
+
+Review loop: `POST /v1/reviews/tasks` persists a `ReviewTask` and, when `PLATFORM_CONTROL_ARGILLA_API_BASE_URL` (plus API key and dataset id) are set, POSTs a bulk records payload to Argilla; otherwise `enqueue_outcome` is `skipped_not_configured`. Ingestion stays on `POST /v1/reviews/sync-from-argilla` (idempotent on `external_id` + `annotation_updated_at`).
+
 See [Platform Control Implementation Plan](platform-control-implementation-plan.md) for the planned repo structure, worker layout, and phased delivery approach.
 
 ## Source of truth
@@ -71,6 +75,15 @@ A user can:
 | Later | AI-generated draft source versions |
 | Later | More granular source family support |
 
+## Discovery drift outputs (non-authoritative)
+
+Acquisition discovery may observe metadata that does not cleanly map to canonical taxonomy keys. These observations are operational evidence, not contract changes.
+
+- Discovery outputs should be recorded as run-scoped drift artifacts (for example, candidate alias/mapping patches) linked to the run record.
+- Drift artifacts may include proposed values for jurisdiction aliases, source-family mapping candidates, language-pair candidates, and court/authority label normalization.
+- Platform-control must not mutate country overlay YAML/config at runtime.
+- Accepted mapping changes are applied through reviewed docs/config updates, then used by subsequent runs.
+
 ## Dependencies
 
 | Dependency | Purpose |
@@ -108,6 +121,13 @@ Unset keys keep local development open. Legacy single-key mode is
 - Service check: `bash scripts/check-platform-control.sh`
 - Docs/contracts checks: `bash scripts/check_docs.sh`
 - Legal-search checks (cross-component CI parity): `bash scripts/check-legal-search.sh`
+
+Multi-country operator scaling references:
+
+- `docs/components/five-country-content-rollout.md`
+- `docs/runbooks/platform-control-multi-country-operator-playbook.md`
+- `docs/architecture/temporal-argilla-wizard-architecture.md`
+- `docs/runbooks/argilla-review-routing-and-sync.md`
 
 ## Testing
 

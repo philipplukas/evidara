@@ -1,0 +1,82 @@
+{
+  "overload_thresholds": {
+    "max_human_decisions_per_state": 1,
+    "max_error_classes_per_state": 3,
+    "max_screens_per_decision": 1,
+    "max_state_duration_skew_ratio_p95": 4.0
+  },
+  "scenarios": [
+    {
+      "id": "single_flat_country",
+      "description": "One country, shallow authority hierarchy, stable pages",
+      "state_metrics": {
+        "PilotRun": {
+          "human_decisions": 1,
+          "error_classes": 1,
+          "screens_per_decision": 1,
+          "state_duration_skew_ratio_p95": 1.2
+        }
+      }
+    },
+    {
+      "id": "federal_wide",
+      "description": "Many jurisdictions at same hierarchy depth",
+      "state_metrics": {
+        "ScaledRun": {
+          "human_decisions": 1,
+          "error_classes": 2,
+          "screens_per_decision": 1,
+          "state_duration_skew_ratio_p95": 3.1
+        }
+      }
+    },
+    {
+      "id": "deep_court_hierarchy",
+      "description": "Deep nested authority and chamber structure",
+      "state_metrics": {
+        "ScaledRun": {
+          "human_decisions": 1,
+          "error_classes": 3,
+          "screens_per_decision": 1,
+          "state_duration_skew_ratio_p95": 3.9
+        }
+      }
+    },
+    {
+      "id": "mixed_source_quality",
+      "description": "Stable, anti-bot, and malformed source mix in one run",
+      "state_metrics": {
+        "ScaledRun": {
+          "human_decisions": 1,
+          "error_classes": 3,
+          "screens_per_decision": 1,
+          "state_duration_skew_ratio_p95": 3.8
+        },
+        "ReviewRouting": {
+          "human_decisions": 1,
+          "error_classes": 2,
+          "screens_per_decision": 1,
+          "state_duration_skew_ratio_p95": 2.7
+        }
+      }
+    },
+    {
+      "id": "policy_variance",
+      "description": "Different crawl policies and localization rules by jurisdiction",
+      "state_metrics": {
+        "DiscoveryPlan": {
+          "human_decisions": 1,
+          "error_classes": 2,
+          "screens_per_decision": 1,
+          "state_duration_skew_ratio_p95": 2.0
+        },
+        "HumanGateApproval": {
+          "human_decisions": 1,
+          "error_classes": 1,
+          "screens_per_decision": 1,
+          "state_duration_skew_ratio_p95": 1.4
+        }
+      }
+    }
+  ]
+}

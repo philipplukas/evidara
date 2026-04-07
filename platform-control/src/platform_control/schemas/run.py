@@ -141,6 +141,24 @@ class RunListResponse(BaseModel):
     offset: int | None = None
 
 
+class RunReadinessCheck(BaseModel):
+    code: str
+    ok: bool
+    detail: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RunReadinessResponse(BaseModel):
+    source_id: str
+    source_version_id: str
+    mode: RunMode
+    ready: bool
+    checks: list[RunReadinessCheck]
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CapturedResourceResponse(BaseModel):
     captured_resource_id: str
     run_id: str

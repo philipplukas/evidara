@@ -65,10 +65,16 @@ A user can:
 | Next | Section-level search |
 | Next | Citation-aware search |
 | Next | i18n: French and Italian UI (ADR-0013) |
+| Next | Five-country content overlays (CH/AT/DE/FR/IT) for consistent filter and detail semantics |
 | Later | Facets and ranking improvements |
 | Later | Per-language OpenSearch analyzers |
 | Later | Semantic search |
 | Later | Richer document exploration |
+
+Content scaling reference:
+
+- `docs/components/five-country-content-rollout.md`
+- `legal-search/frontend/docs/multi-country-content-spec.md`
 
 ## Dependencies
 

@@ -11,6 +11,7 @@
 | [State Management](./state-management.md) | URL + workspace state architecture, provider boundaries, query-cache ownership |
 | [State Libraries](./state-libraries.md) | How to choose between `nuqs`, Context, Zustand, Jotai, Redux Toolkit, and React Query |
 | [Testing Matrix](./testing-matrix.md) | Declarative journey-to-test-layer mapping for UX/UI interactions |
+| [Multi-Country Content Spec](./multi-country-content-spec.md) | End-user content rules for CH/AT/DE/FR/IT scaling (labels, subtitles, overlays, edge states) |
 
 ## Will Evolve Naturally
 

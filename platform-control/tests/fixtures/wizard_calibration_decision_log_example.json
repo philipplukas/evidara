@@ -1,0 +1,36 @@
+{
+  "decision_id": "wcd_01jrb9j9t4px7k0g8v1n2m3q4r",
+  "country_code": "CH",
+  "evidence_window": {
+    "start_date": "2026-03-23",
+    "end_date": "2026-04-06"
+  },
+  "change_type": "promote_shard_strategy",
+  "previous_configuration": {
+    "shard_strategy": "country_jurisdiction",
+    "high_threshold": 0.9,
+    "low_threshold": 0.7
+  },
+  "new_configuration": {
+    "shard_strategy": "country_jurisdiction_authority",
+    "high_threshold": 0.92,
+    "low_threshold": 0.7
+  },
+  "metrics_snapshot": {
+    "run_completion_slo_breach_rate": 0.11,
+    "review_freshness_slo_breach_rate": 0.08,
+    "critical_field_audit_error_rate": 0.017,
+    "state_duration_skew_ratio_p95": 4.6,
+    "retry_density_per_1000_nodes": 18.2,
+    "mandatory_review_rate": 0.27,
+    "taxonomy_drift_incidents_per_week": 4
+  },
+  "approver": "platform-oncall",
+  "rationale": "CH shards show persistent p95 skew and repeated hotspot authorities; promote shard granularity for stability.",
+  "related_run_ids": [
+    "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+    "run_01jq7a4z9b7j4dndd9sgv6pb9e"
+  ],
+  "decided_at": "2026-04-07T14:30:00Z",
+  "contract_version": "1.0.0"
+}

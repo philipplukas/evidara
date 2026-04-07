@@ -1,0 +1,34 @@
+{
+  "overload_thresholds": {
+    "max_human_decisions_per_state": 1,
+    "max_error_classes_per_state": 3,
+    "max_screens_per_decision": 1,
+    "max_state_duration_skew_ratio_p95": 4.0
+  },
+  "scenarios": [
+    {
+      "id": "approval_overload",
+      "description": "Approval state asks for multiple independent operator decisions",
+      "state_metrics": {
+        "HumanGateApproval": {
+          "human_decisions": 3,
+          "error_classes": 2,
+          "screens_per_decision": 2,
+          "state_duration_skew_ratio_p95": 1.8
+        }
+      }
+    },
+    {
+      "id": "scaledrun_error_explosion",
+      "description": "Scaled run combines many unrelated failure classes and skewed shard timing",
+      "state_metrics": {
+        "ScaledRun": {
+          "human_decisions": 1,
+          "error_classes": 6,
+          "screens_per_decision": 1,
+          "state_duration_skew_ratio_p95": 6.2
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "countries": [
+    {
+      "country_code": "CH",
+      "name": "Switzerland",
+      "hierarchy_shape": "federal_and_cantonal_dual_track",
+      "estimated_depth": 6,
+      "estimated_authority_breadth": 26,
+      "administrative_dual_track": true,
+      "language_count": 3,
+      "metadata_quality_risk": "medium",
+      "taxonomy_drift_risk": "high",
+      "source_notes": [
+        "internal_overlay_docs",
+        "swiss_federal_courts_overview_bger"
+      ]
+    },
+    {
+      "country_code": "AT",
+      "name": "Austria",
+      "hierarchy_shape": "federal_ordentliche_plus_admin",
+      "estimated_depth": 5,
+      "estimated_authority_breadth": 12,
+      "administrative_dual_track": true,
+      "language_count": 1,
+      "metadata_quality_risk": "low",
+      "taxonomy_drift_risk": "medium",
+      "source_notes": [
+        "internal_overlay_docs",
+        "austria_ejustice_portal"
+      ]
+    },
+    {
+      "country_code": "DE",
+      "name": "Germany",
+      "hierarchy_shape": "federal_plus_lander_multi_branch",
+      "estimated_depth": 6,
+      "estimated_authority_breadth": 16,
+      "administrative_dual_track": true,
+      "language_count": 1,
+      "metadata_quality_risk": "medium",
+      "taxonomy_drift_risk": "high",
+      "source_notes": [
+        "internal_overlay_docs",
+        "bundesverwaltungsgericht_structure"
+      ]
+    },
+    {
+      "country_code": "FR",
+      "name": "France",
+      "hierarchy_shape": "judicial_and_administrative_dual_order",
+      "estimated_depth": 5,
+      "estimated_authority_breadth": 10,
+      "administrative_dual_track": true,
+      "language_count": 1,
+      "metadata_quality_risk": "medium",
+      "taxonomy_drift_risk": "medium",
+      "source_notes": [
+        "internal_overlay_docs",
+        "france_dual_order_reference"
+      ]
+    },
+    {
+      "country_code": "IT",
+      "name": "Italy",
+      "hierarchy_shape": "ordinary_plus_specialized_circuits",
+      "estimated_depth": 5,
+      "estimated_authority_breadth": 14,
+      "administrative_dual_track": true,
+      "language_count": 1,
+      "metadata_quality_risk": "high",
+      "taxonomy_drift_risk": "medium",
+      "source_notes": [
+        "internal_overlay_docs",
+        "italy_judicial_circuits_reference"
+      ]
+    }
+  ],
+  "scoring_weights": {
+    "depth": 0.35,
+    "breadth": 0.25,
+    "admin_dual_track": 0.15,
+    "language_count": 0.1,
+    "metadata_quality_risk": 0.1,
+    "taxonomy_drift_risk": 0.05
+  },
+  "classification_thresholds": {
+    "low_max": 0.34,
+    "medium_max": 0.66,
+    "high_max": 1.0
+  }
+}

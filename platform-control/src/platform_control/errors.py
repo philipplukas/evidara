@@ -9,6 +9,10 @@ class NotFoundError(PlatformControlError):
     """Requested entity does not exist."""
 
 
+class ConflictError(PlatformControlError):
+    """Resource already exists or conflicts with current state."""
+
+
 class InvalidStateTransitionError(PlatformControlError):
     """Raised when a state transition is invalid."""
 
@@ -23,3 +27,7 @@ class SignatureVerificationError(PlatformControlError):
 
 class IntegrationConfigurationError(PlatformControlError):
     """Raised when storage or event integrations are misconfigured."""
+
+
+class OrchestrationError(PlatformControlError):
+    """Raised when an orchestration backend (e.g. Temporal) cannot complete the action."""

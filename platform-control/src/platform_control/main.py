@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from platform_control.auth import require_control_plane_operator, require_control_plane_service
 from platform_control.config import get_settings
 from platform_control.errors import (
+    ConflictError,
     InvalidStateTransitionError,
     NotFoundError,
     PlatformControlError,
@@ -23,10 +24,12 @@ from platform_control.routers import (
     firecrawl,
     health,
     reference_data,
+    reviews,
     runs,
     schedules,
     sources,
     versions,
+    wizard,
 )
 
 _HTTP_LOGGER_NAME = "platform_control.http"
@@ -88,6 +91,8 @@ def create_app() -> FastAPI:
     app.include_router(sources.router, dependencies=_operator_auth)
     app.include_router(versions.router, dependencies=_operator_auth)
     app.include_router(runs.router, dependencies=_operator_auth)
+    app.include_router(wizard.router, dependencies=_operator_auth)
+    app.include_router(reviews.router, dependencies=_operator_auth)
     app.include_router(schedules.router, dependencies=_operator_auth)
     app.include_router(firecrawl.router, dependencies=_service_auth)
     app.include_router(di_events.router, dependencies=_service_auth)
@@ -95,6 +100,10 @@ def create_app() -> FastAPI:
     @app.exception_handler(NotFoundError)
     async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content=_error_payload(request, str(exc)))
+
+    @app.exception_handler(ConflictError)
+    async def resource_conflict_handler(request: Request, exc: ConflictError) -> JSONResponse:
+        return JSONResponse(status_code=409, content=_error_payload(request, str(exc)))
 
     @app.exception_handler(InvalidStateTransitionError)
     async def conflict_handler(request: Request, exc: InvalidStateTransitionError) -> JSONResponse:

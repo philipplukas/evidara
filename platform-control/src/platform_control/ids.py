@@ -38,6 +38,10 @@ _ALLOWED_PREFIXES = frozenset(
         "src",
         "stg",
         "sv",
+        "wpr",
+        "wrl",
+        "wrn",
+        "wrt",
         "whr",
     }
 )
@@ -48,7 +52,7 @@ def generate_prefixed_id(prefix: str) -> str:
 
     Allowed prefixes: ``abm``, ``art``, ``auth``, ``cap``, ``evt``, ``exp``,
     ``jur``, ``pjob``, ``run``, ``rss``, ``sched``, ``snap``, ``src``,
-    ``stg``, ``sv``, ``whr``.
+    ``stg``, ``sv``, ``whr``, ``wpr``, ``wrl``, ``wrn``, ``wrt``.
     """
     if prefix not in _ALLOWED_PREFIXES:
         raise ValueError(
