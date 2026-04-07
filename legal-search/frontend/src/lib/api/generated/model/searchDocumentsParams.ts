@@ -26,9 +26,29 @@ q: string;
  */
 jurisdiction?: string;
 /**
+ * Comma-separated list of jurisdiction filters
+ */
+jurisdictions?: string;
+/**
+ * Comma-separated list of language filters
+ */
+languages?: string;
+/**
  * Filter by document type
  */
 document_type?: string;
+/**
+ * Comma-separated list of document type filters
+ */
+document_types?: string;
+/**
+ * Limit results to official sources only
+ */
+official_only?: boolean;
+/**
+ * JSON-encoded refinement filter array
+ */
+refinements?: string;
 /**
  * @minimum 1
  */

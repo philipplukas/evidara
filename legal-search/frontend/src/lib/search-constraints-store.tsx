@@ -25,6 +25,7 @@ const SearchConstraintsContext = createContext<SearchConstraintsContextValue | n
 const SUPPORTED_FILTERS = {
   jurisdiction: ["ch", "at"],
   language: ["de", "fr", "it", "en"],
+  document_type: ["law", "decision", "rechtssatz", "commentary"],
   court_level: ["supreme", "appellate", "cantonal", "district"],
   legal_area: ["civil", "commercial", "corporate", "administrative", "criminal", "constitutional"],
   date: ["any", "1y", "5y", "10y"],

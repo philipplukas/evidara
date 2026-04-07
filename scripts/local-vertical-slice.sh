@@ -58,16 +58,20 @@ compose_up() {
 compose_up_all() {
   local mode
   mode="$(normalize_mode "${1:-search}")"
+  local postgres_port="${EVIDARA_POSTGRES_HOST_PORT:-15432}"
+  local os_http_port="${EVIDARA_OPENSEARCH_HTTP_PORT:-19200}"
+  local os_metrics_port="${EVIDARA_OPENSEARCH_METRICS_PORT:-19600}"
+  local pubsub_port="${EVIDARA_PUBSUB_HOST_PORT:-18681}"
   case "$mode" in
     lite)
       echo "up-all requires search or full mode (OpenSearch is required)." >&2
       exit 1
       ;;
     search)
-      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps up -d --build)
+      (cd "$ROOT_DIR" && EVIDARA_POSTGRES_HOST_PORT="$postgres_port" EVIDARA_OPENSEARCH_HTTP_PORT="$os_http_port" EVIDARA_OPENSEARCH_METRICS_PORT="$os_metrics_port" EVIDARA_PUBSUB_HOST_PORT="$pubsub_port" docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps up -d --build)
       ;;
     full)
-      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps up -d --build)
+      (cd "$ROOT_DIR" && EVIDARA_POSTGRES_HOST_PORT="$postgres_port" EVIDARA_OPENSEARCH_HTTP_PORT="$os_http_port" EVIDARA_OPENSEARCH_METRICS_PORT="$os_metrics_port" EVIDARA_PUBSUB_HOST_PORT="$pubsub_port" docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps up -d --build)
       ;;
   esac
 }
@@ -91,16 +95,20 @@ compose_down() {
 compose_down_all() {
   local mode
   mode="$(normalize_mode "${1:-search}")"
+  local postgres_port="${EVIDARA_POSTGRES_HOST_PORT:-15432}"
+  local os_http_port="${EVIDARA_OPENSEARCH_HTTP_PORT:-19200}"
+  local os_metrics_port="${EVIDARA_OPENSEARCH_METRICS_PORT:-19600}"
+  local pubsub_port="${EVIDARA_PUBSUB_HOST_PORT:-18681}"
   case "$mode" in
     lite)
       echo "down-all is only applicable to search/full app compose mode." >&2
       exit 1
       ;;
     search)
-      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps stop)
+      (cd "$ROOT_DIR" && EVIDARA_POSTGRES_HOST_PORT="$postgres_port" EVIDARA_OPENSEARCH_HTTP_PORT="$os_http_port" EVIDARA_OPENSEARCH_METRICS_PORT="$os_metrics_port" EVIDARA_PUBSUB_HOST_PORT="$pubsub_port" docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps stop)
       ;;
     full)
-      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps stop)
+      (cd "$ROOT_DIR" && EVIDARA_POSTGRES_HOST_PORT="$postgres_port" EVIDARA_OPENSEARCH_HTTP_PORT="$os_http_port" EVIDARA_OPENSEARCH_METRICS_PORT="$os_metrics_port" EVIDARA_PUBSUB_HOST_PORT="$pubsub_port" docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps stop)
       ;;
   esac
 }
@@ -124,16 +132,20 @@ compose_status() {
 compose_status_all() {
   local mode
   mode="$(normalize_mode "${1:-search}")"
+  local postgres_port="${EVIDARA_POSTGRES_HOST_PORT:-15432}"
+  local os_http_port="${EVIDARA_OPENSEARCH_HTTP_PORT:-19200}"
+  local os_metrics_port="${EVIDARA_OPENSEARCH_METRICS_PORT:-19600}"
+  local pubsub_port="${EVIDARA_PUBSUB_HOST_PORT:-18681}"
   case "$mode" in
     lite)
       echo "status-all is only applicable to search/full app compose mode." >&2
       exit 1
       ;;
     search)
-      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps ps)
+      (cd "$ROOT_DIR" && EVIDARA_POSTGRES_HOST_PORT="$postgres_port" EVIDARA_OPENSEARCH_HTTP_PORT="$os_http_port" EVIDARA_OPENSEARCH_METRICS_PORT="$os_metrics_port" EVIDARA_PUBSUB_HOST_PORT="$pubsub_port" docker compose -f docker-compose.yml -f docker-compose.local.yml --profile search --profile apps ps)
       ;;
     full)
-      (cd "$ROOT_DIR" && docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps ps)
+      (cd "$ROOT_DIR" && EVIDARA_POSTGRES_HOST_PORT="$postgres_port" EVIDARA_OPENSEARCH_HTTP_PORT="$os_http_port" EVIDARA_OPENSEARCH_METRICS_PORT="$os_metrics_port" EVIDARA_PUBSUB_HOST_PORT="$pubsub_port" docker compose -f docker-compose.yml -f docker-compose.local.yml --profile full --profile apps ps)
       ;;
   esac
 }
@@ -170,11 +182,29 @@ check_all() {
   local ls_ui
   local ls_query
 
-  pc_api="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health || true)"
-  pc_admin="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3100 || true)"
-  ls_api="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/health || true)"
-  ls_ui="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000 || true)"
-  ls_query="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" "http://127.0.0.1:3001/v1/search?q=art%20754" || true)"
+  check_endpoint() {
+    local url="$1"
+    local attempts="${2:-10}"
+    local sleep_seconds="${3:-2}"
+    local code="000"
+    local i
+    for ((i=1; i<=attempts; i++)); do
+      code="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" "$url" || true)"
+      if [[ "$code" == "200" ]]; then
+        echo "$code"
+        return 0
+      fi
+      sleep "$sleep_seconds"
+    done
+    echo "$code"
+    return 1
+  }
+
+  pc_api="$(check_endpoint "http://127.0.0.1:8000/health" 10 2)"
+  pc_admin="$(check_endpoint "http://127.0.0.1:3100" 10 2)"
+  ls_api="$(check_endpoint "http://127.0.0.1:3102/health" 10 2)"
+  ls_ui="$(check_endpoint "http://127.0.0.1:3101" 10 2)"
+  ls_query="$(check_endpoint "http://127.0.0.1:3102/v1/search?q=art%20754" 10 2)"
 
   echo "platform-control API /health: ${pc_api}"
   echo "platform-control admin /:     ${pc_admin}"

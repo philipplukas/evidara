@@ -37,6 +37,14 @@ bash scripts/local-vertical-slice.sh up-all search
 bash scripts/local-vertical-slice.sh status-all search
 ```
 
+`up-all`/`status-all`/`down-all` use isolated host ports for infra by default to avoid
+collisions with existing local services:
+
+- Postgres host port: `15432` (`EVIDARA_POSTGRES_HOST_PORT`)
+- OpenSearch host HTTP port: `19200` (`EVIDARA_OPENSEARCH_HTTP_PORT`)
+- OpenSearch metrics port: `19600` (`EVIDARA_OPENSEARCH_METRICS_PORT`)
+- Pub/Sub host port (full mode): `18681` (`EVIDARA_PUBSUB_HOST_PORT`)
+
 For full runtime wiring (adds pubsub emulator):
 
 ```bash
@@ -62,8 +70,8 @@ Health endpoints after startup:
 
 - `http://127.0.0.1:8000/health` (platform-control API)
 - `http://127.0.0.1:3100` (platform-control admin)
-- `http://127.0.0.1:3001/health` (legal-search API)
-- `http://127.0.0.1:3000` (legal-search frontend)
+- `http://127.0.0.1:3102/health` (legal-search API)
+- `http://127.0.0.1:3101` (legal-search frontend)
 
 Automated check:
 
@@ -117,7 +125,7 @@ npm run dev
 Expected health check:
 
 ```bash
-curl -fsS http://127.0.0.1:3001/health
+curl -fsS http://127.0.0.1:3102/health
 ```
 
 ## Run document-intelligence runtime services
@@ -153,4 +161,3 @@ If you started the full compose app stack:
 ```bash
 bash scripts/local-vertical-slice.sh down-all search
 ```
-

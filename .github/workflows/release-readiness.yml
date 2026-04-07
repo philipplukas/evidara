@@ -19,9 +19,6 @@ permissions:
   contents: read
   id-token: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   release-readiness:
     runs-on: ubuntu-latest
@@ -30,6 +27,7 @@ jobs:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}
       GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
       DI_SURFACES_ROOT_URI: ${{ vars.DI_SURFACES_ROOT_URI_STAGING }}
+      INTERACTION_FLOW_EVIDENCE_GCS_ROOT: ${{ vars.INTERACTION_FLOW_EVIDENCE_GCS_ROOT_STAGING || vars.DI_SURFACES_ROOT_URI_STAGING }}
       TERRAFORM_APPLY_ENABLED: ${{ vars.TERRAFORM_APPLY_ENABLED || 'false' }}
       REPORT_PATH: tmp/release-readiness/report.md
     steps:
@@ -84,6 +82,79 @@ jobs:
               print(f"Latest staging smoke is not successful: {conclusion}", file=sys.stderr)
               sys.exit(2)
           PY
+
+      - name: Verify latest interaction-flow staging evidence run
+        id: interaction_flow_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run list \
+            --workflow "Interaction Flow Staging Evidence" \
+            --branch main \
+            --limit 20 \
+            --json databaseId,createdAt,status,conclusion,url \
+            > tmp/release-readiness/interaction-flow-staging.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          runs = json.loads(
+              open(
+                  "tmp/release-readiness/interaction-flow-staging.json",
+                  "r",
+                  encoding="utf-8",
+              ).read()
+          )
+          if not runs:
+              print(
+                  "No Interaction Flow Staging Evidence runs found on main.",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+
+          latest_success = next(
+              (run for run in runs if (run.get("conclusion") or "") == "success"),
+              None,
+          )
+          if latest_success is None:
+              latest = runs[0]
+              latest_status = latest.get("status") or "unknown"
+              latest_conclusion = latest.get("conclusion") or "unknown"
+              print(
+                  "No successful Interaction Flow Staging Evidence runs found in the latest 20 runs. "
+                  f"Newest run status={latest_status}, conclusion={latest_conclusion}.",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+
+          run_id = latest_success.get("databaseId") or ""
+          conclusion = latest_success.get("conclusion") or "unknown"
+          created_at = latest_success.get("createdAt") or "unknown"
+          url = latest_success.get("url") or ""
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"interaction_flow_run_id={run_id}\n")
+              fh.write(f"interaction_flow_conclusion={conclusion}\n")
+              fh.write(f"interaction_flow_created_at={created_at}\n")
+              fh.write(f"interaction_flow_url={url}\n")
+          PY
+
+      - name: Verify interaction-flow evidence artifact completeness
+        id: interaction_flow_artifact_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          scripts/check-latest-interaction-flow-evidence.sh \
+            --mode staging \
+            --output-dir tmp/release-readiness/interaction-flow-evidence-quickcheck \
+            --gcs-root-uri "${INTERACTION_FLOW_EVIDENCE_GCS_ROOT}" \
+            --github-output "${GITHUB_OUTPUT}"
 
       - name: Verify latest Terraform run
         id: tf_gate
@@ -222,6 +293,31 @@ jobs:
             fi
             echo "| Latest E2E Smoke Staging | ${smoke_status} | [run](${{ steps.smoke_gate.outputs.smoke_url }}) @ ${{ steps.smoke_gate.outputs.smoke_created_at }} |"
 
+            if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" ]]; then
+              interaction_flow_status="PASS"
+            else
+              interaction_flow_status="FAIL"
+            fi
+            echo "| Latest interaction-flow staging evidence | ${interaction_flow_status} | [run](${{ steps.interaction_flow_gate.outputs.interaction_flow_url }}) @ ${{ steps.interaction_flow_gate.outputs.interaction_flow_created_at }} |"
+
+            if [[ "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+              interaction_flow_artifact_status="PASS"
+            else
+              interaction_flow_artifact_status="FAIL"
+            fi
+            interaction_flow_artifact_evidence='`scripts/check-latest-interaction-flow-evidence.sh --mode staging`'
+            if [[ -n "${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}" ]]; then
+              interaction_flow_artifact_evidence="[run ${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_id }}](${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}) + ${interaction_flow_artifact_evidence}"
+            fi
+            echo "| Interaction-flow artifact completeness | ${interaction_flow_artifact_status} | ${interaction_flow_artifact_evidence} |"
+
+            if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+              evidence_quality_score="PASS"
+            else
+              evidence_quality_score="FAIL"
+            fi
+            echo "| Evidence quality score | ${evidence_quality_score} | Composite of latest interaction-flow run + artifact completeness gate |"
+
             if [[ "${{ steps.tf_gate.outcome }}" == "success" ]]; then
               tf_status="PASS"
             else
@@ -243,19 +339,31 @@ jobs:
             fi
             echo "| DLQ depth (15m max) | ${dlq_status} | max=\`${{ steps.dlq_gate.outputs.dlq_max_depth }}\`, subs=\`${{ steps.dlq_gate.outputs.dlq_subscription_count }}\` |"
             echo
-            if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
+            if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
               overall="GO"
             else
               overall="NO-GO"
             fi
             echo "Go/No-Go: **${overall}**"
+            if [[ "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+              echo
+              echo "## Runbook Verification Log Row (copy/paste)"
+              echo
+              echo "| $(date -u +%Y-%m-%d) | Strict release-readiness verification | GitHub Actions run [${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_id }}](${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}) passed interaction-flow evidence artifact completeness quick-check |"
+            fi
           } > "${REPORT_PATH}"
 
           cat "${REPORT_PATH}" >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Upload release readiness artifact
+      - name: Upload release readiness report to GCS
+        id: release_report_upload
         if: ${{ always() }}
-        uses: actions/upload-artifact@v5
-        with:
-          name: release-readiness-report
-          path: ${{ env.REPORT_PATH }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${INTERACTION_FLOW_EVIDENCE_GCS_ROOT}" ]]; then
+            echo "::error::INTERACTION_FLOW_EVIDENCE_GCS_ROOT is not configured."
+            exit 1
+          fi
+          REPORT_GCS_PATH="${INTERACTION_FLOW_EVIDENCE_GCS_ROOT%/}/release-readiness/${GITHUB_RUN_ID}/report.md"
+          gcloud storage cp "${REPORT_PATH}" "${REPORT_GCS_PATH}"
+          echo "report_gcs_path=${REPORT_GCS_PATH}" >> "${GITHUB_OUTPUT}"

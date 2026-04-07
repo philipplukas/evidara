@@ -6,12 +6,19 @@
     "pinned": "Merkliste",
     "controlPanel": "Kontrollbereich",
     "languageGroup": "Sprache",
-    "openUserMenu": "Benutzermenü öffnen"
+    "openUserMenu": "Benutzermenü öffnen",
+    "controlPanelRestricted": "Kontrollbereich nur mit Administratorprofil verfügbar.",
+    "controlPanelUnavailable": "Kontrollbereich-URL ist für diese Umgebung nicht konfiguriert.",
+    "profileLabel": "Profil",
+    "profileOperator": "Operator",
+    "profileStandard": "Standard"
   },
   "filter": {
     "filtersTitle": "Filter",
     "searchPlaceholder": "Suchen...",
-    "yes": "Ja"
+    "yes": "Ja",
+    "clearAll": "Verfeinerungen löschen",
+    "resetAll": "Alles zurücksetzen"
   },
   "context": {
     "officialSourcesOnly": "Nur offizielle Quellen"

@@ -28,9 +28,16 @@ import { useWorkspace } from "@/lib/workspace-store";
 interface WorkspaceClientProps {
   searchContext: SearchContextViewModel;
   filters: FilterViewModel[];
+  showControlPlaneEntry?: boolean;
+  controlPanelUrl?: string;
 }
 
-export default function WorkspaceClient({ searchContext, filters }: WorkspaceClientProps) {
+export default function WorkspaceClient({
+  searchContext,
+  filters,
+  showControlPlaneEntry = true,
+  controlPanelUrl,
+}: WorkspaceClientProps) {
   const t = useTranslations();
   const isDesktop = useDesktop();
   const { state, dispatch } = useWorkspace();
@@ -43,9 +50,13 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
 
   // URL state via nuqs — replaces manual useSearchParams + router.replace
   const [selectedId, setSelectedId] = useQueryState("item", parseAsString);
+  const [urlQuery] = useQueryState("q", parseAsString.withDefault(""));
 
   const leftRef = useRef<PanelImperativeHandle>(null);
   const rightRef = useRef<PanelImperativeHandle>(null);
+  const hasAppliedInitialConstraintsRef = useRef(false);
+  const lastSearchSignatureRef = useRef<string>("");
+  const searchRequestIdRef = useRef(0);
 
   const isDetailOpen = Boolean(selectedId);
   const {
@@ -71,6 +82,35 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
     [setSelectedId, dispatch, state.resultSet.items],
   );
 
+  const createSearchSignature = useCallback(
+    (query: string) =>
+      JSON.stringify({
+        query,
+        jurisdictions: constraints.context.jurisdictions,
+        languages: constraints.context.languages,
+        sourceType: constraints.context.sourceType,
+        officialOnly: constraints.context.officialOnly,
+        refinements: constraints.refinements,
+      }),
+    [constraints],
+  );
+
+  const executeSearch = useCallback(
+    async (query: string) => {
+      const requestId = ++searchRequestIdRef.current;
+      const signature = createSearchSignature(query);
+      const { results, filters: nextFilters } = await runSearch(query, constraints);
+      if (requestId !== searchRequestIdRef.current) {
+        // Ignore stale responses when newer searches have already started.
+        return;
+      }
+      lastSearchSignatureRef.current = signature;
+      setActiveFilters(nextFilters);
+      dispatch({ type: "SEARCH", query, results });
+    },
+    [constraints, dispatch, createSearchSignature],
+  );
+
   const handlePivot = useCallback(
     async (label: string, sourceId: string) => {
       const sourceResult = state.resultSet.items.find((r) => r.id === sourceId);
@@ -91,14 +131,7 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
     [dispatch, state.resultSet, constraints],
   );
 
-  const handleSearch = useCallback(
-    async (query: string) => {
-      const { results, filters: nextFilters } = await runSearch(query, constraints);
-      setActiveFilters(nextFilters);
-      dispatch({ type: "SEARCH", query, results });
-    },
-    [constraints, dispatch],
-  );
+  const handleSearch = executeSearch;
 
   const handlePin = useCallback(
     (id: string, title: string, type: string) => {
@@ -112,6 +145,25 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
   );
 
   const pinnedIds = new Set(state.pinned.map((p) => p.id));
+
+  useEffect(() => {
+    if (!urlQuery) return;
+    if (!hasAppliedInitialConstraintsRef.current) {
+      hasAppliedInitialConstraintsRef.current = true;
+      const hasNonDefaultConstraints =
+        constraints.context.jurisdictions.join(",") !== "ch" ||
+        constraints.context.languages.join(",") !== "de" ||
+        constraints.context.sourceType !== null ||
+        constraints.context.officialOnly ||
+        constraints.refinements.length > 0;
+      if (!hasNonDefaultConstraints) return;
+    }
+    const signature = createSearchSignature(urlQuery);
+    if (signature === lastSearchSignatureRef.current) {
+      return;
+    }
+    void executeSearch(urlQuery);
+  }, [constraints, createSearchSignature, executeSearch, urlQuery]);
 
   // Desktop panel sync
   useEffect(() => {
@@ -166,6 +218,9 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
         onPin={handlePin}
         pinnedIds={pinnedIds}
         onCloseDetail={() => setSelectedId(null)}
+        onSearch={handleSearch}
+        showControlPlaneEntry={showControlPlaneEntry}
+        controlPanelUrl={controlPanelUrl}
       />
     );
   }
@@ -173,7 +228,11 @@ export default function WorkspaceClient({ searchContext, filters }: WorkspaceCli
   // Desktop
   return (
     <div className="flex flex-col h-screen bg-surface-page">
-      <AppHeader onSearch={handleSearch} />
+      <AppHeader
+        onSearch={handleSearch}
+        showControlPlaneEntry={showControlPlaneEntry}
+        controlPanelUrl={controlPanelUrl}
+      />
       <ContextBar context={searchContext} />
 
       <div className="flex-1 min-h-0">

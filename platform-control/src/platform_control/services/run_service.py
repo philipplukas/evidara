@@ -25,6 +25,8 @@ from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.ids import generate_prefixed_id
 from platform_control.integrations import get_artifact_store, get_raw_artifact_publisher
 from platform_control.models.captured_resource import CapturedResource
+from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
+from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
@@ -39,10 +41,14 @@ from platform_control.schemas.run import (
     RawArtifactListResponse,
     RawArtifactResponse,
     RunListItemResponse,
+    RunPipelineHealthResponse,
+    RunPipelineHealthStage,
     RunPreviewSummaryBreakdownEntry,
     RunPreviewSummaryDriftCheck,
     RunPreviewSummaryResponse,
     RunPreviewSummarySample,
+    RunReadinessCheck,
+    RunReadinessResponse,
 )
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
@@ -121,16 +127,20 @@ class RunService:
         source = await self.session.get(Source, request.source_id)
         if source is None:
             raise NotFoundError(f"Source not found: {request.source_id}")
-
         source_version = await self.session.get(SourceVersion, request.source_version_id)
         if source_version is None:
             raise NotFoundError(f"Source version not found: {request.source_version_id}")
-        if source_version.source_id != source.source_id:
-            raise InvalidStateTransitionError(
-                "Source version does not belong to the requested source."
-            )
 
-        self._validate_version_for_run_mode(source_version, request.mode)
+        readiness = self.assess_run_readiness(
+            source=source,
+            source_version=source_version,
+            source_id=request.source_id,
+            source_version_id=request.source_version_id,
+            mode=request.mode,
+        )
+        if not readiness.ready:
+            details = "; ".join(check.detail for check in readiness.checks if not check.ok)
+            raise InvalidStateTransitionError(f"Run preflight failed: {details}")
 
         run = Run(
             source_id=source.source_id,
@@ -155,6 +165,19 @@ class RunService:
         await self.session.refresh(run)
         await self._publish_pending_dispatch_events([pending_publications])
         return run
+
+    async def get_run_readiness(
+        self, *, source_id: str, source_version_id: str, mode: RunMode
+    ) -> RunReadinessResponse:
+        source = await self.session.get(Source, source_id)
+        source_version = await self.session.get(SourceVersion, source_version_id)
+        return self.assess_run_readiness(
+            source=source,
+            source_version=source_version,
+            source_id=source_id,
+            source_version_id=source_version_id,
+            mode=mode,
+        )
 
     async def dispatch_pending_runs(self, limit: int = 10) -> int:
         if self.provider is None and self.provider_registry is None:
@@ -380,6 +403,45 @@ class RunService:
             drift_checks=drift_checks,
         )
 
+    async def get_pipeline_health(self, run_id: str) -> RunPipelineHealthResponse:
+        run = await self.get_run(run_id)
+        processing_updates = list(
+            await self.session.scalars(
+                select(ProcessingStatusUpdate)
+                .where(ProcessingStatusUpdate.run_id == run_id)
+                .order_by(ProcessingStatusUpdate.occurred_at.desc())
+            )
+        )
+        lifecycle_events = list(
+            await self.session.scalars(
+                select(DocumentLifecycleEvent)
+                .where(DocumentLifecycleEvent.run_id == run_id)
+                .order_by(DocumentLifecycleEvent.occurred_at.desc())
+            )
+        )
+        latest_processing = processing_updates[0] if processing_updates else None
+        latest_lifecycle = lifecycle_events[0] if lifecycle_events else None
+
+        acquisition_stage = self._resolve_acquisition_stage(run)
+        di_stage = self._resolve_di_stage(run, latest_processing)
+        projection_stage = self._resolve_projection_stage(latest_processing, latest_lifecycle)
+        search_stage = self._resolve_search_stage(latest_lifecycle)
+
+        stages = [acquisition_stage, di_stage, projection_stage, search_stage]
+        overall_status = self._resolve_overall_pipeline_status(stages)
+
+        return RunPipelineHealthResponse(
+            run_id=run.run_id,
+            source_id=run.source_id,
+            source_version_id=run.source_version_id,
+            mode=run.mode,
+            run_status=run.status,
+            overall_status=overall_status,
+            stages=stages,
+            processing_status_event_count=len(processing_updates),
+            document_lifecycle_event_count=len(lifecycle_events),
+        )
+
     async def get_provider_job_by_external_id(self, external_job_id: str) -> ProviderJob | None:
         return await self.session.scalar(
             select(ProviderJob).where(ProviderJob.external_job_id == external_job_id)
@@ -399,6 +461,107 @@ class RunService:
             raise InvalidStateTransitionError(
                 f"Cannot create runs from source versions in status {source_version.status}."
             )
+
+    @classmethod
+    def assess_run_readiness(
+        cls,
+        *,
+        source: Source | None,
+        source_version: SourceVersion | None,
+        source_id: str,
+        source_version_id: str,
+        mode: RunMode,
+    ) -> RunReadinessResponse:
+        checks: list[RunReadinessCheck] = []
+
+        checks.append(
+            RunReadinessCheck(
+                code="source_exists",
+                ok=source is not None,
+                detail=(
+                    "Source exists." if source is not None else f"Source not found: {source_id}."
+                ),
+            )
+        )
+        checks.append(
+            RunReadinessCheck(
+                code="source_version_exists",
+                ok=source_version is not None,
+                detail=(
+                    "Source version exists."
+                    if source_version is not None
+                    else f"Source version not found: {source_version_id}."
+                ),
+            )
+        )
+
+        belongs_to_source = (
+            source is not None
+            and source_version is not None
+            and source_version.source_id == source.source_id
+        )
+        checks.append(
+            RunReadinessCheck(
+                code="source_version_belongs_to_source",
+                ok=belongs_to_source,
+                detail=(
+                    "Source version belongs to source."
+                    if belongs_to_source
+                    else "Source version does not belong to the requested source."
+                ),
+            )
+        )
+
+        mode_compatible = False
+        mode_detail = "Cannot determine mode compatibility before source/version checks pass."
+        if belongs_to_source and source_version is not None:
+            try:
+                cls._validate_version_for_run_mode(source_version, mode)
+                mode_compatible = True
+                mode_detail = "Version status is compatible with requested run mode."
+            except InvalidStateTransitionError as exc:
+                mode_detail = str(exc)
+        checks.append(
+            RunReadinessCheck(
+                code="mode_compatible_with_version_status",
+                ok=mode_compatible,
+                detail=mode_detail,
+            )
+        )
+
+        has_seed = False
+        seed_detail = "Cannot determine acquisition seeds before source/version checks pass."
+        if belongs_to_source and source_version is not None:
+            acquisition_spec = source_version.acquisition_spec or {}
+            seed_url = acquisition_spec.get("seed_url")
+            seed_urls = acquisition_spec.get("seed_urls")
+            normalized_seed_url = seed_url.strip() if isinstance(seed_url, str) else ""
+            normalized_seed_urls = (
+                [url.strip() for url in seed_urls if isinstance(url, str) and url.strip()]
+                if isinstance(seed_urls, list)
+                else []
+            )
+            has_seed = bool(normalized_seed_url or normalized_seed_urls)
+            seed_detail = (
+                "Acquisition spec has at least one seed URL."
+                if has_seed
+                else "Acquisition spec must define seed_url or seed_urls."
+            )
+        checks.append(
+            RunReadinessCheck(
+                code="acquisition_seed_present",
+                ok=has_seed,
+                detail=seed_detail,
+            )
+        )
+
+        return RunReadinessResponse(
+            source_id=source_id,
+            source_version_id=source_version_id,
+            mode=mode,
+            ready=all(check.ok for check in checks),
+            checks=checks,
+        )
 
     @staticmethod
     def _to_summary_sample(resource: CapturedResource, reason: str) -> RunPreviewSummarySample:
@@ -439,6 +602,135 @@ class RunService:
             status="ok" if ok else "warn",
             detail=success if ok else failure,
         )
+
+    @staticmethod
+    def _resolve_acquisition_stage(run: Run) -> RunPipelineHealthStage:
+        status_map = {
+            RunStatus.PENDING: ("pending", "Run accepted and waiting for acquisition dispatch."),
+            RunStatus.RUNNING: ("in_progress", "Acquisition provider run is in progress."),
+            RunStatus.COMPLETED: ("ok", "Acquisition/provider stage completed."),
+            RunStatus.FAILED: ("failed", run.failure_reason or "Run failed during acquisition."),
+            RunStatus.CANCELLED: (
+                "blocked",
+                run.failure_reason or "Run was cancelled before pipeline completion.",
+            ),
+        }
+        stage_status, detail = status_map[run.status]
+        updated_at = run.completed_at or run.started_at or run.updated_at
+        return RunPipelineHealthStage(
+            stage="acquisition",
+            status=stage_status,
+            detail=detail,
+            updated_at=updated_at,
+        )
+
+    @staticmethod
+    def _resolve_di_stage(
+        run: Run, latest_processing: ProcessingStatusUpdate | None
+    ) -> RunPipelineHealthStage:
+        if latest_processing is None:
+            if run.status in {RunStatus.FAILED, RunStatus.CANCELLED}:
+                return RunPipelineHealthStage(
+                    stage="document_intelligence",
+                    status="blocked",
+                    detail="No processing status events were received after terminal run status.",
+                    updated_at=run.completed_at or run.updated_at,
+                )
+            return RunPipelineHealthStage(
+                stage="document_intelligence",
+                status="pending",
+                detail="Awaiting first document-intelligence processing status event.",
+                updated_at=None,
+            )
+
+        if latest_processing.status.value == "failed":
+            status = "failed"
+            detail = latest_processing.error_summary or "Document-intelligence processing failed."
+        elif latest_processing.status.value in {"accepted", "processing"}:
+            status = "in_progress"
+            detail = f"Latest processing status is {latest_processing.status.value}."
+        else:
+            status = "ok"
+            detail = f"Latest processing status is {latest_processing.status.value}."
+        return RunPipelineHealthStage(
+            stage="document_intelligence",
+            status=status,
+            detail=detail,
+            updated_at=latest_processing.occurred_at,
+        )
+
+    @staticmethod
+    def _resolve_projection_stage(
+        latest_processing: ProcessingStatusUpdate | None,
+        latest_lifecycle: DocumentLifecycleEvent | None,
+    ) -> RunPipelineHealthStage:
+        if latest_lifecycle is not None:
+            return RunPipelineHealthStage(
+                stage="projection",
+                status="ok",
+                detail=(
+                    f"Latest lifecycle event `{latest_lifecycle.event_type}`"
+                    f" (status={latest_lifecycle.lifecycle_status or 'n/a'})."
+                ),
+                updated_at=latest_lifecycle.occurred_at,
+            )
+        if latest_processing is None:
+            return RunPipelineHealthStage(
+                stage="projection",
+                status="pending",
+                detail="Awaiting DI processing signal before projection stage starts.",
+                updated_at=None,
+            )
+        if latest_processing.status.value == "failed":
+            return RunPipelineHealthStage(
+                stage="projection",
+                status="blocked",
+                detail="Projection blocked because DI reported a failed status.",
+                updated_at=latest_processing.occurred_at,
+            )
+        return RunPipelineHealthStage(
+            stage="projection",
+            status="in_progress",
+            detail=(
+                "DI has emitted status updates; waiting for document lifecycle projection events."
+            ),
+            updated_at=latest_processing.occurred_at,
+        )
+
+    @staticmethod
+    def _resolve_search_stage(
+        latest_lifecycle: DocumentLifecycleEvent | None,
+    ) -> RunPipelineHealthStage:
+        if latest_lifecycle is None:
+            return RunPipelineHealthStage(
+                stage="search",
+                status="pending",
+                detail=(
+                    "Awaiting projection lifecycle events before search indexing/disposition is "
+                    "confirmed."
+                ),
+                updated_at=None,
+            )
+        if latest_lifecycle.search_disposition == "remove":
+            detail = "Latest lifecycle indicates search removal/de-index disposition."
+        else:
+            detail = "Latest lifecycle indicates searchable projection path is active."
+        return RunPipelineHealthStage(
+            stage="search",
+            status="ok",
+            detail=detail,
+            updated_at=latest_lifecycle.occurred_at,
+        )
+
+    @staticmethod
+    def _resolve_overall_pipeline_status(stages: list[RunPipelineHealthStage]) -> str:
+        if any(stage.status == "failed" for stage in stages):
+            return "failed"
+        if any(stage.status == "blocked" for stage in stages):
+            return "blocked"
+        if any(stage.status in {"pending", "in_progress"} for stage in stages):
+            return "in_progress"
+        return "ok"
 
     async def _dispatch_run(
         self,

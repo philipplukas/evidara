@@ -5,10 +5,12 @@ from dataclasses import dataclass
 import pytest
 from sqlalchemy import select
 
-from platform_control.domain import ProviderJobStatus, RunMode, RunStatus
+from platform_control.domain import ProcessingStatus, ProviderJobStatus, RunMode, RunStatus
 from platform_control.errors import InvalidStateTransitionError
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
+from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
+from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
 from platform_control.schemas.run import CreateRunRequest
@@ -177,6 +179,40 @@ async def test_production_runs_require_approved_versions(session) -> None:
     run_service = RunService(session, StubProvider())
 
     with pytest.raises(InvalidStateTransitionError):
+        await run_service.create_run(
+            CreateRunRequest(
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                mode=RunMode.PRODUCTION,
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_run_readiness_reports_pass_for_valid_configuration(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    assert readiness.ready is True
+    assert all(check.ok for check in readiness.checks)
+
+
+@pytest.mark.asyncio
+async def test_create_run_fails_preflight_when_seed_urls_are_missing(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {"mode": "crawl"}
+    await session.commit()
+    run_service = RunService(session, StubProvider())
+
+    with pytest.raises(InvalidStateTransitionError, match="Acquisition spec must define seed_url"):
         await run_service.create_run(
             CreateRunRequest(
                 source_id=source.source_id,
@@ -652,6 +688,66 @@ async def test_provider_registry_dispatches_deterministic_inline_runs(session) -
     assert len(publisher.bundle_events) == 1
     assert publisher.bundle_events[0]["event_type"] == "artifact_bundle.available"
     assert publisher.bundle_events[0]["payload"]["provenance"]["run_id"] == run.run_id
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_health_summarizes_run_processing_and_search_stage(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    run.status = RunStatus.COMPLETED
+    run.completed_at = run.created_at
+    session.add(
+        ProcessingStatusUpdate(
+            event_id="evt_ps_1",
+            run_id=run.run_id,
+            processing_manifest_id="pm_1",
+            processing_version="2026.04",
+            status=ProcessingStatus.CANONICAL_READY,
+            occurred_at=run.created_at,
+            source_snapshot_id="snap_1",
+            bundle_manifest_id="abm_1",
+            document_id="doc_1",
+            document_revision=1,
+            error_code=None,
+            error_summary=None,
+        )
+    )
+    session.add(
+        DocumentLifecycleEvent(
+            event_id="evt_dl_1",
+            event_type="document.processed",
+            run_id=run.run_id,
+            document_id="doc_1",
+            document_revision=1,
+            processing_manifest_id="pm_1",
+            processing_version="2026.04",
+            lifecycle_status="active",
+            reason_code=None,
+            reason_summary=None,
+            search_disposition=None,
+            occurred_at=run.created_at,
+        )
+    )
+    await session.commit()
+
+    pipeline = await run_service.get_pipeline_health(run.run_id)
+    by_stage = {stage.stage: stage for stage in pipeline.stages}
+
+    assert pipeline.overall_status == "ok"
+    assert pipeline.processing_status_event_count == 1
+    assert pipeline.document_lifecycle_event_count == 1
+    assert by_stage["acquisition"].status == "ok"
+    assert by_stage["document_intelligence"].status == "ok"
+    assert by_stage["projection"].status == "ok"
+    assert by_stage["search"].status == "ok"
 
 
 @pytest.mark.asyncio

@@ -123,7 +123,7 @@ bash scripts/platform-control-demo.sh admin-sync
 bash scripts/platform-control-demo.sh admin
 ```
 
-The admin app runs on `http://127.0.0.1:3000` by default and proxies
+The admin app runs on `http://127.0.0.1:3100` by default and proxies
 `/api/platform-control/*` to the local FastAPI backend.
 
 Today the code-managed admin covers the main operator slice:

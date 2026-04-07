@@ -27,13 +27,12 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: evidara-platform-control-postgres
     environment:
       POSTGRES_DB: platform_control
       POSTGRES_USER: platform_control
       POSTGRES_PASSWORD: platform_control
     ports:
-      - "5432:5432"
+      - "${EVIDARA_POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - platform-control-postgres-data:/var/lib/postgresql/data
     mem_limit: 512m
@@ -45,7 +44,6 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2.17.1
-    container_name: evidara-opensearch
     profiles: ["search", "full"]
     environment:
       - discovery.type=single-node
@@ -53,8 +51,8 @@ services:
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=admin
       - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
     ports:
-      - "9200:9200"
-      - "9600:9600"
+      - "${EVIDARA_OPENSEARCH_HTTP_PORT:-9200}:9200"
+      - "${EVIDARA_OPENSEARCH_METRICS_PORT:-9600}:9600"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
     mem_limit: 1024m
@@ -70,7 +68,6 @@ services:
 
   pubsub:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:522.0.0-slim
-    container_name: evidara-pubsub-emulator
     profiles: ["full"]
     command:
       [
@@ -83,7 +80,7 @@ services:
         "--host-port=0.0.0.0:8681",
       ]
     ports:
-      - "8681:8681"
+      - "${EVIDARA_PUBSUB_HOST_PORT:-8681}:8681"
     mem_limit: 256m
 
   # Optional: OpenSearch Dashboards for browsing data

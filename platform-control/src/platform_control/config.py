@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,8 +36,26 @@ class Settings(BaseSettings):
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
     run_dispatch_backend: Literal["inline", "worker"] = "inline"
 
-    # Auth — when set, all non-health endpoints require X-API-Key header
-    api_key: str | None = None
+    # Auth — when any of these are set, matching routes require X-API-Key (see auth.py)
+    api_key: str | None = Field(
+        default=None,
+        description="Legacy full-access key for all protected routes when scoped keys are unset.",
+    )
+    operator_api_key: str | None = Field(
+        default=None,
+        description="Admin / control-plane routes (sources, runs, reference data, schedules).",
+    )
+    service_api_key: str | None = Field(
+        default=None,
+        description="Pipeline ingest (DI events, Firecrawl webhook path).",
+    )
+
+    @field_validator("api_key", "operator_api_key", "service_api_key", mode="before")
+    @classmethod
+    def _empty_secret_to_none(cls, value: object) -> str | None:
+        if value is None or value == "":
+            return None
+        return str(value)
 
 
 @lru_cache

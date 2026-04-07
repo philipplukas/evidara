@@ -34,6 +34,11 @@ cloud_run_services = {
       PLATFORM_CONTROL_FIRECRAWL_WEBHOOK_SECRET = {
         secret_name = "firecrawl_webhook"
       }
+      # Optional scoped keys (see docs/adr/adr-0020-api-authentication.md):
+      # PLATFORM_CONTROL_OPERATOR_API_KEY = { secret_name = "platform_control_operator_api_key" }
+      # PLATFORM_CONTROL_SERVICE_API_KEY = { secret_name = "platform_control_service_api_key" }
+      # Legacy full-access key when scoped keys are not used:
+      # PLATFORM_CONTROL_API_KEY = { secret_name = "platform_control_api_key" }
     }
   }
 

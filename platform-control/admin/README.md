@@ -33,11 +33,21 @@ Code-managed React-admin frontend for the Evidara control plane.
 The Next.js app proxies `/api/platform-control/*` to `PLATFORM_CONTROL_API_URL`, so the browser
 never needs direct database access or direct cross-origin calls to FastAPI.
 
-## Runtime deployment
+## Role-aware admin access
 
-- Container image: `platform-control/admin/Dockerfile`
-- Required runtime env var: `PLATFORM_CONTROL_API_URL`
-- Cloud Run service key: `platform-control-admin` (dev/staging tfvars)
+The admin surface now renders an explicit `403 Forbidden` state for non-admin roles, including a
+"Return to legal search" recovery link.
+
+Environment variables:
+
+- `NEXT_PUBLIC_ADMIN_ALLOWED_ROLES`: comma-separated roles allowed to open the admin surface
+  (default: `admin`)
+- `NEXT_PUBLIC_USER_ROLE`: fallback current role for local/dev
+- `NEXT_PUBLIC_LEGAL_SEARCH_URL`: recovery link target for denied users
+
+Local override for acceptance testing:
+
+- set `localStorage["evidara_user_role"]` in the browser to simulate admin vs non-admin behavior
 
 ## Current coverage
 
