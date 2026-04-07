@@ -3,6 +3,7 @@ import { defineConfig } from "@playwright/test";
 const externalBaseUrl = process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim();
 const adminBaseUrl = process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim();
 const expectedControlPanelUrl = process.env.PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL?.trim();
+const useRealBackend = process.env.PLAYWRIGHT_USE_REAL_BACKEND === "true";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -25,6 +26,7 @@ export default defineConfig({
           env: {
             NEXT_PUBLIC_CONTROL_PANEL_URL: expectedControlPanelUrl || "http://localhost:3100",
             NEXT_PUBLIC_DEFAULT_UI_PROFILE: "admin",
+            ...(useRealBackend ? { NEXT_PUBLIC_API_URL: "http://localhost:3102" } : {}),
           },
         },
         {
