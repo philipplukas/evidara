@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/wizard-calibration-decision-log",
+  "title": "WizardCalibrationDecisionLog",
+  "description": "Auditable decision record for country-level wizard calibration updates.",
+  "type": "object",
+  "required": [
+    "decision_id",
+    "country_code",
+    "evidence_window",
+    "change_type",
+    "previous_configuration",
+    "new_configuration",
+    "metrics_snapshot",
+    "approver",
+    "rationale",
+    "decided_at",
+    "contract_version"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "pattern": "^wcd_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "CH",
+        "AT",
+        "DE",
+        "FR",
+        "IT"
+      ]
+    },
+    "evidence_window": {
+      "type": "object",
+      "required": [
+        "start_date",
+        "end_date"
+      ],
+      "properties": {
+        "start_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "end_date": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "additionalProperties": false
+    },
+    "change_type": {
+      "type": "string",
+      "enum": [
+        "keep",
+        "promote_shard_strategy",
+        "demote_shard_strategy",
+        "threshold_adjustment"
+      ]
+    },
+    "previous_configuration": {
+      "$ref": "#/$defs/configuration"
+    },
+    "new_configuration": {
+      "$ref": "#/$defs/configuration"
+    },
+    "metrics_snapshot": {
+      "type": "object",
+      "required": [
+        "run_completion_slo_breach_rate",
+        "review_freshness_slo_breach_rate",
+        "critical_field_audit_error_rate",
+        "state_duration_skew_ratio_p95",
+        "retry_density_per_1000_nodes",
+        "mandatory_review_rate",
+        "taxonomy_drift_incidents_per_week"
+      ],
+      "properties": {
+        "run_completion_slo_breach_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "review_freshness_slo_breach_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "critical_field_audit_error_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "state_duration_skew_ratio_p95": {
+          "type": "number",
+          "minimum": 0
+        },
+        "retry_density_per_1000_nodes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mandatory_review_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "taxonomy_drift_incidents_per_week": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "approver": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 10
+    },
+    "related_run_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^run_[0-9a-hjkmnp-tv-z]{26}$"
+      }
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "contract_version": {
+      "type": "string",
+      "const": "1.0.0"
+    }
+  },
+  "$defs": {
+    "configuration": {
+      "type": "object",
+      "required": [
+        "shard_strategy",
+        "high_threshold",
+        "low_threshold"
+      ],
+      "properties": {
+        "shard_strategy": {
+          "type": "string",
+          "enum": [
+            "country_only",
+            "country_jurisdiction",
+            "country_jurisdiction_authority"
+          ]
+        },
+        "high_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "low_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

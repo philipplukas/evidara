@@ -87,3 +87,26 @@ class DocumentWithdrawalReason(StrEnum):
 class SearchDisposition(StrEnum):
     REMOVE = "remove"
     HIDE = "hide"
+
+
+class WizardProjectStatus(StrEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+class WizardRunState(StrEnum):
+    DRAFT_SCOPE = "DraftScope"
+    DISCOVERY_PLAN = "DiscoveryPlan"
+    PILOT_RUN = "PilotRun"
+    HUMAN_GATE_APPROVAL = "HumanGateApproval"
+    SCALED_RUN = "ScaledRun"
+    REVIEW_ROUTING = "ReviewRouting"
+    FINALIZE_PUBLISH = "FinalizePublish"
+    MONITOR_AND_DRIFT = "MonitorAndDrift"
+
+
+class ReviewTaskStatus(StrEnum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"

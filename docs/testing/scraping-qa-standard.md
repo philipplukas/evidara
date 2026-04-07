@@ -71,6 +71,15 @@ Keep a small deterministic set for:
 
 These tests prevent the most expensive production incidents for acquisition systems.
 
+For wizard-state architecture hardening, include a conceptual simulation gate:
+
+- transition consistency and reachability checks:
+  - `uv run --project platform-control pytest platform-control/tests/unit/test_wizard_state_machine_spec.py`
+- overload and split-signal simulation checks:
+  - `uv run --project platform-control pytest platform-control/tests/unit/test_wizard_state_machine_simulation.py`
+
+These tests keep state-machine design decisions auditable and reduce accidental state overload before runtime implementation.
+
 ## Visualization and Operational Confidence
 
 Run a simple scraping/acquisition dashboard per environment with:

@@ -327,6 +327,7 @@ def test_partial_rerun_requires_parent_run_id() -> None:
         )
 
 
+@pytest.mark.asyncio
 async def test_list_runs_supports_filters_and_joined_display_fields(session) -> None:
     source, version, source_service = await _seed_source_version(session)
 
@@ -515,7 +516,7 @@ async def test_cancel_run_marks_it_cancelled(session) -> None:
 
 
 @pytest.mark.asyncio
-async def test_retry_run_resets_failed_run_to_pending(session) -> None:
+async def test_retry_run_redispatches_when_inline_backend(session) -> None:
     source, version, source_service = await _seed_source_version(session)
     await source_service.approve_source_version(version.source_version_id)
     run_service = RunService(session, StubProvider())
@@ -537,6 +538,46 @@ async def test_retry_run_resets_failed_run_to_pending(session) -> None:
     assert retried.failure_reason is None
     assert retried.started_at is not None
     assert retried.completed_at is None
+
+
+@pytest.mark.asyncio
+async def test_retry_run_worker_backend_leaves_pending_and_clears_provider_jobs(
+    session,
+) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider(), run_dispatch_backend="worker")
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    session.add(
+        ProviderJob(
+            run_id=run.run_id,
+            provider="firecrawl",
+            external_job_id="stale_worker_retry_job",
+            status=ProviderJobStatus.FAILED,
+            request_payload={},
+            response_payload={},
+        )
+    )
+    run.status = RunStatus.FAILED
+    run.failure_reason = "worker never completed"
+    run.completed_at = run.created_at
+    await session.commit()
+
+    retried = await run_service.retry_run(run.run_id)
+
+    assert retried.status is RunStatus.PENDING
+    assert retried.failure_reason is None
+    assert retried.started_at is None
+    assert retried.completed_at is None
+
+    jobs = list(await session.scalars(select(ProviderJob).where(ProviderJob.run_id == run.run_id)))
+    assert jobs == []
 
 
 @pytest.mark.asyncio

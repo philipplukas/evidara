@@ -1,0 +1,70 @@
+{
+  "states": [
+    "DraftScope",
+    "DiscoveryPlan",
+    "PilotRun",
+    "HumanGateApproval",
+    "ScaledRun",
+    "ReviewRouting",
+    "FinalizePublish",
+    "MonitorAndDrift"
+  ],
+  "initial_state": "DraftScope",
+  "terminal_states": [],
+  "transitions": [
+    {
+      "from": "DraftScope",
+      "event": "scope_submitted",
+      "guard": "requiredFieldsPresent && allowedDomainSet",
+      "to": "DiscoveryPlan"
+    },
+    {
+      "from": "DiscoveryPlan",
+      "event": "pilot_started",
+      "guard": "seedCount > 0 && crawlPolicyValid",
+      "to": "PilotRun"
+    },
+    {
+      "from": "PilotRun",
+      "event": "pilot_completed",
+      "guard": "pilotSampleCount >= minPilotSample && fatalErrorCount == 0",
+      "to": "HumanGateApproval"
+    },
+    {
+      "from": "HumanGateApproval",
+      "event": "gate_approved",
+      "guard": "pilotQualityScore >= minPilotQuality",
+      "to": "ScaledRun"
+    },
+    {
+      "from": "HumanGateApproval",
+      "event": "gate_rejected",
+      "guard": "rejectionReason != null",
+      "to": "DiscoveryPlan"
+    },
+    {
+      "from": "ScaledRun",
+      "event": "scaled_completed",
+      "guard": "allShardWorkflowsTerminal == true",
+      "to": "ReviewRouting"
+    },
+    {
+      "from": "ReviewRouting",
+      "event": "review_backlog_within_target",
+      "guard": "mandatoryReviewOpen == 0 && reviewCoverage >= minCoverage",
+      "to": "FinalizePublish"
+    },
+    {
+      "from": "FinalizePublish",
+      "event": "publish_succeeded",
+      "guard": "artifactVersionPinned && indexWriteSucceeded",
+      "to": "MonitorAndDrift"
+    },
+    {
+      "from": "MonitorAndDrift",
+      "event": "drift_replan_required",
+      "guard": "driftScore >= threshold",
+      "to": "DiscoveryPlan"
+    }
+  ]
+}

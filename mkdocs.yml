@@ -112,6 +112,7 @@ nav:
       - Environment Strategy: setup/environment-strategy.md
       - Infrastructure Overview: setup/infrastructure-overview.md
       - Branch Rules: setup/branch-rules.md
+      - Wizard Temporal Argilla Rollout: setup/platform-control-wizard-temporal-argilla-rollout.md
   - Documentation:
       - Overview: documentation/README.md
       - Update Rules: documentation/update-rules.md

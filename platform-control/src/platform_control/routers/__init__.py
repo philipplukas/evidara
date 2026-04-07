@@ -3,9 +3,21 @@ from platform_control.routers import (
     firecrawl,
     health,
     reference_data,
+    reviews,
     runs,
     sources,
     versions,
+    wizard,
 )
 
-__all__ = ["di_events", "firecrawl", "health", "reference_data", "runs", "sources", "versions"]
+__all__ = [
+    "di_events",
+    "firecrawl",
+    "health",
+    "reference_data",
+    "reviews",
+    "runs",
+    "sources",
+    "versions",
+    "wizard",
+]

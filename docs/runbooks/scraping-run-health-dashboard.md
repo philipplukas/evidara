@@ -58,6 +58,42 @@ Start with conservative thresholds and tune after one week of baseline data:
 - duplicate/idempotency count spikes > 3x rolling 7-day median
 - source version without success for > 24 hours (if expected daily)
 
+## Wizard KPIs and SLOs (Temporal + Argilla)
+
+Track these in the same dashboard for wizard-enabled discovery/extraction runs.
+
+### Workflow KPIs
+
+- Lead time from `PilotRun` start to `FinalizePublish`.
+- Percentage of runs blocked at `HumanGateApproval`.
+- Retry count per 1,000 processed source nodes.
+
+### Quality KPIs
+
+- Field-level acceptance rate after review.
+- Audit edit rate on auto-accepted records.
+- Extractor conflict rate by source family.
+
+### Review operations KPIs
+
+- Review queue age (p50/p95).
+- Review throughput (tasks per operator/day).
+- End-to-end review sync lag from enqueue to applied decision.
+
+### Initial SLO targets
+
+- `RunCompletionSLO`: 95% of scheduled runs reach terminal state within 6 hours.
+- `ReviewFreshnessSLO`: 90% of mandatory review tasks are resolved within 24 hours.
+- `PublishQualitySLO`: critical-field audited error rate remains below 2%.
+- `WorkflowAvailabilitySLO`: wizard and run-control endpoints maintain 99.5% monthly availability.
+
+### Wizard-specific alert thresholds
+
+- `run_stuck_state_minutes > 60`
+- `mandatory_review_backlog > 1000`
+- `critical_field_error_rate > 0.03` (rolling 24h)
+- `drift_break_rate > 0.20` for any source family (rolling 7d)
+
 ## Drill-Down Workflow (Single Run)
 
 When a panel degrades, use this sequence:
@@ -100,11 +136,11 @@ jsonPayload.duration_ms>10000
 
 ## Operator Checklist
 
-- [ ] Dashboard shows healthy run success rate
-- [ ] p95 latency within expected bounds
-- [ ] No unexplained spike in duplicate events
-- [ ] No canary source version is stale
-- [ ] Drill-down path works for at least one recent run
+- Dashboard shows healthy run success rate
+- p95 latency within expected bounds
+- No unexplained spike in duplicate events
+- No canary source version is stale
+- Drill-down path works for at least one recent run
 
 ## Related
 

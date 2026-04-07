@@ -18,6 +18,7 @@ dependencies = [
   "pydantic>=2.11.0,<3",
   "pyyaml>=6.0.2,<7",
   "sqlalchemy>=2.0.41,<3",
+  "temporalio>=1.8.0,<2",
   "uvicorn>=0.35.0,<1",
 ]
 
@@ -25,6 +26,7 @@ dependencies = [
 platform-control-seed-reference-data = "platform_control.seed_reference_data:main"
 platform-control-sync-hierarchy = "platform_control.sync_hierarchy:main"
 platform-control-connector-worker = "platform_control.connector_worker:main"
+platform-control-temporal-worker = "platform_control.temporal_worker:main"
 
 [dependency-groups]
 dev = [

@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     raw_artifact_pubsub_topic: str = "raw-artifact-available"
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
     run_dispatch_backend: Literal["inline", "worker"] = "inline"
+    wizard_orchestrator_backend: Literal["in_memory", "temporal"] = "in_memory"
+    temporal_namespace: str = "default"
+    temporal_task_queue: str = "platform-control-wizard"
+    temporal_target: str = "localhost:7233"
+
+    argilla_api_base_url: str | None = None
+    argilla_api_key: str | None = None
+    argilla_dataset_id: str | None = None
+    argilla_records_path: str = "/api/v1/datasets/{dataset_id}/records/bulk"
+    argilla_http_timeout_seconds: float = 30.0
 
     # Auth — when any of these are set, matching routes require X-API-Key (see auth.py)
     api_key: str | None = Field(
@@ -50,9 +60,22 @@ class Settings(BaseSettings):
         description="Pipeline ingest (DI events, Firecrawl webhook path).",
     )
 
-    @field_validator("api_key", "operator_api_key", "service_api_key", mode="before")
+    @field_validator(
+        "api_key",
+        "operator_api_key",
+        "service_api_key",
+        "argilla_api_key",
+        mode="before",
+    )
     @classmethod
     def _empty_secret_to_none(cls, value: object) -> str | None:
+        if value is None or value == "":
+            return None
+        return str(value)
+
+    @field_validator("argilla_api_base_url", "argilla_dataset_id", mode="before")
+    @classmethod
+    def _empty_argilla_str_to_none(cls, value: object) -> str | None:
         if value is None or value == "":
             return None
         return str(value)
