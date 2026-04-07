@@ -194,6 +194,24 @@ Classification outcome:
 2. P2: keep screenshot pack deterministic and monitor flaky retries in staging evidence runs.
 3. P2: align legal-search API docs discoverability expectations (`/docs`) with operator needs.
 
+## CI Contract Guard Edge Cases
+
+Recent hardening updated the contract version guard to handle Git topology edge cases more safely:
+
+- `scripts/check_contract_version_bump.py` now attempts `git diff base...head` first and falls back to `base..head` when Git reports no merge base.
+- `.github/workflows/docs-and-contracts.yml` now fetches base branch history without shallow depth pinning for the guard range setup.
+
+Expected failure signature prior to this hardening:
+
+- `fatal: origin/main...<sha>: no merge base`
+
+Operator policy for merge decisions:
+
+- Prefer rerunning checks after rebasing or merging latest `main` into the PR branch.
+- Admin override is acceptable only when:
+  - the failing signal is isolated to this merge-base topology issue, and
+  - reviewers manually confirm whether any file under `contracts/api/` or `contracts/events/` changed and whether `contracts/manifest.yaml` was bumped accordingly.
+
 ## RC Dry-Run Procedure (Validated)
 
 Use this sequence for release-candidate confidence:

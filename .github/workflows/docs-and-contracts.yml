@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}" --depth=1
+            git fetch origin "${{ github.base_ref }}"
             base_ref="origin/${{ github.base_ref }}"
           else
             base_ref="${{ github.event.before }}"
@@ -41,6 +41,10 @@ jobs:
           fi
           echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
           echo "head_ref=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run contract guard unit tests
+        run: |
+          python -m unittest discover -s scripts/tests -p "test_check_contract_version_bump.py"
 
       - name: Enforce contract manifest version bump
         run: |
