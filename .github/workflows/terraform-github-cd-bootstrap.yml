@@ -1,0 +1,84 @@
+name: Terraform GitHub CD Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: "Run terraform apply (default false)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-github-cd-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TF_ROOT: infra/terraform/gcp/github_cd_bootstrap
+  TF_VAR_FILE: infra/env/github_cd_bootstrap.gcp.tfvars.example
+
+jobs:
+  bootstrap:
+    name: Terraform bootstrap plan/apply
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING || secrets.GCP_SERVICE_ACCOUNT_DEV }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive -diff
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform plan
+        run: |
+          terraform plan \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
+            -no-color \
+            -input=false \
+            -out=tfplan
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform apply
+        if: ${{ github.event.inputs.run_apply == 'true' }}
+        run: |
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            -no-color \
+            tfplan
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "### Terraform GitHub CD Bootstrap" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| run_apply | \`${{ github.event.inputs.run_apply || 'false' }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| var file | \`${{ env.TF_VAR_FILE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| status | \`${{ job.status }}\` |" >> "$GITHUB_STEP_SUMMARY"
