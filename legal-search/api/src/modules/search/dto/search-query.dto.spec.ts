@@ -26,4 +26,18 @@ describe('SearchQueryDto', () => {
       { field: 'court_level', type: 'terms', values: ['supreme', 'cantonal'] },
     ]);
   });
+
+  it('parses official_only from both boolean and string values', () => {
+    const dto = new SearchQueryDto();
+    dto.official_only = true;
+    expect(dto.getOfficialOnly()).toBe(true);
+
+    const dtoStringTrue = new SearchQueryDto();
+    dtoStringTrue.official_only = 'true' as unknown as boolean;
+    expect(dtoStringTrue.getOfficialOnly()).toBe(true);
+
+    const dtoStringFalse = new SearchQueryDto();
+    dtoStringFalse.official_only = 'false' as unknown as boolean;
+    expect(dtoStringFalse.getOfficialOnly()).toBe(false);
+  });
 });
