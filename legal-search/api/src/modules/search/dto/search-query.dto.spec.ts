@@ -40,4 +40,10 @@ describe('SearchQueryDto', () => {
     dtoStringFalse.official_only = 'false' as unknown as boolean;
     expect(dtoStringFalse.getOfficialOnly()).toBe(false);
   });
+
+  it('returns undefined for malformed official_only values', () => {
+    const dto = new SearchQueryDto();
+    dto.official_only = 'yes' as unknown as boolean;
+    expect(dto.getOfficialOnly()).toBeUndefined();
+  });
 });

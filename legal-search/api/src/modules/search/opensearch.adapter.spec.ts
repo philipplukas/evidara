@@ -74,4 +74,33 @@ describe('SearchOpenSearchAdapter', () => {
       { match: { content: 'haftung verwaltungsrat' } },
     ]);
   });
+
+  it('ignores invalid refinement payloads that cannot map to filters', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    await adapter.search('verantwortlichkeit', {
+      refinements: [
+        { field: 'has_commentary', type: 'toggle', values: ['true'], value: 'true' },
+        { field: 'effective_date', type: 'date_range', values: ['missing-bounds'] },
+      ],
+    });
+
+    const firstCall = search.mock.calls[0][0] as {
+      body: { query: { bool: { filter: unknown[] } } };
+    };
+    expect(firstCall.body.query.bool.filter).toEqual([]);
+  });
 });
