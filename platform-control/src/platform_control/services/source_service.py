@@ -21,14 +21,16 @@ class SourceService:
         self.session = session
 
     async def list_sources(
-        self, *, limit: int = 100, offset: int = 0, q: str | None = None,
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        q: str | None = None,
     ) -> tuple[list[Source], int]:
         base = select(Source).order_by(Source.created_at.desc())
         if q:
             base = base.where(Source.name.ilike(f"%{q}%"))
-        count_result = await self.session.execute(
-            select(func.count()).select_from(base.subquery())
-        )
+        count_result = await self.session.execute(select(func.count()).select_from(base.subquery()))
         total = count_result.scalar() or 0
         result = await self.session.scalars(base.limit(limit).offset(offset))
         return list(result), total

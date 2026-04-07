@@ -803,7 +803,8 @@ class RunService:
                 pending_publications.bundle_events.append(bundle_event)
             if bundle_events:
                 await self.artifact_store.store_page_payload(
-                    run.run_id, "bundle_events",
+                    run.run_id,
+                    "bundle_events",
                     {"count": len(bundle_events), "events": bundle_events},
                 )
             provider_job.status = ProviderJobStatus.COMPLETED
@@ -999,10 +1000,7 @@ class RunService:
         if not artifacts:
             return []
 
-        doc_artifacts = [
-            a for a in artifacts
-            if not a.content_type.startswith("application/json")
-        ]
+        doc_artifacts = [a for a in artifacts if not a.content_type.startswith("application/json")]
         if not doc_artifacts:
             return []
 

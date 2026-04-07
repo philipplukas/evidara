@@ -414,7 +414,7 @@ async def test_run_readiness_endpoint_reports_actionable_blocking_details(
     seed_checks = {check["code"]: check for check in seed_missing.json()["checks"]}
     assert seed_checks["acquisition_seed_present"]["ok"] is False
     assert seed_checks["acquisition_seed_present"]["detail"] == (
-        "Acquisition spec must define seed_url or seed_urls."
+        "Acquisition spec must define seed_url, seed_urls, or base_url."
     )
 
 

@@ -56,9 +56,14 @@ async def get_stats() -> dict:
 
         recent_rows = await session.execute(
             select(
-                Run.run_id, Run.status, Run.artifacts_count,
-                Run.created_at, Run.completed_at,
-            ).order_by(Run.created_at.desc()).limit(5)
+                Run.run_id,
+                Run.status,
+                Run.artifacts_count,
+                Run.created_at,
+                Run.completed_at,
+            )
+            .order_by(Run.created_at.desc())
+            .limit(5)
         )
         recent_runs = [
             {

@@ -13,7 +13,6 @@ from typing import Any
 
 import httpx
 
-from platform_control.errors import ProviderConfigurationError
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
@@ -111,15 +110,22 @@ class RisOgdProvider:
                     listing.raise_for_status()
                     listing_json = listing.json()
                 except Exception as exc:
-                    failures.append({"url": base_url, "error": f"listing page {page_number}: {exc}"})
+                    failures.append(
+                        {
+                            "url": base_url,
+                            "error": f"listing page {page_number}: {exc}",
+                        }
+                    )
                     break
 
                 api_error = (listing_json.get("OgdSearchResult") or {}).get("Error")
                 if api_error:
-                    failures.append({
-                        "url": base_url,
-                        "error": f"OGD API error: {api_error.get('Message', str(api_error))}",
-                    })
+                    failures.append(
+                        {
+                            "url": base_url,
+                            "error": f"OGD API error: {api_error.get('Message', str(api_error))}",
+                        }
+                    )
                     break
 
                 refs = _extract_document_refs(listing_json)
@@ -164,8 +170,7 @@ class RisOgdProvider:
         inline_failure_reason = None
         if not resources:
             inline_failure_reason = (
-                "RIS OGD provider did not capture any resources "
-                f"(failures={len(failures)})."
+                f"RIS OGD provider did not capture any resources (failures={len(failures)})."
             )
 
         return ProviderStartResult(
@@ -198,9 +203,7 @@ def _extract_document_refs(listing_json: dict[str, Any]) -> list[dict[str, Any]]
 def _total_hits(listing_json: dict[str, Any]) -> int | None:
     try:
         hits_block = (
-            listing_json.get("OgdSearchResult", {})
-            .get("OgdDocumentResults", {})
-            .get("Hits", {})
+            listing_json.get("OgdSearchResult", {}).get("OgdDocumentResults", {}).get("Hits", {})
         )
         if isinstance(hits_block, dict):
             return int(hits_block.get("#text", 0))

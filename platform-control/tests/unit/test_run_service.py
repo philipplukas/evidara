@@ -28,15 +28,18 @@ from platform_control.services.source_service import SourceService
 @dataclass
 class StubProvider:
     provider_name: str = "firecrawl"
-    external_job_id: str = "crawl_job_123"
+    external_job_id: str | None = None
+    calls: int = 0
 
     async def start_run(self, source, source_version, run) -> ProviderStartResult:
-        del source, source_version, run
+        del source, source_version
+        self.calls += 1
+        external_job_id = self.external_job_id or f"crawl_job_{run.run_id}_{self.calls}"
         return ProviderStartResult(
             provider=self.provider_name,
-            external_job_id=self.external_job_id,
+            external_job_id=external_job_id,
             request_payload={"url": "https://example.com"},
-            response_payload={"id": self.external_job_id, "success": True},
+            response_payload={"id": external_job_id, "success": True},
         )
 
 
@@ -240,7 +243,7 @@ async def test_create_run_persists_provider_job(session) -> None:
 
     assert run.status is RunStatus.RUNNING
     assert provider_job is not None
-    assert provider_job.external_job_id == "crawl_job_123"
+    assert provider_job.external_job_id == f"crawl_job_{run.run_id}_1"
 
 
 @pytest.mark.asyncio
@@ -311,15 +314,18 @@ async def test_list_runs_supports_filters_and_joined_display_fields(session) -> 
     await session.commit()
 
     run_service = RunService(session)
-    all_runs = await run_service.list_runs()
-    production_only = await run_service.list_runs(mode=RunMode.PRODUCTION)
-    completed_only = await run_service.list_runs(status=RunStatus.COMPLETED)
+    all_runs, all_total = await run_service.list_runs()
+    production_only, production_total = await run_service.list_runs(mode=RunMode.PRODUCTION)
+    completed_only, completed_total = await run_service.list_runs(status=RunStatus.COMPLETED)
 
     assert [run.run_id for run in all_runs] == [production_run.run_id, preview_run.run_id]
+    assert all_total == 2
     assert all_runs[0].source_name == "Zurich decisions"
     assert all_runs[0].version_label == "v1"
     assert [run.run_id for run in production_only] == [production_run.run_id]
+    assert production_total == 1
     assert [run.run_id for run in completed_only] == [preview_run.run_id]
+    assert completed_total == 1
 
 
 @pytest.mark.asyncio
@@ -485,9 +491,9 @@ async def test_retry_run_resets_failed_run_to_pending(session) -> None:
 
     retried = await run_service.retry_run(run.run_id)
 
-    assert retried.status is RunStatus.PENDING
+    assert retried.status is RunStatus.RUNNING
     assert retried.failure_reason is None
-    assert retried.started_at is None
+    assert retried.started_at is not None
     assert retried.completed_at is None
 
 

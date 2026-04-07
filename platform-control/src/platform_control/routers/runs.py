@@ -69,8 +69,11 @@ async def list_runs(
     clamped_limit = max(1, min(limit, 500))
     clamped_offset = max(0, offset)
     data, total = await service.list_runs(
-        mode=mode, status=status, source_id=source_id,
-        limit=clamped_limit, offset=clamped_offset,
+        mode=mode,
+        status=status,
+        source_id=source_id,
+        limit=clamped_limit,
+        offset=clamped_offset,
     )
     return RunListResponse(data=data, total=total, limit=clamped_limit, offset=clamped_offset)
 
