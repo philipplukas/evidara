@@ -1,0 +1,32 @@
+version: 1
+country_code: AT
+country_name: Austria
+
+jurisdiction_overlay:
+  canonical_codes:
+    - AT
+  hierarchy_paths:
+    - at
+    - at/federal
+
+language_defaults:
+  primary: de
+  supported:
+    - de
+    - en
+
+source_family_overlay:
+  canonical:
+    - law
+    - decision
+    - commentary
+  local_mappings:
+    - local_type: rechtssatz
+      canonical_type: decision
+      note: Austrian legal principle entries map to decision-family discovery.
+
+court_level_overlay:
+  expected_levels:
+    - supreme
+    - appellate
+    - administrative

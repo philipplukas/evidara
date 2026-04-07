@@ -1,0 +1,21 @@
+version: 1
+country_code: AT
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code AT.
+  - Confirm source family mapping for laws, decisions, and commentary.
+  - Confirm Austrian legal principle (Rechtssatz) handling maps to decision discovery.
+  - Confirm authority records include RIS and high courts.
+
+approval_hotspots:
+  - authority taxonomy correctness
+  - source family boundary between decision and commentary
+  - court level mapping consistency
+
+triage_overlays:
+  mapping_drift:
+    first_action: Compare incoming authority/jurisdiction labels against canonical AT mapping.
+    escalation_owner: platform-control
+  search_projection_mismatch:
+    first_action: Verify processed-event projection parity for AT-tagged documents.
+    escalation_owner: legal-search

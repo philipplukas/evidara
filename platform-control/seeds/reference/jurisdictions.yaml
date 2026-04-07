@@ -3,3 +3,6 @@ items:
   - jurisdiction_id: jur_ch
     slug: ch
     name: Switzerland
+  - jurisdiction_id: jur_at
+    slug: at
+    name: Austria

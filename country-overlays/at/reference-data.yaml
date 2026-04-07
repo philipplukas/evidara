@@ -1,13 +1,12 @@
 version: 1
-items:
-  - authority_id: auth_ch_fedlex
-    jurisdiction_id: jur_ch
-    slug: ch-fedlex
-    name: Fedlex
-  - authority_id: auth_zh_admin
-    jurisdiction_id: jur_ch
-    slug: zh-admin-court
-    name: Zurich Administrative Court
+country_code: AT
+
+jurisdictions:
+  - jurisdiction_id: jur_at
+    slug: at
+    name: Austria
+
+authorities:
   - authority_id: auth_at_ris
     jurisdiction_id: jur_at
     slug: at-ris
