@@ -13,20 +13,89 @@ Run the core runtime flow locally with enough infrastructure to validate:
 From repo root:
 
 ```bash
-bash scripts/local-vertical-slice.sh up
-bash scripts/local-vertical-slice.sh status
+bash scripts/local-vertical-slice.sh up search
+bash scripts/local-vertical-slice.sh status search
 ```
 
-This starts:
+Dependency modes:
 
-- `postgres` (platform-control)
-- `opensearch` (legal-search API)
-- `pubsub` emulator (event-driven wiring)
+- `lite`: `postgres` only (lowest RAM)
+- `search` (default): `postgres` + `opensearch`
+- `full`: `postgres` + `opensearch` + `pubsub` emulator
+
+For RAM planning and recommended machine profiles, see
+`docs/setup/local-dev-ram-guide.md`.
+
+### One-command full local stack with Docker Compose
+
+If you want to avoid individual app startup commands, use Compose for both
+infra and app services:
+
+```bash
+# starts postgres + opensearch + app services (API/admin/search/frontend)
+bash scripts/local-vertical-slice.sh up-all search
+bash scripts/local-vertical-slice.sh status-all search
+```
+
+`up-all`/`status-all`/`down-all` use isolated host ports for infra by default to avoid
+collisions with existing local services:
+
+- Postgres host port: `15432` (`EVIDARA_POSTGRES_HOST_PORT`)
+- OpenSearch host HTTP port: `19200` (`EVIDARA_OPENSEARCH_HTTP_PORT`)
+- OpenSearch metrics port: `19600` (`EVIDARA_OPENSEARCH_METRICS_PORT`)
+- Pub/Sub host port (full mode): `18681` (`EVIDARA_PUBSUB_HOST_PORT`)
+
+For full runtime wiring (adds pubsub emulator):
+
+```bash
+bash scripts/local-vertical-slice.sh up-all full
+bash scripts/local-vertical-slice.sh status-all full
+```
+
+This compose path includes one-shot init/seed containers for:
+
+- `platform-control` migrations + reference data seed
+- `legal-search/api` search index seed
+
+Optional `just` wrappers (if `just` is installed):
+
+```bash
+just up-search
+just check-search
+just up-full
+just check-full
+```
+
+Health endpoints after startup:
+
+- `http://127.0.0.1:8000/health` (platform-control API)
+- `http://127.0.0.1:3100` (platform-control admin)
+- `http://127.0.0.1:3102/health` (legal-search API)
+- `http://127.0.0.1:3101` (legal-search frontend)
+
+Automated check:
+
+```bash
+bash scripts/local-vertical-slice.sh check-all search
+```
+
+Examples:
+
+```bash
+# 4 GB machines: platform-control focused work
+bash scripts/local-vertical-slice.sh up lite
+
+# 8 GB machines: search API + UI work
+bash scripts/local-vertical-slice.sh up search
+
+# Full runtime wiring sessions
+bash scripts/local-vertical-slice.sh up full
+```
 
 Print recommended local env wiring:
 
 ```bash
-bash scripts/local-vertical-slice.sh env
+bash scripts/local-vertical-slice.sh env search
 ```
 
 ## Bootstrap platform-control
@@ -56,7 +125,7 @@ npm run dev
 Expected health check:
 
 ```bash
-curl -fsS http://127.0.0.1:3001/health
+curl -fsS http://127.0.0.1:3102/health
 ```
 
 ## Run document-intelligence runtime services
@@ -84,5 +153,11 @@ uv run document_intelligence_document_service
 ## Teardown
 
 ```bash
-bash scripts/local-vertical-slice.sh down
+bash scripts/local-vertical-slice.sh down search
+```
+
+If you started the full compose app stack:
+
+```bash
+bash scripts/local-vertical-slice.sh down-all search
 ```

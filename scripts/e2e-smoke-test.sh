@@ -15,7 +15,7 @@ set -euo pipefail
 # ───────────────────────────────────────────────────────────────────────
 
 ENVIRONMENT="dev"
-REGION="europe-west6"
+REGION="${GCP_REGION:-europe-west6}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,9 +34,49 @@ done
 # GCP project — override via env var if needed
 PROJECT_ID="${GCP_PROJECT_ID:-data-platform-dev-492214}"
 
+# Auto-auth for private Cloud Run services.
+CURL_AUTH_ARGS=()
+if command -v gcloud >/dev/null 2>&1; then
+  ID_TOKEN="$(gcloud auth print-identity-token 2>/dev/null || true)"
+  if [[ -n "${ID_TOKEN}" ]]; then
+    CURL_AUTH_ARGS=(-H "Authorization: Bearer ${ID_TOKEN}")
+    echo "🔐 Using gcloud identity token for Cloud Run requests."
+  fi
+fi
+
 # ── Shared curl wrapper: fail on HTTP errors, with sane timeouts ──────
 curl_json() {
-  curl -fsS --connect-timeout 5 --max-time 30 "$@"
+  local request_url=""
+  local arg
+  for arg in "$@"; do
+    if [[ "${arg}" =~ ^https?:// ]]; then
+      request_url="${arg}"
+    fi
+  done
+  if [[ -z "${request_url}" ]]; then
+    request_url="${!#}"
+  fi
+  local auth_args=("${CURL_AUTH_ARGS[@]}")
+  if [[ "${request_url}" =~ ^https?://[^/]+ ]]; then
+    if [[ -n "${E2E_PC_ID_TOKEN:-}" && -n "${PC_URL:-}" && "${request_url}" == "${PC_URL}"* ]]; then
+      auth_args=(-H "Authorization: Bearer ${E2E_PC_ID_TOKEN}")
+    elif [[ -n "${E2E_LS_ID_TOKEN:-}" && -n "${LS_URL:-}" && "${request_url}" == "${LS_URL}"* ]]; then
+      auth_args=(-H "Authorization: Bearer ${E2E_LS_ID_TOKEN}")
+    fi
+  fi
+  if [[ ${#auth_args[@]} -eq 0 ]] && command -v gcloud >/dev/null 2>&1; then
+    # GitHub OIDC + service-account auth often requires audience-scoped ID tokens.
+    if [[ "${request_url}" =~ ^https?://[^/]+ ]]; then
+      local audience
+      audience="$(echo "${request_url}" | sed -E 's#(https?://[^/]+).*#\1#')"
+      local audience_token
+      audience_token="$(gcloud auth print-identity-token --audiences="${audience}" 2>/dev/null || true)"
+      if [[ -n "${audience_token}" ]]; then
+        auth_args=(-H "Authorization: Bearer ${audience_token}")
+      fi
+    fi
+  fi
+  curl -fsS --connect-timeout 5 --max-time 30 "${auth_args[@]}" "$@"
 }
 
 echo "╔══════════════════════════════════════════════════════════╗"
@@ -60,6 +100,10 @@ LS_URL=$(gcloud run services describe "legal-search-api-${ENVIRONMENT}" \
 echo "📡 platform-control-api: ${PC_URL}"
 echo "📡 legal-search-api:     ${LS_URL}"
 echo ""
+
+# Deterministic acquisition seed URL; can be overridden per environment/run.
+SMOKE_SEED_URL="${SMOKE_SEED_URL:-https://example.com}"
+SMOKE_REQUEST_TIMEOUT_SECONDS="${SMOKE_REQUEST_TIMEOUT_SECONDS:-10}"
 
 # ── 1. Health checks ─────────────────────────────────────────────────
 
@@ -85,11 +129,21 @@ echo ""
 # ── 3. Create source ────────────────────────────────────────────────
 
 echo "🔍 Step 3: Create source..."
-source_body=$(cat <<'JSON'
+authorities_response=$(curl_json "${PC_URL}/v1/reference-data/authorities")
+JURISDICTION_ID=$(echo "${authorities_response}" | jq -r '.data[0].jurisdiction_id // empty')
+AUTHORITY_ID=$(echo "${authorities_response}" | jq -r '.data[0].authority_id // empty')
+if [[ -z "${JURISDICTION_ID}" || -z "${AUTHORITY_ID}" ]]; then
+  echo "  ❌ Could not determine a valid jurisdiction/authority pair"
+  echo "  ${authorities_response}" | jq .
+  exit 1
+fi
+echo "  ℹ️  Using jurisdiction=${JURISDICTION_ID}, authority=${AUTHORITY_ID}"
+
+source_body=$(cat <<JSON
 {
-  "name": "E2E Smoke Test Source",
-  "jurisdiction_id": "jur_ch",
-  "authority_id": "auth_bger"
+  "name": "E2E Smoke Test Source $(date +%s)",
+  "jurisdiction_id": "${JURISDICTION_ID}",
+  "authority_id": "${AUTHORITY_ID}"
 }
 JSON
 )
@@ -113,8 +167,10 @@ version_body=$(cat <<JSON
 {
   "version_label": "v1-e2e-$(date +%s)",
   "acquisition_spec": {
-    "seed_url": "https://www.bger.ch/ext/eurospider/live/de/php/aza/http/index.php?lang=de&type=show_document&highlight_docid=aza://06-11-2024-4A_400-2024",
-    "mode": "scrape",
+    "provider": "deterministic_http",
+    "seed_url": "${SMOKE_SEED_URL}",
+    "request_timeout_seconds": ${SMOKE_REQUEST_TIMEOUT_SECONDS},
+    "mode": "crawl",
     "limit": 1,
     "tenant_id": "tenant_public",
     "corpus_id": "corpus_ch_de",
@@ -188,34 +244,109 @@ for i in $(seq 1 ${MAX_POLLS}); do
 done
 echo ""
 
-# ── 7. Check projection history ────────────────────────────────────
+# ── 7. Wait for DI signals ─────────────────────────────────────────
 
-echo "🔍 Step 7: Checking projection history..."
-projection_stats=$(curl_json "${LS_URL}/v1/projections/events/history/stats")
-total_events=$(echo "${projection_stats}" | jq -r '.totalEvents // 0')
-applied=$(echo "${projection_stats}" | jq -r '.applied // 0')
-echo "  📊 Projection stats: total=${total_events}, applied=${applied}"
+echo "🔍 Step 7: Verifying DI processing signals..."
+MAX_DI_POLLS=12
+DI_INTERVAL=5
+for i in $(seq 1 ${MAX_DI_POLLS}); do
+  status_response=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}/processing-status")
+  lifecycle_response=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}/document-lifecycle")
 
-if [ "${applied}" -gt 0 ]; then
-  echo "  ✅ Projections applied successfully!"
+  status_count=$(echo "${status_response}" | jq -r '.data | length')
+  canonical_ready_count=$(echo "${status_response}" | jq -r '[.data[] | select(.status=="canonical_ready")] | length')
+  processed_count=$(echo "${lifecycle_response}" | jq -r '[.data[] | select(.event_type=="document.processed")] | length')
+  echo "  [${i}/${MAX_DI_POLLS}] statuses=${status_count}, canonical_ready=${canonical_ready_count}, processed=${processed_count}"
+
+  if [ "${canonical_ready_count}" -gt 0 ] && [ "${processed_count}" -gt 0 ]; then
+    echo "  ✅ DI signals observed"
+    break
+  fi
+
+  if [ "${i}" -eq "${MAX_DI_POLLS}" ]; then
+    echo "  ❌ Timed out waiting for DI canonical_ready and document.processed signals"
+    exit 1
+  fi
+
+  sleep ${DI_INTERVAL}
+done
+echo ""
+
+# ── 8. Check projection history ────────────────────────────────────
+
+echo "🔍 Step 8: Checking projection history..."
+MAX_PROJECTION_POLLS=10
+PROJECTION_INTERVAL=5
+RUN_DOCUMENT_ID=""
+run_total_events=0
+applied=0
+
+for i in $(seq 1 ${MAX_PROJECTION_POLLS}); do
+  projection_history=$(curl_json --get \
+    --data-urlencode "run_id=${RUN_ID}" \
+    --data-urlencode "limit=50" \
+    --data-urlencode "offset=0" \
+    "${LS_URL}/v1/projections/events/history")
+  run_total_events=$(echo "${projection_history}" | jq -r '.total // 0')
+  applied=$(echo "${projection_history}" | jq -r '[.data[] | select(.status=="applied")] | length')
+  RUN_DOCUMENT_ID=$(echo "${projection_history}" | jq -r '([.data[] | select(.status=="applied")][0].documentId // empty)')
+  echo "  [${i}/${MAX_PROJECTION_POLLS}] Projection stats (run-scoped): total=${run_total_events}, applied=${applied}"
+
+  if [ "${applied}" -gt 0 ] && [[ -n "${RUN_DOCUMENT_ID}" ]]; then
+    break
+  fi
+
+  if [ "${i}" -lt "${MAX_PROJECTION_POLLS}" ]; then
+    sleep "${PROJECTION_INTERVAL}"
+  fi
+done
+
+if [ "${applied}" -gt 0 ] && [[ -n "${RUN_DOCUMENT_ID}" ]]; then
+  echo "  ✅ Projections applied for run ${RUN_ID} (document_id=${RUN_DOCUMENT_ID})"
 else
-  echo "  ❌ No projections applied — push subscription may not be wired."
+  echo "  ❌ No run-scoped projections applied for run ${RUN_ID}."
+  echo "  ${projection_history}" | jq .
   exit 1
 fi
 echo ""
 
-# ── 8. Search for indexed document ──────────────────────────────────
+# ── 9. Search for indexed document ──────────────────────────────────
 
-echo "🔍 Step 8: Searching for indexed documents..."
-search_response=$(curl_json "${LS_URL}/v1/search?q=Verantwortlichkeit")
-result_count=$(echo "${search_response}" | jq -r '.results | length')
-echo "  📊 Search results: ${result_count}"
+echo "🔍 Step 9: Searching for indexed documents..."
+MAX_SEARCH_ATTEMPTS=10
+SEARCH_PAGE_SIZE=100
+SEARCH_RETRY_SECONDS=5
+found_document=0
+matched_title=""
+result_count=0
 
-if [ "${result_count}" -gt 0 ]; then
-  first_title=$(echo "${search_response}" | jq -r '.results[0].title')
-  echo "  ✅ Found indexed document: ${first_title}"
+for attempt in $(seq 1 ${MAX_SEARCH_ATTEMPTS}); do
+  search_response=$(curl_json --get \
+    --data-urlencode "q=*" \
+    --data-urlencode "page=1" \
+    --data-urlencode "page_size=${SEARCH_PAGE_SIZE}" \
+    "${LS_URL}/v1/search")
+  result_count=$(echo "${search_response}" | jq -r '.results | length')
+  matching_result_count=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '[.results[] | select(.id == $doc)] | length')
+  echo "  [${attempt}/${MAX_SEARCH_ATTEMPTS}] Search results: ${result_count} (matching run document=${matching_result_count})"
+
+  if [ "${matching_result_count}" -gt 0 ]; then
+    found_document=1
+    matched_title=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | head -n 1)
+    break
+  fi
+
+  if [ "${attempt}" -lt "${MAX_SEARCH_ATTEMPTS}" ]; then
+    sleep "${SEARCH_RETRY_SECONDS}"
+  fi
+done
+
+if [ "${found_document}" -eq 1 ]; then
+  echo "  ✅ Found run-scoped indexed document: ${matched_title}"
 else
-  echo "  ❌ No search results — documents may not have been indexed correctly."
+  echo "  ❌ Run-scoped search failed for document ${RUN_DOCUMENT_ID}."
+  echo "  Last search page payload:"
+  echo "  ${search_response}" | jq .
   exit 1
 fi
 echo ""

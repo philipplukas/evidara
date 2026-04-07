@@ -22,6 +22,10 @@ For the small-team scraping/acquisition quality bar and release-gate expectation
 
 ### Unit Tests
 
+#### API authentication
+
+- Scoped keys: operator routes vs service ingest routes; 401 vs 403 (`tests/unit/test_auth_scopes.py`)
+
 #### State transition tests
 
 - Run lifecycle: `pending` → `running` → `completed` / `failed`

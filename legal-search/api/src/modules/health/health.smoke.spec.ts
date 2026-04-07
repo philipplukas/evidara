@@ -4,10 +4,10 @@
  * These run against the real running app (not a mock context).
  * Run with: npm run test:smoke
  *
- * Note: These tests require the app to be running on localhost:3001.
+ * Note: These tests require the app to be running on localhost:3102.
  * In CI, start the app before running smoke tests.
  */
-const BASE_URL = process.env.API_URL ?? 'http://localhost:3001';
+const BASE_URL = process.env.API_URL ?? 'http://localhost:3102';
 
 describe('App smoke tests', () => {
   it('GET /health → 200 with status ok', async () => {

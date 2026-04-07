@@ -1,5 +1,7 @@
 "use client";
 
+import DOMPurify from "dompurify";
+import { useMemo } from "react";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 
@@ -8,6 +10,13 @@ interface DetailsTabProps {
 }
 
 export function DetailsTab({ detail }: DetailsTabProps) {
+  const sanitizedContentHtml = useMemo(() => {
+    if (!detail.contentHtml) {
+      return "";
+    }
+    return DOMPurify.sanitize(detail.contentHtml);
+  }, [detail.contentHtml]);
+
   return (
     <div className="p-5 space-y-5">
       {/* Metadata */}
@@ -26,11 +35,9 @@ export function DetailsTab({ detail }: DetailsTabProps) {
       )}
 
       {/* Content */}
-      {detail.contentHtml && (
+      {sanitizedContentHtml && (
         <div className="space-y-2">
           <SectionLabel>Content</SectionLabel>
-          {/* TODO: sanitize with DOMPurify before production.
-              Safe now because contentHtml comes from our own mock data / BFF. */}
           <div
             className="text-sm leading-relaxed text-foreground/85 prose-sm font-document
               [&_.article-marginal]:text-micro [&_.article-marginal]:font-semibold [&_.article-marginal]:text-muted-foreground
@@ -38,7 +45,7 @@ export function DetailsTab({ detail }: DetailsTabProps) {
               [&_strong]:text-foreground [&_strong]:font-semibold
               [&_h4]:text-xs [&_h4]:font-semibold [&_h4]:uppercase [&_h4]:tracking-wider [&_h4]:text-muted-foreground [&_h4]:mt-4 [&_h4]:mb-2
               [&_p]:mb-2"
-            dangerouslySetInnerHTML={{ __html: detail.contentHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizedContentHtml }}
           />
         </div>
       )}

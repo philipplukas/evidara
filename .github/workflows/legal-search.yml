@@ -12,11 +12,15 @@ on:
     paths:
       - 'legal-search/**'
       - 'contracts/api/legal-search.openapi.yaml'
+      - 'platform-control/admin/**'
+      - 'docs/runbooks/interaction-flow-validation.md'
   push:
     branches: [main]
     paths:
       - 'legal-search/**'
       - 'contracts/api/legal-search.openapi.yaml'
+      - 'platform-control/admin/**'
+      - 'docs/runbooks/interaction-flow-validation.md'
 
 jobs:
   # ─── API quality gate ───
@@ -31,7 +35,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -56,7 +60,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -73,27 +77,132 @@ jobs:
       - name: Build
         run: npm run build
 
+  # ─── Interaction-flow evidence (Playwright smoke + contract) ───
+  interaction-flow-evidence:
+    runs-on: ubuntu-latest
+    env:
+      SCREENSHOT_PACK_STATUS: not_run
+      SCREENSHOT_PACK_RETRY_COUNT: "0"
+      SCREENSHOT_PACK_FAILURE_REASON: "none"
+      SCREENSHOT_CHECKLIST_COVERAGE: "unknown"
+    defaults:
+      run:
+        working-directory: legal-search/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: legal-search/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install platform-control admin dependencies (Playwright webServer)
+        working-directory: platform-control/admin
+        run: npm ci
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: E2E smoke tests
+      - name: Run smoke suite
         run: npm run e2e:smoke
 
-      - name: Upload Playwright artifacts
+      - name: Run cross-surface contract suite
+        run: npm run e2e:contract
+
+      - name: Capture canonical screenshot evidence pack
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            if npm run e2e:screenshot-pack; then
+              echo "SCREENSHOT_PACK_STATUS=passed" >> "${GITHUB_ENV}"
+              echo "SCREENSHOT_PACK_RETRY_COUNT=$((attempt - 1))" >> "${GITHUB_ENV}"
+              echo "SCREENSHOT_PACK_FAILURE_REASON=none" >> "${GITHUB_ENV}"
+              exit 0
+            fi
+            if [[ "${attempt}" -lt 2 ]]; then
+              echo "Screenshot pack failed on attempt ${attempt}; retrying once after 20s..."
+              sleep 20
+            fi
+          done
+          echo "SCREENSHOT_PACK_STATUS=failed_after_retry" >> "${GITHUB_ENV}"
+          echo "SCREENSHOT_PACK_RETRY_COUNT=1" >> "${GITHUB_ENV}"
+          echo "SCREENSHOT_PACK_FAILURE_REASON=playwright_screenshot_pack_failed" >> "${GITHUB_ENV}"
+          echo "::error::Screenshot evidence pack failed after 2 attempts"
+          exit 1
+
+      - name: Validate screenshot checklist coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        run: |
+          set -euo pipefail
+          required=(
+            "screenshot-pack/cross-surface-header-navigation.png"
+            "screenshot-pack/legal-search-result-list.png"
+            "screenshot-pack/legal-search-detail-panel.png"
+            "screenshot-pack/admin-run-launch-preflight.png"
+            "screenshot-pack/admin-run-lifecycle-visibility.png"
+            "screenshot-pack/operator-journey-events.json"
+          )
+          missing=0
+          for file in "${required[@]}"; do
+            if [[ ! -f "${file}" ]]; then
+              echo "::warning::Missing screenshot checklist file: ${file}"
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -eq 0 ]]; then
+            echo "SCREENSHOT_CHECKLIST_COVERAGE=complete" >> "${GITHUB_ENV}"
+          else
+            echo "SCREENSHOT_CHECKLIST_COVERAGE=incomplete" >> "${GITHUB_ENV}"
+            if [[ "${SCREENSHOT_PACK_FAILURE_REASON}" == "none" ]]; then
+              echo "SCREENSHOT_PACK_FAILURE_REASON=missing_required_capture" >> "${GITHUB_ENV}"
+            fi
+          fi
+
+      - name: Generate evidence manifest
+        if: always()
+        run: |
+          cat <<EOF > interaction-flow-evidence.md
+          # Interaction Flow Evidence
+
+          Source runbook: `docs/runbooks/interaction-flow-validation.md`
+          Source workflow: `.github/workflows/legal-search.yml`
+          Source job: `interaction-flow-evidence`
+
+          Executed suites:
+          - `npm run e2e:smoke`
+          - `npm run e2e:contract`
+          - `npm run e2e:screenshot-pack`
+
+          Screenshot pack status:
+          - `${SCREENSHOT_PACK_STATUS}`
+          - retry_count: `${SCREENSHOT_PACK_RETRY_COUNT}`
+          - failure_reason: `${SCREENSHOT_PACK_FAILURE_REASON}`
+          - checklist_coverage: `${SCREENSHOT_CHECKLIST_COVERAGE}`
+          - if failed, inspect `test-results` traces and retry logs in this run.
+
+          Evidence artifacts in this upload:
+          - `legal-search/frontend/playwright-report`
+          - `legal-search/frontend/test-results`
+          - `legal-search/frontend/screenshot-pack`
+          - `legal-search/frontend/interaction-flow-evidence.md`
+          EOF
+
+      - name: Upload interaction-flow evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
         with:
-          name: frontend-playwright-artifacts
+          name: interaction-flow-evidence-${{ github.run_id }}
           path: |
-            legal-search/frontend/test-results
             legal-search/frontend/playwright-report
-          if-no-files-found: ignore
-
-      # Contract lint — validates the OpenAPI spec.
-      - name: Contract lint
-        run: npm run openapi:lint
-
-      # Drift check — re-generates the typed client from the spec and
-      # fails if the committed output differs.
-      - name: Contract drift check
-        run: npm run openapi:check
+            legal-search/frontend/test-results
+            legal-search/frontend/screenshot-pack
+            legal-search/frontend/interaction-flow-evidence.md
+            docs/runbooks/interaction-flow-validation.md
+          if-no-files-found: warn

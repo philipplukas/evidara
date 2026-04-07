@@ -5,13 +5,22 @@ on:
     paths:
       - ".github/workflows/terraform.yml"
       - "infra/terraform/gcp/runtime_stack/**"
-      - "infra/env/dev/runtime.gcp.tfvars"
+      - "infra/env/dev/runtime.gcp.tfvars.example"
+      - "infra/env/dev/runtime.gcp.ci.tfvars"
   push:
     branches: [main]
     paths:
       - ".github/workflows/terraform.yml"
       - "infra/terraform/gcp/runtime_stack/**"
-      - "infra/env/dev/runtime.gcp.tfvars"
+      - "infra/env/dev/runtime.gcp.tfvars.example"
+      - "infra/env/dev/runtime.gcp.ci.tfvars"
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: "Run terraform apply (default false)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -24,7 +33,8 @@ concurrency:
 
 env:
   TF_ROOT: infra/terraform/gcp/runtime_stack
-  TF_VAR_FILE: infra/env/dev/runtime.gcp.tfvars
+  TF_BASE_VAR_FILE: infra/env/dev/runtime.gcp.tfvars.example
+  TF_CI_VAR_FILE: infra/env/dev/runtime.gcp.ci.tfvars
 
 jobs:
   # ── PR: fmt + validate + plan ───────────────────
@@ -36,10 +46,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
@@ -70,7 +80,8 @@ jobs:
         run: |
           set -o pipefail
           terraform plan \
-            -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_BASE_VAR_FILE }}" \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_CI_VAR_FILE }}" \
             -no-color \
             -input=false \
             -out=tfplan 2>&1 | tee plan_output.txt
@@ -78,7 +89,7 @@ jobs:
         continue-on-error: true
 
       - name: Post plan to PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -160,16 +171,16 @@ jobs:
   # ── Main: apply ─────────────────────────────────
   apply:
     name: Terraform apply
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
     runs-on: ubuntu-latest
     environment: dev
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
@@ -186,7 +197,8 @@ jobs:
       - name: Terraform apply
         run: |
           terraform apply \
-            -var-file="$GITHUB_WORKSPACE/${{ env.TF_VAR_FILE }}" \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_BASE_VAR_FILE }}" \
+            -var-file="$GITHUB_WORKSPACE/${{ env.TF_CI_VAR_FILE }}" \
             -auto-approve \
             -input=false \
             -no-color

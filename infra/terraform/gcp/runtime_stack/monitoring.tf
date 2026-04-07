@@ -129,7 +129,7 @@ resource "google_monitoring_alert_policy" "cloud_run_error_rate" {
     display_name = "5xx error rate > 5% for 5 min"
 
     condition_threshold {
-      filter = <<-EOT
+      filter          = <<-EOT
         resource.type = "cloud_run_revision"
         AND resource.labels.service_name = "${each.value.prefixed_name}"
         AND metric.type = "run.googleapis.com/request_count"
@@ -202,7 +202,7 @@ resource "google_monitoring_alert_policy" "cloud_run_latency" {
     display_name = "Request latency p95 > 5s for 15 min"
 
     condition_threshold {
-      filter = <<-EOT
+      filter          = <<-EOT
         resource.type = "cloud_run_revision"
         AND resource.labels.service_name = "${each.value.prefixed_name}"
         AND metric.type = "run.googleapis.com/request_latencies"

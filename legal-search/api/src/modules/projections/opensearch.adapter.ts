@@ -48,7 +48,7 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
         body: {
           size: 1,
           query: {
-            term: { document_id: documentId },
+            term: { 'document_id.keyword': documentId },
           },
           sort: [{ document_revision: { order: 'desc' } }],
         },
@@ -122,13 +122,13 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
     const filters: Array<Record<string, unknown>> = [];
 
     if (query.documentId) {
-      filters.push({ term: { document_id: query.documentId } });
+      filters.push({ term: { 'document_id.keyword': query.documentId } });
     }
     if (query.runId) {
-      filters.push({ term: { run_id: query.runId } });
+      filters.push({ term: { 'run_id.keyword': query.runId } });
     }
     if (query.status) {
-      filters.push({ term: { status: query.status } });
+      filters.push({ term: { 'status.keyword': query.status } });
     }
 
     const body: Record<string, unknown> = {
@@ -186,10 +186,10 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
           track_total_hits: true,
           aggs: {
             by_status: {
-              terms: { field: 'status', size: 10 },
+              terms: { field: 'status.keyword', size: 10 },
             },
             unique_documents: {
-              cardinality: { field: 'document_id' },
+              cardinality: { field: 'document_id.keyword' },
             },
           },
         },

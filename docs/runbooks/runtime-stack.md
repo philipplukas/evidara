@@ -1,9 +1,9 @@
 # Runtime Stack — Architecture & Operations Runbook
 
 Owner: Platform Team
-Last reviewed: 2026-04-04
-Last verified: 2026-04-04
-Applies to: dev, prod
+Last reviewed: 2026-04-06
+Last verified: 2026-04-06
+Applies to: dev, staging, prod
 
 ## Purpose
 
@@ -116,8 +116,10 @@ terraform apply -var-file="../../../../infra/env/dev/runtime.gcp.tfvars"
 ```
 
 > **Note**: Terraform plan/apply is automated via CI (`.github/workflows/terraform.yml`).
-> PRs touching `infra/terraform/gcp/runtime_stack/**` or `infra/env/dev/runtime.gcp.tfvars`
-> will receive an automatic plan comment. Merging to `main` triggers auto-apply.
+> PRs touching `infra/terraform/gcp/runtime_stack/**` or `infra/env/dev/runtime.gcp.tfvars.example`
+> will receive an automatic plan comment. CI uses `infra/env/dev/runtime.gcp.ci.tfvars`
+> as an overlay for plan-safe project/service-account overrides. Merging to `main`
+> triggers auto-apply.
 
 ### GitHub Actions Variables
 
@@ -232,6 +234,84 @@ gcloud run services update-traffic "${SERVICE}-dev" \
   --to-latest
 ```
 
+### 6. Bootstrap Runtime Schema & OpenSearch Aliases
+
+Use this after fresh environment bring-up (or when smoke preflight reports missing aliases):
+
+```bash
+export GCP_PROJECT_ID="data-platform-dev-492214"
+export GCP_REGION="europe-west6"
+bash scripts/run-runtime-bootstrap.sh staging
+```
+
+What it does:
+
+1. Executes `platform-control-db-migrate-{env}`
+2. Executes `os-alias-bootstrap-{env}`
+3. Executes `os-alias-check-{env}`
+
+If staging smoke fails with:
+
+`OpenSearch alias preflight failed. Run job os-alias-bootstrap-staging and retry smoke.`
+
+remediation is:
+
+```bash
+gcloud run jobs execute os-alias-bootstrap-staging \
+  --project "${GCP_PROJECT_ID}" \
+  --region "${GCP_REGION}" \
+  --wait
+
+gcloud run jobs execute os-alias-check-staging \
+  --project "${GCP_PROJECT_ID}" \
+  --region "${GCP_REGION}" \
+  --wait
+```
+
+### 7. Release Readiness Go/No-Go Operation
+
+`Release Readiness` is the release-lane gate of truth for `staging`. It
+evaluates four signals together:
+
+1. Latest `E2E Smoke Staging` result
+2. Latest `Terraform` workflow result
+3. DI schema drift preflight
+4. DLQ depth (15-minute max undelivered messages)
+
+Manual trigger options:
+
+```bash
+# Strict blocking mode (default)
+gh workflow run "Release Readiness" -f strict=true
+
+# Investigation mode (non-blocking run, still reports GO/NO-GO)
+gh workflow run "Release Readiness" -f strict=false
+```
+
+Interpretation:
+
+- `GO`: all four signals pass in the generated report.
+- `NO-GO`: at least one signal failed; follow owner-first remediation below
+  before attempting release.
+
+### 8. NO-GO Owner Matrix (first response)
+
+| Signal | Primary owner | Backup owner | First response |
+|--------|---------------|--------------|----------------|
+| E2E Smoke Staging failed | Platform Team | Document-Intelligence Team | Inspect latest smoke logs/artifacts, rerun after fix |
+| Terraform workflow failed/drifted | Platform Team | Repo Maintainer on duty | Resolve plan/apply failure and rerun Terraform workflow |
+| DI schema drift preflight failed | Document-Intelligence Team | Platform Team | Investigate surface schema drift, remediate per DI runbook, rerun gate |
+| DLQ depth non-zero | Platform Team | Legal-Search Team | Triage DLQ root cause and replay per DLQ runbook |
+
+### 9. Weekly Readiness Review Cadence
+
+- Frequency: once per week (recommended Monday morning UTC).
+- Inputs: latest `Release Readiness` artifact + previous week incident notes.
+- Output: short checkpoint note with current `GO/NO-GO`, open risks, and
+  remediation owners.
+- Tracking: attach checkpoint note link to the active release-hardening Linear
+  issue.
+
 ## Rollback
 
 ### Rollback to Previous Revision
@@ -270,6 +350,7 @@ git push origin main
 | Terraform plan drift | Manual changes outside Terraform | Run `terraform plan` to see drift, then `terraform apply` |
 | Image not found on deploy | Image not pushed to Artifact Registry | Check `runtime-images.yml` workflow run, verify AR tag exists |
 | Health check timeout | Service startup too slow | Increase `startup_probe.initial_delay_seconds` in tfvars |
+| OpenSearch alias preflight fails in smoke | Missing or broken read/write aliases | Run `scripts/run-runtime-bootstrap.sh <env>` or execute `os-alias-bootstrap-<env>` then `os-alias-check-<env>` |
 
 ## Related
 

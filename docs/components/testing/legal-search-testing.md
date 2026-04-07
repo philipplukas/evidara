@@ -28,6 +28,7 @@ Testing strategy for the legal-search component, which owns:
 
 - Search query string → OpenSearch query DSL is correct
 - Jurisdiction filter → proper filter clause
+- Multi-filter requests (jurisdictions, languages, document types, refinements) map to expected bool filters
 - Empty query → returns sensible default (e.g., match_all with sort)
 - Special characters in query are escaped or handled
 
@@ -103,6 +104,7 @@ One end-to-end user flow:
 1. Apply a jurisdiction filter
 2. Results update to show only documents matching the filter
 3. Removing the filter restores full results
+4. Mobile header search triggers the same search dispatch path as desktop
 
 ### Error / Empty State Test
 

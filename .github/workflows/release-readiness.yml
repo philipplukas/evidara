@@ -1,0 +1,369 @@
+name: Release Readiness
+
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch:
+    inputs:
+      strict:
+        description: "Fail workflow on failed gate checks"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+jobs:
+  release-readiness:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
+      DI_SURFACES_ROOT_URI: ${{ vars.DI_SURFACES_ROOT_URI_STAGING }}
+      INTERACTION_FLOW_EVIDENCE_GCS_ROOT: ${{ vars.INTERACTION_FLOW_EVIDENCE_GCS_ROOT_STAGING || vars.DI_SURFACES_ROOT_URI_STAGING }}
+      TERRAFORM_APPLY_ENABLED: ${{ vars.TERRAFORM_APPLY_ENABLED || 'false' }}
+      REPORT_PATH: tmp/release-readiness/report.md
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Verify latest staging smoke run
+        id: smoke_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p tmp/release-readiness
+          gh run list \
+            --workflow "E2E Smoke Staging" \
+            --branch main \
+            --limit 1 \
+            --json databaseId,createdAt,conclusion,url \
+            > tmp/release-readiness/smoke.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          runs = json.loads(open("tmp/release-readiness/smoke.json", "r", encoding="utf-8").read())
+          if not runs:
+              print("No E2E Smoke Staging runs found on main.", file=sys.stderr)
+              sys.exit(2)
+
+          latest = runs[0]
+          conclusion = latest.get("conclusion") or "unknown"
+          created_at = latest.get("createdAt") or "unknown"
+          url = latest.get("url") or ""
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"smoke_conclusion={conclusion}\n")
+              fh.write(f"smoke_created_at={created_at}\n")
+              fh.write(f"smoke_url={url}\n")
+
+          if conclusion != "success":
+              print(f"Latest staging smoke is not successful: {conclusion}", file=sys.stderr)
+              sys.exit(2)
+          PY
+
+      - name: Verify latest interaction-flow staging evidence run
+        id: interaction_flow_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run list \
+            --workflow "Interaction Flow Staging Evidence" \
+            --branch main \
+            --limit 20 \
+            --json databaseId,createdAt,status,conclusion,url \
+            > tmp/release-readiness/interaction-flow-staging.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          runs = json.loads(
+              open(
+                  "tmp/release-readiness/interaction-flow-staging.json",
+                  "r",
+                  encoding="utf-8",
+              ).read()
+          )
+          if not runs:
+              print(
+                  "No Interaction Flow Staging Evidence runs found on main.",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+
+          latest_success = next(
+              (run for run in runs if (run.get("conclusion") or "") == "success"),
+              None,
+          )
+          if latest_success is None:
+              latest = runs[0]
+              latest_status = latest.get("status") or "unknown"
+              latest_conclusion = latest.get("conclusion") or "unknown"
+              print(
+                  "No successful Interaction Flow Staging Evidence runs found in the latest 20 runs. "
+                  f"Newest run status={latest_status}, conclusion={latest_conclusion}.",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+
+          run_id = latest_success.get("databaseId") or ""
+          conclusion = latest_success.get("conclusion") or "unknown"
+          created_at = latest_success.get("createdAt") or "unknown"
+          url = latest_success.get("url") or ""
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"interaction_flow_run_id={run_id}\n")
+              fh.write(f"interaction_flow_conclusion={conclusion}\n")
+              fh.write(f"interaction_flow_created_at={created_at}\n")
+              fh.write(f"interaction_flow_url={url}\n")
+          PY
+
+      - name: Verify interaction-flow evidence artifact completeness
+        id: interaction_flow_artifact_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          scripts/check-latest-interaction-flow-evidence.sh \
+            --mode staging \
+            --output-dir tmp/release-readiness/interaction-flow-evidence-quickcheck \
+            --gcs-root-uri "${INTERACTION_FLOW_EVIDENCE_GCS_ROOT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Verify latest Terraform run
+        id: tf_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run list \
+            --workflow "Terraform" \
+            --branch main \
+            --limit 1 \
+            --json databaseId,createdAt,status,conclusion,url \
+            > tmp/release-readiness/terraform.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          runs = json.loads(open("tmp/release-readiness/terraform.json", "r", encoding="utf-8").read())
+          if not runs:
+              print("No Terraform runs found on main.", file=sys.stderr)
+              sys.exit(2)
+
+          latest = runs[0]
+          status = latest.get("status") or "unknown"
+          conclusion = latest.get("conclusion") or "unknown"
+          created_at = latest.get("createdAt") or "unknown"
+          url = latest.get("url") or ""
+          terraform_apply_enabled = os.environ.get("TERRAFORM_APPLY_ENABLED", "false").lower() == "true"
+          accepted = conclusion == "success" or (
+              conclusion == "skipped" and not terraform_apply_enabled
+          )
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"tf_status={status}\n")
+              fh.write(f"tf_conclusion={conclusion}\n")
+              fh.write(f"tf_created_at={created_at}\n")
+              fh.write(f"tf_url={url}\n")
+              fh.write(f"tf_accepted={'true' if accepted else 'false'}\n")
+
+          if not accepted:
+              print(
+                  f"Latest Terraform run is not accepted for gate: status={status}, conclusion={conclusion}",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+          PY
+
+      - name: Check staging DI schema drift
+        id: di_drift
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        run: |
+          set -euo pipefail
+          bash scripts/check-di-surface-schema-drift.sh \
+            --project "${GCP_PROJECT_ID}" \
+            --surfaces-root-uri "${DI_SURFACES_ROOT_URI}"
+
+      - name: Query staging DLQ depth
+        id: dlq_gate
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
+        run: |
+          set -euo pipefail
+          TOKEN="$(gcloud auth print-access-token)"
+          END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          START="$(date -u -d '15 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
+          curl -sS -G \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "https://monitoring.googleapis.com/v3/projects/${GCP_PROJECT_ID}/timeSeries" \
+            --data-urlencode 'filter=metric.type="pubsub.googleapis.com/subscription/num_undelivered_messages" AND resource.type="pubsub_subscription" AND resource.labels.subscription_id=monitoring.regex.full_match(".*-staging-dlq-sub")' \
+            --data-urlencode "interval.startTime=${START}" \
+            --data-urlencode "interval.endTime=${END}" \
+            --data-urlencode 'view=FULL' \
+            --data-urlencode 'pageSize=200' \
+            > tmp/release-readiness/dlq-timeseries.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          payload = json.loads(open("tmp/release-readiness/dlq-timeseries.json", "r", encoding="utf-8").read())
+          series = payload.get("timeSeries", [])
+
+          max_depth = 0
+          subscriptions = []
+          for entry in series:
+              sub_id = (
+                  entry.get("resource", {})
+                  .get("labels", {})
+                  .get("subscription_id", "unknown")
+              )
+              subscriptions.append(sub_id)
+              for point in entry.get("points", []):
+                  value = point.get("value", {}).get("int64Value")
+                  if value is None:
+                      continue
+                  max_depth = max(max_depth, int(value))
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"dlq_max_depth={max_depth}\n")
+              fh.write(
+                  "dlq_subscription_count={count}\n".format(
+                      count=len(set(subscriptions))
+                  )
+              )
+
+          if max_depth > 0:
+              print(
+                  f"DLQ backlog is non-zero (max undelivered messages: {max_depth}).",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+          PY
+
+      - name: Build release readiness report
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${REPORT_PATH}")"
+          {
+            echo "# Release Readiness Report"
+            echo
+            echo "- Environment: \`staging\`"
+            echo "- Mode: \`${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' && 'investigation (non-blocking)' || 'strict (blocking)' }}\`"
+            echo "- Generated at: \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`"
+            echo
+            echo "| Signal | Status | Evidence |"
+            echo "|---|---|---|"
+
+            if [[ "${{ steps.smoke_gate.outcome }}" == "success" ]]; then
+              smoke_status="PASS"
+            else
+              smoke_status="FAIL"
+            fi
+            echo "| Latest E2E Smoke Staging | ${smoke_status} | [run](${{ steps.smoke_gate.outputs.smoke_url }}) @ ${{ steps.smoke_gate.outputs.smoke_created_at }} |"
+
+            if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" ]]; then
+              interaction_flow_status="PASS"
+            else
+              interaction_flow_status="FAIL"
+            fi
+            echo "| Latest interaction-flow staging evidence | ${interaction_flow_status} | [run](${{ steps.interaction_flow_gate.outputs.interaction_flow_url }}) @ ${{ steps.interaction_flow_gate.outputs.interaction_flow_created_at }} |"
+
+            if [[ "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+              interaction_flow_artifact_status="PASS"
+            else
+              interaction_flow_artifact_status="FAIL"
+            fi
+            interaction_flow_artifact_evidence='`scripts/check-latest-interaction-flow-evidence.sh --mode staging`'
+            if [[ -n "${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}" ]]; then
+              interaction_flow_artifact_evidence="[run ${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_id }}](${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}) + ${interaction_flow_artifact_evidence}"
+            fi
+            echo "| Interaction-flow artifact completeness | ${interaction_flow_artifact_status} | ${interaction_flow_artifact_evidence} |"
+
+            if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+              evidence_quality_score="PASS"
+            else
+              evidence_quality_score="FAIL"
+            fi
+            echo "| Evidence quality score | ${evidence_quality_score} | Composite of latest interaction-flow run + artifact completeness gate |"
+
+            if [[ "${{ steps.tf_gate.outcome }}" == "success" ]]; then
+              tf_status="PASS"
+            else
+              tf_status="FAIL"
+            fi
+            echo "| Latest Terraform workflow | ${tf_status} | [run](${{ steps.tf_gate.outputs.tf_url }}) @ ${{ steps.tf_gate.outputs.tf_created_at }} (status=\`${{ steps.tf_gate.outputs.tf_status }}\`, conclusion=\`${{ steps.tf_gate.outputs.tf_conclusion }}\`, accepted=\`${{ steps.tf_gate.outputs.tf_accepted }}\`) |"
+
+            if [[ "${{ steps.di_drift.outcome }}" == "success" ]]; then
+              di_status="PASS"
+            else
+              di_status="FAIL"
+            fi
+            echo "| DI schema drift preflight | ${di_status} | \`scripts/check-di-surface-schema-drift.sh\` |"
+
+            if [[ "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
+              dlq_status="PASS"
+            else
+              dlq_status="FAIL"
+            fi
+            echo "| DLQ depth (15m max) | ${dlq_status} | max=\`${{ steps.dlq_gate.outputs.dlq_max_depth }}\`, subs=\`${{ steps.dlq_gate.outputs.dlq_subscription_count }}\` |"
+            echo
+            if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
+              overall="GO"
+            else
+              overall="NO-GO"
+            fi
+            echo "Go/No-Go: **${overall}**"
+            if [[ "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+              echo
+              echo "## Runbook Verification Log Row (copy/paste)"
+              echo
+              echo "| $(date -u +%Y-%m-%d) | Strict release-readiness verification | GitHub Actions run [${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_id }}](${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}) passed interaction-flow evidence artifact completeness quick-check |"
+            fi
+          } > "${REPORT_PATH}"
+
+          cat "${REPORT_PATH}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload release readiness report to GCS
+        id: release_report_upload
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${INTERACTION_FLOW_EVIDENCE_GCS_ROOT}" ]]; then
+            echo "::error::INTERACTION_FLOW_EVIDENCE_GCS_ROOT is not configured."
+            exit 1
+          fi
+          REPORT_GCS_PATH="${INTERACTION_FLOW_EVIDENCE_GCS_ROOT%/}/release-readiness/${GITHUB_RUN_ID}/report.md"
+          gcloud storage cp "${REPORT_PATH}" "${REPORT_GCS_PATH}"
+          echo "report_gcs_path=${REPORT_GCS_PATH}" >> "${GITHUB_OUTPUT}"
