@@ -5,7 +5,11 @@ import type { WarnFn } from '../../core/types/warn';
 import { mapContextAggregations } from './mappers/search-context.mapper';
 import { mapAggregationsToFacets } from './mappers/search-facet.mapper';
 import { mapSearchHitToView } from './mappers/search-result.mapper';
-import { SEARCH_REPOSITORY, type SearchRepository } from './search.repository';
+import {
+  SEARCH_REPOSITORY,
+  type SearchRefinement,
+  type SearchRepository,
+} from './search.repository';
 
 @Injectable()
 export class SearchService {
@@ -22,8 +26,11 @@ export class SearchService {
   async search(
     query: string,
     options?: {
-      jurisdiction?: string;
-      documentType?: string;
+      jurisdictions?: string[];
+      languages?: string[];
+      documentTypes?: string[];
+      officialOnly?: boolean;
+      refinements?: SearchRefinement[];
       page?: number;
       pageSize?: number;
       locale?: SupportedLocale;
@@ -31,8 +38,11 @@ export class SearchService {
   ) {
     const locale = options?.locale ?? DEFAULT_LOCALE;
     const result = await this.repository.search(query, {
-      jurisdiction: options?.jurisdiction,
-      documentType: options?.documentType,
+      jurisdictions: options?.jurisdictions,
+      languages: options?.languages,
+      documentTypes: options?.documentTypes,
+      officialOnly: options?.officialOnly,
+      refinements: options?.refinements,
       page: options?.page,
       pageSize: options?.pageSize,
     });
