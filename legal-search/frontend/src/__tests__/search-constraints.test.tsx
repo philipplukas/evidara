@@ -196,6 +196,32 @@ describe("SearchConstraintsProvider", () => {
     expect(result.current.state.refinements[0].field).toBe("court_level");
   });
 
+  it("CLEAR_ALL_REFINEMENTS removes all refinement filters", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "legal_area",
+        refinement: { field: "legal_area", type: "terms", values: ["civil"] },
+      });
+    });
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "court_level",
+        refinement: { field: "court_level", type: "terms", values: ["supreme"] },
+      });
+    });
+    expect(result.current.state.refinements).toHaveLength(2);
+
+    act(() => {
+      result.current.dispatch({ type: "CLEAR_ALL_REFINEMENTS" });
+    });
+
+    expect(result.current.state.refinements).toEqual([]);
+  });
+
   /**
    * WHY: RESET_ALL is the "start over" escape hatch. If it leaves
    * stale refinements, users get confused by phantom filters.

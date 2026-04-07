@@ -26,6 +26,7 @@ interface MobileWorkspaceProps {
   onPin: (id: string, title: string, type: string) => void;
   pinnedIds: Set<string>;
   onCloseDetail: () => void;
+  onSearch: (query: string) => Promise<void>;
   showControlPlaneEntry?: boolean;
   controlPanelUrl?: string;
 }
@@ -41,6 +42,7 @@ export function MobileWorkspace({
   onPin,
   pinnedIds,
   onCloseDetail,
+  onSearch,
   showControlPlaneEntry = true,
   controlPanelUrl,
 }: MobileWorkspaceProps) {
@@ -49,6 +51,7 @@ export function MobileWorkspace({
   return (
     <div className="flex flex-col h-screen bg-surface-page">
       <AppHeader
+        onSearch={onSearch}
         onOpenFilters={() => setFiltersOpen(true)}
         showControlPlaneEntry={showControlPlaneEntry}
         controlPanelUrl={controlPanelUrl}
