@@ -151,7 +151,7 @@ Selection state lives in URL search parameters — not in any React store. This 
 
 1. **Read**: `useSearchParams().get("item")` → `selectedId` (in `WorkspaceClient`)
 2. **Write**: `router.replace(?item=id)` via `setSelectedId()` callback
-3. **Detail data**: `useDetail(selectedId)` → React Query fetch (or mock)
+3. **Detail data**: `useDetail(selectedId)` → React Query fetch from live BFF (`GET /v1/documents/{document_id}`)
 4. **Panel sync**: `useEffect` expands/collapses the right panel via `ImperativePanelHandle`
 5. **Escape**: Keyboard handler removes `?item=`, collapsing the panel
 6. **Tab sync**: `DetailTabs` reads/writes `?tab=` via `useSearchParams`; `useActiveTab()` hook
@@ -217,6 +217,7 @@ The hook contract stays stable while data loading and caching are handled by Rea
 | `handleSelect` | `[setSelectedId, dispatch, state.resultSet.items]` | URL update + `PUSH_TRAIL` |
 | `handlePivot` | `[dispatch, state.resultSet]` | Fetches pivot data + `PIVOT` dispatch |
 | `handlePin` | `[dispatch, state.pinned]` | Toggle `PIN` / `UNPIN` |
+| `executeSearch` | `[constraints, dispatch]` | Runs URL/constraint search with stale-response guard + signature dedupe |
 
 ---
 
