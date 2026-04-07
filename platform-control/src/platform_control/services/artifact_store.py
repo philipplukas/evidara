@@ -42,7 +42,7 @@ class LocalArtifactStore:
         artifact_dir.mkdir(parents=True, exist_ok=True)
         artifact_path = artifact_dir / f"{artifact_id}.json"
         artifact_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-        return str(artifact_path)
+        return f"file://{artifact_path.resolve()}"
 
     async def store_bundle_manifest(
         self,

@@ -1,8 +1,20 @@
 "use client";
 
-import { Alert, TextField as MuiTextField } from "@mui/material";
-import { Create, FormDataConsumer, required, SimpleForm, TextInput } from "react-admin";
+import { Alert } from "@mui/material";
+import {
+  Create,
+  FormDataConsumer,
+  required,
+  SelectInput,
+  SimpleForm,
+  TextInput,
+} from "react-admin";
 import { AuthoritySelectInput, JurisdictionSelectInput } from "../shared/ReferenceInputs";
+
+const SOURCE_TYPE_CHOICES = [
+  { id: "website", name: "Website (crawl)" },
+  { id: "api", name: "API (structured)" },
+];
 
 export function SourceCreate() {
   return (
@@ -46,13 +58,12 @@ export function SourceCreate() {
           label="Document family"
           helperText="Optional grouping label surfaced during operator review."
         />
-        <MuiTextField
+        <SelectInput
+          source="source_type"
           label="Source type"
-          value="website"
-          helperText="The current control-plane flow is set up for website-backed sources."
-          disabled
-          fullWidth
-          margin="normal"
+          choices={SOURCE_TYPE_CHOICES}
+          helperText="Website for Firecrawl crawls, API for structured endpoints like RIS OGD."
+          validate={required()}
         />
       </SimpleForm>
     </Create>

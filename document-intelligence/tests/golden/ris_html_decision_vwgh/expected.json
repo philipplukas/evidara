@@ -1,0 +1,4 @@
+{
+  "section_count_min": 1,
+  "status_flow": ["accepted", "processing", "canonical_ready"]
+}

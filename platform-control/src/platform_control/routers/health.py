@@ -1,9 +1,11 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 
 from platform_control.config import get_settings
 from platform_control.database import get_session_maker
+from platform_control.models.run import Run
+from platform_control.models.source import Source
 from platform_control.schemas.health import DependencyCheck, HealthResponse, ReadinessResponse
 
 router = APIRouter(tags=["health"])
@@ -35,3 +37,49 @@ async def get_readiness() -> JSONResponse:
     payload = ReadinessResponse(status=status, service=settings.app_name, checks=checks)
     http_status = 200 if status == "ok" else 503
     return JSONResponse(status_code=http_status, content=payload.model_dump())
+
+
+@router.get("/stats")
+async def get_stats() -> dict:
+    session_maker = get_session_maker()
+    async with session_maker() as session:
+        source_count = (await session.execute(select(func.count(Source.source_id)))).scalar() or 0
+
+        run_rows = await session.execute(
+            select(Run.status, func.count(Run.run_id)).group_by(Run.status)
+        )
+        run_by_status = {row[0]: row[1] for row in run_rows}
+        total_runs = sum(run_by_status.values())
+
+        artifact_result = await session.execute(select(func.sum(Run.artifacts_count)))
+        total_artifacts = artifact_result.scalar() or 0
+
+        recent_rows = await session.execute(
+            select(
+                Run.run_id,
+                Run.status,
+                Run.artifacts_count,
+                Run.created_at,
+                Run.completed_at,
+            )
+            .order_by(Run.created_at.desc())
+            .limit(5)
+        )
+        recent_runs = [
+            {
+                "run_id": r.run_id,
+                "status": r.status,
+                "artifacts_count": r.artifacts_count,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            }
+            for r in recent_rows
+        ]
+
+    return {
+        "source_count": source_count,
+        "total_runs": total_runs,
+        "run_by_status": run_by_status,
+        "total_artifacts": total_artifacts,
+        "recent_runs": recent_runs,
+    }

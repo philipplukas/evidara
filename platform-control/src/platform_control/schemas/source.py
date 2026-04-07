@@ -15,10 +15,14 @@ from platform_control.domain import (
 LanguageCode = Annotated[str, Field(pattern=r"^[a-z]{2}(?:-[A-Z]{2})?$")]
 
 
-class FirecrawlAcquisitionSpec(BaseModel):
+class AcquisitionSpec(BaseModel):
     provider: AcquisitionProvider = AcquisitionProvider.FIRECRAWL
+
+    # --- Shared seed fields (Firecrawl, deterministic_http) ---
     seed_url: HttpUrl | None = None
     seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    # --- Firecrawl-specific ---
     mode: FirecrawlMode = FirecrawlMode.CRAWL
     include_paths: list[str] = Field(default_factory=list)
     exclude_paths: list[str] = Field(default_factory=list)
@@ -26,6 +30,15 @@ class FirecrawlAcquisitionSpec(BaseModel):
     max_discovery_depth: int = Field(default=2, ge=0, le=10)
     scrape_formats: list[str] = Field(default_factory=lambda: ["markdown", "html"])
     zero_data_retention: bool = False
+
+    # --- RIS OGD-specific ---
+    base_url: HttpUrl | None = None
+    applikation: str | None = None
+    preferred_formats: list[str] = Field(default_factory=lambda: ["Xml", "Html"])
+    page_size: int = Field(default=20, ge=1, le=100)
+    max_pages: int = Field(default=50, ge=1, le=500)
+
+    # --- Shared provenance / manifest defaults ---
     tenant_id: str = Field(default="tenant_public", pattern=r"^tenant_[a-z0-9_]+$")
     corpus_id: str = Field(default="corpus_public_default", pattern=r"^corpus_[a-z0-9_]+$")
     scope_type: Literal["global_public", "tenant_private", "tenant_shared"] = "global_public"
@@ -39,6 +52,8 @@ class FirecrawlAcquisitionSpec(BaseModel):
     trust_tier: Literal["authoritative", "preferred", "supplemental", "untrusted"] = "authoritative"
     language_codes: list[LanguageCode] = Field(default_factory=list)
     document_type_hint: str | None = None
+
+    # --- HTTP transport ---
     request_timeout_seconds: float = Field(default=30.0, ge=1.0, le=120.0)
     user_agent: str | None = None
     max_content_bytes: int = Field(default=2_000_000, ge=50_000, le=10_000_000)
@@ -46,7 +61,7 @@ class FirecrawlAcquisitionSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
-    def validate_provider_config(self) -> FirecrawlAcquisitionSpec:
+    def validate_provider_config(self) -> AcquisitionSpec:
         if self.provider is AcquisitionProvider.FIRECRAWL:
             if self.mode is FirecrawlMode.CRAWL and self.seed_url is None:
                 raise ValueError("firecrawl crawl mode requires seed_url")
@@ -58,7 +73,17 @@ class FirecrawlAcquisitionSpec(BaseModel):
             if self.seed_url is None and not self.seed_urls:
                 raise ValueError("deterministic_http provider requires seed_url or seed_urls")
             return self
+
+        if self.provider is AcquisitionProvider.RIS_OGD:
+            if self.base_url is None:
+                raise ValueError("ris_ogd provider requires base_url")
+            return self
+
         return self
+
+
+# Backward-compatible alias
+FirecrawlAcquisitionSpec = AcquisitionSpec
 
 
 class CreateSourceRequest(BaseModel):
@@ -66,7 +91,7 @@ class CreateSourceRequest(BaseModel):
     description: str | None = None
     jurisdiction_id: str
     authority_id: str
-    source_type: Literal["website"] = "website"
+    source_type: Literal["website", "api"] = "website"
     document_family: str | None = None
 
 
@@ -87,6 +112,9 @@ class SourceResponse(BaseModel):
 
 class SourceListResponse(BaseModel):
     data: list[SourceResponse]
+    total: int | None = None
+    limit: int | None = None
+    offset: int | None = None
 
 
 class CreateSourceVersionRequest(BaseModel):

@@ -1,0 +1,41 @@
+# Policy Registry
+#
+# Maps (source_system, document_class, jurisdiction) -> policy_set_id
+# Rules are evaluated top-to-bottom; first match wins.
+# All fields in `match` must match (AND logic).
+# Omitting a field acts as a wildcard.
+
+policies:
+  # --- Switzerland ---
+  - match:
+      source_system: fedlex
+      document_class: law
+      jurisdiction: federal
+    policy_set: swiss_federal_law_v1
+
+  - match:
+      source_system: fedlex
+      document_class: regulation
+      jurisdiction: federal
+    policy_set: swiss_federal_law_v1
+
+  # --- Germany ---
+  - match:
+      source_system: gesetze_im_internet
+      document_class: law
+    policy_set: german_law_v1
+
+  # --- Austria ---
+  - match:
+      source_system: ris
+      document_class: court_decision
+    policy_set: austrian_decision_v1
+
+  - match:
+      source_system: ris
+      document_class: law
+    policy_set: austrian_law_v1
+
+  # --- Fallback ---
+  - match: {}
+    policy_set: default_v1

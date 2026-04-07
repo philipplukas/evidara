@@ -1,0 +1,7 @@
+{
+  "title_contains": "Notarstelle",
+  "section_count_min": 1,
+  "key_content_contains": ["Notarstelle", "Wien-Favoriten", "Notariatsordnung", "Sporrer"],
+  "source_flavor": "ris_like",
+  "status_flow": ["accepted", "processing", "canonical_ready"]
+}

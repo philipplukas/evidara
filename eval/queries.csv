@@ -1,0 +1,31 @@
+query_id,query_text,task_type,as_of_date,expected_source_class,requires_pinpoint,difficulty,tags
+Q001,Was regelt die Verordnung BGBl. II Nr. 74/2026?,section_extraction,2026-04-01,law,true,easy,section;law
+Q002,Welche Änderungen enthält die ASVG-Novelle BGBl. I Nr. 14/2026?,section_extraction,2026-04-01,law,true,hard,section;amendment;social
+Q003,Was besagt die Treibstoffpreisabfederungsverordnung BGBl. II Nr. 81/2026?,section_extraction,2026-04-01,law,true,medium,section;energy
+Q004,Welche Meldepflichten sieht die MiCAR-CASP-MV vor?,section_extraction,2026-04-01,law,true,hard,section;crypto;finance
+Q005,Wann wird die Notarstelle in Wien-Favoriten wirksam?,section_extraction,2026-04-01,law,true,easy,section;temporal
+Q006,Was hat der VfGH im Fall V258/2025 entschieden?,holding_extraction,2026-04-01,decision,true,medium,holding;vfgh;zoning
+Q007,Auf welcher Rechtsgrundlage wurde der Flächenwidmungsplan aufgehoben?,holding_extraction,2026-04-01,decision,true,hard,holding;legal_basis
+Q008,Welche Normen zitiert der VfGH im Erkenntnis V258/2025?,holding_extraction,2026-04-01,decision,true,medium,holding;citation
+Q009,Was ist der Leitsatz der VwGH-Entscheidung Ra 2024/19/0104?,holding_extraction,2026-04-01,rechtssatz,true,medium,holding;vwgh
+Q010,Welches Gericht hat die Entscheidung V258/2025 gefällt?,holding_extraction,2026-04-01,decision,false,easy,holding;court
+Q011,Welche Fassung des Preisgesetzes 1992 galt am 1. März 2026?,temporal_version,2026-03-01,law,true,hard,temporal;version
+Q012,War die Treibstoffpreisabfederungsverordnung am 15. März 2026 bereits in Kraft?,temporal_version,2026-03-15,law,false,medium,temporal;effective_date
+Q013,Galt die Notarstellen-Verordnung bereits am 1. April 2026?,temporal_version,2026-04-01,law,false,easy,temporal;effective_date
+Q014,Welche Fassung der Forschungsprämienverordnung galt vor BGBl. II Nr. 82/2026?,temporal_version,2026-03-31,law,true,medium,temporal;version
+Q015,Wann wurde das Mineralölsteuergesetz 2022 zuletzt geändert?,temporal_version,2026-04-01,law,false,easy,temporal;amendment
+Q016,Ist der VfGH-Rechtssatz V258/2025 ein bindendes Gesetz?,source_classification,2026-04-01,rechtssatz,false,easy,classification;bindingness
+Q017,Handelt es sich bei BGBl. II Nr. 74/2026 um eine Verordnung oder ein Bundesgesetz?,source_classification,2026-04-01,law,false,easy,classification;document_type
+Q018,Ist der Leitsatz zu Ra 2024/19/0104 verbindliches Recht?,source_classification,2026-04-01,rechtssatz,false,easy,classification;bindingness
+Q019,Welcher Dokumenttyp ist BGBl. I Nr. 14/2026?,source_classification,2026-04-01,law,false,easy,classification;document_type
+Q020,Ist ein Erkenntnis des VfGH ein Gesetz?,source_classification,2026-04-01,decision,false,easy,classification;concept
+Q021,Welche Gesetze zitiert der VfGH in V258/2025?,citation_chain,2026-04-01,decision,true,hard,citation;cross_reference
+Q022,Auf welche Paragraphen des Oö ROG 1994 verweist der VfGH?,citation_chain,2026-04-01,decision,true,hard,citation;section_reference
+Q023,Welche BGBl-Nummern werden in der ASVG-Novelle referenziert?,citation_chain,2026-04-01,law,true,hard,citation;bgbl
+Q024,Auf welche Rechtsgrundlage stützt sich die Notarstellen-Verordnung?,citation_chain,2026-04-01,law,true,medium,citation;legal_basis
+Q025,Welche Verordnungen verweisen auf das Preisgesetz 1992?,citation_chain,2026-04-01,law,true,hard,citation;reverse
+Q026,Welches Gesetz liegt der Treibstoffpreisabfederungsverordnung zugrunde?,cross_reference,2026-04-01,law,true,medium,cross_ref;legal_basis
+Q027,Welche Gemeinde ist Gegenstand der VfGH-Entscheidung V258/2025?,cross_reference,2026-04-01,decision,false,easy,cross_ref;entity
+Q028,Auf welchen Flächenwidmungsplan bezieht sich das VfGH-Erkenntnis?,cross_reference,2026-04-01,decision,true,medium,cross_ref;regulation
+Q029,Welches Landesgericht ist laut Notarstellen-Verordnung zuständig?,cross_reference,2026-04-01,law,false,easy,cross_ref;entity
+Q030,Welche EU-Verordnung wird in der MiCAR-CASP-MV umgesetzt?,cross_reference,2026-04-01,law,true,medium,cross_ref;eu_law

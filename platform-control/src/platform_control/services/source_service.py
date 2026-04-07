@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.domain import SourceVersionStatus
@@ -20,9 +20,20 @@ class SourceService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_sources(self) -> list[Source]:
-        result = await self.session.scalars(select(Source).order_by(Source.created_at.desc()))
-        return list(result)
+    async def list_sources(
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        q: str | None = None,
+    ) -> tuple[list[Source], int]:
+        base = select(Source).order_by(Source.created_at.desc())
+        if q:
+            base = base.where(Source.name.ilike(f"%{q}%"))
+        count_result = await self.session.execute(select(func.count()).select_from(base.subquery()))
+        total = count_result.scalar() or 0
+        result = await self.session.scalars(base.limit(limit).offset(offset))
+        return list(result), total
 
     async def get_source(self, source_id: str) -> Source:
         source = await self.session.get(Source, source_id)

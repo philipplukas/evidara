@@ -43,6 +43,7 @@ _TEXT_TAGS = {
     "einleitung",
     "praeambel",
     "preamble",
+    "unterschrift",
 }
 _LIST_ITEM_TAGS = {"ziffer", "litera", "listitem", "item", "punkt"}
 _METADATA_TAGS = {
@@ -62,6 +63,10 @@ _SKIPPED_CONTAINER_TAGS = {
     "header",
     "kopf",
     "stammdaten",
+    "kzinhalt",
+    "fzinhalt",
+    "layoutdaten",
+    "ausgabe",
 }
 
 
@@ -129,16 +134,21 @@ class _XmlIrBuilder:
         if tag in _STRUCTURAL_LEVELS:
             heading_block_id = self._emit_structural_heading(element, tag, parent_heading_id)
             next_parent_id = heading_block_id or parent_heading_id
+            first_title_consumed = False
             for child in list(element):
                 child_tag = _local_name(child.tag)
-                if child_tag in _TITLE_TAGS or child_tag in {
-                    "nummer",
-                    "nr",
-                    "label",
-                    "bezeichnung",
-                }:
+                if child_tag in {"nummer", "nr", "label", "bezeichnung"}:
                     continue
+                if child_tag in _TITLE_TAGS:
+                    if not first_title_consumed:
+                        first_title_consumed = True
+                        continue
+                    # Subsequent titles become standalone headings (section boundaries)
                 self.visit(child, next_parent_id)
+            return
+
+        if tag == "ueberschrift":
+            self._emit_standalone_heading(element, parent_heading_id)
             return
 
         if tag in _TEXT_TAGS or tag in _LIST_ITEM_TAGS:
@@ -179,7 +189,34 @@ class _XmlIrBuilder:
         self._order += 1
         return block_id
 
+    def _emit_standalone_heading(self, element, parent_heading_id) -> None:
+        """Emit a standalone <ueberschrift> that is not a child of a structural element."""
+        text = _normalize_whitespace(" ".join(element.itertext()))
+        if not text:
+            return
+        typ = element.attrib.get("typ", "")
+        if typ in {"kz", "fz"}:
+            return
+        block_id = self._next_block_id()
+        self._blocks.append(
+            Block(
+                id=block_id,
+                type="heading",
+                text=text,
+                level=2,
+                order=self._order,
+                parent_id=parent_heading_id,
+                artifact_id=self._artifact_id,
+                attrs={"tag": "ueberschrift", "typ": typ},
+            )
+        )
+        self._order += 1
+
     def _emit_text_block(self, element, tag: str, parent_heading_id) -> None:
+        typ = element.attrib.get("typ", "")
+        if typ in {"kz", "fz"}:
+            return
+
         text = _normalize_whitespace(" ".join(element.itertext()))
         if not text:
             return
@@ -217,6 +254,16 @@ def _choose_title(root, blocks) -> str | None:
             text = _normalize_whitespace(" ".join(element.itertext()))
             if text:
                 return text
+
+    for typ_value in ("titel", "kurztitel"):
+        for element in root.iter():
+            if _local_name(element.tag) != "ueberschrift":
+                continue
+            if element.attrib.get("typ") == typ_value:
+                text = _normalize_whitespace(" ".join(element.itertext()))
+                if text:
+                    return text
+
     for block in blocks:
         if block.type == "heading":
             return block.text
@@ -244,8 +291,10 @@ def _extract_metadata(root) -> dict[str, str]:
 def _looks_like_ris(root, extracted_metadata: dict[str, str]) -> bool:
     if "dokumentnummer" in extracted_metadata or "gesetzesnummer" in extracted_metadata:
         return True
+    if _local_name(root.tag) == "risdok":
+        return True
     observed_tags = {_local_name(element.tag) for element in root.iter()}
-    return bool(observed_tags & {"paragraf", "absatz", "artikel", "anlage", "kundmachungsorgan"})
+    return bool(observed_tags & {"paragraf", "absatz", "artikel", "anlage", "kundmachungsorgan", "nutzdaten"})
 
 
 def _extract_heading_text(element) -> str | None:
