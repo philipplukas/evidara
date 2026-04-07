@@ -1,0 +1,109 @@
+# Policy Sets
+#
+# Each policy_set_id maps to a named set of policy IDs -- one per pipeline stage.
+# Versioning convention: {name}_v{N}
+
+policy_sets:
+
+  swiss_federal_law_v1:
+    description: "Swiss Systematische Rechtssammlung -- federal consolidated law texts"
+    ingestion_policy: html_or_xml_preferred
+    canonicalization_policy: structured_law_text_v1
+    identity_policy: swiss_law_identity_v1
+    parsing_policy: docling_structured_v1
+    nlp_policy: multilingual_legal_ner_v2
+    serving_policy: opensearch_documents_current_v1
+
+  german_law_v1:
+    description: "Gesetze-im-Internet -- German federal law in XML (LegalDocML)"
+    ingestion_policy: xml_first
+    canonicalization_policy: structured_law_text_v1
+    identity_policy: german_law_identity_v1
+    parsing_policy: docling_structured_v1
+    nlp_policy: german_legal_ner_v1
+    serving_policy: opensearch_documents_current_v1
+
+  austrian_decision_v1:
+    description: "RIS -- Austrian court decisions (VfGH, VwGH, OGH)"
+    ingestion_policy: html_pdf_fallback
+    canonicalization_policy: decision_text_v1
+    identity_policy: decision_identity_v1
+    parsing_policy: docling_decision_v1
+    nlp_policy: legal_ner_decision_v1
+    serving_policy: opensearch_chunks_v1
+
+  austrian_law_v1:
+    description: "RIS -- Austrian consolidated law texts"
+    ingestion_policy: html_pdf_fallback
+    canonicalization_policy: structured_law_text_v1
+    identity_policy: austrian_law_identity_v1
+    parsing_policy: docling_structured_v1
+    nlp_policy: german_legal_ner_v1
+    serving_policy: opensearch_documents_current_v1
+
+  default_v1:
+    description: "Generic fallback for unrecognised sources"
+    ingestion_policy: html_or_xml_preferred
+    canonicalization_policy: generic_text_v1
+    identity_policy: content_hash_identity_v1
+    parsing_policy: docling_structured_v1
+    nlp_policy: multilingual_legal_ner_v2
+    serving_policy: opensearch_documents_current_v1
+
+
+# --- Concrete Policy Definitions ---
+
+ingestion_policies:
+  html_or_xml_preferred:
+    preferred_content_types: ["text/html", "application/xml", "text/xml"]
+    fallback_content_types: ["application/pdf"]
+  xml_first:
+    preferred_content_types: ["application/xml", "text/xml", "application/xhtml+xml"]
+    fallback_content_types: ["text/html", "application/pdf"]
+  html_pdf_fallback:
+    preferred_content_types: ["text/html"]
+    fallback_content_types: ["application/pdf"]
+
+parsing_policies:
+  docling_structured_v1:
+    do_ocr: false
+    do_table_structure: true
+    do_figure_extraction: false
+    output_format: json
+    max_pages: 500
+  docling_decision_v1:
+    do_ocr: true
+    do_table_structure: false
+    do_figure_extraction: false
+    output_format: json
+    max_pages: 100
+
+nlp_policies:
+  multilingual_legal_ner_v2:
+    model: "xx_ent_wiki_sm"
+    custom_model_uri: null
+    entity_labels: [PERSON, ORG, GPE, LOC, DATE, MONEY, LAW, PRODUCT, EVENT]
+    do_dependency_parsing: true
+    do_sentence_segmentation: true
+  german_legal_ner_v1:
+    model: "de_core_news_lg"
+    custom_model_uri: null
+    entity_labels: [PER, ORG, LOC, MISC, DATE, LAW, NORM]
+    do_dependency_parsing: true
+    do_sentence_segmentation: true
+  legal_ner_decision_v1:
+    model: "de_core_news_lg"
+    custom_model_uri: null
+    entity_labels: [PER, ORG, LOC, DATE, LAW, COURT, NORM]
+    do_dependency_parsing: false
+    do_sentence_segmentation: true
+
+serving_policies:
+  opensearch_documents_current_v1:
+    index: legal-documents
+    id_field: document_version_id
+    is_chunk_level: false
+  opensearch_chunks_v1:
+    index: legal-document-chunks
+    id_field: chunk_id
+    is_chunk_level: true

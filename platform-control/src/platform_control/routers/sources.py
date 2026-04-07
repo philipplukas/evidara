@@ -19,9 +19,17 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.get("", response_model=SourceListResponse)
-async def list_sources(session: SessionDep) -> SourceListResponse:
+async def list_sources(
+    session: SessionDep,
+    limit: int = 100,
+    offset: int = 0,
+    q: str | None = None,
+) -> SourceListResponse:
     service = SourceService(session)
-    return SourceListResponse(data=await service.list_sources())
+    clamped_limit = max(1, min(limit, 500))
+    clamped_offset = max(0, offset)
+    data, total = await service.list_sources(limit=clamped_limit, offset=clamped_offset, q=q)
+    return SourceListResponse(data=data, total=total, limit=clamped_limit, offset=clamped_offset)
 
 
 @router.post("", response_model=SourceResponse, status_code=status.HTTP_201_CREATED)

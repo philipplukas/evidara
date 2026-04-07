@@ -1,0 +1,31 @@
+query_id,gold_short_answer,required_doc_ids,required_citations,forbidden_doc_ids,source_priority_rule,must_flag_non_binding
+Q001,Errichtung einer weiteren Notarstelle mit Amtssitz Wien-Favoriten im Sprengel des LG für ZRS Wien ab 1.9.2026,DOC_LAW_001,DOC_LAW_001:§9_NotO,,primary_law_only,false
+Q002,Änderung des ASVG und B-KUVG und SVSG betreffend Sozialversicherung,DOC_LAW_002,DOC_LAW_002,,primary_law_only,false
+Q003,Temporärer Mechanismus zur Abfederung übermäßiger Preissteigerungen bei Treibstoffen,DOC_LAW_005,DOC_LAW_005,,primary_law_only,false
+Q004,Meldestichtage und Meldeintervalle gemäß Verordnung EU 2023/1114 für Anbieter von Kryptowerte-Dienstleistungen,DOC_LAW_011,DOC_LAW_011,,primary_law_only,false
+Q005,Die Notarstelle wird mit Wirksamkeit vom 1. September 2026 errichtet,DOC_LAW_001,DOC_LAW_001,,primary_law_only,false
+Q006,Aufhebung des Flächenwidmungsplans Nr 5 der Gemeinde Schleißheim mangels Begründung und Grundlagenforschung,DOC_DEC_001|DOC_DEC_002,DOC_DEC_001,,decision_primary,true
+Q007,Art 139 Abs 1 Z 1 B-VG iVm §§ 21 36 39 Oö ROG 1994,DOC_DEC_001,DOC_DEC_001:B-VG_Art139|DOC_DEC_001:Oö_ROG,,decision_primary,true
+Q008,B-VG Art139 Abs1 Z1 und Oö ROG 1994 §§21 36 39 und VfGG §7 Abs2,DOC_DEC_001,DOC_DEC_001,,decision_primary,true
+Q009,Rechtssatz zu Ra 2024/19/0104,DOC_DEC_003,DOC_DEC_003,,decision_primary,true
+Q010,Verfassungsgerichtshof (VfGH),DOC_DEC_001,DOC_DEC_001,,decision_primary,false
+Q011,Fassung vor BGBl I Nr 13/2026 (in Kraft getreten 31.3.2026),DOC_LAW_003,DOC_LAW_003,,temporal_version_required,false
+Q012,Nein - BGBl II Nr 81/2026 wurde erst am 31.3.2026 ausgegeben,DOC_LAW_005,DOC_LAW_005,,temporal_version_required,false
+Q013,Nein - die Verordnung wurde am 30.3.2026 ausgegeben aber die Notarstelle wird erst am 1.9.2026 wirksam,DOC_LAW_001,DOC_LAW_001,,temporal_version_required,false
+Q014,Die Fassung vor der Änderung durch BGBl II Nr 82/2026 vom 1.4.2026,DOC_LAW_009,DOC_LAW_009,,temporal_version_required,false
+Q015,Durch BGBl I Nr 12/2026 vom 31.3.2026,DOC_LAW_004,DOC_LAW_004,,primary_law_only,false
+Q016,Nein - ein Rechtssatz ist eine Zusammenfassung der Entscheidung und kein bindendes Gesetz,DOC_DEC_001,,DOC_LAW_001|DOC_LAW_002,source_type_classification,true
+Q017,Es handelt sich um eine Verordnung (Teil II des BGBl),DOC_LAW_001,DOC_LAW_001,,source_type_classification,false
+Q018,Nein - ein Leitsatz/Rechtssatz fasst die Entscheidung zusammen und ist nicht selbst verbindliches Recht,DOC_DEC_003,,,source_type_classification,true
+Q019,Bundesgesetz (Teil I des BGBl),DOC_LAW_002,DOC_LAW_002,,source_type_classification,false
+Q020,Nein - ein Erkenntnis ist eine Gerichtsentscheidung und kein Gesetz im formellen Sinn,DOC_DEC_001|DOC_DEC_002,,,source_type_classification,false
+Q021,B-VG Art139 und Oö ROG 1994 §§21 36 39 und Oö ROG 1972 §16 und VfGG §7,DOC_DEC_001,DOC_DEC_001,,decision_primary,false
+Q022,§21 §36 und §39 des Oö ROG 1994,DOC_DEC_001,DOC_DEC_001:Oö_ROG_1994,,decision_primary,false
+Q023,ASVG und B-KUVG und SVSG,DOC_LAW_002,DOC_LAW_002,,primary_law_only,false
+Q024,§ 9 Notariatsordnung RGBl Nr 75/1871 idF BGBl I Nr 50/2025,DOC_LAW_001,DOC_LAW_001:§9_NotO,,primary_law_only,false
+Q025,"Treibstoffpreisabfederungsverordnung (BGBl II Nr 81/2026), Margenbegrenzung (BGBl II Nr 80/2026)",DOC_LAW_005|DOC_LAW_006,DOC_LAW_005|DOC_LAW_006|DOC_LAW_003,,primary_law_only,false
+Q026,Preisgesetz 1992 und/oder Energie-Control-Gesetz,DOC_LAW_005,DOC_LAW_005,,primary_law_only,false
+Q027,Gemeinde Schleißheim,DOC_DEC_001,DOC_DEC_001,,decision_primary,false
+Q028,Flächenwidmungsplan Nr 5 des Gemeinderats der Gemeinde Schleißheim vom 24.09.2009,DOC_DEC_001,DOC_DEC_001,,decision_primary,false
+Q029,Landesgericht für Zivilrechtssachen Wien,DOC_LAW_001,DOC_LAW_001,,primary_law_only,false
+Q030,Verordnung (EU) 2023/1114 über Märkte für Kryptowerte (MiCAR),DOC_LAW_011,DOC_LAW_011,,primary_law_only,false

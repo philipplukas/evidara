@@ -15,5 +15,11 @@ Current fixture coverage:
 - `messy_html`: noisy HTML with navigation and footer content around the main body
 - `nested_headings`: top-level and nested heading ordering
 - `no_heading_fallback`: body-only content with no headings
-- `ris_xml`: RIS-style XML with legal section labels and extracted metadata
+- `ris_xml`: RIS-style XML with legal section labels and extracted metadata (synthetic)
 - `invalid_no_primary`: failure path when the bundle lacks a selectable primary artifact
+- `ris_xml_law_short`: real BGBl. II Nr. 74/2026 — short Verordnung (Notarstelle Wien-Favoriten)
+- `ris_xml_law_consolidated`: real consolidated Bundesnorm (NOR11013238)
+- `ris_xml_decision_vfgh`: real VfGH Rechtssatz V258/2025 — zoning plan annulment
+- `ris_xml_decision_vwgh`: real VwGH Rechtssatz (JWR_2024190104_20260312L01)
+- `ris_html_decision_vfgh`: same VfGH decision in HTML format
+- `ris_html_decision_vwgh`: same VwGH decision in HTML format

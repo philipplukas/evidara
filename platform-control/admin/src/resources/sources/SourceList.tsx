@@ -28,6 +28,7 @@ export function SourceList() {
           <FunctionField<AuthorityRecord> render={(record) => formatReferenceLabel(record)} />
         </ReferenceField>
         <TextField source="document_family" label="Family" emptyText="-" />
+        <TextField source="source_type" label="Type" />
         <DateField source="updated_at" label="Updated" showTime />
       </Datagrid>
     </List>

@@ -61,9 +61,18 @@ async def list_runs(
     session: SessionDep,
     mode: RunMode | None = None,
     status: RunStatus | None = None,
+    source_id: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
 ) -> RunListResponse:
     service = RunService(session)
-    return RunListResponse(data=await service.list_runs(mode=mode, status=status))
+    clamped_limit = max(1, min(limit, 500))
+    clamped_offset = max(0, offset)
+    data, total = await service.list_runs(
+        mode=mode, status=status, source_id=source_id,
+        limit=clamped_limit, offset=clamped_offset,
+    )
+    return RunListResponse(data=data, total=total, limit=clamped_limit, offset=clamped_offset)
 
 
 @router.post("", response_model=RunResponse, status_code=status.HTTP_201_CREATED)

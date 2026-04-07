@@ -1,0 +1,37 @@
+{
+  "event_type": "artifact_bundle.available",
+  "event_version": 1,
+  "event_id": "evt_ris_vwgh_html_001",
+  "occurred_at": "2026-03-12T10:00:00Z",
+  "producer": "platform-control",
+  "correlation_id": "run_ris_vwgh_html_001",
+  "payload": {
+    "bundle_manifest_id": "abm_ris_vwgh_html_001",
+    "source_snapshot_id": "snap_ris_vwgh_html_001",
+    "provenance": {
+      "tenant_id": "tenant_public",
+      "corpus_id": "corpus_public_at_federal_decisions",
+      "scope_type": "global_public",
+      "source_id": "src_ris_at_vwgh",
+      "source_version_id": "sv_ris_at_vwgh_v1",
+      "run_id": "run_ris_vwgh_html_001",
+      "source_snapshot_id": "snap_ris_vwgh_html_001",
+      "bundle_manifest_id": "abm_ris_vwgh_html_001"
+    },
+    "source_origin_kind": "official_primary",
+    "trust_tier": "authoritative",
+    "bundle_manifest_ref": {
+      "manifest_id": "abm_ris_vwgh_html_001",
+      "manifest_type": "artifact_bundle_manifest",
+      "manifest_version": 1,
+      "storage_ref": {
+        "uri": "file://__MANIFEST_PATH__",
+        "content_type": "application/json",
+        "byte_size": "__MANIFEST_SIZE__",
+        "checksum": "__MANIFEST_CHECKSUM__",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-03-12T10:00:00Z"
+      }
+    }
+  }
+}

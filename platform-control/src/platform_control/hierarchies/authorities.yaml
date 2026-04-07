@@ -15,3 +15,23 @@ items:
     path: at/federal/ris
     slug: ris
     name: Rechtsinformationssystem des Bundes
+  - authority_id: auth_vfgh
+    jurisdiction_path: at/federal
+    path: at/federal/vfgh
+    slug: vfgh
+    name: Verfassungsgerichtshof
+  - authority_id: auth_vwgh
+    jurisdiction_path: at/federal
+    path: at/federal/vwgh
+    slug: vwgh
+    name: Verwaltungsgerichtshof
+  - authority_id: auth_ogh
+    jurisdiction_path: at/federal
+    path: at/federal/ogh
+    slug: ogh
+    name: Oberster Gerichtshof
+  - authority_id: auth_bvwg
+    jurisdiction_path: at/federal
+    path: at/federal/bvwg
+    slug: bvwg
+    name: Bundesverwaltungsgericht

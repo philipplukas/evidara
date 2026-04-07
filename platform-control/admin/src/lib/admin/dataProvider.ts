@@ -46,7 +46,8 @@ type Authority = ReferenceDataBase & {
   slug: string;
 };
 
-export type FirecrawlAcquisitionSpec = {
+export type AcquisitionSpec = {
+  provider: "firecrawl" | "deterministic_http" | "ris_ogd";
   seed_url: string | null;
   seed_urls: string[];
   mode: "crawl" | "batch_scrape";
@@ -56,7 +57,14 @@ export type FirecrawlAcquisitionSpec = {
   max_discovery_depth: number;
   scrape_formats: string[];
   zero_data_retention: boolean;
+  base_url: string | null;
+  applikation: string | null;
+  preferred_formats: string[];
+  page_size: number;
+  max_pages: number;
 };
+
+export type FirecrawlAcquisitionSpec = AcquisitionSpec;
 
 type Source = {
   source_id: string;

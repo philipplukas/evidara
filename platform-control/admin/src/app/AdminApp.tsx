@@ -3,6 +3,7 @@
 import { createTheme } from "@mui/material/styles";
 import { Admin, Resource } from "react-admin";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
+import { Dashboard } from "../resources/dashboard/Dashboard";
 import { AuthorityCreate } from "../resources/reference-data/AuthorityCreate";
 import { AuthorityEdit } from "../resources/reference-data/AuthorityEdit";
 import { AuthorityList } from "../resources/reference-data/AuthorityList";
@@ -73,6 +74,7 @@ export default function AdminApp() {
       dataProvider={controlPlaneDataProvider}
       theme={adminTheme}
       title="Evidara Control Plane"
+      dashboard={Dashboard}
       disableTelemetry
     >
       <Resource

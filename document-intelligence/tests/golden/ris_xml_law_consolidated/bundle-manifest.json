@@ -1,0 +1,61 @@
+{
+  "bundle_manifest_id": "abm_ris_law_cons_001",
+  "manifest_version": 1,
+  "provenance": {
+    "tenant_id": "tenant_public",
+    "corpus_id": "corpus_public_at_federal_law",
+    "scope_type": "global_public",
+    "source_id": "src_ris_at_law",
+    "source_version_id": "sv_ris_at_law_v1",
+    "run_id": "run_ris_law_cons_001",
+    "source_snapshot_id": "snap_ris_law_cons_001",
+    "bundle_manifest_id": "abm_ris_law_cons_001"
+  },
+  "source_snapshot_id": "snap_ris_law_cons_001",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "snapshot_captured_at": "2026-04-01T10:00:00Z",
+  "source_defaults": {
+    "jurisdiction_id": "jur_at_federal",
+    "authority_id": "auth_ris",
+    "language_codes": [
+      "de"
+    ],
+    "document_type_hint": "statute"
+  },
+  "parser_hints": {
+    "expected_modalities": [
+      "xml"
+    ],
+    "expected_content_types": [
+      "application/xml"
+    ],
+    "preferred_primary_artifact_roles": [
+      "primary_document"
+    ],
+    "ocr_expected": false,
+    "attachment_policy": "ignore"
+  },
+  "di_overrides": {},
+  "reference_context": {
+    "reference_snapshot_policy": "latest_approved",
+    "reference_snapshot_set_ref": null
+  },
+  "artifacts": [
+    {
+      "artifact_id": "art_6zzj6sbtnd96jtykfqfqqj1qy5",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "file://__ARTIFACT_PATH__",
+        "content_type": "application/xml",
+        "byte_size": "__ARTIFACT_SIZE__",
+        "checksum": "__ARTIFACT_CHECKSUM__",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-01T10:00:00Z"
+      }
+    }
+  ],
+  "bundle_metadata": {
+    "ris_id": "NOR11013238"
+  }
+}

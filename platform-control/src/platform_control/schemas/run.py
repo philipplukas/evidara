@@ -136,6 +136,9 @@ class RunListItemResponse(BaseModel):
 
 class RunListResponse(BaseModel):
     data: list[RunListItemResponse]
+    total: int | None = None
+    limit: int | None = None
+    offset: int | None = None
 
 
 class CapturedResourceResponse(BaseModel):

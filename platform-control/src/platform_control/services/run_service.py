@@ -93,8 +93,11 @@ class RunService:
         *,
         mode: RunMode | None = None,
         status: RunStatus | None = None,
-    ) -> list[RunListItemResponse]:
-        query = (
+        source_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[list[RunListItemResponse], int]:
+        base_query = (
             select(
                 Run.run_id,
                 Run.source_id,
@@ -116,12 +119,20 @@ class RunService:
             .order_by(Run.created_at.desc())
         )
         if mode is not None:
-            query = query.where(Run.mode == mode)
+            base_query = base_query.where(Run.mode == mode)
         if status is not None:
-            query = query.where(Run.status == status)
+            base_query = base_query.where(Run.status == status)
+        if source_id is not None:
+            base_query = base_query.where(Run.source_id == source_id)
 
-        rows = await self.session.execute(query)
-        return [RunListItemResponse.model_validate(dict(row._mapping)) for row in rows]
+        count_result = await self.session.execute(
+            select(func.count()).select_from(base_query.subquery())
+        )
+        total = count_result.scalar() or 0
+
+        rows = await self.session.execute(base_query.limit(limit).offset(offset))
+        data = [RunListItemResponse.model_validate(dict(row._mapping)) for row in rows]
+        return data, total
 
     async def create_run(self, request: CreateRunRequest) -> Run:
         source = await self.session.get(Source, request.source_id)
@@ -296,7 +307,7 @@ class RunService:
         return run
 
     async def retry_run(self, run_id: str) -> Run:
-        """Reset a failed or cancelled run to PENDING so the worker can re-dispatch it."""
+        """Reset a failed or cancelled run and re-dispatch if backend is inline."""
         run = await self.get_run(run_id)
         if run.status not in {RunStatus.FAILED, RunStatus.CANCELLED}:
             raise InvalidStateTransitionError(
@@ -308,6 +319,17 @@ class RunService:
         run.started_at = None
         run.completed_at = None
         run.failure_reason = None
+
+        if self.run_dispatch_backend != "worker":
+            source = await self.session.get(Source, run.source_id)
+            source_version = await self.session.get(SourceVersion, run.source_version_id)
+            if source and source_version:
+                pending_publications = await self._dispatch_run(source, source_version, run)
+                await self.session.commit()
+                await self.session.refresh(run)
+                await self._publish_pending_dispatch_events([pending_publications])
+                return run
+
         await self.session.commit()
         await self.session.refresh(run)
         return run
@@ -535,17 +557,19 @@ class RunService:
             acquisition_spec = source_version.acquisition_spec or {}
             seed_url = acquisition_spec.get("seed_url")
             seed_urls = acquisition_spec.get("seed_urls")
+            base_url = acquisition_spec.get("base_url")
             normalized_seed_url = seed_url.strip() if isinstance(seed_url, str) else ""
             normalized_seed_urls = (
                 [url.strip() for url in seed_urls if isinstance(url, str) and url.strip()]
                 if isinstance(seed_urls, list)
                 else []
             )
-            has_seed = bool(normalized_seed_url or normalized_seed_urls)
+            normalized_base_url = base_url.strip() if isinstance(base_url, str) else ""
+            has_seed = bool(normalized_seed_url or normalized_seed_urls or normalized_base_url)
             seed_detail = (
-                "Acquisition spec has at least one seed URL."
+                "Acquisition spec has at least one seed or base URL."
                 if has_seed
-                else "Acquisition spec must define seed_url or seed_urls."
+                else "Acquisition spec must define seed_url, seed_urls, or base_url."
             )
         checks.append(
             RunReadinessCheck(
@@ -770,13 +794,18 @@ class RunService:
                     resources=provider_result.inline_resources,
                 )
             )
-            bundle_event = await self._build_bundle_manifest_event(
+            bundle_events = await self._build_per_document_bundle_events(
                 run=run,
                 source=source,
                 source_version=source_version,
             )
-            if bundle_event is not None:
+            for bundle_event in bundle_events:
                 pending_publications.bundle_events.append(bundle_event)
+            if bundle_events:
+                await self.artifact_store.store_page_payload(
+                    run.run_id, "bundle_events",
+                    {"count": len(bundle_events), "events": bundle_events},
+                )
             provider_job.status = ProviderJobStatus.COMPLETED
             provider_job.last_event_type = "inline.completed"
             run.status = RunStatus.COMPLETED
@@ -951,6 +980,92 @@ class RunService:
             occurred_at=run.completed_at or datetime.now(UTC),
         )
         return event
+
+    async def _build_per_document_bundle_events(
+        self,
+        *,
+        run: Run,
+        source: Source,
+        source_version: SourceVersion,
+    ) -> list[dict[str, Any]]:
+        """Build one bundle event per non-metadata artifact (one document each)."""
+        artifacts = list(
+            await self.session.scalars(
+                select(RawArtifact)
+                .where(RawArtifact.run_id == run.run_id)
+                .order_by(RawArtifact.created_at.asc())
+            )
+        )
+        if not artifacts:
+            return []
+
+        doc_artifacts = [
+            a for a in artifacts
+            if not a.content_type.startswith("application/json")
+        ]
+        if not doc_artifacts:
+            return []
+
+        acquisition_spec = source_version.acquisition_spec or {}
+        tenant_id = str(acquisition_spec.get("tenant_id") or "tenant_public")
+        corpus_id = str(acquisition_spec.get("corpus_id") or f"corpus_{source.jurisdiction_id}")
+        scope_type = str(acquisition_spec.get("scope_type") or "global_public")
+        source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
+        trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
+
+        events: list[dict[str, Any]] = []
+        for artifact in doc_artifacts:
+            source_snapshot_id = generate_prefixed_id("snap")
+            bundle_manifest_id = generate_prefixed_id("abm")
+            upstream_locator = self._upstream_locator(artifact.artifact_metadata)
+
+            manifest_artifact = {
+                "artifact_id": artifact.artifact_id,
+                "artifact_role": "primary_document",
+                "storage_ref": self._build_storage_ref_for_artifact(artifact),
+            }
+            manifest = build_artifact_bundle_manifest(
+                bundle_manifest_id=bundle_manifest_id,
+                source_snapshot_id=source_snapshot_id,
+                source_id=source.source_id,
+                source_version_id=source_version.source_version_id,
+                run_id=run.run_id,
+                jurisdiction_id=source.jurisdiction_id,
+                authority_id=source.authority_id,
+                upstream_locator=upstream_locator,
+                artifacts=[manifest_artifact],
+                tenant_id=tenant_id,
+                corpus_id=corpus_id,
+                scope_type=scope_type,
+                source_origin_kind=source_origin_kind,
+                trust_tier=trust_tier,
+                language_codes=acquisition_spec.get("language_codes") or [],
+                document_type_hint=acquisition_spec.get("document_type_hint"),
+                snapshot_captured_at=run.completed_at or datetime.now(UTC),
+            )
+            manifest_storage_ref = await self.artifact_store.store_bundle_manifest(
+                run_id=run.run_id,
+                bundle_manifest_id=bundle_manifest_id,
+                payload=manifest,
+            )
+            manifest_ref = {
+                "manifest_id": bundle_manifest_id,
+                "manifest_type": "artifact_bundle_manifest",
+                "manifest_version": 1,
+                "storage_ref": manifest_storage_ref,
+            }
+            event = build_artifact_bundle_available_event(
+                bundle_manifest_id=bundle_manifest_id,
+                source_snapshot_id=source_snapshot_id,
+                source_origin_kind=source_origin_kind,
+                trust_tier=trust_tier,
+                provenance=manifest["provenance"],
+                bundle_manifest_ref=manifest_ref,
+                correlation_id=run.run_id,
+                occurred_at=run.completed_at or datetime.now(UTC),
+            )
+            events.append(event)
+        return events
 
     async def _publish_pending_dispatch_events(
         self, pending_publications: list[PendingDispatchPublications]

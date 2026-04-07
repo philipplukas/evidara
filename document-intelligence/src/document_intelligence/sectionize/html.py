@@ -70,7 +70,7 @@ def build_sections_from_ir(document_ir: NormalizedDocumentIR) -> list[SectionCan
             metadata=first_section.metadata,
         )
 
-    return sections
+    return [s for s in sections if s.content.strip()]
 
 
 def _finalize_section(raw_section: dict[str, Any]) -> SectionCandidate:
