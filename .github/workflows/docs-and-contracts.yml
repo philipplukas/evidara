@@ -67,7 +67,7 @@ jobs:
 
       - name: Run markdown lint
         run: |
-          npx markdownlint \
+          npx markdownlint-cli \
             README.md \
             CONTRIBUTING.md \
             SECURITY.md \
