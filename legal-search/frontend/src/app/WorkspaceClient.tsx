@@ -55,6 +55,8 @@ export default function WorkspaceClient({
   const leftRef = useRef<PanelImperativeHandle>(null);
   const rightRef = useRef<PanelImperativeHandle>(null);
   const hasAppliedInitialConstraintsRef = useRef(false);
+  const lastSearchSignatureRef = useRef<string>("");
+  const searchRequestIdRef = useRef(0);
 
   const isDetailOpen = Boolean(selectedId);
   const {
@@ -80,13 +82,33 @@ export default function WorkspaceClient({
     [setSelectedId, dispatch, state.resultSet.items],
   );
 
+  const createSearchSignature = useCallback(
+    (query: string) =>
+      JSON.stringify({
+        query,
+        jurisdictions: constraints.context.jurisdictions,
+        languages: constraints.context.languages,
+        sourceType: constraints.context.sourceType,
+        officialOnly: constraints.context.officialOnly,
+        refinements: constraints.refinements,
+      }),
+    [constraints],
+  );
+
   const executeSearch = useCallback(
     async (query: string) => {
+      const requestId = ++searchRequestIdRef.current;
+      const signature = createSearchSignature(query);
       const { results, filters: nextFilters } = await runSearch(query, constraints);
+      if (requestId !== searchRequestIdRef.current) {
+        // Ignore stale responses when newer searches have already started.
+        return;
+      }
+      lastSearchSignatureRef.current = signature;
       setActiveFilters(nextFilters);
       dispatch({ type: "SEARCH", query, results });
     },
-    [constraints, dispatch],
+    [constraints, dispatch, createSearchSignature],
   );
 
   const handlePivot = useCallback(
@@ -136,8 +158,12 @@ export default function WorkspaceClient({
         constraints.refinements.length > 0;
       if (!hasNonDefaultConstraints) return;
     }
+    const signature = createSearchSignature(urlQuery);
+    if (signature === lastSearchSignatureRef.current) {
+      return;
+    }
     void executeSearch(urlQuery);
-  }, [constraints, executeSearch, urlQuery]);
+  }, [constraints, createSearchSignature, executeSearch, urlQuery]);
 
   // Desktop panel sync
   useEffect(() => {
