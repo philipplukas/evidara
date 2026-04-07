@@ -1,6 +1,20 @@
 name: Interaction Flow Staging Evidence
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/interaction-flow-staging-evidence.yml"
+      - "legal-search/frontend/e2e/**"
+      - "legal-search/frontend/playwright.config.ts"
+      - "legal-search/frontend/src/app/page.tsx"
+      - "legal-search/frontend/src/app/HomeClient.tsx"
+      - "legal-search/frontend/src/app/WorkspaceClient.tsx"
+      - "legal-search/frontend/src/lib/control-plane-entry.ts"
+      - "legal-search/frontend/src/lib/control-plane-entry-server.ts"
+      - "legal-search/frontend/src/components/layout/AppHeader.tsx"
+      - "legal-search/frontend/src/components/layout/MobileWorkspace.tsx"
+      - "platform-control/admin/src/app/AdminShell.tsx"
   schedule:
     - cron: "45 4 * * *"
   workflow_dispatch:
@@ -65,7 +79,7 @@ jobs:
           echo "PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL=${PC_ADMIN_URL}" >> "${GITHUB_ENV}"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -106,11 +120,11 @@ jobs:
               exit 0
             fi
             if [[ "${attempt}" -lt 2 ]]; then
-              echo "Contract subset failed on attempt ${attempt}; retrying once after 20s..."
+              echo "Contract suite failed on attempt ${attempt}; retrying once after 20s..."
               sleep 20
             fi
           done
-          echo "::error::Staging contract subset failed after 2 attempts"
+          echo "::error::Staging contract suite failed after 2 attempts"
           exit 1
 
       - name: Capture staging canonical screenshot evidence pack
@@ -206,7 +220,7 @@ jobs:
 
       - name: Upload staging interaction-flow evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: interaction-flow-staging-evidence-${{ github.run_id }}
           path: |
