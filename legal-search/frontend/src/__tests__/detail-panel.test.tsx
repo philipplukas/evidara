@@ -132,6 +132,30 @@ describe("DetailPanel", () => {
     expect(screen.getByText("Obligationenrecht (OR)")).toBeInTheDocument();
   });
 
+  it("sanitizes unsafe HTML in detail content", () => {
+    const unsafeDetail = {
+      ...articleDetail,
+      contentHtml:
+        '<p>Safe paragraph</p><img src="x" onerror="window.__evidara_test_xss=1"><script>window.__evidara_test_xss=1</script>',
+    };
+
+    const { container } = renderWithProviders(
+      <DetailPanel
+        detail={unsafeDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+    );
+
+    const img = container.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("onerror")).toBeNull();
+    expect(container.querySelector("script")).toBeNull();
+    expect(screen.getByText("Safe paragraph")).toBeInTheDocument();
+  });
+
   it("has no accessibility violations (empty state)", async () => {
     const { container } = renderWithProviders(<DetailPanel detail={null} />);
     const results = await axe(container);

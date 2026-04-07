@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
 import DOMPurify from "dompurify";
+import { useMemo } from "react";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 
@@ -10,10 +10,12 @@ interface DetailsTabProps {
 }
 
 export function DetailsTab({ detail }: DetailsTabProps) {
-  const sanitizedContentHtml = useMemo(
-    () => (detail.contentHtml ? DOMPurify.sanitize(detail.contentHtml) : ""),
-    [detail.contentHtml],
-  );
+  const sanitizedContentHtml = useMemo(() => {
+    if (!detail.contentHtml) {
+      return "";
+    }
+    return DOMPurify.sanitize(detail.contentHtml);
+  }, [detail.contentHtml]);
   const hasMetadata = detail.metadata.length > 0;
   const hasContent = Boolean(sanitizedContentHtml.trim());
   const showEmptyState = !hasMetadata && !hasContent;

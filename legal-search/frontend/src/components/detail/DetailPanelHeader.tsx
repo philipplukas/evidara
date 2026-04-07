@@ -13,8 +13,7 @@ interface DetailPanelHeaderProps {
 
 export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeaderProps) {
   const safeTitle = detail.title.trim().length > 0 ? detail.title : "Untitled document";
-  const safeSubtitle =
-    detail.subtitle.trim().length > 0 ? detail.subtitle : "No summary available";
+  const safeSubtitle = detail.subtitle.trim().length > 0 ? detail.subtitle : "No summary available";
   const translationLabel =
     detail.contentLanguage?.label && detail.contentLanguage.label.trim().length > 0
       ? detail.contentLanguage.label
@@ -48,11 +47,11 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
           </AccentButton>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground mt-0.5">{safeSubtitle}</p>
+      <p className="text-xs text-muted-foreground mt-1">{safeSubtitle}</p>
 
       {/* Content language indicator */}
       {detail.contentLanguage?.isTranslation && (
-        <div className="mt-2 px-2 py-1 rounded bg-amber-50 border border-amber-100 text-micro text-amber-700 inline-block">
+        <div className="mt-2 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-micro text-amber-700 inline-flex items-center gap-1">
           {translationLabel}
         </div>
       )}

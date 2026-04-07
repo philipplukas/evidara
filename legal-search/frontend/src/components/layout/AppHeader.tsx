@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, MapPin, Search, SlidersHorizontal, User } from "lucide-react";
+import { Clock, Lock, MapPin, Search, Settings2, SlidersHorizontal, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { parseAsString, useQueryState } from "nuqs";
 import { type FormEvent, useEffect, useState } from "react";
@@ -10,9 +10,18 @@ import { useWorkspace } from "@/lib/workspace-store";
 interface AppHeaderProps {
   onOpenFilters?: () => void;
   onSearch?: (query: string) => Promise<void>;
+  /** Set from server (profile + configured control-plane URL). */
+  showControlPlaneEntry?: boolean;
+  /** Set from server to avoid client-only build-time env coupling. */
+  controlPanelUrl?: string;
 }
 
-export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
+export function AppHeader({
+  onOpenFilters,
+  onSearch,
+  showControlPlaneEntry = true,
+  controlPanelUrl,
+}: AppHeaderProps) {
   const { state } = useWorkspace();
   const { locale, setLocale } = useLocale();
   const t = useTranslations();
@@ -21,6 +30,9 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
 
   // Local input state — syncs with store query but allows free typing
   const [inputValue, setInputValue] = useState(storeQuery);
+  const resolvedControlPanelUrl = controlPanelUrl?.trim();
+  const hasControlPanelUrl = Boolean(resolvedControlPanelUrl);
+  const hasControlPanelAccess = hasControlPanelUrl && showControlPlaneEntry;
 
   // Sync input when store query changes (e.g., from URL navigation)
   useEffect(() => {
@@ -97,7 +109,48 @@ export function AppHeader({ onOpenFilters, onSearch }: AppHeaderProps) {
             label={t("header.pinned")}
             count={state.pinned.length > 0 ? state.pinned.length : undefined}
           />
+          {hasControlPanelAccess ? (
+            <a
+              href={resolvedControlPanelUrl!}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-transparent
+                text-muted-foreground hover:text-foreground hover:bg-muted hover:border-border"
+            >
+              <Settings2 className="w-4 h-4" />
+              {t("header.controlPanel")}
+            </a>
+          ) : hasControlPanelUrl ? (
+            <button
+              type="button"
+              disabled
+              title={t("header.controlPanelRestricted")}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border border-border/60
+                text-muted-foreground/80 bg-muted/30 cursor-not-allowed"
+            >
+              <Lock className="w-4 h-4" />
+              {t("header.controlPanel")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title={t("header.controlPanelUnavailable")}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border border-dashed border-border/70
+                text-muted-foreground/80 bg-surface-panel cursor-not-allowed"
+            >
+              <Settings2 className="w-4 h-4" />
+              {t("header.controlPanel")}
+            </button>
+          )}
         </nav>
+
+        <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted/60 text-tiny font-semibold text-muted-foreground uppercase tracking-wider">
+          <span>{t("header.profileLabel")}:</span>
+          <span className={hasControlPanelAccess ? "text-brand" : "text-foreground/70"}>
+            {hasControlPanelAccess ? t("header.profileOperator") : t("header.profileStandard")}
+          </span>
+        </div>
 
         {/* Locale Switcher */}
         {/* biome-ignore lint/a11y/useSemanticElements: fieldset would break flex layout styling */}

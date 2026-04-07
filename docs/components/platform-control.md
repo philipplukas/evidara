@@ -95,6 +95,14 @@ Lineage and document semantics that cross boundaries still remain Evidara-owned 
 - **API:** `contracts/api/platform-control.openapi.yaml`
 - **Schemas:** `ArtifactBundleManifest`
 
+## Authentication
+
+When any of `PLATFORM_CONTROL_API_KEY`, `PLATFORM_CONTROL_OPERATOR_API_KEY`, or
+`PLATFORM_CONTROL_SERVICE_API_KEY` is set, matching routes require `X-API-Key`.
+Unset keys keep local development open. Legacy single-key mode is
+`PLATFORM_CONTROL_API_KEY` only; scoped operator vs service keys are documented in
+[ADR-0020](../adr/adr-0020-api-authentication.md).
+
 ## Developer workflow
 
 - Service check: `bash scripts/check-platform-control.sh`

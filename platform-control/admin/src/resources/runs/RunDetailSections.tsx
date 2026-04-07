@@ -3,6 +3,7 @@
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Link,
@@ -16,7 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type Identifier, useGetList, useRecordContext } from "react-admin";
 import type {
   CapturedResourceRecord,
@@ -24,15 +25,26 @@ import type {
   ProcessingStatusRecord,
   ProviderJobRecord,
   RawArtifactRecord,
+  RunPipelineHealth,
   RunPreviewSummary,
   RunRecord,
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
+import {
+  type ChecklistItem,
+  type ChecklistState,
+  deriveOperatorChecklist,
+} from "./operatorChecklist";
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 100 },
   sort: { field: "created_at", order: "DESC" as const },
 };
+
+const RUN_READINESS_CONFIRMED_KEY_PREFIX = "evidara_run_readiness_confirmed:";
+const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_codes:";
+const RUN_VERIFICATION_OPENED_KEY_PREFIX = "evidara_run_verification_opened:";
 
 type SectionColumn<TRecord extends { id: Identifier }> = {
   header: string;
@@ -40,6 +52,7 @@ type SectionColumn<TRecord extends { id: Identifier }> = {
 };
 
 type RunTableSectionProps<TRecord extends { id: Identifier }> = {
+  sectionId?: string;
   title: string;
   description: string;
   rows: TRecord[] | undefined;
@@ -279,7 +292,353 @@ function PreviewSummarySection({ run }: { run: RunRecord }) {
   );
 }
 
+function pipelineChipColor(status: string): "default" | "info" | "warning" | "error" | "success" {
+  if (status === "ok") return "success";
+  if (status === "failed") return "error";
+  if (status === "blocked") return "warning";
+  if (status === "in_progress") return "info";
+  return "default";
+}
+
+function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
+  if (stage.status === "ok") return "No action required.";
+  if (stage.stage === "acquisition") {
+    return "Check provider jobs for dispatch/crawl status and retry or cancel when stuck.";
+  }
+  if (stage.stage === "document_intelligence") {
+    return "Inspect DI processing status events and error summaries for remediation.";
+  }
+  if (stage.stage === "projection") {
+    return "Confirm document lifecycle events are being emitted for this run.";
+  }
+  return "Verify lifecycle search disposition and confirm indexed document visibility in legal-search.";
+}
+
+function stageActionTarget(
+  stage: RunPipelineHealth["stages"][number],
+  options: { legalSearchUrl?: string; evidenceRunbookPath: string },
+): { label: string; href: string } {
+  if (stage.stage === "acquisition") {
+    return { label: "Open provider jobs", href: "#provider-jobs-section" };
+  }
+  if (stage.stage === "document_intelligence") {
+    return { label: "Open DI processing status", href: "#di-processing-status-section" };
+  }
+  if (stage.stage === "projection") {
+    return { label: "Open document lifecycle", href: "#document-lifecycle-section" };
+  }
+  if (options.legalSearchUrl) {
+    return { label: "Open legal-search verification", href: options.legalSearchUrl };
+  }
+  return { label: "Open evidence runbook", href: options.evidenceRunbookPath };
+}
+
+function checklistChipColor(state: ChecklistState): "default" | "info" | "warning" | "success" {
+  if (state === "ok") return "success";
+  if (state === "blocked") return "warning";
+  if (state === "in_progress") return "info";
+  return "default";
+}
+
+function PipelineHealthSection({ run }: { run: RunRecord }) {
+  const [health, setHealth] = useState<RunPipelineHealth | null>(null);
+  const [isPending, setIsPending] = useState(true);
+  const [error, setError] = useState<unknown>(null);
+  const [readinessConfirmed, setReadinessConfirmed] = useState(false);
+  const [readinessBlockedCodes, setReadinessBlockedCodes] = useState<string[]>([]);
+  const [verificationOpened, setVerificationOpened] = useState(false);
+  const legalSearchUrl = process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim();
+  const evidenceRunbookPath =
+    "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
+  const healthLoadStartedAtRef = useRef<number | null>(null);
+  const firstRemediationEventEmittedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const readiness = window.localStorage.getItem(
+      `${RUN_READINESS_CONFIRMED_KEY_PREFIX}${run.run_id}`,
+    );
+    const blockedRaw = window.localStorage.getItem(
+      `${RUN_READINESS_BLOCKED_CODES_KEY_PREFIX}${run.run_id}`,
+    );
+    const verification = window.localStorage.getItem(
+      `${RUN_VERIFICATION_OPENED_KEY_PREFIX}${run.run_id}`,
+    );
+    setReadinessConfirmed(readiness === "true");
+    setVerificationOpened(verification === "true");
+    if (blockedRaw) {
+      try {
+        const parsed = JSON.parse(blockedRaw);
+        setReadinessBlockedCodes(Array.isArray(parsed) ? parsed.map(String) : []);
+      } catch {
+        setReadinessBlockedCodes([]);
+      }
+    } else {
+      setReadinessBlockedCodes([]);
+    }
+  }, [run.run_id]);
+
+  const checklistItems = useMemo<ChecklistItem[]>(
+    () =>
+      deriveOperatorChecklist({
+        run,
+        health,
+        readinessConfirmed,
+        readinessBlockedCodes,
+        verificationOpened,
+      }),
+    [run, health, readinessConfirmed, readinessBlockedCodes, verificationOpened],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsPending(true);
+    setError(null);
+    healthLoadStartedAtRef.current = Date.now();
+    firstRemediationEventEmittedRef.current = false;
+
+    void controlPlaneActions
+      .getRunPipelineHealth(run.run_id)
+      .then((response) => {
+        if (!cancelled) {
+          setHealth(response);
+          emitOperatorJourneyEvent("pipeline_health_loaded", {
+            run_id: run.run_id,
+            source_id: run.source_id,
+            source_version_id: run.source_version_id,
+            mode: run.mode,
+            duration_ms:
+              healthLoadStartedAtRef.current != null
+                ? Date.now() - healthLoadStartedAtRef.current
+                : undefined,
+          });
+        }
+      })
+      .catch((reason) => {
+        if (!cancelled) {
+          setError(reason);
+          setHealth(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsPending(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [run.mode, run.run_id, run.source_id, run.source_version_id]);
+
+  return (
+    <Paper sx={{ p: 3 }}>
+      <Stack spacing={2}>
+        <Box>
+          <Typography variant="h6">Pipeline Health</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Operational status contract for acquisition, DI, projection, and search stages.
+          </Typography>
+        </Box>
+
+        {isPending ? (
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <CircularProgress size={18} />
+            <Typography variant="body2" color="text.secondary">
+              Loading pipeline health...
+            </Typography>
+          </Stack>
+        ) : null}
+
+        {!isPending && error ? (
+          <Alert severity="error">
+            {error instanceof Error ? error.message : "Unable to load pipeline health."}
+          </Alert>
+        ) : null}
+
+        {!isPending && !error && health ? (
+          <Stack spacing={2}>
+            <Paper variant="outlined" sx={{ p: 1.5 }}>
+              <Stack spacing={1}>
+                <Typography variant="subtitle2">Operator Checklist</Typography>
+                {checklistItems.map((item) => (
+                  <Stack
+                    key={item.key}
+                    direction={{ xs: "column", md: "row" }}
+                    spacing={1}
+                    alignItems="start"
+                  >
+                    <Chip size="small" label={item.state} color={checklistChipColor(item.state)} />
+                    <Box>
+                      <Typography variant="body2">{item.label}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.detail}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ))}
+                {!verificationOpened && legalSearchUrl ? (
+                  <Button
+                    component="a"
+                    href={legalSearchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.localStorage.setItem(
+                          `${RUN_VERIFICATION_OPENED_KEY_PREFIX}${run.run_id}`,
+                          "true",
+                        );
+                      }
+                      setVerificationOpened(true);
+                      emitOperatorJourneyEvent("legal_search_verification_opened", {
+                        run_id: run.run_id,
+                        source_id: run.source_id,
+                        source_version_id: run.source_version_id,
+                        mode: run.mode,
+                        action_label: "Operator checklist legal-search verification",
+                        action_href: legalSearchUrl,
+                      });
+                    }}
+                  >
+                    Open legal-search verification
+                  </Button>
+                ) : null}
+              </Stack>
+            </Paper>
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} flexWrap="wrap">
+              <Chip
+                label={`Overall ${health.overall_status}`}
+                color={pipelineChipColor(health.overall_status)}
+                variant="outlined"
+              />
+              <Chip label={`Processing events ${health.processing_status_event_count}`} />
+              <Chip label={`Lifecycle events ${health.document_lifecycle_event_count}`} />
+            </Stack>
+
+            <Stack spacing={1.5}>
+              {health.stages.map((stage) => {
+                const actionTarget = stageActionTarget(stage, {
+                  legalSearchUrl,
+                  evidenceRunbookPath,
+                });
+                const isInPageAnchor = actionTarget.href.startsWith("#");
+                return (
+                  <Paper key={stage.stage} variant="outlined" sx={{ p: 1.5 }}>
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
+                          {stage.stage.replace("_", " ")}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={stage.status}
+                          color={pipelineChipColor(stage.status)}
+                          variant="outlined"
+                        />
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {stage.detail}
+                      </Typography>
+                      {stage.status !== "ok" ? (
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1}
+                          alignItems="start"
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Recommended next action: {stageNextAction(stage)}
+                          </Typography>
+                          <Button
+                            component="a"
+                            href={actionTarget.href}
+                            target={isInPageAnchor ? undefined : "_blank"}
+                            rel={isInPageAnchor ? undefined : "noreferrer"}
+                            size="small"
+                            variant="text"
+                            onClick={() => {
+                              if (!firstRemediationEventEmittedRef.current) {
+                                emitOperatorJourneyEvent("remediation_action_clicked", {
+                                  run_id: run.run_id,
+                                  source_id: run.source_id,
+                                  source_version_id: run.source_version_id,
+                                  mode: run.mode,
+                                  stage: stage.stage,
+                                  action_label: actionTarget.label,
+                                  action_href: actionTarget.href,
+                                });
+                                firstRemediationEventEmittedRef.current = true;
+                              }
+                            }}
+                          >
+                            {actionTarget.label}
+                          </Button>
+                        </Stack>
+                      ) : null}
+                      <Typography variant="caption" color="text.secondary">
+                        Updated: {formatDateTime(stage.updated_at)}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                );
+              })}
+            </Stack>
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              {legalSearchUrl ? (
+                <Button
+                  component="a"
+                  href={legalSearchUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.localStorage.setItem(
+                        `${RUN_VERIFICATION_OPENED_KEY_PREFIX}${run.run_id}`,
+                        "true",
+                      );
+                    }
+                    setVerificationOpened(true);
+                    emitOperatorJourneyEvent("legal_search_verification_opened", {
+                      run_id: run.run_id,
+                      source_id: run.source_id,
+                      source_version_id: run.source_version_id,
+                      mode: run.mode,
+                      action_label: "Pipeline section legal-search verification",
+                      action_href: legalSearchUrl,
+                    });
+                  }}
+                >
+                  Open legal-search verification
+                </Button>
+              ) : null}
+              <Button
+                component="a"
+                href={evidenceRunbookPath}
+                target="_blank"
+                rel="noreferrer"
+                variant="text"
+                size="small"
+              >
+                Open related evidence runbook
+              </Button>
+            </Stack>
+          </Stack>
+        ) : null}
+      </Stack>
+    </Paper>
+  );
+}
+
 function RunTableSection<TRecord extends { id: Identifier }>({
+  sectionId,
   title,
   description,
   rows,
@@ -289,7 +648,7 @@ function RunTableSection<TRecord extends { id: Identifier }>({
   columns,
 }: RunTableSectionProps<TRecord>) {
   return (
-    <Paper sx={{ p: 3 }}>
+    <Paper id={sectionId} sx={{ p: 3 }}>
       <Stack spacing={2}>
         <Box>
           <Typography variant="h6">{title}</Typography>
@@ -396,9 +755,11 @@ export function RunDetailSections() {
 
   return (
     <Stack spacing={3} sx={{ pt: 2 }}>
+      <PipelineHealthSection run={run} />
       <PreviewSummarySection run={run} />
 
       <RunTableSection
+        sectionId="provider-jobs-section"
         title="Provider Jobs"
         description="Provider-level crawl job state and webhook progression for this run."
         rows={providerJobs.data}
@@ -487,6 +848,7 @@ export function RunDetailSections() {
       />
 
       <RunTableSection
+        sectionId="di-processing-status-section"
         title="DI Processing Status"
         description="Document-intelligence processing updates correlated to this run."
         rows={processingStatus.data}
@@ -518,6 +880,7 @@ export function RunDetailSections() {
       />
 
       <RunTableSection
+        sectionId="document-lifecycle-section"
         title="Document Lifecycle"
         description="Published or withdrawn document lifecycle events emitted by document-intelligence."
         rows={documentLifecycle.data}

@@ -18,7 +18,7 @@ import type {
   SearchHitEntity,
   SearchResultEntity,
 } from './entities/search.entities';
-import type { SearchOptions, SearchRepository } from './search.repository';
+import type { SearchOptions, SearchRefinement, SearchRepository } from './search.repository';
 
 type OpenSearchHit = {
   _source?: Record<string, unknown>;
@@ -51,11 +51,20 @@ export class SearchOpenSearchAdapter implements SearchRepository {
 
     // Build filter clauses
     const filters: Record<string, unknown>[] = [];
-    if (options?.jurisdiction) {
-      filters.push({ term: { jurisdiction: options.jurisdiction } });
+    if (options?.jurisdictions && options.jurisdictions.length > 0) {
+      filters.push({ terms: { jurisdiction: options.jurisdictions } });
     }
-    if (options?.documentType) {
-      filters.push({ term: { document_type: options.documentType } });
+    if (options?.documentTypes && options.documentTypes.length > 0) {
+      filters.push({ terms: { document_type: options.documentTypes } });
+    }
+    if (options?.languages && options.languages.length > 0) {
+      filters.push({ terms: { language: options.languages } });
+    }
+    if (options?.officialOnly) {
+      filters.push({ term: { is_official: true } });
+    }
+    if (options?.refinements && options.refinements.length > 0) {
+      filters.push(...this.mapRefinementsToFilters(options.refinements));
     }
 
     const body = {
@@ -204,6 +213,42 @@ export class SearchOpenSearchAdapter implements SearchRepository {
   }
 
   // ─── Helpers ───
+
+  private mapRefinementsToFilters(refinements: SearchRefinement[]): Record<string, unknown>[] {
+    const mapped: Record<string, unknown>[] = [];
+    for (const refinement of refinements) {
+      if (refinement.values.length === 0) continue;
+      switch (refinement.type) {
+        case 'terms':
+          mapped.push({ terms: { [refinement.field]: refinement.values } });
+          break;
+        case 'toggle':
+          if (typeof refinement.value === 'boolean') {
+            mapped.push({ term: { [refinement.field]: refinement.value } });
+          }
+          break;
+        case 'range':
+        case 'date_range':
+          if (refinement.from || refinement.to) {
+            mapped.push({
+              range: {
+                [refinement.field]: {
+                  ...(refinement.from ? { gte: refinement.from } : {}),
+                  ...(refinement.to ? { lte: refinement.to } : {}),
+                },
+              },
+            });
+          }
+          break;
+        case 'text':
+          mapped.push({ match: { [refinement.field]: refinement.values.join(' ') } });
+          break;
+        default:
+          break;
+      }
+    }
+    return mapped;
+  }
 
   private parseAggregations(
     aggs: Record<string, unknown> | undefined,

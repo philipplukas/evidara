@@ -67,6 +67,14 @@ resource "google_project_iam_member" "deployer_dev_roles" {
   member  = "serviceAccount:${google_service_account.deployer_dev.email}"
 }
 
+resource "google_storage_bucket_iam_member" "deployer_dev_bucket_object_admin" {
+  for_each = var.deployer_dev_storage_object_admin_buckets
+
+  bucket = each.value
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.deployer_dev.email}"
+}
+
 resource "google_project_iam_member" "deployer_prod_roles" {
   provider = google.prod
   for_each = toset([
@@ -79,6 +87,15 @@ resource "google_project_iam_member" "deployer_prod_roles" {
   project = var.prod_project_id
   role    = each.value
   member  = "serviceAccount:${google_service_account.deployer_prod.email}"
+}
+
+resource "google_storage_bucket_iam_member" "deployer_prod_bucket_object_admin" {
+  provider = google.prod
+  for_each = var.deployer_prod_storage_object_admin_buckets
+
+  bucket = each.value
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.deployer_prod.email}"
 }
 
 resource "google_secret_manager_secret" "databricks_token_dev" {

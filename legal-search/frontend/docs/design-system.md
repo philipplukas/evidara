@@ -269,5 +269,5 @@ Production milestone: replace with SVG flag components or `circle-flags` library
 ## Future Work
 
 - **Dark Mode:** Brand/surface/interactive tokens need `.dark {}` overrides in globals.css
-- **DOMPurify:** `DetailsTab.tsx` uses `dangerouslySetInnerHTML` — integrate DOMPurify before production
+- **Docling Renderer Migration:** Replace HTML-string rendering in `DetailsTab.tsx` with structured Docling components when the BFF returns canonical document blocks
 - **Additional Primitives:** `Chip` component for ContextBar/FilterPanel chip patterns

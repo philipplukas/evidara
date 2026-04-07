@@ -53,15 +53,19 @@ describe('SearchService', () => {
     const service = new SearchService(repo);
 
     await service.search('test', {
-      jurisdiction: 'CH',
-      documentType: 'law',
+      jurisdictions: ['ch'],
+      documentTypes: ['law'],
+      languages: ['de'],
+      officialOnly: true,
       page: 2,
       pageSize: 10,
     });
 
     expect(repo.search).toHaveBeenCalledWith('test', {
-      jurisdiction: 'CH',
-      documentType: 'law',
+      jurisdictions: ['ch'],
+      documentTypes: ['law'],
+      languages: ['de'],
+      officialOnly: true,
       page: 2,
       pageSize: 10,
     });

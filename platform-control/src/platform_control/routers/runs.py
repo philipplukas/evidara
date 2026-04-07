@@ -15,7 +15,9 @@ from platform_control.schemas.run import (
     ProviderJobListResponse,
     RawArtifactListResponse,
     RunListResponse,
+    RunPipelineHealthResponse,
     RunPreviewSummaryResponse,
+    RunReadinessResponse,
     RunResponse,
 )
 from platform_control.services.firecrawl_provider import FirecrawlProvider
@@ -77,6 +79,21 @@ async def create_run(
         run_dispatch_backend=settings.run_dispatch_backend,
     )
     return await service.create_run(request)
+
+
+@router.get("/readiness", response_model=RunReadinessResponse)
+async def get_run_readiness(
+    source_id: str,
+    source_version_id: str,
+    session: SessionDep,
+    mode: RunMode = RunMode.PREVIEW,
+) -> RunReadinessResponse:
+    service = RunService(session)
+    return await service.get_run_readiness(
+        source_id=source_id,
+        source_version_id=source_version_id,
+        mode=mode,
+    )
 
 
 @router.get("/{run_id}", response_model=RunResponse)
@@ -147,6 +164,15 @@ async def get_run_preview_summary(
 ) -> RunPreviewSummaryResponse:
     service = RunService(session)
     return await service.get_preview_summary(run_id)
+
+
+@router.get("/{run_id}/pipeline-health", response_model=RunPipelineHealthResponse)
+async def get_run_pipeline_health(
+    run_id: str,
+    session: SessionDep,
+) -> RunPipelineHealthResponse:
+    service = RunService(session)
+    return await service.get_pipeline_health(run_id)
 
 
 @router.get("/{run_id}/processing-status", response_model=ProcessingStatusUpdateListResponse)

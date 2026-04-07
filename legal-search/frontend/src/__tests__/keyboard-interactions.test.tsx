@@ -2,9 +2,21 @@ import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { RelatedTab } from "@/components/detail/tabs/RelatedTab";
 import { StructureTab } from "@/components/detail/tabs/StructureTab";
+import { FilterPanel } from "@/components/filters/FilterPanel";
+import type { FilterViewModel } from "@/lib/types";
 import { renderWithProviders } from "./helpers/render-with-providers";
 
 describe("Keyboard interactions", () => {
+  const filters: FilterViewModel[] = [
+    {
+      key: "has_commentary",
+      label: "Has commentary",
+      type: "toggle",
+      options: [{ value: "true", label: "Yes" }],
+      selected: [],
+    },
+  ];
+
   it("activates related item rows with Enter", () => {
     const onFocus = vi.fn();
     renderWithProviders(
@@ -50,5 +62,16 @@ describe("Keyboard interactions", () => {
     fireEvent.keyDown(row, { key: " " });
 
     expect(onFocus).toHaveBeenCalledWith("art-755");
+  });
+
+  it("toggles filter switch with Enter keyboard activation", () => {
+    renderWithProviders(<FilterPanel filters={filters} />);
+    const toggle = screen.getByRole("button", { name: "Has commentary toggle" });
+    toggle.focus();
+
+    fireEvent.keyDown(toggle, { key: "Enter" });
+    fireEvent.keyUp(toggle, { key: "Enter" });
+
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
   });
 });
