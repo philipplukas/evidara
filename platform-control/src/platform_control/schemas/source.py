@@ -46,6 +46,7 @@ class BaseAcquisitionSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+
 class FirecrawlAcquisitionSpec(BaseAcquisitionSpec):
     provider: Literal[AcquisitionProvider.FIRECRAWL] = AcquisitionProvider.FIRECRAWL
     seed_url: HttpUrl | None = None
@@ -171,9 +172,7 @@ class CreateSourceVersionRequest(BaseModel):
             return self
         if self.overlay_id and self.provider_template_id:
             return self
-        raise ValueError(
-            "Provide acquisition_spec or both overlay_id and provider_template_id."
-        )
+        raise ValueError("Provide acquisition_spec or both overlay_id and provider_template_id.")
 
 
 class UpdateSourceVersionRequest(BaseModel):

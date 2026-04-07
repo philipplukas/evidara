@@ -79,9 +79,7 @@ async def list_source_blueprint_templates(
     session: SessionDep,
 ) -> SourceBlueprintTemplateListResponse:
     service = SourceService(session)
-    return SourceBlueprintTemplateListResponse(
-        data=await service.list_source_blueprint_templates()
-    )
+    return SourceBlueprintTemplateListResponse(data=await service.list_source_blueprint_templates())
 
 
 @router.get("/{source_id}", response_model=SourceResponse)

@@ -8,9 +8,7 @@ import yaml
 
 from platform_control.errors import NotFoundError
 
-_BLUEPRINTS_PATH = (
-    Path(__file__).resolve().parent.parent / "hierarchies" / "source_blueprints.yaml"
-)
+_BLUEPRINTS_PATH = Path(__file__).resolve().parent.parent / "hierarchies" / "source_blueprints.yaml"
 
 
 @lru_cache(maxsize=1)

@@ -190,8 +190,7 @@ async def test_list_source_blueprint_templates_returns_data(client) -> None:
     assert "data" in body
     assert any(row["overlay_id"] == "at" for row in body["data"])
     assert any(
-        row["provider_template_id"] == "deterministic_http_bundesrecht"
-        for row in body["data"]
+        row["provider_template_id"] == "deterministic_http_bundesrecht" for row in body["data"]
     )
 
 
