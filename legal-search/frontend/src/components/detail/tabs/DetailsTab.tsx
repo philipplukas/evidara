@@ -16,18 +16,29 @@ export function DetailsTab({ detail }: DetailsTabProps) {
     }
     return DOMPurify.sanitize(detail.contentHtml);
   }, [detail.contentHtml]);
+  const hasMetadata = detail.metadata.length > 0;
+  const hasContent = Boolean(sanitizedContentHtml.trim());
+  const showEmptyState = !hasMetadata && !hasContent;
 
   return (
     <div className="p-5 space-y-5">
       {/* Metadata */}
-      {detail.metadata.length > 0 && (
+      {hasMetadata && (
         <div className="space-y-2">
           <SectionLabel>Metadata</SectionLabel>
           <div className="space-y-1.5">
             {detail.metadata.map((row, i) => (
               <div key={i} className="flex items-baseline gap-2 text-xs">
                 <span className="text-muted-foreground w-28 shrink-0 font-medium">{row.label}</span>
-                <span className="text-foreground/80 flex items-center gap-1">{row.value}</span>
+                <span
+                  className={
+                    row.value.trim().length > 0
+                      ? "text-foreground/80 flex items-center gap-1"
+                      : "text-muted-foreground/70 italic flex items-center gap-1"
+                  }
+                >
+                  {row.value.trim().length > 0 ? row.value : "Not available"}
+                </span>
               </div>
             ))}
           </div>
@@ -35,7 +46,7 @@ export function DetailsTab({ detail }: DetailsTabProps) {
       )}
 
       {/* Content */}
-      {sanitizedContentHtml && (
+      {hasContent && (
         <div className="space-y-2">
           <SectionLabel>Content</SectionLabel>
           <div
@@ -47,6 +58,12 @@ export function DetailsTab({ detail }: DetailsTabProps) {
               [&_p]:mb-2"
             dangerouslySetInnerHTML={{ __html: sanitizedContentHtml }}
           />
+        </div>
+      )}
+
+      {showEmptyState && (
+        <div className="rounded-md border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground">
+          No document details are available for this result yet.
         </div>
       )}
     </div>
