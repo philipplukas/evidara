@@ -6,6 +6,8 @@ from typing import Annotated
 import typer
 import yaml
 
+from evidara_cli.repo_root import resolve_repo_root
+
 openapi_app = typer.Typer(
     no_args_is_help=True,
     help="Read-only helpers against repo OpenAPI files.",
@@ -15,17 +17,6 @@ SPEC_FILES = {
     "platform-control": "contracts/api/platform-control.openapi.yaml",
     "legal-search": "contracts/api/legal-search.openapi.yaml",
 }
-
-
-def _resolve_repo_root(explicit: Path) -> Path:
-    """Find monorepo root containing contracts/api (supports cwd under tools/evidara-cli)."""
-    candidates = [explicit, Path.cwd(), *Path.cwd().parents]
-    for root in candidates:
-        if root == Path.home():
-            break
-        if (root / "contracts" / "api").is_dir():
-            return root
-    return explicit
 
 
 @openapi_app.command("paths")
@@ -45,7 +36,7 @@ def list_paths(
     if key not in SPEC_FILES:
         typer.echo(f"Unknown service {service!r}; choose: {', '.join(SPEC_FILES)}", err=True)
         raise typer.Exit(code=2)
-    root = _resolve_repo_root(repo_root or Path.cwd())
+    root = resolve_repo_root(repo_root)
     path = root / SPEC_FILES[key]
     if not path.is_file():
         typer.echo(f"Spec not found: {path}", err=True)

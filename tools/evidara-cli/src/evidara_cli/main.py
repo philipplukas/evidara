@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -17,6 +21,7 @@ from evidara_cli.client import (
     use_human_output,
 )
 from evidara_cli.openapi_cmd import openapi_app
+from evidara_cli.repo_root import resolve_repo_root
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -122,6 +127,56 @@ def pc_wizard_smoke(
         )
     except Exception as exc:
         _handle_exc(exc, human=human)
+
+
+@pc.command("ris-bootstrap")
+def pc_ris_bootstrap(
+    max_pages: Annotated[int, typer.Option("--max-pages", min=1, help="Max OGD API pages")] = 1,
+    applikation: Annotated[
+        str | None,
+        typer.Option("--applikation", help="OGD Applikation filter (e.g. Vfgh, BrKons)"),
+    ] = None,
+    process_di: Annotated[
+        bool,
+        typer.Option("--process-di", help="Run script's DI follow-up step when set"),
+    ] = False,
+    repo_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo-root",
+            envvar="EVIDARA_REPO_ROOT",
+            help="Monorepo root (auto-detected if omitted)",
+        ),
+    ] = None,
+) -> None:
+    """Run scripts/bootstrap-ris-source.py (RIS OGD end-to-end bootstrap).
+
+    Uses EVIDARA_PLATFORM_CONTROL_URL and EVIDARA_PLATFORM_CONTROL_API_KEY like other commands.
+    """
+    root = resolve_repo_root(repo_root)
+    script = root / "scripts" / "bootstrap-ris-source.py"
+    if not script.is_file():
+        typer.echo(f"Script not found: {script}", err=True)
+        raise typer.Exit(code=1)
+    api_url = platform_control_base_url()
+    cmd: list[str] = [
+        sys.executable,
+        str(script),
+        "--api-url",
+        api_url,
+        "--max-pages",
+        str(max_pages),
+    ]
+    key = os.environ.get("EVIDARA_PLATFORM_CONTROL_API_KEY", "").strip()
+    if key:
+        cmd.extend(["--api-key", key])
+    if applikation:
+        cmd.extend(["--applikation", applikation])
+    if process_di:
+        cmd.append("--process-di")
+    result = subprocess.run(cmd, cwd=root, check=False)
+    if result.returncode != 0:
+        raise typer.Exit(code=result.returncode)
 
 
 @ls.command("ping")

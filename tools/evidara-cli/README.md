@@ -36,6 +36,7 @@ evidara openapi paths legal-search
 # Platform-control
 evidara platform-control ping
 evidara platform-control wizard-smoke
+evidara platform-control ris-bootstrap --max-pages 1
 
 # Legal-search (needs OpenSearch + API running for ping/search)
 evidara legal-search ping
@@ -47,11 +48,30 @@ Default stdout is **single-line JSON** suitable for agents; use `--human` or `EV
 
 Errors print a JSON object with `ok: false`, `status_code`, and a truncated `body`, then exit with code 1.
 
-## Checks
+### RIS OGD vertical slice (delegates to repo script)
+
+Runs [`scripts/bootstrap-ris-source.py`](../../scripts/bootstrap-ris-source.py): create AT RIS source, version, approve, preview run.
 
 ```bash
 cd tools/evidara-cli
+uv run evidara platform-control ris-bootstrap --max-pages 1
+# Optional: --applikation Vfgh --process-di
+```
+
+Uses the same `EVIDARA_PLATFORM_CONTROL_*` env vars as `ping` / `wizard-smoke`. The script prints human-readable progress to stdout/stderr (not JSON).
+
+## Checks
+
+```bash
+bash scripts/check-evidara-cli.sh
+```
+
+Or from `tools/evidara-cli`:
+
+```bash
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run pytest
 ```
+
+CI: `.github/workflows/evidara-cli.yml` runs `scripts/check-evidara-cli.sh` when this package or the bootstrap script changes.
