@@ -1,0 +1,57 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { DetailsTab } from "@/components/detail/tabs/DetailsTab";
+import type { DetailViewModel } from "@/lib/types";
+
+function buildDetail(
+  contentHtml: string,
+  metadata: DetailViewModel["metadata"] = [],
+): DetailViewModel {
+  return {
+    id: "detail-1",
+    type: "law",
+    title: "Test Title",
+    subtitle: "Test Subtitle",
+    breadcrumbs: [],
+    metadata,
+    contentHtml,
+    tabs: [],
+    relatedGroups: [],
+    references: [],
+    annotations: [],
+  };
+}
+
+describe("DetailsTab", () => {
+  it("sanitizes unsafe HTML before rendering", () => {
+    const maliciousHtml = `
+      <p>Allowed paragraph</p>
+      <img src="x" onerror="alert('xss')" />
+      <script>alert('xss')</script>
+    `;
+    const detail = buildDetail(maliciousHtml);
+
+    const { container } = render(<DetailsTab detail={detail} />);
+
+    expect(screen.getByText("Allowed paragraph")).toBeInTheDocument();
+    expect(container.querySelector("script")).toBeNull();
+    expect(container.querySelector("img")?.getAttribute("onerror")).toBeNull();
+  });
+
+  it("shows a graceful empty state when no metadata and no content exist", () => {
+    const detail = buildDetail("");
+    render(<DetailsTab detail={detail} />);
+
+    expect(
+      screen.getByText("No document details are available for this result yet."),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a fallback label when metadata value is empty", () => {
+    const detail = buildDetail("", [{ label: "Jurisdiction", value: "" }]);
+    render(<DetailsTab detail={detail} />);
+
+    expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
+    expect(screen.getByText("Not available")).toBeInTheDocument();
+  });
+});

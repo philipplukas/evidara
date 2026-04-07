@@ -8,7 +8,7 @@ const SEARCH_PLACEHOLDER =
   /search article, case, commentary, citation|nach artikel, urteil, kommentar oder zitat|rechercher un article, un arrêt, un commentaire ou une citation/i;
 const LEGAL_SEARCH_BASE_URL =
   process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3000";
-const ADMIN_BASE_URL = process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://localhost:3102";
+const ADMIN_BASE_URL = process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://localhost:3100";
 const UI_PROFILE_COOKIE = "evidara-ui-profile";
 const ADMIN_LOCAL_STORAGE_ROLE_KEY = "evidara_user_role";
 const OUTPUT_DIR = "screenshot-pack";
