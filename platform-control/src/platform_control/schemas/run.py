@@ -84,20 +84,6 @@ class CreateRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class RunReadinessCheck(BaseModel):
-    code: str
-    ok: bool
-    detail: str
-
-
-class RunReadinessResponse(BaseModel):
-    source_id: str
-    source_version_id: str
-    mode: RunMode
-    ready: bool
-    checks: list[RunReadinessCheck]
-
-
 class RunResponse(BaseModel):
     run_id: str
     source_id: str
