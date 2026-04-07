@@ -25,9 +25,7 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
       {detail.breadcrumbs.length > 0 && <Breadcrumbs items={detail.breadcrumbs} />}
 
       <div className="flex items-start gap-2 mt-2">
-        <h2 className="text-base font-semibold text-foreground flex-1 leading-snug">
-          {safeTitle}
-        </h2>
+        <h2 className="text-base font-semibold text-foreground flex-1 leading-snug">{safeTitle}</h2>
         {/* Pin + actions */}
         <div className="flex items-center gap-1 shrink-0">
           {onPin && (

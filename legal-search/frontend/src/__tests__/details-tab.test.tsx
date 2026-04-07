@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { DetailsTab } from "@/components/detail/tabs/DetailsTab";
 import type { DetailViewModel } from "@/lib/types";
 
-function buildDetail(contentHtml: string, metadata: DetailViewModel["metadata"] = []): DetailViewModel {
+function buildDetail(
+  contentHtml: string,
+  metadata: DetailViewModel["metadata"] = [],
+): DetailViewModel {
   return {
     id: "detail-1",
     type: "law",
@@ -39,7 +42,9 @@ describe("DetailsTab", () => {
     const detail = buildDetail("");
     render(<DetailsTab detail={detail} />);
 
-    expect(screen.getByText("No document details are available for this result yet.")).toBeInTheDocument();
+    expect(
+      screen.getByText("No document details are available for this result yet."),
+    ).toBeInTheDocument();
   });
 
   it("renders a fallback label when metadata value is empty", () => {
