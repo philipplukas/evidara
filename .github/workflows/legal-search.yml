@@ -79,11 +79,7 @@ jobs:
 
   # ─── Interaction-flow evidence (Playwright smoke + contract) ───
   interaction-flow-evidence:
-    runs-on:
-      - self-hosted
-      - linux
-      - x64
-      - gcp-heavy
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64","gcp-heavy"]') }}
     env:
       SCREENSHOT_PACK_STATUS: not_run
       SCREENSHOT_PACK_RETRY_COUNT: "0"

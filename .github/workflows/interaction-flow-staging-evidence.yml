@@ -26,11 +26,7 @@ permissions:
 
 jobs:
   interaction-flow-staging-evidence:
-    runs-on:
-      - self-hosted
-      - linux
-      - x64
-      - gcp-heavy
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64","gcp-heavy"]') }}
     environment: staging
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}
