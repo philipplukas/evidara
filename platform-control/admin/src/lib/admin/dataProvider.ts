@@ -46,8 +46,26 @@ type Authority = ReferenceDataBase & {
   slug: string;
 };
 
-export type AcquisitionSpec = {
-  provider: "firecrawl" | "deterministic_http" | "ris_ogd";
+type SharedAcquisitionSpec = {
+  tenant_id?: string;
+  corpus_id?: string;
+  scope_type?: "global_public" | "tenant_private" | "tenant_shared";
+  source_origin_kind?:
+    | "official_primary"
+    | "official_mirror"
+    | "licensed_provider"
+    | "community_curated"
+    | "tenant_internal";
+  trust_tier?: "authoritative" | "preferred" | "supplemental" | "untrusted";
+  language_codes?: string[];
+  document_type_hint?: string | null;
+  request_timeout_seconds?: number;
+  user_agent?: string | null;
+  max_content_bytes?: number;
+};
+
+export type FirecrawlAcquisitionSpec = SharedAcquisitionSpec & {
+  provider: "firecrawl";
   seed_url: string | null;
   seed_urls: string[];
   mode: "crawl" | "batch_scrape";
@@ -57,14 +75,27 @@ export type AcquisitionSpec = {
   max_discovery_depth: number;
   scrape_formats: string[];
   zero_data_retention: boolean;
-  base_url: string | null;
+};
+
+export type DeterministicHttpAcquisitionSpec = SharedAcquisitionSpec & {
+  provider: "deterministic_http";
+  seed_url: string | null;
+  seed_urls: string[];
+};
+
+export type RisOgdAcquisitionSpec = SharedAcquisitionSpec & {
+  provider: "ris_ogd";
+  base_url: string;
   applikation: string | null;
   preferred_formats: string[];
   page_size: number;
   max_pages: number;
 };
 
-export type FirecrawlAcquisitionSpec = AcquisitionSpec;
+export type AcquisitionSpec =
+  | FirecrawlAcquisitionSpec
+  | DeterministicHttpAcquisitionSpec
+  | RisOgdAcquisitionSpec;
 
 type Source = {
   source_id: string;
@@ -85,7 +116,7 @@ type SourceVersion = {
   extractor_profile_id: string | null;
   version_label: string;
   status: "draft" | "pending_approval" | "approved" | "rejected" | "superseded";
-  acquisition_spec: FirecrawlAcquisitionSpec;
+  acquisition_spec: AcquisitionSpec;
   created_at: string;
   updated_at: string;
 };
@@ -149,6 +180,21 @@ export type RunPipelineHealth = {
   stages: RunPipelineHealthStage[];
   processing_status_event_count: number;
   document_lifecycle_event_count: number;
+};
+
+export type SourceBlueprintPreviewInput = {
+  overlay_id: string;
+  provider_template_id: string;
+};
+
+export type SourceBlueprintPreview = SourceBlueprintPreviewInput & {
+  acquisition_spec: AcquisitionSpec;
+};
+
+export type SourceBlueprintTemplate = {
+  overlay_id: string;
+  provider_template_id: string;
+  provider: "firecrawl" | "deterministic_http" | "ris_ogd";
 };
 
 type CapturedResource = {
@@ -285,7 +331,14 @@ type SourceVersionMutationData = {
   source_id: string;
   version_label: string;
   extractor_profile_id?: string | null;
-  acquisition_spec: FirecrawlAcquisitionSpec;
+  acquisition_spec?: AcquisitionSpec;
+  overlay_id?: string;
+  provider_template_id?: string;
+};
+
+type SourceCreateWithVersionMutationData = {
+  source: Partial<Source>;
+  source_version: Omit<SourceVersionMutationData, "source_id">;
 };
 
 type RequestOptions = {
@@ -528,6 +581,16 @@ const toSourcePayload = (data: Partial<Source>): Partial<Source> => ({
   document_family: normalizeNullableString(data.document_family),
 });
 
+const toSourceCreateWithVersionPayload = (
+  data: SourceCreateWithVersionMutationData,
+): {
+  source: Partial<Source>;
+  source_version: Partial<Omit<SourceVersionMutationData, "source_id">>;
+} => ({
+  source: toSourcePayload(data.source),
+  source_version: toSourceVersionPayload(data.source_version),
+});
+
 const toSourceVersionPayload = (
   data: Partial<SourceVersionMutationData>,
 ): Partial<Omit<SourceVersionMutationData, "source_id">> => {
@@ -539,7 +602,13 @@ const toSourceVersionPayload = (
     payload.extractor_profile_id = normalizeNullableString(data.extractor_profile_id);
   }
   if (data.acquisition_spec !== undefined) {
-    payload.acquisition_spec = data.acquisition_spec as FirecrawlAcquisitionSpec;
+    payload.acquisition_spec = data.acquisition_spec;
+  }
+  if (data.overlay_id !== undefined && data.overlay_id.trim().length > 0) {
+    payload.overlay_id = data.overlay_id.trim();
+  }
+  if (data.provider_template_id !== undefined && data.provider_template_id.trim().length > 0) {
+    payload.provider_template_id = data.provider_template_id.trim();
   }
   return payload;
 };
@@ -624,6 +693,22 @@ export const controlPlaneActions = {
       method: "POST",
     });
     return toRecord(response, "source_version_id");
+  },
+
+  async previewSourceBlueprint(
+    input: SourceBlueprintPreviewInput,
+  ): Promise<SourceBlueprintPreview> {
+    return requestJson<SourceBlueprintPreview>("/v1/sources/blueprint-preview", {
+      method: "POST",
+      body: input,
+    });
+  },
+
+  async listSourceBlueprintTemplates(): Promise<SourceBlueprintTemplate[]> {
+    const response = await requestJson<ListResponse<SourceBlueprintTemplate>>(
+      "/v1/sources/blueprint-templates",
+    );
+    return response.data;
   },
 };
 
@@ -836,6 +921,26 @@ export const controlPlaneDataProvider: DataProvider = {
       });
       return {
         data: toRecord(response, "source_id"),
+      };
+    }
+
+    if (resource === "source-create-wizard") {
+      const mutation = params.data as SourceCreateWithVersionMutationData;
+      const response = await requestJson<{ source: Source; source_version: SourceVersion }>(
+        "/v1/sources/with-version",
+        {
+          method: "POST",
+          body: toSourceCreateWithVersionPayload(mutation),
+        },
+      );
+      return {
+        data: toRecord(
+          {
+            ...response.source,
+            source_version: response.source_version,
+          },
+          "source_id",
+        ),
       };
     }
 

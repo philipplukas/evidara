@@ -7,6 +7,11 @@ from platform_control.database import get_session
 from platform_control.schemas.source import (
     CreateSourceRequest,
     CreateSourceVersionRequest,
+    CreateSourceWithVersionRequest,
+    CreateSourceWithVersionResponse,
+    SourceBlueprintPreviewRequest,
+    SourceBlueprintPreviewResponse,
+    SourceBlueprintTemplateListResponse,
     SourceListResponse,
     SourceResponse,
     SourceVersionListResponse,
@@ -39,6 +44,42 @@ async def create_source(
 ) -> SourceResponse:
     service = SourceService(session)
     return await service.create_source(request)
+
+
+@router.post(
+    "/with-version",
+    response_model=CreateSourceWithVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_source_with_initial_version(
+    request: CreateSourceWithVersionRequest,
+    session: SessionDep,
+) -> CreateSourceWithVersionResponse:
+    service = SourceService(session)
+    source, source_version = await service.create_source_with_initial_version(request)
+    return CreateSourceWithVersionResponse(source=source, source_version=source_version)
+
+
+@router.post("/blueprint-preview", response_model=SourceBlueprintPreviewResponse)
+async def preview_source_blueprint(
+    request: SourceBlueprintPreviewRequest,
+    session: SessionDep,
+) -> SourceBlueprintPreviewResponse:
+    service = SourceService(session)
+    acquisition_spec = await service.preview_source_blueprint(request)
+    return SourceBlueprintPreviewResponse(
+        overlay_id=request.overlay_id,
+        provider_template_id=request.provider_template_id,
+        acquisition_spec=acquisition_spec,
+    )
+
+
+@router.get("/blueprint-templates", response_model=SourceBlueprintTemplateListResponse)
+async def list_source_blueprint_templates(
+    session: SessionDep,
+) -> SourceBlueprintTemplateListResponse:
+    service = SourceService(session)
+    return SourceBlueprintTemplateListResponse(data=await service.list_source_blueprint_templates())
 
 
 @router.get("/{source_id}", response_model=SourceResponse)

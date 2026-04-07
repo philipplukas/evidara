@@ -108,6 +108,121 @@ async def test_create_source_returns_201(client, seed_reference_data) -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_source_with_initial_version_returns_201(client, seed_reference_data) -> None:
+    response = await client.post(
+        "/v1/sources/with-version",
+        json={
+            "source": {
+                "name": "AT Combined Wizard Source",
+                "jurisdiction_id": "jur_ch",
+                "authority_id": "auth_bger",
+                "source_type": "website",
+            },
+            "source_version": {
+                "version_label": "v1",
+                "overlay_id": "at",
+                "provider_template_id": "ris_ogd_bundesrecht",
+            },
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source"]["name"] == "AT Combined Wizard Source"
+    assert body["source_version"]["version_label"] == "v1"
+    assert body["source_version"]["acquisition_spec"]["provider"] == "ris_ogd"
+
+
+@pytest.mark.asyncio
+async def test_create_source_with_initial_version_unknown_template_returns_404(
+    client, seed_reference_data
+) -> None:
+    response = await client.post(
+        "/v1/sources/with-version",
+        json={
+            "source": {
+                "name": "Invalid template source",
+                "jurisdiction_id": "jur_ch",
+                "authority_id": "auth_bger",
+            },
+            "source_version": {
+                "version_label": "v1",
+                "overlay_id": "at",
+                "provider_template_id": "ris_ogd_missing_template",
+            },
+        },
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_source_blueprint_preview_returns_expanded_acquisition_spec(client) -> None:
+    response = await client.post(
+        "/v1/sources/blueprint-preview",
+        json={
+            "overlay_id": "de",
+            "provider_template_id": "deterministic_http_bundesrecht",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["overlay_id"] == "de"
+    assert body["provider_template_id"] == "deterministic_http_bundesrecht"
+    assert body["acquisition_spec"]["provider"] == "deterministic_http"
+
+
+@pytest.mark.asyncio
+async def test_source_blueprint_preview_unknown_template_returns_404(client) -> None:
+    response = await client.post(
+        "/v1/sources/blueprint-preview",
+        json={
+            "overlay_id": "de",
+            "provider_template_id": "deterministic_http_missing_template",
+        },
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_source_blueprint_templates_returns_data(client) -> None:
+    response = await client.get("/v1/sources/blueprint-templates")
+    assert response.status_code == 200
+    body = response.json()
+    assert "data" in body
+    assert any(row["overlay_id"] == "at" for row in body["data"])
+    assert any(
+        row["provider_template_id"] == "deterministic_http_bundesrecht" for row in body["data"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_source_version_rejects_mixed_spec_and_blueprint(
+    client, seed_reference_data
+) -> None:
+    source = await client.post(
+        "/v1/sources",
+        json={
+            "name": "Mixed payload test",
+            "jurisdiction_id": "jur_ch",
+            "authority_id": "auth_bger",
+        },
+    )
+    source_id = source.json()["source_id"]
+    response = await client.post(
+        f"/v1/sources/{source_id}/versions",
+        json={
+            "version_label": "v1",
+            "overlay_id": "at",
+            "provider_template_id": "ris_ogd_bundesrecht",
+            "acquisition_spec": {
+                "seed_url": "https://example.com",
+                "mode": "crawl",
+            },
+        },
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_create_source_without_name_returns_422(client) -> None:
     response = await client.post("/v1/sources", json={})
     assert response.status_code == 422

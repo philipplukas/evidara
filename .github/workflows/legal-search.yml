@@ -108,7 +108,12 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install chromium
+          fi
 
       - name: Run smoke suite
         run: npm run e2e:smoke

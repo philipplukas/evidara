@@ -1,0 +1,85 @@
+overlays:
+  at:
+    provider_templates:
+      ris_ogd_bundesrecht:
+        provider: ris_ogd
+        base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
+        preferred_formats: [Xml, Html]
+        page_size: 20
+        max_pages: 50
+        tenant_id: tenant_public
+        corpus_id: corpus_public_at_bundesrecht
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: decision
+      firecrawl_justice_portal:
+        provider: firecrawl
+        mode: crawl
+        seed_url: https://www.ris.bka.gv.at/
+        include_paths: [/]
+        exclude_paths: [/Suche/]
+        limit: 100
+        max_discovery_depth: 2
+        scrape_formats: [markdown, html]
+        zero_data_retention: false
+        tenant_id: tenant_public
+        corpus_id: corpus_public_at_justice_portal
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: decision
+  de:
+    provider_templates:
+      deterministic_http_bundesrecht:
+        provider: deterministic_http
+        seed_urls:
+          - https://www.gesetze-im-internet.de/
+        tenant_id: tenant_public
+        corpus_id: corpus_public_de_bundesrecht
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+  ch:
+    provider_templates:
+      deterministic_http_fedlex_legislation:
+        provider: deterministic_http
+        seed_urls:
+          - https://www.fedlex.admin.ch/
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_fedlex_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr, it]
+        document_type_hint: legislation
+  fr:
+    provider_templates:
+      deterministic_http_legifrance_codes:
+        provider: deterministic_http
+        seed_urls:
+          - https://www.legifrance.gouv.fr/
+        tenant_id: tenant_public
+        corpus_id: corpus_public_fr_legifrance_codes
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [fr]
+        document_type_hint: legislation
+  it:
+    provider_templates:
+      deterministic_http_normattiva_legislation:
+        provider: deterministic_http
+        seed_urls:
+          - https://www.normattiva.it/
+        tenant_id: tenant_public
+        corpus_id: corpus_public_it_normattiva_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [it]
+        document_type_hint: legislation

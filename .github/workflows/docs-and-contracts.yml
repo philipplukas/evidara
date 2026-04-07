@@ -50,12 +50,21 @@ jobs:
       - name: Run contract guard unit tests
         run: |
           python -m unittest discover -s scripts/tests -p "test_check_contract_version_bump.py"
+          python -m unittest discover -s scripts/tests -p "test_check_country_overlay.py"
 
       - name: Enforce contract manifest version bump
         run: |
           python scripts/check_contract_version_bump.py \
             --base "${{ steps.contract_guard_range.outputs.base_ref }}" \
             --head "${{ steps.contract_guard_range.outputs.head_ref }}"
+
+      - name: Validate country overlays
+        run: |
+          python scripts/check_country_overlay.py --country AT
+          python scripts/check_country_overlay.py --country DE
+          python scripts/check_country_overlay.py --country CH
+          python scripts/check_country_overlay.py --country FR
+          python scripts/check_country_overlay.py --country IT
 
       - name: Install markdownlint
         run: |

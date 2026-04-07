@@ -362,6 +362,190 @@ describe("controlPlaneDataProvider", () => {
     });
   });
 
+  it("creates source and initial version through the wizard endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          source: {
+            source_id: "src_99",
+            name: "AT Combined Wizard Source",
+            description: null,
+            jurisdiction_id: "jur_ch",
+            authority_id: "auth_bger",
+            source_type: "website",
+            document_family: null,
+            status: "active",
+            created_at: "2026-04-07T10:00:00Z",
+            updated_at: "2026-04-07T10:00:00Z",
+          },
+          source_version: {
+            source_version_id: "sv_99",
+            source_id: "src_99",
+            extractor_profile_id: null,
+            version_label: "v1",
+            status: "draft",
+            acquisition_spec: {
+              provider: "ris_ogd",
+              base_url: "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht",
+              preferred_formats: ["Xml", "Html"],
+              page_size: 20,
+              max_pages: 50,
+            },
+            created_at: "2026-04-07T10:00:00Z",
+            updated_at: "2026-04-07T10:00:00Z",
+          },
+        }),
+        {
+          status: 201,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.create("source-create-wizard", {
+      data: {
+        source: {
+          name: "AT Combined Wizard Source",
+          jurisdiction_id: "jur_ch",
+          authority_id: "auth_bger",
+          source_type: "website",
+        },
+        source_version: {
+          version_label: "v1",
+          overlay_id: "at",
+          provider_template_id: "ris_ogd_bundesrecht",
+        },
+      },
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/sources/with-version",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          source: {
+            name: "AT Combined Wizard Source",
+            jurisdiction_id: "jur_ch",
+            authority_id: "auth_bger",
+            source_type: "website",
+            description: undefined,
+            document_family: undefined,
+          },
+          source_version: {
+            version_label: "v1",
+            overlay_id: "at",
+            provider_template_id: "ris_ogd_bundesrecht",
+          },
+        }),
+      }),
+    );
+    expect(result.data).toMatchObject({
+      id: "src_99",
+      source_id: "src_99",
+      source_version: {
+        source_version_id: "sv_99",
+      },
+    });
+  });
+
+  it("supports end-to-end wizard data flow: templates -> preview -> create", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                overlay_id: "at",
+                provider_template_id: "ris_ogd_bundesrecht",
+                provider: "ris_ogd",
+              },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            overlay_id: "at",
+            provider_template_id: "ris_ogd_bundesrecht",
+            acquisition_spec: {
+              provider: "ris_ogd",
+              base_url: "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht",
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            source: {
+              source_id: "src_flow",
+              name: "Flow source",
+              description: null,
+              jurisdiction_id: "jur_ch",
+              authority_id: "auth_bger",
+              source_type: "website",
+              document_family: null,
+              status: "active",
+              created_at: "2026-04-07T10:00:00Z",
+              updated_at: "2026-04-07T10:00:00Z",
+            },
+            source_version: {
+              source_version_id: "sv_flow",
+              source_id: "src_flow",
+              extractor_profile_id: null,
+              version_label: "v1",
+              status: "draft",
+              acquisition_spec: {
+                provider: "ris_ogd",
+                base_url: "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht",
+                preferred_formats: ["Xml", "Html"],
+                page_size: 20,
+                max_pages: 50,
+              },
+              created_at: "2026-04-07T10:00:00Z",
+              updated_at: "2026-04-07T10:00:00Z",
+            },
+          }),
+          { status: 201, headers: { "content-type": "application/json" } },
+        ),
+      ) as typeof fetch;
+
+    const templates = await controlPlaneActions.listSourceBlueprintTemplates();
+    expect(templates[0]?.provider_template_id).toBe("ris_ogd_bundesrecht");
+
+    const preview = await controlPlaneActions.previewSourceBlueprint({
+      overlay_id: "at",
+      provider_template_id: templates[0]!.provider_template_id,
+    });
+    expect(preview.acquisition_spec.provider).toBe("ris_ogd");
+
+    const created = await controlPlaneDataProvider.create("source-create-wizard", {
+      data: {
+        source: {
+          name: "Flow source",
+          jurisdiction_id: "jur_ch",
+          authority_id: "auth_bger",
+          source_type: "website",
+        },
+        source_version: {
+          version_label: "v1",
+          overlay_id: "at",
+          provider_template_id: templates[0]!.provider_template_id,
+        },
+      },
+    });
+    expect(created.data).toMatchObject({
+      source_id: "src_flow",
+      source_version: { source_version_id: "sv_flow" },
+    });
+  });
+
   it("does not send version_label when updating source versions without it", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(
@@ -740,6 +924,87 @@ describe("controlPlaneDataProvider", () => {
       overall_status: "in_progress",
       stages: [{ stage: "acquisition", status: "in_progress" }],
     });
+  });
+
+  it("loads source blueprint previews through the preview endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          overlay_id: "de",
+          provider_template_id: "deterministic_http_bundesrecht",
+          acquisition_spec: {
+            provider: "deterministic_http",
+            seed_urls: ["https://www.gesetze-im-internet.de/"],
+            seed_url: null,
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneActions.previewSourceBlueprint({
+      overlay_id: "de",
+      provider_template_id: "deterministic_http_bundesrecht",
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/sources/blueprint-preview",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          overlay_id: "de",
+          provider_template_id: "deterministic_http_bundesrecht",
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      acquisition_spec: { provider: "deterministic_http" },
+    });
+  });
+
+  it("loads source blueprint templates through the templates endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              overlay_id: "at",
+              provider_template_id: "ris_ogd_bundesrecht",
+              provider: "ris_ogd",
+            },
+            {
+              overlay_id: "de",
+              provider_template_id: "deterministic_http_bundesrecht",
+              provider: "deterministic_http",
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneActions.listSourceBlueprintTemplates();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/sources/blueprint-templates",
+      expect.objectContaining({
+        headers: {
+          Accept: "application/json",
+        },
+      }),
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0]?.overlay_id).toBe("at");
   });
 
   it("fills missing preview summary collections and normalizes drift status", async () => {
