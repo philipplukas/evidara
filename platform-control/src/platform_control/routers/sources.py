@@ -6,13 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from platform_control.database import get_session
 from platform_control.schemas.source import (
     CreateSourceRequest,
+    CreateSourceVersionRequest,
     CreateSourceWithVersionRequest,
     CreateSourceWithVersionResponse,
-    CreateSourceVersionRequest,
-    SourceListResponse,
     SourceBlueprintPreviewRequest,
     SourceBlueprintPreviewResponse,
     SourceBlueprintTemplateListResponse,
+    SourceListResponse,
     SourceResponse,
     SourceVersionListResponse,
     SourceVersionResponse,
@@ -75,9 +75,13 @@ async def preview_source_blueprint(
 
 
 @router.get("/blueprint-templates", response_model=SourceBlueprintTemplateListResponse)
-async def list_source_blueprint_templates(session: SessionDep) -> SourceBlueprintTemplateListResponse:
+async def list_source_blueprint_templates(
+    session: SessionDep,
+) -> SourceBlueprintTemplateListResponse:
     service = SourceService(session)
-    return SourceBlueprintTemplateListResponse(data=await service.list_source_blueprint_templates())
+    return SourceBlueprintTemplateListResponse(
+        data=await service.list_source_blueprint_templates()
+    )
 
 
 @router.get("/{source_id}", response_model=SourceResponse)

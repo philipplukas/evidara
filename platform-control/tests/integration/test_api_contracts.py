@@ -189,14 +189,23 @@ async def test_list_source_blueprint_templates_returns_data(client) -> None:
     body = response.json()
     assert "data" in body
     assert any(row["overlay_id"] == "at" for row in body["data"])
-    assert any(row["provider_template_id"] == "deterministic_http_bundesrecht" for row in body["data"])
+    assert any(
+        row["provider_template_id"] == "deterministic_http_bundesrecht"
+        for row in body["data"]
+    )
 
 
 @pytest.mark.asyncio
-async def test_create_source_version_rejects_mixed_spec_and_blueprint(client, seed_reference_data) -> None:
+async def test_create_source_version_rejects_mixed_spec_and_blueprint(
+    client, seed_reference_data
+) -> None:
     source = await client.post(
         "/v1/sources",
-        json={"name": "Mixed payload test", "jurisdiction_id": "jur_ch", "authority_id": "auth_bger"},
+        json={
+            "name": "Mixed payload test",
+            "jurisdiction_id": "jur_ch",
+            "authority_id": "auth_bger",
+        },
     )
     source_id = source.json()["source_id"]
     response = await client.post(
