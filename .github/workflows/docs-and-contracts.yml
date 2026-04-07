@@ -26,6 +26,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-docs.txt
 
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
       - name: Determine contract guard git range
         id: contract_guard_range
         run: |
@@ -54,7 +59,7 @@ jobs:
 
       - name: Install markdownlint
         run: |
-          npm install -g markdownlint-cli
+          npm install --no-save markdownlint-cli
 
       - name: Install Mermaid validation dependencies
         run: |
@@ -62,7 +67,7 @@ jobs:
 
       - name: Run markdown lint
         run: |
-          markdownlint \
+          npx markdownlint \
             README.md \
             CONTRIBUTING.md \
             SECURITY.md \
