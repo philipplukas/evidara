@@ -62,8 +62,8 @@ Health endpoints after startup:
 
 - `http://127.0.0.1:8000/health` (platform-control API)
 - `http://127.0.0.1:3100` (platform-control admin)
-- `http://127.0.0.1:3001/health` (legal-search API)
-- `http://127.0.0.1:3000` (legal-search frontend)
+- `http://127.0.0.1:3102/health` (legal-search API)
+- `http://127.0.0.1:3101` (legal-search frontend)
 
 Automated check:
 
@@ -117,7 +117,7 @@ npm run dev
 Expected health check:
 
 ```bash
-curl -fsS http://127.0.0.1:3001/health
+curl -fsS http://127.0.0.1:3102/health
 ```
 
 ## Run document-intelligence runtime services

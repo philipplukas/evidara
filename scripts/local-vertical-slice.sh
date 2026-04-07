@@ -172,9 +172,9 @@ check_all() {
 
   pc_api="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health || true)"
   pc_admin="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3100 || true)"
-  ls_api="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/health || true)"
-  ls_ui="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000 || true)"
-  ls_query="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" "http://127.0.0.1:3001/v1/search?q=art%20754" || true)"
+  ls_api="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3102/health || true)"
+  ls_ui="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3101 || true)"
+  ls_query="$(curl --max-time 10 -sS -o /dev/null -w "%{http_code}" "http://127.0.0.1:3102/v1/search?q=art%20754" || true)"
 
   echo "platform-control API /health: ${pc_api}"
   echo "platform-control admin /:     ${pc_admin}"
