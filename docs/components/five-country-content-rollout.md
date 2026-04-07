@@ -4,6 +4,57 @@
 
 Define one shared content model for legal-search users and platform-control operators that scales across Switzerland, Austria, Germany, France, and Italy without country-specific drift.
 
+## Current state
+
+This document is the **authoritative product and operator content model** for the five-country rollout. Shared taxonomy dimensions and overlay principles are agreed; phased implementation follows [Rollout sequencing and quality gates](#rollout-sequencing-and-quality-gates) below. Legal-search filters, copy, and platform-control onboarding text should converge on the canonical keys described here before expanding country-specific UI.
+
+## Source of truth
+
+| Layer | Source of truth |
+|-------|-----------------|
+| Canonical keys (`jurisdiction`, `source_family`, `court_level`, etc.) | `contracts/` (schemas, vocabularies, OpenAPI) — changes require contract review |
+| Country overlay defaults and templates | Versioned overlay packages / YAML treated as policy (not mutated by crawls at runtime) |
+| Operator procedures | `docs/runbooks/platform-control-multi-country-operator-playbook.md` and related runbooks |
+| End-user copy and facet labels | `legal-search/` (must map to canonical keys; no ad hoc per-country keys) |
+
+## Minimal next tasks
+
+- [ ] Complete Phase 1 (CH + AT): reference content pack, stable labels, executable operator checklist (see gates below).
+- [ ] Add DE + FR overlays (Phase 2) without changing canonical keys unless contracts change.
+- [ ] Add IT overlay and run five-country terminology diff (Phase 3).
+- [ ] Track progress with [Five-country acceptance checklist](#five-country-acceptance-checklist).
+
+## Later expansion
+
+| Phase | Focus |
+|-------|--------|
+| After Phase 3 | Shared glossary published across user and operator docs; automated diff between overlay YAML and UI strings |
+| Future | Additional countries reusing the same canonical layer; optional locale-specific display names behind stable keys |
+
+## Dependencies
+
+| Dependency | Role |
+|------------|------|
+| Contracts / vocabularies | Stable keys for jurisdictions, source families, and facets |
+| Legal-search frontend | Surfaces labels and filters bound to canonical keys |
+| Platform-control | Source onboarding, approvals, and run segmentation aligned to the model |
+| Document intelligence / corpus metadata | Language and document-type signals feeding trust and translation UX |
+
+## Testing
+
+- **Contract tests** — any new canonical key or vocabulary value must ship with schema/OpenAPI updates and validation in CI.
+- **UX / copy review** — Phase gates require no unresolved label conflicts between active country pairs (e.g. CH vs AT for Phase 1).
+- **Operator drills** — Runbook checklist executed end-to-end per phase gate before expanding to the next country set.
+
+## Drift risks
+
+| Risk | Mitigation |
+|------|------------|
+| Country-specific aliases without canonical mapping | Overlay write policy: discovery emits candidates only; humans approve mapping changes |
+| Divergent UI labels for the same key | Single glossary; legal-search uses canonical keys internally |
+| Runtime mutation of overlay config | Acquisition runs must not edit overlay files; use reviewed config changes only |
+| Contract key drift from marketing or legal wording | Changes flow through contracts first, then UI and runbooks |
+
 ## Problem statement
 
 The product already supports multi-jurisdiction filtering and operator run flows, but content semantics are not yet explicitly normalized for:

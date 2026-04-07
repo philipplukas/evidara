@@ -1,5 +1,10 @@
 # Argilla Review Routing and Sync
 
+Owner: Platform team  
+Last reviewed: 2026-04-07  
+Last verified: 2026-04-07 (docs metadata and CI runbook lint)  
+Applies to: dev, staging (platform-control API + Argilla integration)
+
 ## Purpose
 
 Define how platform-control routes uncertain extraction results to Argilla and ingests reviewer outcomes back into control-plane records.

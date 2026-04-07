@@ -46,6 +46,9 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 |---|---|
 | [Architecture](architecture/system-context.md) | System context, storage, communication |
 | [Temporal + Argilla Wizard](architecture/temporal-argilla-wizard-architecture.md) | Hybrid discovery/extraction workflow, contracts, and SLOs |
+| [Wizard / Temporal / Argilla rollout](setup/platform-control-wizard-temporal-argilla-rollout.md) | Post-merge migrations, env vars, worker, smoke checks |
+| [Multi-country operator playbook](runbooks/platform-control-multi-country-operator-playbook.md) | CH/AT/DE/FR/IT onboarding, approval, triage |
+| [Argilla review routing](runbooks/argilla-review-routing-and-sync.md) | Review task enqueue and sync-from-Argilla |
 | [ADRs](adr/0001-monorepo-structure.md) | Architecture decisions |
 | [Components](components/legal-search.md) | Domain component documentation |
 | [Testing](testing/README.md) | Testing strategy and guides |

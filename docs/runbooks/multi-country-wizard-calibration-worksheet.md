@@ -2,6 +2,7 @@
 
 Owner: Platform team  
 Last reviewed: 2026-04-07  
+Last verified: 2026-04-07 (docs metadata and CI runbook lint)  
 Applies to: CH, AT, DE, FR, IT rollout waves
 
 ## Purpose
