@@ -152,6 +152,7 @@ variable "runtime_service_account_ids" {
   type        = map(string)
   default = {
     platform_control_api    = "evidara-platform-control-api"
+    platform_control_admin  = "evidara-platform-control-admin"
     platform_control_worker = "evidara-platform-control-worker"
     legal_search_api        = "evidara-legal-search-api"
     legal_search_frontend   = "evidara-legal-search-frontend"

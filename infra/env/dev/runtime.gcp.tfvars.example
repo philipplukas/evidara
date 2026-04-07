@@ -68,6 +68,24 @@ cloud_run_services = {
     }
   }
 
+  "platform-control-admin" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-dev/runtime/platform-control-admin:latest"
+    service_account_key   = "platform_control_admin"
+    allow_unauthenticated = true
+    env_vars = {
+      PLATFORM_CONTROL_API_URL = "https://platform-control-api-dev.example.run.app"
+    }
+  }
+
+  "legal-search-frontend" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-dev/runtime/legal-search-frontend:latest"
+    service_account_key   = "legal_search_frontend"
+    allow_unauthenticated = true
+    env_vars = {
+      NEXT_PUBLIC_API_URL = "https://legal-search-api-dev.example.run.app"
+    }
+  }
+
   "platform-control-worker" = {
     image               = "europe-west6-docker.pkg.dev/evidara-dev/runtime/platform-control-worker:latest"
     service_account_key = "platform_control_worker"
@@ -265,4 +283,13 @@ cloud_run_jobs = {
 enable_monitoring             = false
 monitoring_notification_email = ""
 # monitoring_slack_webhook_url = ""  # Set via TF_VAR or secrets
+
+runtime_service_account_ids = {
+  platform_control_api    = "evd-pc-api"
+  platform_control_admin  = "evd-pc-admin"
+  platform_control_worker = "evd-pc-worker"
+  legal_search_api        = "evd-ls-api"
+  legal_search_frontend   = "evd-ls-frontend"
+  document_intelligence   = "evd-di-consumer"
+}
 

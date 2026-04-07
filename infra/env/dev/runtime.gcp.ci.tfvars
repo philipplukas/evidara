@@ -3,6 +3,7 @@ project_number = "585502170445"
 
 runtime_service_account_ids = {
   platform_control_api    = "evd-pc-api"
+  platform_control_admin  = "evd-pc-admin"
   platform_control_worker = "evd-pc-worker"
   legal_search_api        = "evd-ls-api"
   legal_search_frontend   = "evd-ls-frontend"

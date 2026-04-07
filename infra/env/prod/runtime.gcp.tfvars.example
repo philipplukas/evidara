@@ -43,6 +43,28 @@ cloud_run_services = {
     vpc_egress    = "PRIVATE_RANGES_ONLY"
   }
 
+  "platform-control-admin" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/platform-control-admin:latest"
+    service_account_key   = "platform_control_admin"
+    allow_unauthenticated = false
+    env_vars = {
+      PLATFORM_CONTROL_API_URL = "https://platform-control-api-prod.example.run.app"
+    }
+    vpc_connector = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
+  }
+
+  "legal-search-frontend" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/legal-search-frontend:latest"
+    service_account_key   = "legal_search_frontend"
+    allow_unauthenticated = false
+    env_vars = {
+      NEXT_PUBLIC_API_URL = "https://legal-search-api-prod.example.run.app"
+    }
+    vpc_connector = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
+  }
+
   "document-intelligence-consumer" = {
     image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/document-intelligence-consumer:latest"
     service_account_key   = "document_intelligence"
@@ -211,4 +233,13 @@ cloud_run_jobs = {
       }
     }
   }
+}
+
+runtime_service_account_ids = {
+  platform_control_api    = "evd-pc-api"
+  platform_control_admin  = "evd-pc-admin"
+  platform_control_worker = "evd-pc-worker"
+  legal_search_api        = "evd-ls-api"
+  legal_search_frontend   = "evd-ls-frontend"
+  document_intelligence   = "evd-di-consumer"
 }
