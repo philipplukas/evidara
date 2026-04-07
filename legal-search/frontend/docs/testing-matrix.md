@@ -38,15 +38,14 @@ It maps each UX journey to the narrowest automated test layer that should own it
 | Detail header | Pin toggle, copy citation | Covered | `interaction-controls.test.tsx` |
 | Detail tabs | Details/Related/References/Annotation/Structure tab switch | Covered | `detail-panel.test.tsx`, `interaction-controls.test.tsx` |
 | Exact-match strip | Exact match quick-select buttons | Covered | `interaction-controls.test.tsx` |
-| Filter panel | Dropdown/select, toggles, checkboxes/chips | Partial | `interaction-controls.test.tsx` + additional tests needed for each filter type |
-| Mobile sheets | Open/close Filters and Detail sheets | Partial | Browser coverage exists indirectly; direct mobile interaction tests still needed |
+| Filter panel | Dropdown/select, toggles, checkboxes/chips, clear/reset actions | Covered | `interaction-controls.test.tsx`, `search-constraints.test.tsx`, `use-search.test.ts` |
+| Mobile sheets | Open/close Filters and Detail sheets + mobile search callback wiring | Covered | `workspace-client.mobile.test.tsx`, browser smoke coverage |
 | Keyboard paths | Escape close detail, tab order, Enter/Space on key controls | Partial | Escape covered in `workspace-client.test.tsx` and `smoke.spec.ts`; tab-order/Enter matrix pending |
 
 ### Remaining Gaps
 
 - Full keyboard accessibility matrix for all interactive controls (Tab + Enter/Space + focus rings).
-- Dedicated mobile interaction tests for opening/closing filter/detail sheets.
-- Filter panel option-type matrix (checkbox/toggle/chip/dropdown) with explicit assertions per type.
+- Expand keyboard coverage for mobile sheet focus management after open/close transitions.
 
 ## Testing Policy
 

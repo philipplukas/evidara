@@ -70,7 +70,7 @@ stateDiagram-v2
    - Expandable groups with checkbox, chip, dropdown, or toggle controls
    - In-group search for facets with >5 options
 
-> **Note:** Filters are currently local state only — not yet wired to BFF/search.
+> **Note:** Context and refinement filters are URL-backed and trigger live BFF search requests.
 
 ---
 

@@ -115,7 +115,7 @@ The `document.processed` event points at those surfaces through `published_docum
 
 User-facing **document detail** in the request path goes through the **Document Service** (see [ADR-0010](../adr/0010-document-content-format.md)): the BFF calls a DI-owned read API that returns only contract-shaped content from those published surfaces, not ad hoc Delta paths.
 
-For the current M4 slice, this read path is still planned. The in-repo `legal-search` BFF currently serves detail from OpenSearch while the projection and indexing path is being built out.
+For the current M4 slice, the in-repo `legal-search` BFF serves detail from OpenSearch first and performs a deterministic fallback to the DI Document Service only when body content is missing (`content_docling`/`content` empty). This keeps request-path behavior stable while projection and indexing continue to mature.
 
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%

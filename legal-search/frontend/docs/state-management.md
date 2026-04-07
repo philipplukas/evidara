@@ -58,8 +58,8 @@ interface SearchConstraintsState {
 | `SET_OFFICIAL_ONLY` | ContextBar toggle | Toggle official sources flag |
 | `SET_REFINEMENT` | FilterPanel checkbox/chip | Upsert a field-level refinement |
 | `CLEAR_REFINEMENT` | FilterPanel deselect all | Remove a single field refinement |
-| `CLEAR_ALL_REFINEMENTS` | (planned) Reset button | Clear all refinements |
-| `RESET_ALL` | (planned) | Reset entire state |
+| `CLEAR_ALL_REFINEMENTS` | FilterPanel "Clear refinements" action | Clear all refinements |
+| `RESET_ALL` | FilterPanel "Reset all" action | Reset entire context + refinements |
 
 ### Consumers
 

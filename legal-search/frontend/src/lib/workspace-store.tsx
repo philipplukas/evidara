@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, type Dispatch, type ReactNode, useContext, useReducer } from "react";
+import {
+  createContext,
+  type Dispatch,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useReducer,
+} from "react";
 import type {
   PinnedItem,
   ResultSet,
@@ -13,6 +20,7 @@ import type {
 
 export type WorkspaceAction =
   | { type: "SEARCH"; query: string; results: SearchResultViewModel[] }
+  | { type: "RESET_FROM_BOOT"; query: string; results: SearchResultViewModel[] }
   | {
       type: "PIVOT";
       source: ResultSetSource;
@@ -56,6 +64,7 @@ function createInitialState(results: SearchResultViewModel[], query: string): Wo
 function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
     case "SEARCH":
+    case "RESET_FROM_BOOT":
       return {
         ...state,
         resultSet: {
@@ -64,6 +73,7 @@ function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): Works
           scopeLabel: `Results for "${action.query}"`,
         },
         resultSetStack: [],
+        trail: [],
       };
 
     case "PIVOT":
@@ -148,6 +158,14 @@ export function WorkspaceProvider({
     workspaceReducer,
     createInitialState(initialResults, initialQuery),
   );
+
+  useEffect(() => {
+    dispatch({
+      type: "RESET_FROM_BOOT",
+      query: initialQuery,
+      results: initialResults,
+    });
+  }, [initialQuery, initialResults]);
 
   return (
     <WorkspaceContext.Provider value={{ state, dispatch }}>{children}</WorkspaceContext.Provider>

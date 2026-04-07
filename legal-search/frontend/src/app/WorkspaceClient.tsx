@@ -50,9 +50,11 @@ export default function WorkspaceClient({
 
   // URL state via nuqs — replaces manual useSearchParams + router.replace
   const [selectedId, setSelectedId] = useQueryState("item", parseAsString);
+  const [urlQuery] = useQueryState("q", parseAsString.withDefault(""));
 
   const leftRef = useRef<PanelImperativeHandle>(null);
   const rightRef = useRef<PanelImperativeHandle>(null);
+  const hasAppliedInitialConstraintsRef = useRef(false);
 
   const isDetailOpen = Boolean(selectedId);
   const {
@@ -78,6 +80,15 @@ export default function WorkspaceClient({
     [setSelectedId, dispatch, state.resultSet.items],
   );
 
+  const executeSearch = useCallback(
+    async (query: string) => {
+      const { results, filters: nextFilters } = await runSearch(query, constraints);
+      setActiveFilters(nextFilters);
+      dispatch({ type: "SEARCH", query, results });
+    },
+    [constraints, dispatch],
+  );
+
   const handlePivot = useCallback(
     async (label: string, sourceId: string) => {
       const sourceResult = state.resultSet.items.find((r) => r.id === sourceId);
@@ -98,14 +109,7 @@ export default function WorkspaceClient({
     [dispatch, state.resultSet, constraints],
   );
 
-  const handleSearch = useCallback(
-    async (query: string) => {
-      const { results, filters: nextFilters } = await runSearch(query, constraints);
-      setActiveFilters(nextFilters);
-      dispatch({ type: "SEARCH", query, results });
-    },
-    [constraints, dispatch],
-  );
+  const handleSearch = executeSearch;
 
   const handlePin = useCallback(
     (id: string, title: string, type: string) => {
@@ -119,6 +123,21 @@ export default function WorkspaceClient({
   );
 
   const pinnedIds = new Set(state.pinned.map((p) => p.id));
+
+  useEffect(() => {
+    if (!urlQuery) return;
+    if (!hasAppliedInitialConstraintsRef.current) {
+      hasAppliedInitialConstraintsRef.current = true;
+      const hasNonDefaultConstraints =
+        constraints.context.jurisdictions.join(",") !== "ch" ||
+        constraints.context.languages.join(",") !== "de" ||
+        constraints.context.sourceType !== null ||
+        constraints.context.officialOnly ||
+        constraints.refinements.length > 0;
+      if (!hasNonDefaultConstraints) return;
+    }
+    void executeSearch(urlQuery);
+  }, [constraints, executeSearch, urlQuery]);
 
   // Desktop panel sync
   useEffect(() => {
@@ -173,6 +192,7 @@ export default function WorkspaceClient({
         onPin={handlePin}
         pinnedIds={pinnedIds}
         onCloseDetail={() => setSelectedId(null)}
+        onSearch={handleSearch}
         showControlPlaneEntry={showControlPlaneEntry}
         controlPanelUrl={controlPanelUrl}
       />

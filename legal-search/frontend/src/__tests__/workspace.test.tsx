@@ -231,4 +231,37 @@ describe("WorkspaceProvider", () => {
     expect(result.current.state.trail[0].id).toBe("r1");
     expect(result.current.state.trail[1].id).toBe("r2");
   });
+
+  it("RESET_FROM_BOOT synchronizes workspace to latest bootstrap state", () => {
+    const { result } = renderHook(() => useWorkspace(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({
+        type: "PIVOT",
+        source: {
+          type: "pivot",
+          label: "Decisions",
+          parentSource: result.current.state.resultSet.source,
+        },
+        results: pivotResults,
+        scopeLabel: "Decisions",
+      });
+      result.current.dispatch({
+        type: "PUSH_TRAIL",
+        entry: { id: "r2", title: "BGer 4A_123", type: "decision", timestamp: 1 },
+      });
+    });
+
+    act(() => {
+      result.current.dispatch({
+        type: "RESET_FROM_BOOT",
+        query: "New query",
+        results: mockResults,
+      });
+    });
+
+    expect(result.current.state.resultSet.source).toEqual({ type: "search", query: "New query" });
+    expect(result.current.state.resultSetStack).toEqual([]);
+    expect(result.current.state.trail).toEqual([]);
+  });
 });

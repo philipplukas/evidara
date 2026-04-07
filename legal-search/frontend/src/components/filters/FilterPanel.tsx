@@ -13,11 +13,30 @@ interface FilterPanelProps {
 }
 
 export function FilterPanel({ filters }: FilterPanelProps) {
+  const { state: constraints, dispatch } = useSearchConstraints();
   const t = useTranslations();
+  const hasRefinements = constraints.refinements.length > 0;
   return (
     <div className="py-4 space-y-1">
-      <div className="px-4 pb-3">
+      <div className="px-4 pb-3 space-y-2">
         <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
+        <div className="flex items-center gap-3 text-xs">
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "CLEAR_ALL_REFINEMENTS" })}
+            disabled={!hasRefinements}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t("filter.clearAll")}
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "RESET_ALL" })}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {t("filter.resetAll")}
+          </button>
+        </div>
       </div>
       {filters.map((filter) => (
         <FilterGroup key={filter.key} filter={filter} />
