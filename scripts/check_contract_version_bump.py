@@ -22,6 +22,22 @@ def run(args: list[str]) -> str:
     return proc.stdout
 
 
+def changed_files_between(base: str, head: str) -> list[str]:
+    """Return changed files between refs with resilient merge-base fallback."""
+    try:
+        changed_raw = run(["git", "diff", "--name-only", f"{base}...{head}"])
+    except RuntimeError as exc:
+        message = str(exc)
+        if "no merge base" not in message.lower():
+            raise
+        print(
+            "Warning: git diff with triple-dot failed due to missing merge base; "
+            "falling back to two-dot range comparison."
+        )
+        changed_raw = run(["git", "diff", "--name-only", f"{base}..{head}"])
+    return [line.strip() for line in changed_raw.splitlines() if line.strip()]
+
+
 def load_manifest_version_from_file(path: Path) -> str:
     if not path.exists():
         raise RuntimeError(f"Missing manifest file: {path}")
@@ -46,16 +62,8 @@ def load_manifest_version_from_git(ref: str) -> str | None:
     return data["version"].strip()
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Require contracts/manifest.yaml version bump on contract changes."
-    )
-    parser.add_argument("--base", required=True, help="Base git ref/sha")
-    parser.add_argument("--head", default="HEAD", help="Head git ref/sha (default: HEAD)")
-    args = parser.parse_args()
-
-    changed_raw = run(["git", "diff", "--name-only", f"{args.base}...{args.head}"])
-    changed_files = [line.strip() for line in changed_raw.splitlines() if line.strip()]
+def evaluate(base: str, head: str) -> int:
+    changed_files = changed_files_between(base, head)
     locked_changed = [p for p in changed_files if p.startswith(LOCKED_PREFIXES)]
 
     if not locked_changed:
@@ -74,7 +82,7 @@ def main() -> int:
         return 2
 
     current_version = load_manifest_version_from_file(Path(MANIFEST_PATH))
-    base_version = load_manifest_version_from_git(args.base)
+    base_version = load_manifest_version_from_git(base)
     if base_version is None:
         print(
             "Manifest is newly introduced relative to base; treating as valid version declaration."
@@ -92,6 +100,16 @@ def main() -> int:
         f"✅ contracts/manifest.yaml version bumped: {base_version} -> {current_version}."
     )
     return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Require contracts/manifest.yaml version bump on contract changes."
+    )
+    parser.add_argument("--base", required=True, help="Base git ref/sha")
+    parser.add_argument("--head", default="HEAD", help="Head git ref/sha (default: HEAD)")
+    args = parser.parse_args()
+    return evaluate(args.base, args.head)
 
 
 if __name__ == "__main__":

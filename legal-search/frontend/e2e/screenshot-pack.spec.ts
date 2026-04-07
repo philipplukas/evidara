@@ -7,7 +7,7 @@ import { mockSearchApi } from "./helpers/mock-api";
 const SEARCH_PLACEHOLDER =
   /search article, case, commentary, citation|nach artikel, urteil, kommentar oder zitat|rechercher un article, un arrêt, un commentaire ou une citation/i;
 const LEGAL_SEARCH_BASE_URL =
-  process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3000";
+  process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3101";
 const ADMIN_BASE_URL = process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://localhost:3100";
 const UI_PROFILE_COOKIE = "evidara-ui-profile";
 const ADMIN_LOCAL_STORAGE_ROLE_KEY = "evidara_user_role";
@@ -29,6 +29,22 @@ async function saveOperatorJourneyEvents(page: Page) {
   });
   await mkdir(OUTPUT_DIR, { recursive: true });
   await writeFile(join(OUTPUT_DIR, "operator-journey-events.json"), JSON.stringify(events, null, 2));
+}
+
+async function gotoWithRetry(page: Page, url: string, attempts = 3) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await page.goto(url, { waitUntil: "load" });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        await page.waitForTimeout(1000 * attempt);
+      }
+    }
+  }
+  throw lastError;
 }
 
 test.describe("Canonical screenshot evidence pack", () => {
@@ -61,7 +77,7 @@ test.describe("Canonical screenshot evidence pack", () => {
 
     await saveScreenshot(page, "legal-search-detail-panel.png");
 
-    await page.goto(`${ADMIN_BASE_URL}/#/runs`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs`);
     await expect(page.getByRole("button", { name: "Create Run" })).toBeVisible();
     await page.getByRole("button", { name: "Create Run" }).click();
     const createRunDialog = page.getByRole("dialog", { name: "Create Run" });
@@ -73,7 +89,7 @@ test.describe("Canonical screenshot evidence pack", () => {
     await expect(page.getByText(/Run is blocked until preflight checks pass/i)).toBeVisible();
     await saveScreenshot(page, "admin-run-launch-preflight.png");
 
-    await page.goto(`${ADMIN_BASE_URL}/#/runs/run_01/show`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs/run_01/show`);
     await expect(page.getByRole("heading", { name: "Pipeline Health" })).toBeVisible();
     await expect(page.getByText("Operator Checklist")).toBeVisible();
     await expect(page.getByRole("link", { name: "Open DI processing status" })).toBeVisible();
