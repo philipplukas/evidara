@@ -20,7 +20,7 @@ info:
     identifier: UNLICENSED
 
 servers:
-  - url: http://localhost:3001
+  - url: http://localhost:3102
     description: Local development
   - url: https://legal-search.evidara.dev
     description: Production
@@ -50,11 +50,36 @@ paths:
           schema:
             type: string
           description: Filter by jurisdiction (ISO 3166-1 alpha-2)
+        - name: jurisdictions
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of jurisdiction filters
+        - name: languages
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of language filters
         - name: document_type
           in: query
           schema:
             type: string
           description: Filter by document type
+        - name: document_types
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of document type filters
+        - name: official_only
+          in: query
+          schema:
+            type: boolean
+          description: Limit results to official sources only
+        - name: refinements
+          in: query
+          schema:
+            type: string
+          description: JSON-encoded refinement filter array
         - name: page
           in: query
           schema:

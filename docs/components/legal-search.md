@@ -8,7 +8,7 @@ Serve legal and document search and detail experiences to users. Legal-search is
 
 The `legal-search/` folder contains:
 
-- **Frontend (Next.js 16):** Full workspace UI with resizable panels, filter panel, result list, detail panel with tabs, mobile layout. 43 components using shadcn/radix primitives and a custom design system. Currently rendering mock data.
+- **Frontend (Next.js 16):** Full workspace UI with resizable panels, filter panel, result list, detail panel with tabs, mobile layout. 43 components using shadcn/radix primitives and a custom design system. Default runtime uses the live BFF via generated clients; e2e keeps an explicit mock mode for deterministic smoke checks.
 - **BFF (NestJS):** Search and document detail endpoints wired to OpenSearch. Contract-first ViewModel mappers (ADR-0011, ADR-0012) with vocabulary-driven labels and observable fallbacks. 104 tests passing. Labels are in German (ADR-0013).
 - **OpenSearch adapters:** Search with multi_match, faceted aggregations (jurisdiction, document type, language), highlight-based snippets. Document detail with sections and citations.
 - **Seed pipeline:** Script to ingest Swiss court decisions from opencaselaw.ch into a local OpenSearch index.
@@ -62,7 +62,6 @@ A user can:
 
 | Phase | Capability |
 |-------|-----------|
-| Next | Connect frontend to live BFF |
 | Next | Section-level search |
 | Next | Citation-aware search |
 | Next | i18n: French and Italian UI (ADR-0013) |

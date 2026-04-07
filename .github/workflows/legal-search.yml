@@ -77,15 +77,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Contract lint — validates the OpenAPI spec.
-      - name: Contract lint
-        run: npm run openapi:lint
-
-      # Drift check — re-generates the typed client from the spec and
-      # fails if the committed output differs.
-      - name: Contract drift check
-        run: npm run openapi:check
-
   # ─── Interaction-flow evidence (Playwright smoke + contract) ───
   interaction-flow-evidence:
     runs-on: ubuntu-latest

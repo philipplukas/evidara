@@ -16,7 +16,9 @@
   "filter": {
     "filtersTitle": "Filtres",
     "searchPlaceholder": "Rechercher...",
-    "yes": "Oui"
+    "yes": "Oui",
+    "clearAll": "Effacer les filtres",
+    "resetAll": "Réinitialiser"
   },
   "context": {
     "officialSourcesOnly": "Sources officielles uniquement"

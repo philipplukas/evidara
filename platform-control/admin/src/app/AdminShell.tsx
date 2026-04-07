@@ -41,7 +41,7 @@ export default function AdminShell() {
   const allowedRoles = parseAllowedRoles(process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES ?? "admin");
   const effectiveAllowedRoles = allowedRoles.length > 0 ? allowedRoles : ["admin"];
   const legalSearchUrl =
-    process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3000";
+    process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
 
   useEffect(() => {
     setUserRole(resolveUserRole(fallbackRole));
