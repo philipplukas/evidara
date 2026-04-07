@@ -27,7 +27,7 @@ permissions:
 jobs:
   platform-control:
     name: Build platform-control image
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout
@@ -82,10 +82,12 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   legal-search-api:
     name: Build legal-search API image
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout
@@ -140,10 +142,12 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   legal-search-frontend:
     name: Build legal-search frontend image
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout
@@ -198,10 +202,12 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   platform-control-admin:
     name: Build platform-control admin image
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout
@@ -256,10 +262,12 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   platform-control-worker:
     name: Build platform-control worker image
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout
@@ -314,10 +322,12 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   document-intelligence-consumer:
     name: Build document-intelligence consumer image
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout
@@ -372,3 +382,5 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
