@@ -1,7 +1,7 @@
 # Runtime Stack — Architecture & Operations Runbook
 
 Owner: Platform Team
-Last reviewed: 2026-04-06
+Last reviewed: 2026-04-08
 Last verified: 2026-04-06
 Applies to: dev, staging, prod
 
@@ -271,12 +271,20 @@ gcloud run jobs execute os-alias-check-staging \
 ### 7. Release Readiness Go/No-Go Operation
 
 `Release Readiness` is the release-lane gate of truth for `staging`. It
-evaluates four signals together:
+evaluates six gating signals together:
 
 1. Latest `E2E Smoke Staging` result
-2. Latest `Terraform` workflow result
-3. DI schema drift preflight
-4. DLQ depth (15-minute max undelivered messages)
+2. Latest `Interaction Flow Staging Evidence` result
+3. Interaction-flow artifact completeness quick-check
+4. Latest `Terraform` workflow result
+5. DI schema drift preflight
+6. DLQ depth (15-minute max undelivered messages)
+
+The generated report also includes:
+
+- an `Evidence quality score` row derived from the interaction-flow run plus artifact completeness
+- a copy/paste `Runbook Verification Log Row` when the interaction-flow artifact quick-check passes
+- a GCS copy of the rendered report at `${INTERACTION_FLOW_EVIDENCE_GCS_ROOT}/release-readiness/<run_id>/report.md`
 
 Manual trigger options:
 
@@ -290,7 +298,7 @@ gh workflow run "Release Readiness" -f strict=false
 
 Interpretation:
 
-- `GO`: all four signals pass in the generated report.
+- `GO`: all six gating signals pass in the generated report.
 - `NO-GO`: at least one signal failed; follow owner-first remediation below
   before attempting release.
 
@@ -299,6 +307,8 @@ Interpretation:
 | Signal | Primary owner | Backup owner | First response |
 |--------|---------------|--------------|----------------|
 | E2E Smoke Staging failed | Platform Team | Document-Intelligence Team | Inspect latest smoke logs/artifacts, rerun after fix |
+| Interaction Flow Staging Evidence failed | Platform Team | Legal-Search Team | Inspect Playwright artifacts, screenshot pack output, and rerun staging evidence |
+| Interaction-flow artifact completeness failed | Platform Team | Legal-Search Team | Run `scripts/check-latest-interaction-flow-evidence.sh --mode staging`, repair missing artifact contents, rerun gate |
 | Terraform workflow failed/drifted | Platform Team | Repo Maintainer on duty | Resolve plan/apply failure and rerun Terraform workflow |
 | DI schema drift preflight failed | Document-Intelligence Team | Platform Team | Investigate surface schema drift, remediate per DI runbook, rerun gate |
 | DLQ depth non-zero | Platform Team | Legal-Search Team | Triage DLQ root cause and replay per DLQ runbook |
