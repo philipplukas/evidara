@@ -101,6 +101,12 @@ Changes to files in `contracts/` require additional scrutiny:
 
 ## Required Local Checks
 
+Install hooks once per clone (idempotent):
+
+```bash
+pre-commit install
+```
+
 Run before opening a PR:
 
 ```bash
@@ -109,7 +115,11 @@ pre-commit run --all-files
 
 This runs markdownlint, schema validation, contract checks, doc checks, and legal-search typecheck/lint/test.
 
+**Git worktrees:** If `main` is already checked out in another worktree, you cannot switch to `main` here. Use a branch that tracks `origin/main` (for example `synced-with-main`) or a short-lived `feat/` / `fix/` / `chore/` branch from `origin/main`.
+
 Documentation checks now include Mermaid validation. Install the pinned repo-root Node dependencies once with `npm install` so `npm run --silent check:mermaid` is available locally.
+
+Full doc validation runs MkDocs `build`, which creates a **`site/`** folder at the repo root. **`site/` is gitignored**—never commit it. Delete it with `rm -rf site/` if you want a clean `git status`. See [docs/documentation/README.md](docs/documentation/README.md) (section **Local MkDocs output**).
 
 ### Evidara CLI (API smoke)
 
@@ -120,6 +130,10 @@ Optional end-to-end ping (requires both services reachable):
 ```bash
 EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh
 ```
+
+### Nix (optional macOS wallpaper helper)
+
+The repo flake can serve the bundled GLSL wallpaper pack for use with Plash. See [nix/README.md](nix/README.md).
 
 ## Code Review
 

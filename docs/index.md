@@ -38,22 +38,27 @@ flowchart TB
   IDX -->|index| OS
 ```
 
+
+
 Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `contracts/`. Detailed C4 views: `structurizr/workspace.dsl`.
 
 ## Quick links
 
-| Area | Description |
-|---|---|
-| [Architecture](architecture/system-context.md) | System context, storage, communication |
-| [Temporal + Argilla Wizard](architecture/temporal-argilla-wizard-architecture.md) | Hybrid discovery/extraction workflow, contracts, and SLOs |
-| [Wizard / Temporal / Argilla rollout](setup/platform-control-wizard-temporal-argilla-rollout.md) | Post-merge migrations, env vars, worker, smoke checks |
-| [Multi-country operator playbook](runbooks/platform-control-multi-country-operator-playbook.md) | CH/AT/DE/FR/IT onboarding, approval, triage |
-| [Argilla review routing](runbooks/argilla-review-routing-and-sync.md) | Review task enqueue and sync-from-Argilla |
-| [ADRs](adr/0001-monorepo-structure.md) | Architecture decisions |
-| [Components](components/legal-search.md) | Domain component documentation |
-| [Testing](testing/README.md) | Testing strategy and guides |
-| [Setup](setup/environment-strategy.md) | Development and deployment setup |
-| [API Reference](api/legal-search.md) | OpenAPI interactive docs (legal-search, document-intelligence, platform-control) |
+
+| Area                                                                                             | Description                                                                      |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| [Architecture](architecture/system-context.md)                                                   | System context, storage, communication                                           |
+| [Temporal + Argilla Wizard](architecture/temporal-argilla-wizard-architecture.md)                | Hybrid discovery/extraction workflow, contracts, and SLOs                        |
+| [Wizard / Temporal / Argilla rollout](setup/platform-control-wizard-temporal-argilla-rollout.md) | Post-merge migrations, env vars, worker, smoke checks                            |
+| [Multi-country operator playbook](runbooks/platform-control-multi-country-operator-playbook.md)  | CH/AT/DE/FR/IT onboarding, approval, triage                                      |
+| [Argilla review routing](runbooks/argilla-review-routing-and-sync.md)                            | Review task enqueue and sync-from-Argilla                                        |
+| [ADRs](adr/0001-monorepo-structure.md)                                                           | Architecture decisions                                                           |
+| [Components](components/legal-search.md)                                                         | Domain component documentation                                                   |
+| [Testing](testing/README.md)                                                                     | Testing strategy and guides                                                      |
+| [Setup](setup/environment-strategy.md)                                                           | Development and deployment setup                                                 |
+| [Evidara CLI (API smoke)](https://github.com/philipplukas/evidara/blob/main/tools/evidara-cli/README.md) | `evidara` pings, OpenAPI discovery, env vars per environment |
+| [API Reference](api/legal-search.md)                                                             | OpenAPI interactive docs (legal-search, document-intelligence, platform-control) |
+
 
 ## Repository structure
 

@@ -10,7 +10,7 @@ This is the Evidara monorepo — a document intelligence platform for legal rese
 - **contracts** — OpenAPI specs, JSON Schemas, event schemas (build-time only)
 - **infra** — Terraform, deployment configs, environment definitions
 - **docs** — Architecture, ADRs, runbooks, testing strategy, component docs
-- **tools/evidara-cli** — Typer CLI for agent/operator smoke against platform-control + legal-search (`evidara --help`)
+- **tools/evidara-cli** — Typer CLI for agent/operator smoke against platform-control + legal-search (`evidara --help`); optional `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` when both APIs are reachable
 
 ## Core rules
 

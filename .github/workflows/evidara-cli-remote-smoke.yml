@@ -1,0 +1,51 @@
+# Manual smoke: platform-control + legal-search via evidara-cli against chosen base URLs.
+#
+# Optional repository secrets (Settings → Secrets and variables → Actions). Omit or leave
+# empty when the target environment does not require auth:
+#   EVIDARA_PLATFORM_CONTROL_API_KEY  — sent as X-API-Key
+#   EVIDARA_LEGAL_SEARCH_TOKEN       — sent as Authorization: Bearer …
+#   EVIDARA_LEGAL_SEARCH_API_KEY     — sent as X-API-Key
+#
+# Run: Actions → "Evidara CLI remote smoke" → Run workflow → enter both base URLs.
+name: Evidara CLI remote smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform_control_url:
+        description: Platform-control base URL (no trailing path, e.g. https://api.example.com)
+        required: true
+        type: string
+      legal_search_url:
+        description: Legal-search BFF base URL (e.g. https://bff.example.com)
+        required: true
+        type: string
+
+jobs:
+  remote-smoke:
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    env:
+      EVIDARA_PLATFORM_CONTROL_URL: ${{ inputs.platform_control_url }}
+      EVIDARA_LEGAL_SEARCH_URL: ${{ inputs.legal_search_url }}
+      EVIDARA_PLATFORM_CONTROL_API_KEY: ${{ secrets.EVIDARA_PLATFORM_CONTROL_API_KEY }}
+      EVIDARA_LEGAL_SEARCH_TOKEN: ${{ secrets.EVIDARA_LEGAL_SEARCH_TOKEN }}
+      EVIDARA_LEGAL_SEARCH_API_KEY: ${{ secrets.EVIDARA_LEGAL_SEARCH_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: python -m pip install uv
+
+      - name: Sync CLI and run pings
+        run: |
+          cd tools/evidara-cli
+          uv sync --group dev --quiet
+          uv run evidara platform-control ping
+          uv run evidara legal-search ping

@@ -25,6 +25,12 @@ This directory contains the rules, policies, and templates that govern how Evida
 | [Testing Doc Template](templates/testing-doc-template.md) | New component testing guides |
 | [ADR Template](templates/adr-template.md) | New architecture decision records |
 
+## Local MkDocs output (`site/`)
+
+`python3 -m mkdocs build` and [`scripts/check_docs.sh`](../../scripts/check_docs.sh) write the static HTML site to **`site/`** at the repository root (MkDocs default). That directory is **gitignored**; do not add or commit it. Published docs are built from `docs/` + `mkdocs.yml` in CI / GitHub Pages, not from a checked-in `site/`.
+
+If you already have an untracked `site/` from an older clone, delete it once (`rm -rf site/`) or simply leave it—after updating `.gitignore`, Git ignores it. Prefer `mkdocs serve` for local preview when you only need a browser and not a full strict build artifact.
+
 ## Key Principle
 
 **Deterministic checks fail builds. AI checks suggest.**

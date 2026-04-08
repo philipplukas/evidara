@@ -48,6 +48,7 @@ N/A
 - [ ] `pre-commit run --all-files` passes
 - [ ] CI should pass
 - [ ] Backwards compatible (or breaking changes documented above)
+- [ ] If this PR touches `tools/evidara-cli/**`, `scripts/check-evidara-cli.sh`, `scripts/smoke-evidara-cli.sh`, `.github/workflows/evidara-cli.yml`, or `.github/workflows/evidara-cli-remote-smoke.yml`: ran `pre-commit run evidara-cli-check --all-files` (or full `pre-commit run --all-files`)
 
 ## Scraping / Acquisition QA (Platform-Control Only)
 

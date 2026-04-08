@@ -1,19 +1,45 @@
 import { defineConfig } from "@playwright/test";
 
 const externalBaseUrl = process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim();
-const adminBaseUrl = process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim();
 const expectedControlPanelUrl = process.env.PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL?.trim();
 const useRealBackend = process.env.PLAYWRIGHT_USE_REAL_BACKEND === "true";
+const ci = Boolean(process.env.CI);
+
+/** Trace recording: off | on | retain-on-failure | on-first-retry (see Playwright docs). */
+function traceMode(): "off" | "on" | "retain-on-failure" | "on-first-retry" {
+  const raw = process.env.PLAYWRIGHT_TRACE?.trim().toLowerCase();
+  if (raw === "off") {
+    return "off";
+  }
+  if (raw === "on") {
+    return "on";
+  }
+  if (raw === "on-first-retry" || raw === "on_first_retry") {
+    return "on-first-retry";
+  }
+  if (raw === "retain-on-failure" || raw === "retain_on_failure") {
+    return "retain-on-failure";
+  }
+  // Default: keep traces for failed tests (and use CI retry so flaky journeys self-heal).
+  return "retain-on-failure";
+}
 
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
-  retries: 0,
+  retries: ci ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: externalBaseUrl || "http://localhost:3101",
     headless: true,
     screenshot: "only-on-failure",
+    trace: traceMode(),
+    video:
+      process.env.PLAYWRIGHT_VIDEO === "on"
+        ? "on"
+        : process.env.PLAYWRIGHT_VIDEO === "off"
+          ? "off"
+          : "retain-on-failure",
   },
   webServer: externalBaseUrl
     ? undefined

@@ -59,6 +59,29 @@ Differences between environments are limited to:
 | Secrets | Google Secret Manager, referenced by name |
 | Feature flags | Environment variables (simple) or config service (future) |
 
+## Evidara CLI env vars (dev / staging / prod)
+
+Use [`tools/evidara-cli`](../../tools/evidara-cli/README.md) for quick HTTP checks against **platform-control** and **legal-search** in any environment. Set the variables below from **deploy-time config**, **Google Secret Manager**, or your **operator runbook** — never commit real URLs that embed credentials, API keys, or bearer tokens.
+
+| Variable | Default (local) | Purpose |
+|----------|-----------------|---------|
+| `EVIDARA_PLATFORM_CONTROL_URL` | `http://localhost:8000` | Platform-control base URL |
+| `EVIDARA_PLATFORM_CONTROL_API_KEY` | _(empty)_ | `X-API-Key` when the API requires it |
+| `EVIDARA_LEGAL_SEARCH_URL` | `http://localhost:3102` | Legal-search BFF base URL |
+| `EVIDARA_LEGAL_SEARCH_TOKEN` | _(empty)_ | `Authorization: Bearer …` when configured |
+| `EVIDARA_LEGAL_SEARCH_API_KEY` | _(empty)_ | `X-API-Key` when the API requires it |
+| `EVIDARA_CLI_HUMAN` | `0` | Set to `1` for indented JSON (`evidara` output) |
+| `EVIDARA_REPO_ROOT` | _(auto)_ | Optional override for `evidara openapi paths` |
+| `EVIDARA_CLI_SMOKE` | _(unset)_ | Set to `1` with [`scripts/smoke-evidara-cli.sh`](../../scripts/smoke-evidara-cli.sh) to run both `ping` subcommands |
+
+After exporting the URLs and optional auth vars for the target environment:
+
+```bash
+EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh
+```
+
+For a **manual run from GitHub Actions**, use workflow [`.github/workflows/evidara-cli-remote-smoke.yml`](../../.github/workflows/evidara-cli-remote-smoke.yml): pass service base URLs as inputs and configure repository secrets `EVIDARA_PLATFORM_CONTROL_API_KEY`, `EVIDARA_LEGAL_SEARCH_TOKEN`, and `EVIDARA_LEGAL_SEARCH_API_KEY` when those environments require auth.
+
 ## Folder Structure
 
 ```text
