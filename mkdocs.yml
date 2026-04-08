@@ -56,6 +56,7 @@ nav:
   - Home: index.md
   - Architecture:
       - System Context: architecture/system-context.md
+      - Agentic CLI Workflow: architecture/agentic-cli-workflow-architecture.md
       - Repository Structure: architecture/repository-structure.md
       - Communication Model: architecture/communication-model.md
       - Boundary Contracts: architecture/boundary-contracts.md
@@ -83,6 +84,7 @@ nav:
       - "0013: Internationalization": adr/0013-internationalization-strategy.md
       - "0014: DI Pipeline Integration": adr/0014-document-intelligence-pipeline-integration.md
       - "0015: FastAPI Conventions": adr/0015-fastapi-conventions-platform-control.md
+      - "0022: Agentic CLI Workflow Control Surface": adr/adr-0022-agentic-cli-workflow-control-surface.md
   - Components:
       - Platform Control: components/platform-control.md
       - Document Intelligence: components/document-intelligence.md
