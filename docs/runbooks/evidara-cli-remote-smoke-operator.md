@@ -22,8 +22,8 @@ Secrets cannot be created from git; configure them once in GitHub.
 | `EVIDARA_LEGAL_SEARCH_TOKEN` | `Authorization: Bearer …` on legal-search BFF | BFF expects a bearer token |
 | `EVIDARA_LEGAL_SEARCH_API_KEY` | `X-API-Key` on legal-search BFF | BFF expects `X-API-Key` instead of/in addition to bearer |
 
-3. Leave a secret **unset** if that auth mechanism is not used (empty env in the workflow).
-4. **Actions** → **Evidara CLI remote smoke** → **Run workflow** → enter **platform_control_url** and **legal_search_url** (base URLs only, no path suffix).
+1. Leave a secret **unset** if that auth mechanism is not used (empty env in the workflow).
+2. **Actions** → **Evidara CLI remote smoke** → **Run workflow** → enter **platform_control_url** and **legal_search_url** (base URLs only, no path suffix).
 
 ## Security
 
