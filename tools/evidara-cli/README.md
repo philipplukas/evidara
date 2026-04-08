@@ -25,6 +25,7 @@ Or install the package into an environment of your choice (`pip install -e .` / 
 | `EVIDARA_LEGAL_SEARCH_API_KEY` | _(empty)_ | `X-API-Key` when the API requires it |
 | `EVIDARA_CLI_HUMAN` | `0` | Set to `1` for indented JSON (same as `--human`) |
 | `EVIDARA_REPO_ROOT` | _(auto)_ | Optional override for `evidara openapi paths`; otherwise walks up from cwd for `contracts/api/` |
+| `EVIDARA_CLI_SMOKE` | _(unset)_ | Set to `1` to run [`scripts/smoke-evidara-cli.sh`](../../scripts/smoke-evidara-cli.sh) (both `ping` subcommands) |
 
 ## Commands (wave 1)
 
@@ -75,3 +76,9 @@ uv run pytest
 ```
 
 CI: `.github/workflows/evidara-cli.yml` runs `scripts/check-evidara-cli.sh` when this package or the bootstrap script changes.
+
+Pre-commit runs the same check when files under `tools/evidara-cli/` (or related scripts/workflow) change.
+
+## Roadmap (extend on demand)
+
+Add new **workflow** subcommands when a second golden path is repeated often (wrap `scripts/*.py` or short HTTP sequences). Prefer **not** mirroring every OpenAPI operation in the CLI. Candidates discussed: vertical-slice command (platform-control seed + legal-search query), richer `evidara openapi` (methods per path), optional OpenAPI-generated types.

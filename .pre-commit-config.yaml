@@ -99,6 +99,13 @@ repos:
         pass_filenames: false
         files: ^platform-control/
 
+      - id: evidara-cli-check
+        name: Evidara CLI (ruff + pytest)
+        entry: bash scripts/check-evidara-cli.sh
+        language: system
+        pass_filenames: false
+        files: ^(tools/evidara-cli/|.github/workflows/evidara-cli\.yml|scripts/check-evidara-cli\.sh|scripts/smoke-evidara-cli\.sh|scripts/bootstrap-ris-source\.py)$
+
       - id: document-intelligence-check
         name: Document Intelligence checks (schemas + tests + dbt parse)
         entry: bash scripts/check-document-intelligence.sh

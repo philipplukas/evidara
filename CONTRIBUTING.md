@@ -111,6 +111,16 @@ This runs markdownlint, schema validation, contract checks, doc checks, and lega
 
 Documentation checks now include Mermaid validation. Install the pinned repo-root Node dependencies once with `npm install` so `npm run --silent check:mermaid` is available locally.
 
+### Evidara CLI (API smoke)
+
+The [`tools/evidara-cli/`](tools/evidara-cli/README.md) package installs an `evidara` command for **platform-control** and **legal-search** health/search smoke tests, OpenAPI path discovery, and the RIS bootstrap wrapper. Use it when validating local or deployed APIs (set `EVIDARA_PLATFORM_CONTROL_*` and `EVIDARA_LEGAL_SEARCH_*` as in that README).
+
+Optional end-to-end ping (requires both services reachable):
+
+```bash
+EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh
+```
+
 ## Code Review
 
 - At least **1 review** (human or AI) is required before merging.

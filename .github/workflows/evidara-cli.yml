@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/evidara-cli/**"
       - "scripts/check-evidara-cli.sh"
+      - "scripts/smoke-evidara-cli.sh"
       - "scripts/bootstrap-ris-source.py"
       - ".github/workflows/evidara-cli.yml"
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - "tools/evidara-cli/**"
       - "scripts/check-evidara-cli.sh"
+      - "scripts/smoke-evidara-cli.sh"
       - "scripts/bootstrap-ris-source.py"
       - ".github/workflows/evidara-cli.yml"
 

@@ -6,6 +6,8 @@ Evidara uses three environments: **dev**, **staging**, and **prod**. All environ
 
 Initial environment scaffolding now exists for the `document-intelligence` Databricks stack under [`../../infra/env/`](../../infra/env/).
 
+For quick **HTTP checks** against platform-control and legal-search (after pointing env vars at dev/staging URLs), use [`tools/evidara-cli`](../../tools/evidara-cli/README.md) or `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` (see [CONTRIBUTING.md](../../CONTRIBUTING.md)).
+
 ## Environments
 
 ### dev
