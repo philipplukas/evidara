@@ -1,8 +1,8 @@
 # MVP Demo Package and Release Recommendation
 
 Owner: Platform team
-Last reviewed: 2026-04-06
-Last verified: 2026-04-06
+Last reviewed: 2026-04-08
+Last verified: 2026-04-08
 Applies to: dev, staging
 
 ## Objective
@@ -24,6 +24,7 @@ Primary artifacts:
 
 - `docs/runbooks/mvp-website-walkthrough.md`
 - `docs/runbooks/mvp-acceptance-scenario-pack.md`
+- `docs/runbooks/interaction-flow-validation.md`
 - `docs/runbooks/runtime-stack.md` (release-lane operation)
 
 ## Current Recommendation
@@ -34,6 +35,7 @@ Rationale:
 
 - Technical readiness signal is green (`Release Readiness` strict `GO`).
 - API-level MVP flow evidence is present in dev and staging.
+- Browser interaction evidence is owned by the interaction-flow runbook and staging parity workflow.
 - Website surfaces are published and reachable in dev/staging:
   - legal-search frontend (dev/staging)
   - platform-control admin UI (dev/staging)
@@ -54,6 +56,7 @@ Rationale:
 Promote to full product `GO` only when all are true:
 
 1. `TAR-87` and `TAR-88` completed with walkthrough evidence attached
-2. Acceptance scenario pack rerun and passing in dev and staging
-3. No unresolved blocker findings in website walkthrough
-4. Latest `Release Readiness` run remains `GO`
+2. Latest API acceptance evidence is green in dev and staging via `docs/runbooks/mvp-acceptance-scenario-pack.md`
+3. Latest browser interaction evidence is green via `docs/runbooks/interaction-flow-validation.md`
+4. No unresolved blocker findings in website walkthrough
+5. Latest `Release Readiness` run remains `GO`

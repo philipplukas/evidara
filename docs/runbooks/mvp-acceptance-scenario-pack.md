@@ -19,11 +19,16 @@ uv run evidara workflow mvp-acceptance --human
 
 Preferred surface: [`tools/evidara-cli`](../../tools/evidara-cli/README.md) via `evidara workflow mvp-acceptance`.
 
+CLI output modes:
+
+- default: single-line JSON for agents, CI notes, or follow-on tooling
+- `--human`: pretty-printed JSON for operators
+
 Lower-level helper: `scripts/mvp-acceptance-scenario-pack.sh` remains available when you want a shell-only version of the same API-oriented checks.
 
 The shell helper requires `curl`, `jq`, and `gcloud` with a user that can mint identity tokens for the Cloud Run service URLs (same pattern as [`scripts/e2e-smoke-test.sh`](../../scripts/e2e-smoke-test.sh)).
 
-Output modes:
+Shell helper output modes:
 
 - default: human-readable terminal summary for operators
 - `--json`: machine-readable summary for agents, CI notes, or follow-on tooling
@@ -44,6 +49,16 @@ with parity evidence.
 - `Release Readiness` latest strict run is `GO`.
 - Caller has valid identity token access for Cloud Run services.
 - Runtime services are healthy in target environment.
+
+## Evidence Ownership
+
+Use these surfaces as the source of truth for each evidence type:
+
+- API acceptance evidence: this runbook plus `uv run evidara workflow mvp-acceptance`
+- Browser interaction evidence: [`docs/runbooks/interaction-flow-validation.md`](interaction-flow-validation.md)
+- Release sign-off evidence: latest strict `Release Readiness` workflow run
+
+This runbook is intentionally limited to API and proxy-path confidence. It does not replace browser-visible validation or release-lane sign-off.
 
 ## Scenario Checklist
 
@@ -132,7 +147,9 @@ Automated: Playwright `@smoke` `exposes control panel entrypoint in header` ([`l
 
 ### Release readiness parity
 
-Re-check latest workflow runs before sign-off; historical reference:
+Use the latest strict `Release Readiness` run as the sign-off surface, with this runbook attached as API evidence and [`docs/runbooks/interaction-flow-validation.md`](interaction-flow-validation.md) attached as browser evidence.
+
+Historical reference:
 
 - Strict `GO`: [run 24028370655](https://github.com/philipplukas/evidara/actions/runs/24028370655)
 - Investigation `GO`: [run 24028371278](https://github.com/philipplukas/evidara/actions/runs/24028371278)

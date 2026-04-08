@@ -1,8 +1,8 @@
 # Interaction Flow Validation (UI <-> Control Panel <-> APIs)
 
 Owner: Platform team  
-Last reviewed: 2026-04-06  
-Last verified: 2026-04-06  
+Last reviewed: 2026-04-08  
+Last verified: 2026-04-08  
 Applies to: local, dev, staging
 
 ## Purpose
@@ -15,6 +15,17 @@ Define and validate the highest-risk end-to-end interaction flows across:
 
 This runbook is intentionally risk-first and is used as the acceptance baseline
 before adding lower-priority flow coverage.
+
+## Evidence Boundary
+
+This runbook is the canonical source for browser-visible interaction evidence across legal-search and the platform-control admin UI.
+
+Use companion evidence surfaces for adjacent concerns:
+
+- API acceptance and proxy-route confidence: [`docs/runbooks/mvp-acceptance-scenario-pack.md`](mvp-acceptance-scenario-pack.md) and `uv run evidara workflow mvp-acceptance`
+- Release sign-off: latest strict `Release Readiness` workflow run
+
+This runbook should not become a second home for API-only acceptance evidence.
 
 ## Critical User Journeys
 
@@ -140,6 +151,9 @@ In **CI**, `CI=1` enables **one Playwright retry per test** so flaky journeys ca
   - staging evidence: `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence`
   - quick-check (recommended): `scripts/check-latest-interaction-flow-evidence.sh --mode staging`
   - screenshot pack output path: `legal-search/frontend/screenshot-pack`
+- Companion API acceptance evidence:
+  - runbook: `docs/runbooks/mvp-acceptance-scenario-pack.md`
+  - preferred command: `uv run evidara workflow mvp-acceptance`
 
 ## Canonical Screenshot Evidence Pack
 
