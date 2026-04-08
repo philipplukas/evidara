@@ -1,8 +1,8 @@
 # First Vertical Slice Exit Gates
 
 Owner: Platform team
-Last reviewed: 2026-04-05
-Last verified: 2026-04-06
+Last reviewed: 2026-04-08
+Last verified: 2026-04-08
 Applies to: dev, staging, prod
 
 This runbook defines the minimum verification set to declare the first Evidara vertical slice ready.
@@ -58,6 +58,9 @@ The gate covers:
 - Projection verification must query `GET /v1/projections/events/history?run_id=<run_id>`.
 - Search verification must confirm the exact `document_id` from the run-scoped
   projection history appears in `/v1/search` results.
+- API acceptance evidence for platform-control, legal-search, and proxy routes must come from:
+  - `docs/runbooks/mvp-acceptance-scenario-pack.md`
+  - `uv run evidara workflow mvp-acceptance`
 - Release checklist must include the latest interaction-flow evidence artifact:
   - local/PR evidence: `scripts/fetch-interaction-flow-evidence.sh`
   - staging parity evidence: `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence`
@@ -68,6 +71,7 @@ The gate covers:
     - `legal-search/frontend/playwright-report`
     - `legal-search/frontend/screenshot-pack`
     - `docs/runbooks/interaction-flow-validation.md`
+- Release sign-off must still use the latest strict `Release Readiness` run as the final decision surface.
 
 ## Local Verification Commands
 

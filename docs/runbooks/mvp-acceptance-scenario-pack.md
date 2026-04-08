@@ -45,6 +45,16 @@ with parity evidence.
 - Caller has valid identity token access for Cloud Run services.
 - Runtime services are healthy in target environment.
 
+## Evidence Ownership
+
+Use these surfaces as the source of truth for each evidence type:
+
+- API acceptance evidence: this runbook plus `uv run evidara workflow mvp-acceptance`
+- Browser interaction evidence: [`docs/runbooks/interaction-flow-validation.md`](interaction-flow-validation.md)
+- Release sign-off evidence: latest strict `Release Readiness` workflow run
+
+This runbook is intentionally limited to API and proxy-path confidence. It does not replace browser-visible validation or release-lane sign-off.
+
 ## Scenario Checklist
 
 ### Scenario 1: Platform Control surface is operational
@@ -132,7 +142,9 @@ Automated: Playwright `@smoke` `exposes control panel entrypoint in header` ([`l
 
 ### Release readiness parity
 
-Re-check latest workflow runs before sign-off; historical reference:
+Use the latest strict `Release Readiness` run as the sign-off surface, with this runbook attached as API evidence and [`docs/runbooks/interaction-flow-validation.md`](interaction-flow-validation.md) attached as browser evidence.
+
+Historical reference:
 
 - Strict `GO`: [run 24028370655](https://github.com/philipplukas/evidara/actions/runs/24028370655)
 - Investigation `GO`: [run 24028371278](https://github.com/philipplukas/evidara/actions/runs/24028371278)
