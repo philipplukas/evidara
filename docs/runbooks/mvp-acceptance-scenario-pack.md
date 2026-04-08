@@ -1,9 +1,34 @@
 # MVP Acceptance Scenario Pack (Dev -> Staging)
 
 Owner: Platform team
-Last reviewed: 2026-04-06
-Last verified: 2026-04-06
+Last reviewed: 2026-04-08
+Last verified: 2026-04-08
 Applies to: dev, staging
+
+## Automation
+
+Repeatable HTTP checks (scenarios 1–4) for dev or staging:
+
+```bash
+uv run evidara workflow mvp-acceptance
+uv run evidara workflow mvp-acceptance --human
+./scripts/mvp-acceptance-scenario-pack.sh dev
+./scripts/mvp-acceptance-scenario-pack.sh staging
+./scripts/mvp-acceptance-scenario-pack.sh dev --json
+```
+
+Preferred surface: [`tools/evidara-cli`](../../tools/evidara-cli/README.md) via `evidara workflow mvp-acceptance`.
+
+Lower-level helper: `scripts/mvp-acceptance-scenario-pack.sh` remains available when you want a shell-only version of the same API-oriented checks.
+
+The shell helper requires `curl`, `jq`, and `gcloud` with a user that can mint identity tokens for the Cloud Run service URLs (same pattern as [`scripts/e2e-smoke-test.sh`](../../scripts/e2e-smoke-test.sh)).
+
+Output modes:
+
+- default: human-readable terminal summary for operators
+- `--json`: machine-readable summary for agents, CI notes, or follow-on tooling
+
+Scenario 5 remains browser-verified in the canonical interaction-flow lane (see [`docs/runbooks/interaction-flow-validation.md`](interaction-flow-validation.md) and the Playwright control-panel test in `legal-search/frontend/e2e/smoke.spec.ts`).
 
 ## Purpose
 
@@ -41,7 +66,9 @@ with parity evidence.
 - Take first result `id` from scenario 2
 - Call `GET /v1/documents/{id}` on `legal-search-api-{env}` -> expected `200`
 - Verify response includes:
-  - `id`, `title`, `subtitle`
+  - `id` matching the requested document id
+  - non-empty `title`
+  - non-empty `subtitle`
   - `metadata[]`
   - `tabs[]`
 
@@ -58,7 +85,9 @@ with parity evidence.
 - Verify header shows control-panel link label
 - Verify link target equals configured admin URL
 
-## Latest Verification Evidence (2026-04-06)
+## Latest Verification Evidence (2026-04-08)
+
+Evidence produced by `./scripts/mvp-acceptance-scenario-pack.sh` (dev + staging).
 
 ### Environment health
 
@@ -71,17 +100,17 @@ with parity evidence.
 
 | Query | dev totalResults | staging totalResults |
 |---|---:|---:|
-| `art 754` | 11 | 3 |
-| `haftung` | 11 | 3 |
-| `obligationenrecht` | 11 | 3 |
-| `switzerland` | 11 | 3 |
+| `art 754` | 13 | 6 |
+| `haftung` | 13 | 6 |
+| `obligationenrecht` | 13 | 6 |
+| `switzerland` | 13 | 6 |
 
 ### Detail fetch validation
 
-| Environment | Document ID | `/v1/documents/{id}` |
-|---|---|---|
-| dev | `doc_1gb582v3a8y213hvg3p0n0zk01` | 200 |
-| staging | `doc_49n3ksesast1e2gbw1b7zev9q7` | 200 |
+| Environment | Document ID | `/v1/documents/{id}` | id match, title, subtitle, metadata[], tabs[] |
+|---|---|---|---|
+| dev | `doc_1gb582v3a8y213hvg3p0n0zk01` | 200 | present |
+| staging | `doc_49n3ksesast1e2gbw1b7zev9q7` | 200 | present |
 
 ### Website proxy validation
 
@@ -92,12 +121,18 @@ with parity evidence.
 
 ### UI to admin navigation validation
 
-| Environment | legal-search header link visible | link target configured |
-|---|---:|---:|
-| dev | pending | pending |
-| staging | pending | pending |
+Canonical browser evidence lives in [`docs/runbooks/interaction-flow-validation.md`](interaction-flow-validation.md).
+
+Automated: Playwright `@smoke` `exposes control panel entrypoint in header` ([`legal-search/frontend/e2e/smoke.spec.ts`](../../legal-search/frontend/e2e/smoke.spec.ts)) with `NEXT_PUBLIC_CONTROL_PANEL_URL` / `PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL`. Run locally via `npm run e2e:smoke` in `legal-search/frontend`.
+
+| Environment | legal-search header link | link target |
+|---|---|---|
+| dev | verify in deployed UI with configured env | equals `NEXT_PUBLIC_CONTROL_PANEL_URL` |
+| staging | verify in deployed UI with configured env | equals `NEXT_PUBLIC_CONTROL_PANEL_URL` |
 
 ### Release readiness parity
+
+Re-check latest workflow runs before sign-off; historical reference:
 
 - Strict `GO`: [run 24028370655](https://github.com/philipplukas/evidara/actions/runs/24028370655)
 - Investigation `GO`: [run 24028371278](https://github.com/philipplukas/evidara/actions/runs/24028371278)

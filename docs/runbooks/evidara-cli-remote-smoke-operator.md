@@ -1,6 +1,8 @@
 # Evidara CLI remote smoke — GitHub Actions secrets (operator)
 
 Owner: Platform / DevOps  
+Last reviewed: 2026-04-08  
+Last verified: 2026-04-08  
 Applies to: repository **Actions → Evidara CLI remote smoke** (`.github/workflows/evidara-cli-remote-smoke.yml`)
 
 ## Purpose

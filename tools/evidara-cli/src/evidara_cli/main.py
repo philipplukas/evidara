@@ -8,16 +8,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
+import httpx
 import typer
 
 from evidara_cli.client import (
     HttpJsonError,
     join_url,
     legal_search_base_url,
+    legal_search_frontend_base_url,
     legal_search_headers,
+    platform_control_admin_base_url,
     platform_control_base_url,
     platform_control_headers,
     request_json,
+    request_status,
     use_human_output,
 )
 from evidara_cli.openapi_cmd import openapi_app
@@ -28,6 +32,11 @@ app = typer.Typer(
     help="Evidara APIs — workflows and discovery for humans and agents.",
 )
 app.add_typer(openapi_app, name="openapi")
+workflow = typer.Typer(
+    no_args_is_help=True,
+    help="Cross-component workflow commands for operators and agents.",
+)
+app.add_typer(workflow, name="workflow")
 
 pc = typer.Typer(
     no_args_is_help=True,
@@ -39,6 +48,8 @@ ls = typer.Typer(
 )
 app.add_typer(pc, name="platform-control")
 app.add_typer(ls, name="legal-search")
+
+MVP_ACCEPTANCE_QUERIES = ("art 754", "haftung", "obligationenrecht", "switzerland")
 
 
 def _emit(data: Any, *, human: bool) -> None:
@@ -59,6 +70,47 @@ def _handle_exc(exc: Exception, *, human: bool) -> None:
         _emit(payload, human=human)
         raise typer.Exit(code=1) from exc
     raise exc
+
+
+def _extract_search_total(payload: Any) -> int | str:
+    if isinstance(payload, dict):
+        total = payload.get("totalResults", payload.get("total_results", "n/a"))
+        return total if isinstance(total, int | str) else "n/a"
+    return "n/a"
+
+
+def _first_result_id(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    for key in ("results", "hits", "items"):
+        value = payload.get(key)
+        if isinstance(value, list) and value:
+            first = value[0]
+            if isinstance(first, dict):
+                doc_id = first.get("id")
+                if isinstance(doc_id, str) and doc_id:
+                    return doc_id
+    return None
+
+
+def _detail_checks(payload: Any, *, document_id: str) -> dict[str, bool]:
+    if not isinstance(payload, dict):
+        return {
+            "id_matches_request": False,
+            "title_present": False,
+            "subtitle_present": False,
+            "metadata_is_array": False,
+            "tabs_is_array": False,
+        }
+    title = payload.get("title")
+    subtitle = payload.get("subtitle")
+    return {
+        "id_matches_request": payload.get("id") == document_id,
+        "title_present": isinstance(title, str) and len(title.strip()) > 0,
+        "subtitle_present": isinstance(subtitle, str) and len(subtitle.strip()) > 0,
+        "metadata_is_array": isinstance(payload.get("metadata"), list),
+        "tabs_is_array": isinstance(payload.get("tabs"), list),
+    }
 
 
 @pc.command("ping")
@@ -239,6 +291,155 @@ def ls_document(
     try:
         out = request_json("GET", url, headers=headers, timeout=60.0)
         _emit({"ok": True, "service": "legal-search", "url": url, "response": out}, human=human)
+    except Exception as exc:
+        _handle_exc(exc, human=human)
+
+
+@workflow.command("mvp-acceptance")
+def workflow_mvp_acceptance(
+    human: Annotated[bool, typer.Option("--human", help="Pretty-print JSON")] = False,
+    correlation_id: Annotated[str | None, typer.Option("--correlation-id")] = None,
+) -> None:
+    """Run repeatable API-level MVP acceptance checks across platform-control and legal-search."""
+    pc_base = platform_control_base_url()
+    ls_base = legal_search_base_url()
+    ls_ui_base = legal_search_frontend_base_url()
+    admin_base = platform_control_admin_base_url()
+
+    pc_headers = platform_control_headers(correlation_id=correlation_id)
+    ls_headers = legal_search_headers(correlation_id=correlation_id)
+    ui_headers = {"Accept": "*/*"}
+
+    try:
+        with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+            scenario_1 = {
+                "platform_control_health_http_code": request_status(
+                    "GET",
+                    join_url(pc_base, "/health"),
+                    headers=pc_headers,
+                    client=client,
+                ),
+                "platform_control_sources_http_code": request_status(
+                    "GET",
+                    join_url(pc_base, "/v1/sources"),
+                    headers=pc_headers,
+                    client=client,
+                ),
+            }
+
+            query_results: list[dict[str, Any]] = []
+            first_search_payload: Any | None = None
+            for query in MVP_ACCEPTANCE_QUERIES:
+                payload = request_json(
+                    "GET",
+                    join_url(ls_base, "/v1/search"),
+                    headers=ls_headers,
+                    params={"q": query, "page": "1", "page_size": "10"},
+                    timeout=60.0,
+                    client=client,
+                )
+                if first_search_payload is None:
+                    first_search_payload = payload
+                query_results.append(
+                    {
+                        "query": query,
+                        "http_code": 200,
+                        "total_results": _extract_search_total(payload),
+                    }
+                )
+
+            document_id = _first_result_id(first_search_payload)
+            scenario_3: dict[str, Any] = {
+                "document_id": document_id,
+                "document_http_code": None,
+                "checks": {
+                    "id_matches_request": False,
+                    "title_present": False,
+                    "subtitle_present": False,
+                    "metadata_is_array": False,
+                    "tabs_is_array": False,
+                },
+            }
+            if document_id:
+                detail_payload = request_json(
+                    "GET",
+                    join_url(ls_base, f"/v1/documents/{document_id}"),
+                    headers=ls_headers,
+                    timeout=60.0,
+                    client=client,
+                )
+                scenario_3 = {
+                    "document_id": document_id,
+                    "document_http_code": 200,
+                    "checks": _detail_checks(detail_payload, document_id=document_id),
+                }
+
+            scenario_4 = {
+                "legal_search_ui_root_http_code": request_status(
+                    "GET",
+                    join_url(ls_ui_base, "/"),
+                    headers=ui_headers,
+                    client=client,
+                ),
+                "legal_search_ui_search_http_code": request_status(
+                    "GET",
+                    join_url(ls_ui_base, "/v1/search"),
+                    headers=ui_headers,
+                    params={"q": "art 754"},
+                    client=client,
+                ),
+                "admin_ui_root_http_code": request_status(
+                    "GET",
+                    join_url(admin_base, "/"),
+                    headers=ui_headers,
+                    client=client,
+                ),
+                "admin_ui_sources_http_code": request_status(
+                    "GET",
+                    join_url(admin_base, "/api/platform-control/v1/sources"),
+                    headers=ui_headers,
+                    client=client,
+                ),
+            }
+
+        query_ok = all(result["http_code"] == 200 for result in query_results)
+        detail_ok = (
+            bool(document_id)
+            and all(scenario_3["checks"].values())
+            and scenario_3["document_http_code"] == 200
+        )
+        ui_ok = all(code == 200 for code in scenario_4.values())
+        overall_ok = (
+            scenario_1["platform_control_health_http_code"] == 200
+            and scenario_1["platform_control_sources_http_code"] == 200
+            and query_ok
+            and detail_ok
+            and ui_ok
+        )
+
+        payload = {
+            "ok": overall_ok,
+            "workflow": "mvp-acceptance",
+            "surfaces": {
+                "platform_control_api": pc_base,
+                "legal_search_api": ls_base,
+                "legal_search_frontend": ls_ui_base,
+                "platform_control_admin": admin_base,
+            },
+            "scenario_1": scenario_1,
+            "scenario_2": {"queries": query_results},
+            "scenario_3": scenario_3,
+            "scenario_4": scenario_4,
+            "notes": {
+                "scenario_5_browser_evidence_runbook": (
+                    "docs/runbooks/interaction-flow-validation.md"
+                ),
+                "scenario_5_browser_smoke_test": "legal-search/frontend/e2e/smoke.spec.ts",
+            },
+        }
+        _emit(payload, human=human)
+        if not overall_ok:
+            raise typer.Exit(code=1)
     except Exception as exc:
         _handle_exc(exc, human=human)
 

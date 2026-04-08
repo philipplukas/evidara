@@ -20,7 +20,9 @@ Or install the package into an environment of your choice (`pip install -e .` / 
 |----------|---------|---------|
 | `EVIDARA_PLATFORM_CONTROL_URL` | `http://localhost:8000` | Platform-control base URL |
 | `EVIDARA_PLATFORM_CONTROL_API_KEY` | _(empty)_ | `X-API-Key` when the API requires it |
+| `EVIDARA_PLATFORM_CONTROL_ADMIN_URL` | `http://localhost:3100` | Platform-control admin base URL for workflow checks |
 | `EVIDARA_LEGAL_SEARCH_URL` | `http://localhost:3102` | Legal-search BFF base URL (see OpenAPI `servers`) |
+| `EVIDARA_LEGAL_SEARCH_FRONTEND_URL` | `http://localhost:3101` | Legal-search frontend base URL for workflow checks |
 | `EVIDARA_LEGAL_SEARCH_TOKEN` | _(empty)_ | `Authorization: Bearer …` when configured |
 | `EVIDARA_LEGAL_SEARCH_API_KEY` | _(empty)_ | `X-API-Key` when the API requires it |
 | `EVIDARA_CLI_HUMAN` | `0` | Set to `1` for indented JSON (same as `--human`) |
@@ -39,6 +41,9 @@ evidara platform-control ping
 evidara platform-control wizard-smoke
 evidara platform-control ris-bootstrap --max-pages 1
 
+# Workflow
+evidara workflow mvp-acceptance
+
 # Legal-search (needs OpenSearch + API running for ping/search)
 evidara legal-search ping
 evidara legal-search search --q "your query"
@@ -48,6 +53,24 @@ evidara legal-search document doc_001
 Default stdout is **single-line JSON** suitable for agents; use `--human` or `EVIDARA_CLI_HUMAN=1` for readable formatting.
 
 Errors print a JSON object with `ok: false`, `status_code`, and a truncated `body`, then exit with code 1.
+
+## MVP acceptance workflow
+
+Run the repeatable API-level MVP acceptance path across `platform-control`, `legal-search`, and the deployed/proxied web surfaces:
+
+```bash
+uv run evidara workflow mvp-acceptance
+uv run evidara workflow mvp-acceptance --human
+```
+
+This command is the CLI-owned surface for scenarios 1–4 in [`docs/runbooks/mvp-acceptance-scenario-pack.md`](../../docs/runbooks/mvp-acceptance-scenario-pack.md):
+
+- platform-control health + sources reachability
+- legal-search query pack
+- legal-search detail fetch and contract-shaped field checks
+- legal-search/admin frontend proxy reachability
+
+Browser-only validation remains owned by Playwright interaction-flow coverage in [`docs/runbooks/interaction-flow-validation.md`](../../docs/runbooks/interaction-flow-validation.md).
 
 ### RIS OGD vertical slice (delegates to repo script)
 

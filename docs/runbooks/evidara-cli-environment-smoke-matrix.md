@@ -1,5 +1,10 @@
 # Evidara CLI — environment smoke matrix (operator checklist)
 
+Owner: Platform team
+Last reviewed: 2026-04-08
+Last verified: 2026-04-08
+Applies to: local, dev, staging, prod
+
 Use this as a **repeatable checklist** per environment (dev, staging, prod). Fill in **where you resolve base URLs and credentials** (Secret Manager, Cloud Run console, internal wiki — not this file).
 
 CLI covers **HTTP APIs only**, not browser UX. For UI journeys use [Interaction flow validation](interaction-flow-validation.md) and Playwright.
@@ -14,6 +19,11 @@ uv sync --group dev
 
 Export env vars per [Environment strategy](../setup/environment-strategy.md) (section **Evidara CLI env vars (dev / staging / prod)**).
 
+For workflow-level acceptance checks, also set:
+
+- `EVIDARA_PLATFORM_CONTROL_ADMIN_URL`
+- `EVIDARA_LEGAL_SEARCH_FRONTEND_URL`
+
 ## Matrix (copy and record results)
 
 | Step | Command | dev | staging | prod | Notes |
@@ -23,7 +33,8 @@ Export env vars per [Environment strategy](../setup/environment-strategy.md) (se
 | 3 | `uv run evidara legal-search search --q "test"` | | | | Optional; uses live search |
 | 4 | `uv run evidara legal-search document <id>` | | | | Optional; needs known document id |
 | 5 | `uv run evidara platform-control wizard-smoke` | | | | Only if wizard path deployed |
-| 6 | `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` | | | | From repo root; both pings |
+| 6 | `uv run evidara workflow mvp-acceptance` | | | | Canonical API-level MVP acceptance path; expects API + frontend/admin base URLs |
+| 7 | `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` | | | | From repo root; both pings |
 
 Mark cells with pass/fail/date or link to a ticket.
 
