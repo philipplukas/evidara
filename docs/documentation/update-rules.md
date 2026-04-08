@@ -101,6 +101,12 @@ It is acceptable for code to land slightly ahead of documentation. But:
 
 ---
 
+## MkDocs build directory (`site/`)
+
+A local **`site/`** directory at the repo root is **generated output** from `mkdocs build` (including `scripts/check_docs.sh`). It is **not source** and must **not** be committed (see `.gitignore`). Remove stray copies with `rm -rf site/` if you want a clean working tree.
+
+---
+
 ## Enforcement
 
 | Rule                       | Enforced by                                     |

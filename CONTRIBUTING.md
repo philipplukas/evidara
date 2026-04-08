@@ -119,6 +119,8 @@ This runs markdownlint, schema validation, contract checks, doc checks, and lega
 
 Documentation checks now include Mermaid validation. Install the pinned repo-root Node dependencies once with `npm install` so `npm run --silent check:mermaid` is available locally.
 
+Full doc validation runs MkDocs `build`, which creates a **`site/`** folder at the repo root. **`site/` is gitignored**—never commit it. Delete it with `rm -rf site/` if you want a clean `git status`. See [docs/documentation/README.md](docs/documentation/README.md) (section **Local MkDocs output**).
+
 ### Evidara CLI (API smoke)
 
 The [`tools/evidara-cli/`](tools/evidara-cli/README.md) package installs an `evidara` command for **platform-control** and **legal-search** health/search smoke tests, OpenAPI path discovery, and the RIS bootstrap wrapper. Use it when validating local or deployed APIs (set `EVIDARA_PLATFORM_CONTROL_*` and `EVIDARA_LEGAL_SEARCH_*` as in that README).

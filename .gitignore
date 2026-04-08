@@ -93,3 +93,5 @@ generated/
 dist/
 build/
 target/
+# MkDocs default output (`mkdocs build`, `scripts/check_docs.sh`); do not commit
+site/

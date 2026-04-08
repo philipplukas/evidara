@@ -15,7 +15,8 @@ python3 scripts/check_doc_links.py
 python3 scripts/check_diagram_format.py
 npm run --silent check:mermaid
 
-# 3. Build docs site (strict mode catches broken cross-references)
+# 3. Build docs site (strict mode catches broken cross-references).
+#    Writes ./site/ (gitignored); do not commit. See docs/documentation/README.md.
 echo "Building docs site (strict mode)..."
 python3 -m mkdocs build --strict --quiet
 
