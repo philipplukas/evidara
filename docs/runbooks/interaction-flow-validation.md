@@ -96,6 +96,22 @@ before adding lower-priority flow coverage.
 | CI evidence pack (local CI)          | `.github/workflows/legal-search.yml` (`interaction-flow-evidence` job)                           | Uploaded Playwright reports/results + evidence manifest        |
 | CI evidence pack (staging parity)    | `.github/workflows/interaction-flow-staging-evidence.yml`                                        | Smoke+contract suites run against staging frontend/admin URLs with artifacts |
 
+## Autonomous local run (matches CI suites)
+
+One command from the **repository root** installs deps, Chromium, then runs **smoke → contract → screenshot pack** in order (same three npm scripts as CI):
+
+```bash
+bash scripts/run-interaction-flow-local.sh
+```
+
+- **Traces** default to `retain-on-failure` (inspect with [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer)). For a **full recording of every journey** (large `test-results/`): `PLAYWRIGHT_TRACE=on bash scripts/run-interaction-flow-local.sh`
+- **Videos** also default to retain-on-failure; disable with `PLAYWRIGHT_VIDEO=off`
+- **HTML report**: `legal-search/frontend/playwright-report/index.html`
+- **Against staging URLs** (no local `webServer`): set `PLAYWRIGHT_EXTERNAL_BASE_URL`, `PLAYWRIGHT_ADMIN_BASE_URL`, and `PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL` then run `npm run e2e:interaction-flow` from `legal-search/frontend` after `npm ci` + `npx playwright install chromium`
+- **Record a new journey** (human-in-the-loop → generated steps): `cd legal-search/frontend && npm run e2e:codegen` (then move assertions into `e2e/*.spec.ts`)
+
+In **CI**, `CI=1` enables **one Playwright retry per test** so flaky journeys can self-heal while still retaining traces on failure.
+
 ## CI Evidence Automation
 
 - Local/PR workflow: `.github/workflows/legal-search.yml` (`interaction-flow-evidence`)

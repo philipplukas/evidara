@@ -9,7 +9,8 @@ It maps each UX journey to the narrowest automated test layer that should own it
 |---|---|---|
 | Unit/store | `src/__tests__/workspace.test.tsx`, `src/__tests__/search-constraints.test.tsx`, `src/__tests__/badge-tokens.test.ts` | Reducer transitions, URL-backed constraints state, token mappings |
 | Component | `src/__tests__/result-list.test.tsx`, `src/__tests__/result-card.test.tsx`, `src/__tests__/detail-panel.test.tsx` | Render behavior, callback wiring, local interactions |
-| Browser e2e | `e2e/smoke.spec.ts`, `e2e/workspace-panels.spec.ts`, `e2e/diagnostic.spec.ts` | End-to-end journeys and panel behavior in real browser (mock default + opt-in real backend mode) |
+| Browser e2e | `e2e/smoke.spec.ts`, `e2e/workspace-panels.spec.ts`, `e2e/rbac-cross-surface.spec.ts`, `e2e/screenshot-pack.spec.ts`, … | End-to-end journeys in real browser (mock default + opt-in real backend mode) |
+| Interaction-flow bundle | `npm run e2e:interaction-flow`, repo `scripts/run-interaction-flow-local.sh` | Same sequence as CI: `@smoke` → `@contract` → `@screenshots`; traces/videos retained on failure (`PLAYWRIGHT_TRACE=on` for full recording) |
 | CI gate | `.github/workflows/legal-search.yml` | Typecheck/lint/unit/build/contract checks |
 
 ## Journey Coverage Matrix

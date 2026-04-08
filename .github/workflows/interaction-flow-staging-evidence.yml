@@ -15,6 +15,7 @@ on:
       - "legal-search/frontend/src/components/layout/AppHeader.tsx"
       - "legal-search/frontend/src/components/layout/MobileWorkspace.tsx"
       - "platform-control/admin/src/app/AdminShell.tsx"
+      - "scripts/run-interaction-flow-local.sh"
   schedule:
     - cron: "45 4 * * *"
   workflow_dispatch:
