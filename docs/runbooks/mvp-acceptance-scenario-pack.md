@@ -19,11 +19,16 @@ uv run evidara workflow mvp-acceptance --human
 
 Preferred surface: [`tools/evidara-cli`](../../tools/evidara-cli/README.md) via `evidara workflow mvp-acceptance`.
 
+CLI output modes:
+
+- default: single-line JSON for agents, CI notes, or follow-on tooling
+- `--human`: pretty-printed JSON for operators
+
 Lower-level helper: `scripts/mvp-acceptance-scenario-pack.sh` remains available when you want a shell-only version of the same API-oriented checks.
 
 The shell helper requires `curl`, `jq`, and `gcloud` with a user that can mint identity tokens for the Cloud Run service URLs (same pattern as [`scripts/e2e-smoke-test.sh`](../../scripts/e2e-smoke-test.sh)).
 
-Output modes:
+Shell helper output modes:
 
 - default: human-readable terminal summary for operators
 - `--json`: machine-readable summary for agents, CI notes, or follow-on tooling
