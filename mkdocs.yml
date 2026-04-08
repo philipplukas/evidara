@@ -108,6 +108,8 @@ nav:
   - Runbooks:
       - Document Service & Detail: runbooks/document-service-document-detail.md
       - Firecrawl Preview Run: runbooks/firecrawl-preview-run.md
+      - Evidara CLI environment smoke matrix: runbooks/evidara-cli-environment-smoke-matrix.md
+      - Evidara CLI remote smoke secrets: runbooks/evidara-cli-remote-smoke-operator.md
   - Setup:
       - Environment Strategy: setup/environment-strategy.md
       - Infrastructure Overview: setup/infrastructure-overview.md

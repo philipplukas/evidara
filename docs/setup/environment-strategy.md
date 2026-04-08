@@ -80,7 +80,7 @@ After exporting the URLs and optional auth vars for the target environment:
 EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh
 ```
 
-For a **manual run from GitHub Actions**, use workflow [`.github/workflows/evidara-cli-remote-smoke.yml`](../../.github/workflows/evidara-cli-remote-smoke.yml): pass service base URLs as inputs and configure repository secrets `EVIDARA_PLATFORM_CONTROL_API_KEY`, `EVIDARA_LEGAL_SEARCH_TOKEN`, and `EVIDARA_LEGAL_SEARCH_API_KEY` when those environments require auth.
+For a **manual run from GitHub Actions**, use workflow [`.github/workflows/evidara-cli-remote-smoke.yml`](../../.github/workflows/evidara-cli-remote-smoke.yml): pass service base URLs as inputs and configure repository secrets `EVIDARA_PLATFORM_CONTROL_API_KEY`, `EVIDARA_LEGAL_SEARCH_TOKEN`, and `EVIDARA_LEGAL_SEARCH_API_KEY` when those environments require auth. Step-by-step: [Evidara CLI remote smoke — operator](../runbooks/evidara-cli-remote-smoke-operator.md). Per-environment command checklist: [CLI environment smoke matrix](../runbooks/evidara-cli-environment-smoke-matrix.md).
 
 ## Folder Structure
 
