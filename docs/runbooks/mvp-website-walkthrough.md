@@ -1,7 +1,7 @@
 # MVP Website Walkthrough (Dev -> Staging)
 
 Owner: Platform team
-Last reviewed: 2026-04-09
+Last reviewed: 2026-04-08
 Last verified: 2026-04-06
 Applies to: dev, staging
 
