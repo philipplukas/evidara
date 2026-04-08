@@ -19,6 +19,11 @@ on:
   schedule:
     - cron: "45 4 * * *"
   workflow_dispatch:
+    inputs:
+      full_playwright_trace:
+        description: "Record Playwright trace + video for every test (large artifacts in GCS upload)"
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -42,6 +47,8 @@ jobs:
       SCREENSHOT_CHECKLIST_COVERAGE: "unknown"
       SMOKE_RETRY_COUNT: "0"
       CONTRACT_RETRY_COUNT: "0"
+      PLAYWRIGHT_TRACE: ${{ github.event_name == 'workflow_dispatch' && inputs.full_playwright_trace && 'on' || 'retain-on-failure' }}
+      PLAYWRIGHT_VIDEO: ${{ github.event_name == 'workflow_dispatch' && inputs.full_playwright_trace && 'on' || 'retain-on-failure' }}
 
     steps:
       - name: Checkout

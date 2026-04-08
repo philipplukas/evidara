@@ -4,6 +4,7 @@
 #
 # Usage (repo root):
 #   bash scripts/run-interaction-flow-local.sh
+#   bash scripts/run-interaction-flow-local.sh --record   # full trace + video for every test (large artifacts)
 #
 # Env (optional):
 #   PLAYWRIGHT_TRACE=on              — record every test (large artifacts; full journey replay)
@@ -16,6 +17,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRONTEND="${REPO_ROOT}/legal-search/frontend"
 ADMIN="${REPO_ROOT}/platform-control/admin"
 
+if [[ "${1:-}" == "--record" ]]; then
+  export PLAYWRIGHT_TRACE="on"
+  export PLAYWRIGHT_VIDEO="on"
+  shift
+fi
+
 export PLAYWRIGHT_TRACE="${PLAYWRIGHT_TRACE:-retain-on-failure}"
 
 echo "Installing dependencies (frontend + admin for Playwright webServer)..." >&2
@@ -25,8 +32,13 @@ echo "Installing dependencies (frontend + admin for Playwright webServer)..." >&
 echo "Installing Chromium for Playwright..." >&2
 (cd "${FRONTEND}" && npx playwright install chromium)
 
-echo "Running interaction-flow suites (smoke → contract → screenshot pack)..." >&2
-(cd "${FRONTEND}" && npm run e2e:interaction-flow)
+if [[ "${PLAYWRIGHT_TRACE}" == "on" ]]; then
+  echo "Running interaction-flow suites with FULL trace + video (PLAYWRIGHT_TRACE=on)..." >&2
+  (cd "${FRONTEND}" && npm run e2e:interaction-flow:record)
+else
+  echo "Running interaction-flow suites (smoke → contract → screenshot pack)..." >&2
+  (cd "${FRONTEND}" && npm run e2e:interaction-flow)
+fi
 
 echo "" >&2
 echo "Done. HTML report: ${FRONTEND}/playwright-report/index.html" >&2

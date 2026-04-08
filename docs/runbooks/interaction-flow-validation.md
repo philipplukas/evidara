@@ -104,11 +104,20 @@ One command from the **repository root** installs deps, Chromium, then runs **sm
 bash scripts/run-interaction-flow-local.sh
 ```
 
-- **Traces** default to `retain-on-failure` (inspect with [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer)). For a **full recording of every journey** (large `test-results/`): `PLAYWRIGHT_TRACE=on bash scripts/run-interaction-flow-local.sh`
-- **Videos** also default to retain-on-failure; disable with `PLAYWRIGHT_VIDEO=off`
+- **Full recording (every test)** — traces **and** video for all journeys (large `test-results/`):
+
+  ```bash
+  bash scripts/run-interaction-flow-local.sh --record
+  # or from legal-search/frontend:
+  npm run e2e:interaction-flow:record
+  ```
+
+- **Traces** default to `retain-on-failure` (inspect with [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer)). Same as above without `--record`: `PLAYWRIGHT_TRACE=on PLAYWRIGHT_VIDEO=on bash scripts/run-interaction-flow-local.sh`
+- **Videos** default to retain-on-failure unless `--record` / `PLAYWRIGHT_VIDEO=on`; disable with `PLAYWRIGHT_VIDEO=off`
 - **HTML report**: `legal-search/frontend/playwright-report/index.html`
 - **Against staging URLs** (no local `webServer`): set `PLAYWRIGHT_EXTERNAL_BASE_URL`, `PLAYWRIGHT_ADMIN_BASE_URL`, and `PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL` then run `npm run e2e:interaction-flow` from `legal-search/frontend` after `npm ci` + `npx playwright install chromium`
-- **Record a new journey** (human-in-the-loop → generated steps): `cd legal-search/frontend && npm run e2e:codegen` (then move assertions into `e2e/*.spec.ts`)
+- **Record a new journey** (human-in-the-loop → generated steps): `cd legal-search/frontend && npm run e2e:codegen:local` after dev servers are up (`localhost:3101` legal-search, `3100` admin via Playwright or manual), or `npm run e2e:codegen` with a URL you pass on the CLI. Then move generated steps into `e2e/*.spec.ts` and tag with `@smoke` / `@contract` / `@screenshots` as appropriate.
+- **Staging CI full trace**: in GitHub **Actions**, workflow **Interaction Flow Staging Evidence** (`.github/workflows/interaction-flow-staging-evidence.yml`) → **Run workflow** → enable **full Playwright trace** (larger `test-results` in the evidence upload to GCS).
 
 In **CI**, `CI=1` enables **one Playwright retry per test** so flaky journeys can self-heal while still retaining traces on failure.
 

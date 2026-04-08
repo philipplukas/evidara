@@ -34,7 +34,12 @@ export default defineConfig({
     headless: true,
     screenshot: "only-on-failure",
     trace: traceMode(),
-    video: process.env.PLAYWRIGHT_VIDEO === "off" ? "off" : "retain-on-failure",
+    video:
+      process.env.PLAYWRIGHT_VIDEO === "on"
+        ? "on"
+        : process.env.PLAYWRIGHT_VIDEO === "off"
+          ? "off"
+          : "retain-on-failure",
   },
   webServer: externalBaseUrl
     ? undefined
