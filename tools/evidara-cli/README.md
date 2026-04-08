@@ -77,6 +77,8 @@ uv run pytest
 
 CI: `.github/workflows/evidara-cli.yml` runs `scripts/check-evidara-cli.sh` when this package or the bootstrap script changes.
 
+Manual **remote** smoke (Actions → run workflow; base URLs as inputs, optional repository secrets for auth): `.github/workflows/evidara-cli-remote-smoke.yml`.
+
 Pre-commit runs the same check when files under `tools/evidara-cli/` (or related scripts/workflow) change.
 
 ## Roadmap (extend on demand)

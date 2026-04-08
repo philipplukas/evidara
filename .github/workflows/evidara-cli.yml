@@ -8,6 +8,7 @@ on:
       - "scripts/smoke-evidara-cli.sh"
       - "scripts/bootstrap-ris-source.py"
       - ".github/workflows/evidara-cli.yml"
+      - ".github/workflows/evidara-cli-remote-smoke.yml"
   push:
     branches: [main]
     paths:
@@ -16,6 +17,7 @@ on:
       - "scripts/smoke-evidara-cli.sh"
       - "scripts/bootstrap-ris-source.py"
       - ".github/workflows/evidara-cli.yml"
+      - ".github/workflows/evidara-cli-remote-smoke.yml"
 
 jobs:
   evidara-cli:
