@@ -131,6 +131,10 @@ Optional end-to-end ping (requires both services reachable):
 EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh
 ```
 
+### Nix (optional macOS wallpaper helper)
+
+The repo flake can serve the bundled GLSL wallpaper pack for use with Plash. See [nix/README.md](nix/README.md).
+
 ## Code Review
 
 - At least **1 review** (human or AI) is required before merging.
