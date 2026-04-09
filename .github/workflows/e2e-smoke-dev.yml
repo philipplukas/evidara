@@ -103,7 +103,7 @@ jobs:
       - name: Summarize smoke result
         if: always()
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import os
           import re
           from pathlib import Path
