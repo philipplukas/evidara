@@ -7,6 +7,13 @@ bucket_location = "EUROPE-WEST6"
 raw_artifact_bucket_name = "evidara-raw-artifacts-staging"
 manifest_bucket_name     = "evidara-manifests-staging"
 
+document_intelligence_published_bucket_name = "evidara-document-intelligence-surfaces-staging"
+
+artifact_bundle_subscription_push = {
+  subscription_key = "document-intelligence-artifact-bundle-available-staging"
+  target_service   = "di-consumer"
+}
+
 enable_cloud_sql       = true
 cloud_sql_tier         = "db-f1-micro"
 cloud_sql_disk_size_gb = 10
@@ -26,6 +33,7 @@ event_subscriptions = {
     ack_deadline_seconds = 120
     retry_policy         = { minimum_backoff = "30s", maximum_backoff = "600s" }
     dead_letter_policy   = { max_delivery_attempts = 10 }
+    # push_config merged via artifact_bundle_subscription_push (targets di-consumer).
   }
   "platform-control-document-processing-status-updated-staging" = {
     topic_name         = "document-processing-status-updated-staging"
@@ -163,20 +171,22 @@ cloud_run_services = {
     }
   }
 
-  "document-intelligence-consumer" = {
-    image                 = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/di-consumer-dev:latest"
+  "di-consumer" = {
+    image                 = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/runtime/di-consumer:latest"
     service_account_key   = "document_intelligence"
     allow_unauthenticated = false
-    min_instance_count    = 1
+    min_instance_count    = 0
     startup_probe_path    = "/health"
     liveness_probe_path   = "/health"
     env_vars = {
-      DI_GCP_PROJECT_ID       = "project-dacd6b7b-dc96-4534-b82"
-      DI_SUBSCRIPTION_NAME    = "document-intelligence-artifact-bundle-available-staging"
-      DI_STATUS_TOPIC_NAME    = "document-processing-status-updated-staging"
-      DI_PROCESSED_TOPIC_NAME = "document-processed-staging"
-      DI_SURFACES_ROOT_URI    = "gs://evidara-document-intelligence-surfaces-staging/published"
-      DI_PROCESSING_VERSION   = "0.1.0-staging"
+      DI_GCP_PROJECT_ID                  = "project-dacd6b7b-dc96-4534-b82"
+      DI_EVENT_PUBLISHER_BACKEND         = "pubsub"
+      DI_STATUS_TOPIC_NAME               = "document-processing-status-updated-staging"
+      DI_PROCESSED_TOPIC_NAME            = "document-processed-staging"
+      DI_DOCUMENT_PROCESSED_PUBSUB_TOPIC = "document-processed-staging"
+      DI_SURFACES_ROOT_URI               = "gs://evidara-document-intelligence-surfaces-staging/published"
+      DI_PROCESSING_VERSION              = "0.1.0-staging"
+      DI_PARSER_BACKEND                  = "legacy"
     }
   }
 }

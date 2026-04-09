@@ -12,6 +12,16 @@ region     = "europe-west6"
 raw_artifact_bucket_name = "evidara-raw-artifacts-dev"
 manifest_bucket_name     = "evidara-manifests-dev"
 
+# DI published Delta surfaces (GCS). Grants the document_intelligence runtime SA objectAdmin here
+# (see google_storage_bucket_iam_member.document_intelligence_published_surfaces_object_admin).
+document_intelligence_published_bucket_name = "evidara-document-intelligence-surfaces-dev"
+
+# Push artifact-bundle events to the HTTP DI ingress (runtime image di-consumer / Dockerfile.runtime-ingress).
+artifact_bundle_subscription_push = {
+  subscription_key = "document-intelligence-artifact-bundle-available"
+  target_service   = "di-consumer"
+}
+
 enable_cloud_sql = true
 
 cloud_run_services = {
@@ -114,17 +124,22 @@ cloud_run_services = {
     }
   }
 
-  "document-intelligence-consumer" = {
-    image                 = "europe-west6-docker.pkg.dev/evidara-dev/runtime/document-intelligence-consumer:latest"
+  # HTTP ingress: Pub/Sub push → /internal/events/artifact-bundles:process (not pull).
+  "di-consumer" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-dev/runtime/di-consumer:latest"
     service_account_key   = "document_intelligence"
     allow_unauthenticated = false
+    startup_probe_path    = "/health"
+    liveness_probe_path   = "/health"
     env_vars = {
-      DI_GCP_PROJECT_ID      = "evidara-dev"
-      DI_SUBSCRIPTION_NAME   = "document-intelligence-artifact-bundle-available"
-      DI_STATUS_TOPIC_NAME   = "document-processing-status-updated"
-      DI_PROCESSED_TOPIC_NAME = "document-processed"
-      DI_SURFACES_ROOT_URI   = "gs://evidara-document-intelligence-surfaces-dev/published"
-      DI_PROCESSING_VERSION  = "0.1.0-dev"
+      DI_GCP_PROJECT_ID               = "evidara-dev"
+      DI_EVENT_PUBLISHER_BACKEND      = "pubsub"
+      DI_STATUS_TOPIC_NAME            = "document-processing-status-updated"
+      DI_PROCESSED_TOPIC_NAME         = "document-processed"
+      DI_DOCUMENT_PROCESSED_PUBSUB_TOPIC = "document-processed"
+      DI_SURFACES_ROOT_URI          = "gs://evidara-document-intelligence-surfaces-dev/published"
+      DI_PROCESSING_VERSION         = "0.1.0-dev"
+      DI_PARSER_BACKEND             = "legacy"
     }
   }
 }
