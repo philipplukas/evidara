@@ -101,7 +101,7 @@ These tests should answer:
 
 - Do not build comprehensive CRUD tests for every entity — focus on state transitions and boundaries
 - Do not test database query performance — correctness first
-- Do not build UI tests for Retool admin (it does not exist yet)
+- Do not build broad UI automation for the React-admin app early — prefer API and service tests; add targeted Playwright only for critical operator flows when they stabilize
 - Do not test every possible source configuration — test the schema validation, trust that the schema covers the rest
 - Do not build sophisticated source health monitoring — simple artifact count and content type checks are enough for MVP
 - Do not call live Firecrawl in CI — stub provider calls and use fixture webhook payloads instead

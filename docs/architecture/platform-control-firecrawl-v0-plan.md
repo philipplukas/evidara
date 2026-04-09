@@ -2,7 +2,7 @@
 
 ## Status
 
-Partially implemented. The FastAPI service, initial schema, Firecrawl webhook path, raw artifact persistence, bundle-manifest publication path, preview-summary API surface, and repo-owned Retool control-panel artifacts now exist in-repo. Dedicated worker separation and deployed operator tooling still remain follow-on work.
+Partially implemented. The FastAPI service, initial schema, Firecrawl webhook path, raw artifact persistence, bundle-manifest publication path, preview-summary API surface, and the code-managed **React-admin** operator UI (`platform-control/admin`) now exist in-repo. Archived Retool artifacts under `platform-control/retool/` remain as historical reference only (see ADR-0015). Dedicated worker separation and some deployed operator hardening still remain follow-on work.
 
 ## Purpose
 
@@ -11,13 +11,13 @@ Translate the current platform-control design into an execution-ready plan for a
 ## Goals
 
 - Keep `platform-control` as the system of record for sources, versions, runs, approvals, and raw artifact lineage.
-- Use Retool for the internal operator workflow and AI-assisted setup experience.
+- Use the **React-admin** app for the internal operator workflow; treat archived Retool docs/workflows only as migration reference.
 - Use Firecrawl as an acquisition provider behind a provider adapter, not as a first-class domain model.
 - Preserve enough raw and normalized capture data for a later exhaustive extractor to replay or reprocess old runs.
 
 ## Non-goals
 
-- Custom admin frontend outside Retool
+- A second parallel admin stack (beyond `platform-control/admin` + API read models)
 - Fully automated approvals
 - General-purpose agent orchestration platform
 - Exhaustive extraction logic for every source family
@@ -32,7 +32,7 @@ Translate the current platform-control design into an execution-ready plan for a
    - linked extractor profile
    - preview limits
 4. Trigger a preview run.
-5. Review captured resources and raw artifact summary in Retool.
+5. Review captured resources and raw artifact summary in React-admin.
 6. Edit acquisition settings if needed.
 7. Approve or reject the version.
 8. Trigger production runs from approved versions only.
@@ -72,7 +72,7 @@ Translate the current platform-control design into an execution-ready plan for a
 - `GET /v1/runs/{id}`
 - `POST /v1/firecrawl/webhooks`
 
-Retool reads list views directly from Postgres and uses the API only for business actions and webhooks.
+The React-admin app reads list/detail data via platform-control APIs (no direct Postgres from the browser); mutations use the same API and webhooks.
 
 ## Workstreams
 
@@ -94,10 +94,10 @@ Retool reads list views directly from Postgres and uses the API only for busines
 
 `raw_artifact.available` can still exist as an internal preview or observability event, but it is not the primary DI handoff contract for M4.
 
-### Workstream 3: Retool operator workflow
+### Workstream 3: React-admin operator workflow
 
-- Build `Reference Data`, `Sources`, `Draft Version`, `Preview Review`, and `Runs` pages.
-- Use direct Postgres queries for browse/filter/list screens.
+- Build `Reference Data`, `Sources`, `Draft Version`, `Preview Review`, and `Runs` pages in `platform-control/admin`.
+- Use platform-control read endpoints for browse/filter/list screens (and extend the API where gaps remain).
 - Use platform-control API calls for approve/reject/run actions.
 - Add a preview summary table showing:
   - captured URL count
@@ -108,8 +108,7 @@ Retool reads list views directly from Postgres and uses the API only for busines
 
 ### Workstream 4: AI-assisted setup
 
-- Add a Retool workflow `run_firecrawl_preview`.
-- Add a Retool agent `Source Setup Copilot`.
+- **Deferred / reference:** archived Retool workflow `run_firecrawl_preview` and agent `Source Setup Copilot` under `platform-control/retool/` describe the intended flow; re-implement in API + React-admin (or CLI) rather than extending Retool.
 - Limit agent tools to structured actions:
   - list jurisdictions and authorities
   - create draft source
@@ -135,11 +134,11 @@ Retool reads list views directly from Postgres and uses the API only for busines
 | PC-010 | Add artifact store and GCS write path | Raw Firecrawl payloads stored in object storage | Data |
 | PC-011 | Add captured-resource normalization | Provider-neutral fetched resource inventory | Data |
 | PC-012 | Publish bundle manifest + emit `artifact_bundle.available` | Immutable DI handoff plus Pub/Sub progression signal | API/data |
-| PC-013 | Build Retool read views | Reference data, sources, versions, runs tables | Ops |
-| PC-014 | Build Retool action screens | Draft, approve, reject, preview, rerun flows | Ops |
-| PC-015 | Build preview summary screen | Captured-resource review and operator feedback loop | Ops |
-| PC-016 | Add Retool preview workflow | Firecrawl preview orchestration | Ops |
-| PC-017 | Add Retool setup agent | AI-assisted source setup and preview guidance | Ops |
+| PC-013 | Build React-admin read views | Reference data, sources, versions, runs via API | Eng |
+| PC-014 | Build React-admin action flows | Draft, approve, reject, preview, rerun via API | Eng |
+| PC-015 | Build preview summary screen | Captured-resource review and operator feedback loop | Eng |
+| PC-016 | Add preview orchestration (API or UI) | Firecrawl preview trigger from operator workflow | Eng |
+| PC-017 | Add AI-assisted setup (post-parity) | Source setup copilot without new Retool work | Eng |
 | PC-018 | Add unit, contract, and smoke tests | MVP confidence gates | API/data |
 | PC-019 | Add operational docs and runbook | Preview procedure and recovery steps | Whole team |
 
@@ -166,7 +165,7 @@ Done when:
 
 Done when:
 
-- Retool supports create -> preview -> review -> approve.
+- React-admin supports create → preview → review → approve (parity ongoing; see migration doc).
 - The setup agent can propose a draft acquisition spec from a seed URL.
 - Human approval remains the final gate before production runs.
 
@@ -204,7 +203,7 @@ Done when:
 
 - Stub Firecrawl at the provider boundary in CI.
 - Use fixture payloads for webhook tests.
-- Do not depend on live Firecrawl, live Retool, or live GCS in the default CI path.
+- Do not depend on live Firecrawl, live operator SaaS UIs, or live GCS in the default CI path.
 
 ## Documentation Plan
 
@@ -222,18 +221,18 @@ Update these docs in the same PRs as implementation:
 
 - Build the API, schema, and webhook path first.
 - Add Firecrawl capture next.
-- Add Retool screens and agent last.
+- Add AI-assisted operator UX after React-admin parity (not via new Retool work).
 
 ### Two people
 
 - Person 1: schema, API, state machines, webhook handling
-- Person 2: Retool screens, workflow, agent, preview review UX
+- Person 2: React-admin screens, preview review UX, API read gaps
 
 ### Three people
 
 - Person 1: schema, models, and API
 - Person 2: Firecrawl integration, GCS storage, event emission
-- Person 3: Retool app, workflow, and AI setup assistant
+- Person 3: AI-assisted setup (post-parity), CLI smoke, operator docs
 
 ## Out of Scope for V0
 

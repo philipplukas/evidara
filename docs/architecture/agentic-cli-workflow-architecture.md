@@ -508,7 +508,7 @@ This enables postmortems, replay analysis, and training-data extraction for boun
 | ACW-004 | Persist workflow journal | Add durable run and step models plus read surfaces in `platform-control` | `platform-control` |
 | ACW-005 | Add approval and compensation flow | Persist approval state and compensation actions for reversible steps | `platform-control` |
 | ACW-006 | Deliver first golden path | Implement source inspect, proposal, draft creation, preview run, and preview verification | `tools/evidara-cli` + `platform-control` |
-| ACW-007 | Add operator visibility | Expose workflow journal and evidence in operator-facing read surfaces | `platform-control` admin or Retool |
+| ACW-007 | Add operator visibility | Expose workflow journal and evidence in operator-facing read surfaces | `platform-control` React-admin app |
 | ACW-008 | Add one DSPy module | Start with `propose-spec` or preview summarization plus eval set and shadow mode | bounded AI module |
 
 ## Backlog
@@ -564,7 +564,7 @@ This enables postmortems, replay analysis, and training-data extraction for boun
 ## Open Questions
 
 - Should the workflow journal extend existing `platform-control` run entities or introduce dedicated workflow-run entities?
-- Which approval surfaces should own human interaction first: Retool, admin UI, or CLI-mediated operator flows?
+- Which approval surfaces should own human interaction first: React-admin, additional APIs, or CLI-mediated operator flows?
 - Which single workflow should be the first production candidate after `mvp-acceptance`?
 - What minimum eval set size is required before introducing the first DSPy module?
 
