@@ -18,6 +18,8 @@
 
 <!-- Check all that apply. -->
 
+Parallel streams by component: [docs/process/parallel-work-streams.md](docs/process/parallel-work-streams.md).
+
 - [ ] `platform-control`
 - [ ] `document-intelligence`
 - [ ] `legal-search`
@@ -25,6 +27,14 @@
 - [ ] `infra`
 - [ ] `docs`
 - [ ] `scripts`
+- [ ] `tools/evidara-cli`
+
+## Work stream coordination
+
+<!-- When two PRs touch the same OpenAPI file, migration, or cross-service behavior, one stream leads — link it here. -->
+
+- [ ] N/A — no shared seam with another in-flight change
+- [ ] Coordinating PR or owner: <!-- link and/or @handle -->
 
 ## Sync Impact
 

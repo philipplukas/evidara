@@ -17,6 +17,17 @@ Use this when closing phase-5 Linear items that need **run output or screenshots
    - Local: `EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT=… GCP_PROJECT_ID=… ./scripts/e2e-smoke-test.sh --env dev`
 5. Attach to Linear: artifact logs / run URLs / timestamps scoped to each run.
 
+### Debugging e2e step 7 (DI signals) — order of checks
+
+Work top-down; the script fails when **both** `canonical_ready` processing-status rows **and** `document.processed` lifecycle rows are missing after the wait.
+
+1. **Run completed with captures?** On timeout the script prints `GET /v1/runs/{run_id}` — confirm `status=completed` and `artifacts_count` / `captured_resources_count` are positive. If zero captures, fix acquisition / `SMOKE_SEED_URL` first.
+2. **Which service consumes `artifact_bundle.available`?** In GCP, open the subscription on topic `artifact-bundle-available` (unsuffixed dev) and note the push URL. It must hit the **HTTP ingress** service (`…/internal/events/artifact-bundles:process`), not a pull-only worker with no HTTP handler for that path.
+3. **DI publishes outbound events:** After processing, document-intelligence must publish to Pub/Sub topics that platform-control subscribes to (`document-processing-status-updated`, `document-processed`). The HTTP ingress path publishes when `DI_GCP_PROJECT_ID` is set and `DI_EVENT_PUBLISHER_BACKEND` is not `noop` / `off` / `none` (topic names: `DI_STATUS_TOPIC_NAME`, `DI_PROCESSED_TOPIC_NAME` or `DI_DOCUMENT_PROCESSED_PUBSUB_TOPIC`). Redeploy `di-consumer` after code changes.
+4. **Pub/Sub → platform-control:** Confirm push subscriptions exist for both topics to `platform-control-api` `/v1/di/events/…` (see [`infra/terraform/gcp/runtime_stack/variables.tf`](../../infra/terraform/gcp/runtime_stack/variables.tf)). Inspect **DLQ** subscription message counts if delivery fails (auth, 4xx/5xx).
+5. **Push auth to DI and PC:** Subscriptions use OIDC; the target Cloud Run service must allow the push identity (`roles/run.invoker` for the token’s SA). Do **not** set a static `DOCUMENT_INTELLIGENCE_INGEST_BEARER_TOKEN` on the DI ingress service unless Pub/Sub is configured to send that same secret (OIDC Bearer will not match).
+6. **Logs:** `gcloud logging read` filtered by `di-consumer` and `platform-control-api` revision around the run’s `completed_at` time; look for 401/500 on ingest or DI event routes.
+
 ## TAR-77 — Required check on `main`
 
 1. GitHub **Settings** → **Branches** → branch protection for `main`.

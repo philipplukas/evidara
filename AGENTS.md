@@ -12,6 +12,8 @@ This is the Evidara monorepo — a document intelligence platform for legal rese
 - **docs** — Architecture, ADRs, runbooks, testing strategy, component docs
 - **tools/evidara-cli** — Typer CLI for agent/operator smoke against platform-control + legal-search (`evidara --help`); optional `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` when both APIs are reachable; against **private Cloud Run** use [`scripts/mint-cloud-run-tokens.sh`](scripts/mint-cloud-run-tokens.sh) and [docs/setup/gcp-local-cloud-run-auth.md](docs/setup/gcp-local-cloud-run-auth.md)
 
+**Parallel work streams** (by component, what to serialize): [docs/process/parallel-work-streams.md](docs/process/parallel-work-streams.md).
+
 ## Core rules
 
 1. **Small, production-safe changes.** Prefer focused commits over sweeping refactors.
