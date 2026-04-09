@@ -264,6 +264,8 @@ class ProcessingPipelineTests(unittest.TestCase):
                 result.document.metadata["official_citation"],
                 "BGBl. I Nr. 12/2026",
             )
+            self.assertEqual(result.document.metadata["original_language"], "de")
+            self.assertEqual(result.document.metadata["translation_status"], "original")
             self.assertEqual(
                 result.sections[0].metadata["official_label"],
                 "§ 1",

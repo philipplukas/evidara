@@ -206,6 +206,7 @@ describe('composeLanguage', () => {
       display: 'de',
       original: 'de',
       isTranslation: false,
+      label: 'Originalsprache',
     });
   });
 
@@ -229,6 +230,7 @@ describe('mapSearchHitToView', () => {
     expect(view.relatedCounts).toHaveLength(3);
     expect(view.actions).toHaveLength(2);
     expect(view.contentLanguage?.display).toBe('de');
+    expect(view.contentLanguage?.label).toBe('Originalsprache');
   });
 
   it('should omit structuralContext when missing', () => {

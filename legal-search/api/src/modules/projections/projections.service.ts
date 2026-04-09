@@ -102,6 +102,8 @@ export class ProjectionsService {
       title,
       authority_name: event.payload.authority_name,
       official_citation: extracted.officialCitation,
+      original_language: extracted.originalLanguage,
+      translation_status: extracted.translationStatus,
       is_official: event.payload.is_official,
       sections_count: extracted.sectionsCount,
       citations_count: extracted.citationsCount,
@@ -122,6 +124,8 @@ export class ProjectionsService {
     title?: string;
     language?: string;
     officialCitation?: string;
+    originalLanguage?: string;
+    translationStatus?: 'original' | 'machine_translated' | 'translation_unavailable';
     previewText?: string;
     sectionsCount: number;
     citationsCount: number;
@@ -137,13 +141,26 @@ export class ProjectionsService {
       ['metadata', 'official_citation'],
       ['official_citation'],
     ]);
+    const originalLanguage =
+      this.firstNestedString(doc, [['metadata', 'original_language'], ['original_language']]) ??
+      language;
+    const translationStatus = this.firstTranslationStatus(doc, originalLanguage);
     const sectionCandidates = [doc.sections, doc.document_sections, doc.body_sections];
     const citationCandidates = [doc.citations, doc.document_citations];
     const textCandidates = [doc.content_text, doc.text, doc.summary];
     const sectionsCount = this.countArrayLike(sectionCandidates);
     const citationsCount = this.countArrayLike(citationCandidates);
     const previewText = this.firstString(textCandidates);
-    return { title, language, officialCitation, previewText, sectionsCount, citationsCount };
+    return {
+      title,
+      language,
+      officialCitation,
+      originalLanguage,
+      translationStatus,
+      previewText,
+      sectionsCount,
+      citationsCount,
+    };
   }
 
   private countArrayLike(values: unknown[]): number {
@@ -180,6 +197,27 @@ export class ProjectionsService {
       if (typeof current === 'string' && current.trim()) {
         return current.trim();
       }
+    }
+    return undefined;
+  }
+
+  private firstTranslationStatus(
+    source: Record<string, unknown>,
+    originalLanguage?: string,
+  ): 'original' | 'machine_translated' | 'translation_unavailable' | undefined {
+    const explicit = this.firstNestedString(source, [
+      ['metadata', 'translation_status'],
+      ['translation_status'],
+    ]);
+    if (
+      explicit === 'original' ||
+      explicit === 'machine_translated' ||
+      explicit === 'translation_unavailable'
+    ) {
+      return explicit;
+    }
+    if (originalLanguage) {
+      return 'original';
     }
     return undefined;
   }

@@ -146,7 +146,11 @@ describe('ProjectionsService', () => {
     (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
       title: 'Bundesgerichtsurteil 9C_100/2025',
       language: 'de',
-      metadata: { official_citation: 'SR 101' },
+      metadata: {
+        official_citation: 'SR 101',
+        original_language: 'de',
+        translation_status: 'original',
+      },
       sections: [{ id: 's1' }, { id: 's2' }],
       citations: [{ id: 'c1' }],
       content_text: 'Leitsatz und Sachverhalt...',
@@ -160,6 +164,8 @@ describe('ProjectionsService', () => {
         title: 'Bundesgerichtsurteil 9C_100/2025',
         authority_name: 'Fedlex',
         official_citation: 'SR 101',
+        original_language: 'de',
+        translation_status: 'original',
         is_official: true,
         sections_count: 2,
         citations_count: 1,

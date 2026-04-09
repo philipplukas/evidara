@@ -103,6 +103,7 @@ describe('search response contract (ADR-0011)', () => {
     const lawResult = res.body.results.find((r: { type: string }) => r.type === 'law');
     expect(lawResult.contentLanguage).toBeDefined();
     expect(lawResult.contentLanguage.display).toBe('de');
+    expect(lawResult.contentLanguage.label).toBe('Originalsprache');
   });
 
   it('facets have proper structure', async () => {

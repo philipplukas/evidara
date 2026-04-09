@@ -69,6 +69,7 @@ describe('mapDocumentToDetailView', () => {
     expect(view.breadcrumbs).toEqual(['OR', 'Gesellschaftsrecht', 'Verantwortlichkeit']);
     expect(view.content).toEqual({ version: '1.0', body: [] });
     expect(view.contentLanguage?.display).toBe('de');
+    expect(view.contentLanguage?.label).toBe('Originalsprache');
   });
 
   it('should compose metadata rows', () => {

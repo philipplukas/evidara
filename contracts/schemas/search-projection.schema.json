@@ -38,6 +38,16 @@
       "type": "string",
       "description": "Canonical official publication citation denormalized for UI trust metadata."
     },
+    "original_language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}$",
+      "description": "Original source language used for translation-state labeling."
+    },
+    "translation_status": {
+      "type": "string",
+      "enum": ["original", "machine_translated", "translation_unavailable"],
+      "description": "Translation state of the content exposed to the UI."
+    },
     "is_official": {
       "type": "boolean",
       "description": "Whether the source origin is official and can be surfaced as a trust signal."

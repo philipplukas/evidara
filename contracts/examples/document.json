@@ -28,7 +28,9 @@
   "full_text": "Bundesverfassung der Schweizerischen Eidgenossenschaft ...",
   "body_text": "Bundesverfassung der Schweizerischen Eidgenossenschaft ...",
   "metadata": {
-    "official_citation": "SR 101"
+    "official_citation": "SR 101",
+    "original_language": "de",
+    "translation_status": "original"
   },
   "extensions": {}
 }

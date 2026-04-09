@@ -18,6 +18,9 @@
   "metadata.source": "Source",
   "metadata.officialSource": "Source officielle",
   "metadata.jurisdiction": "Juridiction",
+  "contentLanguage.original": "Langue d'origine",
+  "contentLanguage.machineTranslatedFrom": "Traduit automatiquement depuis {language}",
+  "contentLanguage.unavailable": "Traduction indisponible",
 
   "tabs.content": "Contenu",
   "tabs.sections": "Sections",

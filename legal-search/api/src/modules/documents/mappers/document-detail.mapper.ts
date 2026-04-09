@@ -7,7 +7,7 @@
  */
 
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE, t } from '../../../core/i18n';
+import { DEFAULT_LOCALE, formatMessage, t } from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/document.entities';
@@ -26,6 +26,7 @@ export interface DetailView {
     display: string;
     original: string;
     isTranslation: boolean;
+    label?: string;
   };
   tabs: { key: string; label: string; count?: number }[];
   relatedGroups: {
@@ -197,6 +198,27 @@ function composeLocalStructure(
   };
 }
 
+function composeContentLanguage(
+  doc: DocumentEntity,
+  locale: SupportedLocale,
+): DetailView['contentLanguage'] | undefined {
+  const display = doc.language;
+  const original = doc.original_language ?? doc.language;
+  if (!display || !original) return undefined;
+  const status = doc.translation_status ?? 'original';
+  return {
+    display,
+    original,
+    isTranslation: status === 'machine_translated',
+    label:
+      status === 'machine_translated'
+        ? formatMessage('contentLanguage.machineTranslatedFrom', { language: original }, locale)
+        : status === 'translation_unavailable'
+          ? t('contentLanguage.unavailable', locale)
+          : t('contentLanguage.original', locale),
+  };
+}
+
 // ─── Main Mapper ───
 
 /** Map a DocumentEntity with its sections and citations to a complete DetailView. */
@@ -226,12 +248,8 @@ export function mapDocumentToDetailView(
     }),
     ...(doc.content_docling !== undefined &&
       doc.content_docling !== null && { content: doc.content_docling }),
-    ...(doc.language && {
-      contentLanguage: {
-        display: doc.language,
-        original: doc.language,
-        isTranslation: false,
-      },
+    ...(composeContentLanguage(doc, locale) && {
+      contentLanguage: composeContentLanguage(doc, locale),
     }),
     ...(sections.length > 0 && {
       localStructure: composeLocalStructure(sections, locale),

@@ -30,4 +30,16 @@ export function t(key: string, locale: SupportedLocale = DEFAULT_LOCALE): string
   return MESSAGES[locale]?.[key] ?? MESSAGES[DEFAULT_LOCALE]?.[key] ?? key;
 }
 
+export function formatMessage(
+  key: string,
+  values: Record<string, string>,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): string {
+  let message = t(key, locale);
+  for (const [name, value] of Object.entries(values)) {
+    message = message.replaceAll(`{${name}}`, value);
+  }
+  return message;
+}
+
 export { DEFAULT_LOCALE, resolveLocale, type SupportedLocale } from './locale';
