@@ -589,6 +589,53 @@ async def test_run_pipeline_health_endpoint_returns_stage_summary(
 
 
 @pytest.mark.asyncio
+async def test_di_processing_status_pubsub_push_envelope_accepted(client) -> None:
+    import base64
+    import json
+
+    run_id = "run_01jq7a3s9b7j4dndd9sgv6pb9d"
+    inner = {
+        "event_type": "document.processing_status.updated",
+        "event_version": 1,
+        "event_id": "evt_pubsub_wrap_1",
+        "occurred_at": "2026-04-02T12:00:00Z",
+        "producer": "document-intelligence",
+        "correlation_id": run_id,
+        "payload": {
+            "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+            "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+            "document_revision": 3,
+            "provenance": {
+                "tenant_id": "tenant_public",
+                "corpus_id": "corpus_public_ch_federal_law",
+                "scope_type": "global_public",
+                "source_id": "src_01jq79xv3wdd6yr8q5bn0m3zfk",
+                "source_version_id": "sv_01jq79zcskf4m3m4gm3t5s59xq",
+                "run_id": run_id,
+                "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+                "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fk",
+            },
+            "processing_version": "di_2026_03_29",
+            "status": "canonical_ready",
+            "error_code": None,
+            "error_summary": None,
+        },
+    }
+    wrapped = {
+        "message": {
+            "data": base64.b64encode(json.dumps(inner).encode("utf-8")).decode("ascii"),
+            "messageId": "2070443601311540",
+        },
+        "subscription": "projects/test/subscriptions/s",
+    }
+    response = await client.post(
+        "/v1/di/events/document-processing-status-updated",
+        json=wrapped,
+    )
+    assert response.status_code == 202
+
+
+@pytest.mark.asyncio
 async def test_di_event_with_invalid_schema_returns_422(client) -> None:
     response = await client.post(
         "/v1/di/events/document-processing-status-updated",

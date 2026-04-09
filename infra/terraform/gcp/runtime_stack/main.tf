@@ -8,9 +8,33 @@ locals {
     system      = "evidara"
   }
 
+  document_intelligence_runtime_key = "document_intelligence"
+
+  event_subscriptions_effective = (
+    var.artifact_bundle_subscription_push == null
+    ? var.event_subscriptions
+    : merge(
+      var.event_subscriptions,
+      {
+        (var.artifact_bundle_subscription_push.subscription_key) = merge(
+          var.event_subscriptions[var.artifact_bundle_subscription_push.subscription_key],
+          {
+            push_config = {
+              target_service = var.artifact_bundle_subscription_push.target_service
+              endpoint_path = coalesce(
+                var.artifact_bundle_subscription_push.endpoint_path,
+                "/internal/events/artifact-bundles:process",
+              )
+            }
+          },
+        )
+      },
+    )
+  )
+
   topic_base_names = setunion(
     var.event_topic_names,
-    toset([for subscription in values(var.event_subscriptions) : subscription.topic_name]),
+    toset([for subscription in values(local.event_subscriptions_effective) : subscription.topic_name]),
   )
 
   prefixed_secret_ids = {
@@ -43,10 +67,21 @@ locals {
 check "subscription_topics_exist" {
   assert {
     condition = alltrue([
-      for subscription in values(var.event_subscriptions) :
+      for subscription in values(local.event_subscriptions_effective) :
       contains(var.event_topic_names, subscription.topic_name)
     ])
     error_message = "Each event_subscriptions[*].topic_name must exist in event_topic_names."
+  }
+}
+
+check "artifact_bundle_push_subscription_key_exists" {
+  assert {
+    condition = (
+      var.artifact_bundle_subscription_push == null
+      ? true
+      : contains(keys(var.event_subscriptions), var.artifact_bundle_subscription_push.subscription_key)
+    )
+    error_message = "artifact_bundle_subscription_push.subscription_key must exist in event_subscriptions."
   }
 }
 
@@ -76,6 +111,29 @@ resource "google_storage_bucket" "manifests" {
   }
 }
 
+# Narrow GCS access for the document-intelligence runtime SA (HTTP ingress + pull consumer).
+# Project-level roles/storage.objectAdmin on this SA remains; these bindings document intent and
+# ensure read access to raw bundles and write access to published Delta surfaces even when bucket
+# IAM is customized independently of project defaults.
+resource "google_storage_bucket_iam_member" "document_intelligence_raw_artifacts_object_viewer" {
+  count = contains(keys(local.prefixed_service_account_ids), local.document_intelligence_runtime_key) ? 1 : 0
+
+  bucket = google_storage_bucket.raw_artifacts.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.runtime[local.document_intelligence_runtime_key].email}"
+}
+
+resource "google_storage_bucket_iam_member" "document_intelligence_published_surfaces_object_admin" {
+  count = (
+    var.document_intelligence_published_bucket_name != null
+    && contains(keys(local.prefixed_service_account_ids), local.document_intelligence_runtime_key)
+  ) ? 1 : 0
+
+  bucket = var.document_intelligence_published_bucket_name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.runtime[local.document_intelligence_runtime_key].email}"
+}
+
 resource "google_pubsub_topic" "events" {
   for_each = local.topic_base_names
 
@@ -84,7 +142,7 @@ resource "google_pubsub_topic" "events" {
 }
 
 resource "google_pubsub_subscription" "events" {
-  for_each = var.event_subscriptions
+  for_each = local.event_subscriptions_effective
 
   name                       = each.key
   topic                      = google_pubsub_topic.events[each.value.topic_name].id
@@ -127,7 +185,7 @@ resource "google_pubsub_subscription" "events" {
 
 locals {
   dlq_subscriptions = {
-    for name, sub in var.event_subscriptions :
+    for name, sub in local.event_subscriptions_effective :
     name => sub if sub.dead_letter_policy != null
   }
 }
@@ -186,13 +244,13 @@ resource "google_pubsub_subscription_iam_member" "dlq_subscriber" {
 
 locals {
   push_target_services = toset([
-    for sub in values(var.event_subscriptions) :
+    for sub in values(local.event_subscriptions_effective) :
     sub.push_config.target_service
     if sub.push_config != null
   ])
 
   push_target_sa_keys = toset([
-    for sub in values(var.event_subscriptions) :
+    for sub in values(local.event_subscriptions_effective) :
     local.cloud_run_services[sub.push_config.target_service].service_account_key
     if sub.push_config != null
   ])

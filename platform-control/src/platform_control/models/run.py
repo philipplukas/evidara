@@ -19,9 +19,21 @@ class Run(TimestampMixin, Base):
     )
     source_id: Mapped[str] = mapped_column(ForeignKey("sources.source_id"))
     source_version_id: Mapped[str] = mapped_column(ForeignKey("source_versions.source_version_id"))
-    mode: Mapped[RunMode] = mapped_column(Enum(RunMode, native_enum=False), default=RunMode.PREVIEW)
+    mode: Mapped[RunMode] = mapped_column(
+        Enum(
+            RunMode,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=RunMode.PREVIEW,
+    )
     status: Mapped[RunStatus] = mapped_column(
-        Enum(RunStatus, native_enum=False), default=RunStatus.PENDING
+        Enum(
+            RunStatus,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=RunStatus.PENDING,
     )
     started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

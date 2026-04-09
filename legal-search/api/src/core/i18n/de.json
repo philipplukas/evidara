@@ -18,6 +18,7 @@
   "metadata.source": "Quelle",
   "metadata.officialSource": "Offizielle Quelle",
   "metadata.jurisdiction": "Zuständigkeit",
+  "metadata.language": "Sprache",
   "contentLanguage.original": "Originalsprache",
   "contentLanguage.machineTranslatedFrom": "Maschinell übersetzt aus {language}",
   "contentLanguage.unavailable": "Übersetzung nicht verfügbar",

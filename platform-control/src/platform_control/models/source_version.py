@@ -20,7 +20,12 @@ class SourceVersion(TimestampMixin, Base):
     )
     version_label: Mapped[str] = mapped_column()
     status: Mapped[SourceVersionStatus] = mapped_column(
-        Enum(SourceVersionStatus, native_enum=False), default=SourceVersionStatus.DRAFT
+        Enum(
+            SourceVersionStatus,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=SourceVersionStatus.DRAFT,
     )
     acquisition_spec: Mapped[dict] = mapped_column(JSON, default=dict)
 

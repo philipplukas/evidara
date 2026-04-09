@@ -203,6 +203,10 @@ export function composeMetadata(
     });
   }
 
+  if (hit.language) {
+    rows.push({ label: t('metadata.language', locale), value: hit.language });
+  }
+
   return rows;
 }
 

@@ -18,7 +18,12 @@ class ProviderJob(TimestampMixin, Base):
     provider: Mapped[str] = mapped_column(default="firecrawl")
     external_job_id: Mapped[str | None] = mapped_column(nullable=True, unique=True)
     status: Mapped[ProviderJobStatus] = mapped_column(
-        Enum(ProviderJobStatus, native_enum=False), default=ProviderJobStatus.ACCEPTED
+        Enum(
+            ProviderJobStatus,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=ProviderJobStatus.ACCEPTED,
     )
     request_payload: Mapped[dict] = mapped_column(JSON, default=dict)
     response_payload: Mapped[dict] = mapped_column(JSON, default=dict)

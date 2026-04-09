@@ -915,14 +915,21 @@ class RunService:
         bundle_manifest_id = generate_prefixed_id("abm")
         upstream_locator = self._upstream_locator(artifacts[0].artifact_metadata)
 
-        manifest_artifacts: list[dict[str, Any]] = []
+        roles: list[str] = []
         for index, artifact in enumerate(artifacts):
             if artifact.content_type.startswith("application/json"):
-                role = "metadata"
+                roles.append("metadata")
             elif index == 0:
-                role = "primary_document"
+                roles.append("primary_document")
             else:
-                role = "attachment"
+                roles.append("attachment")
+        # JSON-only bundles (e.g. deterministic_http on application/json URLs) must still expose a
+        # primary_document so document-intelligence can load the bundle.
+        if roles and "primary_document" not in roles:
+            roles[0] = "primary_document"
+
+        manifest_artifacts: list[dict[str, Any]] = []
+        for artifact, role in zip(artifacts, roles, strict=True):
             manifest_artifacts.append(
                 {
                     "artifact_id": artifact.artifact_id,
@@ -1018,6 +1025,9 @@ class RunService:
             return []
 
         doc_artifacts = [a for a in artifacts if not a.content_type.startswith("application/json")]
+        if not doc_artifacts:
+            # JSON-only acquisition (e.g. API seeds): still one processable document.
+            doc_artifacts = list(artifacts)
         if not doc_artifacts:
             return []
 

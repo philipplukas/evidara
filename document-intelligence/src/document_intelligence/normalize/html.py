@@ -10,7 +10,27 @@ from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
 class _SimpleHtmlParser(HTMLParser):
     _TEXT_TAGS = {"p", "li", "td", "th", "blockquote", "pre", "article", "section", "main"}
     _HEADING_TAGS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
-    _SKIPPED_TAGS = {"script", "style", "noscript", "template", "svg", "canvas", "nav", "footer", "aside"}
+    _SKIPPED_TAGS = {
+        "script",
+        "style",
+        "noscript",
+        "template",
+        "svg",
+        "canvas",
+        "nav",
+        "footer",
+        "aside",
+        # Embedded / chrome — common in scraped pages; strip to stabilize body text.
+        "iframe",
+        "form",
+        "object",
+        "embed",
+        "picture",
+        "video",
+        "audio",
+        "track",
+        "map",
+    }
 
     def __init__(self, artifact_id: str) -> None:
         super().__init__(convert_charrefs=True)
@@ -112,9 +132,45 @@ class _SimpleHtmlParser(HTMLParser):
 
 def normalize_html_document(html_text: str, artifact_id: str) -> NormalizedDocumentIR:
     parser = _SimpleHtmlParser(artifact_id=artifact_id)
-    parser.feed(html_text)
+    try:
+        parser.feed(html_text)
+    except Exception:
+        # Malformed markup should not abort the pipeline; strip tags heuristically.
+        text = _normalize_whitespace(_strip_tags_fallback(html_text))
+        blocks = (
+            [
+                Block(
+                    id="blk_0000",
+                    type="paragraph",
+                    text=text,
+                    level=None,
+                    order=0,
+                    parent_id=None,
+                    artifact_id=artifact_id,
+                    attrs={"fallback": True, "parse_error_recovery": True},
+                )
+            ]
+            if text
+            else []
+        )
+        return NormalizedDocumentIR(
+            blocks=blocks,
+            metadata={
+                "title": None,
+                "language": None,
+                "normalizer": "html_v1",
+                "source_profile_ref": "default_html_v1",
+                "normalization_profile_ref": "html_v1",
+                "source_flavor": "generic_html",
+                "html_parse_used_fallback": True,
+                "html_parse_recovery": "exception",
+            },
+        )
+
     blocks = parser.blocks
+    used_fallback = False
     if not blocks:
+        used_fallback = True
         text = _normalize_whitespace(_strip_tags_fallback(html_text))
         blocks = (
             [
@@ -141,6 +197,7 @@ def normalize_html_document(html_text: str, artifact_id: str) -> NormalizedDocum
             "source_profile_ref": "default_html_v1",
             "normalization_profile_ref": "html_v1",
             "source_flavor": _detect_html_source_flavor(blocks),
+            "html_parse_used_fallback": used_fallback,
         },
     )
 

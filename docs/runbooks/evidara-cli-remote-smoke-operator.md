@@ -1,4 +1,4 @@
-# Evidara CLI remote smoke — GitHub Actions secrets (operator)
+# Evidara CLI remote smoke — GitHub Actions (operator)
 
 Owner: Platform / DevOps  
 Last reviewed: 2026-04-08  
@@ -7,29 +7,33 @@ Applies to: repository **Actions → Evidara CLI remote smoke** (`.github/workfl
 
 ## Purpose
 
-The workflow is **workflow_dispatch only**. It runs `evidara platform-control ping` and `evidara legal-search ping` against **URLs you type** into the form. Optional **repository secrets** supply auth headers when dev/staging/prod APIs are not anonymous.
+The workflow is **workflow_dispatch only**. It runs `evidara platform-control ping` and `evidara legal-search ping` against **URLs you type** into the form.
 
-Secrets cannot be created from git; configure them once in GitHub.
+**Cloud Run IAM (Bearer):** the workflow authenticates with **Google OIDC** (Workload Identity Federation), impersonates the environment service account (`GCP_SERVICE_ACCOUNT_DEV` or `GCP_SERVICE_ACCOUNT_STAGING`), and **mints** audience-scoped ID tokens for the two base URLs you enter. You do **not** need repository secrets `EVIDARA_PLATFORM_CONTROL_TOKEN` / `EVIDARA_LEGAL_SEARCH_TOKEN` for private Cloud Run in CI.
 
-## Steps (repository secrets)
+**Terraform:** manage GitHub environments and secrets with [`infra/terraform/github/repo_settings`](../../infra/terraform/github/repo_settings/README.md) (`environment_secrets` for WIF + SA email; optional `repository_secrets` for API keys — see README warning on short-lived Google ID tokens).
 
-1. Open the repo on GitHub → **Settings** → **Secrets and variables** → **Actions**.
-2. Under **Repository secrets**, **New repository secret** for each value you need (names are **exact**):
+**Local / manual:** for tokens from your laptop, see [MVP acceptance — Cloud Run auth](mvp-acceptance-scenario-pack.md#cloud-run-auth-local-and-cli) and [GCP local Cloud Run auth](../setup/gcp-local-cloud-run-auth.md).
+
+## Steps (GitHub configuration)
+
+1. Ensure **GitHub Environment** `dev` or `staging` has secrets **`GCP_WORKLOAD_IDENTITY_PROVIDER`** and **`GCP_SERVICE_ACCOUNT_DEV`** / **`GCP_SERVICE_ACCOUNT_STAGING`** (typically applied via Terraform — see [`infra/terraform/github/repo_settings/README.md`](../../infra/terraform/github/repo_settings/README.md)).
+1. Optional **repository** secrets for app-layer API keys (Terraform: `repository_secrets` / `TF_VAR_repository_secrets`):
 
 | Secret name | Maps to | When to set |
 |-------------|---------|-------------|
-| `EVIDARA_PLATFORM_CONTROL_API_KEY` | `X-API-Key` on platform-control requests | Platform-control requires API key |
-| `EVIDARA_LEGAL_SEARCH_TOKEN` | `Authorization: Bearer …` on legal-search BFF | BFF expects a bearer token |
-| `EVIDARA_LEGAL_SEARCH_API_KEY` | `X-API-Key` on legal-search BFF | BFF expects `X-API-Key` instead of/in addition to bearer |
+| `EVIDARA_PLATFORM_CONTROL_API_KEY` | `X-API-Key` on platform-control requests | Deployed API enforces operator key |
+| `EVIDARA_LEGAL_SEARCH_API_KEY` | `X-API-Key` on legal-search BFF | BFF expects `X-API-Key` |
 
-1. Leave a secret **unset** if that auth mechanism is not used (empty env in the workflow).
-2. **Actions** → **Evidara CLI remote smoke** → **Run workflow** → enter **platform_control_url** and **legal_search_url** (base URLs only, no path suffix).
+Leave a secret **unset** if unused.
+
+1. **Actions** → **Evidara CLI remote smoke** → **Run workflow** → choose **github_environment** (`dev` or `staging`) → enter **platform_control_url** and **legal_search_url** (HTTPS origins for the two Cloud Run services, e.g. `https://platform-control-api-dev-….run.app`).
 
 ## Security
 
 - Use **environment-specific** API keys or tokens where possible; rotate on compromise.
 - Do not paste secrets into issues, PRs, or chat logs.
-- Prefer **GitHub Environments** with protection rules if you later split staging vs prod secrets (workflow would need a small change to target an `environment:`).
+- The workflow uses **GitHub Environments** (`dev` / `staging`) for WIF secrets; environment protection rules (required reviewers) apply to each run for the chosen environment.
 
 ## Related docs
 

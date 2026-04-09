@@ -11,6 +11,25 @@ from document_intelligence.canonical.models import Document, ProcessingManifest,
 from document_intelligence.errors import ProcessingError
 
 
+def _document_dict_for_delta(document: Document) -> dict[str, object]:
+    """Match legacy `published_documents` Delta schemas (no extensions / effective_date)."""
+    row = document.to_dict()
+    row.pop("extensions", None)
+    row.pop("effective_date", None)
+    return row
+
+
+def _manifest_dict_for_delta(manifest: ProcessingManifest) -> dict[str, object]:
+    """Match legacy `processing_manifests` nested structs (e.g. storage_ref without created_at)."""
+    row = manifest.to_dict()
+    ibmr = row.get("input_bundle_manifest_ref")
+    if isinstance(ibmr, dict):
+        storage_ref = ibmr.get("storage_ref")
+        if isinstance(storage_ref, dict):
+            storage_ref.pop("created_at", None)
+    return row
+
+
 class CanonicalSink:
     """Persistence interface for canonical writes and emitted events."""
 
@@ -81,14 +100,24 @@ class DeltaCanonicalSink(CanonicalSink):
         sections: list[Section],
         manifest: ProcessingManifest,
     ) -> None:
-        self._write_rows(self._config.published_documents_uri, [document.to_dict()])
+        self._write_rows(
+            self._config.published_documents_uri,
+            [_document_dict_for_delta(document)],
+        )
+        # Published Delta tables predate `parent_section_id`; omit until schemas are migrated.
+        section_rows = []
+        for section in sections:
+            row = section.to_dict()
+            row.pop("parent_section_id", None)
+            section_rows.append(row)
         self._write_rows(
             self._config.published_sections_uri,
-            [section.to_dict() for section in sections],
+            section_rows,
+            always_present_keys=frozenset({"metadata"}),
         )
         self._write_rows(
             self._config.processing_manifests_uri,
-            [manifest.to_dict()],
+            [_manifest_dict_for_delta(manifest)],
         )
 
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
@@ -97,11 +126,17 @@ class DeltaCanonicalSink(CanonicalSink):
     def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
         self.document_processed_events.append(document_processed_event)
 
-    def _write_rows(self, uri: str, rows: Sequence[dict[str, object]]) -> None:
+    def _write_rows(
+        self,
+        uri: str,
+        rows: Sequence[dict[str, object]],
+        *,
+        always_present_keys: frozenset[str] | None = None,
+    ) -> None:
         if not rows:
             return
         try:
-            table = pa.Table.from_pylist(_delta_ready_rows(rows))
+            table = pa.Table.from_pylist(_delta_ready_rows(rows, always_present_keys=always_present_keys))
             self._writer(uri, table, mode=_delta_write_mode(uri))
         except Exception as error:  # pragma: no cover - library-specific
             raise ProcessingError(
@@ -129,11 +164,17 @@ def _delta_write_mode(uri: str) -> str:
     return "append" if os.path.exists(delta_log_path) else "overwrite"
 
 
-def _delta_ready_rows(rows: Sequence[dict[str, object]]) -> list[dict[str, object]]:
+def _delta_ready_rows(
+    rows: Sequence[dict[str, object]],
+    *,
+    always_present_keys: frozenset[str] | None = None,
+) -> list[dict[str, object]]:
     normalized_rows = [{key: _normalize_delta_value(value) for key, value in row.items()} for row in rows]
     retained_keys = {
         key for key in normalized_rows[0].keys() if any(row.get(key) is not None for row in normalized_rows)
     }
+    if always_present_keys:
+        retained_keys |= always_present_keys
     return [{key: value for key, value in row.items() if key in retained_keys} for row in normalized_rows]
 
 

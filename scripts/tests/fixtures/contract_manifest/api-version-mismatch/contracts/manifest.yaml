@@ -1,0 +1,46 @@
+version: "1.3.0"
+last_reviewed: "2026-04-09"
+owner: "Platform Team"
+mvp_flow:
+  name: "ingest_to_searchable_detail"
+  description: "test"
+  sequence:
+    - platform_control.create_source
+    - platform_control.create_version
+    - platform_control.approve_version
+    - document_intelligence.publish_status
+    - legal_search.search_document_detail
+apis:
+  platform_control:
+    file: "contracts/api/platform-control.openapi.yaml"
+    version: "0.3.2"
+  document_intelligence:
+    file: "contracts/api/document-intelligence-runtime.openapi.yaml"
+    version: "0.1.0"
+  legal_search:
+    file: "contracts/api/legal-search.openapi.yaml"
+    version: "0.2.0"
+events:
+  - name: "artifact_bundle.available"
+    schema: "contracts/events/artifact-bundle-available.schema.json"
+    event_version: "1.0.0"
+    producer: "platform-control"
+    consumers:
+      - "document-intelligence"
+  - name: "document.processing_status.updated"
+    schema: "contracts/events/document-processing-status-updated.schema.json"
+    event_version: "1.0.0"
+    producer: "document-intelligence"
+    consumers:
+      - "platform-control"
+  - name: "document.processed"
+    schema: "contracts/events/document-processed.schema.json"
+    event_version: "1.0.0"
+    producer: "document-intelligence"
+    consumers:
+      - "platform-control"
+      - "legal-search"
+compatibility_policy:
+  additive_change: "minor"
+  breaking_change: "major"
+  enforcement: "fail-ci-on-breaking-without-version-bump"

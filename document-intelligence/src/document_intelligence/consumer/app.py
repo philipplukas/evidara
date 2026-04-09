@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Header, HTTPException
 
 from document_intelligence.contracts.envelope import EnvelopeError
+from document_intelligence.errors import ProcessingError
 from document_intelligence.http_observability import install_http_observability
 from document_intelligence.processing_runtime import process_artifact_bundle_event
 
@@ -52,6 +53,8 @@ def create_app(
             return processor(body)
         except EnvelopeError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+        except ProcessingError as error:
+            raise HTTPException(status_code=500, detail=error.summary) from error
 
     @app.get("/health", include_in_schema=False)
     async def health() -> dict[str, str]:

@@ -44,6 +44,33 @@ class StubProvider:
 
 
 @dataclass
+class InlineJsonDeterministicProvider:
+    """Simulates deterministic_http capturing a single JSON document (no HTML)."""
+
+    provider_name: str = "deterministic_http"
+
+    async def start_run(self, source, source_version, run) -> ProviderStartResult:
+        del source, source_version, run
+        return ProviderStartResult(
+            provider=self.provider_name,
+            external_job_id="det_job_json",
+            request_payload={"seed_urls": ["https://registry.npmjs.org/left-pad/latest"]},
+            response_payload={"captured": 1},
+            inline_resources=[
+                ProviderResource(
+                    source_url="https://registry.npmjs.org/left-pad/latest",
+                    final_url="https://registry.npmjs.org/left-pad/latest",
+                    content_type="application/json",
+                    body='{"name":"left-pad","version":"1.3.0"}',
+                    title=None,
+                    http_status=200,
+                    discovery_depth=0,
+                )
+            ],
+        )
+
+
+@dataclass
 class InlineDeterministicProvider:
     provider_name: str = "deterministic_http"
 
@@ -777,6 +804,43 @@ async def test_provider_registry_dispatches_deterministic_inline_runs(session) -
     assert len(publisher.bundle_events) == 1
     assert publisher.bundle_events[0]["event_type"] == "artifact_bundle.available"
     assert publisher.bundle_events[0]["payload"]["provenance"]["run_id"] == run.run_id
+
+
+@pytest.mark.asyncio
+async def test_provider_registry_publishes_bundle_for_json_only_inline_artifact(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "deterministic_http",
+        "seed_url": "https://registry.npmjs.org/left-pad/latest",
+        "mode": "crawl",
+    }
+    await session.commit()
+
+    registry = ProviderRegistry()
+    registry.register(StubProvider())
+    registry.register(InlineJsonDeterministicProvider())
+
+    artifact_store = InMemoryArtifactStore()
+    publisher = RecordingPublisher()
+    run_service = RunService(
+        session,
+        provider_registry=registry,
+        artifact_store=artifact_store,
+        publisher=publisher,
+    )
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+
+    assert run.status is RunStatus.COMPLETED
+    assert publisher.bundle_events is not None
+    assert len(publisher.bundle_events) == 1
+    assert publisher.bundle_events[0]["event_type"] == "artifact_bundle.available"
 
 
 @pytest.mark.asyncio

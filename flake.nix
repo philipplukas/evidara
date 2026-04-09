@@ -1,5 +1,5 @@
 {
-  description = "Evidara monorepo — Nix helpers (GLSL wallpaper server for Plash on macOS)";
+  description = "Evidara monorepo — dev shell (Terraform, gcloud, jq, …) and Nix helpers for the GLSL wallpaper server";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -15,6 +15,24 @@
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
+          default = pkgs.mkShell {
+            packages = with pkgs; [
+              terraform
+              jq
+              shellcheck
+              uv
+              google-cloud-sdk
+            ];
+          };
+        }
+      );
+
       packages = forAllSystems (
         system:
         let

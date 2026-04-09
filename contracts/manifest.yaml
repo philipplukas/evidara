@@ -32,7 +32,7 @@ apis:
     version: "0.1.0"
   legal_search:
     file: "contracts/api/legal-search.openapi.yaml"
-    version: "0.2.0"
+    version: "0.3.0"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"

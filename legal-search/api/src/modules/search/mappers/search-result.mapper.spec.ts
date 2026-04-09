@@ -136,6 +136,14 @@ describe('composeMetadata', () => {
     });
   });
 
+  it('should include language row when language is present', () => {
+    const rows = composeMetadata(lawHit);
+    expect(rows).toContainEqual({
+      label: 'Sprache',
+      value: 'de',
+    });
+  });
+
   it('should produce "Datum" row for decision', () => {
     const rows = composeMetadata(decisionHit);
     expect(rows).toContainEqual({
@@ -226,7 +234,7 @@ describe('mapSearchHitToView', () => {
     expect(view.snippet).toBe('Art. 1 OR — Vertragsschluss');
     expect(view.structuralContext).toBe('OR › Gesellschaftsrecht › Verantwortlichkeit');
     expect(view.badges).toHaveLength(1);
-    expect(view.metadataRows).toHaveLength(3);
+    expect(view.metadataRows).toHaveLength(4);
     expect(view.relatedCounts).toHaveLength(3);
     expect(view.actions).toHaveLength(2);
     expect(view.contentLanguage?.display).toBe('de');
@@ -282,7 +290,8 @@ describe('locale-aware label resolution', () => {
 
   it('should render French metadata when locale is fr', () => {
     const rows = composeMetadata(lawHit, 'fr');
-    expect(rows[0].label).toBe('En vigueur');
+    expect(rows.some((r) => r.label === 'En vigueur')).toBe(true);
+    expect(rows.some((r) => r.label === 'Langue' && r.value === 'de')).toBe(true);
   });
 
   it('should render French related counts when locale is fr', () => {

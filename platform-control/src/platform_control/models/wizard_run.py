@@ -23,7 +23,11 @@ class WizardRun(TimestampMixin, Base):
     )
     workflow_id: Mapped[str | None] = mapped_column(nullable=True)
     state: Mapped[WizardRunState] = mapped_column(
-        Enum(WizardRunState, native_enum=False),
+        Enum(
+            WizardRunState,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         default=WizardRunState.DRAFT_SCOPE,
     )
     state_entered_at: Mapped[datetime] = mapped_column(

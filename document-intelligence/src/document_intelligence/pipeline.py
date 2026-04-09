@@ -21,6 +21,10 @@ from document_intelligence.events.document_processed import (
     build_document_processed_event,
 )
 from document_intelligence.events.status_updated import build_processing_status_event
+from document_intelligence.extractors.metadata import (
+    MetadataExtractionCandidate,
+    MetadataExtractor,
+)
 from document_intelligence.ingest.docling_adapter import normalize_with_docling
 from document_intelligence.ingest.loaders import BundleLoader, DispatchingBundleLoader
 from document_intelligence.nlp.citation_extractor import extract_citations
@@ -82,9 +86,14 @@ class ProcessingPipeline:
         spacy_model_name: str = "xx_sent_ud_sm",
         spacy_max_chars_per_section: int = 100000,
         spacy_batch_size: int = 32,
+        enable_llm_extractor: bool = False,
+        llm_confidence_threshold: float = 0.7,
+        llm_metadata_extractor: MetadataExtractor | None = None,
     ) -> None:
         if parser_backend not in {"legacy", "docling"}:
             raise ValueError("parser_backend must be one of: legacy, docling")
+        if not 0.0 <= llm_confidence_threshold <= 1.0:
+            raise ValueError("llm_confidence_threshold must be between 0.0 and 1.0")
         self._bundle_loader = bundle_loader or DispatchingBundleLoader()
         self._sink = sink or InMemoryCanonicalSink()
         self._processing_version = processing_version
@@ -93,6 +102,9 @@ class ProcessingPipeline:
         self._spacy_model_name = spacy_model_name
         self._spacy_max_chars_per_section = spacy_max_chars_per_section
         self._spacy_batch_size = spacy_batch_size
+        self._enable_llm_extractor = enable_llm_extractor
+        self._llm_confidence_threshold = llm_confidence_threshold
+        self._llm_metadata_extractor = llm_metadata_extractor
 
     def process_event(self, event_data: dict[str, Any]) -> ProcessingResult:
         event = ArtifactBundleAvailableEvent.from_dict(event_data)
@@ -148,6 +160,11 @@ class ProcessingPipeline:
             provenance=provenance,
             section_candidates=build_sections_from_ir(normalized_document),
         )
+        llm_metadata = self._extract_metadata_candidate(
+            normalized_document=normalized_document,
+            manifest=selected_bundle.manifest,
+            primary_artifact=primary_artifact,
+        )
 
         document = _build_document(
             normalized_document=normalized_document,
@@ -158,6 +175,9 @@ class ProcessingPipeline:
             document_revision=document_revision,
             processing_manifest_id=processing_manifest_id,
             processing_version=self._processing_version,
+            llm_metadata=llm_metadata,
+            llm_confidence_threshold=self._llm_confidence_threshold,
+            llm_extractor_enabled=self._enable_llm_extractor,
         )
         if self._enable_spacy:
             document.metadata["nlp"] = enrich_with_spacy(
@@ -225,6 +245,28 @@ class ProcessingPipeline:
             document_processed_event=document_processed_event,
         )
 
+    def _extract_metadata_candidate(
+        self,
+        *,
+        normalized_document: NormalizedDocumentIR,
+        manifest: ArtifactBundleManifest,
+        primary_artifact: ArtifactBundleManifestArtifact,
+    ) -> MetadataExtractionCandidate | None:
+        if not self._enable_llm_extractor or self._llm_metadata_extractor is None:
+            return None
+        try:
+            return self._llm_metadata_extractor.extract(
+                normalized_document=normalized_document,
+                manifest=manifest,
+                primary_artifact=primary_artifact,
+            )
+        except Exception as error:
+            return MetadataExtractionCandidate(
+                confidence=0.0,
+                summary=f"extractor_failed:{type(error).__name__}",
+                raw={"error": str(error)},
+            )
+
     def _normalize_artifact(
         self,
         artifact: ArtifactBundleManifestArtifact,
@@ -243,6 +285,8 @@ class ProcessingPipeline:
             return normalize_xml_document(artifact_text, artifact.artifact_id)
         if content_type in {"text/markdown", "text/x-markdown", "application/markdown"}:
             return normalize_markdown_document(artifact_text, artifact.artifact_id)
+        if content_type in {"application/json", "application/ld+json", "text/json"}:
+            return normalize_plain_text_document(artifact_text, artifact.artifact_id)
         if content_type.startswith("text/plain"):
             detected = _detect_text_modality(artifact_text)
             if detected == "html":
@@ -292,6 +336,9 @@ def _build_document(
     document_revision: int,
     processing_manifest_id: str,
     processing_version: str,
+    llm_metadata: MetadataExtractionCandidate | None,
+    llm_confidence_threshold: float,
+    llm_extractor_enabled: bool,
 ) -> Document:
     now = _utc_now()
     metadata = {
@@ -313,9 +360,36 @@ def _build_document(
     source_flavor = normalized_document.metadata.get("source_flavor")
     if source_flavor:
         metadata["source_flavor"] = source_flavor
+    if "html_parse_used_fallback" in normalized_document.metadata:
+        metadata["html_parse_used_fallback"] = normalized_document.metadata["html_parse_used_fallback"]
+    html_parse_recovery = normalized_document.metadata.get("html_parse_recovery")
+    if html_parse_recovery:
+        metadata["html_parse_recovery"] = html_parse_recovery
     docling_metadata = normalized_document.metadata.get("docling")
     if docling_metadata:
         metadata["docling"] = dict(docling_metadata)
+    applied_llm_metadata = bool(
+        llm_metadata
+        and llm_metadata.confidence >= llm_confidence_threshold
+        and (llm_metadata.title or llm_metadata.document_type)
+    )
+    if llm_extractor_enabled:
+        if llm_metadata is None:
+            metadata["llm_extraction"] = {
+                "enabled": True,
+                "applied": False,
+                "summary": "no_extractor_configured",
+                "confidence_threshold": llm_confidence_threshold,
+            }
+        else:
+            metadata["llm_extraction"] = llm_metadata.to_metadata(applied=applied_llm_metadata)
+            metadata["llm_extraction"]["confidence_threshold"] = llm_confidence_threshold
+    title = _choose_document_title(normalized_document)
+    if applied_llm_metadata and llm_metadata and llm_metadata.title:
+        title = llm_metadata.title.strip() or title
+    llm_document_type = None
+    if applied_llm_metadata and llm_metadata:
+        llm_document_type = _normalize_document_type(llm_metadata.document_type)
 
     return Document(
         document_id=document_id,
@@ -325,14 +399,14 @@ def _build_document(
         primary_artifact_id=primary_artifact.artifact_id,
         jurisdiction_id=manifest.source_defaults.get("jurisdiction_id"),
         authority_id=manifest.source_defaults.get("authority_id"),
-        title=_choose_document_title(normalized_document),
+        title=title,
         processed_at=now,
         processing_version=processing_version,
         lifecycle_status="active",
         full_text=normalized_document.full_text,
         body_text=normalized_document.body_text,
         document_type=_resolve_document_type(
-            normalized_document.metadata.get("document_type"),
+            llm_document_type or normalized_document.metadata.get("document_type"),
             manifest.source_defaults.get("document_type_hint"),
         ),
         metadata=metadata,

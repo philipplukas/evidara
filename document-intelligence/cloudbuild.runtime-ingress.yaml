@@ -1,0 +1,17 @@
+# One-off / CI helper: build HTTP ingress image (not default Dockerfile CMD).
+# Usage from repo root:
+#   gcloud builds submit . --config=document-intelligence/cloudbuild.runtime-ingress.yaml --substitutions=_TAG=manual-YYYYMMDD
+substitutions:
+  _TAG: "manual-latest"
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "Dockerfile.runtime-ingress"
+      - "-t"
+      - "europe-west6-docker.pkg.dev/${PROJECT_ID}/runtime/di-consumer:${_TAG}"
+      - "."
+    dir: document-intelligence
+images:
+  - "europe-west6-docker.pkg.dev/${PROJECT_ID}/runtime/di-consumer:${_TAG}"

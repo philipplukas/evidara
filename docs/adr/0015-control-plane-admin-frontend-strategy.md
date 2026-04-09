@@ -4,6 +4,8 @@
 
 Accepted
 
+**Implementation note:** The React-admin app in `platform-control/admin` is the **current** operator UI. Retool is retired for day-to-day work; archived artifacts live under `platform-control/retool/`. The Context and Decision sections below record the migration from the ADR-0006 Retool approach.
+
 ## Date
 
 2026-04-03

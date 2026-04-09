@@ -74,7 +74,7 @@ Secret categories:
 
 Standard deployment flow:
 
-1. `terraform apply` infrastructure and secret containers.
+1. `terraform apply` infrastructure and secret containers. If `terraform` is missing locally, use the [Nix dev shell](nix.md) (`nix develop`).
 2. Add/update secret values in Secret Manager.
    - For self-managed OpenSearch on GKE, sync stack outputs with `scripts/sync_opensearch_secrets.py`.
 3. Deploy or roll Cloud Run services to load latest secret versions.

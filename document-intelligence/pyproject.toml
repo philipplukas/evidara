@@ -32,6 +32,11 @@ docling = [
 nlp = [
   "spacy>=3.7.0",
 ]
+llm = [
+  "dspy>=2.5.0",
+  "google-cloud-aiplatform>=1.60.0",
+  "openai>=1.30.0",
+]
 
 [project.scripts]
 document_intelligence_process_event = "document_intelligence.jobs.process_event:main"
@@ -66,3 +71,9 @@ quote-style = "double"
 dev = [
     "pytest>=9.0.2",
 ]
+
+# Default collection is tests/ only — `databricks/notebooks/` contains PySpark smoke
+# modules that are not valid local pytest targets (no pyspark in dev env).
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
