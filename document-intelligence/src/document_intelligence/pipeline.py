@@ -350,6 +350,13 @@ def _build_document(
     extracted_metadata = dict(normalized_document.metadata.get("extracted_metadata") or {})
     if extracted_metadata:
         metadata["extracted_metadata"] = extracted_metadata
+    official_citation = _resolve_official_citation(normalized_document.metadata, extracted_metadata)
+    if official_citation:
+        metadata["official_citation"] = official_citation
+    original_language = _resolve_original_language(normalized_document.metadata, manifest.source_defaults)
+    if original_language:
+        metadata["original_language"] = original_language
+        metadata["translation_status"] = "original"
     source_flavor = normalized_document.metadata.get("source_flavor")
     if source_flavor:
         metadata["source_flavor"] = source_flavor
@@ -405,6 +412,38 @@ def _build_document(
         metadata=metadata,
         extensions={},
     )
+
+
+def _resolve_official_citation(
+    normalized_metadata: dict[str, Any],
+    extracted_metadata: dict[str, Any],
+) -> str | None:
+    explicit = normalized_metadata.get("official_citation")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+
+    kundmachungsorgan = extracted_metadata.get("kundmachungsorgan")
+    if isinstance(kundmachungsorgan, str) and kundmachungsorgan.strip():
+        return kundmachungsorgan.strip()
+
+    return None
+
+
+def _resolve_original_language(
+    normalized_metadata: dict[str, Any],
+    source_defaults: dict[str, Any],
+) -> str | None:
+    explicit = normalized_metadata.get("language")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip().split("-")[0].lower()
+
+    default_languages = source_defaults.get("language_codes")
+    if isinstance(default_languages, list):
+        for candidate in default_languages:
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip().split("-")[0].lower()
+
+    return None
 
 
 def _build_sections(

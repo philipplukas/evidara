@@ -104,6 +104,7 @@ def build_manifest_payload(
         "source_defaults": {
             "jurisdiction_id": "jur_ch_federal",
             "authority_id": "auth_fedlex",
+            "authority_name": "Fedlex",
             "language_codes": ["de"],
             "document_type_hint": "statute",
         },

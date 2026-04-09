@@ -105,6 +105,11 @@ export class ProjectionsService {
     const projection: SearchProjectionDocument = {
       document_id: event.payload.document_id,
       title,
+      authority_name: event.payload.authority_name,
+      official_citation: extracted.officialCitation,
+      original_language: extracted.originalLanguage,
+      translation_status: extracted.translationStatus,
+      is_official: event.payload.is_official,
       sections_count: extracted.sectionsCount,
       citations_count: extracted.citationsCount,
       source_id: provenance.source_id,
@@ -127,6 +132,9 @@ export class ProjectionsService {
   private extractLeanDocumentFields(leanDocument: unknown): {
     title?: string;
     language?: string;
+    officialCitation?: string;
+    originalLanguage?: string;
+    translationStatus?: 'original' | 'machine_translated' | 'translation_unavailable';
     previewText?: string;
     bodyPreviewFallback?: string;
     sectionsCount: number;
@@ -143,6 +151,14 @@ export class ProjectionsService {
     const title = typeof doc.title === 'string' && doc.title.trim() ? doc.title.trim() : undefined;
     const language =
       typeof doc.language === 'string' && doc.language.trim() ? doc.language.trim() : undefined;
+    const officialCitation = this.firstNestedString(doc, [
+      ['metadata', 'official_citation'],
+      ['official_citation'],
+    ]);
+    const originalLanguage =
+      this.firstNestedString(doc, [['metadata', 'original_language'], ['original_language']]) ??
+      language;
+    const translationStatus = this.firstTranslationStatus(doc, originalLanguage);
     const sectionCandidates = [doc.sections, doc.document_sections, doc.body_sections];
     const citationCandidates = [doc.citations, doc.document_citations];
     const extensions = this.asRecord(doc.extensions);
@@ -196,6 +212,9 @@ export class ProjectionsService {
     return {
       title,
       language,
+      officialCitation,
+      originalLanguage,
+      translationStatus,
       previewText,
       bodyPreviewFallback,
       sectionsCount,
@@ -243,6 +262,47 @@ export class ProjectionsService {
       if (typeof value === 'string' && value.trim()) {
         return value.trim();
       }
+    }
+    return undefined;
+  }
+
+  private firstNestedString(
+    source: Record<string, unknown>,
+    paths: string[][],
+  ): string | undefined {
+    for (const path of paths) {
+      let current: unknown = source;
+      for (const key of path) {
+        if (!current || typeof current !== 'object') {
+          current = undefined;
+          break;
+        }
+        current = (current as Record<string, unknown>)[key];
+      }
+      if (typeof current === 'string' && current.trim()) {
+        return current.trim();
+      }
+    }
+    return undefined;
+  }
+
+  private firstTranslationStatus(
+    source: Record<string, unknown>,
+    originalLanguage?: string,
+  ): 'original' | 'machine_translated' | 'translation_unavailable' | undefined {
+    const explicit = this.firstNestedString(source, [
+      ['metadata', 'translation_status'],
+      ['translation_status'],
+    ]);
+    if (
+      explicit === 'original' ||
+      explicit === 'machine_translated' ||
+      explicit === 'translation_unavailable'
+    ) {
+      return explicit;
+    }
+    if (originalLanguage) {
+      return 'original';
     }
     return undefined;
   }

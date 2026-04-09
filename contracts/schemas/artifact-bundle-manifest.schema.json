@@ -92,6 +92,13 @@
           "pattern": "^auth_[a-z0-9_]+$",
           "description": "Default authority assignment owned by platform-control."
         },
+        "authority_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Human-readable authority label owned by platform-control."
+        },
         "language_codes": {
           "type": "array",
           "items": {

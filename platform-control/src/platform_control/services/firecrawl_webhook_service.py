@@ -17,6 +17,7 @@ from platform_control.events.artifact_bundle import (
 )
 from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.ids import generate_prefixed_id
+from platform_control.models.authority import Authority
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
@@ -250,6 +251,7 @@ class FirecrawlWebhookService:
         scope_type = str(acquisition_spec.get("scope_type") or "global_public")
         source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
         trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
+        authority_name = await self._resolve_authority_name(source.authority_id)
 
         manifest = build_artifact_bundle_manifest(
             bundle_manifest_id=bundle_manifest_id,
@@ -259,6 +261,7 @@ class FirecrawlWebhookService:
             run_id=run.run_id,
             jurisdiction_id=source.jurisdiction_id,
             authority_id=source.authority_id,
+            authority_name=authority_name,
             upstream_locator=upstream_locator,
             artifacts=manifest_artifacts,
             tenant_id=tenant_id,
@@ -319,6 +322,12 @@ class FirecrawlWebhookService:
             or metadata.get("url")
             or "https://unknown.local/resource"
         )
+
+    async def _resolve_authority_name(self, authority_id: str | None) -> str | None:
+        if not authority_id:
+            return None
+        authority = await self.session.get(Authority, authority_id)
+        return authority.name if authority is not None else None
 
     @staticmethod
     def _build_storage_ref_for_artifact(artifact: RawArtifact) -> dict[str, Any]:

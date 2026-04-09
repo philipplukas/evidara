@@ -14,7 +14,7 @@
  */
 
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE, t } from '../../../core/i18n';
+import { DEFAULT_LOCALE, formatMessage, t } from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { SearchHitEntity } from '../entities/search.entities';
@@ -171,6 +171,9 @@ export function composeSubtitle(
   if (config && hit.document_type) {
     parts.push(getDocumentTypeLabel(hit.document_type, locale));
   }
+  if (hit.authority_name) {
+    parts.push(hit.authority_name);
+  }
 
   return parts.join(' · ') || (hit.document_type ?? t('labels.document', locale));
 }
@@ -186,6 +189,18 @@ export function composeMetadata(
     const label =
       hit.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({ label, value: hit.effective_date });
+  }
+  if (hit.official_citation) {
+    rows.push({
+      label: t('metadata.citation', locale),
+      value: hit.official_citation,
+    });
+  }
+  if (hit.is_official) {
+    rows.push({
+      label: t('metadata.source', locale),
+      value: t('metadata.officialSource', locale),
+    });
   }
 
   if (hit.language) {
@@ -242,12 +257,28 @@ export function composeActions(
 }
 
 /** Compose content-language view from hit language field. */
-export function composeLanguage(hit: { language?: string }): ContentLanguageView | undefined {
-  if (!hit.language) return undefined;
+export function composeLanguage(
+  hit: {
+    language?: string;
+    original_language?: string;
+    translation_status?: 'original' | 'machine_translated' | 'translation_unavailable';
+  },
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): ContentLanguageView | undefined {
+  const display = hit.language;
+  const original = hit.original_language ?? hit.language;
+  if (!display || !original) return undefined;
+  const status = hit.translation_status ?? 'original';
   return {
-    display: hit.language,
-    original: hit.language,
-    isTranslation: false,
+    display,
+    original,
+    isTranslation: status === 'machine_translated',
+    label:
+      status === 'machine_translated'
+        ? formatMessage('contentLanguage.machineTranslatedFrom', { language: original }, locale)
+        : status === 'translation_unavailable'
+          ? t('contentLanguage.unavailable', locale)
+          : t('contentLanguage.original', locale),
   };
 }
 
@@ -271,6 +302,6 @@ export function mapSearchHitToView(
     actions: composeActions(hit, locale, warn),
     // Optional scalars — omit when absent (ADR-0011)
     ...(hit.structural_path && { structuralContext: hit.structural_path }),
-    ...(hit.language && { contentLanguage: composeLanguage(hit) }),
+    ...(composeLanguage(hit, locale) && { contentLanguage: composeLanguage(hit, locale) }),
   };
 }

@@ -7,7 +7,7 @@
  */
 
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE, t } from '../../../core/i18n';
+import { DEFAULT_LOCALE, formatMessage, t } from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/document.entities';
@@ -26,6 +26,7 @@ export interface DetailView {
     display: string;
     original: string;
     isTranslation: boolean;
+    label?: string;
   };
   tabs: { key: string; label: string; count?: number }[];
   relatedGroups: {
@@ -80,6 +81,9 @@ function composeSubtitle(doc: DocumentEntity, locale: SupportedLocale, warn?: Wa
       });
     }
   }
+  if (doc.authority_name) {
+    parts.push(doc.authority_name);
+  }
 
   return parts.join(' · ') || (doc.document_type ?? t('labels.document', locale));
 }
@@ -94,6 +98,24 @@ function composeMetadata(
     const label =
       doc.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({ label, value: doc.effective_date });
+  }
+  if (doc.authority_name) {
+    rows.push({
+      label: t('metadata.authority', locale),
+      value: doc.authority_name,
+    });
+  }
+  if (doc.official_citation) {
+    rows.push({
+      label: t('metadata.citation', locale),
+      value: doc.official_citation,
+    });
+  }
+  if (doc.is_official) {
+    rows.push({
+      label: t('metadata.source', locale),
+      value: t('metadata.officialSource', locale),
+    });
   }
   if (doc.jurisdiction) {
     const meta = getJurisdictionMeta(doc.jurisdiction, locale);
@@ -176,6 +198,27 @@ function composeLocalStructure(
   };
 }
 
+function composeContentLanguage(
+  doc: DocumentEntity,
+  locale: SupportedLocale,
+): DetailView['contentLanguage'] | undefined {
+  const display = doc.language;
+  const original = doc.original_language ?? doc.language;
+  if (!display || !original) return undefined;
+  const status = doc.translation_status ?? 'original';
+  return {
+    display,
+    original,
+    isTranslation: status === 'machine_translated',
+    label:
+      status === 'machine_translated'
+        ? formatMessage('contentLanguage.machineTranslatedFrom', { language: original }, locale)
+        : status === 'translation_unavailable'
+          ? t('contentLanguage.unavailable', locale)
+          : t('contentLanguage.original', locale),
+  };
+}
+
 // ─── Main Mapper ───
 
 /** Map a DocumentEntity with its sections and citations to a complete DetailView. */
@@ -205,12 +248,8 @@ export function mapDocumentToDetailView(
     }),
     ...(doc.content_docling !== undefined &&
       doc.content_docling !== null && { content: doc.content_docling }),
-    ...(doc.language && {
-      contentLanguage: {
-        display: doc.language,
-        original: doc.language,
-        isTranslation: false,
-      },
+    ...(composeContentLanguage(doc, locale) && {
+      contentLanguage: composeContentLanguage(doc, locale),
     }),
     ...(sections.length > 0 && {
       localStructure: composeLocalStructure(sections, locale),

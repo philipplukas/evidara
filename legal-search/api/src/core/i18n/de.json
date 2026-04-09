@@ -13,8 +13,15 @@
 
   "metadata.date": "Datum",
   "metadata.inForce": "In Kraft",
+  "metadata.authority": "Behörde",
+  "metadata.citation": "Fundstelle",
+  "metadata.source": "Quelle",
+  "metadata.officialSource": "Offizielle Quelle",
   "metadata.jurisdiction": "Zuständigkeit",
   "metadata.language": "Sprache",
+  "contentLanguage.original": "Originalsprache",
+  "contentLanguage.machineTranslatedFrom": "Maschinell übersetzt aus {language}",
+  "contentLanguage.unavailable": "Übersetzung nicht verfügbar",
 
   "tabs.content": "Inhalt",
   "tabs.sections": "Abschnitte",

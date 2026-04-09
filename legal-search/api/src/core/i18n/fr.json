@@ -13,8 +13,15 @@
 
   "metadata.date": "Date",
   "metadata.inForce": "En vigueur",
+  "metadata.authority": "Autorité",
+  "metadata.citation": "Citation officielle",
+  "metadata.source": "Source",
+  "metadata.officialSource": "Source officielle",
   "metadata.jurisdiction": "Juridiction",
   "metadata.language": "Langue",
+  "contentLanguage.original": "Langue d'origine",
+  "contentLanguage.machineTranslatedFrom": "Traduit automatiquement depuis {language}",
+  "contentLanguage.unavailable": "Traduction indisponible",
 
   "tabs.content": "Contenu",
   "tabs.sections": "Sections",

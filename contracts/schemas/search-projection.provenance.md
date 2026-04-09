@@ -10,6 +10,11 @@ Companion to `search-projection.schema.json`. Documents ownership, source, and f
 | `title` | document-intelligence | canonical output | **yes** | Projection rejected |
 | `jurisdiction` | document-intelligence | canonical output (enum) | no | Facets and badges omit jurisdiction |
 | `document_type` | document-intelligence | canonical output (enum) | no | Generic badge, generic actions |
+| `authority_name` | platform-control → document-intelligence | `source_defaults.authority_name`, forwarded via `document.processed` | no | Subtitle omits court/authority label |
+| `official_citation` | document-intelligence | canonical metadata `official_citation` | no | Citation trust row omitted |
+| `original_language` | document-intelligence | canonical metadata `original_language` | no | Translation label loses explicit source-language state |
+| `translation_status` | document-intelligence | canonical metadata `translation_status` | no | Content-language label falls back to implicit behavior |
+| `is_official` | document-intelligence | derived from `source_origin_kind`, forwarded via `document.processed` | no | Official-source trust row omitted |
 | `language` | document-intelligence | extraction result | no | Language facet/badge omitted |
 | `structural_path` | document-intelligence | structural analysis | no | No breadcrumbs in detail view |
 | `effective_date` | document-intelligence | metadata extraction | no | Date metadata row omitted |
