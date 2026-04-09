@@ -107,6 +107,12 @@
     "metadata": {
       "type": "object",
       "description": "Additional low-risk canonical metadata.",
+      "properties": {
+        "official_citation": {
+          "type": "string",
+          "description": "Canonical official publication citation when one can be derived reliably."
+        }
+      },
       "additionalProperties": true
     },
     "extensions": {

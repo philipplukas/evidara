@@ -101,6 +101,7 @@ export class ProjectionsService {
       document_id: event.payload.document_id,
       title,
       authority_name: event.payload.authority_name,
+      official_citation: extracted.officialCitation,
       is_official: event.payload.is_official,
       sections_count: extracted.sectionsCount,
       citations_count: extracted.citationsCount,
@@ -120,6 +121,7 @@ export class ProjectionsService {
   private extractLeanDocumentFields(leanDocument: unknown): {
     title?: string;
     language?: string;
+    officialCitation?: string;
     previewText?: string;
     sectionsCount: number;
     citationsCount: number;
@@ -131,13 +133,17 @@ export class ProjectionsService {
     const title = typeof doc.title === 'string' && doc.title.trim() ? doc.title.trim() : undefined;
     const language =
       typeof doc.language === 'string' && doc.language.trim() ? doc.language.trim() : undefined;
+    const officialCitation = this.firstNestedString(doc, [
+      ['metadata', 'official_citation'],
+      ['official_citation'],
+    ]);
     const sectionCandidates = [doc.sections, doc.document_sections, doc.body_sections];
     const citationCandidates = [doc.citations, doc.document_citations];
     const textCandidates = [doc.content_text, doc.text, doc.summary];
     const sectionsCount = this.countArrayLike(sectionCandidates);
     const citationsCount = this.countArrayLike(citationCandidates);
     const previewText = this.firstString(textCandidates);
-    return { title, language, previewText, sectionsCount, citationsCount };
+    return { title, language, officialCitation, previewText, sectionsCount, citationsCount };
   }
 
   private countArrayLike(values: unknown[]): number {
@@ -153,6 +159,26 @@ export class ProjectionsService {
     for (const value of values) {
       if (typeof value === 'string' && value.trim()) {
         return value.trim();
+      }
+    }
+    return undefined;
+  }
+
+  private firstNestedString(
+    source: Record<string, unknown>,
+    paths: string[][],
+  ): string | undefined {
+    for (const path of paths) {
+      let current: unknown = source;
+      for (const key of path) {
+        if (!current || typeof current !== 'object') {
+          current = undefined;
+          break;
+        }
+        current = (current as Record<string, unknown>)[key];
+      }
+      if (typeof current === 'string' && current.trim()) {
+        return current.trim();
       }
     }
     return undefined;

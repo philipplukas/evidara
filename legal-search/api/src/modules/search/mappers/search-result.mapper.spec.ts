@@ -20,6 +20,7 @@ const lawHit: SearchHitEntity = {
   jurisdiction: 'CH',
   document_type: 'law',
   authority_name: 'Fedlex',
+  official_citation: 'SR 101',
   is_official: true,
   effective_date: '2024-01-01',
   structural_path: 'OR › Gesellschaftsrecht › Verantwortlichkeit',
@@ -126,6 +127,10 @@ describe('composeMetadata', () => {
       value: '2024-01-01',
     });
     expect(rows).toContainEqual({
+      label: 'Fundstelle',
+      value: 'SR 101',
+    });
+    expect(rows).toContainEqual({
       label: 'Quelle',
       value: 'Offizielle Quelle',
     });
@@ -220,7 +225,7 @@ describe('mapSearchHitToView', () => {
     expect(view.snippet).toBe('Art. 1 OR — Vertragsschluss');
     expect(view.structuralContext).toBe('OR › Gesellschaftsrecht › Verantwortlichkeit');
     expect(view.badges).toHaveLength(1);
-    expect(view.metadataRows).toHaveLength(2);
+    expect(view.metadataRows).toHaveLength(3);
     expect(view.relatedCounts).toHaveLength(3);
     expect(view.actions).toHaveLength(2);
     expect(view.contentLanguage?.display).toBe('de');

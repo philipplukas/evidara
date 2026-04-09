@@ -34,6 +34,10 @@
       "type": "string",
       "description": "Human-readable court or issuing-authority label denormalized for UI composition."
     },
+    "official_citation": {
+      "type": "string",
+      "description": "Canonical official publication citation denormalized for UI trust metadata."
+    },
     "is_official": {
       "type": "boolean",
       "description": "Whether the source origin is official and can be surfaced as a trust signal."

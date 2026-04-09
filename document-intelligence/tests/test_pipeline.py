@@ -261,6 +261,10 @@ class ProcessingPipelineTests(unittest.TestCase):
                 "20012345",
             )
             self.assertEqual(
+                result.document.metadata["official_citation"],
+                "BGBl. I Nr. 12/2026",
+            )
+            self.assertEqual(
                 result.sections[0].metadata["official_label"],
                 "§ 1",
             )

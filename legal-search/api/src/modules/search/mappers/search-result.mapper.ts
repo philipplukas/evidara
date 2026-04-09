@@ -190,6 +190,12 @@ export function composeMetadata(
       hit.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({ label, value: hit.effective_date });
   }
+  if (hit.official_citation) {
+    rows.push({
+      label: t('metadata.citation', locale),
+      value: hit.official_citation,
+    });
+  }
   if (hit.is_official) {
     rows.push({
       label: t('metadata.source', locale),

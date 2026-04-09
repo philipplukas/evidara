@@ -60,6 +60,7 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
         jurisdiction: src.jurisdiction as string | undefined,
         document_type: src.document_type as string | undefined,
         authority_name: src.authority_name as string | undefined,
+        official_citation: src.official_citation as string | undefined,
         is_official: src.is_official as boolean | undefined,
         effective_date: src.effective_date as string | undefined,
         source_id: src.source_id as string | undefined,

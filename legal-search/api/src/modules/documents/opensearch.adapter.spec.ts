@@ -14,6 +14,7 @@ describe('DocumentsOpenSearchAdapter', () => {
                 title: 'Obligationenrecht',
                 document_type: 'law',
                 authority_name: 'Fedlex',
+                official_citation: 'SR 101',
                 is_official: true,
               },
             },
@@ -44,6 +45,7 @@ describe('DocumentsOpenSearchAdapter', () => {
       expect.objectContaining({
         document_id: 'doc_001',
         authority_name: 'Fedlex',
+        official_citation: 'SR 101',
         is_official: true,
       }),
     );

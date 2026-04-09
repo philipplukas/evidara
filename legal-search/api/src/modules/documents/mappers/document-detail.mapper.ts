@@ -104,6 +104,12 @@ function composeMetadata(
       value: doc.authority_name,
     });
   }
+  if (doc.official_citation) {
+    rows.push({
+      label: t('metadata.citation', locale),
+      value: doc.official_citation,
+    });
+  }
   if (doc.is_official) {
     rows.push({
       label: t('metadata.source', locale),
