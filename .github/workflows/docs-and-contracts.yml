@@ -52,6 +52,7 @@ jobs:
           python -m unittest discover -s scripts/tests -p "test_check_contract_version_bump.py"
           python -m unittest discover -s scripts/tests -p "test_check_contract_manifest.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay.py"
+          python -m unittest discover -s scripts/tests -p "test_check_country_overlay_at.py"
 
       - name: Enforce contract manifest version bump
         run: |
@@ -100,6 +101,10 @@ jobs:
       - name: Check staging smoke workflow isolation
         run: |
           python scripts/check-staging-smoke-workflow-isolation.py
+
+      - name: Check Austria overlay consistency
+        run: |
+          python scripts/check_country_overlay_at.py
 
       - name: Check component doc headings
         run: |
