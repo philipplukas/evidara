@@ -3,8 +3,24 @@ environment = "dev"
 project_id = "evidara-dev"
 region     = "europe-west6"
 
+# Runtime Pub/Sub: unless you override `event_topic_names` / `event_subscriptions` below, the
+# runtime_stack module defaults apply — including push subscriptions from
+# `document-processing-status-updated` and `document-processed` to `platform-control-api`
+# (see infra/terraform/gcp/runtime_stack/variables.tf). Environments with suffixed topic names
+# must define matching subscriptions (pattern: infra/env/staging/runtime.gcp.tfvars.example).
+
 raw_artifact_bucket_name = "evidara-raw-artifacts-dev"
 manifest_bucket_name     = "evidara-manifests-dev"
+
+# DI published Delta surfaces (GCS). Grants the document_intelligence runtime SA objectAdmin here
+# (see google_storage_bucket_iam_member.document_intelligence_published_surfaces_object_admin).
+document_intelligence_published_bucket_name = "evidara-document-intelligence-surfaces-dev"
+
+# Push artifact-bundle events to the HTTP DI ingress (runtime image di-consumer / Dockerfile.runtime-ingress).
+artifact_bundle_subscription_push = {
+  subscription_key = "document-intelligence-artifact-bundle-available"
+  target_service   = "di-consumer"
+}
 
 enable_cloud_sql = true
 
@@ -23,6 +39,8 @@ cloud_run_services = {
       PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET = "evidara-raw-artifacts-dev"
       PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC = "raw-artifact-available"
       PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC = "artifact-bundle-available"
+      # Keep acquisition dispatch off the API process; `platform-control-worker` polls `dispatch_pending_runs`.
+      PLATFORM_CONTROL_RUN_DISPATCH_BACKEND = "worker"
     }
     secret_env_vars = {
       PLATFORM_CONTROL_DATABASE_URL = {
@@ -82,7 +100,8 @@ cloud_run_services = {
     service_account_key   = "legal_search_frontend"
     allow_unauthenticated = true
     env_vars = {
-      NEXT_PUBLIC_API_URL = "https://legal-search-api-dev.example.run.app"
+      NEXT_PUBLIC_API_URL              = "https://legal-search-api-dev.example.run.app"
+      NEXT_PUBLIC_CONTROL_PANEL_URL    = "https://platform-control-admin-dev.example.run.app"
     }
   }
 
@@ -105,17 +124,22 @@ cloud_run_services = {
     }
   }
 
-  "document-intelligence-consumer" = {
-    image                 = "europe-west6-docker.pkg.dev/evidara-dev/runtime/document-intelligence-consumer:latest"
+  # HTTP ingress: Pub/Sub push → /internal/events/artifact-bundles:process (not pull).
+  "di-consumer" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-dev/runtime/di-consumer:latest"
     service_account_key   = "document_intelligence"
     allow_unauthenticated = false
+    startup_probe_path    = "/health"
+    liveness_probe_path   = "/health"
     env_vars = {
-      DI_GCP_PROJECT_ID      = "evidara-dev"
-      DI_SUBSCRIPTION_NAME   = "document-intelligence-artifact-bundle-available"
-      DI_STATUS_TOPIC_NAME   = "document-processing-status-updated"
-      DI_PROCESSED_TOPIC_NAME = "document-processed"
-      DI_SURFACES_ROOT_URI   = "gs://evidara-document-intelligence-surfaces-dev/published"
-      DI_PROCESSING_VERSION  = "0.1.0-dev"
+      DI_GCP_PROJECT_ID                  = "evidara-dev"
+      DI_EVENT_PUBLISHER_BACKEND         = "pubsub"
+      DI_STATUS_TOPIC_NAME               = "document-processing-status-updated"
+      DI_PROCESSED_TOPIC_NAME            = "document-processed"
+      DI_DOCUMENT_PROCESSED_PUBSUB_TOPIC = "document-processed"
+      DI_SURFACES_ROOT_URI               = "gs://evidara-document-intelligence-surfaces-dev/published"
+      DI_PROCESSING_VERSION              = "0.1.0-dev"
+      DI_PARSER_BACKEND                  = "legacy"
     }
   }
 }

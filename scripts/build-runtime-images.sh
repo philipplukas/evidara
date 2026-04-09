@@ -28,9 +28,28 @@ build_image() {
     --substitutions="_IMAGE=${image_uri},_DOCKERFILE=${dockerfile},_CONTEXT=${context}"
 }
 
-build_image "platform-control" "platform-control/Dockerfile.api" "platform-control-api"
-build_image "platform-control" "platform-control/Dockerfile.worker" "platform-control-worker"
-build_image "legal-search/api" "legal-search/api/Dockerfile" "legal-search-api"
-build_image "document-intelligence" "document-intelligence/Dockerfile.runtime-ingress" "document-intelligence-ingress"
+# Run independent image builds concurrently (separate Cloud Build jobs). Watch project
+# concurrent build quotas if you add many more images here.
+pids=()
+build_image "platform-control" "platform-control/Dockerfile.api" "platform-control-api" &
+pids+=($!)
+build_image "platform-control" "platform-control/Dockerfile.worker" "platform-control-worker" &
+pids+=($!)
+build_image "legal-search/api" "legal-search/api/Dockerfile" "legal-search-api" &
+pids+=($!)
+build_image "document-intelligence" "document-intelligence/Dockerfile.runtime-ingress" "document-intelligence-ingress" &
+pids+=($!)
+
+exit_status=0
+for pid in "${pids[@]}"; do
+  if ! wait "${pid}"; then
+    exit_status=1
+  fi
+done
+
+if [[ "${exit_status}" -ne 0 ]]; then
+  echo "One or more image builds failed." >&2
+  exit "${exit_status}"
+fi
 
 echo "Done. Built runtime images with tag: ${TAG}"

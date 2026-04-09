@@ -13,7 +13,10 @@ for path in Path("docs").rglob("*.md"):
     for match in link_pattern.findall(text):
         if match.startswith("#") or match.startswith("mailto:"):
             continue
-        target = (path.parent / match).resolve()
+        path_part = match.split("#", 1)[0].split("?", 1)[0]
+        if not path_part:
+            continue
+        target = (path.parent / path_part).resolve()
         if not target.exists():
             failed = True
             print(f"FAIL: {path} -> missing link target: {match}")

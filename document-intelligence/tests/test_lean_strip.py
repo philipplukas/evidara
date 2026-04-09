@@ -84,6 +84,23 @@ class TestLeanPlainTextFacade(unittest.TestCase):
         raw = {"a": "hello"}
         self.assertIn("hello", to_plain_text(raw))
 
+    def test_to_lean_dict_preserves_canonical_published_document_fields(self) -> None:
+        """Delta-style published row is not a Docling doc; fallback must keep canonical keys."""
+        canonical = {
+            "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+            "title": "Testgesetz",
+            "document_type": "law",
+            "jurisdiction_id": "at_federal",
+            "body_text": "Art. 1 …",
+            "bbox": [0, 0, 1, 1],
+        }
+        out = to_lean_dict(canonical)
+        self.assertEqual(out.get("title"), "Testgesetz")
+        self.assertEqual(out.get("document_type"), "law")
+        self.assertEqual(out.get("jurisdiction_id"), "at_federal")
+        self.assertEqual(out.get("body_text"), "Art. 1 …")
+        self.assertNotIn("bbox", out)
+
 
 if __name__ == "__main__":
     unittest.main()

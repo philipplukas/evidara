@@ -80,7 +80,8 @@ export class SearchOpenSearchAdapter implements SearchRepository {
                     multi_match: {
                       query: normalizedQuery,
                       fields: [
-                        'title^3',
+                        'title^4',
+                        'structural_path^2',
                         'regeste^2',
                         'content',
                         'content_preview',

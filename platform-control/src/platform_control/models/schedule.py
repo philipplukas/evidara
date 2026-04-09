@@ -22,7 +22,12 @@ class Schedule(TimestampMixin, Base):
     cron_expression: Mapped[str] = mapped_column(String(128))
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
     mode: Mapped[RunMode] = mapped_column(
-        Enum(RunMode, native_enum=False), default=RunMode.PRODUCTION
+        Enum(
+            RunMode,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=RunMode.PRODUCTION,
     )
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     description: Mapped[str | None] = mapped_column(String(512), nullable=True)

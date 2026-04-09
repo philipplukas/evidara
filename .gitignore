@@ -56,6 +56,9 @@ terraform.rc
 .databricks/
 *.dbc
 
+# --- direnv (local) ---
+.envrc
+
 # --- IDE ---
 .idea/
 .vscode/

@@ -2,7 +2,9 @@ import logging
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.exceptions import HTTPException
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
@@ -16,6 +18,7 @@ from platform_control.schemas.processing_status import (
     EventAcceptedResponse,
 )
 from platform_control.services.processing_status_service import ProcessingStatusService
+from platform_control.web.pubsub_push import decode_pubsub_push_json
 
 router = APIRouter(prefix="/v1/di/events", tags=["di-events"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -29,9 +32,19 @@ LOGGER = logging.getLogger("platform_control.di_events")
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def receive_document_processing_status_updated(
-    event: DocumentProcessingStatusUpdatedEvent,
+    request: Request,
     session: SessionDep,
 ) -> EventAcceptedResponse:
+    try:
+        payload = decode_pubsub_push_json(await request.json())
+        event = DocumentProcessingStatusUpdatedEvent.model_validate(payload)
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error.errors(include_url=False, include_context=False),
+        ) from error
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
     log_event(
         LOGGER,
         logging.INFO,
@@ -64,9 +77,19 @@ async def receive_document_processing_status_updated(
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def receive_document_processed(
-    event: DocumentProcessedEvent,
+    request: Request,
     session: SessionDep,
 ) -> EventAcceptedResponse:
+    try:
+        payload = decode_pubsub_push_json(await request.json())
+        event = DocumentProcessedEvent.model_validate(payload)
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error.errors(include_url=False, include_context=False),
+        ) from error
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
     log_event(
         LOGGER,
         logging.INFO,
@@ -100,9 +123,19 @@ async def receive_document_processed(
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def receive_document_withdrawn(
-    event: DocumentWithdrawnEvent,
+    request: Request,
     session: SessionDep,
 ) -> EventAcceptedResponse:
+    try:
+        payload = decode_pubsub_push_json(await request.json())
+        event = DocumentWithdrawnEvent.model_validate(payload)
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error.errors(include_url=False, include_context=False),
+        ) from error
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
     log_event(
         LOGGER,
         logging.INFO,

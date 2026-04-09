@@ -55,6 +55,7 @@ This runbook should not become a second home for API-only acceptance evidence.
 
 ### Journey 3: DI callback ingest
 
+- **Infra prerequisite:** In each environment, Pub/Sub must deliver DI outbound events to platform-control (push subscriptions on `document-processing-status-updated` and `document-processed` → `platform-control-api` `/v1/di/events/...`). See [`infra/terraform/gcp/runtime_stack/variables.tf`](../../infra/terraform/gcp/runtime_stack/variables.tf) defaults and [`infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example) for suffixed topics. Without this, `GET …/processing-status` stays empty even when the DI consumer runs.
 - Trigger: DI event endpoints for `document.processing_status.updated`, `document.processed`, `document.withdrawn`
 - Expected transitions:
   - processing status rows appear for run

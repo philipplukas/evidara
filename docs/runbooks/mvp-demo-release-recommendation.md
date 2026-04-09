@@ -31,22 +31,22 @@ Primary artifacts:
 
 Attach one packet per release candidate or demo handoff:
 
-| Packet item | Canonical source | What to attach |
-|---|---|---|
-| Release sign-off report | `Release Readiness` strict workflow + `docs/runbooks/runtime-stack.md` | Latest strict `GO` report (strict GO required) plus run URL |
-| API acceptance evidence | `docs/runbooks/mvp-acceptance-scenario-pack.md` | Latest dev + staging API/proxy evidence from `uv run evidara workflow mvp-acceptance` or the shell helper |
-| Browser interaction evidence | `docs/runbooks/interaction-flow-validation.md` | Latest staging interaction-flow artifact, including screenshot pack and Playwright report |
-| Narrative walkthrough note | `docs/runbooks/mvp-website-walkthrough.md` | Short operator note covering what was shown, what still feels rough, and any open follow-up issues |
+| Packet item                  | Canonical source                                                       | What to attach                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Release sign-off report      | `Release Readiness` strict workflow + `docs/runbooks/runtime-stack.md` | Latest strict `GO` report (strict GO required) plus run URL                                               |
+| API acceptance evidence      | `docs/runbooks/mvp-acceptance-scenario-pack.md`                        | Latest dev + staging API/proxy evidence from `uv run evidara workflow mvp-acceptance` or the shell helper |
+| Browser interaction evidence | `docs/runbooks/interaction-flow-validation.md`                         | Latest staging interaction-flow artifact, including screenshot pack and Playwright report                 |
+| Narrative walkthrough note   | `docs/runbooks/mvp-website-walkthrough.md`                             | Short operator note covering what was shown, what still feels rough, and any open follow-up issues        |
 
 ## Release-Candidate Handoff
 
 Use this order when preparing a demo or release recommendation:
 
 1. Confirm the latest strict `Release Readiness` run is `GO` and capture the generated strict `GO` report.
-2. Attach the latest API acceptance evidence for dev and staging from [`docs/runbooks/mvp-acceptance-scenario-pack.md`](mvp-acceptance-scenario-pack.md).
+2. Attach the latest API acceptance evidence for dev and staging from `[docs/runbooks/mvp-acceptance-scenario-pack.md](mvp-acceptance-scenario-pack.md)`.
 3. Verify and attach the latest staging browser evidence via `scripts/check-latest-interaction-flow-evidence.sh --mode staging --branch main`.
-4. Use [`docs/runbooks/mvp-website-walkthrough.md`](mvp-website-walkthrough.md) as the narrative overlay for the demo, not as a replacement for API or Playwright truth.
-5. Paste the generated `Runbook Verification Log Row` from the `Release Readiness` report into [`docs/runbooks/first-vertical-slice-exit-gates.md`](first-vertical-slice-exit-gates.md) or the active release issue.
+4. Use `[docs/runbooks/mvp-website-walkthrough.md](mvp-website-walkthrough.md)` as the narrative overlay for the demo, not as a replacement for API or Playwright truth.
+5. Paste the generated `Runbook Verification Log Row` from the `Release Readiness` report into `[docs/runbooks/first-vertical-slice-exit-gates.md](first-vertical-slice-exit-gates.md)` or the active release issue.
 
 ## Current Recommendation
 

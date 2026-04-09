@@ -162,6 +162,42 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('maps canonical published-document lean rows into projection metadata', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'BVGE 123/2024',
+      document_type: 'decision',
+      effective_date: '2024-06-01',
+      jurisdiction_id: 'ch_zh',
+      language: 'de',
+      body_text: 'Kurzfassung des Urteils mit ausreichend Text für eine Vorschau.',
+      metadata: {
+        extracted_metadata: {
+          structural_path: 'BGer › Zivilrecht',
+        },
+      },
+      extensions: {
+        citations: [{ id: 'c1' }],
+      },
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'BVGE 123/2024',
+        document_type: 'decision',
+        effective_date: '2024-06-01',
+        jurisdiction: 'CH',
+        structural_path: 'BGer › Zivilrecht',
+        citations_count: 1,
+        content_preview: expect.stringContaining('Kurzfassung'),
+      }),
+    );
+  });
+
   it('applies projection with fallback fields when DI enrichment is unavailable', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();

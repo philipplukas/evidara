@@ -4,12 +4,34 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from evidara_cli.client import HttpJsonError, join_url, request_json
+from evidara_cli.client import (
+    HttpJsonError,
+    join_url,
+    platform_control_headers,
+    request_json,
+)
 
 
 def test_join_url() -> None:
     assert join_url("http://localhost:8000", "/health") == "http://localhost:8000/health"
     assert join_url("http://localhost:8000/", "v1/sources") == "http://localhost:8000/v1/sources"
+
+
+def test_platform_control_headers_optional_bearer_and_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("EVIDARA_PLATFORM_CONTROL_TOKEN", raising=False)
+    monkeypatch.delenv("EVIDARA_PLATFORM_CONTROL_API_KEY", raising=False)
+    headers = platform_control_headers(correlation_id=None)
+    assert "Authorization" not in headers
+    monkeypatch.setenv("EVIDARA_PLATFORM_CONTROL_TOKEN", "id_token_pc")
+    headers = platform_control_headers(correlation_id=None)
+    assert headers["Authorization"] == "Bearer id_token_pc"
+    monkeypatch.setenv("EVIDARA_PLATFORM_CONTROL_API_KEY", "api_key_pc")
+    headers = platform_control_headers(correlation_id="c1")
+    assert headers["Authorization"] == "Bearer id_token_pc"
+    assert headers["X-API-Key"] == "api_key_pc"
+    assert headers["X-Correlation-Id"] == "c1"
 
 
 @patch("evidara_cli.client.httpx.Client")

@@ -24,7 +24,11 @@ class ReviewTask(TimestampMixin, Base):
     argilla_external_id: Mapped[str] = mapped_column(nullable=False, unique=True)
     record_id: Mapped[str | None] = mapped_column(nullable=True)
     status: Mapped[ReviewTaskStatus] = mapped_column(
-        Enum(ReviewTaskStatus, native_enum=False),
+        Enum(
+            ReviewTaskStatus,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         default=ReviewTaskStatus.PENDING,
     )
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
