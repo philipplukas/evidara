@@ -21,6 +21,7 @@ export type SearchProjectionDocument = {
   document_id: string;
   title: string;
   authority_name?: string;
+  is_official?: boolean;
   sections_count: number;
   citations_count: number;
   source_id?: string;

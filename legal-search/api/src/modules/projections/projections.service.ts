@@ -101,6 +101,7 @@ export class ProjectionsService {
       document_id: event.payload.document_id,
       title,
       authority_name: event.payload.authority_name,
+      is_official: event.payload.is_official,
       sections_count: extracted.sectionsCount,
       citations_count: extracted.citationsCount,
       source_id: provenance.source_id,

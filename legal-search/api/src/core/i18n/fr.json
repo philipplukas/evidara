@@ -14,6 +14,8 @@
   "metadata.date": "Date",
   "metadata.inForce": "En vigueur",
   "metadata.authority": "Autorité",
+  "metadata.source": "Source",
+  "metadata.officialSource": "Source officielle",
   "metadata.jurisdiction": "Juridiction",
 
   "tabs.content": "Contenu",

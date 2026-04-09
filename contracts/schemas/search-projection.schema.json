@@ -34,6 +34,10 @@
       "type": "string",
       "description": "Human-readable court or issuing-authority label denormalized for UI composition."
     },
+    "is_official": {
+      "type": "boolean",
+      "description": "Whether the source origin is official and can be surfaced as a trust signal."
+    },
     "language": {
       "type": "string",
       "description": "Primary language (ISO 639-1). Copied from canonical output.",

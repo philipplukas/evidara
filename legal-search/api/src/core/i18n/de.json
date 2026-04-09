@@ -14,6 +14,8 @@
   "metadata.date": "Datum",
   "metadata.inForce": "In Kraft",
   "metadata.authority": "Behörde",
+  "metadata.source": "Quelle",
+  "metadata.officialSource": "Offizielle Quelle",
   "metadata.jurisdiction": "Zuständigkeit",
 
   "tabs.content": "Inhalt",

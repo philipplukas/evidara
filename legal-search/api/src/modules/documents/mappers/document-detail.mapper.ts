@@ -104,6 +104,12 @@ function composeMetadata(
       value: doc.authority_name,
     });
   }
+  if (doc.is_official) {
+    rows.push({
+      label: t('metadata.source', locale),
+      value: t('metadata.officialSource', locale),
+    });
+  }
   if (doc.jurisdiction) {
     const meta = getJurisdictionMeta(doc.jurisdiction, locale);
     rows.push({

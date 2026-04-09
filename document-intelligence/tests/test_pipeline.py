@@ -139,6 +139,7 @@ class ProcessingPipelineTests(unittest.TestCase):
                 result.document_processed_event["payload"]["authority_name"],
                 "Fedlex",
             )
+            self.assertTrue(result.document_processed_event["payload"]["is_official"])
 
             validate_instance_against_contract(
                 result.document.to_dict(),

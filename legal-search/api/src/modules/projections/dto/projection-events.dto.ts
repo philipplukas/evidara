@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -74,6 +75,10 @@ class ProcessedPayloadDto {
   @IsString()
   @IsNotEmpty()
   authority_name?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  is_official?: boolean;
 
   @IsString()
   @IsIn(['active', 'superseded', 'repealed', 'withdrawn'])

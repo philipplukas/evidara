@@ -64,6 +64,10 @@
                 "null"
               ]
             },
+            "is_official": {
+              "type": "boolean",
+              "description": "Whether the canonical document came from an official source origin."
+            },
             "lifecycle_status": {
               "type": "string",
               "enum": [

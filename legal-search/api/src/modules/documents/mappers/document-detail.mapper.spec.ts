@@ -11,6 +11,7 @@ const lawDoc: DocumentEntity = {
   jurisdiction: 'CH',
   document_type: 'law',
   authority_name: 'Fedlex',
+  is_official: true,
   effective_date: '2024-01-01',
   structural_path: 'OR › Gesellschaftsrecht › Verantwortlichkeit',
   language: 'de',
@@ -79,6 +80,10 @@ describe('mapDocumentToDetailView', () => {
     expect(view.metadata).toContainEqual({
       label: 'Behörde',
       value: 'Fedlex',
+    });
+    expect(view.metadata).toContainEqual({
+      label: 'Quelle',
+      value: 'Offizielle Quelle',
     });
   });
 

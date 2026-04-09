@@ -27,6 +27,7 @@
     },
     "authority_id": "auth_fedlex",
     "authority_name": "Fedlex",
+    "is_official": true,
     "lifecycle_status": "active",
     "published_document_ref": {
       "surface_name": "published_documents",

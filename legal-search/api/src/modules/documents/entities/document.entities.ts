@@ -11,6 +11,7 @@ export interface DocumentEntity {
   jurisdiction?: string;
   document_type?: string;
   authority_name?: string;
+  is_official?: boolean;
   effective_date?: string;
   source_id?: string;
   processed_at?: string;

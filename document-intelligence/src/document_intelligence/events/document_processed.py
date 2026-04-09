@@ -15,6 +15,7 @@ def build_document_processed_event(
     causation_id: str | None,
 ) -> dict[str, Any]:
     source_defaults = document.metadata.get("source_defaults")
+    source_origin_kind = document.metadata.get("source_origin_kind")
     authority_name = (
         source_defaults.get("authority_name")
         if isinstance(source_defaults, dict)
@@ -22,6 +23,7 @@ def build_document_processed_event(
         and source_defaults.get("authority_name")
         else None
     )
+    is_official = source_origin_kind in {"official_primary", "official_mirror"}
     payload = {
         "document_id": document.document_id,
         "document_revision": document.document_revision,
@@ -30,6 +32,7 @@ def build_document_processed_event(
         "provenance": document.provenance.to_dict(),
         "authority_id": document.authority_id,
         "authority_name": authority_name,
+        "is_official": is_official,
         "lifecycle_status": document.lifecycle_status,
         "published_document_ref": dict(manifest.published_document_ref or {}),
         "published_sections_ref": dict(manifest.published_sections_ref or {}),
