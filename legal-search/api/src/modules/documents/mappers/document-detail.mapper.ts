@@ -80,6 +80,9 @@ function composeSubtitle(doc: DocumentEntity, locale: SupportedLocale, warn?: Wa
       });
     }
   }
+  if (doc.authority_name) {
+    parts.push(doc.authority_name);
+  }
 
   return parts.join(' · ') || (doc.document_type ?? t('labels.document', locale));
 }
@@ -94,6 +97,12 @@ function composeMetadata(
     const label =
       doc.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({ label, value: doc.effective_date });
+  }
+  if (doc.authority_name) {
+    rows.push({
+      label: t('metadata.authority', locale),
+      value: doc.authority_name,
+    });
   }
   if (doc.jurisdiction) {
     const meta = getJurisdictionMeta(doc.jurisdiction, locale);

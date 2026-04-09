@@ -42,6 +42,8 @@ const baseProcessedEvent: DocumentProcessedEventDto = {
     document_revision: 2,
     processing_manifest_id: 'pm_01jq7bhgy7g0pkj4f1d03f8f8c',
     processing_version: 'v1.0.0',
+    authority_id: 'auth_fedlex',
+    authority_name: 'Fedlex',
     lifecycle_status: 'active',
     provenance: {
       tenant_id: 'tenant_evidara',
@@ -154,6 +156,7 @@ describe('ProjectionsService', () => {
     expect(repository.upsertProjection).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Bundesgerichtsurteil 9C_100/2025',
+        authority_name: 'Fedlex',
         sections_count: 2,
         citations_count: 1,
         language: 'de',
@@ -174,6 +177,7 @@ describe('ProjectionsService', () => {
     expect(repository.upsertProjection).toHaveBeenCalledWith(
       expect.objectContaining({
         title: `Document ${baseProcessedEvent.payload.document_id}`,
+        authority_name: 'Fedlex',
         sections_count: 0,
         citations_count: 0,
       }),

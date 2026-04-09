@@ -94,6 +94,10 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(result.document.document_type, "law")
             self.assertEqual(result.document.jurisdiction_id, "jur_ch_federal")
             self.assertEqual(result.document.authority_id, "auth_fedlex")
+            self.assertEqual(
+                result.document.metadata["source_defaults"]["authority_name"],
+                "Fedlex",
+            )
             self.assertEqual(len(result.sections), 2)
             self.assertEqual(result.sections[0].title, "Section 1")
             self.assertIn("Introductory material", result.sections[0].content)
@@ -127,6 +131,14 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(len(sink.processing_manifests), 1)
             self.assertEqual(len(sink.status_events), 3)
             self.assertEqual(len(sink.document_processed_events), 1)
+            self.assertEqual(
+                result.document_processed_event["payload"]["authority_id"],
+                "auth_fedlex",
+            )
+            self.assertEqual(
+                result.document_processed_event["payload"]["authority_name"],
+                "Fedlex",
+            )
 
             validate_instance_against_contract(
                 result.document.to_dict(),

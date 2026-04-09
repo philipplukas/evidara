@@ -171,6 +171,9 @@ export function composeSubtitle(
   if (config && hit.document_type) {
     parts.push(getDocumentTypeLabel(hit.document_type, locale));
   }
+  if (hit.authority_name) {
+    parts.push(hit.authority_name);
+  }
 
   return parts.join(' · ') || (hit.document_type ?? t('labels.document', locale));
 }

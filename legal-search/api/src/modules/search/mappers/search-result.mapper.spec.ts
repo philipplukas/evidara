@@ -19,6 +19,7 @@ const lawHit: SearchHitEntity = {
   snippet: 'Art. 1 OR — Vertragsschluss',
   jurisdiction: 'CH',
   document_type: 'law',
+  authority_name: 'Fedlex',
   effective_date: '2024-01-01',
   structural_path: 'OR › Gesellschaftsrecht › Verantwortlichkeit',
   language: 'de',
@@ -33,6 +34,7 @@ const decisionHit: SearchHitEntity = {
   title: 'BGE 144 III 264',
   jurisdiction: 'CH',
   document_type: 'decision',
+  authority_name: 'Swiss Federal Supreme Court',
   effective_date: '2018-06-15',
 };
 
@@ -93,12 +95,14 @@ describe('composeBadges', () => {
 // ─── composeSubtitle ───
 
 describe('composeSubtitle', () => {
-  it('should compose "Schweiz · Gesetz" for CH + law', () => {
-    expect(composeSubtitle(lawHit)).toBe('Schweiz · Gesetz');
+  it('should compose authority-aware subtitle for CH + law', () => {
+    expect(composeSubtitle(lawHit)).toBe('Schweiz · Gesetz · Fedlex');
   });
 
-  it('should compose "Schweiz · Gerichtsentscheid" for CH + decision', () => {
-    expect(composeSubtitle(decisionHit)).toBe('Schweiz · Gerichtsentscheid');
+  it('should compose authority-aware subtitle for CH + decision', () => {
+    expect(composeSubtitle(decisionHit)).toBe(
+      'Schweiz · Gerichtsentscheid · Swiss Federal Supreme Court',
+    );
   });
 
   it('should fall back to document_type label for unknown jurisdiction', () => {
@@ -261,7 +265,7 @@ describe('locale-aware label resolution', () => {
   });
 
   it('should render French subtitle when locale is fr', () => {
-    expect(composeSubtitle(lawHit, 'fr')).toBe('Suisse · Loi');
+    expect(composeSubtitle(lawHit, 'fr')).toBe('Suisse · Loi · Fedlex');
   });
 
   it('should render French metadata when locale is fr', () => {
@@ -282,7 +286,7 @@ describe('locale-aware label resolution', () => {
   it('should compose complete French view', () => {
     const view = mapSearchHitToView(lawHit, 'fr');
     expect(view.badges[0].label).toBe('Loi');
-    expect(view.subtitle).toBe('Suisse · Loi');
+    expect(view.subtitle).toBe('Suisse · Loi · Fedlex');
     expect(view.actions[0].label).toBe("Ouvrir l'article");
   });
 });

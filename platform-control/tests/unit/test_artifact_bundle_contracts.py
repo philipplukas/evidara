@@ -43,6 +43,7 @@ def test_artifact_bundle_manifest_matches_contract_schema() -> None:
         run_id="run_01jq7a3s9b7j4dndd9sgv6pb9d",
         jurisdiction_id="jur_ch",
         authority_id="auth_zh_admin",
+        authority_name="Zurich Administrative Court",
         upstream_locator="https://example.com/decisions/1",
         artifacts=[
             {

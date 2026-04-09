@@ -25,6 +25,8 @@
       "document_revision": 3,
       "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
     },
+    "authority_id": "auth_fedlex",
+    "authority_name": "Fedlex",
     "lifecycle_status": "active",
     "published_document_ref": {
       "surface_name": "published_documents",

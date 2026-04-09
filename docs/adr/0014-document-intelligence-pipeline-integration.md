@@ -30,6 +30,7 @@ The `ArtifactBundleManifest` already supports this:
 
 - `source_defaults.jurisdiction_id` — default jurisdiction
 - `source_defaults.authority_id` — default authority
+- `source_defaults.authority_name` — human-readable authority label for downstream UI composition
 - `source_defaults.document_type_hint` — document type hint
 - `bundle_metadata` — open metadata map for source-specific facts (SR number, ELI URI, etc.)
 

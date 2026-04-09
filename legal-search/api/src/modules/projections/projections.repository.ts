@@ -20,6 +20,7 @@ export type ProjectionHistoryEntry = {
 export type SearchProjectionDocument = {
   document_id: string;
   title: string;
+  authority_name?: string;
   sections_count: number;
   citations_count: number;
   source_id?: string;

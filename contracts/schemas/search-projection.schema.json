@@ -30,6 +30,10 @@
       "description": "Normalized document type. Copied from canonical output. MUST match contracts/vocabularies/document-type.json.",
       "enum": ["law", "decision", "commentary", "rechtssatz"]
     },
+    "authority_name": {
+      "type": "string",
+      "description": "Human-readable court or issuing-authority label denormalized for UI composition."
+    },
     "language": {
       "type": "string",
       "description": "Primary language (ISO 639-1). Copied from canonical output.",

@@ -10,6 +10,7 @@ export interface DocumentEntity {
   content_docling?: unknown;
   jurisdiction?: string;
   document_type?: string;
+  authority_name?: string;
   effective_date?: string;
   source_id?: string;
   processed_at?: string;

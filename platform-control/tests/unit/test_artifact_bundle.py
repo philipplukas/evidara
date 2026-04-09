@@ -12,6 +12,7 @@ def test_build_manifest_skips_invalid_content_type_entries() -> None:
         run_id="run_01jq7a3s9b7j4dndd9sgv6pb9d",
         jurisdiction_id="jur_ch_federal",
         authority_id="auth_fedlex",
+        authority_name="Fedlex",
         upstream_locator="https://example.com/decision/1",
         artifacts=[
             {"artifact_id": "art_1", "artifact_role": "primary_document", "storage_ref": {}},
@@ -25,3 +26,4 @@ def test_build_manifest_skips_invalid_content_type_entries() -> None:
     )
 
     assert manifest["parser_hints"]["expected_content_types"] == ["text/html"]
+    assert manifest["source_defaults"]["authority_name"] == "Fedlex"

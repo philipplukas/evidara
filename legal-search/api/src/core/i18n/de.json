@@ -13,6 +13,7 @@
 
   "metadata.date": "Datum",
   "metadata.inForce": "In Kraft",
+  "metadata.authority": "Behörde",
   "metadata.jurisdiction": "Zuständigkeit",
 
   "tabs.content": "Inhalt",

@@ -16,6 +16,7 @@ const PM_ID_PATTERN = /^pm_[0-9a-hjkmnp-tv-z]{26}$/;
 const RUN_ID_PATTERN = /^run_[0-9a-hjkmnp-tv-z]{26}$/;
 const SRC_ID_PATTERN = /^src_[0-9a-hjkmnp-tv-z]{26}$/;
 const SV_ID_PATTERN = /^sv_[0-9a-hjkmnp-tv-z]{26}$/;
+const AUTH_ID_PATTERN = /^auth_[a-z0-9_]+$/;
 
 class ProvenanceDto {
   @IsString()
@@ -63,6 +64,16 @@ class ProcessedPayloadDto {
   @ValidateNested()
   @Type(() => ProvenanceDto)
   provenance!: ProvenanceDto;
+
+  @IsOptional()
+  @IsString()
+  @Matches(AUTH_ID_PATTERN)
+  authority_id?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  authority_name?: string;
 
   @IsString()
   @IsIn(['active', 'superseded', 'repealed', 'withdrawn'])

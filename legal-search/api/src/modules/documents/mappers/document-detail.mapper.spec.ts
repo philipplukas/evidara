@@ -10,6 +10,7 @@ const lawDoc: DocumentEntity = {
   title: 'Bundesgesetz über das Obligationenrecht',
   jurisdiction: 'CH',
   document_type: 'law',
+  authority_name: 'Fedlex',
   effective_date: '2024-01-01',
   structural_path: 'OR › Gesellschaftsrecht › Verantwortlichkeit',
   language: 'de',
@@ -62,6 +63,7 @@ describe('mapDocumentToDetailView', () => {
     expect(view.type).toBe('law');
     expect(view.title).toBe('Bundesgesetz über das Obligationenrecht');
     expect(view.subtitle).toContain('Schweiz');
+    expect(view.subtitle).toContain('Fedlex');
     expect(view.breadcrumbs).toEqual(['OR', 'Gesellschaftsrecht', 'Verantwortlichkeit']);
     expect(view.content).toEqual({ version: '1.0', body: [] });
     expect(view.contentLanguage?.display).toBe('de');
@@ -73,6 +75,10 @@ describe('mapDocumentToDetailView', () => {
     expect(view.metadata).toContainEqual({
       label: 'In Kraft',
       value: '2024-01-01',
+    });
+    expect(view.metadata).toContainEqual({
+      label: 'Behörde',
+      value: 'Fedlex',
     });
   });
 
