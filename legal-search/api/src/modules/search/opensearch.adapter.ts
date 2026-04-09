@@ -174,6 +174,7 @@ export class SearchOpenSearchAdapter implements SearchRepository {
               | undefined,
             is_official: src.is_official as boolean | undefined,
             effective_date: src.effective_date as string | undefined,
+            lifecycle_status: src.lifecycle_status as string | undefined,
             relevance_score: typeof hit._score === 'number' ? hit._score : undefined,
             structural_path: src.structural_path as string | undefined,
             language: src.language as string | undefined,

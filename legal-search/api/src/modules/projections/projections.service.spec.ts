@@ -170,6 +170,7 @@ describe('ProjectionsService', () => {
         sections_count: 2,
         citations_count: 1,
         language: 'de',
+        lifecycle_status: 'active',
         content_preview: 'Leitsatz und Sachverhalt...',
       }),
     );
@@ -227,6 +228,7 @@ describe('ProjectionsService', () => {
         is_official: true,
         sections_count: 0,
         citations_count: 0,
+        lifecycle_status: 'active',
       }),
     );
     expect(repository.appendHistory).toHaveBeenCalledTimes(1);

@@ -80,6 +80,10 @@ describe('mapDocumentToDetailView', () => {
       value: '2024-01-01',
     });
     expect(view.metadata).toContainEqual({
+      label: 'Sprache',
+      value: 'DE',
+    });
+    expect(view.metadata).toContainEqual({
       label: 'Behörde',
       value: 'Fedlex',
     });
@@ -90,6 +94,18 @@ describe('mapDocumentToDetailView', () => {
     expect(view.metadata).toContainEqual({
       label: 'Quelle',
       value: 'Offizielle Quelle',
+    });
+  });
+
+  it('should include a non-active lifecycle status row when present', () => {
+    const view = mapDocumentToDetailView(
+      { ...lawDoc, lifecycle_status: 'superseded' },
+      sections,
+      citations,
+    );
+    expect(view.metadata[0]).toEqual({
+      label: 'Status',
+      value: 'Ersetzt',
     });
   });
 
@@ -152,5 +168,15 @@ describe('mapDocumentToDetailView', () => {
       document_id: 'doc_099',
       jurisdiction: 'XX',
     });
+  });
+
+  it('should not leak raw unknown document_type codes into detail subtitles', () => {
+    const view = mapDocumentToDetailView(
+      { ...minimalDoc, document_type: 'regulation' },
+      [],
+      [],
+      'de',
+    );
+    expect(view.subtitle).toBe('Dokument');
   });
 });

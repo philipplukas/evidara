@@ -69,6 +69,7 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
           | undefined,
         is_official: src.is_official as boolean | undefined,
         effective_date: src.effective_date as string | undefined,
+        lifecycle_status: src.lifecycle_status as string | undefined,
         source_id: src.source_id as string | undefined,
         processed_at: src.processed_at as string | undefined,
         structural_path: src.structural_path as string | undefined,

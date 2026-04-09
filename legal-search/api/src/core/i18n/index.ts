@@ -20,6 +20,13 @@ const MESSAGES: Record<SupportedLocale, TranslationMessages> = {
   fr: frMessages,
 };
 
+const LANGUAGE_DISPLAY_LABELS: Record<string, string> = {
+  de: 'DE',
+  fr: 'FR',
+  it: 'IT',
+  en: 'EN',
+};
+
 /**
  * Resolve a translation key for the given locale.
  *
@@ -40,6 +47,20 @@ export function formatMessage(
     message = message.replaceAll(`{${name}}`, value);
   }
   return message;
+}
+
+/** Format a language code for compact user-facing display. */
+export function formatLanguageDisplay(languageCode: string): string {
+  const normalized = languageCode.trim().toLowerCase();
+  return LANGUAGE_DISPLAY_LABELS[normalized] ?? normalized.toUpperCase();
+}
+
+/** Format a lifecycle status code for user-facing display. */
+export function formatLifecycleStatus(
+  lifecycleStatus: string,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): string {
+  return t(`statuses.${lifecycleStatus.trim().toLowerCase()}`, locale);
 }
 
 export { DEFAULT_LOCALE, resolveLocale, type SupportedLocale } from './locale';

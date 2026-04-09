@@ -18,6 +18,7 @@ export interface SearchHitEntity {
   translation_status?: 'original' | 'machine_translated' | 'translation_unavailable';
   is_official?: boolean;
   effective_date?: string;
+  lifecycle_status?: string;
   relevance_score?: number;
   structural_path?: string;
   language?: string;

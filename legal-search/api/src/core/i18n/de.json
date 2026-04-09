@@ -19,6 +19,7 @@
   "metadata.officialSource": "Offizielle Quelle",
   "metadata.jurisdiction": "Zuständigkeit",
   "metadata.language": "Sprache",
+  "metadata.status": "Status",
   "contentLanguage.original": "Originalsprache",
   "contentLanguage.machineTranslatedFrom": "Maschinell übersetzt aus {language}",
   "contentLanguage.unavailable": "Übersetzung nicht verfügbar",
@@ -38,6 +39,11 @@
   "labels.document": "Dokument",
   "labels.references": "Referenzen",
   "labels.section": "Abschnitt",
+
+  "statuses.active": "Aktiv",
+  "statuses.superseded": "Ersetzt",
+  "statuses.repealed": "Aufgehoben",
+  "statuses.withdrawn": "Zurückgezogen",
 
   "plurals.law": "Gesetze",
   "plurals.decision": "Gerichtsentscheide",

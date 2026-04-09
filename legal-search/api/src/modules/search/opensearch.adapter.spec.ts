@@ -122,6 +122,43 @@ describe('SearchOpenSearchAdapter', () => {
     expect(firstCall.body.query.bool.filter).toEqual([]);
   });
 
+  it('maps lifecycle_status from OpenSearch hits', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: {
+          total: { value: 1 },
+          hits: [
+            {
+              _source: {
+                document_id: 'doc_001',
+                title: 'Obligationenrecht',
+                lifecycle_status: 'repealed',
+              },
+            },
+          ],
+        },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    const result = await adapter.search('obligationenrecht');
+
+    expect(result.hits[0]).toEqual(
+      expect.objectContaining({
+        document_id: 'doc_001',
+        lifecycle_status: 'repealed',
+      }),
+    );
+  });
+
   it('maps authority_name from OpenSearch hits', async () => {
     const search = vi.fn().mockResolvedValue({
       body: {
