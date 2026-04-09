@@ -165,6 +165,49 @@ class ProcessingPipelineTests(unittest.TestCase):
             os.unlink(artifact_path)
             os.unlink(manifest_path)
 
+    def test_processes_local_application_json_bundle_into_contract_valid_outputs(self) -> None:
+        sample_json = '{"name": "left-pad", "version": "1.3.0", "description": "String left pad"}'
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as json_handle:
+            json_handle.write(sample_json)
+            artifact_path = json_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(
+                build_manifest_payload(
+                    artifact_path,
+                    artifact_role="primary_document",
+                    content_type="application/json",
+                    parser_hints={
+                        "expected_modalities": ["html"],
+                        "expected_content_types": ["application/json"],
+                        "preferred_primary_artifact_roles": ["primary_document"],
+                        "ocr_expected": False,
+                        "attachment_policy": "ignore",
+                    },
+                ),
+                manifest_handle,
+            )
+            manifest_path = manifest_handle.name
+
+        try:
+            sink = InMemoryCanonicalSink()
+            pipeline = ProcessingPipeline(
+                sink=sink,
+                processing_version="di_2026_03_29",
+            )
+            result = pipeline.process_event(build_bundle_event(manifest_path))
+
+            self.assertEqual(result.document.document_revision, 1)
+            self.assertIn("left-pad", result.document.body_text or result.document.full_text)
+            self.assertEqual(
+                [event["payload"]["status"] for event in result.status_events],
+                ["accepted", "processing", "canonical_ready"],
+            )
+            self.assertEqual(len(sink.document_processed_events), 1)
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
     def test_replay_keeps_document_identity_stable(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
             html_handle.write(SAMPLE_HTML)

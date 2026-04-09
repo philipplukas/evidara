@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from typing import Any
 
+from document_intelligence.canonical.models import ProcessingResult
 from document_intelligence.config.runtime import RuntimeSettings
 from document_intelligence.contracts.envelope import ArtifactBundleAvailableEvent
 from document_intelligence.errors import ProcessingError
+from document_intelligence.events.publisher import EventPublisherConfig, PubSubEventPublisher
 from document_intelligence.ingest import resolve_artifact_bundle_event
 from document_intelligence.ingest.loaders import BundleLoader
 from document_intelligence.persist.sinks import (
@@ -40,6 +43,45 @@ def build_processing_pipeline(
     )
 
 
+def _outbound_pubsub_topic_names() -> tuple[str, str] | None:
+    """Return (status_topic, processed_topic) when outbound Pub/Sub publish is enabled."""
+    backend = (os.environ.get("DI_EVENT_PUBLISHER_BACKEND") or "").strip().lower()
+    if backend in {"none", "off", "noop"}:
+        return None
+    project_id = (os.environ.get("DI_GCP_PROJECT_ID") or "").strip()
+    if not project_id:
+        return None
+    status_topic = (os.environ.get("DI_STATUS_TOPIC_NAME") or "document-processing-status-updated").strip()
+    processed_topic = (
+        os.environ.get("DI_PROCESSED_TOPIC_NAME") or os.environ.get("DI_DOCUMENT_PROCESSED_PUBSUB_TOPIC") or ""
+    ).strip() or "document-processed"
+    return status_topic, processed_topic
+
+
+def publish_processing_result_to_pubsub(
+    result: ProcessingResult,
+    *,
+    publisher: PubSubEventPublisher | None = None,
+) -> None:
+    """Publish status and document.processed events (same contract as runtime_consumer)."""
+    topic_names = _outbound_pubsub_topic_names()
+    if topic_names is None:
+        return
+    status_topic, processed_topic = topic_names
+    project_id = (os.environ.get("DI_GCP_PROJECT_ID") or "").strip()
+    assert project_id
+    pub = publisher or PubSubEventPublisher(
+        EventPublisherConfig(
+            project_id=project_id,
+            status_topic_name=status_topic,
+            processed_topic_name=processed_topic,
+        )
+    )
+    for status_event in result.status_events:
+        pub.publish_status_event(status_event)
+    pub.publish_document_processed_event(result.document_processed_event)
+
+
 def process_artifact_bundle_event(
     event_payload: Mapping[str, Any],
     *,
@@ -59,6 +101,7 @@ def process_artifact_bundle_event(
         runtime_settings=effective_settings,
         bundle_loader=bundle_loader,
     ).process_event(dict(resolved_event_payload))
+    publish_processing_result_to_pubsub(result)
     return {
         "status": "processed",
         "event_id": event.event_id,

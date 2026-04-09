@@ -215,8 +215,6 @@ version_body=$(cat <<JSON
     "provider": "deterministic_http",
     "seed_url": "${SMOKE_SEED_URL}",
     "request_timeout_seconds": ${SMOKE_REQUEST_TIMEOUT_SECONDS},
-    "mode": "crawl",
-    "limit": 1,
     "tenant_id": "tenant_public",
     "corpus_id": "corpus_ch_de",
     "scope_type": "global_public",

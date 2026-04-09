@@ -285,6 +285,8 @@ class ProcessingPipeline:
             return normalize_xml_document(artifact_text, artifact.artifact_id)
         if content_type in {"text/markdown", "text/x-markdown", "application/markdown"}:
             return normalize_markdown_document(artifact_text, artifact.artifact_id)
+        if content_type in {"application/json", "application/ld+json", "text/json"}:
+            return normalize_plain_text_document(artifact_text, artifact.artifact_id)
         if content_type.startswith("text/plain"):
             detected = _detect_text_modality(artifact_text)
             if detected == "html":
