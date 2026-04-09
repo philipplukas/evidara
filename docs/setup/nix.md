@@ -25,7 +25,7 @@ nix develop -c gcloud version
 
 ## direnv (optional)
 
-If you use [direnv](https://direnv.net/), the repo root includes a `.envrc` that runs `use flake`. After a one-time `direnv allow` in this directory, your normal shell picks up the same tools automatically when you `cd` into the repo.
+If you use [direnv](https://direnv.net/), add a repo-root `.envrc` containing `use flake` (this file is **gitignored** so each machine can opt in). Run `direnv allow` once in this directory; then your shell picks up the same tools when you `cd` into the repo.
 
 ## What is in the shell today
 

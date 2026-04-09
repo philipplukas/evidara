@@ -11,6 +11,7 @@ This is the Evidara monorepo — a document intelligence platform for legal rese
 - **infra** — Terraform, deployment configs, environment definitions
 - **docs** — Architecture, ADRs, runbooks, testing strategy, component docs
 - **tools/evidara-cli** — Typer CLI for agent/operator smoke against platform-control + legal-search (`evidara --help`); optional `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` when both APIs are reachable; against **private Cloud Run** use [`scripts/mint-cloud-run-tokens.sh`](scripts/mint-cloud-run-tokens.sh) and [docs/setup/gcp-local-cloud-run-auth.md](docs/setup/gcp-local-cloud-run-auth.md)
+- **Nix flake** — Optional reproducible shell (`nix develop`) with Terraform, `gcloud`, `jq`, `shellcheck`, and `uv`; see [docs/setup/nix.md](docs/setup/nix.md). Add missing CLIs to `flake.nix` `devShells.default` rather than assuming Homebrew or a global install.
 
 **Parallel work streams** (by component, what to serialize): [docs/process/parallel-work-streams.md](docs/process/parallel-work-streams.md).
 

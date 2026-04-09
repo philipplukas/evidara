@@ -138,6 +138,7 @@ nav:
       - Runtime stack: runbooks/runtime-stack.md
   - Setup:
       - Environment Strategy: setup/environment-strategy.md
+      - Nix dev shell: setup/nix.md
       - GCP local Cloud Run auth: setup/gcp-local-cloud-run-auth.md
       - Infrastructure Overview: setup/infrastructure-overview.md
       - Branch Rules: setup/branch-rules.md

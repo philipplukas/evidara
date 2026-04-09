@@ -33,7 +33,6 @@ event_subscriptions = {
     ack_deadline_seconds = 120
     retry_policy         = { minimum_backoff = "30s", maximum_backoff = "600s" }
     dead_letter_policy   = { max_delivery_attempts = 10 }
-    # push_config merged via artifact_bundle_subscription_push (targets di-consumer).
   }
   "platform-control-document-processing-status-updated-staging" = {
     topic_name         = "document-processing-status-updated-staging"

@@ -132,14 +132,14 @@ cloud_run_services = {
     startup_probe_path    = "/health"
     liveness_probe_path   = "/health"
     env_vars = {
-      DI_GCP_PROJECT_ID               = "evidara-dev"
-      DI_EVENT_PUBLISHER_BACKEND      = "pubsub"
-      DI_STATUS_TOPIC_NAME            = "document-processing-status-updated"
-      DI_PROCESSED_TOPIC_NAME         = "document-processed"
+      DI_GCP_PROJECT_ID                  = "evidara-dev"
+      DI_EVENT_PUBLISHER_BACKEND         = "pubsub"
+      DI_STATUS_TOPIC_NAME               = "document-processing-status-updated"
+      DI_PROCESSED_TOPIC_NAME            = "document-processed"
       DI_DOCUMENT_PROCESSED_PUBSUB_TOPIC = "document-processed"
-      DI_SURFACES_ROOT_URI          = "gs://evidara-document-intelligence-surfaces-dev/published"
-      DI_PROCESSING_VERSION         = "0.1.0-dev"
-      DI_PARSER_BACKEND             = "legacy"
+      DI_SURFACES_ROOT_URI               = "gs://evidara-document-intelligence-surfaces-dev/published"
+      DI_PROCESSING_VERSION              = "0.1.0-dev"
+      DI_PARSER_BACKEND                  = "legacy"
     }
   }
 }

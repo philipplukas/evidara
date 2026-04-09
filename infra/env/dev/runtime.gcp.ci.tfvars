@@ -9,3 +9,8 @@ runtime_service_account_ids = {
   legal_search_frontend   = "evd-ls-frontend"
   document_intelligence   = "evd-di-consumer"
 }
+
+# CI plan project may not have the published-surfaces bucket; optional IAM is skipped.
+document_intelligence_published_bucket_name = null
+# Avoid push_endpoint resolution against real Cloud Run URLs in ephemeral CI plans.
+artifact_bundle_subscription_push = null

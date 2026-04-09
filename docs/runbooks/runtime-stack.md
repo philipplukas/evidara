@@ -31,7 +31,7 @@ infrastructure.
 │                      │    │  platform-control-api-{env}             │
 │  platform-control    │    │  platform-control-worker-{env}          │
 │  platform-control-   │    │  legal-search-api-{env}                 │
-│    worker            │    │  document-intelligence-consumer-{env}   │
+│    worker            │    │  di-consumer-{env} (HTTP DI ingress)    │
 │  legal-search-api    │    │                                         │
 │  di-consumer         │    └──────┬──────────────┬───────────────────┘
 │                      │           │              │
@@ -68,7 +68,7 @@ infrastructure.
 | platform-control-api | `platform-control` | 8080 | `/health`, `/ready` | REST API, connector management |
 | platform-control-worker | `platform-control-worker` | 8080 | `/health` | Pub/Sub pull consumer, connector execution |
 | legal-search-api | `legal-search-api` | 3000 | `/health` | NestJS search API, OpenSearch proxy |
-| document-intelligence-consumer | `di-consumer` | 8080 | `/health` | Pub/Sub pull consumer, document processing pipeline |
+| di-consumer | `di-consumer` (image `runtime/di-consumer`) | 8080 | `/health` | HTTP ingress: Pub/Sub **push** to `/internal/events/artifact-bundles:process`, Delta publish + outbound status/processed topics |
 
 ## Infrastructure (Terraform)
 
@@ -95,13 +95,21 @@ infra/
 
 | Resource | Type | Purpose |
 |----------|------|---------|
-| `google_cloud_run_v2_service.runtime` | Cloud Run | All 4 runtime services (dynamic block) |
+| `google_cloud_run_v2_service.runtime` | Cloud Run | Runtime services from tfvars (e.g. platform-control-api, legal-search-api, di-consumer) |
 | `google_pubsub_topic.events` | Pub/Sub | Event mesh topics |
 | `google_pubsub_subscription.events` | Pub/Sub | Pull subscriptions with DLQ |
 | `google_storage_bucket.raw_artifacts` | GCS | Raw crawl artifact storage |
 | `google_storage_bucket.manifests` | GCS | Bundle manifest storage |
 | `google_sql_database_instance.platform_control` | Cloud SQL | PostgreSQL for platform-control |
-| `google_service_account.runtime` | IAM | Shared runtime SA |
+| `google_service_account.runtime` | IAM | Per-service runtime SAs (map in tfvars) |
+| `google_storage_bucket_iam_member.document_intelligence_*` | GCS IAM | `document_intelligence` SA: read raw artifacts bucket; optional admin on published-surfaces bucket |
+
+### Document intelligence (`di-consumer`)
+
+- **Service account:** Use `service_account_key = "document_intelligence"` in `cloud_run_services` so the service runs as the Terraform-managed DI SA (not the default compute SA). That SA receives project-level Pub/Sub publish/subscribe and storage roles from `runtime_stack`; bucket-level bindings add explicit read on **raw artifacts** and optional **objectAdmin** on the **published Delta surfaces** bucket.
+- **Published surfaces bucket:** Set `document_intelligence_published_bucket_name` in tfvars (e.g. `evidara-document-intelligence-surfaces-dev`). The bucket must already exist; Terraform only attaches IAM.
+- **Pub/Sub push:** Set `artifact_bundle_subscription_push` with the subscription map key for `artifact-bundle-available` in that environment and `target_service = "di-consumer"`. That merges `push_config` onto the existing pull-style subscription definition without duplicating the whole `event_subscriptions` block.
+- **CI plans:** `infra/env/dev/runtime.gcp.ci.tfvars` sets `document_intelligence_published_bucket_name = null` and `artifact_bundle_subscription_push = null` so plans against the CI GCP project do not assume dev buckets or push endpoints.
 
 ### Applying Changes
 
