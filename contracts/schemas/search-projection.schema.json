@@ -40,6 +40,11 @@
       "format": "date",
       "description": "Effective date. Copied from canonical output."
     },
+    "lifecycle_status": {
+      "type": "string",
+      "description": "Lifecycle state copied from the document.processed event payload.",
+      "enum": ["active", "superseded", "repealed", "withdrawn"]
+    },
     "structural_path": {
       "type": "string",
       "description": "Intrinsic document hierarchy path. Copied from canonical output."

@@ -14,6 +14,8 @@
   "metadata.date": "Datum",
   "metadata.inForce": "In Kraft",
   "metadata.jurisdiction": "Zuständigkeit",
+  "metadata.language": "Sprache",
+  "metadata.status": "Status",
 
   "tabs.content": "Inhalt",
   "tabs.sections": "Abschnitte",
@@ -30,6 +32,11 @@
   "labels.document": "Dokument",
   "labels.references": "Referenzen",
   "labels.section": "Abschnitt",
+
+  "statuses.active": "Aktiv",
+  "statuses.superseded": "Ersetzt",
+  "statuses.repealed": "Aufgehoben",
+  "statuses.withdrawn": "Zurückgezogen",
 
   "plurals.law": "Gesetze",
   "plurals.decision": "Gerichtsentscheide",

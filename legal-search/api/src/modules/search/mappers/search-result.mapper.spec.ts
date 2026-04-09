@@ -36,6 +36,13 @@ const decisionHit: SearchHitEntity = {
   effective_date: '2018-06-15',
 };
 
+const repealedLawHit: SearchHitEntity = {
+  ...lawHit,
+  document_id: 'doc_004',
+  title: 'Altrecht',
+  lifecycle_status: 'repealed',
+};
+
 const minimalHit: SearchHitEntity = {
   document_id: 'doc_003',
   title: 'Unknown Document',
@@ -109,6 +116,11 @@ describe('composeSubtitle', () => {
   it('should fall back to "Dokument" for fully unknown hit', () => {
     expect(composeSubtitle(minimalHit)).toBe('Dokument');
   });
+
+  it('should not leak raw unknown document_type codes into subtitle fallback', () => {
+    const hit = { ...minimalHit, document_type: 'regulation' };
+    expect(composeSubtitle(hit)).toBe('Dokument');
+  });
 });
 
 // ─── composeMetadata ───
@@ -120,6 +132,10 @@ describe('composeMetadata', () => {
       label: 'In Kraft',
       value: '2024-01-01',
     });
+    expect(rows).toContainEqual({
+      label: 'Sprache',
+      value: 'DE',
+    });
   });
 
   it('should produce "Datum" row for decision', () => {
@@ -127,6 +143,24 @@ describe('composeMetadata', () => {
     expect(rows).toContainEqual({
       label: 'Datum',
       value: '2018-06-15',
+    });
+  });
+
+  it('should produce a language row when language is present without a date', () => {
+    const rows = composeMetadata({ ...minimalHit, language: 'fr' });
+    expect(rows).toEqual([
+      {
+        label: 'Sprache',
+        value: 'FR',
+      },
+    ]);
+  });
+
+  it('should put non-active lifecycle status first for trust visibility', () => {
+    const rows = composeMetadata(repealedLawHit);
+    expect(rows[0]).toEqual({
+      label: 'Status',
+      value: 'Aufgehoben',
     });
   });
 
@@ -211,7 +245,7 @@ describe('mapSearchHitToView', () => {
     expect(view.snippet).toBe('Art. 1 OR — Vertragsschluss');
     expect(view.structuralContext).toBe('OR › Gesellschaftsrecht › Verantwortlichkeit');
     expect(view.badges).toHaveLength(1);
-    expect(view.metadataRows).toHaveLength(1);
+    expect(view.metadataRows).toHaveLength(2);
     expect(view.relatedCounts).toHaveLength(3);
     expect(view.actions).toHaveLength(2);
     expect(view.contentLanguage?.display).toBe('de');
@@ -267,6 +301,18 @@ describe('locale-aware label resolution', () => {
   it('should render French metadata when locale is fr', () => {
     const rows = composeMetadata(lawHit, 'fr');
     expect(rows[0].label).toBe('En vigueur');
+    expect(rows[1]).toEqual({
+      label: 'Langue',
+      value: 'DE',
+    });
+  });
+
+  it('should render French status labels when locale is fr', () => {
+    const rows = composeMetadata(repealedLawHit, 'fr');
+    expect(rows[0]).toEqual({
+      label: 'Statut',
+      value: 'Abrogé',
+    });
   });
 
   it('should render French related counts when locale is fr', () => {

@@ -11,6 +11,7 @@ export interface DocumentEntity {
   jurisdiction?: string;
   document_type?: string;
   effective_date?: string;
+  lifecycle_status?: string;
   source_id?: string;
   processed_at?: string;
   structural_path?: string;

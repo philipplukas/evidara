@@ -20,6 +20,13 @@ const MESSAGES: Record<SupportedLocale, TranslationMessages> = {
   fr: frMessages,
 };
 
+const LANGUAGE_DISPLAY_LABELS: Record<string, string> = {
+  de: 'DE',
+  fr: 'FR',
+  it: 'IT',
+  en: 'EN',
+};
+
 /**
  * Resolve a translation key for the given locale.
  *
@@ -28,6 +35,20 @@ const MESSAGES: Record<SupportedLocale, TranslationMessages> = {
  */
 export function t(key: string, locale: SupportedLocale = DEFAULT_LOCALE): string {
   return MESSAGES[locale]?.[key] ?? MESSAGES[DEFAULT_LOCALE]?.[key] ?? key;
+}
+
+/** Format a language code for compact user-facing display. */
+export function formatLanguageDisplay(languageCode: string): string {
+  const normalized = languageCode.trim().toLowerCase();
+  return LANGUAGE_DISPLAY_LABELS[normalized] ?? normalized.toUpperCase();
+}
+
+/** Format a lifecycle status code for user-facing display. */
+export function formatLifecycleStatus(
+  lifecycleStatus: string,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): string {
+  return t(`statuses.${lifecycleStatus.trim().toLowerCase()}`, locale);
 }
 
 export { DEFAULT_LOCALE, resolveLocale, type SupportedLocale } from './locale';

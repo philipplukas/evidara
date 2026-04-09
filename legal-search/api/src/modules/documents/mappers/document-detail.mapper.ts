@@ -7,7 +7,12 @@
  */
 
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE, t } from '../../../core/i18n';
+import {
+  DEFAULT_LOCALE,
+  formatLanguageDisplay,
+  formatLifecycleStatus,
+  t,
+} from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/document.entities';
@@ -81,7 +86,7 @@ function composeSubtitle(doc: DocumentEntity, locale: SupportedLocale, warn?: Wa
     }
   }
 
-  return parts.join(' · ') || (doc.document_type ?? t('labels.document', locale));
+  return parts.join(' · ') || t('labels.document', locale);
 }
 
 function composeMetadata(
@@ -90,6 +95,12 @@ function composeMetadata(
 ): { label: string; value: string; iconKey?: string }[] {
   const rows: { label: string; value: string; iconKey?: string }[] = [];
 
+  if (doc.lifecycle_status && doc.lifecycle_status !== 'active') {
+    rows.push({
+      label: t('metadata.status', locale),
+      value: formatLifecycleStatus(doc.lifecycle_status, locale),
+    });
+  }
   if (doc.effective_date) {
     const label =
       doc.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
@@ -101,6 +112,12 @@ function composeMetadata(
       label: t('metadata.jurisdiction', locale),
       value: meta?.label ?? doc.jurisdiction,
       ...(meta?.iconKey && { iconKey: meta.iconKey }),
+    });
+  }
+  if (doc.language) {
+    rows.push({
+      label: t('metadata.language', locale),
+      value: formatLanguageDisplay(doc.language),
     });
   }
 

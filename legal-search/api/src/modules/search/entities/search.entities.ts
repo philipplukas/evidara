@@ -13,6 +13,7 @@ export interface SearchHitEntity {
   jurisdiction?: string;
   document_type?: string;
   effective_date?: string;
+  lifecycle_status?: string;
   relevance_score?: number;
   structural_path?: string;
   language?: string;

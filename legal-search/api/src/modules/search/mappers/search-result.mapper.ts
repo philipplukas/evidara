@@ -14,7 +14,12 @@
  */
 
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE, t } from '../../../core/i18n';
+import {
+  DEFAULT_LOCALE,
+  formatLanguageDisplay,
+  formatLifecycleStatus,
+  t,
+} from '../../../core/i18n';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { SearchHitEntity } from '../entities/search.entities';
@@ -172,7 +177,7 @@ export function composeSubtitle(
     parts.push(getDocumentTypeLabel(hit.document_type, locale));
   }
 
-  return parts.join(' · ') || (hit.document_type ?? t('labels.document', locale));
+  return parts.join(' · ') || t('labels.document', locale);
 }
 
 /** Compose metadata rows (date label varies by document type). */
@@ -182,10 +187,22 @@ export function composeMetadata(
 ): MetadataRowView[] {
   const rows: MetadataRowView[] = [];
 
+  if (hit.lifecycle_status && hit.lifecycle_status !== 'active') {
+    rows.push({
+      label: t('metadata.status', locale),
+      value: formatLifecycleStatus(hit.lifecycle_status, locale),
+    });
+  }
   if (hit.effective_date) {
     const label =
       hit.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({ label, value: hit.effective_date });
+  }
+  if (hit.language) {
+    rows.push({
+      label: t('metadata.language', locale),
+      value: formatLanguageDisplay(hit.language),
+    });
   }
 
   return rows;

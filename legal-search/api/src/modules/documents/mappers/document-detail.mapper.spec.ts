@@ -74,6 +74,22 @@ describe('mapDocumentToDetailView', () => {
       label: 'In Kraft',
       value: '2024-01-01',
     });
+    expect(view.metadata).toContainEqual({
+      label: 'Sprache',
+      value: 'DE',
+    });
+  });
+
+  it('should include a non-active lifecycle status row when present', () => {
+    const view = mapDocumentToDetailView(
+      { ...lawDoc, lifecycle_status: 'superseded' },
+      sections,
+      citations,
+    );
+    expect(view.metadata[0]).toEqual({
+      label: 'Status',
+      value: 'Ersetzt',
+    });
   });
 
   it('should compose tabs from counts', () => {
@@ -135,5 +151,15 @@ describe('mapDocumentToDetailView', () => {
       document_id: 'doc_099',
       jurisdiction: 'XX',
     });
+  });
+
+  it('should not leak raw unknown document_type codes into detail subtitles', () => {
+    const view = mapDocumentToDetailView(
+      { ...minimalDoc, document_type: 'regulation' },
+      [],
+      [],
+      'de',
+    );
+    expect(view.subtitle).toBe('Dokument');
   });
 });

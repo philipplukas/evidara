@@ -6,7 +6,7 @@
  */
 
 import type { SupportedLocale } from '../../../core/i18n';
-import { DEFAULT_LOCALE, t } from '../../../core/i18n';
+import { DEFAULT_LOCALE, formatLanguageDisplay, t } from '../../../core/i18n';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { ContextAggregations } from '../entities/search.entities';
 
@@ -23,15 +23,6 @@ export interface SearchContextView {
   sourceTypes: ContextChipView[];
   exactMatches: never[]; // populated later when exact-match logic exists
 }
-
-// ─── Language Labels ───
-
-const LANGUAGE_LABELS: Record<string, string> = {
-  de: 'DE',
-  fr: 'FR',
-  it: 'IT',
-  en: 'EN',
-};
 
 // ─── Mapper ───
 
@@ -52,7 +43,7 @@ export function mapContextAggregations(
     }),
     languages: aggs.languages.map((bucket) => ({
       key: bucket.key,
-      label: LANGUAGE_LABELS[bucket.key] ?? bucket.key.toUpperCase(),
+      label: formatLanguageDisplay(bucket.key),
       active: bucket.key === 'de', // default: DE active
     })),
     sourceTypes: [

@@ -14,6 +14,8 @@
   "metadata.date": "Date",
   "metadata.inForce": "En vigueur",
   "metadata.jurisdiction": "Juridiction",
+  "metadata.language": "Langue",
+  "metadata.status": "Statut",
 
   "tabs.content": "Contenu",
   "tabs.sections": "Sections",
@@ -30,6 +32,11 @@
   "labels.document": "Document",
   "labels.references": "Références",
   "labels.section": "Section",
+
+  "statuses.active": "Actif",
+  "statuses.superseded": "Remplacé",
+  "statuses.repealed": "Abrogé",
+  "statuses.withdrawn": "Retiré",
 
   "plurals.law": "Lois",
   "plurals.decision": "Décisions judiciaires",
