@@ -107,6 +107,22 @@
     "metadata": {
       "type": "object",
       "description": "Additional low-risk canonical metadata.",
+      "properties": {
+        "official_citation": {
+          "type": "string",
+          "description": "Canonical official publication citation when one can be derived reliably."
+        },
+        "original_language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}$",
+          "description": "Original source language when the pipeline can determine it reliably."
+        },
+        "translation_status": {
+          "type": "string",
+          "enum": ["original", "machine_translated", "translation_unavailable"],
+          "description": "Translation state of the published content."
+        }
+      },
       "additionalProperties": true
     },
     "extensions": {

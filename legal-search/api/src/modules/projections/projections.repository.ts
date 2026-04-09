@@ -20,6 +20,11 @@ export type ProjectionHistoryEntry = {
 export type SearchProjectionDocument = {
   document_id: string;
   title: string;
+  authority_name?: string;
+  official_citation?: string;
+  original_language?: string;
+  translation_status?: 'original' | 'machine_translated' | 'translation_unavailable';
+  is_official?: boolean;
   sections_count: number;
   citations_count: number;
   source_id?: string;
@@ -32,6 +37,12 @@ export type SearchProjectionDocument = {
   jurisdiction?: string;
   language?: string;
   content_preview?: string;
+  /** Normalized document type from canonical DI row (law, decision, …). */
+  document_type?: string;
+  /** ISO date from canonical document when present. */
+  effective_date?: string;
+  /** Breadcrumb-style path when present in canonical metadata. */
+  structural_path?: string;
 };
 
 export interface ProjectionRepository {

@@ -7,6 +7,9 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
 
+from document_intelligence.extractors.metadata import (
+    MetadataExtractionCandidate,
+)
 from document_intelligence.persist.sinks import InMemoryCanonicalSink
 from document_intelligence.pipeline import ProcessingPipeline
 from document_intelligence.validate.schema_validation import (
@@ -65,6 +68,14 @@ Dieses Gesetz schützt personenbezogene Daten.
 """
 
 
+class StubMetadataExtractor:
+    def __init__(self, candidate: MetadataExtractionCandidate | None) -> None:
+        self._candidate = candidate
+
+    def extract(self, **kwargs) -> MetadataExtractionCandidate | None:
+        return self._candidate
+
+
 class ProcessingPipelineTests(unittest.TestCase):
     def test_processes_local_html_bundle_into_contract_valid_outputs(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
@@ -94,6 +105,10 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(result.document.document_type, "law")
             self.assertEqual(result.document.jurisdiction_id, "jur_ch_federal")
             self.assertEqual(result.document.authority_id, "auth_fedlex")
+            self.assertEqual(
+                result.document.metadata["source_defaults"]["authority_name"],
+                "Fedlex",
+            )
             self.assertEqual(len(result.sections), 2)
             self.assertEqual(result.sections[0].title, "Section 1")
             self.assertIn("Introductory material", result.sections[0].content)
@@ -127,6 +142,15 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(len(sink.processing_manifests), 1)
             self.assertEqual(len(sink.status_events), 3)
             self.assertEqual(len(sink.document_processed_events), 1)
+            self.assertEqual(
+                result.document_processed_event["payload"]["authority_id"],
+                "auth_fedlex",
+            )
+            self.assertEqual(
+                result.document_processed_event["payload"]["authority_name"],
+                "Fedlex",
+            )
+            self.assertTrue(result.document_processed_event["payload"]["is_official"])
 
             validate_instance_against_contract(
                 result.document.to_dict(),
@@ -150,6 +174,49 @@ class ProcessingPipelineTests(unittest.TestCase):
                 result.document_processed_event,
                 "events/document-processed.schema.json",
             )
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_processes_local_application_json_bundle_into_contract_valid_outputs(self) -> None:
+        sample_json = '{"name": "left-pad", "version": "1.3.0", "description": "String left pad"}'
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as json_handle:
+            json_handle.write(sample_json)
+            artifact_path = json_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(
+                build_manifest_payload(
+                    artifact_path,
+                    artifact_role="primary_document",
+                    content_type="application/json",
+                    parser_hints={
+                        "expected_modalities": ["html"],
+                        "expected_content_types": ["application/json"],
+                        "preferred_primary_artifact_roles": ["primary_document"],
+                        "ocr_expected": False,
+                        "attachment_policy": "ignore",
+                    },
+                ),
+                manifest_handle,
+            )
+            manifest_path = manifest_handle.name
+
+        try:
+            sink = InMemoryCanonicalSink()
+            pipeline = ProcessingPipeline(
+                sink=sink,
+                processing_version="di_2026_03_29",
+            )
+            result = pipeline.process_event(build_bundle_event(manifest_path))
+
+            self.assertEqual(result.document.document_revision, 1)
+            self.assertIn("left-pad", result.document.body_text or result.document.full_text)
+            self.assertEqual(
+                [event["payload"]["status"] for event in result.status_events],
+                ["accepted", "processing", "canonical_ready"],
+            )
+            self.assertEqual(len(sink.document_processed_events), 1)
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)
@@ -247,6 +314,12 @@ class ProcessingPipelineTests(unittest.TestCase):
                 result.document.metadata["extracted_metadata"]["gesetzesnummer"],
                 "20012345",
             )
+            self.assertEqual(
+                result.document.metadata["official_citation"],
+                "BGBl. I Nr. 12/2026",
+            )
+            self.assertEqual(result.document.metadata["original_language"], "de")
+            self.assertEqual(result.document.metadata["translation_status"], "original")
             self.assertEqual(
                 result.sections[0].metadata["official_label"],
                 "§ 1",
@@ -373,6 +446,7 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(result.document.title, "Sample Statute")
             self.assertEqual(result.document.metadata["normalizer"], "html_v1")
             self.assertEqual(result.document.metadata["source_flavor"], "structured_html")
+            self.assertIs(result.document.metadata.get("html_parse_used_fallback"), False)
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)
@@ -407,6 +481,71 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(result.sections[0].title, "Art. 1 Zweck")
             self.assertIn("personenbezogene Daten", result.sections[0].content)
             self.assertEqual(result.sections[1].title, "Art. 2 Geltungsbereich")
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_high_confidence_llm_metadata_can_override_title_and_document_type(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(SAMPLE_HTML)
+            artifact_path = html_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(build_manifest_payload(artifact_path, artifact_role="primary_document"), manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(
+                processing_version="di_2026_04_09",
+                enable_llm_extractor=True,
+                llm_confidence_threshold=0.8,
+                llm_metadata_extractor=StubMetadataExtractor(
+                    MetadataExtractionCandidate(
+                        title="LLM Selected Title",
+                        document_type="commentary",
+                        confidence=0.95,
+                        model="test-model",
+                        provider="stub",
+                    )
+                ),
+            ).process_event(build_bundle_event(manifest_path))
+
+            self.assertEqual(result.document.title, "LLM Selected Title")
+            self.assertEqual(result.document.document_type, "commentary")
+            self.assertTrue(result.document.metadata["llm_extraction"]["applied"])
+            self.assertEqual(result.document.metadata["llm_extraction"]["model"], "test-model")
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_low_confidence_llm_metadata_keeps_deterministic_document_fields(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(SAMPLE_HTML)
+            artifact_path = html_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(build_manifest_payload(artifact_path, artifact_role="primary_document"), manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(
+                processing_version="di_2026_04_09",
+                enable_llm_extractor=True,
+                llm_confidence_threshold=0.8,
+                llm_metadata_extractor=StubMetadataExtractor(
+                    MetadataExtractionCandidate(
+                        title="Ignored LLM Title",
+                        document_type="commentary",
+                        confidence=0.4,
+                        model="test-model",
+                    )
+                ),
+            ).process_event(build_bundle_event(manifest_path))
+
+            self.assertEqual(result.document.title, "Sample Statute")
+            self.assertEqual(result.document.document_type, "law")
+            self.assertFalse(result.document.metadata["llm_extraction"]["applied"])
+            self.assertEqual(result.document.metadata["llm_extraction"]["confidence_threshold"], 0.8)
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)

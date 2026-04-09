@@ -10,6 +10,9 @@ const lawDoc: DocumentEntity = {
   title: 'Bundesgesetz über das Obligationenrecht',
   jurisdiction: 'CH',
   document_type: 'law',
+  authority_name: 'Fedlex',
+  official_citation: 'SR 101',
+  is_official: true,
   effective_date: '2024-01-01',
   structural_path: 'OR › Gesellschaftsrecht › Verantwortlichkeit',
   language: 'de',
@@ -62,9 +65,11 @@ describe('mapDocumentToDetailView', () => {
     expect(view.type).toBe('law');
     expect(view.title).toBe('Bundesgesetz über das Obligationenrecht');
     expect(view.subtitle).toContain('Schweiz');
+    expect(view.subtitle).toContain('Fedlex');
     expect(view.breadcrumbs).toEqual(['OR', 'Gesellschaftsrecht', 'Verantwortlichkeit']);
     expect(view.content).toEqual({ version: '1.0', body: [] });
     expect(view.contentLanguage?.display).toBe('de');
+    expect(view.contentLanguage?.label).toBe('Originalsprache');
   });
 
   it('should compose metadata rows', () => {
@@ -77,6 +82,18 @@ describe('mapDocumentToDetailView', () => {
     expect(view.metadata).toContainEqual({
       label: 'Sprache',
       value: 'DE',
+    });
+    expect(view.metadata).toContainEqual({
+      label: 'Behörde',
+      value: 'Fedlex',
+    });
+    expect(view.metadata).toContainEqual({
+      label: 'Fundstelle',
+      value: 'SR 101',
+    });
+    expect(view.metadata).toContainEqual({
+      label: 'Quelle',
+      value: 'Offizielle Quelle',
     });
   });
 

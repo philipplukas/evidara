@@ -37,6 +37,18 @@ export function t(key: string, locale: SupportedLocale = DEFAULT_LOCALE): string
   return MESSAGES[locale]?.[key] ?? MESSAGES[DEFAULT_LOCALE]?.[key] ?? key;
 }
 
+export function formatMessage(
+  key: string,
+  values: Record<string, string>,
+  locale: SupportedLocale = DEFAULT_LOCALE,
+): string {
+  let message = t(key, locale);
+  for (const [name, value] of Object.entries(values)) {
+    message = message.replaceAll(`{${name}}`, value);
+  }
+  return message;
+}
+
 /** Format a language code for compact user-facing display. */
 export function formatLanguageDisplay(languageCode: string): string {
   const normalized = languageCode.trim().toLowerCase();

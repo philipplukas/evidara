@@ -10,6 +10,11 @@ export interface DocumentEntity {
   content_docling?: unknown;
   jurisdiction?: string;
   document_type?: string;
+  authority_name?: string;
+  official_citation?: string;
+  original_language?: string;
+  translation_status?: 'original' | 'machine_translated' | 'translation_unavailable';
+  is_official?: boolean;
   effective_date?: string;
   lifecycle_status?: string;
   source_id?: string;

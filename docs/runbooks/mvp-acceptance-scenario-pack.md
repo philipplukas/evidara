@@ -19,16 +19,37 @@ uv run evidara workflow mvp-acceptance --human
 
 Preferred surface: [`tools/evidara-cli`](../../tools/evidara-cli/README.md) via `evidara workflow mvp-acceptance`.
 
-CLI output modes:
+Lower-level helper: `scripts/mvp-acceptance-scenario-pack.sh` remains available when you want a shell-only version of the same API-oriented checks.
+
+The shell helper requires `curl`, `jq`, and `gcloud`. For **private** Cloud Run APIs, see [Cloud Run auth](#cloud-run-auth-local-and-cli) below.
+
+### CLI output modes (`evidara workflow mvp-acceptance`)
 
 - default: single-line JSON for agents, CI notes, or follow-on tooling
 - `--human`: pretty-printed JSON for operators
 
-Lower-level helper: `scripts/mvp-acceptance-scenario-pack.sh` remains available when you want a shell-only version of the same API-oriented checks.
+### Cloud Run auth (local and CLI)
 
-The shell helper requires `curl`, `jq`, and `gcloud` with a user that can mint identity tokens for the Cloud Run service URLs (same pattern as [`scripts/e2e-smoke-test.sh`](../../scripts/e2e-smoke-test.sh)).
+API services use **audience-scoped Google ID tokens** at the Cloud Run layer. A normal `gcloud auth login` user often **cannot** run `gcloud auth print-identity-token --audiences=https://…run.app` (service account required). Use one of:
 
-Shell helper output modes:
+1. **`EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT`** — set to the same service account email used in CI (GitHub secrets `GCP_SERVICE_ACCOUNT_DEV` / `GCP_SERVICE_ACCOUNT_STAGING`); your user needs `roles/iam.serviceAccountTokenCreator` on that SA. Then run `./scripts/mvp-acceptance-scenario-pack.sh staging` or [`scripts/e2e-smoke-test.sh`](../../scripts/e2e-smoke-test.sh) (see script headers).
+2. **Pre-minted tokens for evidara-cli** — mint **two** tokens (platform-control and legal-search have **different** audiences = different base URLs), then:
+
+   ```bash
+   export EVIDARA_PLATFORM_CONTROL_URL="https://…platform-control-api-staging….run.app"
+   export EVIDARA_LEGAL_SEARCH_URL="https://…legal-search-api-staging….run.app"
+   export EVIDARA_PLATFORM_CONTROL_TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="$SA" --audiences="$EVIDARA_PLATFORM_CONTROL_URL")"
+   export EVIDARA_LEGAL_SEARCH_TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="$SA" --audiences="$EVIDARA_LEGAL_SEARCH_URL")"
+   # Optional app-layer keys if the deployment enforces them:
+   # export EVIDARA_PLATFORM_CONTROL_API_KEY=…
+   uv run evidara workflow mvp-acceptance --human
+   ```
+
+3. **Helper:** `source` the output of [`scripts/mint-cloud-run-tokens.sh`](../../scripts/mint-cloud-run-tokens.sh) (see script usage).
+
+Reference: audience-scoped token step in [`.github/workflows/e2e-smoke-staging.yml`](../../.github/workflows/e2e-smoke-staging.yml) (`--impersonate-service-account` + `--audiences`).
+
+### Shell helper output modes (`mvp-acceptance-scenario-pack.sh`)
 
 - default: human-readable terminal summary for operators
 - `--json`: machine-readable summary for agents, CI notes, or follow-on tooling
@@ -104,6 +125,12 @@ This runbook is intentionally limited to API and proxy-path confidence. It does 
 
 Evidence produced by `./scripts/mvp-acceptance-scenario-pack.sh` (dev + staging).
 
+### Repo validation (2026-04-09)
+
+- `tools/evidara-cli` contract test for the `mvp-acceptance` workflow payload:  
+  `cd tools/evidara-cli && uv run pytest tests/test_workflow_cmd.py -q`
+- **Staging refresh:** with `EVIDARA_PLATFORM_CONTROL_URL`, `EVIDARA_LEGAL_SEARCH_URL`, `EVIDARA_LEGAL_SEARCH_FRONTEND_URL`, `EVIDARA_PLATFORM_CONTROL_ADMIN_URL`, and auth vars (`EVIDARA_PLATFORM_CONTROL_TOKEN`, `EVIDARA_LEGAL_SEARCH_TOKEN`, optional API keys) pointed at **staging**, run `uv run evidara workflow mvp-acceptance --human` and attach the summary (or `--json` output) to Linear **TAR-85**.
+
 ### Environment health
 
 | Environment | platform-control `/health` | legal-search `/health` |
@@ -159,3 +186,7 @@ Historical reference:
 - All scenarios pass in dev and staging.
 - No unresolved `severity:blocker` findings remain for user-facing walkthrough.
 - Evidence links are attached to active product phase issues.
+
+## M5 Linear evidence
+
+For TAR-64 / TAR-77 / TAR-85 attachment steps, see [M5 evidence checklist](m5-evidence-checklist.md).

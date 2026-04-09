@@ -37,6 +37,9 @@ class DocumentProcessedPayload(BaseModel):
     processing_manifest_id: str = Field(pattern=r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
     processing_version: str
     provenance: ProcessingStatusProvenance
+    authority_id: str | None = Field(default=None, pattern=r"^auth_[a-z0-9_]+$")
+    authority_name: str | None = None
+    is_official: bool = False
     lifecycle_status: DocumentLifecycleStatus
     published_document_ref: DatasetRef
     published_sections_ref: DatasetRef

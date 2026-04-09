@@ -43,6 +43,19 @@ export TF_VAR_environment_secrets='{
 terraform apply -var-file="../../../env/github.repo_settings.tfvars.example"
 ```
 
+### Repository-level secrets (`TF_VAR_repository_secrets`)
+
+Use for **long-lived** values only (API keys, static third-party tokens). Example:
+
+```bash
+export TF_VAR_repository_secrets='{
+  "EVIDARA_PLATFORM_CONTROL_API_KEY": "…",
+  "EVIDARA_LEGAL_SEARCH_API_KEY": "…"
+}'
+```
+
+**Do not** put **Google Cloud Run IAM ID tokens** (`gcloud auth print-identity-token --audiences=…`) in `repository_secrets`: they expire in about an hour. For CI, [`.github/workflows/evidara-cli-remote-smoke.yml`](../../../.github/workflows/evidara-cli-remote-smoke.yml) mints fresh tokens using the **GitHub Environment** secrets `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_SERVICE_ACCOUNT_DEV` / `GCP_SERVICE_ACCOUNT_STAGING` (same pattern as e2e smoke).
+
 For the staging smoke workflow, ensure these GitHub settings are present:
 
 - Repository variables:

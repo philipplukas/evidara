@@ -51,6 +51,23 @@
             "provenance": {
               "$ref": "https://evidara.dev/common/provenance"
             },
+            "authority_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^auth_[a-z0-9_]+$"
+            },
+            "authority_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "is_official": {
+              "type": "boolean",
+              "description": "Whether the canonical document came from an official source origin."
+            },
             "lifecycle_status": {
               "type": "string",
               "enum": [

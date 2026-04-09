@@ -19,6 +19,7 @@ Or install the package into an environment of your choice (`pip install -e .` / 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `EVIDARA_PLATFORM_CONTROL_URL` | `http://localhost:8000` | Platform-control base URL |
+| `EVIDARA_PLATFORM_CONTROL_TOKEN` | _(empty)_ | `Authorization: Bearer …` for private Cloud Run (IAM) |
 | `EVIDARA_PLATFORM_CONTROL_API_KEY` | _(empty)_ | `X-API-Key` when the API requires it |
 | `EVIDARA_PLATFORM_CONTROL_ADMIN_URL` | `http://localhost:3100` | Platform-control admin base URL for workflow checks |
 | `EVIDARA_LEGAL_SEARCH_URL` | `http://localhost:3102` | Legal-search BFF base URL (see OpenAPI `servers`) |
@@ -100,7 +101,9 @@ uv run pytest
 
 CI: `.github/workflows/evidara-cli.yml` runs `scripts/check-evidara-cli.sh` when this package or the bootstrap script changes.
 
-Manual **remote** smoke (Actions → run workflow; base URLs as inputs, optional repository secrets for auth): `.github/workflows/evidara-cli-remote-smoke.yml`.
+Manual **remote** smoke (Actions → run workflow; pick GitHub **environment** `dev` or `staging`, OIDC mints Cloud Run Bearer tokens; optional repository API-key secrets): `.github/workflows/evidara-cli-remote-smoke.yml`.
+
+**Operator runbooks:** [environment smoke matrix](../../docs/runbooks/evidara-cli-environment-smoke-matrix.md) (dev/staging/prod checklist), [GitHub secrets for remote smoke](../../docs/runbooks/evidara-cli-remote-smoke-operator.md). **Cursor:** project skill `.cursor/skills/evidara-cli-workflow/SKILL.md` (CLI vs Playwright router for agents).
 
 **Operator runbooks:** [environment smoke matrix](../../docs/runbooks/evidara-cli-environment-smoke-matrix.md) (dev/staging/prod checklist), [GitHub secrets for remote smoke](../../docs/runbooks/evidara-cli-remote-smoke-operator.md). **Cursor:** project skill `.cursor/skills/evidara-cli-workflow/SKILL.md` (CLI vs Playwright router for agents).
 

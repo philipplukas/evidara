@@ -50,6 +50,7 @@ jobs:
       - name: Run contract guard unit tests
         run: |
           python -m unittest discover -s scripts/tests -p "test_check_contract_version_bump.py"
+          python -m unittest discover -s scripts/tests -p "test_check_contract_manifest.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay.py"
 
       - name: Enforce contract manifest version bump

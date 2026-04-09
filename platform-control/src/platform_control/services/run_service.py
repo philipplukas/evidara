@@ -24,6 +24,7 @@ from platform_control.events.artifact_bundle import (
 from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.ids import generate_prefixed_id
 from platform_control.integrations import get_artifact_store, get_raw_artifact_publisher
+from platform_control.models.authority import Authority
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
 from platform_control.models.processing_status_update import ProcessingStatusUpdate
@@ -914,14 +915,21 @@ class RunService:
         bundle_manifest_id = generate_prefixed_id("abm")
         upstream_locator = self._upstream_locator(artifacts[0].artifact_metadata)
 
-        manifest_artifacts: list[dict[str, Any]] = []
+        roles: list[str] = []
         for index, artifact in enumerate(artifacts):
             if artifact.content_type.startswith("application/json"):
-                role = "metadata"
+                roles.append("metadata")
             elif index == 0:
-                role = "primary_document"
+                roles.append("primary_document")
             else:
-                role = "attachment"
+                roles.append("attachment")
+        # JSON-only bundles (e.g. deterministic_http on application/json URLs) must still expose a
+        # primary_document so document-intelligence can load the bundle.
+        if roles and "primary_document" not in roles:
+            roles[0] = "primary_document"
+
+        manifest_artifacts: list[dict[str, Any]] = []
+        for artifact, role in zip(artifacts, roles, strict=True):
             manifest_artifacts.append(
                 {
                     "artifact_id": artifact.artifact_id,
@@ -936,6 +944,7 @@ class RunService:
         scope_type = str(acquisition_spec.get("scope_type") or "global_public")
         source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
         trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
+        authority_name = await self._resolve_authority_name(source.authority_id)
 
         manifest = build_artifact_bundle_manifest(
             bundle_manifest_id=bundle_manifest_id,
@@ -945,6 +954,7 @@ class RunService:
             run_id=run.run_id,
             jurisdiction_id=source.jurisdiction_id,
             authority_id=source.authority_id,
+            authority_name=authority_name,
             upstream_locator=upstream_locator,
             artifacts=manifest_artifacts,
             tenant_id=tenant_id,
@@ -1016,6 +1026,9 @@ class RunService:
 
         doc_artifacts = [a for a in artifacts if not a.content_type.startswith("application/json")]
         if not doc_artifacts:
+            # JSON-only acquisition (e.g. API seeds): still one processable document.
+            doc_artifacts = list(artifacts)
+        if not doc_artifacts:
             return []
 
         acquisition_spec = source_version.acquisition_spec or {}
@@ -1024,6 +1037,7 @@ class RunService:
         scope_type = str(acquisition_spec.get("scope_type") or "global_public")
         source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
         trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
+        authority_name = await self._resolve_authority_name(source.authority_id)
 
         events: list[dict[str, Any]] = []
         for artifact in doc_artifacts:
@@ -1044,6 +1058,7 @@ class RunService:
                 run_id=run.run_id,
                 jurisdiction_id=source.jurisdiction_id,
                 authority_id=source.authority_id,
+                authority_name=authority_name,
                 upstream_locator=upstream_locator,
                 artifacts=[manifest_artifact],
                 tenant_id=tenant_id,
@@ -1078,6 +1093,12 @@ class RunService:
             )
             events.append(event)
         return events
+
+    async def _resolve_authority_name(self, authority_id: str | None) -> str | None:
+        if not authority_id:
+            return None
+        authority = await self.session.get(Authority, authority_id)
+        return authority.name if authority is not None else None
 
     async def _publish_pending_dispatch_events(
         self, pending_publications: list[PendingDispatchPublications]

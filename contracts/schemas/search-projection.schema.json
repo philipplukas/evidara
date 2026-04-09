@@ -30,6 +30,28 @@
       "description": "Normalized document type. Copied from canonical output. MUST match contracts/vocabularies/document-type.json.",
       "enum": ["law", "decision", "commentary", "rechtssatz"]
     },
+    "authority_name": {
+      "type": "string",
+      "description": "Human-readable court or issuing-authority label denormalized for UI composition."
+    },
+    "official_citation": {
+      "type": "string",
+      "description": "Canonical official publication citation denormalized for UI trust metadata."
+    },
+    "original_language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}$",
+      "description": "Original source language used for translation-state labeling."
+    },
+    "translation_status": {
+      "type": "string",
+      "enum": ["original", "machine_translated", "translation_unavailable"],
+      "description": "Translation state of the content exposed to the UI."
+    },
+    "is_official": {
+      "type": "boolean",
+      "description": "Whether the source origin is official and can be surfaced as a trust signal."
+    },
     "language": {
       "type": "string",
       "description": "Primary language (ISO 639-1). Copied from canonical output.",

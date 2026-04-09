@@ -39,6 +39,8 @@ uv run platform-control-connector-worker --once
 uv run platform-control-connector-worker --limit 25 --interval-seconds 10
 ```
 
+In deployed environments that run this worker, set `PLATFORM_CONTROL_RUN_DISPATCH_BACKEND=worker` on **both** the API and the worker so run creation stays `PENDING` on the API and provider calls execute in the worker process (Firecrawl webhooks remain on the API).
+
 Local configuration starts from `.env.example`. Keep real secrets out of Git.
 
 The code-managed admin app now lives in `admin/` and covers:

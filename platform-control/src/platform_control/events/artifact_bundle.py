@@ -15,6 +15,7 @@ def build_artifact_bundle_manifest(
     run_id: str,
     jurisdiction_id: str,
     authority_id: str | None,
+    authority_name: str | None,
     upstream_locator: str,
     artifacts: list[dict[str, Any]],
     tenant_id: str = "tenant_public",
@@ -50,6 +51,7 @@ def build_artifact_bundle_manifest(
         "source_defaults": {
             "jurisdiction_id": jurisdiction_id,
             "authority_id": authority_id,
+            "authority_name": authority_name,
             "language_codes": language_codes or [],
             "document_type_hint": document_type_hint,
         },

@@ -45,6 +45,8 @@ class RuntimeSettings:
     spacy_model_name: str = "xx_sent_ud_sm"
     spacy_max_chars_per_section: int = 100000
     spacy_batch_size: int = 32
+    enable_llm_extractor: bool = False
+    llm_confidence_threshold: float = 0.7
 
     @classmethod
     def from_mapping(
@@ -61,6 +63,8 @@ class RuntimeSettings:
         spacy_model_name: str | None = None,
         spacy_max_chars_per_section: Any | None = None,
         spacy_batch_size: Any | None = None,
+        enable_llm_extractor: Any | None = None,
+        llm_confidence_threshold: Any | None = None,
     ) -> "RuntimeSettings":
         effective_processing_version = processing_version or mapping.get("DI_PROCESSING_VERSION") or "0.1.0-dev"
         effective_parser_backend = (parser_backend or mapping.get("DI_PARSER_BACKEND") or "legacy").strip()
@@ -83,6 +87,19 @@ class RuntimeSettings:
             spacy_batch_size if spacy_batch_size is not None else mapping.get("DI_SPACY_BATCH_SIZE", "32"),
             name="DI_SPACY_BATCH_SIZE",
             minimum=1,
+        )
+        effective_enable_llm_extractor = (
+            _coerce_bool(enable_llm_extractor)
+            if enable_llm_extractor is not None
+            else _parse_bool(mapping.get("DI_ENABLE_LLM_EXTRACTOR", "false"))
+        )
+        effective_llm_confidence_threshold = _coerce_float(
+            llm_confidence_threshold
+            if llm_confidence_threshold is not None
+            else mapping.get("DI_LLM_CONFIDENCE_THRESHOLD", "0.7"),
+            name="DI_LLM_CONFIDENCE_THRESHOLD",
+            minimum=0.0,
+            maximum=1.0,
         )
 
         direct_documents_uri = published_documents_uri or mapping.get("DI_PUBLISHED_DOCUMENTS_URI")
@@ -111,6 +128,8 @@ class RuntimeSettings:
             spacy_model_name=effective_spacy_model_name,
             spacy_max_chars_per_section=effective_spacy_max_chars_per_section,
             spacy_batch_size=effective_spacy_batch_size,
+            enable_llm_extractor=effective_enable_llm_extractor,
+            llm_confidence_threshold=effective_llm_confidence_threshold,
         )
 
     @classmethod
@@ -145,4 +164,14 @@ def _coerce_int(value: Any, *, name: str, minimum: int) -> int:
         raise ValueError(f"{name} must be an integer") from error
     if parsed < minimum:
         raise ValueError(f"{name} must be >= {minimum}")
+    return parsed
+
+
+def _coerce_float(value: Any, *, name: str, minimum: float, maximum: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{name} must be a float") from error
+    if parsed < minimum or parsed > maximum:
+        raise ValueError(f"{name} must be between {minimum} and {maximum}")
     return parsed

@@ -23,6 +23,9 @@ def platform_control_base_url() -> str:
 
 def platform_control_headers(*, correlation_id: str | None) -> dict[str, str]:
     headers: dict[str, str] = {"Accept": "application/json"}
+    token = os.environ.get("EVIDARA_PLATFORM_CONTROL_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     key = os.environ.get("EVIDARA_PLATFORM_CONTROL_API_KEY", "").strip()
     if key:
         headers["X-API-Key"] = key

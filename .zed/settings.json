@@ -1,0 +1,46 @@
+{
+  "auto_install_extensions": {
+    "dockerfile": true,
+    "make": true,
+    "nix": true,
+    "sql": true,
+    "terraform": true,
+    "xml": true
+  },
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.svn",
+    "**/.hg",
+    "**/.jj",
+    "**/CVS",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "**/.classpath",
+    "**/.settings",
+    "**/.next",
+    "**/.venv",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/__pycache__",
+    "**/node_modules",
+    "**/site",
+    "**/tmp"
+  ],
+  "context_servers": {
+    "evidara": {
+      "source": "custom",
+      "enabled": true,
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "tools/zed-evidara-mcp",
+        "evidara-zed-mcp"
+      ],
+      "env": {
+        "EVIDARA_REPO_ROOT": "."
+      },
+      "timeout": 30
+    }
+  }
+}

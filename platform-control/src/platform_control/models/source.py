@@ -21,7 +21,12 @@ class Source(TimestampMixin, Base):
     source_type: Mapped[str] = mapped_column(default="website")
     document_family: Mapped[str | None] = mapped_column(nullable=True)
     status: Mapped[SourceStatus] = mapped_column(
-        Enum(SourceStatus, native_enum=False), default=SourceStatus.ACTIVE
+        Enum(
+            SourceStatus,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=SourceStatus.ACTIVE,
     )
 
     versions = relationship("SourceVersion", back_populates="source")

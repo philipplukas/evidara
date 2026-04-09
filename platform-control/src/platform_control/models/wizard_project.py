@@ -17,7 +17,11 @@ class WizardProject(TimestampMixin, Base):
     )
     name: Mapped[str] = mapped_column(nullable=False)
     status: Mapped[WizardProjectStatus] = mapped_column(
-        Enum(WizardProjectStatus, native_enum=False),
+        Enum(
+            WizardProjectStatus,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         default=WizardProjectStatus.DRAFT,
     )
     scope: Mapped[dict] = mapped_column(JSON, default=dict)

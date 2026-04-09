@@ -78,6 +78,13 @@ The gate covers:
 Run these checks before marking a slice validation complete:
 
 ```bash
+cd evidara
+./scripts/vertical-slice-exit-gates-local.sh
+```
+
+Or run the underlying commands directly:
+
+```bash
 cd evidara/legal-search/api
 npm test -- --run src/modules/projections/projections.service.spec.ts
 ```
@@ -106,6 +113,18 @@ SMOKE_REQUEST_TIMEOUT_SECONDS=10 \
 scripts/e2e-smoke-test.sh --env dev
 ```
 
+### TAR-64: dev smoke evidence (attach to Linear)
+
+Linear [**TAR-64**](https://linear.app/tart-baozi/issue/TAR-64) needs **two successful** dev runs on separate occasions (different days or `main` commits). For each run, paste into the issue:
+
+1. **Command + exit code:** `scripts/e2e-smoke-test.sh --env dev` → `0`
+2. **`run_id`** printed or inferred from smoke output (platform-control run used for the slice).
+3. **Gate D — projection history:** `GET /v1/projections/events/history?run_id=<run_id>` (legal-search API) — note `event_id` / `document_id` for an **applied** row.
+4. **Gate D — search:** `GET /v1/search?q=*` (or the smoke’s verification query) showing the same **`document_id`** in hits.
+5. **Optional:** link to `.github/workflows/e2e-smoke-dev.yml` run if executed from CI.
+
+If smoke is run only locally, attach redacted log tail or Gist; do not commit secrets.
+
 ## Verification Log
 
 Recent closure evidence for this slice:
@@ -121,6 +140,8 @@ Recent closure evidence for this slice:
 | 2026-04-06 | Staging interaction-flow evidence with screenshot pack | GitHub Actions run [24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493) passed smoke subset + cross-surface contract subset + screenshot pack upload |
 | 2026-04-06 | Strict release-readiness verification | GitHub Actions run [24046126662](https://github.com/philipplukas/evidara/actions/runs/24046126662) passed including interaction-flow artifact completeness gate |
 | 2026-04-06 | Strict release-readiness verification (generated log-row flow) | Release Readiness run [24049226588](https://github.com/philipplukas/evidara/actions/runs/24049226588) passed and produced a copy/paste verification-log row referencing interaction-flow evidence run [24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493) |
+| 2026-04-09 | Local exit-gate bundle (run 1) | `scripts/vertical-slice-exit-gates-local.sh`: legal-search projections spec 6/6 pass; platform-control `test_firecrawl_webhook_service` 3/3 pass |
+| 2026-04-09 | Local exit-gate bundle (run 2) | Repeat of same script on separate invocation; same pass counts (reproducible pre-flight for TAR-64) |
 
 ## Ownership Handoff
 

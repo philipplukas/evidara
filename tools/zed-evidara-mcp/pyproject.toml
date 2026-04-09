@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zed-evidara-mcp"
+version = "0.1.0"
+description = "Repo-local MCP server for Evidara workflows in Zed"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "mcp>=1.10.0",
+]
+
+[project.scripts]
+evidara-zed-mcp = "evidara_zed_mcp.server:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4.0",
+]

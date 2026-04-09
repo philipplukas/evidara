@@ -10,7 +10,10 @@ This is the Evidara monorepo — a document intelligence platform for legal rese
 - **contracts** — OpenAPI specs, JSON Schemas, event schemas (build-time only)
 - **infra** — Terraform, deployment configs, environment definitions
 - **docs** — Architecture, ADRs, runbooks, testing strategy, component docs
-- **tools/evidara-cli** — Typer CLI for agent/operator smoke against platform-control + legal-search (`evidara --help`); optional `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` when both APIs are reachable
+- **tools/evidara-cli** — Typer CLI for agent/operator smoke against platform-control + legal-search (`evidara --help`); optional `EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh` when both APIs are reachable; against **private Cloud Run** use [`scripts/mint-cloud-run-tokens.sh`](scripts/mint-cloud-run-tokens.sh) and [docs/setup/gcp-local-cloud-run-auth.md](docs/setup/gcp-local-cloud-run-auth.md)
+- **Nix flake** — Optional reproducible shell (`nix develop`) with Terraform, `gcloud`, `jq`, `shellcheck`, and `uv`; see [docs/setup/nix.md](docs/setup/nix.md). Add missing CLIs to `flake.nix` `devShells.default` rather than assuming Homebrew or a global install.
+
+**Parallel work streams** (by component, what to serialize): [docs/process/parallel-work-streams.md](docs/process/parallel-work-streams.md).
 
 ## Core rules
 
@@ -112,8 +115,8 @@ All shared contracts live at `contracts/` (monorepo root). Never inside a compon
 - **Pydantic v2** for request/response validation.
 - **SQLAlchemy + Alembic** for ORM and migrations.
 - **uv** for dependency management.
-- **Retool** is the ops UI — connects via direct Postgres (reads) and platform-control API (business actions). See ADR-0006.
-- **Action-focused API** — API endpoints handle state transitions and webhooks; Retool reads directly from Postgres.
+- **React-admin** (`platform-control/admin`, Next.js) is the ops UI — it uses the platform-control API only (no direct Postgres from the browser). See ADR-0009 and ADR-0015. Archived Retool artifacts live under `platform-control/retool/` for historical comparison only (ADR-0006 superseded).
+- **Action-focused API** — endpoints cover state transitions, webhooks, and operator read models consumed by the admin app.
 - Test layers: unit (state machines, service logic), integration (Testcontainers Postgres), smoke (HTTP-level).
 - **`ruff check` + `ruff format`** for linting and formatting (not flake8/black).
 - **`pytest`** for all tests.

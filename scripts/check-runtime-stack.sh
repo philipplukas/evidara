@@ -20,6 +20,14 @@ if ! grep -Eq "topic_name[[:space:]]*=[[:space:]]*\"document-processed\"" "${run
   echo "Missing document-processed topic mapping in ${runtime_variables_file}" >&2
   exit 1
 fi
+if ! grep -Eq "\"platform-control-document-processed\"[[:space:]]*=[[:space:]]*\\{" "${runtime_variables_file}"; then
+  echo "Missing platform-control document.processed push subscription in ${runtime_variables_file}" >&2
+  exit 1
+fi
+if ! grep -Eq "/v1/di/events/document-processing-status-updated" "${runtime_variables_file}"; then
+  echo "Missing platform-control push endpoint for processing status in ${runtime_variables_file}" >&2
+  exit 1
+fi
 if ! grep -Eq "topic_name[[:space:]]*=[[:space:]]*\"document-withdrawn\"" "${runtime_variables_file}"; then
   echo "Missing document-withdrawn topic mapping in ${runtime_variables_file}" >&2
   exit 1

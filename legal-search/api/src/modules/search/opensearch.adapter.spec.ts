@@ -28,7 +28,14 @@ describe('SearchOpenSearchAdapter', () => {
     });
 
     const firstCall = search.mock.calls[0][0] as {
-      body: { query: { bool: { filter: unknown[] } } };
+      body: {
+        query: {
+          bool: {
+            filter: unknown[];
+            must?: [{ multi_match: { fields: string[] } }];
+          };
+        };
+      };
     };
     expect(firstCall.body.query.bool.filter).toEqual([
       { terms: { jurisdiction: ['ch', 'at'] } },
@@ -36,6 +43,17 @@ describe('SearchOpenSearchAdapter', () => {
       { terms: { language: ['de'] } },
       { term: { is_official: true } },
       { terms: { court_level: ['supreme'] } },
+    ]);
+
+    const must = firstCall.body.query.bool.must;
+    expect(must).toBeDefined();
+    expect(must![0].multi_match.fields).toEqual([
+      'title^4',
+      'structural_path^2',
+      'regeste^2',
+      'content',
+      'content_preview',
+      'docket_number^2',
     ]);
   });
 
@@ -137,6 +155,47 @@ describe('SearchOpenSearchAdapter', () => {
       expect.objectContaining({
         document_id: 'doc_001',
         lifecycle_status: 'repealed',
+      }),
+    );
+  });
+
+  it('maps authority_name from OpenSearch hits', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: {
+          total: { value: 1 },
+          hits: [
+            {
+              _source: {
+                document_id: 'doc_001',
+                title: 'Obligationenrecht',
+                authority_name: 'Fedlex',
+                official_citation: 'SR 101',
+                is_official: true,
+              },
+            },
+          ],
+        },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    const result = await adapter.search('obligationenrecht');
+
+    expect(result.hits[0]).toEqual(
+      expect.objectContaining({
+        document_id: 'doc_001',
+        authority_name: 'Fedlex',
+        official_citation: 'SR 101',
+        is_official: true,
       }),
     );
   });

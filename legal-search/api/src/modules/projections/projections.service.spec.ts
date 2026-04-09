@@ -42,6 +42,9 @@ const baseProcessedEvent: DocumentProcessedEventDto = {
     document_revision: 2,
     processing_manifest_id: 'pm_01jq7bhgy7g0pkj4f1d03f8f8c',
     processing_version: 'v1.0.0',
+    authority_id: 'auth_fedlex',
+    authority_name: 'Fedlex',
+    is_official: true,
     lifecycle_status: 'active',
     provenance: {
       tenant_id: 'tenant_evidara',
@@ -143,6 +146,11 @@ describe('ProjectionsService', () => {
     (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
       title: 'Bundesgerichtsurteil 9C_100/2025',
       language: 'de',
+      metadata: {
+        official_citation: 'SR 101',
+        original_language: 'de',
+        translation_status: 'original',
+      },
       sections: [{ id: 's1' }, { id: 's2' }],
       citations: [{ id: 'c1' }],
       content_text: 'Leitsatz und Sachverhalt...',
@@ -154,11 +162,52 @@ describe('ProjectionsService', () => {
     expect(repository.upsertProjection).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Bundesgerichtsurteil 9C_100/2025',
+        authority_name: 'Fedlex',
+        official_citation: 'SR 101',
+        original_language: 'de',
+        translation_status: 'original',
+        is_official: true,
         sections_count: 2,
         citations_count: 1,
         language: 'de',
         lifecycle_status: 'active',
         content_preview: 'Leitsatz und Sachverhalt...',
+      }),
+    );
+  });
+
+  it('maps canonical published-document lean rows into projection metadata', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'BVGE 123/2024',
+      document_type: 'decision',
+      effective_date: '2024-06-01',
+      jurisdiction_id: 'ch_zh',
+      language: 'de',
+      body_text: 'Kurzfassung des Urteils mit ausreichend Text für eine Vorschau.',
+      metadata: {
+        extracted_metadata: {
+          structural_path: 'BGer › Zivilrecht',
+        },
+      },
+      extensions: {
+        citations: [{ id: 'c1' }],
+      },
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'BVGE 123/2024',
+        document_type: 'decision',
+        effective_date: '2024-06-01',
+        jurisdiction: 'CH',
+        structural_path: 'BGer › Zivilrecht',
+        citations_count: 1,
+        content_preview: expect.stringContaining('Kurzfassung'),
       }),
     );
   });
@@ -175,6 +224,8 @@ describe('ProjectionsService', () => {
     expect(repository.upsertProjection).toHaveBeenCalledWith(
       expect.objectContaining({
         title: `Document ${baseProcessedEvent.payload.document_id}`,
+        authority_name: 'Fedlex',
+        is_official: true,
         sections_count: 0,
         citations_count: 0,
         lifecycle_status: 'active',

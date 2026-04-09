@@ -10,7 +10,11 @@
 # Optional overrides (full base URLs, no trailing slash):
 #   PC_API_URL, LS_API_URL, LS_FRONTEND_URL, ADMIN_FRONTEND_URL
 #
-# Authentication: uses gcloud identity token with per-host audience when available.
+# Authentication: gcloud identity token with per-host audience (required for
+# private Cloud Run). User logins often cannot mint --audiences=…; set
+# EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT to an SA with run.invoker (same as CI:
+# .github/workflows/e2e-smoke-*.yml). Your user needs
+# roles/iam.serviceAccountTokenCreator on that SA.
 
 set -euo pipefail
 
@@ -74,7 +78,11 @@ token_for_url() {
     echo ""
     return
   fi
-  gcloud auth print-identity-token --audiences="${base}" 2>/dev/null || true
+  local -a args=(auth print-identity-token --audiences="${base}")
+  if [[ -n "${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}" ]]; then
+    args+=(--impersonate-service-account="${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT}")
+  fi
+  gcloud "${args[@]}" 2>/dev/null || true
 }
 
 http_code() {
@@ -108,7 +116,25 @@ log "platform-control API: ${PC_API}"
 log "legal-search API:     ${LS_API}"
 log "legal-search UI:      ${LS_UI}"
 log "admin UI:             ${ADMIN_UI}"
+if [[ -n "${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}" ]]; then
+  log "impersonation SA:     ${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT}"
+fi
 log ""
+
+if [[ -n "${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}" ]] && command -v gcloud >/dev/null 2>&1; then
+  probe_pc="$(token_for_url "${PC_API}")"
+  if [[ -z "${probe_pc}" ]]; then
+    echo "ERROR: Failed to mint identity token for ${PC_API} with EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT." >&2
+    echo "Ensure the SA has roles/run.invoker on the service and your user has roles/iam.serviceAccountTokenCreator on the SA." >&2
+    exit 1
+  fi
+  probe_ls="$(token_for_url "${LS_API}")"
+  if [[ -z "${probe_ls}" ]]; then
+    echo "ERROR: Failed to mint identity token for ${LS_API} with EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT." >&2
+    echo "Ensure the SA has roles/run.invoker on the service and your user has roles/iam.serviceAccountTokenCreator on the SA." >&2
+    exit 1
+  fi
+fi
 
 # Scenario 1
 log "--- Scenario 1: Platform Control ---"

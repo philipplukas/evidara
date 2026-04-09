@@ -21,6 +21,7 @@ class GoldenBundleTests(unittest.TestCase):
             "messy_html",
             "nested_headings",
             "no_heading_fallback",
+            "html_div_fallback",
             "ris_xml",
         ]
         for fixture_name in fixture_names:
@@ -38,6 +39,11 @@ class GoldenBundleTests(unittest.TestCase):
                     headings = [section.title for section in result.sections if section.title]
                     for heading in expected["key_headings"]:
                         self.assertIn(heading, headings)
+                    if "html_parse_used_fallback" in expected:
+                        self.assertEqual(
+                            result.document.metadata.get("html_parse_used_fallback"),
+                            expected["html_parse_used_fallback"],
+                        )
                 finally:
                     shutil.rmtree(temp_dir)
 

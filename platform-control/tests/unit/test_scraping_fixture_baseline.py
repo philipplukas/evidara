@@ -60,6 +60,7 @@ def test_scraping_fixture_baseline_contract_and_handoff_integrity(fixture_path: 
         run_id=fixture["run_id"],
         jurisdiction_id=fixture["jurisdiction_id"],
         authority_id=fixture.get("authority_id"),
+        authority_name=fixture.get("authority_name"),
         upstream_locator=fixture["upstream_locator"],
         artifacts=fixture["artifacts"],
         tenant_id=fixture["tenant_id"],
