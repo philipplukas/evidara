@@ -85,9 +85,9 @@ variable "document_intelligence_published_bucket_name" {
     When set, grants the document_intelligence runtime service account roles/storage.objectAdmin on this bucket.
     The bucket may live outside this module; it must already exist.
   EOT
-  type     = string
-  default  = null
-  nullable = true
+  type        = string
+  default     = null
+  nullable    = true
 }
 
 variable "event_subscriptions" {

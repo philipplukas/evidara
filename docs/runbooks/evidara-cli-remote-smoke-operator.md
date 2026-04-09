@@ -18,7 +18,7 @@ The workflow is **workflow_dispatch only**. It runs `evidara platform-control pi
 ## Steps (GitHub configuration)
 
 1. Ensure **GitHub Environment** `dev` or `staging` has secrets **`GCP_WORKLOAD_IDENTITY_PROVIDER`** and **`GCP_SERVICE_ACCOUNT_DEV`** / **`GCP_SERVICE_ACCOUNT_STAGING`** (typically applied via Terraform — see [`infra/terraform/github/repo_settings/README.md`](../../infra/terraform/github/repo_settings/README.md)).
-2. Optional **repository** secrets for app-layer API keys (Terraform: `repository_secrets` / `TF_VAR_repository_secrets`):
+1. Optional **repository** secrets for app-layer API keys (Terraform: `repository_secrets` / `TF_VAR_repository_secrets`):
 
 | Secret name | Maps to | When to set |
 |-------------|---------|-------------|
@@ -27,7 +27,7 @@ The workflow is **workflow_dispatch only**. It runs `evidara platform-control pi
 
 Leave a secret **unset** if unused.
 
-3. **Actions** → **Evidara CLI remote smoke** → **Run workflow** → choose **github_environment** (`dev` or `staging`) → enter **platform_control_url** and **legal_search_url** (HTTPS origins for the two Cloud Run services, e.g. `https://platform-control-api-dev-….run.app`).
+1. **Actions** → **Evidara CLI remote smoke** → **Run workflow** → choose **github_environment** (`dev` or `staging`) → enter **platform_control_url** and **legal_search_url** (HTTPS origins for the two Cloud Run services, e.g. `https://platform-control-api-dev-….run.app`).
 
 ## Security
 

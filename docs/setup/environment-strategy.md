@@ -52,7 +52,6 @@ Differences between environments are limited to:
 
 ## Configuration Management
 
-
 | Concern            | Mechanism                                                 |
 | ------------------ | --------------------------------------------------------- |
 | Infrastructure     | Terraform with per-env `tfvars`                           |
@@ -60,11 +59,9 @@ Differences between environments are limited to:
 | Secrets            | Google Secret Manager, referenced by name                 |
 | Feature flags      | Environment variables (simple) or config service (future) |
 
-
 ## Evidara CLI env vars (dev / staging / prod)
 
 Use `[tools/evidara-cli](../../tools/evidara-cli/README.md)` for quick HTTP checks against **platform-control** and **legal-search** in any environment. Set the variables below from **deploy-time config**, **Google Secret Manager**, or your **operator runbook** — never commit real URLs that embed credentials, API keys, or bearer tokens.
-
 
 | Variable                           | Default (local)         | Purpose                                                                                                             |
 | ---------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -77,7 +74,6 @@ Use `[tools/evidara-cli](../../tools/evidara-cli/README.md)` for quick HTTP chec
 | `EVIDARA_CLI_HUMAN`                | `0`                     | Set to `1` for indented JSON (`evidara` output)                                                                     |
 | `EVIDARA_REPO_ROOT`                | *(auto)*                | Optional override for `evidara openapi paths`                                                                       |
 | `EVIDARA_CLI_SMOKE`                | *(unset)*               | Set to `1` with `[scripts/smoke-evidara-cli.sh](../../scripts/smoke-evidara-cli.sh)` to run both `ping` subcommands |
-
 
 For **shell** checks against private Cloud Run (`scripts/e2e-smoke-test.sh`, `scripts/mvp-acceptance-scenario-pack.sh`), set `**EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT`** to a service account that has `roles/run.invoker` on the target services; your user needs `roles/iam.serviceAccountTokenCreator` on that SA. This matches `[.github/workflows/e2e-smoke-dev.yml](../../.github/workflows/e2e-smoke-dev.yml)` / `e2e-smoke-staging.yml`. Optional helper: `[scripts/mint-cloud-run-tokens.sh](../../scripts/mint-cloud-run-tokens.sh)`. Step-by-step IAM: [GCP local Cloud Run auth](gcp-local-cloud-run-auth.md).
 
@@ -142,4 +138,3 @@ dev → staging → prod
 1. Changes deploy to **dev** first (automatic on merge to main, or manual).
 2. After validation, promote to **staging** (manual trigger or scheduled).
 3. After staging validation, promote to **prod** (manual trigger with approval).
-

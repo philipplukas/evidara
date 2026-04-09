@@ -31,14 +31,12 @@ Primary artifacts:
 
 Attach one packet per release candidate or demo handoff:
 
-
 | Packet item                  | Canonical source                                                       | What to attach                                                                                            |
 | ---------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Release sign-off report      | `Release Readiness` strict workflow + `docs/runbooks/runtime-stack.md` | Latest strict `GO` report (strict GO required) plus run URL                                               |
 | API acceptance evidence      | `docs/runbooks/mvp-acceptance-scenario-pack.md`                        | Latest dev + staging API/proxy evidence from `uv run evidara workflow mvp-acceptance` or the shell helper |
 | Browser interaction evidence | `docs/runbooks/interaction-flow-validation.md`                         | Latest staging interaction-flow artifact, including screenshot pack and Playwright report                 |
 | Narrative walkthrough note   | `docs/runbooks/mvp-website-walkthrough.md`                             | Short operator note covering what was shown, what still feels rough, and any open follow-up issues        |
-
 
 ## Release-Candidate Handoff
 
@@ -82,4 +80,3 @@ Promote to full product `GO` only when all are true:
 4. Latest browser interaction evidence is green via `docs/runbooks/interaction-flow-validation.md`
 5. No unresolved blocker findings in website walkthrough
 6. Latest `Release Readiness` run remains `GO`
-
