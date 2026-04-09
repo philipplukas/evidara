@@ -110,6 +110,20 @@ class GcsBundleLoaderTests(unittest.TestCase):
 
 
 @unittest.skipUnless(DELTA_AVAILABLE, "deltalake is not installed")
+class DeltaReadyRowsTests(unittest.TestCase):
+    def test_projects_rows_to_published_surface_columns(self) -> None:
+        from document_intelligence.persist.sinks import (
+            _PROCESSING_MANIFESTS_DELTA_KEYS,
+            _delta_ready_rows,
+        )
+
+        rows = [{"processing_manifest_id": "m1", "manifest_version": 1, "noise": "drop-me"}]
+        out = _delta_ready_rows(rows, always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS)
+        self.assertNotIn("noise", out[0])
+        self.assertIsNone(out[0]["published_document_ref"])
+
+
+@unittest.skipUnless(DELTA_AVAILABLE, "deltalake is not installed")
 class DeltaCanonicalSinkTests(unittest.TestCase):
     def test_writes_contract_rows_to_delta_tables(self) -> None:
         import deltalake

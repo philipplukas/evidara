@@ -47,6 +47,8 @@ jobs:
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID_DEV }}
 
       - name: Preflight DI surface schema drift
         run: |

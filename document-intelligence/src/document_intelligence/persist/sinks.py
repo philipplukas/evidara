@@ -10,6 +10,63 @@ import pyarrow as pa
 from document_intelligence.canonical.models import Document, ProcessingManifest, Section
 from document_intelligence.errors import ProcessingError
 
+# Delta append requires an Arrow schema compatible with the existing table. `_delta_ready_rows`
+# normally drops keys that are null in every row; that narrows the schema and breaks append
+# against legacy published surfaces (SchemaMismatchError: field count mismatch).
+_PUBLISHED_DOCUMENTS_DELTA_KEYS = frozenset(
+    {
+        "document_id",
+        "document_revision",
+        "processing_manifest_id",
+        "provenance",
+        "primary_artifact_id",
+        "jurisdiction_id",
+        "authority_id",
+        "title",
+        "document_type",
+        "processed_at",
+        "processing_version",
+        "lifecycle_status",
+        "full_text",
+        "body_text",
+        "metadata",
+    }
+)
+_PUBLISHED_SECTIONS_DELTA_KEYS = frozenset(
+    {
+        "section_id",
+        "document_id",
+        "document_revision",
+        "processing_manifest_id",
+        "provenance",
+        "ordinal",
+        "depth",
+        "title",
+        "content",
+        "section_type",
+        "metadata",
+    }
+)
+_PROCESSING_MANIFESTS_DELTA_KEYS = frozenset(
+    {
+        "processing_manifest_id",
+        "manifest_version",
+        "document_id",
+        "document_revision",
+        "processing_version",
+        "status",
+        "provenance",
+        "input_bundle_manifest_ref",
+        "selected_profiles",
+        "document_count",
+        "section_count",
+        "citation_count",
+        "published_document_ref",
+        "published_sections_ref",
+        "canonical_ready_at",
+    }
+)
+
 
 def _document_dict_for_delta(document: Document) -> dict[str, object]:
     """Match legacy `published_documents` Delta schemas (no extensions / effective_date)."""
@@ -103,6 +160,7 @@ class DeltaCanonicalSink(CanonicalSink):
         self._write_rows(
             self._config.published_documents_uri,
             [_document_dict_for_delta(document)],
+            always_present_keys=_PUBLISHED_DOCUMENTS_DELTA_KEYS,
         )
         # Published Delta tables predate `parent_section_id`; omit until schemas are migrated.
         section_rows = []
@@ -113,11 +171,12 @@ class DeltaCanonicalSink(CanonicalSink):
         self._write_rows(
             self._config.published_sections_uri,
             section_rows,
-            always_present_keys=frozenset({"metadata"}),
+            always_present_keys=_PUBLISHED_SECTIONS_DELTA_KEYS,
         )
         self._write_rows(
             self._config.processing_manifests_uri,
             [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
         )
 
     def record_status_events(self, status_events: list[dict[str, object]]) -> None:
@@ -136,8 +195,20 @@ class DeltaCanonicalSink(CanonicalSink):
         if not rows:
             return
         try:
-            table = pa.Table.from_pylist(_delta_ready_rows(rows, always_present_keys=always_present_keys))
-            self._writer(uri, table, mode=_delta_write_mode(uri))
+            ready = _delta_ready_rows(rows, always_present_keys=always_present_keys)
+            mode = _delta_write_mode(uri)
+            schema: pa.Schema | None = None
+            if mode == "append":
+                try:
+                    deltalake_mod = importlib.import_module("deltalake")
+                    schema = deltalake_mod.DeltaTable(uri).to_pyarrow_dataset().schema
+                except Exception:
+                    schema = None
+            if schema is not None:
+                table = pa.Table.from_pylist(ready, schema=schema)
+            else:
+                table = pa.Table.from_pylist(ready)
+            self._writer(uri, table, mode=mode)
         except Exception as error:  # pragma: no cover - library-specific
             raise ProcessingError(
                 "delta_write_failed",
@@ -175,7 +246,12 @@ def _delta_ready_rows(
     }
     if always_present_keys:
         retained_keys |= always_present_keys
-    return [{key: value for key, value in row.items() if key in retained_keys} for row in normalized_rows]
+    projected = [{key: value for key, value in row.items() if key in retained_keys} for row in normalized_rows]
+    if always_present_keys:
+        # Project to the exact published-surface column set so append matches the Delta schema and
+        # optional model fields omitted from `to_dict()` still appear as null columns.
+        return [{key: row.get(key, None) for key in always_present_keys} for row in projected]
+    return projected
 
 
 def _normalize_delta_value(value):

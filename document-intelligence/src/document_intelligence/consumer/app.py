@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Callable
 from typing import Any
@@ -12,6 +13,8 @@ from document_intelligence.contracts.envelope import EnvelopeError
 from document_intelligence.errors import ProcessingError
 from document_intelligence.http_observability import install_http_observability
 from document_intelligence.processing_runtime import process_artifact_bundle_event
+
+_LOG = logging.getLogger(__name__)
 
 
 def verify_ingest_bearer(
@@ -54,6 +57,12 @@ def create_app(
         except EnvelopeError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         except ProcessingError as error:
+            _LOG.error(
+                "artifact_bundle_process_failed code=%s summary=%s cause=%r",
+                error.code,
+                error.summary,
+                error.__cause__,
+            )
             raise HTTPException(status_code=500, detail=error.summary) from error
 
     @app.get("/health", include_in_schema=False)

@@ -47,6 +47,8 @@ jobs:
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID_STAGING }}
 
       - name: Preflight DI surface schema drift
         run: |
@@ -135,7 +137,7 @@ jobs:
       - name: Summarize smoke result
         if: always()
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import os
           import re
           from pathlib import Path
