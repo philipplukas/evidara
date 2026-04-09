@@ -64,6 +64,32 @@ variable "event_topic_names" {
   ]
 }
 
+variable "artifact_bundle_subscription_push" {
+  description = <<-EOT
+    When set, merges push_config onto an existing subscription (matched by map key in event_subscriptions)
+    so Pub/Sub delivers artifact-bundle events to the HTTP DI ingress Cloud Run service.
+    Example: subscription_key = "document-intelligence-artifact-bundle-available", target_service = "di-consumer".
+  EOT
+  type = object({
+    subscription_key = string
+    target_service   = string
+    endpoint_path    = optional(string, "/internal/events/artifact-bundles:process")
+  })
+  default  = null
+  nullable = true
+}
+
+variable "document_intelligence_published_bucket_name" {
+  description = <<-EOT
+    GCS bucket for DI published Delta surfaces (e.g. evidara-document-intelligence-surfaces-dev).
+    When set, grants the document_intelligence runtime service account roles/storage.objectAdmin on this bucket.
+    The bucket may live outside this module; it must already exist.
+  EOT
+  type     = string
+  default  = null
+  nullable = true
+}
+
 variable "event_subscriptions" {
   description = "Subscription definitions keyed by base subscription name."
   type = map(object({

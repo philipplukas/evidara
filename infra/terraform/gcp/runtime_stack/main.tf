@@ -111,6 +111,29 @@ resource "google_storage_bucket" "manifests" {
   }
 }
 
+# Narrow GCS access for the document-intelligence runtime SA (HTTP ingress + pull consumer).
+# Project-level roles/storage.objectAdmin on this SA remains; these bindings document intent and
+# ensure read access to raw bundles and write access to published Delta surfaces even when bucket
+# IAM is customized independently of project defaults.
+resource "google_storage_bucket_iam_member" "document_intelligence_raw_artifacts_object_viewer" {
+  count = contains(keys(local.prefixed_service_account_ids), local.document_intelligence_runtime_key) ? 1 : 0
+
+  bucket = google_storage_bucket.raw_artifacts.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.runtime[local.document_intelligence_runtime_key].email}"
+}
+
+resource "google_storage_bucket_iam_member" "document_intelligence_published_surfaces_object_admin" {
+  count = (
+    var.document_intelligence_published_bucket_name != null
+    && contains(keys(local.prefixed_service_account_ids), local.document_intelligence_runtime_key)
+  ) ? 1 : 0
+
+  bucket = var.document_intelligence_published_bucket_name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.runtime[local.document_intelligence_runtime_key].email}"
+}
+
 resource "google_pubsub_topic" "events" {
   for_each = local.topic_base_names
 
