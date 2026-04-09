@@ -115,8 +115,8 @@ All shared contracts live at `contracts/` (monorepo root). Never inside a compon
 - **Pydantic v2** for request/response validation.
 - **SQLAlchemy + Alembic** for ORM and migrations.
 - **uv** for dependency management.
-- **Retool** is the ops UI — connects via direct Postgres (reads) and platform-control API (business actions). See ADR-0006.
-- **Action-focused API** — API endpoints handle state transitions and webhooks; Retool reads directly from Postgres.
+- **React-admin** (`platform-control/admin`, Next.js) is the ops UI — it uses the platform-control API only (no direct Postgres from the browser). See ADR-0009 and ADR-0015. Archived Retool artifacts live under `platform-control/retool/` for historical comparison only (ADR-0006 superseded).
+- **Action-focused API** — endpoints cover state transitions, webhooks, and operator read models consumed by the admin app.
 - Test layers: unit (state machines, service logic), integration (Testcontainers Postgres), smoke (HTTP-level).
 - **`ruff check` + `ruff format`** for linting and formatting (not flake8/black).
 - **`pytest`** for all tests.
