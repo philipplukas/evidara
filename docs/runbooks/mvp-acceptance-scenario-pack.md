@@ -23,6 +23,11 @@ Lower-level helper: `scripts/mvp-acceptance-scenario-pack.sh` remains available 
 
 The shell helper requires `curl`, `jq`, and `gcloud`. For **private** Cloud Run APIs, see [Cloud Run auth](#cloud-run-auth-local-and-cli) below.
 
+### CLI output modes (`evidara workflow mvp-acceptance`)
+
+- default: single-line JSON for agents, CI notes, or follow-on tooling
+- `--human`: pretty-printed JSON for operators
+
 ### Cloud Run auth (local and CLI)
 
 API services use **audience-scoped Google ID tokens** at the Cloud Run layer. A normal `gcloud auth login` user often **cannot** run `gcloud auth print-identity-token --audiences=https://…run.app` (service account required). Use one of:
@@ -44,7 +49,7 @@ API services use **audience-scoped Google ID tokens** at the Cloud Run layer. A 
 
 Reference: audience-scoped token step in [`.github/workflows/e2e-smoke-staging.yml`](../../.github/workflows/e2e-smoke-staging.yml) (`--impersonate-service-account` + `--audiences`).
 
-Output modes:
+### Shell helper output modes (`mvp-acceptance-scenario-pack.sh`)
 
 - default: human-readable terminal summary for operators
 - `--json`: machine-readable summary for agents, CI notes, or follow-on tooling

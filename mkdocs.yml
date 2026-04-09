@@ -68,6 +68,7 @@ nav:
   - Home: index.md
   - Architecture:
       - System Context: architecture/system-context.md
+      - Agentic CLI Workflow: architecture/agentic-cli-workflow-architecture.md
       - Repository Structure: architecture/repository-structure.md
       - Communication Model: architecture/communication-model.md
       - Boundary Contracts: architecture/boundary-contracts.md
@@ -99,6 +100,7 @@ nav:
       - "0016: Cloud Run Services vs Jobs": adr/0016-cloud-run-services-vs-jobs.md
       - "0020: API Authentication": adr/adr-0020-api-authentication.md
       - "0021: Wizard Orchestration Abstraction": adr/adr-0021-wizard-orchestration-abstraction.md
+      - "0022: Agentic CLI Workflow Control Surface": adr/adr-0022-agentic-cli-workflow-control-surface.md
       - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md

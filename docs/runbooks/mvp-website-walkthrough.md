@@ -1,7 +1,7 @@
 # MVP Website Walkthrough (Dev -> Staging)
 
 Owner: Platform team
-Last reviewed: 2026-04-06
+Last reviewed: 2026-04-08
 Last verified: 2026-04-06
 Applies to: dev, staging
 
@@ -14,6 +14,16 @@ Run a repeatable, evidence-first walkthrough of user-facing MVP flow surfaces:
 3. Operator/demo pages used in release walkthroughs
 
 This runbook captures both the checklist and the latest verification evidence.
+
+## Evidence Boundary
+
+This runbook is the narrative/demo overlay for operator walkthroughs.
+
+Use companion evidence surfaces for canonical proof:
+
+- API acceptance truth: [`docs/runbooks/mvp-acceptance-scenario-pack.md`](mvp-acceptance-scenario-pack.md)
+- Browser interaction truth and screenshot pack: [`docs/runbooks/interaction-flow-validation.md`](interaction-flow-validation.md)
+- Final release sign-off: latest strict `Release Readiness` workflow run
 
 ## Surface Inventory
 
@@ -54,7 +64,7 @@ Published website surfaces:
 
 - [x] Deployed React-admin UI is accessible in dev and staging
 - [x] Frontend proxied source list path (`/api/platform-control/v1/sources`) returns 200 in dev and staging
-- [ ] Operator flow walkthrough captured with screenshots
+- [x] Operator flow walkthrough evidence is available via the interaction-flow screenshot pack
 
 ## Verification Evidence (2026-04-06)
 
@@ -67,14 +77,15 @@ Authenticated endpoint probes (gcloud identity token) succeeded:
   - dev: `/health` 200, `/v1/search?q=art%20754` 200, `/v1/documents/{id}` 200
   - staging: `/health` 200, `/v1/search?q=art%20754` 200, `/v1/documents/{id}` 200
 
-Observed UX-quality findings from API payloads:
+Observed walkthrough findings and operator notes:
 
 1. Result/detail metadata is minimal and generic (`type: "unknown"`, generic
    titles like `Document <id>`), limiting user trust and explainability.
 2. Legal-search docs endpoints (`/docs`) are not exposed (404) while platform
    control docs are available; this reduces operator/debug discoverability.
-3. Browser surfaces are reachable, but operator screenshot evidence still needs
-   a canonical capture pack for demo workflows.
+3. Browser surfaces are reachable, and the canonical screenshot pack now lives
+   in the latest interaction-flow staging evidence artifact; attach it alongside
+   walkthrough notes for demo and release packets.
 
 ## Triage Mapping
 
@@ -88,5 +99,5 @@ Suggested mapping for this run:
 
 - Generic document metadata/titles in result/detail payloads -> `severity:high`
 - Missing legal-search docs surface -> `severity:medium`
-- Missing screenshot evidence pack for operator walkthrough -> `severity:medium`
+- Missing attachment to the latest screenshot evidence pack -> `severity:medium`
 - Missing or misconfigured UI-to-admin link -> `severity:medium`
