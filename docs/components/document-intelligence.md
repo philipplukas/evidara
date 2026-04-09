@@ -39,6 +39,10 @@ Document-intelligence should lean on Databricks-native lineage for internal trac
 - **Does own:** normalization, parsing, profile selection, canonical entities, document revisions, published surfaces, Databricks pipelines
 - **Does NOT own:** source lifecycle, approvals, acquisition checkpoints, search projection logic
 
+### HTML normalization (v1)
+
+The built-in HTML normalizer uses `html.parser` for common block tags (`p`, headings, list items, table cells, etc.). When no blocks are extracted (for example, prose only inside `<div>`), it falls back to tag-stripping with whitespace normalization. Normalized IR metadata includes `html_parse_used_fallback` when that fallback runs. Embedded chrome (`iframe`, `form`, `object`, `embed`, `picture`, `video`, `audio`, `track`, `map`, plus script/style/nav/footer/aside) is skipped to stabilize body text. If `feed()` raises on malformed markup, recovery uses the same strip path and sets `html_parse_recovery` to `exception`.
+
 ## Minimal next tasks
 
 - [x] Define canonical `Document` schema

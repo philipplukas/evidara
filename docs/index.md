@@ -57,6 +57,7 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 | [Testing](testing/README.md)                                                                     | Testing strategy and guides                                                      |
 | [Setup](setup/environment-strategy.md)                                                           | Development and deployment setup                                                 |
 | [Evidara CLI (API smoke)](https://github.com/philipplukas/evidara/blob/main/tools/evidara-cli/README.md) | `evidara` pings, OpenAPI discovery, env vars per environment |
+| [Phase 5 go / no-go memo](runbooks/phase-5-go-no-go-memo.md)                                     | Release gates, Linear evidence (TAR-64 / 77 / 85), M5 checklist |
 | [API Reference](api/legal-search.md)                                                             | OpenAPI interactive docs (legal-search, document-intelligence, platform-control) |
 
 

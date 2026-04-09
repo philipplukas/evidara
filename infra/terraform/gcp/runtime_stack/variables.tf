@@ -96,6 +96,19 @@ variable "event_subscriptions" {
       topic_name         = "document-processing-status-updated"
       retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
       dead_letter_policy = { max_delivery_attempts = 5 }
+      push_config = {
+        target_service = "platform-control-api"
+        endpoint_path  = "/v1/di/events/document-processing-status-updated"
+      }
+    }
+    "platform-control-document-processed" = {
+      topic_name         = "document-processed"
+      retry_policy       = { minimum_backoff = "10s", maximum_backoff = "300s" }
+      dead_letter_policy = { max_delivery_attempts = 5 }
+      push_config = {
+        target_service = "platform-control-api"
+        endpoint_path  = "/v1/di/events/document-processed"
+      }
     }
     "legal-search-document-processed" = {
       topic_name         = "document-processed"

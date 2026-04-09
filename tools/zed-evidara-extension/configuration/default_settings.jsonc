@@ -1,0 +1,4 @@
+{
+  /// Absolute path to the Evidara repository root
+  "repo_root": "/absolute/path/to/evidara"
+}

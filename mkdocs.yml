@@ -2,6 +2,18 @@ site_name: Evidara — Document Intelligence Platform
 site_description: Architecture, ADRs, contracts, testing, and operational documentation for the Evidara platform.
 site_url: https://philipplukas.github.io/evidara/
 
+# MkDocs 1.6+: keep --strict useful without failing on links to repo paths outside docs/
+# (contracts/, infra/, .github/, etc.). `scripts/check_doc_links.py` still validates
+# markdown targets on disk for docs/**/*.md.
+validation:
+  nav:
+    omitted_files: info
+    not_found: warn
+  links:
+    not_found: info
+    absolute_links: info
+    unrecognized_links: info
+
 theme:
   name: material
   palette:
@@ -76,13 +88,18 @@ nav:
       - "0006: Internal Ops UI": adr/0006-internal-ops-ui-strategy.md
       - "0007: OpenAPI Client Strategy": adr/0007-openapi-client-strategy-legal-search.md
       - "0008: Contract Interaction Model": adr/0008-contract-interaction-model.md
+      - "NestJS Conventions (legal-search)": adr/0008-nestjs-conventions-legal-search.md
       - "0009: Technology Stack": adr/0009-technology-stack-and-language-boundaries.md
+      - "0009: FastAPI Conventions (platform-control)": adr/0009-fastapi-conventions-platform-control.md
       - "0010: Document Content Format": adr/0010-document-content-format.md
-      - "0011: NestJS Conventions": adr/0011-nestjs-conventions-legal-search.md
       - "0012: Layered Contract Governance": adr/0012-layered-contract-governance.md
       - "0013: Internationalization": adr/0013-internationalization-strategy.md
       - "0014: DI Pipeline Integration": adr/0014-document-intelligence-pipeline-integration.md
-      - "0015: FastAPI Conventions": adr/0015-fastapi-conventions-platform-control.md
+      - "0015: Control Plane Admin Frontend": adr/0015-control-plane-admin-frontend-strategy.md
+      - "0016: Cloud Run Services vs Jobs": adr/0016-cloud-run-services-vs-jobs.md
+      - "0020: API Authentication": adr/adr-0020-api-authentication.md
+      - "0021: Wizard Orchestration Abstraction": adr/adr-0021-wizard-orchestration-abstraction.md
+      - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md
       - Document Intelligence: components/document-intelligence.md
@@ -110,10 +127,19 @@ nav:
       - Firecrawl Preview Run: runbooks/firecrawl-preview-run.md
       - Evidara CLI environment smoke matrix: runbooks/evidara-cli-environment-smoke-matrix.md
       - Evidara CLI remote smoke secrets: runbooks/evidara-cli-remote-smoke-operator.md
+      - M5 evidence checklist: runbooks/m5-evidence-checklist.md
+      - Phase 5 go / no-go memo: runbooks/phase-5-go-no-go-memo.md
+      - First vertical slice exit gates: runbooks/first-vertical-slice-exit-gates.md
+      - MVP acceptance scenario pack: runbooks/mvp-acceptance-scenario-pack.md
+      - Interaction flow validation: runbooks/interaction-flow-validation.md
+      - Search relevance baseline: runbooks/search-relevance-baseline.md
+      - Runtime stack: runbooks/runtime-stack.md
   - Setup:
       - Environment Strategy: setup/environment-strategy.md
+      - GCP local Cloud Run auth: setup/gcp-local-cloud-run-auth.md
       - Infrastructure Overview: setup/infrastructure-overview.md
       - Branch Rules: setup/branch-rules.md
+      - Zed Setup: setup/zed.md
       - Wizard Temporal Argilla Rollout: setup/platform-control-wizard-temporal-argilla-rollout.md
   - Documentation:
       - Overview: documentation/README.md

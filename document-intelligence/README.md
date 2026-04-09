@@ -22,6 +22,7 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 - A top-level Databricks Terraform stack plus `dev` / `staging` / `prod` tfvars under [`../infra/terraform/databricks/document_intelligence_stack/`](../infra/terraform/databricks/document_intelligence_stack/) and [`../infra/env/`](../infra/env/)
 - SQL/bootstrap assets for published surface registration under [`databricks/sql/`](databricks/sql/)
 - Optional parser/NLP runtime flags (`DI_PARSER_BACKEND`, `DI_ENABLE_SPACY`) with safe defaults
+- Optional `llm` dependency group plus extractor package scaffold under [`src/document_intelligence/extractors/`](src/document_intelligence/extractors/)
 - Initial dbt scaffold under [`dbt/`](dbt/)
 - Databricks resource wiring for canonical processing, bronze autoloader bootstrap, dbt transformations, and smoke jobs under [`resources/`](resources/)
 
@@ -34,12 +35,20 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 - Citation extraction
 - Canonical jurisdiction assignment
 - RIS-specific XML schema tuning beyond the current heuristic path
+- LLM extractor pipeline integration and runtime configuration
 
 ## Local setup
 
 ```bash
 cd document-intelligence
 python3 -m pip install -e ".[dev]"
+```
+
+For experimental LLM extractor work, install the optional extra instead:
+
+```bash
+cd document-intelligence
+python3 -m pip install -e ".[dev,llm]"
 ```
 
 ## Local quality gate
@@ -79,6 +88,21 @@ Available entrypoints:
 - `document_intelligence_document_service` for the read-oriented document service
 - `document_intelligence_runtime_ingress` for the internal event-processing ingress
 
+## Optional LLM extraction extras
+
+The `llm` extra installs DSPy and hosted-model clients for upcoming
+LLM-assisted extraction work:
+
+```bash
+cd document-intelligence
+python3 -m pip install -e ".[llm]"
+```
+
+Today this only provides the dependency set and the
+[`extractors/`](src/document_intelligence/extractors/) package scaffold. It
+does not yet switch the main processing pipeline away from the existing
+deterministic path.
+
 ## Optional Delta sink configuration
 
 Set these together to switch the CLI path from the in-memory sink to the Delta sink:
@@ -95,6 +119,8 @@ Optional:
 - `DI_SPACY_MODEL_NAME` (`xx_sent_ud_sm` by default)
 - `DI_SPACY_MAX_CHARS_PER_SECTION` (`100000` by default)
 - `DI_SPACY_BATCH_SIZE` (`32` by default)
+- `DI_ENABLE_LLM_EXTRACTOR` (`false` by default; currently only activates the guarded extractor seam)
+- `DI_LLM_CONFIDENCE_THRESHOLD` (`0.7` by default)
 
 ## dbt validation
 

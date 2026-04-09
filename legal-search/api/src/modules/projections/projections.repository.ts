@@ -32,6 +32,12 @@ export type SearchProjectionDocument = {
   jurisdiction?: string;
   language?: string;
   content_preview?: string;
+  /** Normalized document type from canonical DI row (law, decision, …). */
+  document_type?: string;
+  /** ISO date from canonical document when present. */
+  effective_date?: string;
+  /** Breadcrumb-style path when present in canonical metadata. */
+  structural_path?: string;
 };
 
 export interface ProjectionRepository {

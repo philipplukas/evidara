@@ -83,6 +83,7 @@ cloud_run_services = {
       PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET           = "evidara-raw-artifacts-staging"
       PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC     = "raw-artifact-available-staging"
       PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC  = "artifact-bundle-available-staging"
+      PLATFORM_CONTROL_RUN_DISPATCH_BACKEND          = "worker"
     }
     secret_env_vars = {
       PLATFORM_CONTROL_DATABASE_URL = {
@@ -135,7 +136,8 @@ cloud_run_services = {
     service_account_key   = "legal_search_frontend"
     allow_unauthenticated = true
     env_vars = {
-      NEXT_PUBLIC_API_URL = "https://legal-search-api-staging-kxc5agexna-oa.a.run.app"
+      NEXT_PUBLIC_API_URL           = "https://legal-search-api-staging-kxc5agexna-oa.a.run.app"
+      NEXT_PUBLIC_CONTROL_PANEL_URL = "https://platform-control-admin-staging-kxc5agexna-oa.a.run.app"
     }
   }
 

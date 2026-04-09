@@ -11,6 +11,7 @@ from document_intelligence.persist.surfaces import (
     PUBLISHED_SECTIONS,
     get_surface_definition,
 )
+from document_intelligence.processing_runtime import build_processing_pipeline
 
 
 class RuntimeSettingsTests(unittest.TestCase):
@@ -53,6 +54,8 @@ class RuntimeSettingsTests(unittest.TestCase):
         self.assertEqual(settings.spacy_model_name, "xx_sent_ud_sm")
         self.assertEqual(settings.spacy_max_chars_per_section, 100000)
         self.assertEqual(settings.spacy_batch_size, 32)
+        self.assertFalse(settings.enable_llm_extractor)
+        self.assertEqual(settings.llm_confidence_threshold, 0.7)
 
     def test_parses_parser_backend_and_spacy_toggle_from_mapping(self) -> None:
         settings = RuntimeSettings.from_mapping(
@@ -62,6 +65,8 @@ class RuntimeSettingsTests(unittest.TestCase):
                 "DI_SPACY_MODEL_NAME": "en_core_web_sm",
                 "DI_SPACY_MAX_CHARS_PER_SECTION": "777",
                 "DI_SPACY_BATCH_SIZE": "8",
+                "DI_ENABLE_LLM_EXTRACTOR": "true",
+                "DI_LLM_CONFIDENCE_THRESHOLD": "0.9",
             }
         )
         self.assertEqual(settings.parser_backend, "docling")
@@ -69,6 +74,8 @@ class RuntimeSettingsTests(unittest.TestCase):
         self.assertEqual(settings.spacy_model_name, "en_core_web_sm")
         self.assertEqual(settings.spacy_max_chars_per_section, 777)
         self.assertEqual(settings.spacy_batch_size, 8)
+        self.assertTrue(settings.enable_llm_extractor)
+        self.assertEqual(settings.llm_confidence_threshold, 0.9)
 
     def test_rejects_unknown_parser_backend(self) -> None:
         with self.assertRaises(ValueError):
@@ -79,6 +86,25 @@ class RuntimeSettingsTests(unittest.TestCase):
             RuntimeSettings.from_mapping({"DI_SPACY_MAX_CHARS_PER_SECTION": "0"})
         with self.assertRaises(ValueError):
             RuntimeSettings.from_mapping({"DI_SPACY_BATCH_SIZE": "0"})
+        with self.assertRaises(ValueError):
+            RuntimeSettings.from_mapping({"DI_LLM_CONFIDENCE_THRESHOLD": "1.5"})
+
+    def test_build_processing_pipeline_propagates_runtime_flags(self) -> None:
+        settings = RuntimeSettings.from_mapping(
+            {
+                "DI_PARSER_BACKEND": "docling",
+                "DI_ENABLE_SPACY": "true",
+                "DI_ENABLE_LLM_EXTRACTOR": "true",
+                "DI_LLM_CONFIDENCE_THRESHOLD": "0.85",
+            }
+        )
+
+        pipeline = build_processing_pipeline(runtime_settings=settings)
+
+        self.assertEqual(pipeline._parser_backend, "docling")
+        self.assertTrue(pipeline._enable_spacy)
+        self.assertTrue(pipeline._enable_llm_extractor)
+        self.assertEqual(pipeline._llm_confidence_threshold, 0.85)
 
 
 class SurfaceDefinitionTests(unittest.TestCase):

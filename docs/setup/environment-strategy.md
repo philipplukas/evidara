@@ -66,6 +66,7 @@ Use [`tools/evidara-cli`](../../tools/evidara-cli/README.md) for quick HTTP chec
 | Variable | Default (local) | Purpose |
 |----------|-----------------|---------|
 | `EVIDARA_PLATFORM_CONTROL_URL` | `http://localhost:8000` | Platform-control base URL |
+| `EVIDARA_PLATFORM_CONTROL_TOKEN` | _(empty)_ | `Authorization: Bearer …` for private Cloud Run (IAM invoker); mint per service URL audience |
 | `EVIDARA_PLATFORM_CONTROL_API_KEY` | _(empty)_ | `X-API-Key` when the API requires it |
 | `EVIDARA_LEGAL_SEARCH_URL` | `http://localhost:3102` | Legal-search BFF base URL |
 | `EVIDARA_LEGAL_SEARCH_TOKEN` | _(empty)_ | `Authorization: Bearer …` when configured |
@@ -74,13 +75,15 @@ Use [`tools/evidara-cli`](../../tools/evidara-cli/README.md) for quick HTTP chec
 | `EVIDARA_REPO_ROOT` | _(auto)_ | Optional override for `evidara openapi paths` |
 | `EVIDARA_CLI_SMOKE` | _(unset)_ | Set to `1` with [`scripts/smoke-evidara-cli.sh`](../../scripts/smoke-evidara-cli.sh) to run both `ping` subcommands |
 
+For **shell** checks against private Cloud Run (`scripts/e2e-smoke-test.sh`, `scripts/mvp-acceptance-scenario-pack.sh`), set **`EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT`** to a service account that has `roles/run.invoker` on the target services; your user needs `roles/iam.serviceAccountTokenCreator` on that SA. This matches [`.github/workflows/e2e-smoke-dev.yml`](../../.github/workflows/e2e-smoke-dev.yml) / `e2e-smoke-staging.yml`. Optional helper: [`scripts/mint-cloud-run-tokens.sh`](../../scripts/mint-cloud-run-tokens.sh). Step-by-step IAM: [GCP local Cloud Run auth](gcp-local-cloud-run-auth.md).
+
 After exporting the URLs and optional auth vars for the target environment:
 
 ```bash
 EVIDARA_CLI_SMOKE=1 bash scripts/smoke-evidara-cli.sh
 ```
 
-For a **manual run from GitHub Actions**, use workflow [`.github/workflows/evidara-cli-remote-smoke.yml`](../../.github/workflows/evidara-cli-remote-smoke.yml): pass service base URLs as inputs and configure repository secrets `EVIDARA_PLATFORM_CONTROL_API_KEY`, `EVIDARA_LEGAL_SEARCH_TOKEN`, and `EVIDARA_LEGAL_SEARCH_API_KEY` when those environments require auth. Step-by-step: [Evidara CLI remote smoke — operator](../runbooks/evidara-cli-remote-smoke-operator.md). Per-environment command checklist: [CLI environment smoke matrix](../runbooks/evidara-cli-environment-smoke-matrix.md).
+For a **manual run from GitHub Actions**, use workflow [`.github/workflows/evidara-cli-remote-smoke.yml`](../../.github/workflows/evidara-cli-remote-smoke.yml): choose GitHub **environment** `dev` or `staging`, pass both API base URLs; the workflow mints Cloud Run ID tokens via OIDC (no static Bearer secrets). Optional repository secrets: `EVIDARA_PLATFORM_CONTROL_API_KEY`, `EVIDARA_LEGAL_SEARCH_API_KEY`. Step-by-step: [Evidara CLI remote smoke — operator](../runbooks/evidara-cli-remote-smoke-operator.md). Per-environment command checklist: [CLI environment smoke matrix](../runbooks/evidara-cli-environment-smoke-matrix.md). Terraform: [`infra/terraform/github/repo_settings`](../../infra/terraform/github/repo_settings/README.md).
 
 ## Folder Structure
 

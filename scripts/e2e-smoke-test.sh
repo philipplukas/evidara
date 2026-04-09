@@ -10,6 +10,20 @@ set -euo pipefail
 #   - jq installed
 #   - All services deployed and healthy
 #
+# Private Cloud Run (default for APIs): audience-scoped ID tokens need a
+# service-account principal. User credentials alone often fail for
+# `gcloud auth print-identity-token --audiences=…`.
+#
+# Optional env:
+#   EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT — SA email; passed to gcloud
+#     --impersonate-service-account when minting tokens (same pattern as CI:
+#     .github/workflows/e2e-smoke-*.yml).
+#   E2E_PC_ID_TOKEN / E2E_LS_ID_TOKEN — pre-minted Bearer tokens for each
+#     Cloud Run host (skip auto-mint for matching URLs).
+#   E2E_DI_MAX_POLLS — step 7 poll count (default 24).
+#   E2E_DI_POLL_INTERVAL — seconds between step 7 polls (default 5).
+#   E2E_DI_ZERO_HINT_AFTER — poll iteration before one-shot Pub/Sub wiring hint if statuses stay empty (default 3).
+#
 # Usage:
 #   ./scripts/e2e-smoke-test.sh [--env dev]
 # ───────────────────────────────────────────────────────────────────────
@@ -34,13 +48,27 @@ done
 # GCP project — override via env var if needed
 PROJECT_ID="${GCP_PROJECT_ID:-data-platform-dev-492214}"
 
+_gcloud_print_identity_token() {
+  local -a args=(auth print-identity-token)
+  if [[ -n "${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}" ]]; then
+    args+=(--impersonate-service-account="${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT}")
+  fi
+  if [[ -n "${1:-}" ]]; then
+    args+=(--audiences="$1")
+  fi
+  gcloud "${args[@]}" 2>/dev/null || true
+}
+
 # Auto-auth for private Cloud Run services.
 CURL_AUTH_ARGS=()
 if command -v gcloud >/dev/null 2>&1; then
-  ID_TOKEN="$(gcloud auth print-identity-token 2>/dev/null || true)"
+  ID_TOKEN="$(_gcloud_print_identity_token)"
   if [[ -n "${ID_TOKEN}" ]]; then
     CURL_AUTH_ARGS=(-H "Authorization: Bearer ${ID_TOKEN}")
     echo "🔐 Using gcloud identity token for Cloud Run requests."
+  fi
+  if [[ -n "${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}" ]]; then
+    echo "🔐 Impersonation: ${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT}"
   fi
 fi
 
@@ -70,7 +98,7 @@ curl_json() {
       local audience
       audience="$(echo "${request_url}" | sed -E 's#(https?://[^/]+).*#\1#')"
       local audience_token
-      audience_token="$(gcloud auth print-identity-token --audiences="${audience}" 2>/dev/null || true)"
+      audience_token="$(_gcloud_print_identity_token "${audience}")"
       if [[ -n "${audience_token}" ]]; then
         auth_args=(-H "Authorization: Bearer ${audience_token}")
       fi
@@ -100,6 +128,23 @@ LS_URL=$(gcloud run services describe "legal-search-api-${ENVIRONMENT}" \
 echo "📡 platform-control-api: ${PC_URL}"
 echo "📡 legal-search-api:     ${LS_URL}"
 echo ""
+
+if [[ -n "${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}" ]] && command -v gcloud >/dev/null 2>&1; then
+  if [[ -z "${E2E_PC_ID_TOKEN:-}" || -z "${E2E_LS_ID_TOKEN:-}" ]]; then
+    if [[ -z "$(_gcloud_print_identity_token "${PC_URL}")" ]]; then
+      echo "❌ Failed to mint Cloud Run identity token for platform-control (${PC_URL})." >&2
+      echo "   With EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT set, ensure the SA has run.invoker on this service" >&2
+      echo "   and your user has roles/iam.serviceAccountTokenCreator on that SA." >&2
+      exit 1
+    fi
+    if [[ -z "$(_gcloud_print_identity_token "${LS_URL}")" ]]; then
+      echo "❌ Failed to mint Cloud Run identity token for legal-search (${LS_URL})." >&2
+      echo "   With EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT set, ensure the SA has run.invoker on this service" >&2
+      echo "   and your user has roles/iam.serviceAccountTokenCreator on that SA." >&2
+      exit 1
+    fi
+  fi
+fi
 
 # Deterministic acquisition seed URL; can be overridden per environment/run.
 SMOKE_SEED_URL="${SMOKE_SEED_URL:-https://example.com}"
@@ -247,8 +292,10 @@ echo ""
 # ── 7. Wait for DI signals ─────────────────────────────────────────
 
 echo "🔍 Step 7: Verifying DI processing signals..."
-MAX_DI_POLLS=12
-DI_INTERVAL=5
+MAX_DI_POLLS="${E2E_DI_MAX_POLLS:-24}"
+DI_INTERVAL="${E2E_DI_POLL_INTERVAL:-5}"
+E2E_DI_ZERO_HINT_AFTER="${E2E_DI_ZERO_HINT_AFTER:-3}"
+di_zero_hint_shown=0
 for i in $(seq 1 ${MAX_DI_POLLS}); do
   status_response=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}/processing-status")
   lifecycle_response=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}/document-lifecycle")
@@ -263,8 +310,19 @@ for i in $(seq 1 ${MAX_DI_POLLS}); do
     break
   fi
 
+  if [ "${status_count}" -eq 0 ] && [ "${i}" -ge "${E2E_DI_ZERO_HINT_AFTER}" ] && [ "${di_zero_hint_shown}" -eq 0 ]; then
+    di_zero_hint_shown=1
+    echo "  ℹ️  No processing-status rows yet — if this persists, verify Pub/Sub push subscriptions deliver"
+    echo "     document-processing-status-updated and document.processed to platform-control-api"
+    echo "     (see infra/terraform/gcp/runtime_stack/variables.tf; mirror staging tfvars for suffixed topics)."
+    echo "     Check document-intelligence-consumer health, DLQ: docs/runbooks/dlq-triage-and-replay.md"
+  fi
+
   if [ "${i}" -eq "${MAX_DI_POLLS}" ]; then
     echo "  ❌ Timed out waiting for DI canonical_ready and document.processed signals"
+    run_diag=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}" || true)
+    echo "  Run summary (GET /v1/runs/${RUN_ID}):"
+    echo "${run_diag}" | jq -c '{run_id, status, failure_reason, artifacts_count, captured_resources_count}' 2>/dev/null || echo "${run_diag}"
     exit 1
   fi
 

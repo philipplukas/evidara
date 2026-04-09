@@ -3,6 +3,12 @@ environment = "dev"
 project_id = "evidara-dev"
 region     = "europe-west6"
 
+# Runtime Pub/Sub: unless you override `event_topic_names` / `event_subscriptions` below, the
+# runtime_stack module defaults apply — including push subscriptions from
+# `document-processing-status-updated` and `document-processed` to `platform-control-api`
+# (see infra/terraform/gcp/runtime_stack/variables.tf). Environments with suffixed topic names
+# must define matching subscriptions (pattern: infra/env/staging/runtime.gcp.tfvars.example).
+
 raw_artifact_bucket_name = "evidara-raw-artifacts-dev"
 manifest_bucket_name     = "evidara-manifests-dev"
 
@@ -23,6 +29,8 @@ cloud_run_services = {
       PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET = "evidara-raw-artifacts-dev"
       PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC = "raw-artifact-available"
       PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC = "artifact-bundle-available"
+      # Keep acquisition dispatch off the API process; `platform-control-worker` polls `dispatch_pending_runs`.
+      PLATFORM_CONTROL_RUN_DISPATCH_BACKEND = "worker"
     }
     secret_env_vars = {
       PLATFORM_CONTROL_DATABASE_URL = {
@@ -82,7 +90,8 @@ cloud_run_services = {
     service_account_key   = "legal_search_frontend"
     allow_unauthenticated = true
     env_vars = {
-      NEXT_PUBLIC_API_URL = "https://legal-search-api-dev.example.run.app"
+      NEXT_PUBLIC_API_URL              = "https://legal-search-api-dev.example.run.app"
+      NEXT_PUBLIC_CONTROL_PANEL_URL    = "https://platform-control-admin-dev.example.run.app"
     }
   }
 

@@ -98,6 +98,11 @@ For the first end-to-end slice, keep these Cloud Run services present in each en
 
 The runtime stack defaults already include Pub/Sub subscription wiring for DI ingestion and legal-search projection push callbacks; do not remove those subscriptions unless replacing them with an equivalent delivery path.
 
+### Acquisition dispatch and control-panel deep link
+
+- When `platform-control-worker` is in use, set `PLATFORM_CONTROL_RUN_DISPATCH_BACKEND=worker` on **`platform-control-api`** so new runs stay `PENDING` until the worker calls providers (see `runtime.gcp.tfvars.example` for dev/staging).
+- Set `NEXT_PUBLIC_CONTROL_PANEL_URL` on **`legal-search-frontend`** to the public URL of `platform-control-admin` so the search header can show the control-panel entrypoint (see the same tfvars examples).
+
 ### GKE OpenSearch secret sync
 
 After applying the self-managed OpenSearch GKE stack, sync stack outputs into GCP Secret Manager:

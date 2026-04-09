@@ -30,6 +30,13 @@ def build_processing_pipeline(
         bundle_loader=bundle_loader,
         sink=sink,
         processing_version=runtime_settings.processing_version,
+        parser_backend=runtime_settings.parser_backend,
+        enable_spacy=runtime_settings.enable_spacy,
+        spacy_model_name=runtime_settings.spacy_model_name,
+        spacy_max_chars_per_section=runtime_settings.spacy_max_chars_per_section,
+        spacy_batch_size=runtime_settings.spacy_batch_size,
+        enable_llm_extractor=runtime_settings.enable_llm_extractor,
+        llm_confidence_threshold=runtime_settings.llm_confidence_threshold,
     )
 
 

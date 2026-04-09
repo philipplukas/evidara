@@ -55,3 +55,15 @@ environment_variables = {
 #     DATABRICKS_TOKEN               = "..."
 #   }
 # }
+#
+# Optional repository-level Actions secrets (TF_VAR_repository_secrets JSON), e.g. for
+# `.github/workflows/evidara-cli-remote-smoke.yml` app-layer keys:
+#
+# repository_secrets = {
+#   EVIDARA_PLATFORM_CONTROL_API_KEY = "..."
+#   EVIDARA_LEGAL_SEARCH_API_KEY     = "..."
+# }
+#
+# Do NOT store Google Cloud Run IAM ID tokens in repository_secrets: they expire quickly
+# (~1h). The Evidara CLI remote smoke workflow mints Bearer tokens via WIF + impersonation
+# using the environment secrets above. See infra/terraform/github/repo_settings/README.md.

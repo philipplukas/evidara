@@ -47,11 +47,11 @@ The next implementation phase should establish a cleaner separation between the 
 ## Minimal next tasks
 
 - [x] Create the `platform-control/` API scaffold
-- [ ] Create the connector-worker scaffold under the same top-level component
+- [x] Create the connector-worker scaffold under the same top-level component (`connector_worker` entrypoint, `Dockerfile.worker`)
 - [x] Define initial Postgres tables and migrations for sources, source versions, runs, raw artifacts, webhook receipts, DI event tracking, and reference data
 - [x] Implement the first source/version/run/artifact APIs
 - [x] Implement bundle-manifest creation and `artifact_bundle.available` emission
-- [~] Implement one connector path with one source family; the current Firecrawl-backed acquisition path exists, but dedicated worker separation is still pending
+- [x] Implement one connector path with one source family; Firecrawl acquisition is dispatched from the connector worker when `PLATFORM_CONTROL_RUN_DISPATCH_BACKEND=worker` on the API (webhook ingress stays on the API service)
 - [x] Add tests for run state, artifact registration, webhook handling, and event publication flow
 
 ## Target architecture

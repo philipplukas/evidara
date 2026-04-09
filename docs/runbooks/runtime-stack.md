@@ -288,6 +288,21 @@ gh workflow run "Release Readiness" -f strict=true
 gh workflow run "Release Readiness" -f strict=false
 ```
 
+#### Required status check on `main`
+
+To enforce Release Readiness as a merge gate (see Linear P6-1 / branch protection policy):
+
+1. GitHub → **Settings** → **Rules** (rulesets) or **Branches** → protection for `main`.
+2. Enable **Require status checks to pass before merging**.
+3. Add the check for workflow [`.github/workflows/release-readiness.yml`](../../.github/workflows/release-readiness.yml): job id `release-readiness`. On pull requests the required check name is usually **`Release Readiness / release-readiness`** — confirm against the checks list on an open PR after the workflow has run at least once.
+4. Save and verify a draft PR cannot merge when that check is failing or pending.
+
+**Evidence:** capture a screenshot or ruleset export showing the required check, and link a green `Release Readiness` workflow run used for validation.
+
+**Linear P6-1 ([TAR-77](https://linear.app/tart-baozi/issue/TAR-77)):** attach the screenshot/export plus the workflow run URL as issue evidence so merges are auditable.
+
+**Stability:** renaming the workflow `name:` or the job id breaks branch protection until the rule is updated.
+
 Interpretation:
 
 - `GO`: all four signals pass in the generated report.

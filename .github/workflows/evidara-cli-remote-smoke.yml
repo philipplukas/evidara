@@ -1,39 +1,91 @@
 # Manual smoke: platform-control + legal-search via evidara-cli against chosen base URLs.
 #
-# Optional repository secrets (Settings → Secrets and variables → Actions). Omit or leave
-# empty when the target environment does not require auth:
-#   EVIDARA_PLATFORM_CONTROL_API_KEY  — sent as X-API-Key
-#   EVIDARA_LEGAL_SEARCH_TOKEN       — sent as Authorization: Bearer …
-#   EVIDARA_LEGAL_SEARCH_API_KEY     — sent as X-API-Key
+# Auth model (private Cloud Run):
+#   - Job uses GitHub Environment (dev | staging) for WIF + invoker SA (same secrets as e2e smoke).
+#   - OIDC to GCP, then gcloud mints audience-scoped ID tokens for the two URL inputs.
 #
-# Run: Actions → "Evidara CLI remote smoke" → Run workflow → enter both base URLs.
+# Optional repository secrets (app-layer only):
+#   EVIDARA_PLATFORM_CONTROL_API_KEY — X-API-Key
+#   EVIDARA_LEGAL_SEARCH_API_KEY     — X-API-Key
+#
+# Run: Actions → "Evidara CLI remote smoke" → pick environment + both base URLs.
 name: Evidara CLI remote smoke
 
 on:
   workflow_dispatch:
     inputs:
+      github_environment:
+        description: GitHub Actions environment (must match WIF + GCP_SERVICE_ACCOUNT_* secrets)
+        type: choice
+        options:
+          - dev
+          - staging
+        default: dev
       platform_control_url:
-        description: Platform-control base URL (no trailing path, e.g. https://api.example.com)
+        description: Platform-control base URL (HTTPS origin, e.g. https://platform-control-api-dev-….run.app)
         required: true
         type: string
       legal_search_url:
-        description: Legal-search BFF base URL (e.g. https://bff.example.com)
+        description: Legal-search BFF base URL (HTTPS origin)
         required: true
         type: string
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   remote-smoke:
     runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    environment: ${{ github.event.inputs.github_environment }}
     env:
-      EVIDARA_PLATFORM_CONTROL_URL: ${{ inputs.platform_control_url }}
-      EVIDARA_LEGAL_SEARCH_URL: ${{ inputs.legal_search_url }}
+      EVIDARA_PLATFORM_CONTROL_URL: ${{ github.event.inputs.platform_control_url }}
+      EVIDARA_LEGAL_SEARCH_URL: ${{ github.event.inputs.legal_search_url }}
       EVIDARA_PLATFORM_CONTROL_API_KEY: ${{ secrets.EVIDARA_PLATFORM_CONTROL_API_KEY }}
-      EVIDARA_LEGAL_SEARCH_TOKEN: ${{ secrets.EVIDARA_LEGAL_SEARCH_TOKEN }}
       EVIDARA_LEGAL_SEARCH_API_KEY: ${{ secrets.EVIDARA_LEGAL_SEARCH_API_KEY }}
+      GCP_SERVICE_ACCOUNT_EMAIL: ${{ github.event.inputs.github_environment == 'dev' && secrets.GCP_SERVICE_ACCOUNT_DEV || secrets.GCP_SERVICE_ACCOUNT_STAGING }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ github.event.inputs.github_environment == 'dev' && secrets.GCP_SERVICE_ACCOUNT_DEV || secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Mint audience-scoped Cloud Run ID tokens
+        env:
+          PC_INPUT: ${{ github.event.inputs.platform_control_url }}
+          LS_INPUT: ${{ github.event.inputs.legal_search_url }}
+        run: |
+          set -euo pipefail
+          audience_for() {
+            python3 -c 'import sys,urllib.parse; u=sys.argv[1].strip().rstrip("/"); p=urllib.parse.urlsplit(u); assert p.scheme and p.netloc, u; print("%s://%s" % (p.scheme, p.netloc))' "$1"
+          }
+          PC_AUDIENCE="$(audience_for "${PC_INPUT}")"
+          LS_AUDIENCE="$(audience_for "${LS_INPUT}")"
+
+          PC_TOKEN="$(gcloud auth print-identity-token \
+            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
+            --audiences="${PC_AUDIENCE}")"
+          LS_TOKEN="$(gcloud auth print-identity-token \
+            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
+            --audiences="${LS_AUDIENCE}")"
+
+          if [[ -z "${PC_TOKEN}" || -z "${LS_TOKEN}" ]]; then
+            echo "::error::Failed to mint ID tokens (check invoker IAM and URL origins)."
+            exit 1
+          fi
+
+          echo "::add-mask::${PC_TOKEN}"
+          echo "::add-mask::${LS_TOKEN}"
+          echo "EVIDARA_PLATFORM_CONTROL_TOKEN=${PC_TOKEN}" >> "${GITHUB_ENV}"
+          echo "EVIDARA_LEGAL_SEARCH_TOKEN=${LS_TOKEN}" >> "${GITHUB_ENV}"
 
       - name: Setup Python
         uses: actions/setup-python@v5

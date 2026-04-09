@@ -3,6 +3,9 @@ environment = "prod"
 project_id = "evidara-prod"
 region     = "europe-west6"
 
+# Runtime Pub/Sub defaults (runtime_stack `variables.tf`) push `document-processing-status-updated`
+# and `document-processed` to platform-control-api unless you override `event_subscriptions`.
+
 raw_artifact_bucket_name = "evidara-raw-artifacts-prod"
 manifest_bucket_name     = "evidara-manifests-prod"
 
@@ -59,7 +62,8 @@ cloud_run_services = {
     service_account_key   = "legal_search_frontend"
     allow_unauthenticated = false
     env_vars = {
-      NEXT_PUBLIC_API_URL = "https://legal-search-api-prod.example.run.app"
+      NEXT_PUBLIC_API_URL           = "https://legal-search-api-prod.example.run.app"
+      NEXT_PUBLIC_CONTROL_PANEL_URL = "https://platform-control-admin-prod.example.run.app"
     }
     vpc_connector = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
     vpc_egress    = "PRIVATE_RANGES_ONLY"

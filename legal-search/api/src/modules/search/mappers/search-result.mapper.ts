@@ -188,6 +188,10 @@ export function composeMetadata(
     rows.push({ label, value: hit.effective_date });
   }
 
+  if (hit.language) {
+    rows.push({ label: t('metadata.language', locale), value: hit.language });
+  }
+
   return rows;
 }
 
