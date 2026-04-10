@@ -77,7 +77,7 @@ event_subscriptions = {
 
 cloud_run_services = {
   "platform-control-api" = {
-    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/platform-control-api-dev:latest"
+    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/runtime/platform-control:latest"
     service_account_key = "platform_control_api"
     allow_unauthenticated = false
     vpc_connector = "projects/project-dacd6b7b-dc96-4534-b82/locations/europe-west6/connectors/evidara-connector"
@@ -106,7 +106,7 @@ cloud_run_services = {
   }
 
   "legal-search-api" = {
-    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/legal-search-api-dev:latest"
+    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/runtime/legal-search-api:latest"
     service_account_key = "legal_search_api"
     allow_unauthenticated = false
     env_vars = {
@@ -149,7 +149,7 @@ cloud_run_services = {
   }
 
   "platform-control-worker" = {
-    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/platform-control-worker-dev:latest"
+    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/runtime/platform-control-worker:latest"
     service_account_key = "platform_control_worker"
     allow_unauthenticated = false
     startup_probe_path  = "/health"
@@ -192,7 +192,7 @@ cloud_run_services = {
 
 cloud_run_jobs = {
   "platform-control-db-migrate" = {
-    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/platform-control-api-dev:latest"
+    image               = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/runtime/platform-control:latest"
     service_account_key = "platform_control_api"
     command             = ["sh"]
     args = [
