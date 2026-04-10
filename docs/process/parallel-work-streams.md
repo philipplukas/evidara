@@ -28,5 +28,6 @@ Use this when several people or initiatives move at once. The goal is **parallel
 
 ## Related
 
+- Max concurrency, stale-branch refresh policy, and serialization gates: [Max parallel execution](max-parallel-execution.md)
 - Change classification and required sync checks: [AGENTS.md](../../AGENTS.md)
 - Contract location (monorepo root only): [ADR-0004: Contract strategy](../adr/0004-contract-strategy.md)
