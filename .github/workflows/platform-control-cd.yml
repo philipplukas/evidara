@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Image tag = short SHA for traceability across environments
+  # Image tag = full SHA for traceability (must match Runtime Images tags on Artifact Registry).
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -49,6 +49,27 @@ jobs:
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: Wait for runtime images (Artifact Registry)
+        run: |
+          set -euo pipefail
+          REPO_PATH="${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}"
+          for image in platform-control platform-control-worker legal-search-api di-consumer; do
+            echo "Waiting for ${REPO_PATH}/${image}:${IMAGE_TAG} ..."
+            found=""
+            for i in $(seq 1 90); do
+              if gcloud artifacts docker images describe "${REPO_PATH}/${image}:${IMAGE_TAG}" >/dev/null 2>&1; then
+                echo "Found ${image}:${IMAGE_TAG}"
+                found=1
+                break
+              fi
+              sleep 10
+            done
+            if [ -z "${found}" ]; then
+              echo "::error::Timeout waiting for ${REPO_PATH}/${image}:${IMAGE_TAG}"
+              exit 1
+            fi
+          done
 
       - name: Deploy platform-control API (dev)
         run: |

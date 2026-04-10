@@ -245,7 +245,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-legal-search-frontend
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID_DEV }}/cloud-run-source-deploy/legal-search-frontend-dev
+            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/legal-search-frontend
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
@@ -308,7 +308,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-platform-control-admin
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID_DEV }}/cloud-run-source-deploy/platform-control-admin-dev
+            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/platform-control-admin
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
