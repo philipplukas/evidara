@@ -26,8 +26,57 @@ permissions:
   id-token: write   # for Workload Identity Federation to Artifact Registry
 
 jobs:
+  # Cheap job on GitHub-hosted runners; drives which image builds run (cuts self-hosted load and wall time).
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      platform_control: ${{ steps.filter.outputs.platform_control }}
+      platform_control_worker: ${{ steps.filter.outputs.platform_control_worker }}
+      platform_control_admin: ${{ steps.filter.outputs.platform_control_admin }}
+      legal_search_api: ${{ steps.filter.outputs.legal_search_api }}
+      legal_search_frontend: ${{ steps.filter.outputs.legal_search_frontend }}
+      document_intelligence_consumer: ${{ steps.filter.outputs.document_intelligence_consumer }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paths filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            platform_control:
+              - 'platform-control/**'
+              - '.github/workflows/runtime-images.yml'
+            platform_control_worker:
+              - 'platform-control/pyproject.toml'
+              - 'platform-control/README.md'
+              - 'platform-control/src/**'
+              - 'platform-control/Dockerfile.worker'
+              - '.github/workflows/runtime-images.yml'
+            platform_control_admin:
+              - 'platform-control/admin/**'
+              - '.github/workflows/runtime-images.yml'
+            legal_search_api:
+              - 'legal-search/api/**'
+              - 'contracts/**'
+              - '.github/workflows/runtime-images.yml'
+            legal_search_frontend:
+              - 'legal-search/frontend/**'
+              - 'contracts/**'
+              - '.github/workflows/runtime-images.yml'
+            document_intelligence_consumer:
+              - 'document-intelligence/**'
+              - '.github/workflows/runtime-images.yml'
+
   platform-control:
     name: Build platform-control image
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.platform_control == 'true'
     runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
     environment: dev
 
@@ -89,6 +138,8 @@ jobs:
 
   legal-search-api:
     name: Build legal-search API image
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.legal_search_api == 'true'
     runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
     environment: dev
 
@@ -150,6 +201,8 @@ jobs:
 
   legal-search-frontend:
     name: Build legal-search frontend image
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.legal_search_frontend == 'true'
     runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
     environment: dev
 
@@ -211,6 +264,8 @@ jobs:
 
   platform-control-admin:
     name: Build platform-control admin image
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.platform_control_admin == 'true'
     runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
     environment: dev
 
@@ -272,6 +327,8 @@ jobs:
 
   platform-control-worker:
     name: Build platform-control worker image
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.platform_control_worker == 'true'
     runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
     environment: dev
 
@@ -333,6 +390,8 @@ jobs:
 
   document-intelligence-consumer:
     name: Build document-intelligence consumer image
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.document_intelligence_consumer == 'true'
     runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
     environment: dev
 

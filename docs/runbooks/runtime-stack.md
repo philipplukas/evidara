@@ -143,12 +143,15 @@ terraform apply -var-file="../../../env/github.repo_settings.tfvars.example"
 
 ### Image Build (runtime-images.yml)
 
-**Trigger**: Push to `main` affecting service source code.
+**Trigger**: Push to `main` or PR affecting paths under `.github/workflows/runtime-images.yml`, `platform-control/**`, `legal-search/**`, `document-intelligence/**`, or `contracts/**`.
 
-1. Builds Docker image per service (parallel jobs)
-2. Pushes to **GHCR** (ghcr.io) and **Artifact Registry** (europe-west6-docker.pkg.dev)
-3. Tags: `sha-<short>`, `<full-sha>`, `<branch>`, `latest` (main only)
-4. PR builds are build-only (no push)
+1. A lightweight **`changes`** job (`dorny/paths-filter`) decides which image jobs run.
+2. **Pull requests**: only jobs whose paths changed run (faster CI, fewer self-hosted minutes). Builds do not push (`push: false` on PR).
+3. **Push to `main`**: every image job still runs so **all** runtime images exist at the same **`github.sha`** — required because **Runtime Cloud Run CD** deploys every service with that single tag.
+4. **`workflow_dispatch`**: all image jobs run (full matrix); use for manual rebuilds.
+5. Tags on push / dispatch: `sha-<short>`, `<full-sha>`, `<branch>`, `latest` (main only).
+
+To optimize **main** pushes further (build only what changed), CD would need to deploy **per-service** only when an image tag exists, which breaks the “one SHA for every runtime service” invariant unless you introduce a separate promotion model.
 
 ### Service Deploy (platform-control-cd.yml)
 
