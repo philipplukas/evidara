@@ -130,7 +130,7 @@ cloud_run_services = {
   }
 
   "platform-control-admin" = {
-    image                 = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/platform-control-admin-dev:latest"
+    image                 = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/runtime/platform-control-admin:latest"
     service_account_key   = "platform_control_admin"
     allow_unauthenticated = true
     env_vars = {
@@ -139,7 +139,7 @@ cloud_run_services = {
   }
 
   "legal-search-frontend" = {
-    image                 = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/cloud-run-source-deploy/legal-search-frontend-dev:latest"
+    image                 = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/runtime/legal-search-frontend:latest"
     service_account_key   = "legal_search_frontend"
     allow_unauthenticated = true
     env_vars = {
