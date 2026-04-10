@@ -9,6 +9,6 @@ WORKDIR /app
 COPY document-intelligence/ /app/
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+    && pip install --no-cache-dir ".[service]"
 
-CMD ["sh", "-c", "document_intelligence_runtime_consumer --project-id \"$DI_GCP_PROJECT_ID\" --subscription-name \"${DI_SUBSCRIPTION_NAME:-document-intelligence-artifact-bundle-available}\" --status-topic-name \"${DI_STATUS_TOPIC_NAME:-document-processing-status-updated}\" --processed-topic-name \"${DI_PROCESSED_TOPIC_NAME:-document-processed}\""]
+CMD ["document_intelligence_runtime_ingress"]
