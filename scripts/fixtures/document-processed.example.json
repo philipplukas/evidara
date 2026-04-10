@@ -1,0 +1,25 @@
+{
+  "event_id": "replace-me-on-each-replay",
+  "event_type": "document.processed",
+  "event_version": 1,
+  "occurred_at": "2026-04-09T12:00:00Z",
+  "producer": "document-intelligence",
+  "payload": {
+    "document_id": "doc_01jq7bhgy7g0pkj4f1d03f8f8c",
+    "document_revision": 2,
+    "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+    "processing_version": "v1.0.0",
+    "authority_id": "auth_fedlex",
+    "authority_name": "Fedlex",
+    "is_official": true,
+    "lifecycle_status": "active",
+    "provenance": {
+      "tenant_id": "tenant_evidara",
+      "corpus_id": "ch_de",
+      "scope_type": "source-version",
+      "source_id": "src_01jq7bhgy7g0pkj4f1d03f8f8c",
+      "source_version_id": "sv_01jq7bhgy7g0pkj4f1d03f8f8c",
+      "run_id": "run_01jq7bhgy7g0pkj4f1d03f8f8c"
+    }
+  }
+}

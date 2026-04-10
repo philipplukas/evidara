@@ -1,0 +1,44 @@
+{
+  "ok": true,
+  "workflow": "mvp-acceptance",
+  "captured_at": "2026-04-09T17:15:00Z",
+  "surfaces": {
+    "platform_control_api": "https://platform-control-api-staging-kxc5agexna-oa.a.run.app",
+    "legal_search_api": "https://legal-search-api-staging-kxc5agexna-oa.a.run.app",
+    "legal_search_frontend": "https://legal-search-frontend-staging-kxc5agexna-oa.a.run.app",
+    "platform_control_admin": "https://platform-control-admin-staging-kxc5agexna-oa.a.run.app"
+  },
+  "scenario_1": {
+    "platform_control_health_http_code": 200,
+    "platform_control_sources_http_code": 200
+  },
+  "scenario_2": {
+    "queries": [
+      { "query": "art 754", "http_code": 200, "total_results": 7 },
+      { "query": "haftung", "http_code": 200, "total_results": 7 },
+      { "query": "obligationenrecht", "http_code": 200, "total_results": 7 },
+      { "query": "switzerland", "http_code": 200, "total_results": 7 }
+    ]
+  },
+  "scenario_3": {
+    "document_id": "doc_49n3ksesast1e2gbw1b7zev9q7",
+    "document_http_code": 200,
+    "checks": {
+      "id_matches_request": true,
+      "title_present": true,
+      "subtitle_present": true,
+      "metadata_is_array": true,
+      "tabs_is_array": true
+    }
+  },
+  "scenario_4": {
+    "legal_search_ui_root_http_code": 200,
+    "legal_search_ui_search_http_code": 200,
+    "admin_ui_root_http_code": 200,
+    "admin_ui_sources_http_code": 200
+  },
+  "notes": {
+    "scenario_5_browser_evidence_runbook": "docs/runbooks/interaction-flow-validation.md",
+    "scenario_5_browser_smoke_test": "legal-search/frontend/e2e/smoke.spec.ts"
+  }
+}
