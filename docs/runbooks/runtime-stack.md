@@ -176,7 +176,7 @@ To optimize **main** pushes further (build only what changed), CD would need to 
 1. For the same commit on `main`, confirm **`Runtime Images`** finished successfully before or in parallel with **`Runtime Cloud Run CD`** (CD polls Artifact Registry for the four deployed images: `platform-control`, `platform-control-worker`, `legal-search-api`, `di-consumer` at tag `${github.sha}`).
 2. Example checks: `gh run list --workflow=runtime-images.yml --branch main --limit 3` and `gh run list --workflow=platform-control-cd.yml --branch main --limit 3`; open the paired runs for the merge commit.
 3. **Tfvars / examples:** runtime service images belong under the **`runtime/`** repository in Artifact Registry (see [`infra/env/dev/runtime.gcp.tfvars.example`](../../infra/env/dev/runtime.gcp.tfvars.example) and [`infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example)). Replace any legacy `cloud-run-source-deploy/…` image URLs when updating real tfvars.
-4. If CD fails **after** the wait step with **startup probe** errors on `document-intelligence-consumer-*`, the container is exiting or not passing `/health` on `PORT` — this is **not** fixed by retagging alone. Inspect the failing revision logs in Cloud Logging; common causes include invalid `DI_*` env (see `RuntimeSettings` in `document-intelligence`), wrong Pub/Sub **subscription** name for the environment, or IAM for Pub/Sub / GCS. The image built by `runtime-images.yml` uses [`document-intelligence/Dockerfile`](../../document-intelligence/Dockerfile) (`document_intelligence_runtime_consumer`).
+4. If CD fails **after** the wait step with **startup probe** errors on `document-intelligence-consumer-*`, the container is exiting or not passing `/health` on `PORT` — this is **not** fixed by retagging alone. Inspect the failing revision logs in Cloud Logging; common causes include invalid `DI_*` env (see `RuntimeSettings` in `document-intelligence`) or IAM for Pub/Sub / GCS. The image built by `runtime-images.yml` uses [`document-intelligence/Dockerfile`](../../document-intelligence/Dockerfile) (`document_intelligence_runtime_ingress` — the push-based FastAPI consumer).
 
 ### Manual image build (Cloud Build)
 
@@ -213,7 +213,7 @@ gcloud builds submit . \
 
 **Batch helper:** `scripts/build-runtime-images.sh` runs parallel Cloud Build jobs (see `scripts/cloudbuild.runtime-image.yaml`) for `platform-control`, `platform-control-worker`, `legal-search-api`, and `di-consumer` with the same tagging defaults.
 
-**DI HTTP ingress only:** the image wired for Pub/Sub push to the ingress service is built from `document-intelligence/Dockerfile.runtime-ingress` — use `document-intelligence/cloudbuild.runtime-ingress.yaml` for that variant (not the default `document-intelligence/Dockerfile` used by `runtime-images.yml` for `di-consumer`).
+**DI HTTP ingress only:** the main `document-intelligence/Dockerfile` (used by `runtime-images.yml` for `di-consumer`) now runs the push-based `document_intelligence_runtime_ingress`. `document-intelligence/Dockerfile.runtime-ingress` is equivalent but uses a different build context (for standalone `gcloud builds submit` from the `document-intelligence/` directory; see `cloudbuild.runtime-ingress.yaml`).
 
 ### Infrastructure (terraform.yml)
 
