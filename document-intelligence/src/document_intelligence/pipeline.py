@@ -310,19 +310,35 @@ class ProcessingPipeline:
 
 
 _NORMALIZED_DOCUMENT_TYPES = frozenset({"law", "decision", "commentary", "rechtssatz"})
-_DOCUMENT_TYPE_HINT_MAP = {"statute": "law"}
+_DOCUMENT_TYPE_HINT_MAP = {"statute": "law", "judgment": "decision"}
+# Labels sometimes present in extracted metadata (normalized by lowercasing for lookup).
+_EXTRACTED_DOCUMENT_TYPE_LABELS = {"urteil": "decision"}
+
+
+def _normalize_document_type_token(raw: str) -> str | None:
+    s = raw.strip()
+    if not s:
+        return None
+    if s in _DOCUMENT_TYPE_HINT_MAP:
+        return _DOCUMENT_TYPE_HINT_MAP[s]
+    lowered = s.lower()
+    if lowered in _EXTRACTED_DOCUMENT_TYPE_LABELS:
+        return _EXTRACTED_DOCUMENT_TYPE_LABELS[lowered]
+    if s in _NORMALIZED_DOCUMENT_TYPES:
+        return s
+    return None
 
 
 def _resolve_document_type(
     extracted: str | None,
     hint: str | None,
 ) -> str | None:
-    candidate = extracted or hint
-    if candidate is None:
-        return None
-    mapped = _DOCUMENT_TYPE_HINT_MAP.get(candidate, candidate)
-    if mapped in _NORMALIZED_DOCUMENT_TYPES:
-        return mapped
+    if extracted is not None:
+        resolved = _normalize_document_type_token(extracted)
+        if resolved is not None:
+            return resolved
+    if hint is not None:
+        return _normalize_document_type_token(hint)
     return None
 
 
