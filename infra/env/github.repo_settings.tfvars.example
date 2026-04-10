@@ -13,7 +13,8 @@ repository_variables = {
   GCP_PROJECT_ID_PROD                  = "data-platform-prod-492214"
   GCP_ARTIFACT_PROJECT_ID              = "data-platform-dev-492214"
   ARTIFACT_REGISTRY_REPOSITORY         = "runtime"
-  PLATFORM_CONTROL_SERVICE_NAME        = "platform-control"
+  # Cloud Run resource name prefix before -dev / -prod (see runtime.gcp.tfvars keys, e.g. platform-control-api).
+  PLATFORM_CONTROL_SERVICE_NAME        = "platform-control-api"
   PLATFORM_CONTROL_WORKER_SERVICE_NAME = "platform-control-worker"
   LEGAL_SEARCH_API_SERVICE_NAME        = "legal-search-api"
   DI_CONSUMER_SERVICE_NAME             = "document-intelligence-consumer"

@@ -1,6 +1,7 @@
 name: Runtime Images
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/workflows/runtime-images.yml"
