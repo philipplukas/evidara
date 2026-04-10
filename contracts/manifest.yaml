@@ -1,4 +1,4 @@
-version: "1.4.0"
+version: "1.4.1"
 last_reviewed: "2026-04-09"
 owner: "Platform Team"
 
@@ -53,7 +53,7 @@ events:
       - "platform-control"
   - name: "document.processed"
     schema: "contracts/events/document-processed.schema.json"
-    event_version: "1.1.0"
+    event_version: "1.0.0"
     producer: "document-intelligence"
     consumers:
       - "platform-control"

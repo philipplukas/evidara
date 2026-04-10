@@ -128,4 +128,4 @@ jobs:
 
       - name: Build docs site (strict)
         run: |
-          mkdocs build --strict --quiet
+          python -m mkdocs build --strict --quiet
