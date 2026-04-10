@@ -2,6 +2,7 @@
 
 Owner: Platform / release  
 Last reviewed: 2026-04-09  
+Last verified: 2026-04-09  
 Applies to: Phase-5 memos, walkthroughs, Linear gate issues
 
 ## When to attach screenshots

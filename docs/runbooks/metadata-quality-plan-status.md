@@ -2,6 +2,7 @@
 
 Owner: Platform / legal-search  
 Last reviewed: 2026-04-09 (staging evidence snapshots, 3.5.2 corpus inventory, TAR-89 staging honesty note)  
+Last verified: 2026-04-09  
 Applies to: MVP demo path, **Linear TAR-89** (search/detail metadata quality), related release gates
 
 This report ties together the **stated plan** (runbooks + Linear) and **repo reality** (what ships in code today). Update it when TAR-89 scope closes or gates move.
@@ -10,7 +11,6 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 ## 1. What “the plan” refers to
 
-
 | Source                                                                  | Role                                                                                                          |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | [MVP demo & release recommendation](mvp-demo-release-recommendation.md) | **Conditional GO**; remaining product risk called out as **TAR-89** (metadata credibility on search/detail)   |
@@ -18,7 +18,6 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 | [MVP website walkthrough](mvp-website-walkthrough.md)                   | Observed **high** severity: generic titles / `type: "unknown"` on result/detail                               |
 | [Search relevance baseline](search-relevance-baseline.md)               | Staging eval pack for **TAR-82** / **TAR-68** (ranking baselines, separate but adjacent to metadata richness) |
 | [First vertical slice exit gates](first-vertical-slice-exit-gates.md)   | End-to-end evidence expectations (includes search surface)                                                    |
-
 
 **TAR-89** (Linear) is the umbrella issue for **improving search/detail metadata quality for user trust** per MVP recommendation.
 
@@ -49,28 +48,23 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 **Projection layer (legal-search):** inferring type from bundle hints and richer title fallbacks is implemented in `ProjectionsService` (2026-04-09). **Existing OpenSearch rows** still show old titles/types until projections are replayed or documents are re-processed and re-indexed.
 
-
 | Gap                                             | Evidence / notes                                                                                                                                                                               |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Generic titles / weak document typing in UI** | [mvp-website-walkthrough.md](mvp-website-walkthrough.md) — mitigated for **new** projections when lean payloads carry hints/citations/body; verify on seeded corpus after re-projection        |
 | **Trust/explainability**                        | [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) — “demo-quality polish (metadata credibility)”; **BFF** `MetadataRow` labels/icons still thin where facets are sparse |
 | **LLM enrichment not a default path**           | Policy recorded in [document-intelligence README](../../document-intelligence/README.md) (“LLM extraction policy”): **default off**; pilot requires observability + cost bounds; BFF consumes `metadata.llm_extraction` when present |
 
-
 **Likely workstreams** (not all tracked as separate issues in this file): richer **source-acquisition** metadata into bundles; **DI** normalization improvements per corpus; **re-projection / re-index** for demo envs; **BFF mapper** labels/icons for `MetadataRow`; optional **LLM** rollout with guardrails and cost/quality metrics.
 
 ### 3.2 Relevance baselines (TAR-82 / TAR-68) — adjacent
-
 
 | Gap                                                     | Evidence                                                                                                              |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | **Staging query pack not attached as routine evidence** | [search-relevance-baseline.md](search-relevance-baseline.md), [phase-5-go-no-go-memo.md](phase-5-go-no-go-memo.md) §3 |
 
-
 ### 3.3 Release / evidence gates (block full product GO, not only TAR-89)
 
 From [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) and [phase-5-go-no-go-memo.md](phase-5-go-no-go-memo.md):
-
 
 | Item                            | Status in memo                                          |
 | ------------------------------- | ------------------------------------------------------- |
@@ -80,15 +74,12 @@ From [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) an
 | TAR-85                          | Fresh staging MVP acceptance                            |
 | M5 checklist / interaction-flow | Operator evidence for Pub/Sub + DI path                 |
 
-
 ### 3.4 Secondary UX / ops (walkthrough)
-
 
 | Gap                                                        | Severity (walkthrough) |
 | ---------------------------------------------------------- | ---------------------- |
 | Legal-search `/docs` not exposed (404) vs platform-control | mitigated: `/docs` route on legal-search frontend (see `legal-search/frontend/src/app/docs/`); optional `NEXT_PUBLIC_EVIDARA_DOCS_BASE_URL` for hosted MkDocs                 |
 | Screenshot pack attachment discipline                      | medium — see [screenshot evidence discipline](screenshot-evidence-discipline.md)                 |
-
 
 ---
 
@@ -96,17 +87,17 @@ From [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) an
 
 **Linear:** criteria are in the **[TAR-89](https://linear.app/tart-baozi/issue/TAR-89/p7-7-improve-searchdetail-metadata-quality-for-user-trust)** issue description (includes pointers to **3.5.1** / **3.5.2**). **Editing procedure:** [section 5 — Keeping TAR-89 acceptance in sync](#5-how-to-refresh-this-report). Adjust corpus IDs / environments as needed. Criteria are **met** when all bullets hold for the agreed demo corpus after **re-projection** or re-index (stale OpenSearch rows do not count against the code path).
 
-**Search / list**
+### Search / list
 
 - For each fixture in the agreed corpus, the search hit (or list card) shows a **non-placeholder title**: not `Untitled document`, not `Document <id>` unless no citation, body, or structural hint exists.
 - For each fixture, `type` (document type) is a **controlled vocabulary code** (`law`, `decision`, …) or an explicitly documented exception — not `unknown` when `document_type`, `metadata.source_defaults.document_type_hint`, or `metadata.extracted_metadata.document_type` supplies a mappable hint on the lean row.
 
-**Detail**
+### Detail
 
 - **Dokumenttyp** appears when the projected type is controlled (existing UI rule).
 - At least one of: **citation** (`official_citation` / structural path), **language**, **authority** (`source_defaults.authority_name` or equivalent), or **status** — when present on lean — surfaces as a `MetadataRow` with a stable presentation key (icon / label), not silently dropped.
 
-**Process**
+### Process
 
 - One **document ID** is traced end-to-end with written hops (**section 6.8** for local lean fixture; **section 6.9** when the full bundle → DI path must be validated); first broken hop is fixed or tracked as a dependency with issue ID.
 - Staging/demo envs: after code changes to projections or lean shape, operators run **replay** or full re-ingest so acceptance is evaluated on **fresh** index rows.
@@ -165,14 +156,14 @@ Post a short comment on **TAR-89** when staging rows in **3.5.2** are verified, 
 ## 4. Suggested next actions (ordered)
 
 1. **TAR-89 acceptance** — Use **section 3.5.1** (local) and **3.5.2** (staging list) as the agreed corpus; sign off in Linear **TAR-89** after checks pass.
-2. **Trace one demo document** — Use §6.8 as the reference trace; extend to full bundle → DI processing when validating pipeline changes (not only file-backed lean).
-3. **LLM extractor** — **Default remains off** for staging/prod until explicitly enabled; policy and toggles are documented in [document-intelligence README](../../document-intelligence/README.md) (“LLM extraction policy”). Turning **on** requires observability (confidence, failure rate) and cost bounds — track as follow-up issues when product approves a pilot.
-4. **Run staging relevance pack** per [search-relevance-baseline.md](search-relevance-baseline.md); record results with [relevance-eval-result-template.md](relevance-eval-result-template.md) and attach to **TAR-82** / **TAR-68** (comments on those issues point to these runbooks).
-5. **Close gate issues** (TAR-64, TAR-77, TAR-85; TAR-87 / TAR-88 for full GO) — evidence steps in [m5-evidence-checklist.md](m5-evidence-checklist.md) and [tar64-tar85-evidence-capture.md](tar64-tar85-evidence-capture.md); Linear comments on each issue link to the matching section.
+1. **Trace one demo document** — Use §6.8 as the reference trace; extend to full bundle → DI processing when validating pipeline changes (not only file-backed lean).
+1. **LLM extractor** — **Default remains off** for staging/prod until explicitly enabled; policy and toggles are documented in [document-intelligence README](../../document-intelligence/README.md) (“LLM extraction policy”). Turning **on** requires observability (confidence, failure rate) and cost bounds — track as follow-up issues when product approves a pilot.
+1. **Run staging relevance pack** per [search-relevance-baseline.md](search-relevance-baseline.md); record results with [relevance-eval-result-template.md](relevance-eval-result-template.md) and attach to **TAR-82** / **TAR-68** (comments on those issues point to these runbooks).
+1. **Close gate issues** (TAR-64, TAR-77, TAR-85; TAR-87 / TAR-88 for full GO) — evidence steps in [m5-evidence-checklist.md](m5-evidence-checklist.md) and [tar64-tar85-evidence-capture.md](tar64-tar85-evidence-capture.md); Linear comments on each issue link to the matching section.
 
 **Week-shaped cut (2026-04-09):** acceptance criteria in Linear **TAR-89** + section 3.5 here, section 6.8 (reference trace), LLM policy in DI README, and [document-intelligence implementation plan](../components/document-intelligence-implementation-plan.md) reconciled with repo reality.
 
-6. **Parallel engineering (DI)** — Terraform + Databricks bundle CI/CD, golden/XML quality, citations, jurisdiction: see [document-intelligence implementation plan](../components/document-intelligence-implementation-plan.md) **Immediate next steps**; track against platform milestones separately from metadata acceptance above.
+1. **Parallel engineering (DI)** — Terraform + Databricks bundle CI/CD, golden/XML quality, citations, jurisdiction: see [document-intelligence implementation plan](../components/document-intelligence-implementation-plan.md) **Immediate next steps**; track against platform milestones separately from metadata acceptance above.
 
 ---
 
@@ -200,7 +191,6 @@ Use this when validating **§3.1** fixes: you need to know which process talks t
 
 ### 6.1 Components
 
-
 | Piece                      | Role                                                                                            | Typical local                                                                                                                             | Staging / prod                |
 | -------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
 | **legal-search frontend**  | Next.js UI                                                                                      | `localhost` (dev server)                                                                                                                  | Hosted URL                    |
@@ -208,7 +198,6 @@ Use this when validating **§3.1** fixes: you need to know which process talks t
 | **OpenSearch**             | Search index + **projection document** store (via adapter)                                      | `OPENSEARCH_NODE` e.g. `http://localhost:9200`                                                                                            | Managed cluster               |
 | **Document Service**       | document-intelligence **read** API: `GET /v1/documents/{id}/lean`                               | Python service; default listen port from `PORT` or `DOCUMENT_SERVICE_PORT` (**8090** in `document_intelligence/service/main.py` if unset) | Same contract, cloud URL      |
 | **DI processing**          | Pipeline / Databricks / consumer — **writes** published surfaces and emits `document.processed` | CLI, local consumer, or remote job                                                                                                        | Databricks / runtime consumer |
-
 
 **Upstream** for the BFF means: **OpenSearch** (always for search + stored projections) and **Document Service** (when `DOCUMENT_INTELLIGENCE_BASE_URL` is set — projections and detail body both lean on this; if unset, lean fetch returns null and projections use event-only fallbacks).
 

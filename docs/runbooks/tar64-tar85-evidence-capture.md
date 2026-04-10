@@ -2,6 +2,7 @@
 
 Owner: Platform  
 Last reviewed: 2026-04-09  
+Last verified: 2026-04-09  
 Applies to: Linear **TAR-64** (dev e2e smoke ×2), **TAR-85** (staging MVP acceptance)
 
 Use this when attaching **run output** to Linear so reviewers can find commands and expected artifacts without rereading the full M5 memo.

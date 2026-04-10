@@ -2,6 +2,7 @@
 
 Owner: Legal-search / platform  
 Last reviewed: 2026-04-09  
+Last verified: 2026-04-09  
 Applies to: [search relevance baseline](search-relevance-baseline.md), [relevance eval result template](relevance-eval-result-template.md), Linear **TAR-82** / **TAR-68**
 
 Pick **5–10** queries for your **staging** corpus; replace or extend this list per locale and seeded content. For each query, record top-3 hits using the **template** and attach to TAR-82 (tuning) and/or TAR-68 (baseline lock).

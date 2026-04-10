@@ -5,7 +5,7 @@ Use this when you need **search + projections + `GET …/lean`** without staging
 ## Prerequisites
 
 - **Docker**
-- `**jq`** on the host only if you use `**up-split`** or run `validate-tar89-metadata-local.sh` locally. The `**lean-stack`** Compose path installs `jq` inside the bootstrap container — you do not need it on the host for `docker compose --profile lean-stack up`.
+- **jq** on the host only if you use **up-split** or run `validate-tar89-metadata-local.sh` locally. The **lean-stack** Compose path installs `jq` inside the bootstrap container — you do not need it on the host for `docker compose --profile lean-stack up`.
 - **curl** (for `replay` / `smoke` from the host)
 
 OpenSearch’s `/_cluster/health?wait_for_status=…` long-poll and **HEAD** on index names have proven flaky with some local setups; `validate-tar89-metadata-local.sh` uses short **GET** polls and **GET + HTTP status** for index existence instead.
@@ -64,4 +64,3 @@ cd legal-search/api && npm run dev
 
 - [Metadata quality plan status](../runbooks/metadata-quality-plan-status.md) (TAR-89 acceptance draft and reference trace in sections 3.5 and 6.8)  
 - [scripts/README.md](../../scripts/README.md)
-

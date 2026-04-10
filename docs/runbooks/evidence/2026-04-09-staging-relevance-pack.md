@@ -5,7 +5,7 @@
 
 **Note:** Staging index currently returns **7** documents; **lexical ranking does not change top-3 order** across these queries (same three IDs for every row). Treat this snapshot as **infrastructure proof** (search responds); **discrimination** must be re-evaluated after a larger corpus or ranking work (TAR-82).
 
-**Run metadata**
+## Run metadata
 
 - **Corpus size:** 7 `totalResults` for all queries below
 - **Ranking / API:** staging legal-search BFF as deployed 2026-04-09

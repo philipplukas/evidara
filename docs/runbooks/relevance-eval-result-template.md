@@ -2,6 +2,7 @@
 
 Owner: Legal-search / platform  
 Last reviewed: 2026-04-09  
+Last verified: 2026-04-09  
 Applies to: **TAR-82**, **TAR-68**, [search relevance baseline](search-relevance-baseline.md)
 
 Copy the table below into a **Linear comment** on TAR-82 and/or TAR-68 (or attach a spreadsheet). One row per query from the agreed **5–10 query** pack. For layout-only reference (synthetic data), see [relevance-eval-result-EXAMPLE.md](relevance-eval-result-EXAMPLE.md).
@@ -11,7 +12,7 @@ Copy the table below into a **Linear comment** on TAR-82 and/or TAR-68 (or attac
 | 1 |            |                     |             |                     |             |                     |             |                              |       |
 | 2 |            |                     |             |                     |             |                     |             |                              |       |
 
-**Run metadata**
+## Run metadata
 
 - **Environment:** staging legal-search API base URL: `________________`
 - **Corpus snapshot / date:** `________________`

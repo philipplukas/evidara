@@ -1,8 +1,13 @@
 # Example: relevance eval result (replace with real staging data)
 
+Owner: Legal-search / platform  
+Last reviewed: 2026-04-09  
+Last verified: 2026-04-09  
+Applies to: **TAR-82**, **TAR-68** (illustration only; not a locked baseline)
+
 **Do not treat this file as a locked baseline.** Copy the table into Linear **TAR-82** / **TAR-68** after running queries against **your** staging corpus. See [relevance-eval-result-template.md](relevance-eval-result-template.md).
 
-**Run metadata**
+## Run metadata
 
 - **Environment:** `https://legal-search.example.invalid` (replace)
 - **Corpus snapshot / date:** 2026-04-09
