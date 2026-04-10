@@ -1,3 +1,5 @@
+# Optional slim API-only image (context: platform-control/). CI and platform-control/cloudbuild.api.yaml
+# use the repo-root build in Dockerfile (monorepo copy) to match runtime-images.yml.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

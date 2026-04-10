@@ -1,16 +1,32 @@
-# Build platform-control API image (Dockerfile.api).
-# Repo root: gcloud builds submit . --config=platform-control/cloudbuild.api.yaml --substitutions=_TAG=manual-YYYYMMDD
+# Platform Control API image — mirrors .github/workflows/runtime-images.yml (platform-control job).
+#
+# Build context is the repo root; Dockerfile matches CI (not Dockerfile.api).
+#
+# From repo root, use the GCP project that hosts Artifact Registry (often the same as the runtime
+# project; see infra/env/*/runtime.gcp.tfvars). Tag with the full commit SHA so the image matches
+# platform-control-cd.yml (IMAGE_TAG: ${{ github.sha }}).
+#
+#   export CLOUDSDK_PYTHON=/usr/bin/python3   # if gcloud fails on a missing venv python
+#   TAG="$(git rev-parse HEAD)"
+#   gcloud builds submit . \
+#     --project=YOUR_ARTIFACT_PROJECT \
+#     --config=platform-control/cloudbuild.api.yaml \
+#     --substitutions=_TAG="${TAG}"
+#
 substitutions:
   _TAG: "manual-latest"
+  _REGION: "europe-west6"
+  _REPOSITORY: "runtime"
 steps:
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "build"
+      - "--platform"
+      - "linux/amd64"
       - "-f"
-      - "Dockerfile.api"
+      - "platform-control/Dockerfile"
       - "-t"
-      - "europe-west6-docker.pkg.dev/${PROJECT_ID}/runtime/platform-control:${_TAG}"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/platform-control:${_TAG}"
       - "."
-    dir: platform-control
 images:
-  - "europe-west6-docker.pkg.dev/${PROJECT_ID}/runtime/platform-control:${_TAG}"
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/platform-control:${_TAG}"
