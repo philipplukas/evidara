@@ -1,0 +1,13 @@
+{
+  "title": "Bundesgericht — TAR-89 lokale Verifikation",
+  "document_type": "decision",
+  "language": "de",
+  "body_text": "Dies ist eine ausreichend lange erste Zeile für den Metadaten-Fallback im Dokumentendienst.",
+  "metadata": {
+    "official_citation": "BGE 999 II 1",
+    "source_defaults": {
+      "document_type_hint": "urteil",
+      "authority_name": "Fedlex"
+    }
+  }
+}
