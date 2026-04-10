@@ -80,7 +80,7 @@ jobs:
         with:
           context: .
           file: ./platform-control/Dockerfile
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -140,7 +140,7 @@ jobs:
         with:
           context: .
           file: ./legal-search/api/Dockerfile
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -200,7 +200,7 @@ jobs:
         with:
           context: ./legal-search/frontend
           file: ./legal-search/frontend/Dockerfile
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -260,7 +260,7 @@ jobs:
         with:
           context: ./platform-control/admin
           file: ./platform-control/admin/Dockerfile
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -320,7 +320,7 @@ jobs:
         with:
           context: ./platform-control
           file: ./platform-control/Dockerfile.worker
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -380,7 +380,7 @@ jobs:
         with:
           context: .
           file: ./document-intelligence/Dockerfile
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
