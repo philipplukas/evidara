@@ -1,8 +1,8 @@
 # Runtime Stack — Architecture & Operations Runbook
 
 Owner: Platform Team
-Last reviewed: 2026-04-09
-Last verified: 2026-04-06
+Last reviewed: 2026-04-10
+Last verified: 2026-04-10
 Applies to: dev, staging, prod
 
 ## Purpose
@@ -170,6 +170,13 @@ To optimize **main** pushes further (build only what changed), CD would need to 
 **Prod gate:** `deploy-prod` has `needs: deploy-dev`. Add a **manual approval** rule on the GitHub `prod` environment if you want a human promotion step.
 
 **Manual image rebuild:** `runtime-images.yml` also supports `workflow_dispatch` on `main` when you need a full parallel build without a matching push.
+
+**Post-merge verification (Artifact Registry + CD):**
+
+1. For the same commit on `main`, confirm **`Runtime Images`** finished successfully before or in parallel with **`Runtime Cloud Run CD`** (CD polls Artifact Registry for the four deployed images: `platform-control`, `platform-control-worker`, `legal-search-api`, `di-consumer` at tag `${github.sha}`).
+2. Example checks: `gh run list --workflow=runtime-images.yml --branch main --limit 3` and `gh run list --workflow=platform-control-cd.yml --branch main --limit 3`; open the paired runs for the merge commit.
+3. **Tfvars / examples:** runtime service images belong under the **`runtime/`** repository in Artifact Registry (see [`infra/env/dev/runtime.gcp.tfvars.example`](../../infra/env/dev/runtime.gcp.tfvars.example) and [`infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example)). Replace any legacy `cloud-run-source-deploy/…` image URLs when updating real tfvars.
+4. If CD fails **after** the wait step with **startup probe** errors on `document-intelligence-consumer-*`, the container is exiting or not passing `/health` on `PORT` — this is **not** fixed by retagging alone. Inspect the failing revision logs in Cloud Logging; common causes include invalid `DI_*` env (see `RuntimeSettings` in `document-intelligence`), wrong Pub/Sub **subscription** name for the environment, or IAM for Pub/Sub / GCS. The image built by `runtime-images.yml` uses [`document-intelligence/Dockerfile`](../../document-intelligence/Dockerfile) (`document_intelligence_runtime_consumer`).
 
 ### Manual image build (Cloud Build)
 
