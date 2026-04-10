@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read # dorny/paths-filter compares PR head/base via the API on pull_request
   packages: write
   id-token: write   # for Workload Identity Federation to Artifact Registry
 
