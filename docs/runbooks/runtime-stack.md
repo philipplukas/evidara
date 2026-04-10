@@ -158,6 +158,16 @@ terraform apply -var-file="../../../env/github.repo_settings.tfvars.example"
 2. **Prod**: Deploy same image SHA that passed dev → smoke test
 3. Uses `GCP_ARTIFACT_PROJECT_ID` for image registry (shared across envs)
 
+**Repository variables:** `PLATFORM_CONTROL_SERVICE_NAME` must be the **Cloud Run service name prefix** before `-dev` / `-prod` (for example `platform-control-api`), not the Artifact Registry image repository name (`platform-control`). The image in AR stays `…/platform-control:${IMAGE_TAG}`. See [`infra/env/github.repo_settings.tfvars.example`](../../infra/env/github.repo_settings.tfvars.example).
+
+**IAM:** the Workload Identity Federation service accounts (`GCP_SERVICE_ACCOUNT_DEV` / `GCP_SERVICE_ACCOUNT_PROD` environment secrets) must be allowed to **update** the target Cloud Run services (for example `roles/run.admin` or a custom role including `run.services.update`) in the **runtime** project (`GCP_PROJECT_ID_DEV` / `GCP_PROJECT_ID_PROD`). If deploy fails with `Permission 'run.services.update' denied`, fix IAM on the runtime project, not the artifact project alone.
+
+**Staging:** this workflow has **no** staging deploy job. Use the manual Cloud Run procedure below (or Terraform) for `*-staging` services.
+
+**Prod gate:** `deploy-prod` has `needs: deploy-dev`. Add a **manual approval** rule on the GitHub `prod` environment if you want a human promotion step.
+
+**Manual image rebuild:** `runtime-images.yml` also supports `workflow_dispatch` on `main` when you need a full parallel build without a matching push.
+
 ### Manual image build (Cloud Build)
 
 Use this when you need an image in Artifact Registry **without** waiting for `runtime-images.yml` (for example, hotfix validation on dev). Prefer the **same Dockerfile and context** as CI so the image matches what Actions would produce.
