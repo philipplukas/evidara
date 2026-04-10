@@ -7,6 +7,14 @@ from document_intelligence.canonical.ids import random_prefixed_id
 from document_intelligence.canonical.models import Document, ProcessingManifest
 
 
+def _optional_non_empty_str(value: str | None) -> str | None:
+    """Normalize optional string fields for downstream JSON Schema / Pydantic (empty string is not null)."""
+    if value is None:
+        return None
+    stripped = str(value).strip()
+    return stripped or None
+
+
 def build_document_processed_event(
     *,
     document: Document,
@@ -30,8 +38,8 @@ def build_document_processed_event(
         "processing_manifest_id": manifest.processing_manifest_id,
         "processing_version": manifest.processing_version,
         "provenance": document.provenance.to_dict(),
-        "authority_id": document.authority_id,
-        "authority_name": authority_name,
+        "authority_id": _optional_non_empty_str(document.authority_id),
+        "authority_name": _optional_non_empty_str(authority_name),
         "is_official": is_official,
         "lifecycle_status": document.lifecycle_status,
         "published_document_ref": dict(manifest.published_document_ref or {}),
