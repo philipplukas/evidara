@@ -48,6 +48,43 @@ Use short-lived branches from `main` with these prefixes:
 - `docs/` — documentation
 - `adr/` — architecture decisions
 
+Avoid long-lived parked namespaces such as `pr/…` unless you are actively using them; stale lines should be **rebased onto current `main` and opened as a normal PR**, or deleted. See [Max parallel execution](../process/max-parallel-execution.md) (stale-branch policy).
+
+## Git worktrees and `shelf/*` branches
+
+Git allows only **one** checked-out worktree per branch name. If you use multiple clones (for example `evidara`, `evidara-next-pr`, `evidara-pr-stack`), only **one** worktree should use the branch name `main`.
+
+**Convention in this repo:**
+
+| Worktree role | Typical local branch | Tracks |
+|---|---|---|
+| Primary clone | `main` | `origin/main` |
+| Extra worktrees | `shelf/<purpose>` | `origin/main` (or a feature branch) |
+
+Examples: `shelf/next-pr`, `shelf/pr-stack`, `shelf/tar137-worktree`. Create with:
+
+```bash
+git fetch origin
+git checkout -B shelf/my-worktree origin/main
+```
+
+To add a worktree directory (from repo root):
+
+```bash
+git worktree add -b shelf/other ../evidara-other origin/main
+```
+
+Remove a worktree when done:
+
+```bash
+git worktree remove ../evidara-other
+git worktree prune
+```
+
+After removing the last checkout of a `shelf/*` branch, delete the local branch if you no longer need it: `git branch -d shelf/other`.
+
+For **parallel streams** (which paths can merge independently), see [Parallel work streams](../process/parallel-work-streams.md).
+
 ## Why convention-based
 
 The repo is private and on GitHub Free, which does not support branch protection rules. These conventions are enforced by:
