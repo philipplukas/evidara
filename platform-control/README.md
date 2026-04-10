@@ -67,3 +67,7 @@ app, see `../docs/setup/platform-control-local-demo.md`. Historical Retool artif
 ```bash
 ../scripts/check-platform-control.sh
 ```
+
+## Container images
+
+CI builds the API image with the repo-root `Dockerfile` (see `.github/workflows/runtime-images.yml`). For manual Cloud Build, tagging with the full git SHA, and deploying to Cloud Run, see **Manual image build** and **Deploy a Single Service Manually** in [`docs/runbooks/runtime-stack.md`](../docs/runbooks/runtime-stack.md).

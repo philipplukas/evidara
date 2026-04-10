@@ -1,7 +1,7 @@
 # Runtime Stack — Architecture & Operations Runbook
 
 Owner: Platform Team
-Last reviewed: 2026-04-08
+Last reviewed: 2026-04-09
 Last verified: 2026-04-06
 Applies to: dev, staging, prod
 
@@ -158,6 +158,43 @@ terraform apply -var-file="../../../env/github.repo_settings.tfvars.example"
 2. **Prod**: Deploy same image SHA that passed dev → smoke test
 3. Uses `GCP_ARTIFACT_PROJECT_ID` for image registry (shared across envs)
 
+### Manual image build (Cloud Build)
+
+Use this when you need an image in Artifact Registry **without** waiting for `runtime-images.yml` (for example, hotfix validation on dev). Prefer the **same Dockerfile and context** as CI so the image matches what Actions would produce.
+
+**Tag:** use the **full git commit SHA** (`git rev-parse HEAD`) as the image tag. That matches `platform-control-cd.yml`, which deploys with `IMAGE_TAG: ${{ github.sha }}`. CI also publishes `sha-<short>` aliases; a manual build typically only pushes the tag you pass.
+
+**Project:** pass `--project` to `gcloud builds submit` for the GCP project that **hosts Artifact Registry** (often the same as the runtime project; see `infra/env/*/runtime.gcp.tfvars` and `cloud_run_services` image hostnames).
+
+**Platform:** Cloud Run expects **linux/amd64**. The checked-in Cloud Build configs pass `--platform linux/amd64`. For local `docker build` on Apple Silicon, add `--platform linux/amd64` before push.
+
+**gcloud Python:** if `gcloud builds submit` fails because `CLOUDSDK_PYTHON` points at a missing interpreter (for example an old repo venv path), use a system Python:
+
+```bash
+export CLOUDSDK_PYTHON=/usr/bin/python3
+```
+
+**Single service (examples from repo root):**
+
+```bash
+TAG="$(git rev-parse HEAD)"
+export CLOUDSDK_PYTHON=/usr/bin/python3
+
+gcloud builds submit . \
+  --project "${ARTIFACT_PROJECT_ID}" \
+  --config=platform-control/cloudbuild.api.yaml \
+  --substitutions=_TAG="${TAG}"
+
+gcloud builds submit . \
+  --project "${ARTIFACT_PROJECT_ID}" \
+  --config=platform-control/cloudbuild.worker.yaml \
+  --substitutions=_TAG="${TAG}"
+```
+
+**Batch helper:** `scripts/build-runtime-images.sh` runs parallel Cloud Build jobs (see `scripts/cloudbuild.runtime-image.yaml`) for `platform-control`, `platform-control-worker`, `legal-search-api`, and `di-consumer` with the same tagging defaults.
+
+**DI HTTP ingress only:** the image wired for Pub/Sub push to the ingress service is built from `document-intelligence/Dockerfile.runtime-ingress` — use `document-intelligence/cloudbuild.runtime-ingress.yaml` for that variant (not the default `document-intelligence/Dockerfile` used by `runtime-images.yml` for `di-consumer`).
+
 ### Infrastructure (terraform.yml)
 
 **Trigger**: Push to `main` affecting `infra/terraform/gcp/runtime_stack/**`.
@@ -176,20 +213,22 @@ terraform apply -var-file="../../../env/github.repo_settings.tfvars.example"
 
 ### 1. Deploy a Single Service Manually
 
+Cloud Run service **names** include the role suffix (for example `platform-control-api-dev`), while Artifact Registry **images** use shorter names (for example `runtime/platform-control`). Use the runtime GCP project for `--project` on `gcloud run` (not necessarily the same as the registry project if you split them).
+
 ```bash
-export PROJECT_ID="data-platform-dev-492214"
+export RUNTIME_PROJECT_ID="evidara-dev"
+export ARTIFACT_PROJECT_ID="evidara-dev"   # registry host project; often same as runtime
 export REGION="europe-west6"
 export REPO="runtime"
-export SERVICE="platform-control"
-export TAG="sha-abc1234"
+export TAG="$(git rev-parse HEAD)"   # or any tag you pushed (e.g. sha-abc1234 from CI)
 
-gcloud run services update "${SERVICE}-dev" \
-  --project "${PROJECT_ID}" \
+gcloud run services update "platform-control-api-dev" \
+  --project "${RUNTIME_PROJECT_ID}" \
   --region "${REGION}" \
-  --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${SERVICE}:${TAG}"
+  --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${REPO}/platform-control:${TAG}"
 ```
 
-**Expected output**: `Service [platform-control-dev] revision [...] is active`
+**Expected output**: a new ready revision for `platform-control-api-dev`.
 
 ### 2. Check Service Health
 

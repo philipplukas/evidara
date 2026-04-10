@@ -12,7 +12,8 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-DEFAULT_TAG="${GITHUB_SHA:-$(git -C "${ROOT_DIR}" rev-parse --short=12 HEAD 2>/dev/null || echo latest)}"
+# Full commit SHA matches platform-control-cd.yml / runtime-images primary tags.
+DEFAULT_TAG="${GITHUB_SHA:-$(git -C "${ROOT_DIR}" rev-parse HEAD 2>/dev/null || echo latest)}"
 TAG="${TAG:-${DEFAULT_TAG}}"
 
 build_image() {
@@ -31,13 +32,13 @@ build_image() {
 # Run independent image builds concurrently (separate Cloud Build jobs). Watch project
 # concurrent build quotas if you add many more images here.
 pids=()
-build_image "platform-control" "platform-control/Dockerfile.api" "platform-control-api" &
+build_image "." "platform-control/Dockerfile" "platform-control" &
 pids+=($!)
 build_image "platform-control" "platform-control/Dockerfile.worker" "platform-control-worker" &
 pids+=($!)
-build_image "legal-search/api" "legal-search/api/Dockerfile" "legal-search-api" &
+build_image "." "legal-search/api/Dockerfile" "legal-search-api" &
 pids+=($!)
-build_image "document-intelligence" "document-intelligence/Dockerfile.runtime-ingress" "document-intelligence-ingress" &
+build_image "." "document-intelligence/Dockerfile" "di-consumer" &
 pids+=($!)
 
 exit_status=0
