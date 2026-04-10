@@ -84,6 +84,10 @@ async def receive_document_processed(
         payload = decode_pubsub_push_json(await request.json())
         event = DocumentProcessedEvent.model_validate(payload)
     except ValidationError as error:
+        LOGGER.error(
+            "document_processed_validation_failed errors=%s",
+            error.errors(include_url=False, include_context=False),
+        )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=error.errors(include_url=False, include_context=False),
