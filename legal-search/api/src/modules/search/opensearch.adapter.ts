@@ -112,9 +112,9 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         },
       },
       aggs: {
-        jurisdiction: { terms: { field: 'jurisdiction', size: 20 } },
-        document_type: { terms: { field: 'document_type', size: 20 } },
-        language: { terms: { field: 'language', size: 10 } },
+        jurisdiction: { terms: { field: 'jurisdiction.keyword', size: 20 } },
+        document_type: { terms: { field: 'document_type.keyword', size: 20 } },
+        language: { terms: { field: 'language.keyword', size: 10 } },
       },
     };
 
@@ -204,9 +204,9 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         body: {
           size: 0,
           aggs: {
-            jurisdictions: { terms: { field: 'jurisdiction', size: 20 } },
-            languages: { terms: { field: 'language', size: 10 } },
-            source_types: { terms: { field: 'document_type', size: 20 } },
+            jurisdictions: { terms: { field: 'jurisdiction.keyword', size: 20 } },
+            languages: { terms: { field: 'language.keyword', size: 10 } },
+            source_types: { terms: { field: 'document_type.keyword', size: 20 } },
           },
         },
       });
