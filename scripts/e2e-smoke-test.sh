@@ -166,9 +166,18 @@ echo ""
 # ── 2. Seed reference data ──────────────────────────────────────────
 
 echo "🔍 Step 2: Seeding reference data..."
-sync_result=$(curl_json -X POST "${PC_URL}/v1/reference-data/hierarchy/sync?dry_run=false")
-jur_count=$(echo "${sync_result}" | jq -r '.jurisdictions.created // 0')
-echo "  ✅ Hierarchy sync: ${jur_count} jurisdictions created"
+sync_http_code=$(curl -sS -o /tmp/e2e-hierarchy-sync-response.json -w "%{http_code}" \
+  "${CURL_AUTH_ARGS[@]}" -X POST "${PC_URL}/v1/reference-data/hierarchy/sync?dry_run=false" || echo "000")
+if [ "${sync_http_code}" = "200" ]; then
+  jur_count=$(jq -r '.jurisdictions.created // 0' /tmp/e2e-hierarchy-sync-response.json)
+  echo "  ✅ Hierarchy sync: ${jur_count} jurisdictions created"
+else
+  echo "  ⚠️  Hierarchy sync failed (HTTP ${sync_http_code}); continuing with existing reference data."
+  if [ -s /tmp/e2e-hierarchy-sync-response.json ]; then
+    echo "  Response:"
+    cat /tmp/e2e-hierarchy-sync-response.json | jq . 2>/dev/null || cat /tmp/e2e-hierarchy-sync-response.json
+  fi
+fi
 echo ""
 
 # ── 3. Create source ────────────────────────────────────────────────
