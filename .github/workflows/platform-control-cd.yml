@@ -169,7 +169,10 @@ jobs:
             --region "${REGION}" \
             --format='value(status.url)')
           echo "Checking ${DI_URL}/health ..."
-          TOKEN=$(gcloud auth print-identity-token --audiences="${DI_URL}")
+          TOKEN=$(gcloud auth print-identity-token \
+            --impersonate-service-account="${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}" \
+            --audiences="${DI_URL}" \
+            --include-email)
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
             -H "Authorization: Bearer ${TOKEN}" "${DI_URL}/health" || echo "000")
           echo "HTTP ${HTTP_CODE}"
