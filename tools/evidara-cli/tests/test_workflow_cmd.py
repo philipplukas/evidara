@@ -5,7 +5,19 @@ from unittest.mock import patch
 import pytest
 import typer
 
+from evidara_cli.envelope import build_envelope, evidence_assertion, evidence_count, evidence_http
 from evidara_cli.main import workflow_mvp_acceptance
+from evidara_cli.proposal import SourceSpecProposal
+from evidara_cli.workflow_cmd import (
+    run_evidence,
+    run_status,
+    search_inspect,
+    search_verify,
+    source_compensate,
+    source_inspect,
+    source_propose,
+    source_verify,
+)
 
 
 @patch("evidara_cli.main._emit")
@@ -86,3 +98,334 @@ def test_workflow_mvp_acceptance_exits_when_detail_cannot_be_resolved(
     assert payload["ok"] is False
     assert payload["scenario_3"]["document_id"] is None
     assert payload["scenario_3"]["document_http_code"] is None
+
+
+# ---------------------------------------------------------------------------
+# envelope builder
+# ---------------------------------------------------------------------------
+
+
+
+def test_build_envelope_minimal():
+    env = build_envelope(
+        ok=True,
+        workflow="source-lifecycle",
+        step="source.inspect",
+        status="passed",
+        side_effect_level="none",
+        inputs={"source_id": "src_123"},
+    )
+    assert env["ok"] is True
+    assert env["workflow"] == "source-lifecycle"
+    assert env["step"] == "source.inspect"
+    assert env["status"] == "passed"
+    assert env["side_effect_level"] == "none"
+    assert env["inputs"] == {"source_id": "src_123"}
+    assert env["run_id"] is None
+    assert env.get("error") is None
+    assert env.get("error_detail") is None
+
+
+def test_build_envelope_with_error():
+    env = build_envelope(
+        ok=False,
+        workflow="source-lifecycle",
+        step="source.apply",
+        status="failed_terminal",
+        side_effect_level="reversible",
+        inputs={},
+        error="Service unavailable",
+        error_detail={"status_code": 503, "body": ""},
+    )
+    assert env["ok"] is False
+    assert env["error"] == "Service unavailable"
+    assert env["error_detail"]["status_code"] == 503
+
+
+def test_evidence_http_defaults_passed():
+    ev = evidence_http("platform-control:/health", status_code=200)
+    assert ev["kind"] == "http"
+    assert ev["passed"] is True
+
+
+def test_evidence_http_failed_on_4xx():
+    ev = evidence_http("platform-control:/health", status_code=404)
+    assert ev["passed"] is False
+
+
+def test_evidence_assertion():
+    ev = evidence_assertion("dup-check", value="none", passed=True)
+    assert ev["kind"] == "assertion"
+    assert ev["passed"] is True
+
+
+def test_evidence_count():
+    ev = evidence_count("sources", value=5, passed=True)
+    assert ev["kind"] == "count"
+    assert ev["value"] == 5
+
+
+# ---------------------------------------------------------------------------
+# proposal module
+# ---------------------------------------------------------------------------
+
+
+
+def test_source_spec_proposal_rule_based():
+    p = SourceSpecProposal()
+    result = p.propose("https://www.ris.bka.gv.at/laws")
+    assert result["backend"] == "rule-based"
+    assert "spec" in result
+    assert "confidence" in result
+    assert result["spec"]["seed_url"] == "https://www.ris.bka.gv.at/laws"
+    assert result["spec"]["hostname"] == "www.ris.bka.gv.at"
+
+
+def test_source_spec_proposal_detects_high_duplicate():
+    p = SourceSpecProposal()
+    result = p.propose("https://ris.bka.gv.at/", existing_source_names=["Ris"])
+    assert result["duplicate_risk"] == "high"
+
+
+def test_source_spec_proposal_no_duplicate():
+    p = SourceSpecProposal()
+    result = p.propose("https://novel-source.example.com/", existing_source_names=["OtherSource"])
+    assert result["duplicate_risk"] in ("none", "low")
+
+
+# ---------------------------------------------------------------------------
+# workflow source inspect
+# ---------------------------------------------------------------------------
+
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.request_status", return_value=200)
+@patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_source_inspect_no_source_id(
+    _pc_base,
+    _req_status,
+    req_json_mock,
+    emit_mock,
+):
+    req_json_mock.return_value = [{"display_name": "Ris"}, {"display_name": "BGbl"}]
+    source_inspect(source_id=None, human=False, correlation_id=None)
+    emit_mock.assert_called_once()
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["step"] == "source.inspect"
+    assert payload["side_effect_level"] == "none"
+    assert payload["artifacts"]["source_count"] == 2
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.request_status", return_value=200)
+@patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_source_inspect_with_source_id(
+    _pc_base,
+    _req_status,
+    req_json_mock,
+    emit_mock,
+):
+    req_json_mock.return_value = {
+        "source_id": "src_abc",
+        "display_name": "Test",
+        "status": "active",
+    }
+    source_inspect(source_id="src_abc", human=False, correlation_id=None)
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["artifacts"]["source"]["source_id"] == "src_abc"
+
+
+# ---------------------------------------------------------------------------
+# workflow source propose
+# ---------------------------------------------------------------------------
+
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_source_propose_no_duplicate(
+    _pc_base,
+    req_json_mock,
+    emit_mock,
+):
+    req_json_mock.return_value = [{"display_name": "Existing"}]
+    source_propose(seed_url="https://newsite.example.com/", human=False, correlation_id=None)
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["step"] == "source.propose"
+    assert payload["side_effect_level"] == "none"
+    assert "proposal" in payload["artifacts"]
+    assert payload["artifacts"]["proposal"]["backend"] == "rule-based"
+
+
+# ---------------------------------------------------------------------------
+# workflow source verify
+# ---------------------------------------------------------------------------
+
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_source_verify_by_source_id(
+    _pc_base,
+    req_json_mock,
+    emit_mock,
+):
+    req_json_mock.return_value = {"source_id": "src_xyz", "status": "active"}
+    source_verify(source_id="src_xyz", run_id=None, human=False, correlation_id=None)
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["step"] == "source.verify"
+    assert payload["artifacts"]["source"]["status"] == "active"
+
+
+def test_source_verify_requires_args():
+    with pytest.raises(typer.Exit) as exc_info:
+        source_verify(source_id=None, run_id=None, human=False, correlation_id=None)
+    assert exc_info.value.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# workflow source compensate
+# ---------------------------------------------------------------------------
+
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_source_compensate_cancels_run(
+    _pc_base,
+    req_json_mock,
+    emit_mock,
+):
+    req_json_mock.return_value = {"run_id": "run_001", "status": "cancelled"}
+    source_compensate(
+        source_id=None,
+        run_id="run_001",
+        reason="Test compensation",
+        human=False,
+        correlation_id=None,
+    )
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["step"] == "source.compensate"
+    assert payload["status"] == "compensated"
+    assert payload["side_effect_level"] == "reversible"
+
+
+def test_source_compensate_requires_args():
+    with pytest.raises(typer.Exit) as exc_info:
+        source_compensate(
+            source_id=None,
+            run_id=None,
+            reason="test",
+            human=False,
+            correlation_id=None,
+        )
+    assert exc_info.value.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# workflow search inspect
+# ---------------------------------------------------------------------------
+
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_status", return_value=200)
+@patch("evidara_cli.workflow_cmd.legal_search_base_url", return_value="http://ls.test")
+def test_search_inspect_ok(_ls_base, _req_status, emit_mock):
+    search_inspect(human=False, correlation_id=None)
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["step"] == "search.inspect"
+    assert payload["side_effect_level"] == "none"
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_status", return_value=503)
+@patch("evidara_cli.workflow_cmd.legal_search_base_url", return_value="http://ls.test")
+def test_search_inspect_unreachable(_ls_base, _req_status, emit_mock):
+    with pytest.raises(typer.Exit) as exc_info:
+        search_inspect(human=False, correlation_id=None)
+    assert exc_info.value.exit_code == 1
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is False
+
+
+# ---------------------------------------------------------------------------
+# workflow search verify
+# ---------------------------------------------------------------------------
+
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.legal_search_base_url", return_value="http://ls.test")
+def test_search_verify_passes(_ls_base, req_json_mock, emit_mock):
+    req_json_mock.return_value = {"totalResults": 5, "results": []}
+    search_verify(queries=["art 754"], min_results=1, human=False, correlation_id=None)
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["step"] == "search.verify"
+    assert payload["artifacts"]["query_results"][0]["total_results"] == 5
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.legal_search_base_url", return_value="http://ls.test")
+def test_search_verify_fails_when_below_min(_ls_base, req_json_mock, emit_mock):
+    req_json_mock.return_value = {"totalResults": 0, "results": []}
+    with pytest.raises(typer.Exit) as exc_info:
+        search_verify(queries=["obscure"], min_results=1, human=False, correlation_id=None)
+    assert exc_info.value.exit_code == 1
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is False
+
+
+# ---------------------------------------------------------------------------
+# workflow run status
+# ---------------------------------------------------------------------------
+
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_run_status_emits_envelope(_pc_base, req_json_mock, emit_mock):
+    req_json_mock.return_value = {"run_id": "run_abc", "status": "completed"}
+    run_status(run_id="run_abc", human=False, correlation_id=None)
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["step"] == "run.status"
+    assert payload["artifacts"]["run"]["status"] == "completed"
+    assert payload["compensation"]["available"] is False  # completed run
+
+
+# ---------------------------------------------------------------------------
+# workflow run evidence
+# ---------------------------------------------------------------------------
+
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_run_evidence_collects_resources(_pc_base, req_json_mock, emit_mock):
+    req_json_mock.side_effect = [
+        {"run_id": "run_abc", "status": "completed"},
+        [{"resource_id": "r1"}, {"resource_id": "r2"}],
+    ]
+    run_evidence(run_id="run_abc", human=False, correlation_id=None)
+    payload = emit_mock.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["step"] == "run.evidence"
+    assert payload["artifacts"]["captured_resource_count"] == 2
