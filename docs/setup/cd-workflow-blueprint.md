@@ -229,9 +229,21 @@ jobs:
       - name: Run lightweight smoke
         run: echo "databricks bundle run document_intelligence_smoke --target dev"
 
-  deploy_prod:
+  deploy_staging:
     runs-on: ubuntu-latest
     needs: [build_bundle_artifact, deploy_dev]
+    environment: staging
+    steps:
+      - name: Authenticate to Databricks
+        run: echo "Auth using staging profile/workspace"
+      - name: Deploy bundle to staging
+        run: echo "databricks bundle deploy --target staging"
+      - name: Run staging smoke
+        run: echo "databricks bundle run document_intelligence_smoke --target staging"
+
+  deploy_prod:
+    runs-on: ubuntu-latest
+    needs: [build_bundle_artifact, deploy_staging]
     environment: prod
     steps:
       - name: Authenticate to Databricks
