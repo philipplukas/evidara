@@ -55,6 +55,7 @@ The detailed proposed design lives in `docs/architecture/agentic-cli-workflow-ar
 - Existing service-specific commands can continue to exist alongside workflow-oriented commands.
 - Some workflows may remain synchronous in the CLI initially before moving to durable orchestration.
 - Read-only OpenAPI helpers (`evidara openapi paths`, `evidara openapi tags`) are part of the bounded discovery surface and do not execute workflows or mutate cloud state.
+- Read-heavy MVP operations are additionally tagged `agent-discovery` in the canonical OpenAPI specs so agents can filter discovery surfaces without new endpoints.
 
 ## Alternatives Considered
 
