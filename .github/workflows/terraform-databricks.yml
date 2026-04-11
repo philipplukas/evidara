@@ -1,0 +1,454 @@
+name: Terraform Databricks
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/terraform-databricks.yml"
+      - "infra/terraform/databricks/**"
+      - "infra/env/*/document_intelligence.databricks.tfvars"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/terraform-databricks.yml"
+      - "infra/terraform/databricks/**"
+      - "infra/env/*/document_intelligence.databricks.tfvars"
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: "Run terraform apply (default false)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write   # for posting plan output to PR
+
+concurrency:
+  group: terraform-databricks-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TF_ROOT: infra/terraform/databricks/document_intelligence_stack
+
+jobs:
+  # ── PR: fmt + plan ───────────────────────────────
+  fmt-check:
+    name: Terraform fmt check
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive -diff
+        working-directory: infra/terraform/databricks
+
+  plan-dev:
+    name: Terraform plan (dev)
+    if: github.event_name == 'pull_request'
+    needs: fmt-check
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    environment: dev
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Prepare plan output directory
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.tmp/terraform-databricks-plan/dev"
+          echo "TF_PLAN_DIR=$GITHUB_WORKSPACE/.tmp/terraform-databricks-plan/dev" >> "$GITHUB_ENV"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        id: init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          set -o pipefail
+          terraform plan \
+            -var-file="$GITHUB_WORKSPACE/infra/env/dev/document_intelligence.databricks.tfvars" \
+            -var "workspace_host=${DATABRICKS_HOST}" \
+            -no-color \
+            -input=false \
+            -out=tfplan 2>&1 | tee "$TF_PLAN_DIR/plan_output.txt"
+        working-directory: ${{ env.TF_ROOT }}
+        continue-on-error: true
+
+      - name: Post plan to PR
+        uses: actions/github-script@v8
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const envName = 'dev';
+            const planPath = `${process.env.TF_PLAN_DIR}/plan_output.txt`;
+            let plan = '';
+            try {
+              plan = fs.readFileSync(planPath, 'utf8');
+            } catch {
+              plan = 'Plan output not available.';
+            }
+
+            // Truncate if too long for GitHub comment
+            const maxLen = 60000;
+            if (plan.length > maxLen) {
+              plan = plan.substring(0, maxLen) + '\n\n... (truncated)';
+            }
+
+            const initResult = '${{ steps.init.outcome }}';
+            const validateResult = '${{ steps.validate.outcome }}';
+            const planResult = '${{ steps.plan.outcome }}';
+
+            const body = `### Terraform Databricks Plan (${envName}) 🏗️
+
+            | Step | Result |
+            |------|--------|
+            | ⚙️ init | \`${initResult}\` |
+            | ✅ validate | \`${validateResult}\` |
+            | 📋 plan | \`${planResult}\` |
+
+            <details><summary>Plan output</summary>
+
+            \`\`\`
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            *Pushed by @${{ github.actor }}, commit \`${{ github.sha }}\`*`;
+
+            // Find and update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = `### Terraform Databricks Plan (${envName})`;
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes(marker)
+            );
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  plan-staging:
+    name: Terraform plan (staging)
+    if: github.event_name == 'pull_request'
+    needs: fmt-check
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    environment: staging
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Prepare plan output directory
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.tmp/terraform-databricks-plan/staging"
+          echo "TF_PLAN_DIR=$GITHUB_WORKSPACE/.tmp/terraform-databricks-plan/staging" >> "$GITHUB_ENV"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        id: init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          set -o pipefail
+          terraform plan \
+            -var-file="$GITHUB_WORKSPACE/infra/env/staging/document_intelligence.databricks.tfvars" \
+            -var "workspace_host=${DATABRICKS_HOST}" \
+            -no-color \
+            -input=false \
+            -out=tfplan 2>&1 | tee "$TF_PLAN_DIR/plan_output.txt"
+        working-directory: ${{ env.TF_ROOT }}
+        continue-on-error: true
+
+      - name: Post plan to PR
+        uses: actions/github-script@v8
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const envName = 'staging';
+            const planPath = `${process.env.TF_PLAN_DIR}/plan_output.txt`;
+            let plan = '';
+            try {
+              plan = fs.readFileSync(planPath, 'utf8');
+            } catch {
+              plan = 'Plan output not available.';
+            }
+
+            // Truncate if too long for GitHub comment
+            const maxLen = 60000;
+            if (plan.length > maxLen) {
+              plan = plan.substring(0, maxLen) + '\n\n... (truncated)';
+            }
+
+            const initResult = '${{ steps.init.outcome }}';
+            const validateResult = '${{ steps.validate.outcome }}';
+            const planResult = '${{ steps.plan.outcome }}';
+
+            const body = `### Terraform Databricks Plan (${envName}) 🏗️
+
+            | Step | Result |
+            |------|--------|
+            | ⚙️ init | \`${initResult}\` |
+            | ✅ validate | \`${validateResult}\` |
+            | 📋 plan | \`${planResult}\` |
+
+            <details><summary>Plan output</summary>
+
+            \`\`\`
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            *Pushed by @${{ github.actor }}, commit \`${{ github.sha }}\`*`;
+
+            // Find and update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = `### Terraform Databricks Plan (${envName})`;
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes(marker)
+            );
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # ── Main: apply ─────────────────────────────────
+  apply-dev:
+    name: Terraform apply (dev)
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_DATABRICKS_APPLY_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    environment: dev
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    outputs:
+      staging_apply_enabled: ${{ steps.meta.outputs.staging_apply_enabled }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Record promotion gates
+        id: meta
+        run: |
+          staging_enabled='${{ vars.TERRAFORM_DATABRICKS_APPLY_ENABLED_STAGING }}'
+          if [ -z "$staging_enabled" ]; then
+            staging_enabled='false'
+          fi
+          echo "staging_apply_enabled=${staging_enabled}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform apply
+        run: |
+          terraform apply \
+            -var-file="$GITHUB_WORKSPACE/infra/env/dev/document_intelligence.databricks.tfvars" \
+            -var "workspace_host=${DATABRICKS_HOST}" \
+            -auto-approve \
+            -input=false \
+            -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Post apply summary
+        if: always()
+        run: |
+          echo "### Terraform Databricks Apply (dev) 🏗️" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | @${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tfvars | \`infra/env/dev/document_intelligence.databricks.tfvars\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Staging apply enabled (repo var) | \`${{ steps.meta.outputs.staging_apply_enabled }}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+  apply-staging:
+    name: Terraform apply (staging)
+    needs: apply-dev
+    if: |
+      always() &&
+      needs.apply-dev.result == 'success' &&
+      needs.apply-dev.outputs.staging_apply_enabled == 'true'
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    environment: staging
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform apply
+        run: |
+          terraform apply \
+            -var-file="$GITHUB_WORKSPACE/infra/env/staging/document_intelligence.databricks.tfvars" \
+            -var "workspace_host=${DATABRICKS_HOST}" \
+            -auto-approve \
+            -input=false \
+            -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Post apply summary
+        if: always()
+        run: |
+          echo "### Terraform Databricks Apply (staging) 🏗️" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | @${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tfvars | \`infra/env/staging/document_intelligence.databricks.tfvars\` |" >> "$GITHUB_STEP_SUMMARY"
+
+  apply-prod:
+    name: Terraform apply (prod)
+    needs:
+      - apply-dev
+      - apply-staging
+    if: |
+      always() &&
+      needs.apply-dev.result == 'success' &&
+      (
+        needs.apply-staging.result == 'success' ||
+        needs.apply-staging.result == 'skipped'
+      ) &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_DATABRICKS_APPLY_ENABLED_PROD == 'true') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
+      )
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    environment: prod
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform apply
+        run: |
+          terraform apply \
+            -var-file="$GITHUB_WORKSPACE/infra/env/prod/document_intelligence.databricks.tfvars" \
+            -var "workspace_host=${DATABRICKS_HOST}" \
+            -auto-approve \
+            -input=false \
+            -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Post apply summary
+        if: always()
+        run: |
+          echo "### Terraform Databricks Apply (prod) 🏗️" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | @${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tfvars | \`infra/env/prod/document_intelligence.databricks.tfvars\` |" >> "$GITHUB_STEP_SUMMARY"
