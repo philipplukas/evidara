@@ -12,7 +12,7 @@ info:
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
     Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
-  version: 0.3.0
+  version: 0.3.1
   contact:
     name: Evidara Team
   license:
@@ -28,6 +28,16 @@ servers:
 security:
   - bearerAuth: []
 
+tags:
+  - name: search
+    description: Search listing and global search context.
+  - name: documents
+    description: Document detail and section reads.
+  - name: agent-discovery
+    description: |
+      Read-only search and document reads commonly used by operators, agents, and smoke flows
+      (`evidara openapi tags`, MVP acceptance). Does not cover projection mutation endpoints.
+
 paths:
   /v1/search:
     get:
@@ -36,7 +46,7 @@ paths:
       description: |
         Returns search results as composed ViewModels with embedded facets.
         Facet counts are live (computed from the same query via OpenSearch aggs).
-      tags: [search]
+      tags: [search, agent-discovery]
       parameters:
         - $ref: '#/components/parameters/AcceptLanguage'
         - name: q
@@ -110,7 +120,7 @@ paths:
       description: |
         Returns global search context (jurisdictions, languages, source types).
         Query-independent and cacheable. Changes rarely.
-      tags: [search]
+      tags: [search, agent-discovery]
       parameters:
         - $ref: '#/components/parameters/AcceptLanguage'
       responses:
@@ -127,7 +137,7 @@ paths:
     get:
       operationId: getDocument
       summary: Get document detail
-      tags: [documents]
+      tags: [documents, agent-discovery]
       parameters:
         - $ref: '#/components/parameters/AcceptLanguage'
         - $ref: '#/components/parameters/CorrelationId'
@@ -150,7 +160,7 @@ paths:
     get:
       operationId: getDocumentSections
       summary: Get sections of a document
-      tags: [documents]
+      tags: [documents, agent-discovery]
       parameters:
         - name: document_id
           in: path

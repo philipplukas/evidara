@@ -1,4 +1,4 @@
-version: "1.4.2"
+version: "1.4.3"
 last_reviewed: "2026-04-11"
 owner: "Platform Team"
 
@@ -18,7 +18,7 @@ mvp_flow:
 apis:
   platform_control:
     file: "contracts/api/platform-control.openapi.yaml"
-    version: "0.3.3"
+    version: "0.3.4"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
@@ -32,7 +32,7 @@ apis:
     version: "0.1.0"
   legal_search:
     file: "contracts/api/legal-search.openapi.yaml"
-    version: "0.3.0"
+    version: "0.3.1"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"
