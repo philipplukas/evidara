@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import JSON, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -58,3 +59,8 @@ class Run(TimestampMixin, Base):
     def replay(self) -> dict | None:
         replay = (self.run_metadata or {}).get("replay")
         return dict(replay) if isinstance(replay, dict) else None
+
+    @property
+    def replay_checkpoint(self) -> dict[str, Any] | None:
+        checkpoint = (self.run_metadata or {}).get("replay_checkpoint")
+        return dict(checkpoint) if isinstance(checkpoint, dict) else None

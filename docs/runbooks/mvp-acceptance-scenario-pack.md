@@ -27,6 +27,7 @@ The shell helper requires `curl`, `jq`, and `gcloud`. For **private** Cloud Run 
 
 - default: single-line JSON for agents, CI notes, or follow-on tooling
 - `--human`: pretty-printed JSON for operators
+- `evidence_pack_version` in the JSON payload identifies the acceptance bundle revision (tie-break when comparing archived outputs).
 
 ### Cloud Run auth (local and CLI)
 

@@ -54,6 +54,7 @@ from platform_control.schemas.run import (
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
 from platform_control.services.provider_registry import ProviderRegistry
+from platform_control.services.replay_checkpoint import checkpoint_dict_from_parent
 
 
 @dataclass(slots=True)
@@ -154,15 +155,22 @@ class RunService:
             details = "; ".join(check.detail for check in readiness.checks if not check.ok)
             raise InvalidStateTransitionError(f"Run preflight failed: {details}")
 
+        run_metadata: dict[str, Any] = {
+            "scope": request.scope.model_dump(mode="json"),
+            "replay": request.replay.model_dump(mode="json") if request.replay else None,
+        }
+        if request.replay and request.replay.parent_run_id:
+            parent = await self.session.get(Run, request.replay.parent_run_id)
+            seeded = checkpoint_dict_from_parent(parent)
+            if seeded is not None:
+                run_metadata["replay_checkpoint"] = seeded
+
         run = Run(
             source_id=source.source_id,
             source_version_id=source_version.source_version_id,
             mode=request.mode,
             status=RunStatus.PENDING,
-            run_metadata={
-                "scope": request.scope.model_dump(mode="json"),
-                "replay": request.replay.model_dump(mode="json") if request.replay else None,
-            },
+            run_metadata=run_metadata,
         )
         self.session.add(run)
         await self.session.flush()

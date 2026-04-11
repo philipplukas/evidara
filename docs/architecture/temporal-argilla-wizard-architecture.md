@@ -11,7 +11,7 @@ Define a production-safe architecture for a human-guided, AI-assisted wizard tha
 ## Scope
 
 - Covers hybrid execution (`scheduled` + `event-triggered`) for discovery and extraction.
-- Uses Temporal for workflow orchestration and checkpointed state.
+- Uses Temporal for workflow orchestration and checkpointed state (scope-shard child workflows accept an optional `resume_token` string today as a forward-compatible hook; durable frontier bytes still live primarily on Postgres run metadata via `replay_checkpoint`).
 - Uses custom operator wizard surfaces for setup, approval, and run operations.
 - Uses Argilla for review and correction queues.
 - Defines initial API, data contracts, routing policy, and SLO/KPI targets.

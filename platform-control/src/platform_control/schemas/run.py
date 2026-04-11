@@ -91,6 +91,7 @@ class RunResponse(BaseModel):
     mode: RunMode
     scope: RunScopeRequest
     replay: RunReplayRequest | None
+    replay_checkpoint: dict[str, Any] | None = None
     status: RunStatus
     started_at: datetime | None
     completed_at: datetime | None

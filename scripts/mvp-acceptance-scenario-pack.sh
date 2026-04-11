@@ -72,6 +72,8 @@ log() {
   fi
 }
 
+log "Tip: evidara workflow mvp-acceptance mirrors this pack; set PC_API_URL / LS_API_URL when targeting private hosts."
+
 token_for_url() {
   local base="$1"
   if ! command -v gcloud >/dev/null 2>&1; then

@@ -26,6 +26,7 @@ from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.models.webhook_receipt import WebhookReceipt
 from platform_control.services.artifact_store import ArtifactStore
+from platform_control.services.replay_checkpoint import merge_run_replay_checkpoint
 
 
 class FirecrawlWebhookService:
@@ -132,6 +133,10 @@ class FirecrawlWebhookService:
         if event_type == "crawl.started":
             provider_job.status = ProviderJobStatus.RUNNING
             run.status = RunStatus.RUNNING
+            merge_run_replay_checkpoint(
+                run,
+                last_firecrawl_event_type=event_type,
+            )
             return
 
         if event_type == "crawl.page":
@@ -180,12 +185,22 @@ class FirecrawlWebhookService:
                 run.artifacts_count += 1
                 run.captured_resources_count += 1
                 await self.publisher.publish_raw_artifact_available(artifact)
+            merge_run_replay_checkpoint(
+                run,
+                last_firecrawl_event_type=event_type,
+                pages_ingested=run.captured_resources_count,
+            )
             return
 
         if event_type == "crawl.completed":
             provider_job.status = ProviderJobStatus.COMPLETED
             run.status = RunStatus.COMPLETED
             run.completed_at = datetime.now(UTC)
+            merge_run_replay_checkpoint(
+                run,
+                last_firecrawl_event_type=event_type,
+                pages_ingested=run.captured_resources_count,
+            )
             await self._publish_bundle_manifest(run)
             return
 
@@ -194,6 +209,12 @@ class FirecrawlWebhookService:
             run.status = RunStatus.FAILED
             run.completed_at = datetime.now(UTC)
             run.failure_reason = str(payload.get("error") or "Firecrawl job failed.")
+            merge_run_replay_checkpoint(
+                run,
+                last_firecrawl_event_type=event_type,
+                pages_ingested=run.captured_resources_count,
+                extra={"terminal": True},
+            )
 
     @staticmethod
     def _checksum(page: dict[str, Any]) -> str:

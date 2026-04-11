@@ -100,6 +100,14 @@ async def test_temporal_orchestrator_starts_standalone_child_workflows() -> None
                 scope_shard_key="de/hamburg",
             )
             assert "scope_shard_api" in scope_id
+            scope_resume = await orch.start_scope_shard_workflow(
+                "wrn_childtest001",
+                scope_shard_key="de/hamburg-resume",
+                resume_token="seed:checkpoint=v1",
+            )
+            assert "scope_shard_api" in scope_resume
+            resume_handle = env.client.get_workflow_handle(scope_resume)
+            assert await resume_handle.result() == "shard_complete"
             drain_id = await orch.start_review_drain_workflow("wrn_childtest001")
             assert "review_drain_api" in drain_id
 

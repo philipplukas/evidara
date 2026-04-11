@@ -420,6 +420,7 @@ def workflow_mvp_acceptance(
         payload = {
             "ok": overall_ok,
             "workflow": "mvp-acceptance",
+            "evidence_pack_version": "tar-85-2026-04-11",
             "surfaces": {
                 "platform_control_api": pc_base,
                 "legal_search_api": ls_base,
