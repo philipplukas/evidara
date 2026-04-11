@@ -580,9 +580,7 @@ class SectionCitationExtractionTests(unittest.TestCase):
             manifest_path = manifest_handle.name
 
         try:
-            result = ProcessingPipeline(processing_version="di_test").process_event(
-                build_bundle_event(manifest_path)
-            )
+            result = ProcessingPipeline(processing_version="di_test").process_event(build_bundle_event(manifest_path))
             overview_sections = [s for s in result.sections if s.title and "Overview" in s.title]
             self.assertEqual(len(overview_sections), 1)
             # The overview section has no citations
@@ -600,9 +598,7 @@ class SectionCitationExtractionTests(unittest.TestCase):
             manifest_path = manifest_handle.name
 
         try:
-            result = ProcessingPipeline(processing_version="di_test").process_event(
-                build_bundle_event(manifest_path)
-            )
+            result = ProcessingPipeline(processing_version="di_test").process_event(build_bundle_event(manifest_path))
             legal_basis_sections = [s for s in result.sections if s.title and "Legal Basis" in s.title]
             self.assertEqual(len(legal_basis_sections), 1)
             section = legal_basis_sections[0]
@@ -623,9 +619,7 @@ class SectionCitationExtractionTests(unittest.TestCase):
             manifest_path = manifest_handle.name
 
         try:
-            result = ProcessingPipeline(processing_version="di_test").process_event(
-                build_bundle_event(manifest_path)
-            )
+            result = ProcessingPipeline(processing_version="di_test").process_event(build_bundle_event(manifest_path))
             case_law_sections = [s for s in result.sections if s.title and "Case Law" in s.title]
             self.assertEqual(len(case_law_sections), 1)
             section = case_law_sections[0]
@@ -646,9 +640,7 @@ class SectionCitationExtractionTests(unittest.TestCase):
             manifest_path = manifest_handle.name
 
         try:
-            result = ProcessingPipeline(processing_version="di_test").process_event(
-                build_bundle_event(manifest_path)
-            )
+            result = ProcessingPipeline(processing_version="di_test").process_event(build_bundle_event(manifest_path))
             for section in result.sections:
                 if "citations" in section.metadata:
                     for cit in section.metadata["citations"]:
