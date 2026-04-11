@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       strict:
-        description: "Fail workflow on failed gate checks"
+        description: "Fail workflow on failed gate checks (TAR-67/TAR-69: attach this run URL + uploaded artifacts to Linear when filing drill evidence)"
         required: false
         default: "true"
         type: choice
@@ -351,9 +351,24 @@ jobs:
               echo
               echo "| $(date -u +%Y-%m-%d) | Strict release-readiness verification | GitHub Actions run [${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_id }}](${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}) passed interaction-flow evidence artifact completeness quick-check |"
             fi
+            echo
+            echo "## Drill evidence (TAR-67 / TAR-69)"
+            echo
+            echo "- This workflow run: \`${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\`"
+            echo "- Download **release-readiness-${{ github.run_id }}** artifact for JSON snapshots (smoke, interaction-flow, Terraform, DLQ query)."
+            echo "- Runbooks: [first vertical slice exit gates](https://github.com/${{ github.repository }}/blob/main/docs/runbooks/first-vertical-slice-exit-gates.md), [phase 5 go/no-go memo](https://github.com/${{ github.repository }}/blob/main/docs/runbooks/phase-5-go-no-go-memo.md)."
           } > "${REPORT_PATH}"
 
           cat "${REPORT_PATH}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload release readiness gate snapshots (drill evidence)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-readiness-${{ github.run_id }}
+          path: tmp/release-readiness/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload release readiness report to GCS
         id: release_report_upload

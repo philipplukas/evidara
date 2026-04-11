@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       full_playwright_trace:
-        description: "Record Playwright trace + video for every test (large artifacts in GCS upload)"
+        description: "Record Playwright trace + video for every test (large GCS upload). TAR-67: attach this run URL + GCS prefix to Linear."
         type: boolean
         default: false
 
@@ -195,6 +195,12 @@ jobs:
           Source runbook: `docs/runbooks/interaction-flow-validation.md`
           Source workflow: `.github/workflows/interaction-flow-staging-evidence.yml`
           Source job: `interaction-flow-staging-evidence`
+
+          Drill evidence (TAR-67 / TAR-69):
+          - Attach the GitHub Actions run URL for this workflow to Linear when filing operator drills.
+          - Cross-surface checklist: `docs/runbooks/interaction-flow-validation.md`
+          - Exit gates context: `docs/runbooks/first-vertical-slice-exit-gates.md`
+          - Go/no-go memo: `docs/runbooks/phase-5-go-no-go-memo.md`
 
           Executed suites:
           - `npm run e2e:smoke`

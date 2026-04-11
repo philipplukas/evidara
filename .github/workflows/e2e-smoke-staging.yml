@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       smoke_seed_url:
-        description: "Override deterministic acquisition seed URL"
+        description: "Override deterministic acquisition seed URL (TAR-67: attach run URL + drill JSON artifact to Linear)"
         required: false
         default: "http://example.org"
         type: string
@@ -138,12 +138,17 @@ jobs:
         if: always()
         run: |
           python3 - <<'PY'
+          import json
           import os
           import re
           from pathlib import Path
 
           summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
           log_path = Path(os.environ["LOG_PATH"])
+          repo = os.environ.get("GITHUB_REPOSITORY", "owner/repo")
+          server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+          gh_run = os.environ.get("GITHUB_RUN_ID", "")
+          run_url = f"{server}/{repo}/actions/runs/{gh_run}" if gh_run else "n/a"
           status = "passed" if os.environ.get("SMOKE_STEP_OUTCOME") == "success" else "failed"
 
           text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
@@ -173,11 +178,52 @@ jobs:
               f"- Projection applied: {projection_applied}",
               f"- Search match: {search_matched}",
               f"- Log artifact: e2e-smoke-staging-log-{os.environ.get('GITHUB_RUN_ID', 'n/a')}",
+              "",
+              "#### Drill evidence (TAR-67 / TAR-69)",
+              "",
+              f"- Attach this workflow run URL to Linear when filing drill evidence: `{run_url}`",
+              "- Gate D style IDs above pair with [first vertical slice exit gates](https://github.com/"
+              + repo
+              + "/blob/main/docs/runbooks/first-vertical-slice-exit-gates.md).",
+              "- MVP acceptance evidence pack: [tar64-tar85-evidence-capture.md](https://github.com/"
+              + repo
+              + "/blob/main/docs/runbooks/tar64-tar85-evidence-capture.md).",
           ]
           summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+          evidence_path = Path(os.environ["EVIDENCE_DIR"]) / "e2e-smoke-staging-drill.json"
+          evidence_path.parent.mkdir(parents=True, exist_ok=True)
+          evidence_path.write_text(
+              json.dumps(
+                  {
+                      "workflow_run_url": run_url,
+                      "github_run_id": gh_run,
+                      "environment": os.environ.get("TARGET_ENV", "staging"),
+                      "smoke_outcome": status,
+                      "source_id": source_id,
+                      "source_version_id": version_id,
+                      "platform_control_run_id": run_id,
+                      "legal_search_document_id": document_id,
+                      "projection_applied": projection_applied,
+                      "search_matched": search_matched,
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
           PY
         env:
           SMOKE_STEP_OUTCOME: ${{ steps.smoke.outcome }}
+
+      - name: Upload drill evidence JSON
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-smoke-staging-drill-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}/e2e-smoke-staging-drill.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Notify Slack on failure
         if: failure() && env.SLACK_WEBHOOK_URL != ''
