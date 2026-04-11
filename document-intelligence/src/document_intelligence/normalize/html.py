@@ -17,6 +17,7 @@ class _SimpleHtmlParser(HTMLParser):
         "template",
         "svg",
         "canvas",
+        "header",
         "nav",
         "footer",
         "aside",
