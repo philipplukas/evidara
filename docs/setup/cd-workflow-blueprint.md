@@ -122,6 +122,8 @@ on push to main (path-filtered)
   -> build + test + publish artifact
   -> deploy_dev (environment=dev)
   -> verify_dev smoke
+  -> deploy_staging (environment=staging, optional gate)
+  -> verify_staging smoke
   -> deploy_prod (environment=prod, approval required)
   -> verify_prod smoke
 ```
@@ -171,9 +173,22 @@ jobs:
       - name: Smoke check dev
         run: echo "Run service health/smoke tests"
 
-  deploy_prod:
+  deploy_staging:
     runs-on: ubuntu-latest
     needs: [build_and_publish, deploy_dev]
+    environment: staging
+    steps:
+      - name: Auth to GCP (OIDC)
+        run: echo "Authenticate with staging service account"
+      - name: Deploy to Cloud Run staging
+        run: |
+          echo "gcloud run deploy ... --image '${{ needs.build_and_publish.outputs.image_digest }}'"
+      - name: Smoke check staging
+        run: echo "Run service health/smoke tests"
+
+  deploy_prod:
+    runs-on: ubuntu-latest
+    needs: [build_and_publish, deploy_staging]
     environment: prod
     steps:
       - name: Auth to GCP (OIDC)
@@ -253,6 +268,27 @@ jobs:
       - name: Run post-deploy smoke
         run: echo "Run prod smoke and fail fast on contract regressions"
 ```
+
+## Implemented reference workflows (this repo)
+
+These are concrete implementations of the patterns above (use them as the “real” blueprint when docs and skeleton diverge):
+
+### Databricks bundle CD
+
+- Workflow: [`.github/workflows/document-intelligence-cd.yml`](../../.github/workflows/document-intelligence-cd.yml)
+- Bundle targets: [`document-intelligence/databricks.yml`](../../document-intelligence/databricks.yml)
+- Promotion: `dev -> staging -> prod` with GitHub Environments (`dev`, `staging`, `prod`)
+
+### GCP `runtime_stack` Terraform
+
+- Workflow: [`.github/workflows/terraform.yml`](../../.github/workflows/terraform.yml)
+- Terraform root: [`infra/terraform/gcp/runtime_stack`](../../infra/terraform/gcp/runtime_stack)
+- Checked-in tfvars examples: [`infra/env/README.md`](../../infra/env/README.md)
+- PR plans: separate plan comments for **dev** and **staging** (each uses a `*.ci.tfvars` overlay to keep CI plans safe)
+- `main` applies: `apply-dev` → optional `apply-staging` → optional `apply-prod`, gated by repo variables:
+  - `TERRAFORM_APPLY_ENABLED`
+  - `TERRAFORM_APPLY_ENABLED_STAGING`
+  - `TERRAFORM_APPLY_ENABLED_PROD`
 
 ## Infra Workflow Separation
 
