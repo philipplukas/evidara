@@ -32,6 +32,38 @@ This directory documents the first Databricks-oriented runtime packaging for `do
 
 ## Validation and deployment
 
+### CLI auth (no pasted PATs in the shell history)
+
+0. **One-shot login check** (optional): prompts for **gh**, **gcloud** (and optional ADC), and **databricks** profiles `dev` / `staging` / `prod`:
+
+   ```bash
+   ../scripts/ensure-evidara-cli-auth.sh
+   ```
+
+1. **Databricks** (Terraform + bundle): use the official CLI so tokens stay short-lived where possible.
+
+   ```bash
+   databricks auth login   # or: databricks configure --token (legacy)
+   ```
+
+   Then load host + token for the profile you use for **dev** (repeat with other profiles for staging/prod):
+
+   ```bash
+   eval "$(../scripts/export-databricks-auth-env.sh --profile dev)"
+   ```
+
+   Run Terraform from the repo root with that environment in your shell, or pass the same exports into CI.
+
+2. **GitHub Actions** optional policy override: after the guardrails policy exists in the workspace, push its id into the environment secret using **Databricks + gh** CLIs (no UI copy/paste):
+
+   ```bash
+   ../scripts/sync-databricks-cluster-policy-github-secret.sh --env dev --profile dev --apply
+   ```
+
+3. **GCP** identity tokens for Cloud Run are already scripted as `../scripts/mint-cloud-run-tokens.sh` (see [docs/setup/gcp-local-cloud-run-auth.md](../../docs/setup/gcp-local-cloud-run-auth.md)).
+
+4. **Bulk GitHub CD sync** (variables + `DATABRICKS_*` secrets from GSM or CLI profiles): `../scripts/sync-github-cd-config.sh --help`
+
 Typical commands from the `document-intelligence/` directory:
 
 ```bash
@@ -39,6 +71,7 @@ cd ..
 bash scripts/check-document-intelligence-runtime.sh
 
 # then deploy from the component directory
+eval "$(../scripts/export-databricks-auth-env.sh --profile dev)"
 cd document-intelligence
 databricks bundle validate -t dev
 databricks bundle validate -t staging
@@ -69,7 +102,7 @@ This slice does not yet include:
 
 Typical infra flow:
 
-1. Plan/apply the stack in [`../../infra/terraform/databricks/document_intelligence_stack/`](../../infra/terraform/databricks/document_intelligence_stack/) with an env file from [`../../infra/env/`](../../infra/env/).
-2. Deploy the Asset Bundle job.
+1. Plan/apply the stack in [`../../infra/terraform/databricks/document_intelligence_stack/`](../../infra/terraform/databricks/document_intelligence_stack/) with an env file from [`../../infra/env/`](../../infra/env/). When `enable_databricks_compute_guardrails` is true, this creates the cluster policy **`Evidara compute guardrails`** that the bundle resolves by name for every job cluster.
+2. Deploy the Asset Bundle job (`databricks bundle validate` / `deploy` need that policy to exist in the workspace, unless you override `compute_guardrails_policy_id` with `--var`).
 3. Run the DI job so Delta data lands at the published-surface root.
 4. Register the published surfaces using the bootstrap SQL.

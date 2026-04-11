@@ -258,3 +258,9 @@ runtime_service_account_ids = {
   legal_search_frontend   = "evd-ls-frontend"
   document_intelligence   = "evd-di-consumer"
 }
+
+# --- Optional billing guardrails (Cloud Billing budgets) ---
+# See infra/terraform/gcp/runtime_stack/billing_guardrails.tf and dev/runtime.gcp.tfvars.example.
+# enable_billing_budget = false
+
+enable_billing_budget = false

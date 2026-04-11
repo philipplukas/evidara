@@ -259,3 +259,65 @@ variable "runtime_secret_ids" {
     platform_control_dsn = "platform-control-database-url"
   }
 }
+
+# --- Optional billing guardrails (see billing_guardrails.tf) ---
+
+variable "enable_billing_budget" {
+  description = "When true, create a Cloud Billing budget scoped to this project."
+  type        = bool
+  default     = false
+}
+
+variable "billing_account_id" {
+  description = "GCP billing account ID (format 012345-67890A-BCEDF0). Required when enable_billing_budget is true."
+  type        = string
+  default     = ""
+}
+
+variable "billing_budget_amount_units" {
+  description = "Whole currency units for the monthly project budget (string for API compatibility, e.g. \"500\")."
+  type        = string
+  default     = "500"
+}
+
+variable "billing_budget_currency_code" {
+  description = "ISO 4217 currency code for the budget amount."
+  type        = string
+  default     = "EUR"
+}
+
+variable "billing_budget_threshold_percentages" {
+  description = "Alert thresholds as fractions of the budget (0–1, for example 0.5 for 50%)."
+  type        = list(number)
+  default     = [0.5, 0.8, 1.0]
+
+  validation {
+    condition = alltrue([
+      for p in var.billing_budget_threshold_percentages : p > 0 && p <= 1
+    ])
+    error_message = "Each billing_budget_threshold_percentages entry must be in (0, 1]."
+  }
+}
+
+variable "billing_budget_notification_emails" {
+  description = "Extra alert recipients via Cloud Monitoring email channels in this project (in addition to billing admins unless disabled). When non-empty, an all_updates_rule is created; GCP allows at most five channels."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.billing_budget_notification_emails) <= 5
+    error_message = "billing_budget_notification_emails may contain at most five addresses (GCP limit)."
+  }
+}
+
+variable "billing_budget_enable_project_level_recipients" {
+  description = "When custom notification emails are set, also notify Cloud project Owners for this single-project budget."
+  type        = bool
+  default     = true
+}
+
+variable "billing_budget_disable_default_iam_recipients" {
+  description = "When true, billing account admins do not receive budget alerts by default; use billing_budget_notification_emails instead."
+  type        = bool
+  default     = false
+}

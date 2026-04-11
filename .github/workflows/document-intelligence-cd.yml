@@ -36,13 +36,27 @@ jobs:
 
       - name: Validate Databricks bundle (dev)
         working-directory: document-intelligence
+        env:
+          COMPUTE_GUARDRAILS_POLICY_ID: ${{ secrets.DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID }}
         run: |
-          databricks bundle validate --target dev --var "workspace_host=${DATABRICKS_HOST}"
+          set -euo pipefail
+          extra=()
+          if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
+            extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
+          fi
+          databricks bundle validate --target dev --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
 
       - name: Deploy Databricks bundle (dev)
         working-directory: document-intelligence
+        env:
+          COMPUTE_GUARDRAILS_POLICY_ID: ${{ secrets.DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID }}
         run: |
-          databricks bundle deploy --target dev --var "workspace_host=${DATABRICKS_HOST}"
+          set -euo pipefail
+          extra=()
+          if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
+            extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
+          fi
+          databricks bundle deploy --target dev --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
 
   deploy-staging:
     name: Deploy bundle to staging
@@ -61,13 +75,27 @@ jobs:
 
       - name: Validate Databricks bundle (staging)
         working-directory: document-intelligence
+        env:
+          COMPUTE_GUARDRAILS_POLICY_ID: ${{ secrets.DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID }}
         run: |
-          databricks bundle validate --target staging --var "workspace_host=${DATABRICKS_HOST}"
+          set -euo pipefail
+          extra=()
+          if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
+            extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
+          fi
+          databricks bundle validate --target staging --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
 
       - name: Deploy Databricks bundle (staging)
         working-directory: document-intelligence
+        env:
+          COMPUTE_GUARDRAILS_POLICY_ID: ${{ secrets.DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID }}
         run: |
-          databricks bundle deploy --target staging --var "workspace_host=${DATABRICKS_HOST}"
+          set -euo pipefail
+          extra=()
+          if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
+            extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
+          fi
+          databricks bundle deploy --target staging --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
 
   deploy-prod:
     name: Deploy bundle to prod
@@ -88,10 +116,24 @@ jobs:
 
       - name: Validate Databricks bundle (prod)
         working-directory: document-intelligence
+        env:
+          COMPUTE_GUARDRAILS_POLICY_ID: ${{ secrets.DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID }}
         run: |
-          databricks bundle validate --target prod --var "workspace_host=${DATABRICKS_HOST}"
+          set -euo pipefail
+          extra=()
+          if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
+            extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
+          fi
+          databricks bundle validate --target prod --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
 
       - name: Deploy Databricks bundle (prod)
         working-directory: document-intelligence
+        env:
+          COMPUTE_GUARDRAILS_POLICY_ID: ${{ secrets.DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID }}
         run: |
-          databricks bundle deploy --target prod --var "workspace_host=${DATABRICKS_HOST}"
+          set -euo pipefail
+          extra=()
+          if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
+            extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
+          fi
+          databricks bundle deploy --target prod --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"

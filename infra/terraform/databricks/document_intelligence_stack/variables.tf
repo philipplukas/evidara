@@ -83,3 +83,46 @@ variable "external_location_grants" {
   }))
   default = []
 }
+
+# --- Optional compute guardrails (see compute_guardrails.tf) ---
+
+variable "enable_databricks_compute_guardrails" {
+  description = "When true, create a workspace cluster policy with DBU/hour and worker caps, and grant CAN_USE to the configured group."
+  type        = bool
+  default     = false
+}
+
+variable "databricks_guardrails_max_workers" {
+  description = "Maximum workers (fixed or autoscale) allowed by the guardrails cluster policy."
+  type        = number
+  default     = 8
+
+  validation {
+    condition     = var.databricks_guardrails_max_workers >= 1
+    error_message = "databricks_guardrails_max_workers must be at least 1."
+  }
+}
+
+variable "databricks_guardrails_max_dbu_per_hour" {
+  description = "Maximum DBU per hour per cluster enforced by the guardrails policy."
+  type        = number
+  default     = 25
+
+  validation {
+    condition     = var.databricks_guardrails_max_dbu_per_hour > 0
+    error_message = "databricks_guardrails_max_dbu_per_hour must be positive."
+  }
+}
+
+variable "databricks_guardrails_grant_can_use_group" {
+  description = "Workspace group that may attach the guardrails cluster policy (typically \"users\")."
+  type        = string
+  default     = "users"
+}
+
+variable "databricks_guardrails_cluster_policy_definition_override" {
+  description = "Optional raw JSON policy definition; when null, a default policy is built from the max_workers and max_dbu_per_hour variables."
+  type        = string
+  default     = null
+  nullable    = true
+}

@@ -77,3 +77,8 @@ output "cloud_run_job_names" {
     key => job.name
   }
 }
+
+output "billing_budget_resource_name" {
+  description = "Resource name of the project-scoped billing budget when enable_billing_budget is true (for API or Console deep links)."
+  value       = var.enable_billing_budget ? google_billing_budget.project_spend[0].name : null
+}

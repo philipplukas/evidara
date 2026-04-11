@@ -49,6 +49,14 @@ variables:
   spacy_batch_size:
     description: Batch size for spaCy pipeline execution.
     default: "32"
+  compute_guardrails_policy_id:
+    description: |
+      Cluster policy ID applied to all job task new_cluster definitions.
+      Resolved by name in the target workspace; create with Terraform
+      (document_intelligence_stack, enable_databricks_compute_guardrails).
+      Override with --var when needed (for example if the policy is not provisioned yet).
+    lookup:
+      cluster_policy: "Evidara compute guardrails"
 
 targets:
   dev:

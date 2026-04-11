@@ -33,3 +33,7 @@ external_location_grants = [
     privileges = ["CREATE_EXTERNAL_TABLE", "READ_FILES", "WRITE_FILES"]
   },
 ]
+
+# Compute guardrails — cluster policy "Evidara compute guardrails" (see compute_guardrails.tf).
+# The document-intelligence Asset Bundle resolves it by name for job clusters.
+enable_databricks_compute_guardrails = true

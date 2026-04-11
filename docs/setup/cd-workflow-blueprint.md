@@ -51,7 +51,7 @@ For `document-intelligence` specifically, configure per-environment secrets:
 
 Repository environments/variables/secrets can be provisioned via Terraform in [`../../infra/terraform/github/repo_settings`](../../infra/terraform/github/repo_settings) with example inputs in [`../../infra/env/github.repo_settings.tfvars.example`](../../infra/env/github.repo_settings.tfvars.example).
 
-For CLI-driven synchronization (discovery via `gcloud`/Databricks CLI and write via `gh`), use [`../../scripts/sync-github-cd-config.sh`](../../scripts/sync-github-cd-config.sh). It supports dry-run by default, optional secret sync via Google Secret Manager, optional Databricks PAT sourcing from local Databricks CLI profiles (`--databricks-token-source profile`) with Secret Manager rotation, auto-detection for common WIF/token naming patterns, and an `--interactive` mode for account/project selection when gcloud context needs fixing.
+For CLI-driven synchronization (discovery via `gcloud`/Databricks CLI and write via `gh`), use [`../../scripts/sync-github-cd-config.sh`](../../scripts/sync-github-cd-config.sh). It supports dry-run by default, optional secret sync via Google Secret Manager, optional Databricks PAT sourcing from local Databricks CLI profiles (`--databricks-token-source profile`) with Secret Manager rotation, auto-detection for common WIF/token naming patterns, GitHub environment **staging** (with `--staging-project`), optional **`--sync-databricks-compute-policy-ids`**, and an `--interactive` mode for account/project selection when gcloud context needs fixing. Run [`../../scripts/ensure-evidara-cli-auth.sh`](../../scripts/ensure-evidara-cli-auth.sh) first if you need guided **gh** / **gcloud** / **databricks** logins.
 
 Recommended first run:
 

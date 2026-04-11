@@ -33,3 +33,6 @@ external_location_grants = [
     privileges = ["CREATE_EXTERNAL_TABLE", "READ_FILES", "WRITE_FILES"]
   },
 ]
+
+# Compute guardrails — see infra/terraform/databricks/document_intelligence_stack/compute_guardrails.tf
+enable_databricks_compute_guardrails = true
