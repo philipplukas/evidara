@@ -53,6 +53,7 @@ jobs:
           python -m unittest discover -s scripts/tests -p "test_check_contract_manifest.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay_at.py"
+          python -m unittest discover -s scripts/tests -p "test_analyze_github_actions_queue.py"
 
       - name: Enforce contract manifest version bump
         run: |
