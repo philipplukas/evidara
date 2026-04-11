@@ -314,7 +314,8 @@ class SparkDeltaCanonicalSink(CanonicalSink):
             json_records = [json.dumps(row, default=str) for row in ready]
             rdd = spark.sparkContext.parallelize(json_records)  # type: ignore[attr-defined]
             df = spark.read.json(rdd)  # type: ignore[attr-defined]
-            df.write.format("delta").mode("append").option("mergeSchema", "true").save(uri)  # type: ignore[attr-defined]
+            writer = df.write.format("delta").mode("append")  # type: ignore[attr-defined]
+            writer.option("mergeSchema", "true").save(uri)
         except ProcessingError:
             raise
         except Exception as error:  # pragma: no cover - library-specific

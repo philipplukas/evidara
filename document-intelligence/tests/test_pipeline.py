@@ -553,3 +553,109 @@ class ProcessingPipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SectionCitationExtractionTests(unittest.TestCase):
+    """Verify that per-section citation extraction is performed in _build_sections."""
+
+    CITATION_HTML = """
+    <html><head><title>Legal Document with Citations</title></head>
+    <body>
+      <h1>Overview</h1>
+      <p>This section cites no specific law.</p>
+      <h2>Legal Basis</h2>
+      <p>Pursuant to SR 210 (ZGB) and Art. 8 EMRK, the following applies.</p>
+      <h2>Case Law</h2>
+      <p>BGE 147 III 49 is the leading authority here.</p>
+    </body>
+    </html>
+    """
+
+    def test_sections_without_citations_have_no_citations_key(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(self.CITATION_HTML)
+            artifact_path = html_handle.name
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(build_manifest_payload(artifact_path, artifact_role="primary_document"), manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_test").process_event(
+                build_bundle_event(manifest_path)
+            )
+            overview_sections = [s for s in result.sections if s.title and "Overview" in s.title]
+            self.assertEqual(len(overview_sections), 1)
+            # The overview section has no citations
+            self.assertNotIn("citations", overview_sections[0].metadata)
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_sections_with_citations_have_citations_in_metadata(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(self.CITATION_HTML)
+            artifact_path = html_handle.name
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(build_manifest_payload(artifact_path, artifact_role="primary_document"), manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_test").process_event(
+                build_bundle_event(manifest_path)
+            )
+            legal_basis_sections = [s for s in result.sections if s.title and "Legal Basis" in s.title]
+            self.assertEqual(len(legal_basis_sections), 1)
+            section = legal_basis_sections[0]
+            self.assertIn("citations", section.metadata)
+            citation_types = {c["citation_type"] for c in section.metadata["citations"]}
+            self.assertIn("sr", citation_types)
+            self.assertIn("article", citation_types)
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_bge_citation_extracted_in_case_law_section(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(self.CITATION_HTML)
+            artifact_path = html_handle.name
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(build_manifest_payload(artifact_path, artifact_role="primary_document"), manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_test").process_event(
+                build_bundle_event(manifest_path)
+            )
+            case_law_sections = [s for s in result.sections if s.title and "Case Law" in s.title]
+            self.assertEqual(len(case_law_sections), 1)
+            section = case_law_sections[0]
+            self.assertIn("citations", section.metadata)
+            bge_citations = [c for c in section.metadata["citations"] if c["citation_type"] == "bge"]
+            self.assertEqual(len(bge_citations), 1)
+            self.assertIn("BGE 147 III 49", bge_citations[0]["text"])
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_citation_metadata_contains_required_fields(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(self.CITATION_HTML)
+            artifact_path = html_handle.name
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(build_manifest_payload(artifact_path, artifact_role="primary_document"), manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_test").process_event(
+                build_bundle_event(manifest_path)
+            )
+            for section in result.sections:
+                if "citations" in section.metadata:
+                    for cit in section.metadata["citations"]:
+                        self.assertIn("text", cit)
+                        self.assertIn("citation_type", cit)
+                        self.assertIn("start", cit)
+                        self.assertIn("end", cit)
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
