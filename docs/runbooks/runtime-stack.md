@@ -218,12 +218,45 @@ gcloud builds submit . \
 
 **DI HTTP ingress only:** the main `document-intelligence/Dockerfile` (used by `runtime-images.yml` for `di-consumer`) now runs the push-based `document_intelligence_runtime_ingress`. `document-intelligence/Dockerfile.runtime-ingress` is equivalent but uses a different build context (for standalone `gcloud builds submit` from the `document-intelligence/` directory; see `cloudbuild.runtime-ingress.yaml`).
 
+### Databricks bundle deploy (document-intelligence-cd.yml)
+
+**Trigger**: Push to `main` (path-filtered) for `document-intelligence/**`, selected `contracts/**` paths, and the workflow file itself.
+
+**Promotion chain:** `dev -> staging -> prod` as separate GitHub Actions jobs:
+
+1. `deploy-dev` (`environment: dev`)
+2. `deploy-staging` (`environment: staging`, `needs: deploy-dev`)
+3. `deploy-prod` (`environment: prod`, `needs: [deploy-dev, deploy-staging]`)
+
+**Auth:** each job uses `DATABRICKS_HOST` + `DATABRICKS_TOKEN` from the active GitHub Environment secrets.
+
+**Targets:** bundle targets live in [`document-intelligence/databricks.yml`](../../document-intelligence/databricks.yml) (`dev`, `staging`, `prod`).
+
+**Operator checklist after merge:**
+
+- Confirm the workflow run for the merge commit is green end-to-end (staging is now a hard prerequisite for prod in this workflow).
+- If prod should require human approval, enforce it via GitHub Environment protection rules on `prod` (and optionally `staging`).
+
 ### Infrastructure (terraform.yml)
 
 **Trigger**: Push to `main` affecting `infra/terraform/gcp/runtime_stack/**` or checked-in runtime tfvars examples under `infra/env/{dev,staging,prod}/`.
 
-- **PR**: `fmt -check` → `validate` → `plan` for **dev** and **staging** (posted as separate PR comments)
-- **Main**: `terraform apply -auto-approve` with an explicit **dev → staging → prod** gate chain (staging/prod are controlled by repo variables)
+- **PR**: `fmt-check` → separate `plan-dev` + `plan-staging` jobs (`validate` + `plan`, posted as **two** PR comments)
+- **Main**: `apply-dev` → optional `apply-staging` → optional `apply-prod` (`terraform apply -auto-approve` in each job)
+
+**Tfvars layering (important):**
+
+- **Examples** (`infra/env/*/runtime.gcp.tfvars.example`) describe the intended runtime wiring for each environment.
+- **CI overlays** (`infra/env/*/runtime.gcp.ci.tfvars`) intentionally null out a few expensive / environment-specific edges (notably DI published surfaces + push subscriptions) so PR plans can run safely against the CI GCP project.
+- `*.tfvars` files are ignored by default in `.gitignore`; the CI overlay files are tracked via `git add -f` (same pattern as `infra/env/dev/runtime.gcp.ci.tfvars`).
+
+**Repo variables (promotion gates on `main`):**
+
+- `TERRAFORM_APPLY_ENABLED` → runs `apply-dev`
+- `TERRAFORM_APPLY_ENABLED_STAGING` → runs `apply-staging` after dev succeeds
+- `TERRAFORM_APPLY_ENABLED_PROD` → runs `apply-prod` after dev succeeds and staging is **success or skipped**
+
+**Traceability:** each apply job writes a small table to the GitHub Actions job summary including the commit SHA, tfvars paths, and (for dev) the resolved staging gate flag.
 
 ## Prerequisites
 
