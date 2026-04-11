@@ -26,10 +26,11 @@ As of **2026-04-11**, the **repo-side** splits below are largely landed on `main
 - **Lane 1 (`TAR-62`):** staging bundle promotion, runtime promotion gating, and promotion runbook/docs (`#187`, `#188`, `#189`).
 - **Lane 2 (`TAR-63`) + Lane 4 (`TAR-85`) + Lane 5 (`TAR-139`) (combined delivery):** replay checkpoint metadata, MVP acceptance / CLI workflow hardening, read-only OpenAPI discovery helpers, and related surfaces (`#190`). Follow the file-level ownership table above when making new edits so two branches do not fight the same seam.
 - **Lane 3 (`TAR-67` + `TAR-69`):** drill runbook alignment, readiness / staging evidence workflows, and phase-5 memo + MVP demo recommendation package (`#191`, `#192`, `#193`).
+- **Follow-on merges same window:** projection title enrichment (`#185`), HTML normalizer chrome skip for **TAR-66** (`#195`), and **Lane 5 PR 3** tag-only `agent-discovery` surface on both OpenAPI specs + manifest bump (`#196`).
 
 **Still outside git (operator / Linear):** fresh evidence for **TAR-64** (dev smokes), **TAR-77** (branch protection + release readiness), **TAR-85** (staging MVP acceptance), and **executed** **TAR-67** drills with workflow URLs and downloaded artifacts — see [phase-5 go / no-go memo](../runbooks/phase-5-go-no-go-memo.md) section 5 and [MVP demo release recommendation](../runbooks/mvp-demo-release-recommendation.md).
 
-**Optional later:** Lane **5 PR 3** (contract-backed agent workflow operations) only if discovery proves new APIs are required; treat as contract-first and serialize on OpenAPI files per [max-parallel-execution](max-parallel-execution.md).
+**Later (only if needed):** new **HTTP** workflow or journal APIs for agents — contract-first PR; serialize on OpenAPI files per [max-parallel-execution](max-parallel-execution.md). The **`agent-discovery`** tag (`#196`) is metadata only and does not replace that work when mutating endpoints are required.
 
 ## Shared Rules
 
