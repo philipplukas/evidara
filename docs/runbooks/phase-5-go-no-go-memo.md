@@ -71,12 +71,12 @@ From repo root: `bash scripts/check_docs.sh`, `bash scripts/check-legal-search.s
 
 Execute after MVP path is credible (TAR-64 green):
 
-1. **[TAR-66](https://linear.app/tart-baozi/issue/TAR-66)** — Harden HTML parsing + corpus fixtures (ingest stability).  
+1. **[TAR-66](https://linear.app/tart-baozi/issue/TAR-66)** — Harden HTML parsing + corpus fixtures (ingest stability). **Repo:** header chrome skip + regression tests merged ([#195](https://github.com/philipplukas/evidara/pull/195)); extend or close in Linear if remaining scope is fixture-only.  
 2. **[TAR-62](https://linear.app/tart-baozi/issue/TAR-62)** — Automate DI + infra promotion (dev → staging → prod).  
 3. **[TAR-63](https://linear.app/tart-baozi/issue/TAR-63)** — Resumable replay / checkpoint orchestration (platform-control).  
 4. **[TAR-67](https://linear.app/tart-baozi/issue/TAR-67)** — Operational drills + runbook verification (withdrawal, DLQ, alias rollback). **Repo surfaces for drill evidence are on `main` (2026-04-11);** operators must still **run** drills and attach URLs + artifacts per section 2.1.
 
-Optional parallel: [TAR-139](https://linear.app/tart-baozi/issue/TAR-139) (agent workflow surface) after CLI stabilizes; wizard epic [TAR-106](https://linear.app/tart-baozi/issue/TAR-106) is post-M5.
+Optional parallel: [TAR-139](https://linear.app/tart-baozi/issue/TAR-139) (agent workflow surface) — **`agent-discovery` OpenAPI tags** landed ([#196](https://github.com/philipplukas/evidara/pull/196)); journal / mutating workflow APIs remain future if needed. Wizard epic [TAR-106](https://linear.app/tart-baozi/issue/TAR-106) is post-M5.
 
 ## Related docs
 
