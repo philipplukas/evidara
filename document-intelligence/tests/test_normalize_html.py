@@ -49,6 +49,33 @@ class NormalizeHtmlDocumentTests(unittest.TestCase):
         self.assertEqual(len(ir.blocks), 1)
         self.assertIn("recover me", ir.blocks[0].text)
 
+    def test_main_wraps_div_extracts_without_fallback(self) -> None:
+        """Semantic outer <main> keeps prose inside nested <div> without tag-strip fallback."""
+        html = (
+            '<!DOCTYPE html><html lang="de"><head><title>BGE 99 II 1</title></head>'
+            "<body><main><div>Leitsatz: Haftung des Arbeitgebers. Art. 109 OR.</div></main></body></html>"
+        )
+        ir = normalize_html_document(html, "art_main_div")
+        self.assertFalse(ir.metadata.get("html_parse_used_fallback"))
+        self.assertEqual(ir.metadata.get("title"), "BGE 99 II 1")
+        self.assertEqual(len(ir.blocks), 1)
+        self.assertIn("Art. 109 OR", ir.blocks[0].text)
+        self.assertNotIn("fallback", ir.blocks[0].attrs)
+
+    def test_header_chrome_skipped_body_keeps_paragraph(self) -> None:
+        html = (
+            "<!DOCTYPE html><html><head><title>Test</title></head>"
+            "<body>"
+            "<header><nav>Site menu noise</nav></header>"
+            "<p>Binding body paragraph.</p>"
+            "</body></html>"
+        )
+        ir = normalize_html_document(html, "art_header")
+        self.assertFalse(ir.metadata.get("html_parse_used_fallback"))
+        self.assertEqual(len(ir.blocks), 1)
+        self.assertEqual(ir.blocks[0].text, "Binding body paragraph.")
+        self.assertNotIn("Site menu", ir.blocks[0].text)
+
 
 if __name__ == "__main__":
     unittest.main()
