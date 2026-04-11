@@ -373,13 +373,11 @@ gcloud run jobs execute os-alias-check-staging \
 
 ### 7. Release Readiness Go/No-Go Operation
 
-`Release Readiness` is the release-lane gate of truth for the GitHub Actions
-**`staging`** environment (WIF + GCP project / GCS vars used by that env). It
-evaluates six gating signals together:
+`Release Readiness` is the release-lane gate for the GitHub Actions **environment** chosen by repository variable **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** (default **`staging`**). That environment supplies WIF secrets; **`GCP_PROJECT_ID`**, **`DI_SURFACES_ROOT_URI`**, and **`INTERACTION_FLOW_EVIDENCE_GCS_ROOT`** follow **`dev`** vs **`staging`** repo variables as in [`.github/workflows/release-readiness.yml`](../../.github/workflows/release-readiness.yml). It evaluates six gating signals together:
 
-1. Latest **E2E smoke** result — workflow name defaults to `E2E Smoke Staging`; set repository variable **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** to `E2E Smoke Dev` when your org is **dev-first** and does not run staging smoke on every train (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)).
-2. Latest `Interaction Flow Staging Evidence` result
-3. Interaction-flow artifact completeness quick-check
+1. Latest **E2E smoke** result — workflow name defaults to `E2E Smoke Staging`; set **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** to `E2E Smoke Dev` when you run the dev smoke train (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)).
+2. Latest **`Interaction Flow Staging Evidence`** result (workflow name is still staging-oriented; dev-first orgs may keep this cadence or accept a NO-GO on this row until a dev interaction-flow exists)
+3. Interaction-flow artifact completeness quick-check (`scripts/check-latest-interaction-flow-evidence.sh --mode staging`)
 4. Latest `Terraform` workflow result
 5. DI schema drift preflight
 6. DLQ depth (15-minute max undelivered messages)
@@ -400,7 +398,13 @@ gh workflow run "Release Readiness" -f strict=true
 gh workflow run "Release Readiness" -f strict=false
 ```
 
-**Repository variable (optional):** `RELEASE_READINESS_E2E_SMOKE_WORKFLOW` — exact GitHub Actions workflow **display name** to treat as the smoke gate (must match `name:` in that workflow file). Default when unset: `E2E Smoke Staging`. Dev-first: set to `E2E Smoke Dev` so Release Readiness does not wait on a workflow you never run.
+**Repository variables (optional):**
+
+| Variable | Purpose |
+| -------- | ------- |
+| `RELEASE_READINESS_GITHUB_ENVIRONMENT` | GitHub **Environment** name for the job (`staging` default). Set to **`dev`** so OIDC uses the **`dev`** environment secrets and GCP project/DI vars resolve to `*_DEV` (same idea as [E2E Smoke Dev](../../.github/workflows/e2e-smoke-dev.yml)). |
+| `RELEASE_READINESS_E2E_SMOKE_WORKFLOW` | Exact Actions workflow **display name** for the smoke gate (`E2E Smoke Staging` default). Dev-first: **`E2E Smoke Dev`**. |
+| `RELEASE_READINESS_DLQ_SUBSCRIPTION_REGEX` | Monitoring filter regex for DLQ subscription IDs (defaults: **`.*-dev-dlq-sub`** when GitHub env is `dev`, else **`.*-staging-dlq-sub`**). |
 
 #### Required status check on `main`
 

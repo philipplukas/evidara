@@ -22,16 +22,21 @@ permissions:
 jobs:
   release-readiness:
     runs-on: ubuntu-latest
-    environment: staging
+    # Dev-first: set repository variable RELEASE_READINESS_GITHUB_ENVIRONMENT to "dev"
+    # (GitHub Environment must exist with WIF secrets for that env — same pattern as E2E Smoke Dev).
+    environment: ${{ vars.RELEASE_READINESS_GITHUB_ENVIRONMENT || 'staging' }}
     env:
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}
+      RR_GITHUB_ENVIRONMENT: ${{ vars.RELEASE_READINESS_GITHUB_ENVIRONMENT || 'staging' }}
+      GCP_PROJECT_ID: ${{ vars.RELEASE_READINESS_GITHUB_ENVIRONMENT == 'dev' && vars.GCP_PROJECT_ID_DEV || vars.GCP_PROJECT_ID_STAGING }}
       GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
-      DI_SURFACES_ROOT_URI: ${{ vars.DI_SURFACES_ROOT_URI_STAGING }}
-      INTERACTION_FLOW_EVIDENCE_GCS_ROOT: ${{ vars.INTERACTION_FLOW_EVIDENCE_GCS_ROOT_STAGING || vars.DI_SURFACES_ROOT_URI_STAGING }}
+      DI_SURFACES_ROOT_URI: ${{ vars.RELEASE_READINESS_GITHUB_ENVIRONMENT == 'dev' && vars.DI_SURFACES_ROOT_URI_DEV || vars.DI_SURFACES_ROOT_URI_STAGING }}
+      INTERACTION_FLOW_EVIDENCE_GCS_ROOT: ${{ vars.RELEASE_READINESS_GITHUB_ENVIRONMENT == 'dev' && (vars.INTERACTION_FLOW_EVIDENCE_GCS_ROOT_DEV || vars.DI_SURFACES_ROOT_URI_DEV) || (vars.INTERACTION_FLOW_EVIDENCE_GCS_ROOT_STAGING || vars.DI_SURFACES_ROOT_URI_STAGING) }}
       TERRAFORM_APPLY_ENABLED: ${{ vars.TERRAFORM_APPLY_ENABLED || 'false' }}
       REPORT_PATH: tmp/release-readiness/report.md
-      # Dev-first orgs: set repo variable RELEASE_READINESS_E2E_SMOKE_WORKFLOW to "E2E Smoke Dev"
+      # Dev-first: set RELEASE_READINESS_E2E_SMOKE_WORKFLOW to "E2E Smoke Dev"
       E2E_SMOKE_WORKFLOW_NAME: ${{ vars.RELEASE_READINESS_E2E_SMOKE_WORKFLOW || 'E2E Smoke Staging' }}
+      # Override when DLQ subscription IDs do not match .*-(dev|staging)-dlq-sub
+      DLQ_SUBSCRIPTION_REGEX: ${{ vars.RELEASE_READINESS_DLQ_SUBSCRIPTION_REGEX || (vars.RELEASE_READINESS_GITHUB_ENVIRONMENT == 'dev' && '.*-dev-dlq-sub' || '.*-staging-dlq-sub') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -40,7 +45,7 @@ jobs:
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+          service_account: ${{ vars.RELEASE_READINESS_GITHUB_ENVIRONMENT == 'dev' && secrets.GCP_SERVICE_ACCOUNT_DEV || secrets.GCP_SERVICE_ACCOUNT_STAGING }}
 
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v3
@@ -209,7 +214,7 @@ jobs:
               sys.exit(2)
           PY
 
-      - name: Check staging DI schema drift
+      - name: Check DI surface schema drift (target GCP project)
         id: di_drift
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
         run: |
@@ -218,7 +223,7 @@ jobs:
             --project "${GCP_PROJECT_ID}" \
             --surfaces-root-uri "${DI_SURFACES_ROOT_URI}"
 
-      - name: Query staging DLQ depth
+      - name: Query DLQ depth (Pub/Sub monitoring)
         id: dlq_gate
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
         run: |
@@ -226,10 +231,11 @@ jobs:
           TOKEN="$(gcloud auth print-access-token)"
           END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           START="$(date -u -d '15 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
+          dlq_regex="${DLQ_SUBSCRIPTION_REGEX:?}"
           curl -sS -G \
             -H "Authorization: Bearer ${TOKEN}" \
             "https://monitoring.googleapis.com/v3/projects/${GCP_PROJECT_ID}/timeSeries" \
-            --data-urlencode 'filter=metric.type="pubsub.googleapis.com/subscription/num_undelivered_messages" AND resource.type="pubsub_subscription" AND resource.labels.subscription_id=monitoring.regex.full_match(".*-staging-dlq-sub")' \
+            --data-urlencode "filter=metric.type=\"pubsub.googleapis.com/subscription/num_undelivered_messages\" AND resource.type=\"pubsub_subscription\" AND resource.labels.subscription_id=monitoring.regex.full_match(\"${dlq_regex}\")" \
             --data-urlencode "interval.startTime=${START}" \
             --data-urlencode "interval.endTime=${END}" \
             --data-urlencode 'view=FULL' \
@@ -283,8 +289,10 @@ jobs:
           {
             echo "# Release Readiness Report"
             echo
-            echo "- GitHub Actions environment: \`staging\` (secrets/vars for GCP + GCS)"
+            echo "- GitHub Actions environment: \`${RR_GITHUB_ENVIRONMENT}\` (repo var \`RELEASE_READINESS_GITHUB_ENVIRONMENT\` overrides default \`staging\`)"
+            echo "- Target GCP project: \`${GCP_PROJECT_ID}\` (from \`GCP_PROJECT_ID_DEV\` when env is \`dev\`, else \`GCP_PROJECT_ID_STAGING\`)"
             echo "- E2E smoke gate workflow: \`${E2E_SMOKE_WORKFLOW_NAME}\` (repo var \`RELEASE_READINESS_E2E_SMOKE_WORKFLOW\` overrides default)"
+            echo "- DLQ subscription filter regex: \`${DLQ_SUBSCRIPTION_REGEX}\` (override with \`RELEASE_READINESS_DLQ_SUBSCRIPTION_REGEX\`)"
             echo "- Mode: \`${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' && 'investigation (non-blocking)' || 'strict (blocking)' }}\`"
             echo "- Generated at: \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`"
             echo
@@ -342,7 +350,7 @@ jobs:
             else
               dlq_status="FAIL"
             fi
-            echo "| DLQ depth (15m max) | ${dlq_status} | max=\`${{ steps.dlq_gate.outputs.dlq_max_depth }}\`, subs=\`${{ steps.dlq_gate.outputs.dlq_subscription_count }}\` |"
+            echo "| DLQ depth (15m max) | ${dlq_status} | max=\`${{ steps.dlq_gate.outputs.dlq_max_depth }}\`, subs=\`${{ steps.dlq_gate.outputs.dlq_subscription_count }}\`, regex=\`${DLQ_SUBSCRIPTION_REGEX}\` |"
             echo
             if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
               overall="GO"

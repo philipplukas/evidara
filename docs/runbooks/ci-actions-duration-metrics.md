@@ -28,7 +28,7 @@ See `scripts/analyze_github_actions_queue.py --help` for filters (`--repo`, `--b
 |------|----------------|--------------|
 | Light | `LIGHT_RUNNER_RUNS_ON_JSON` | fmt, unit tests, npm `check`, Terraform fmt/plan when pointed here |
 | Heavy | `HEAVY_RUNNER_RUNS_ON_JSON` | Playwright / interaction-flow, e2e smokes, multi-arch image builds |
-| GitHub-hosted | `ubuntu-latest` | **Release Readiness** (WIF + `gh` API); keep here unless OIDC is validated on self-hosted. **Dev-first orgs:** set repo variable **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** to **`E2E Smoke Dev`** so the smoke gate matches your train — see [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md) §2.1 and [Runtime stack §7](runtime-stack.md#7-release-readiness-go-no-go-operation). |
+| GitHub-hosted | `ubuntu-latest` | **Release Readiness** (WIF + `gh` API); keep here unless OIDC is validated on self-hosted. **Dev-first orgs:** set **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** = **`dev`**, **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** = **`E2E Smoke Dev`**, and ensure GitHub **Environment `dev`** has the same OIDC secrets as E2E Smoke Dev — see [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md) §2.1 and [Runtime stack §7](runtime-stack.md#7-release-readiness-go-no-go-operation). |
 
 If self-hosted queues starve PRs, **scale runner count** or **split labels** (e.g. dedicated Playwright vs Docker-heavy) instead of moving every job to one pool.
 

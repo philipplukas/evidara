@@ -2,7 +2,17 @@
 
 ## Overview
 
-Evidara uses three environments: **dev**, **staging**, and **prod**. All environments are provisioned from the same Terraform modules with environment-specific variable files.
+The **canonical** Evidara model is three environments: **dev**, **staging**, and **prod**, each provisioned from the same Terraform modules with environment-specific variable files under `[../../infra/env/](../../infra/env/)`.
+
+### Operator posture: dev-first (no staging GCP project)
+
+Some teams (especially small ones) run only **dev** and **prod** in GCP and use **dev** as the shared integration surface. That is a valid posture:
+
+- Operator evidence that other runbooks label “staging” (for example **TAR-85** / MVP acceptance JSON) should be collected against **dev Cloud Run** URLs and the same `evidara workflow mvp-acceptance` command.
+- **Re-evaluate** whether to add a dedicated staging project when you need prod-like isolation, stable demo URLs, or release gates that must not depend on dev churn (see [Phase 5 go / no-go memo](../runbooks/phase-5-go-no-go-memo.md) and your Linear **TAR-69** thread).
+- **Release Readiness** (`.github/workflows/release-readiness.yml`) can run in GitHub **Environment `dev`** so WIF + GCP APIs target your dev project: set repository variable **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** to `dev` (default remains `staging`). Pair with **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** = `E2E Smoke Dev` and ensure the GitHub `dev` environment defines the same OIDC secrets as [E2E Smoke Dev](../../.github/workflows/e2e-smoke-dev.yml) (`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_DEV`) plus repo variables **`GCP_PROJECT_ID_DEV`**, **`DI_SURFACES_ROOT_URI_DEV`**, and optional **`INTERACTION_FLOW_EVIDENCE_GCS_ROOT_DEV`**. DLQ monitoring defaults to subscription IDs matching **`.*-dev-dlq-sub`** in dev; override with **`RELEASE_READINESS_DLQ_SUBSCRIPTION_REGEX`** if your Terraform naming differs. Interaction-flow gates still use the **Interaction Flow Staging Evidence** workflow and `--mode staging` artifact checks until a dev-native flow exists.
+
+`infra/env/staging/` and staging-oriented GitHub workflows remain in the repo for organizations that **do** operate staging; they are not removed when a team is dev-first.
 
 Initial environment scaffolding now exists for the `document-intelligence` Databricks stack under `[../../infra/env/](../../infra/env/)`.
 
@@ -75,7 +85,7 @@ Use `[tools/evidara-cli](../../tools/evidara-cli/README.md)` for quick HTTP chec
 | `EVIDARA_REPO_ROOT`                | *(auto)*                | Optional override for `evidara openapi paths`                                                                       |
 | `EVIDARA_CLI_SMOKE`                | *(unset)*               | Set to `1` with `[scripts/smoke-evidara-cli.sh](../../scripts/smoke-evidara-cli.sh)` to run both `ping` subcommands |
 
-For **shell** checks against private Cloud Run (`scripts/e2e-smoke-test.sh`, `scripts/mvp-acceptance-scenario-pack.sh`), set `**EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT`** to a service account that has `roles/run.invoker` on the target services; your user needs `roles/iam.serviceAccountTokenCreator` on that SA. This matches `[.github/workflows/e2e-smoke-dev.yml](../../.github/workflows/e2e-smoke-dev.yml)` / `e2e-smoke-staging.yml`. Optional helper: `[scripts/mint-cloud-run-tokens.sh](../../scripts/mint-cloud-run-tokens.sh)`. Step-by-step IAM: [GCP local Cloud Run auth](gcp-local-cloud-run-auth.md).
+For **shell** checks against private Cloud Run (`scripts/e2e-smoke-test.sh`, `scripts/mvp-acceptance-scenario-pack.sh`), set `**EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT`** to a service account that has `roles/run.invoker` on the target services; your user needs `roles/iam.serviceAccountTokenCreator` on that SA. This matches `[.github/workflows/e2e-smoke-dev.yml](../../.github/workflows/e2e-smoke-dev.yml)` (and `e2e-smoke-staging.yml` when staging exists). Optional helpers: `[scripts/mint-cloud-run-tokens.sh](../../scripts/mint-cloud-run-tokens.sh)`, `[scripts/evidara-cloud-run-operator-session.sh](../../scripts/evidara-cloud-run-operator-session.sh)`. Step-by-step IAM: [GCP local Cloud Run auth](gcp-local-cloud-run-auth.md).
 
 After exporting the URLs and optional auth vars for the target environment:
 

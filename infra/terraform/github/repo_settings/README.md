@@ -54,7 +54,7 @@ export TF_VAR_repository_secrets='{
 }'
 ```
 
-**Do not** put **Google Cloud Run IAM ID tokens** (`gcloud auth print-identity-token --audiences=…`) in `repository_secrets`: they expire in about an hour. For CI, [`.github/workflows/evidara-cli-remote-smoke.yml`](../../../.github/workflows/evidara-cli-remote-smoke.yml) mints fresh tokens using the **GitHub Environment** secrets `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_SERVICE_ACCOUNT_DEV` / `GCP_SERVICE_ACCOUNT_STAGING` (same pattern as e2e smoke).
+**Do not** put **Google Cloud Run IAM ID tokens** (`gcloud auth print-identity-token --audiences=…`) in `repository_secrets`: they expire in about an hour. For CI, [`.github/workflows/evidara-cli-remote-smoke.yml`](../../../../.github/workflows/evidara-cli-remote-smoke.yml) mints fresh tokens using the **GitHub Environment** secrets `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_SERVICE_ACCOUNT_DEV` / `GCP_SERVICE_ACCOUNT_STAGING` (same pattern as e2e smoke).
 
 For the staging smoke workflow, ensure these GitHub settings are present:
 
@@ -63,7 +63,9 @@ For the staging smoke workflow, ensure these GitHub settings are present:
   - `DI_SURFACES_ROOT_URI_STAGING`
   - `SMOKE_SEED_URL_STAGING` (optional)
   - `SMOKE_REQUEST_TIMEOUT_SECONDS_STAGING` (optional)
-  - `RELEASE_READINESS_E2E_SMOKE_WORKFLOW` (optional) — exact Actions workflow **display name** for the Release Readiness smoke gate; default `E2E Smoke Staging`; use `E2E Smoke Dev` for dev-first orgs (see [Runtime stack runbook](../../../docs/runbooks/runtime-stack.md#7-release-readiness-go-no-go-operation))
+  - `RELEASE_READINESS_GITHUB_ENVIRONMENT` (optional) — GitHub Actions **environment** for the Release Readiness job (`staging` default; use `dev` for dev-first GCP — requires `dev` environment secrets per [E2E Smoke Dev](../../../../.github/workflows/e2e-smoke-dev.yml))
+  - `RELEASE_READINESS_E2E_SMOKE_WORKFLOW` (optional) — exact Actions workflow **display name** for the smoke gate; default `E2E Smoke Staging`; use `E2E Smoke Dev` when `RELEASE_READINESS_GITHUB_ENVIRONMENT=dev`
+  - `RELEASE_READINESS_DLQ_SUBSCRIPTION_REGEX` (optional) — Monitoring MQL regex for DLQ subscription IDs; defaults to `.*-dev-dlq-sub` vs `.*-staging-dlq-sub` from the GitHub environment choice (see [Runtime stack runbook](../../../docs/runbooks/runtime-stack.md#7-release-readiness-go-no-go-operation))
 - Environment `staging` secrets:
   - `GCP_WORKLOAD_IDENTITY_PROVIDER`
   - `GCP_SERVICE_ACCOUNT_STAGING`

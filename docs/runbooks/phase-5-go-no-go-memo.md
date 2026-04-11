@@ -28,7 +28,7 @@ Canonical template history: this file is the **working draft**; publish final re
 
 These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, and **TAR-69** evidence. They **do not** replace missing dev smokes, branch-protection proof (TAR-77), or a fresh **TAR-85** MVP acceptance pass (run against **dev** when you have no staging GCP project).
 
-**CI note:** **Release Readiness** gates on the latest successful **E2E smoke** workflow whose display name is **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** (repository variable), defaulting to **`E2E Smoke Staging`**. For **dev-first** orgs, set that variable to **`E2E Smoke Dev`** so the gate tracks the smoke you actually run; see [Runtime stack — §7](runtime-stack.md#7-release-readiness-go-no-go-operation).
+**CI note:** **Release Readiness** uses GitHub Environment **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** (default **`staging`**) for OIDC; set to **`dev`** so GCP project, DI surfaces, GCS evidence root, DLQ regex, and WIF service account follow the **dev** path (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)). It gates on the latest successful **E2E smoke** workflow named **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** (default **`E2E Smoke Staging`**; dev-first: **`E2E Smoke Dev`**). Interaction-flow rows still expect **`Interaction Flow Staging Evidence`** until a dev-native workflow exists. Details: [Runtime stack — §7](runtime-stack.md#7-release-readiness-go-no-go-operation).
 
 | Area | What landed | Operator action when updating this memo |
 |------|-------------|----------------------------------------|
