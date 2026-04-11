@@ -254,7 +254,7 @@ See `legal-search/api/.env.example`:
 
 **Refresh existing corpus (step 2):** any document already in OpenSearch needs a **new** `event_id` per replay (or your normal Pub/Sub redelivery). The bootstrap script models that by seeding a stale doc and overwriting it when projection applies.
 
-### 6.7 What is *not* implied by “local”
+### 6.7 What is _not_ implied by “local”
 
 - Local BFF + local OpenSearch **does not** automatically use staging DI or staging data unless `DOCUMENT_INTELLIGENCE_BASE_URL` and published content point there.
 - Conversely, pointing `DOCUMENT_INTELLIGENCE_BASE_URL` at staging while using **local** OpenSearch yields **local search results** built from **remote** lean payloads — useful for debugging projection mapping without processing bundles locally.
