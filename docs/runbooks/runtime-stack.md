@@ -373,10 +373,11 @@ gcloud run jobs execute os-alias-check-staging \
 
 ### 7. Release Readiness Go/No-Go Operation
 
-`Release Readiness` is the release-lane gate of truth for `staging`. It
+`Release Readiness` is the release-lane gate of truth for the GitHub Actions
+**`staging`** environment (WIF + GCP project / GCS vars used by that env). It
 evaluates six gating signals together:
 
-1. Latest `E2E Smoke Staging` result
+1. Latest **E2E smoke** result — workflow name defaults to `E2E Smoke Staging`; set repository variable **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** to `E2E Smoke Dev` when your org is **dev-first** and does not run staging smoke on every train (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)).
 2. Latest `Interaction Flow Staging Evidence` result
 3. Interaction-flow artifact completeness quick-check
 4. Latest `Terraform` workflow result
@@ -398,6 +399,8 @@ gh workflow run "Release Readiness" -f strict=true
 # Investigation mode (non-blocking run, still reports GO/NO-GO)
 gh workflow run "Release Readiness" -f strict=false
 ```
+
+**Repository variable (optional):** `RELEASE_READINESS_E2E_SMOKE_WORKFLOW` — exact GitHub Actions workflow **display name** to treat as the smoke gate (must match `name:` in that workflow file). Default when unset: `E2E Smoke Staging`. Dev-first: set to `E2E Smoke Dev` so Release Readiness does not wait on a workflow you never run.
 
 #### Required status check on `main`
 
@@ -424,7 +427,7 @@ Interpretation:
 
 | Signal | Primary owner | Backup owner | First response |
 |--------|---------------|--------------|----------------|
-| E2E Smoke Staging failed | Platform Team | Document-Intelligence Team | Inspect latest smoke logs/artifacts, rerun after fix |
+| E2E smoke gate failed (workflow from `RELEASE_READINESS_E2E_SMOKE_WORKFLOW`, default `E2E Smoke Staging`) | Platform Team | Document-Intelligence Team | Inspect latest smoke logs/artifacts, confirm repo variable matches the smoke you run, rerun after fix |
 | Interaction Flow Staging Evidence failed | Platform Team | Legal-Search Team | Inspect Playwright artifacts, screenshot pack output, and rerun staging evidence |
 | Interaction-flow artifact completeness failed | Platform Team | Legal-Search Team | Run `scripts/check-latest-interaction-flow-evidence.sh --mode staging`, repair missing artifact contents, rerun gate |
 | Terraform workflow failed/drifted | Platform Team | Repo Maintainer on duty | Resolve plan/apply failure and rerun Terraform workflow |

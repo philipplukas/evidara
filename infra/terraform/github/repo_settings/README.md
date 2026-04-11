@@ -63,6 +63,7 @@ For the staging smoke workflow, ensure these GitHub settings are present:
   - `DI_SURFACES_ROOT_URI_STAGING`
   - `SMOKE_SEED_URL_STAGING` (optional)
   - `SMOKE_REQUEST_TIMEOUT_SECONDS_STAGING` (optional)
+  - `RELEASE_READINESS_E2E_SMOKE_WORKFLOW` (optional) — exact Actions workflow **display name** for the Release Readiness smoke gate; default `E2E Smoke Staging`; use `E2E Smoke Dev` for dev-first orgs (see [Runtime stack runbook](../../../docs/runbooks/runtime-stack.md#7-release-readiness-go-no-go-operation))
 - Environment `staging` secrets:
   - `GCP_WORKLOAD_IDENTITY_PROVIDER`
   - `GCP_SERVICE_ACCOUNT_STAGING`

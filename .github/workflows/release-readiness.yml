@@ -30,6 +30,8 @@ jobs:
       INTERACTION_FLOW_EVIDENCE_GCS_ROOT: ${{ vars.INTERACTION_FLOW_EVIDENCE_GCS_ROOT_STAGING || vars.DI_SURFACES_ROOT_URI_STAGING }}
       TERRAFORM_APPLY_ENABLED: ${{ vars.TERRAFORM_APPLY_ENABLED || 'false' }}
       REPORT_PATH: tmp/release-readiness/report.md
+      # Dev-first orgs: set repo variable RELEASE_READINESS_E2E_SMOKE_WORKFLOW to "E2E Smoke Dev"
+      E2E_SMOKE_WORKFLOW_NAME: ${{ vars.RELEASE_READINESS_E2E_SMOKE_WORKFLOW || 'E2E Smoke Staging' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -43,7 +45,7 @@ jobs:
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Verify latest staging smoke run
+      - name: Verify latest E2E smoke run (configurable workflow)
         id: smoke_gate
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
         env:
@@ -51,8 +53,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p tmp/release-readiness
+          wf_name="${E2E_SMOKE_WORKFLOW_NAME:?}"
           gh run list \
-            --workflow "E2E Smoke Staging" \
+            --workflow "${wf_name}" \
             --branch main \
             --limit 1 \
             --json databaseId,createdAt,conclusion,url \
@@ -63,9 +66,10 @@ jobs:
           import os
           import sys
 
+          wf = os.environ.get("E2E_SMOKE_WORKFLOW_NAME", "E2E Smoke Staging")
           runs = json.loads(open("tmp/release-readiness/smoke.json", "r", encoding="utf-8").read())
           if not runs:
-              print("No E2E Smoke Staging runs found on main.", file=sys.stderr)
+              print(f"No {wf} runs found on main.", file=sys.stderr)
               sys.exit(2)
 
           latest = runs[0]
@@ -79,7 +83,7 @@ jobs:
               fh.write(f"smoke_url={url}\n")
 
           if conclusion != "success":
-              print(f"Latest staging smoke is not successful: {conclusion}", file=sys.stderr)
+              print(f"Latest {wf} smoke is not successful: {conclusion}", file=sys.stderr)
               sys.exit(2)
           PY
 
@@ -279,7 +283,8 @@ jobs:
           {
             echo "# Release Readiness Report"
             echo
-            echo "- Environment: \`staging\`"
+            echo "- GitHub Actions environment: \`staging\` (secrets/vars for GCP + GCS)"
+            echo "- E2E smoke gate workflow: \`${E2E_SMOKE_WORKFLOW_NAME}\` (repo var \`RELEASE_READINESS_E2E_SMOKE_WORKFLOW\` overrides default)"
             echo "- Mode: \`${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' && 'investigation (non-blocking)' || 'strict (blocking)' }}\`"
             echo "- Generated at: \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`"
             echo
@@ -291,7 +296,7 @@ jobs:
             else
               smoke_status="FAIL"
             fi
-            echo "| Latest E2E Smoke Staging | ${smoke_status} | [run](${{ steps.smoke_gate.outputs.smoke_url }}) @ ${{ steps.smoke_gate.outputs.smoke_created_at }} |"
+            echo "| Latest ${E2E_SMOKE_WORKFLOW_NAME} | ${smoke_status} | [run](${{ steps.smoke_gate.outputs.smoke_url }}) @ ${{ steps.smoke_gate.outputs.smoke_created_at }} |"
 
             if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" ]]; then
               interaction_flow_status="PASS"

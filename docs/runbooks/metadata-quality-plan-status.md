@@ -1,7 +1,7 @@
 # Metadata & search quality — plan status report
 
 Owner: Platform / legal-search  
-Last reviewed: 2026-04-11 (TAR-89 workstream doc link in §3.1)  
+Last reviewed: 2026-04-11 (dev-first posture; TAR-85 / remote corpus wording)  
 Last verified: 2026-04-11  
 Applies to: MVP demo path, **Linear TAR-89** (search/detail metadata quality), related release gates
 
@@ -16,7 +16,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 | [MVP demo & release recommendation](mvp-demo-release-recommendation.md) | **Conditional GO**; remaining product risk called out as **TAR-89** (metadata credibility on search/detail)   |
 | [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md)                     | Gate table; §3 “Search and metadata quality” (projection fields **shipped**, relevance eval **pending**)      |
 | [MVP website walkthrough](mvp-website-walkthrough.md)                   | Observed **high** severity: generic titles / `type: "unknown"` on result/detail                               |
-| [Search relevance baseline](search-relevance-baseline.md)               | Staging eval pack for **TAR-82** / **TAR-68** (ranking baselines, separate but adjacent to metadata richness) |
+| [Search relevance baseline](search-relevance-baseline.md)               | Remote eval pack (**dev** or staging) for **TAR-82** / **TAR-68** (ranking baselines, separate but adjacent to metadata richness) |
 | [First vertical slice exit gates](first-vertical-slice-exit-gates.md)   | End-to-end evidence expectations (includes search surface)                                                    |
 
 **TAR-89** (Linear) is the umbrella issue for **improving search/detail metadata quality for user trust** per MVP recommendation.
@@ -62,7 +62,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 | Gap                                                     | Evidence                                                                                                              |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Staging query pack not attached as routine evidence** | [search-relevance-baseline.md](search-relevance-baseline.md), [phase-5-go-no-go-memo.md](phase-5-go-no-go-memo.md) §3 |
+| **Remote query pack not attached as routine evidence** | [search-relevance-baseline.md](search-relevance-baseline.md), [phase-5-go-no-go-memo.md](phase-5-go-no-go-memo.md) §3 |
 
 ### 3.3 Release / evidence gates (block full product GO, not only TAR-89)
 
@@ -73,7 +73,7 @@ From [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) an
 | TAR-87, TAR-88                  | Required for **full product GO** (walkthrough evidence) |
 | TAR-64                          | Dev smoke ×2 / vertical slice evidence                  |
 | TAR-77                          | Branch protection proof                                 |
-| TAR-85                          | Fresh staging MVP acceptance                            |
+| TAR-85                          | Fresh **remote** MVP acceptance (**dev** when no staging GCP project) |
 | M5 checklist / interaction-flow | Operator evidence for Pub/Sub + DI path                 |
 
 ### 3.4 Secondary UX / ops (walkthrough)
@@ -102,13 +102,13 @@ From [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) an
 ### Process
 
 - One **document ID** is traced end-to-end with written hops (**section 6.8** for local lean fixture; **section 6.9** when the full bundle → DI path must be validated); first broken hop is fixed or tracked as a dependency with issue ID.
-- Staging/demo envs: after code changes to projections or lean shape, operators run **replay** or full re-ingest so acceptance is evaluated on **fresh** index rows.
+- Remote envs (dev/staging): after code changes to projections or lean shape, operators run **replay** or full re-ingest so acceptance is evaluated on **fresh** index rows.
 
 ### Release / guardrails
 
 - Representative query pack shows improved title/subtitle/metadata quality where applicable.
 - No contract lock violations introduced.
-- Before/after evidence attached for dev and staging where required by release gates.
+- Before/after evidence attached for **dev** (and staging when operated) where required by release gates.
 
 ### 3.5.1 Agreed demo corpus (phase 1 — local)
 
@@ -127,11 +127,13 @@ From [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) an
 
 **Last automated local verify:** 2026-04-09 — `./scripts/dev-lean-search-stack.sh replay` returned `applied`; search snippet showed `decision` type, non-placeholder title, and `metadataRows` including Dokumenttyp, Fundstelle, Quelle, Sprache (matches section 3.5 Search / list, Detail, and Process for this ID).
 
-### 3.5.2 Staging / extended corpus (product-owned)
+### 3.5.2 Remote / extended corpus (product-owned; historically “staging”)
 
-**Staging BFF (2026-04-09 snapshot):** `https://legal-search-api-staging-kxc5agexna-oa.a.run.app` (see [`infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example)). Hostnames may drift with deploys — re-verify URLs before release.
+**Dev-first posture:** if your org has **no** staging GCP project, maintain the same style of table for **dev** legal-search URLs (from your deployed `legal-search-api` Cloud Run host) and treat **3.5.1** (local) + **dev** inventory as the live acceptance surfaces until staging is added. Re-evaluate when to provision staging per [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project).
 
-Corpus = **7** indexed documents (search `totalResults`); list hits still show generic titles / `unknown` type on several rows — **metadata acceptance** (section 3.5) is **not** fully met for staging until re-projection or richer lean (tracked in section 3.1). This table records **which IDs exist** for demo/trace work.
+**Example staging BFF (2026-04-09 snapshot):** `https://legal-search-api-staging-kxc5agexna-oa.a.run.app` (see [`infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example)). Hostnames may drift with deploys — re-verify URLs before release.
+
+Corpus = **7** indexed documents (search `totalResults`) for that snapshot environment; list hits still show generic titles / `unknown` type on several rows — **metadata acceptance** (section 3.5) is **not** fully met until re-projection or richer lean (tracked in section 3.1). This table records **which IDs exist** for demo/trace work.
 
 | Document ID | Environment URL (legal-search API or UI) | Notes |
 | ----------- | ------------------------------------------ | ----- |
@@ -143,24 +145,33 @@ Corpus = **7** indexed documents (search `totalResults`); list hits still show g
 | `doc_2zgbt902hbby5mhzpmygrr2tfv` | same | Search result |
 | `doc_54j7r37eqp2nzzxak5qes5eghp` | same | Search result |
 
-**Procedure:** (1) Pick IDs from staging search/detail that must read well for demos. (2) If projections are stale after a BFF/DI change, use [staging projection replay](staging-projection-replay.md) or full re-ingest. (3) Verify search + detail against section 3.5 **Search / list** and **Detail**. (4) Add a short **sign-off** comment on Linear **TAR-89** with date and link to this table row(s) (**3.5.3**) only when criteria are **actually met** (replay alone does not fix missing lean metadata).
+#### 3.5.2a Dev document ID inventory (operator-maintained)
 
-Phase-1 local corpus (**3.5.1**) remains the **clean** reference for passing TAR-89 criteria in CI-like conditions; staging rows above are **inventory + honesty** about current staging metadata quality.
+When **no** staging GCP project exists, paste **dev** legal-search base URL(s) and the document IDs you are tracking for demos / TAR-89 sign-off (same columns as **3.5.2**). Remove this subsection or fold rows into **3.5.2** once staging is authoritative again.
+
+| Document ID | Environment URL (legal-search API or UI) | Notes |
+| ----------- | ------------------------------------------ | ----- |
+| _TBD_ | _e.g. `https://legal-search-api-dev-…run.app`_ | _operator fills after search/detail spot-check_ |
+| _TBD_ | same | |
+
+**Procedure:** (1) Pick IDs from **dev** or staging search/detail that must read well for demos. (2) If projections are stale after a BFF/DI change, use [staging projection replay](staging-projection-replay.md) (same HTTP contract against whichever BFF you target) or full re-ingest. (3) Verify search + detail against section 3.5 **Search / list** and **Detail**. (4) Add a short **sign-off** comment on Linear **TAR-89** with date and link to this table row(s) (**3.5.3**) only when criteria are **actually met** (replay alone does not fix missing lean metadata).
+
+Phase-1 local corpus (**3.5.1**) remains the **clean** reference for passing TAR-89 criteria in CI-like conditions; rows above are **inventory + honesty** about metadata quality on the **remote** environment referenced in the heading.
 
 ### 3.5.3 Formal sign-off (Linear TAR-89)
 
-Post a short comment on **TAR-89** when staging rows in **3.5.2** are verified, for example:
+Post a short comment on **TAR-89** when **3.5.2** remote rows are verified, for example:
 
-> TAR-89 acceptance sign-off — **YYYY-MM-DD** — Environment: **staging** — Document IDs: **…** — Replay/re-index: **yes** (how) — Checked search + detail against section 3.5 criteria: **pass** — Owner: **name**
+> TAR-89 acceptance sign-off — **YYYY-MM-DD** — Environment: **dev** (or **staging**) — Document IDs: **…** — Replay/re-index: **yes** (how) — Checked search + detail against section 3.5 criteria: **pass** — Owner: **name**
 
 ---
 
 ## 4. Suggested next actions (ordered)
 
-1. **TAR-89 acceptance** — Use **section 3.5.1** (local) and **3.5.2** (staging list) as the agreed corpus; sign off in Linear **TAR-89** after checks pass.
+1. **TAR-89 acceptance** — Use **section 3.5.1** (local) and **3.5.2** (remote inventory: **dev** when no staging project) as the agreed corpus; sign off in Linear **TAR-89** after checks pass.
 1. **Trace one demo document** — Use §6.8 as the reference trace; extend to full bundle → DI processing when validating pipeline changes (not only file-backed lean).
 1. **LLM extractor** — **Default remains off** for staging/prod until explicitly enabled; policy and toggles are documented in [document-intelligence README](../../document-intelligence/README.md) (“LLM extraction policy”). Turning **on** requires observability (confidence, failure rate) and cost bounds — track as follow-up issues when product approves a pilot.
-1. **Run staging relevance pack** per [search-relevance-baseline.md](search-relevance-baseline.md); record results with [relevance-eval-result-template.md](relevance-eval-result-template.md) and attach to **TAR-82** / **TAR-68** (comments on those issues point to these runbooks).
+1. **Run relevance query pack** per [search-relevance-baseline.md](search-relevance-baseline.md) against **dev** (or staging) legal-search API; record results with [relevance-eval-result-template.md](relevance-eval-result-template.md) and attach to **TAR-82** / **TAR-68** (comments on those issues point to these runbooks).
 1. **Close gate issues** (TAR-64, TAR-77, TAR-85; TAR-87 / TAR-88 for full GO) — evidence steps in [m5-evidence-checklist.md](m5-evidence-checklist.md) and [tar64-tar85-evidence-capture.md](tar64-tar85-evidence-capture.md); Linear comments on each issue link to the matching section.
 
 **Week-shaped cut (2026-04-09):** acceptance criteria in Linear **TAR-89** + section 3.5 here, section 6.8 (reference trace), LLM policy in DI README, and [document-intelligence implementation plan](../components/document-intelligence-implementation-plan.md) reconciled with repo reality.
