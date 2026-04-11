@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. This document describes a planned architecture for agent- and operator-driven workflows across Evidara. It does not describe current production behavior unless a section explicitly says so.
+Accepted. Phase 0 implemented in `tools/evidara-cli` (command envelope schema, local workflow journal, and source workflow commands). This document describes the full planned architecture; sections marked "Proposed" describe future phases not yet implemented.
 
 ## Purpose
 

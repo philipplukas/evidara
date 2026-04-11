@@ -26,6 +26,7 @@ from evidara_cli.client import (
 )
 from evidara_cli.openapi_cmd import openapi_app
 from evidara_cli.repo_root import resolve_repo_root
+from evidara_cli.workflow_cmd import run_app, source_app
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -37,6 +38,8 @@ workflow = typer.Typer(
     help="Cross-component workflow commands for operators and agents.",
 )
 app.add_typer(workflow, name="workflow")
+workflow.add_typer(source_app, name="source")
+workflow.add_typer(run_app, name="run")
 
 pc = typer.Typer(
     no_args_is_help=True,
