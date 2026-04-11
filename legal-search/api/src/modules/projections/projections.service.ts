@@ -148,7 +148,6 @@ export class ProjectionsService {
       return { sectionsCount: 0, citationsCount: 0 };
     }
     const doc = leanDocument as Record<string, unknown>;
-    const title = typeof doc.title === 'string' && doc.title.trim() ? doc.title.trim() : undefined;
     const language =
       typeof doc.language === 'string' && doc.language.trim() ? doc.language.trim() : undefined;
     const officialCitation = this.firstNestedString(doc, [
@@ -204,13 +203,30 @@ export class ProjectionsService {
         : undefined,
       extractedMeta && typeof extractedMeta.path === 'string' ? extractedMeta.path : undefined,
     ]);
+    const fallbackTitle = this.deriveTitle({
+      title:
+        typeof doc.title === 'string' && doc.title.trim()
+          ? this.normalizeTitle(doc.title)
+          : undefined,
+      llmTitle:
+        llmMeta?.applied === true &&
+        typeof llmMeta.title === 'string' &&
+        llmMeta.title.trim() &&
+        !llmMeta.title.startsWith('extractor_failed:')
+          ? this.normalizeTitle(llmMeta.title)
+          : undefined,
+      officialCitation,
+      previewText,
+      bodyPreviewFallback,
+      structuralPath,
+    });
     const jurisdictionFromCanonical =
       typeof doc.jurisdiction_id === 'string' && doc.jurisdiction_id.trim()
         ? this.inferJurisdictionFromCanonicalId(doc.jurisdiction_id.trim())
         : undefined;
 
     return {
-      title,
+      title: fallbackTitle,
       language,
       officialCitation,
       originalLanguage,
@@ -224,6 +240,40 @@ export class ProjectionsService {
       structuralPath,
       jurisdictionFromCanonical,
     };
+  }
+
+  private deriveTitle(args: {
+    title?: string;
+    llmTitle?: string;
+    officialCitation?: string;
+    previewText?: string;
+    bodyPreviewFallback?: string;
+    structuralPath?: string;
+  }): string | undefined {
+    const structuralTail = args.structuralPath?.split('›').at(-1)?.trim();
+    return this.firstString([
+      args.title,
+      args.llmTitle,
+      args.officialCitation,
+      this.firstSubstantiveLine(args.previewText ?? args.bodyPreviewFallback),
+      structuralTail,
+    ]);
+  }
+
+  private firstSubstantiveLine(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    const line = value
+      .split('\n')
+      .map((part) => part.trim())
+      .find((part) => part.length >= 24);
+    return line;
+  }
+
+  private normalizeTitle(value: string): string | undefined {
+    const title = value.trim();
+    if (!title) return undefined;
+    if (title.toLowerCase() === 'untitled document') return undefined;
+    return title;
   }
 
   private truncateForPreview(text: string | undefined, maxChars = 400): string | undefined {

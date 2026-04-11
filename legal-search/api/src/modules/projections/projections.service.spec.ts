@@ -212,6 +212,78 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('falls back to LLM title when canonical title is a placeholder', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Untitled document',
+      metadata: {
+        llm_extraction: {
+          applied: true,
+          title: 'Bundesgericht 2C_123/2024',
+          structural_path: 'BGer › Öffentliches Recht',
+        },
+      },
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Bundesgericht 2C_123/2024',
+      }),
+    );
+  });
+
+  it('falls back to citation, substantive text, and structural-path tail for missing titles', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const service = new ProjectionsService(repository, diClient);
+
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Untitled document',
+      metadata: {
+        official_citation: 'BGE 150 II 10',
+      },
+      body_text: 'Kurz.\nDies ist eine ausreichend lange Titel-ähnliche Zeile.',
+      structural_path: 'BGer › Zivilrecht',
+    });
+    await service.applyDocumentProcessed(baseProcessedEvent);
+    expect(repository.upsertProjection).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'BGE 150 II 10' }),
+    );
+
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Untitled document',
+      body_text: 'Kurz.\nDies ist eine ausreichend lange Titel-ähnliche Zeile.',
+      structural_path: 'BGer › Zivilrecht',
+    });
+    await service.applyDocumentProcessed({
+      ...baseProcessedEvent,
+      event_id: 'evt_3',
+      payload: { ...baseProcessedEvent.payload, document_id: 'doc_2' },
+    });
+    expect(repository.upsertProjection).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Dies ist eine ausreichend lange Titel-ähnliche Zeile.',
+      }),
+    );
+
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Untitled document',
+      structural_path: 'BGer › Zivilrecht',
+    });
+    await service.applyDocumentProcessed({
+      ...baseProcessedEvent,
+      event_id: 'evt_4',
+      payload: { ...baseProcessedEvent.payload, document_id: 'doc_3' },
+    });
+    expect(repository.upsertProjection).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Zivilrecht' }),
+    );
+  });
+
   it('applies projection with fallback fields when DI enrichment is unavailable', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
