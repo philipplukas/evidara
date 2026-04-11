@@ -16,6 +16,7 @@ from document_intelligence.ingest.loaders import BundleLoader
 from document_intelligence.persist.sinks import (
     DeltaCanonicalSink,
     InMemoryCanonicalSink,
+    SparkDeltaCanonicalSink,
 )
 from document_intelligence.pipeline import ProcessingPipeline
 
@@ -27,6 +28,8 @@ def build_processing_pipeline(
 ) -> ProcessingPipeline:
     if runtime_settings.surface_uris is None:
         sink = InMemoryCanonicalSink()
+    elif runtime_settings.use_spark_delta:
+        sink = SparkDeltaCanonicalSink(runtime_settings.surface_uris.to_delta_sink_config())
     else:
         sink = DeltaCanonicalSink(runtime_settings.surface_uris.to_delta_sink_config())
     return ProcessingPipeline(

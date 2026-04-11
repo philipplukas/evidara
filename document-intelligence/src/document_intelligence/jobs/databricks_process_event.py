@@ -22,6 +22,7 @@ def run(
     spacy_model_name: str = "",
     spacy_max_chars_per_section: int = 100000,
     spacy_batch_size: int = 32,
+    use_spark_delta: bool = False,
 ) -> dict[str, Any]:
     runtime_settings = RuntimeSettings.from_mapping(
         {},
@@ -35,6 +36,7 @@ def run(
         spacy_model_name=spacy_model_name or None,
         spacy_max_chars_per_section=spacy_max_chars_per_section,
         spacy_batch_size=spacy_batch_size,
+        use_spark_delta=use_spark_delta,
     )
     if runtime_settings.surface_uris is None:
         raise ValueError(
@@ -82,6 +84,11 @@ def cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--spacy-model-name", default="")
     parser.add_argument("--spacy-max-chars-per-section", type=int, default=100000)
     parser.add_argument("--spacy-batch-size", type=int, default=32)
+    parser.add_argument(
+        "--use-spark-delta",
+        action="store_true",
+        help="Use PySpark DataFrame writer for Delta outputs instead of the Python deltalake library.",
+    )
     args = parser.parse_args(argv)
 
     output = run(
@@ -96,6 +103,7 @@ def cli(argv: list[str] | None = None) -> int:
         spacy_model_name=args.spacy_model_name,
         spacy_max_chars_per_section=args.spacy_max_chars_per_section,
         spacy_batch_size=args.spacy_batch_size,
+        use_spark_delta=args.use_spark_delta,
     )
     print(json.dumps(output, indent=2, sort_keys=True))
     return 0
