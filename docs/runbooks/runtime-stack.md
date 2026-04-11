@@ -167,7 +167,7 @@ To optimize **main** pushes further (build only what changed), CD would need to 
 
 **Staging:** this workflow has **no** staging deploy job. Use the manual Cloud Run procedure below (or Terraform) for `*-staging` services.
 
-**Prod gate:** `deploy-prod` has `needs: deploy-dev`. Add a **manual approval** rule on the GitHub `prod` environment if you want a human promotion step.
+**Prod gate:** in `platform-control-cd.yml`, `deploy-prod` has `needs: deploy-dev`. For **Databricks bundle CD**, `document-intelligence-cd.yml` promotes `dev -> staging -> prod` before `deploy-prod` runs. Add a **manual approval** rule on the GitHub `prod` environment if you want a human promotion step.
 
 **Manual image rebuild:** `runtime-images.yml` also supports `workflow_dispatch` on `main` when you need a full parallel build without a matching push.
 

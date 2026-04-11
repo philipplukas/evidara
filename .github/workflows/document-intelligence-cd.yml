@@ -44,10 +44,37 @@ jobs:
         run: |
           databricks bundle deploy --target dev --var "workspace_host=${DATABRICKS_HOST}"
 
+  deploy-staging:
+    name: Deploy bundle to staging
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    environment: staging
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate Databricks bundle (staging)
+        working-directory: document-intelligence
+        run: |
+          databricks bundle validate --target staging --var "workspace_host=${DATABRICKS_HOST}"
+
+      - name: Deploy Databricks bundle (staging)
+        working-directory: document-intelligence
+        run: |
+          databricks bundle deploy --target staging --var "workspace_host=${DATABRICKS_HOST}"
+
   deploy-prod:
     name: Deploy bundle to prod
     runs-on: ubuntu-latest
-    needs: deploy-dev
+    needs:
+      - deploy-dev
+      - deploy-staging
     environment: prod
     env:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}

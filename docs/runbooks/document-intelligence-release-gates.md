@@ -1,8 +1,8 @@
 # Document Intelligence Release Gates
 
 Owner: Platform team
-Last reviewed: 2026-04-05
-Last verified: 2026-04-05
+Last reviewed: 2026-04-11
+Last verified: 2026-04-11
 Applies to: dev, staging, prod
 
 ## Scope
@@ -56,6 +56,8 @@ Exercised by `.github/workflows/document-intelligence-cd.yml` on push to
 |------|------|-----------------|
 | DAB validate (dev) | `databricks bundle validate` | Invalid bundle config |
 | DAB deploy (dev) | `databricks bundle deploy` | Failed deployment to dev |
+| DAB validate (staging) | `databricks bundle validate` | Invalid staging bundle config |
+| DAB deploy (staging) | `databricks bundle deploy` | Failed deployment to staging |
 | DAB validate (prod) | `databricks bundle validate` | Invalid prod bundle config |
 | DAB deploy (prod) | `databricks bundle deploy` | Failed deployment to prod |
 
@@ -66,9 +68,10 @@ Before promoting a document-intelligence change to production:
 1. All CI checks pass on the PR (quality + runtime gates)
 2. Container image builds successfully
 3. DAB dev deployment succeeds
-4. DAB prod deployment succeeds (requires manual approval via GitHub environment)
-5. DI schema preflight passes in dev (`published_*` surfaces)
-6. Smoke-test ingestion flow in dev environment
+4. DAB staging deployment succeeds
+5. DAB prod deployment succeeds (requires manual approval via GitHub environment)
+6. DI schema preflight passes in dev (`published_*` surfaces)
+7. Smoke-test ingestion flow in dev environment
 
 ## Dev Runtime Verification Commands
 
