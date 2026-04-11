@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. This document describes a planned architecture for agent- and operator-driven workflows across Evidara. It does not describe current production behavior unless a section explicitly says so.
+Accepted. Phase 1 implemented in `tools/evidara-cli` (command envelope schema, DSPy-optional proposal module, and the full `inspect / propose / apply / verify / compensate` verb family for source-lifecycle and search workflows). This document describes the full planned architecture; sections describing Phase 2 durable journal endpoints in platform-control are still proposed.
 
 ## Purpose
 

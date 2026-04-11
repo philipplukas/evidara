@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/workflow-command-envelope",
+  "title": "WorkflowCommandEnvelope",
+  "description": "Standard JSON envelope returned by every evidara-cli workflow command. Provides structured feedback for agents, operators, and evaluators after each workflow step.",
+  "type": "object",
+  "required": [
+    "ok",
+    "workflow",
+    "step",
+    "status",
+    "side_effect_level",
+    "inputs"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "description": "Overall command success. false for transport, evaluation, or contract failures."
+    },
+    "workflow": {
+      "type": "string",
+      "description": "Stable workflow family name, e.g. source-lifecycle, search-verification.",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "run_id": {
+      "type": ["string", "null"],
+      "description": "Durable workflow run identifier. Stable across steps of the same run."
+    },
+    "step": {
+      "type": "string",
+      "description": "Stable step identifier within the workflow, e.g. source.inspect, source.apply.",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+    },
+    "status": {
+      "type": "string",
+      "description": "Step outcome classification.",
+      "enum": [
+        "passed",
+        "failed_retriable",
+        "failed_terminal",
+        "needs_human",
+        "compensated"
+      ]
+    },
+    "side_effect_level": {
+      "type": "string",
+      "description": "Mutation class of this step. none = read-only; reversible = mutating but compensatable; irreversible = mutating with no guaranteed rollback.",
+      "enum": ["none", "reversible", "irreversible"]
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Minimal structured echo of command inputs. Must not include secrets or oversized payloads.",
+      "additionalProperties": true
+    },
+    "artifacts": {
+      "type": ["object", "null"],
+      "description": "Key ids, counts, or refs produced by the step. Use domain identifiers where possible.",
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": ["array", "null"],
+      "description": "Supporting facts for operator or evaluator review.",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "Evidence kind: http, contract, object-ref, count, assertion.",
+            "enum": ["http", "contract", "object-ref", "count", "assertion"]
+          },
+          "target": {
+            "type": "string",
+            "description": "What was checked, e.g. platform-control:/v1/sources/src_123."
+          },
+          "status_code": {
+            "type": ["integer", "null"],
+            "description": "HTTP status code for http kind evidence."
+          },
+          "value": {
+            "description": "Observed value for count or assertion evidence."
+          },
+          "passed": {
+            "type": ["boolean", "null"],
+            "description": "Whether the evidence check passed."
+          },
+          "note": {
+            "type": ["string", "null"],
+            "description": "Human-readable annotation."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "decision": {
+      "type": ["object", "null"],
+      "description": "Recommended next action and rationale. Guidance for agents and humans; not final authority.",
+      "required": ["recommended_action"],
+      "properties": {
+        "recommended_action": {
+          "type": "string",
+          "description": "Recommended next action, e.g. approve, retry, compensate, needs-human."
+        },
+        "reason": {
+          "type": ["string", "null"],
+          "description": "Human-readable rationale for the recommendation."
+        },
+        "confidence": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Confidence score when produced by a learned module (0.0–1.0)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "next_actions": {
+      "type": ["array", "null"],
+      "description": "Enumerated safe continuations from this step. Enables bounded planner branching.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "compensation": {
+      "type": ["object", "null"],
+      "description": "Recovery metadata when a compensating action is available.",
+      "required": ["available"],
+      "properties": {
+        "available": {
+          "type": "boolean",
+          "description": "Whether a compensation action is available for this step."
+        },
+        "command": {
+          "type": ["string", "null"],
+          "description": "CLI command to run in order to compensate, e.g. evidara workflow source compensate --run-id wf_xyz."
+        },
+        "note": {
+          "type": ["string", "null"],
+          "description": "Human-readable description of the compensating action."
+        }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": ["string", "null"],
+      "description": "Error message when ok is false."
+    },
+    "error_detail": {
+      "type": ["object", "null"],
+      "description": "Structured error detail for programmatic handling.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
