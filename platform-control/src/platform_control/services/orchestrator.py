@@ -143,11 +143,12 @@ class TemporalOrchestrator:
     def _gate_states(self) -> tuple[WizardRunState, ...]:
         """States from which the API may signal the human gate on the workflow.
 
-        `PILOT_RUN` is included so approve/reject works before a separate
-        `HUMAN_GATE_APPROVAL` persistence step exists (pilot completion activity).
+        Only ``HUMAN_GATE_APPROVAL`` is valid: the ``persist_pilot_completed`` Temporal
+        activity (wired in ``WizardRunWorkflow``) updates the DB to this state before the
+        workflow blocks on the operator signal, so the approve/reject endpoints can guard
+        correctly without the workaround of accepting ``PILOT_RUN`` here.
         """
-
-        return (WizardRunState.PILOT_RUN, WizardRunState.HUMAN_GATE_APPROVAL)
+        return (WizardRunState.HUMAN_GATE_APPROVAL,)
 
     async def signal_approve(
         self, wizard_run: WizardRun, reason: str | None = None

@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.3.4
+  version: 0.4.0
   contact:
     name: Evidara Team
 
@@ -24,6 +24,11 @@ tags:
   - name: runs
   - name: wizard
   - name: reviews
+  - name: corpora
+    description: |
+      First-class corpus and tenant/scope management.  A corpus groups source versions
+      under a shared ``tenant_id`` and ``scope_type`` identity.  Operators create corpora
+      here and reference them by ``corpus_id`` in acquisition configs.
   - name: di-events
   - name: firecrawl
   - name: health
@@ -913,6 +918,137 @@ paths:
         "401":
           description: Signature verification failed
 
+  /v1/corpora:
+    get:
+      operationId: listCorpora
+      summary: List corpora
+      tags: [corpora]
+      parameters:
+        - name: tenant_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: include_archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: List of corpora
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorpusListResponse"
+    post:
+      operationId: createCorpus
+      summary: Create a corpus
+      tags: [corpora]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCorpusRequest"
+      responses:
+        "201":
+          description: Corpus created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorpusResponse"
+        "409":
+          description: Active corpus with this name already exists for the tenant
+
+  /v1/corpora/{corpus_id}:
+    get:
+      operationId: getCorpus
+      summary: Get a corpus by ID
+      tags: [corpora]
+      parameters:
+        - name: corpus_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^cps_[a-z0-9]+$"
+      responses:
+        "200":
+          description: Corpus details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorpusResponse"
+        "404":
+          description: Corpus not found
+    patch:
+      operationId: updateCorpus
+      summary: Update corpus name, description, or scope_type
+      tags: [corpora]
+      parameters:
+        - name: corpus_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^cps_[a-z0-9]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCorpusRequest"
+      responses:
+        "200":
+          description: Corpus updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorpusResponse"
+        "404":
+          description: Corpus not found
+        "409":
+          description: Corpus is archived and cannot be updated
+
+  /v1/corpora/{corpus_id}/archive:
+    post:
+      operationId: archiveCorpus
+      summary: Archive a corpus (soft-delete)
+      tags: [corpora]
+      parameters:
+        - name: corpus_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^cps_[a-z0-9]+$"
+      responses:
+        "200":
+          description: Corpus archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorpusResponse"
+        "404":
+          description: Corpus not found
+
   /health:
     get:
       operationId: getHealth
@@ -997,6 +1133,88 @@ components:
         default: 0
 
   schemas:
+    CorpusResponse:
+      type: object
+      required: [corpus_id, name, tenant_id, scope_type, status, created_at, updated_at]
+      properties:
+        corpus_id:
+          type: string
+          pattern: "^cps_[a-z0-9]+$"
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        tenant_id:
+          type: string
+          pattern: "^tenant_[a-z0-9_]+$"
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+        status:
+          type: string
+          enum: [active, archived]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CorpusListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CorpusResponse"
+        total:
+          type: integer
+          nullable: true
+        limit:
+          type: integer
+          nullable: true
+        offset:
+          type: integer
+          nullable: true
+
+    CreateCorpusRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        tenant_id:
+          type: string
+          pattern: "^tenant_[a-z0-9_]+$"
+          default: tenant_public
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+          default: global_public
+
+    UpdateCorpusRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+          nullable: true
+
     Jurisdiction:
       type: object
       required: [jurisdiction_id, name, slug, created_at, updated_at]

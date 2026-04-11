@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 
 import httpx
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
@@ -20,11 +22,27 @@ from platform_control.schemas.wizard import (
 from platform_control.services.argilla_enqueue_service import ArgillaEnqueueService
 from platform_control.services.orchestrator import InMemoryOrchestrator, TemporalOrchestrator
 from platform_control.services.wizard_service import WizardService
+from platform_control.temporal.activities import (
+    ReviewDrainActivities,
+    ScopeShardActivities,
+    WizardStateActivities,
+)
 from platform_control.temporal.workflows import (
     ReviewDrainWorkflow,
     ScopeShardWorkflow,
     WizardRunWorkflow,
 )
+
+
+def _make_test_activities(
+    session_maker: async_sessionmaker[AsyncSession],
+) -> tuple[WizardStateActivities, ScopeShardActivities, ReviewDrainActivities]:
+    """Construct activity instances wired to the test DB session factory."""
+    return (
+        WizardStateActivities(session_factory=session_maker),
+        ScopeShardActivities(session_factory=session_maker),
+        ReviewDrainActivities(session_factory=session_maker),
+    )
 
 
 @pytest.mark.asyncio
@@ -52,12 +70,23 @@ async def test_wizard_state_guards_and_transitions(session) -> None:
 
 
 @pytest.mark.asyncio
-async def test_temporal_orchestrator_starts_workflow_and_signals(session) -> None:
+async def test_temporal_orchestrator_starts_workflow_and_signals(
+    session, session_maker: async_sessionmaker[AsyncSession]
+) -> None:
+    state_acts, shard_acts, drain_acts = _make_test_activities(session_maker)
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with Worker(
             env.client,
             task_queue="wizard",
             workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
+            activities=[
+                state_acts.persist_pilot_completed,
+                state_acts.fetch_scope_shards,
+                shard_acts.run_shard_crawl,
+                shard_acts.report_shard_progress,
+                drain_acts.enqueue_pending_reviews,
+                drain_acts.check_review_drain_complete,
+            ],
         ):
             orch = TemporalOrchestrator(
                 namespace="default",
@@ -75,6 +104,15 @@ async def test_temporal_orchestrator_starts_workflow_and_signals(session) -> Non
             assert run.workflow_id is not None
             assert run.state is WizardRunState.PILOT_RUN
 
+            # Allow the workflow's persist_pilot_completed activity to commit the
+            # PilotRun → HumanGateApproval transition before we signal approve.
+            for _ in range(50):
+                await asyncio.sleep(0)
+                session.expire_all()
+                current = await service.get_run(run.wizard_run_id)
+                if current.state is WizardRunState.HUMAN_GATE_APPROVAL:
+                    break
+
             approved = await service.approve_run(run.wizard_run_id, reason="ok")
             assert approved.state is WizardRunState.SCALED_RUN
 
@@ -83,12 +121,23 @@ async def test_temporal_orchestrator_starts_workflow_and_signals(session) -> Non
 
 
 @pytest.mark.asyncio
-async def test_temporal_orchestrator_starts_standalone_child_workflows() -> None:
+async def test_temporal_orchestrator_starts_standalone_child_workflows(
+    session_maker: async_sessionmaker[AsyncSession],
+) -> None:
+    state_acts, shard_acts, drain_acts = _make_test_activities(session_maker)
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with Worker(
             env.client,
             task_queue="wizard",
             workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
+            activities=[
+                state_acts.persist_pilot_completed,
+                state_acts.fetch_scope_shards,
+                shard_acts.run_shard_crawl,
+                shard_acts.report_shard_progress,
+                drain_acts.enqueue_pending_reviews,
+                drain_acts.check_review_drain_complete,
+            ],
         ):
             orch = TemporalOrchestrator(
                 namespace="default",

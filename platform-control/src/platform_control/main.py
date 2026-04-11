@@ -31,6 +31,7 @@ from platform_control.routers import (
     versions,
     wizard,
 )
+from platform_control.routers.corpora import router as corpora_router
 
 _HTTP_LOGGER_NAME = "platform_control.http"
 
@@ -94,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(wizard.router, dependencies=_operator_auth)
     app.include_router(reviews.router, dependencies=_operator_auth)
     app.include_router(schedules.router, dependencies=_operator_auth)
+    app.include_router(corpora_router, dependencies=_operator_auth)
     app.include_router(firecrawl.router, dependencies=_service_auth)
     app.include_router(di_events.router, dependencies=_service_auth)
 
