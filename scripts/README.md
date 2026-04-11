@@ -8,6 +8,6 @@ Operator-focused entry points (from repo root unless noted).
 | [`mvp-acceptance-scenario-pack.sh`](mvp-acceptance-scenario-pack.sh) | HTTP scenarios 1–4 for dev/staging; same impersonation env as e2e. |
 | [`mint-cloud-run-tokens.sh`](mint-cloud-run-tokens.sh) | Prints `export …` lines for `EVIDARA_PLATFORM_CONTROL_TOKEN`, `EVIDARA_LEGAL_SEARCH_TOKEN`, `E2E_PC_ID_TOKEN`, `E2E_LS_ID_TOKEN`. |
 | [`smoke-evidara-cli.sh`](smoke-evidara-cli.sh) | Local/API `evidara` pings when `EVIDARA_CLI_SMOKE=1`. |
-| [`analyze_github_actions_queue.py`](analyze_github_actions_queue.py) | Summarize GitHub Actions **queue vs run** time via `gh` (`--csv`, `--per-job`). |
+| [`analyze_github_actions_queue.py`](analyze_github_actions_queue.py) | Summarize GitHub Actions **queue vs run** time via `gh` (`--csv`, `--per-job`, `--aggregate-jobs`). |
 
 Auth details: [docs/setup/gcp-local-cloud-run-auth.md](../docs/setup/gcp-local-cloud-run-auth.md) and [docs/runbooks/mvp-acceptance-scenario-pack.md](../docs/runbooks/mvp-acceptance-scenario-pack.md).

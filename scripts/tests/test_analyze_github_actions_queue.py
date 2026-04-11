@@ -47,6 +47,24 @@ class AnalyzeGitHubActionsQueueTest(unittest.TestCase):
         self.assertEqual(rows[0].run_s, 180.0)
         self.assertEqual(rows[0].total_s, 240.0)
 
+    def test_job_queue_run_seconds_skipped(self):
+        self.assertIsNone(
+            self.m._job_queue_run_seconds({"conclusion": "skipped", "name": "x"})
+        )
+
+    def test_job_queue_run_seconds_success(self):
+        t = self.m._job_queue_run_seconds(
+            {
+                "conclusion": "success",
+                "created_at": "2026-01-01T00:00:00Z",
+                "started_at": "2026-01-01T00:02:00Z",
+                "completed_at": "2026-01-01T00:05:00Z",
+            }
+        )
+        self.assertIsNotNone(t)
+        self.assertEqual(t[0], 120.0)
+        self.assertEqual(t[1], 180.0)
+
     def test_summarize_groups_workflows(self):
         r = self.m.RunRow(
             database_id=1,

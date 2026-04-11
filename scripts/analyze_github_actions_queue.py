@@ -12,6 +12,7 @@ Examples:
   ./scripts/analyze_github_actions_queue.py -w "Legal Search" -w "Runtime Images" -L 200
   ./scripts/analyze_github_actions_queue.py --csv
   ./scripts/analyze_github_actions_queue.py --per-job --workflow "Legal Search" -L 15
+  ./scripts/analyze_github_actions_queue.py -w "Legal Search" -L 50 --aggregate-jobs
 """
 
 from __future__ import annotations
@@ -160,6 +161,20 @@ def _summarize(rows: list[RunRow]) -> dict[str, dict[str, Any]]:
     return summary
 
 
+def _job_queue_run_seconds(job: dict[str, Any]) -> tuple[float, float] | None:
+    """Return (queue_s, run_s) for a job, or None if skipped or not finished."""
+    if job.get("conclusion") == "skipped":
+        return None
+    c = _parse_iso(job.get("created_at"))
+    st = _parse_iso(job.get("started_at"))
+    en = _parse_iso(job.get("completed_at"))
+    if not st or not en:
+        return None
+    jq = max(0.0, (st - c).total_seconds()) if c else 0.0
+    jr = max(0.0, (en - st).total_seconds())
+    return jq, jr
+
+
 def _fetch_jobs(repo: str, run_id: int) -> list[dict[str, Any]]:
     data = _gh_json(
         [
@@ -187,15 +202,12 @@ def _print_per_job(repo: str, rows: list[RunRow]) -> None:
         )
         job_rows: list[tuple[float, float, str, str | None]] = []
         for j in jobs:
-            c = _parse_iso(j.get("created_at"))
-            st = _parse_iso(j.get("started_at"))
-            en = _parse_iso(j.get("completed_at"))
             name = str(j.get("name") or "?")
             concl = j.get("conclusion")
-            if not st or not en:
+            parsed = _job_queue_run_seconds(j)
+            if not parsed:
                 continue
-            jq = max(0.0, (st - c).total_seconds()) if c else 0.0
-            jr = max(0.0, (en - st).total_seconds())
+            jq, jr = parsed
             job_rows.append((jq, jr, name, concl))
         job_rows.sort(key=lambda t: -(t[0] + t[1]))
         for jq, jr, name, concl in job_rows[:12]:
@@ -203,6 +215,66 @@ def _print_per_job(repo: str, rows: list[RunRow]) -> None:
         if len(job_rows) > 12:
             print(f"  ... {len(job_rows) - 12} more jobs")
         print()
+
+
+def _print_aggregate_jobs(repo: str, rows: list[RunRow]) -> None:
+    """Summarize job-level queue and run seconds across all runs (non-skipped jobs)."""
+    by_name: dict[str, dict[str, list[float]]] = defaultdict(
+        lambda: {"queue": [], "run": []}
+    )
+    per_run_max_queue: list[float] = []
+    multi_wf = len({r.workflow_name for r in rows}) > 1
+
+    for row in rows:
+        jobs = _fetch_jobs(repo, row.database_id)
+        queues_this_run: list[float] = []
+        for j in jobs:
+            parsed = _job_queue_run_seconds(j)
+            if not parsed:
+                continue
+            jq, jr = parsed
+            name = str(j.get("name") or "?")
+            key = f"{row.workflow_name} / {name}" if multi_wf else name
+            queues_this_run.append(jq)
+            by_name[key]["queue"].append(jq)
+            by_name[key]["run"].append(jr)
+        if queues_this_run:
+            per_run_max_queue.append(max(queues_this_run))
+
+    print("\n## Job-level aggregate (non-skipped jobs across sample runs)\n")
+    if per_run_max_queue:
+        pm = _percentile(per_run_max_queue, 50)
+        pp = _percentile(per_run_max_queue, 90)
+        print(
+            "Per-run max job queue_s (largest queue among jobs in each run): "
+            f"median={pm:.0f}  p90={pp:.0f}  (n_runs={len(per_run_max_queue)})\n"
+        )
+
+    ranked = []
+    for name, buckets in by_name.items():
+        qs, rs = buckets["queue"], buckets["run"]
+        if not qs:
+            continue
+        ranked.append(
+            (
+                -(_percentile(qs, 50) or 0),
+                name,
+                len(qs),
+                _percentile(qs, 50),
+                _percentile(qs, 90),
+                _percentile(rs, 50),
+                _percentile(rs, 90),
+            )
+        )
+    ranked.sort()
+    print(f"{'job_name':<48} {'n':>5}  {'q_med':>7} {'q_p90':>7}  {'r_med':>7} {'r_p90':>7}")
+    for _, name, n, qm, qp, rm, rp in ranked:
+        print(
+            f"{name:<48} {n:>5}  "
+            f"{qm or 0:>7.0f} {qp or 0:>7.0f}  "
+            f"{rm or 0:>7.0f} {rp or 0:>7.0f}"
+        )
+    print()
 
 
 def main() -> None:
@@ -241,6 +313,11 @@ def main() -> None:
         "--per-job",
         action="store_true",
         help="After summary, fetch jobs API for each run (extra API calls)",
+    )
+    parser.add_argument(
+        "--aggregate-jobs",
+        action="store_true",
+        help="After summary, fetch jobs for each run and print per-job queue/run percentiles",
     )
     args = parser.parse_args()
     repo = args.repo or _default_repo()
@@ -281,9 +358,9 @@ def main() -> None:
                     f"{r.total_s:.1f}",
                 ]
             )
-        if args.per_job:
+        if args.per_job or args.aggregate_jobs:
             print(
-                "Note: --per-job with --csv is not supported; run without --csv",
+                "Note: --per-job / --aggregate-jobs with --csv is not supported",
                 file=sys.stderr,
             )
         return
@@ -326,6 +403,9 @@ def main() -> None:
             else "  total_s:   (n/a)"
         )
         print()
+
+    if args.aggregate_jobs:
+        _print_aggregate_jobs(repo, rows)
 
     if args.per_job:
         _print_per_job(repo, rows)
