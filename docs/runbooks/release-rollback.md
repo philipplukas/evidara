@@ -1,7 +1,7 @@
 # Release & Rollback Runbook
 
 Owner: Platform team
-Last reviewed: 2026-04-03
+Last reviewed: 2026-04-11
 Last verified: Not yet verified
 Applies to: dev, prod
 
@@ -34,6 +34,10 @@ Before merging to `main`:
 - [ ] PR reviewed and approved
 - [ ] No known breaking changes in platform-control or legal-search
 - [ ] If schema change: migration tested locally and in dev first
+
+## Operational drill evidence (TAR-67)
+
+Rehearse rollback steps in **dev** (or staging when available) before a go/no-go window. For each drill iteration, record: UTC timestamp, environment, Cloud Run service and revision IDs before/after traffic shift, command transcript or Actions run URL, and whether smoke passed. Attach evidence to Linear **TAR-67** / **TAR-69**; only commit artifacts under [`docs/runbooks/evidence/`](evidence/README.md) when explicitly approved for that release. Tie back to [first vertical slice exit gates](first-vertical-slice-exit-gates.md) and [alert response](alert-response-playbook.md#operational-drill-evidence-tar-67).
 
 ## Rollback Procedures
 

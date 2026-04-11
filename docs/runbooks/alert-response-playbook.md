@@ -1,7 +1,7 @@
 # Alert Response Playbook
 
 Owner: Platform team
-Last reviewed: 2026-04-03
+Last reviewed: 2026-04-11
 Last verified: Not yet verified
 Applies to: dev, staging, prod
 
@@ -11,6 +11,10 @@ This playbook documents how to respond to automated alerts from the Evidara
 monitoring stack. Each alert links to a specific section below.
 
 For SLI/SLO definitions, see [docs/adr/sli-slo-definitions.md](../adr/sli-slo-definitions.md).
+
+## Operational drill evidence (TAR-67)
+
+For table-top or live alert drills, capture: alert name, environment, acknowledgement time, first Cloud Logging query used, and resolution path (rollback, config fix, or “no action / benign”). Link DLQ-related drills to [DLQ triage and replay](dlq-triage-and-replay.md#operational-drill-evidence-tar-67) and traffic-affecting drills to [release and rollback](release-rollback.md#operational-drill-evidence-tar-67). Store attachments on **TAR-67** / **TAR-69** unless the evidence pack is already cleared for [`docs/runbooks/evidence/`](evidence/README.md).
 
 ## Alert Triage Flow
 
