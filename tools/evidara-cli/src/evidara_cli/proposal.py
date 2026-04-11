@@ -71,7 +71,13 @@ def _dspy_proposal(seed_url: str, name: str | None) -> dict[str, Any]:
         predictor = dspy.Predict(SourceSpecSignature)
         result = predictor(seed_url=seed_url, name_hint=name or "")
         parsed: dict[str, Any] = json.loads(result.proposal)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        import sys
+
+        print(
+            f"[evidara-cli] DSPy proposal failed ({exc!r}); falling back to rule-based.",
+            file=sys.stderr,
+        )
         return _rule_based_proposal(seed_url, name)
 
     parsed["seed_url"] = seed_url

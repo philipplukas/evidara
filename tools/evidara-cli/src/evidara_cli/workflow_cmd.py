@@ -72,7 +72,7 @@ _RUN_ID_OPTION = typer.Option("--run-id", help="Workflow run identifier from a p
 
 
 def _new_run_id(prefix: str) -> str:
-    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     short = uuid.uuid4().hex[:6]
     return f"wf_{prefix}_{ts}_{short}"
 
@@ -183,7 +183,9 @@ def source_inspect(
                     )
 
         pc_ok = health_code == 200
-        sources_ok = sources_code in (200, 401, 403)  # auth errors mean the service is up
+        # 401/403 on /v1/sources means the service is reachable but credentials are not
+        # configured for this environment — a separate configuration concern from reachability.
+        sources_ok = sources_code in (200, 401, 403)
         all_ok = pc_ok and sources_ok
 
         status: StepStatus = "passed" if all_ok else "failed_retriable"
@@ -804,6 +806,8 @@ def search_verify_query_pack(
                     client=client,
                 )
                 total = (
+                    # legal-search OpenAPI uses camelCase; tolerate snake_case for resilience
+                    # across dev/staging environments and future contract iterations.
                     payload.get("totalResults", payload.get("total_results", 0))
                     if isinstance(payload, dict)
                     else 0
