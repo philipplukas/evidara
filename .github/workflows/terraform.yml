@@ -7,6 +7,9 @@ on:
       - "infra/terraform/gcp/runtime_stack/**"
       - "infra/env/dev/runtime.gcp.tfvars.example"
       - "infra/env/dev/runtime.gcp.ci.tfvars"
+      - "infra/env/staging/runtime.gcp.tfvars.example"
+      - "infra/env/staging/runtime.gcp.ci.tfvars"
+      - "infra/env/prod/runtime.gcp.tfvars.example"
   push:
     branches: [main]
     paths:
@@ -14,6 +17,9 @@ on:
       - "infra/terraform/gcp/runtime_stack/**"
       - "infra/env/dev/runtime.gcp.tfvars.example"
       - "infra/env/dev/runtime.gcp.ci.tfvars"
+      - "infra/env/staging/runtime.gcp.tfvars.example"
+      - "infra/env/staging/runtime.gcp.ci.tfvars"
+      - "infra/env/prod/runtime.gcp.tfvars.example"
   workflow_dispatch:
     inputs:
       run_apply:
@@ -33,20 +39,42 @@ concurrency:
 
 env:
   TF_ROOT: infra/terraform/gcp/runtime_stack
-  TF_BASE_VAR_FILE: infra/env/dev/runtime.gcp.tfvars.example
-  TF_CI_VAR_FILE: infra/env/dev/runtime.gcp.ci.tfvars
 
 jobs:
   # ── PR: fmt + validate + plan ───────────────────
-  plan:
-    name: Terraform plan
+  fmt-check:
+    name: Terraform fmt check
     if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive -diff
+        working-directory: ${{ env.TF_ROOT }}
+
+  plan-dev:
+    name: Terraform plan (dev)
+    if: github.event_name == 'pull_request'
+    needs: fmt-check
     runs-on: ubuntu-latest
     environment: dev
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Prepare plan output directory
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.tmp/terraform-plan/dev"
+          echo "TF_PLAN_DIR=$GITHUB_WORKSPACE/.tmp/terraform-plan/dev" >> "$GITHUB_ENV"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -58,12 +86,6 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~> 1.9"
-
-      - name: Terraform fmt check
-        id: fmt
-        run: terraform fmt -check -recursive -diff
-        working-directory: ${{ env.TF_ROOT }}
-        continue-on-error: true
 
       - name: Terraform init
         id: init
@@ -80,11 +102,11 @@ jobs:
         run: |
           set -o pipefail
           terraform plan \
-            -var-file="$GITHUB_WORKSPACE/${{ env.TF_BASE_VAR_FILE }}" \
-            -var-file="$GITHUB_WORKSPACE/${{ env.TF_CI_VAR_FILE }}" \
+            -var-file="$GITHUB_WORKSPACE/infra/env/dev/runtime.gcp.tfvars.example" \
+            -var-file="$GITHUB_WORKSPACE/infra/env/dev/runtime.gcp.ci.tfvars" \
             -no-color \
             -input=false \
-            -out=tfplan 2>&1 | tee plan_output.txt
+            -out=tfplan 2>&1 | tee "$TF_PLAN_DIR/plan_output.txt"
         working-directory: ${{ env.TF_ROOT }}
         continue-on-error: true
 
@@ -95,7 +117,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const planPath = `${process.env.TF_ROOT}/plan_output.txt`;
+            const envName = 'dev';
+            const planPath = `${process.env.TF_PLAN_DIR}/plan_output.txt`;
             let plan = '';
             try {
               plan = fs.readFileSync(planPath, 'utf8');
@@ -109,16 +132,14 @@ jobs:
               plan = plan.substring(0, maxLen) + '\n\n... (truncated)';
             }
 
-            const fmtResult = '${{ steps.fmt.outcome }}';
             const initResult = '${{ steps.init.outcome }}';
             const validateResult = '${{ steps.validate.outcome }}';
             const planResult = '${{ steps.plan.outcome }}';
 
-            const body = `### Terraform Plan 🏗️
+            const body = `### Terraform Plan (${envName}) 🏗️
 
             | Step | Result |
             |------|--------|
-            | 🖌 fmt | \`${fmtResult}\` |
             | ⚙️ init | \`${initResult}\` |
             | ✅ validate | \`${validateResult}\` |
             | 📋 plan | \`${planResult}\` |
@@ -139,8 +160,9 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
+            const marker = `### Terraform Plan (${envName})`;
             const botComment = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('Terraform Plan')
+              c.user.type === 'Bot' && c.body.includes(marker)
             );
             if (botComment) {
               await github.rest.issues.updateComment({
@@ -162,22 +184,151 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-      - name: Fail if fmt failed
-        if: steps.fmt.outcome == 'failure'
-        run: |
-          echo "::error::Terraform formatting check failed. Run 'terraform fmt -recursive' locally."
-          exit 1
-
-  # ── Main: apply ─────────────────────────────────
-  apply:
-    name: Terraform apply
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
+  plan-staging:
+    name: Terraform plan (staging)
+    if: github.event_name == 'pull_request'
+    needs: fmt-check
     runs-on: ubuntu-latest
-    environment: dev
+    environment: staging
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Prepare plan output directory
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.tmp/terraform-plan/staging"
+          echo "TF_PLAN_DIR=$GITHUB_WORKSPACE/.tmp/terraform-plan/staging" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        id: init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          set -o pipefail
+          terraform plan \
+            -var-file="$GITHUB_WORKSPACE/infra/env/staging/runtime.gcp.tfvars.example" \
+            -var-file="$GITHUB_WORKSPACE/infra/env/staging/runtime.gcp.ci.tfvars" \
+            -no-color \
+            -input=false \
+            -out=tfplan 2>&1 | tee "$TF_PLAN_DIR/plan_output.txt"
+        working-directory: ${{ env.TF_ROOT }}
+        continue-on-error: true
+
+      - name: Post plan to PR
+        uses: actions/github-script@v8
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const envName = 'staging';
+            const planPath = `${process.env.TF_PLAN_DIR}/plan_output.txt`;
+            let plan = '';
+            try {
+              plan = fs.readFileSync(planPath, 'utf8');
+            } catch {
+              plan = 'Plan output not available.';
+            }
+
+            // Truncate if too long for GitHub comment
+            const maxLen = 60000;
+            if (plan.length > maxLen) {
+              plan = plan.substring(0, maxLen) + '\n\n... (truncated)';
+            }
+
+            const initResult = '${{ steps.init.outcome }}';
+            const validateResult = '${{ steps.validate.outcome }}';
+            const planResult = '${{ steps.plan.outcome }}';
+
+            const body = `### Terraform Plan (${envName}) 🏗️
+
+            | Step | Result |
+            |------|--------|
+            | ⚙️ init | \`${initResult}\` |
+            | ✅ validate | \`${validateResult}\` |
+            | 📋 plan | \`${planResult}\` |
+
+            <details><summary>Plan output</summary>
+
+            \`\`\`
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            *Pushed by @${{ github.actor }}, commit \`${{ github.sha }}\`*`;
+
+            // Find and update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = `### Terraform Plan (${envName})`;
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes(marker)
+            );
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # ── Main: apply ─────────────────────────────────
+  apply-dev:
+    name: Terraform apply (dev)
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      staging_apply_enabled: ${{ steps.meta.outputs.staging_apply_enabled }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Record promotion gates
+        id: meta
+        run: |
+          staging_enabled='${{ vars.TERRAFORM_APPLY_ENABLED_STAGING }}'
+          if [ -z "$staging_enabled" ]; then
+            staging_enabled='false'
+          fi
+          echo "staging_apply_enabled=${staging_enabled}" >> "$GITHUB_OUTPUT"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -197,8 +348,8 @@ jobs:
       - name: Terraform apply
         run: |
           terraform apply \
-            -var-file="$GITHUB_WORKSPACE/${{ env.TF_BASE_VAR_FILE }}" \
-            -var-file="$GITHUB_WORKSPACE/${{ env.TF_CI_VAR_FILE }}" \
+            -var-file="$GITHUB_WORKSPACE/infra/env/dev/runtime.gcp.tfvars.example" \
+            -var-file="$GITHUB_WORKSPACE/infra/env/dev/runtime.gcp.ci.tfvars" \
             -auto-approve \
             -input=false \
             -no-color
@@ -207,9 +358,121 @@ jobs:
       - name: Post apply summary
         if: always()
         run: |
-          echo "### Terraform Apply 🏗️" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Terraform Apply (dev) 🏗️" >> "$GITHUB_STEP_SUMMARY"
           echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
           echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
           echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Triggered by | @${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Base tfvars | \`infra/env/dev/runtime.gcp.tfvars.example\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| CI overlay | \`infra/env/dev/runtime.gcp.ci.tfvars\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Staging apply enabled (repo var) | \`${{ steps.meta.outputs.staging_apply_enabled }}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+  apply-staging:
+    name: Terraform apply (staging)
+    needs: apply-dev
+    if: |
+      always() &&
+      needs.apply-dev.result == 'success' &&
+      needs.apply-dev.outputs.staging_apply_enabled == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform apply
+        run: |
+          terraform apply \
+            -var-file="$GITHUB_WORKSPACE/infra/env/staging/runtime.gcp.tfvars.example" \
+            -var-file="$GITHUB_WORKSPACE/infra/env/staging/runtime.gcp.ci.tfvars" \
+            -auto-approve \
+            -input=false \
+            -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Post apply summary
+        if: always()
+        run: |
+          echo "### Terraform Apply (staging) 🏗️" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | @${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Base tfvars | \`infra/env/staging/runtime.gcp.tfvars.example\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| CI overlay | \`infra/env/staging/runtime.gcp.ci.tfvars\` |" >> "$GITHUB_STEP_SUMMARY"
+
+  apply-prod:
+    name: Terraform apply (prod)
+    needs:
+      - apply-dev
+      - apply-staging
+    if: |
+      always() &&
+      needs.apply-dev.result == 'success' &&
+      (
+        needs.apply-staging.result == 'success' ||
+        needs.apply-staging.result == 'skipped'
+      ) &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED_PROD == 'true') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
+      )
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_PROD }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Terraform apply
+        run: |
+          terraform apply \
+            -var-file="$GITHUB_WORKSPACE/infra/env/prod/runtime.gcp.tfvars.example" \
+            -auto-approve \
+            -input=false \
+            -no-color
+        working-directory: ${{ env.TF_ROOT }}
+
+      - name: Post apply summary
+        if: always()
+        run: |
+          echo "### Terraform Apply (prod) 🏗️" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | @${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Base tfvars | \`infra/env/prod/runtime.gcp.tfvars.example\` |" >> "$GITHUB_STEP_SUMMARY"

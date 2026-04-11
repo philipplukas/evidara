@@ -109,7 +109,7 @@ infra/
 - **Service account:** Use `service_account_key = "document_intelligence"` in `cloud_run_services` so the service runs as the Terraform-managed DI SA (not the default compute SA). That SA receives project-level Pub/Sub publish/subscribe and storage roles from `runtime_stack`; bucket-level bindings add explicit read on **raw artifacts** and optional **objectAdmin** on the **published Delta surfaces** bucket.
 - **Published surfaces bucket:** Set `document_intelligence_published_bucket_name` in tfvars (e.g. `evidara-document-intelligence-surfaces-dev`). The bucket must already exist; Terraform only attaches IAM.
 - **Pub/Sub push:** Set `artifact_bundle_subscription_push` with the subscription map key for `artifact-bundle-available` in that environment and `target_service = "di-consumer"`. That merges `push_config` onto the existing pull-style subscription definition without duplicating the whole `event_subscriptions` block.
-- **CI plans:** `infra/env/dev/runtime.gcp.ci.tfvars` sets `document_intelligence_published_bucket_name = null` and `artifact_bundle_subscription_push = null` so plans against the CI GCP project do not assume dev buckets or push endpoints.
+- **CI plans:** `infra/env/dev/runtime.gcp.ci.tfvars` and `infra/env/staging/runtime.gcp.ci.tfvars` set `document_intelligence_published_bucket_name = null` and `artifact_bundle_subscription_push = null` so plans against the CI GCP project do not assume environment buckets or push endpoints.
 
 ### Applying Changes
 
@@ -124,10 +124,13 @@ terraform apply -var-file="../../../../infra/env/dev/runtime.gcp.tfvars"
 ```
 
 > **Note**: Terraform plan/apply is automated via CI (`.github/workflows/terraform.yml`).
-> PRs touching `infra/terraform/gcp/runtime_stack/**` or `infra/env/dev/runtime.gcp.tfvars.example`
-> will receive an automatic plan comment. CI uses `infra/env/dev/runtime.gcp.ci.tfvars`
-> as an overlay for plan-safe project/service-account overrides. Merging to `main`
-> triggers auto-apply.
+> PRs touching `infra/terraform/gcp/runtime_stack/**` or the checked-in runtime tfvars examples
+> will receive automatic plan comments for **dev** and **staging**. CI uses `infra/env/*/runtime.gcp.ci.tfvars`
+> as an overlay for plan-safe project/service-account overrides. Merging to `main` can trigger applies when enabled:
+>
+> - `TERRAFORM_APPLY_ENABLED` → dev apply
+> - `TERRAFORM_APPLY_ENABLED_STAGING` → staging apply (after dev succeeds)
+> - `TERRAFORM_APPLY_ENABLED_PROD` → prod apply (after dev succeeds, and after staging succeeds or is skipped)
 
 ### GitHub Actions Variables
 
@@ -217,10 +220,10 @@ gcloud builds submit . \
 
 ### Infrastructure (terraform.yml)
 
-**Trigger**: Push to `main` affecting `infra/terraform/gcp/runtime_stack/**`.
+**Trigger**: Push to `main` affecting `infra/terraform/gcp/runtime_stack/**` or checked-in runtime tfvars examples under `infra/env/{dev,staging,prod}/`.
 
-- **PR**: `fmt -check` → `validate` → `plan` (posted as PR comment)
-- **Main**: `terraform apply -auto-approve`
+- **PR**: `fmt -check` → `validate` → `plan` for **dev** and **staging** (posted as separate PR comments)
+- **Main**: `terraform apply -auto-approve` with an explicit **dev → staging → prod** gate chain (staging/prod are controlled by repo variables)
 
 ## Prerequisites
 
