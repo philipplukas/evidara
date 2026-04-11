@@ -1,7 +1,7 @@
 # Dead-Letter Queue Triage and Replay Runbook
 
 Owner: Platform team
-Last reviewed: 2026-04-05
+Last reviewed: 2026-04-11
 Last verified: Not yet verified
 Applies to: dev, staging, prod
 
@@ -9,6 +9,10 @@ Applies to: dev, staging, prod
 
 This runbook covers inspecting, triaging, and replaying messages that have been
 forwarded to dead-letter queues (DLQs) after exhausting their retry budget.
+
+## Operational drill evidence (TAR-67)
+
+When practicing DLQ triage as an operator drill, capture a minimal evidence bundle **before** mutating production traffic: UTC timestamp, environment, subscription or DLQ name, approximate depth at drill start, and either a Cloud Logging query URL or Pub/Sub console path. Note whether replay was executed, dry-run only, or deferred. Attach the bundle to Linear **TAR-67** / **TAR-69** unless the release window already approved commits under [`docs/runbooks/evidence/`](evidence/README.md). Align expectations with [first vertical slice exit gates](first-vertical-slice-exit-gates.md) and [alert response](alert-response-playbook.md#operational-drill-evidence-tar-67).
 
 ## Ownership
 

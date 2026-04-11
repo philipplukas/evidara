@@ -1,7 +1,7 @@
 # First Vertical Slice Exit Gates
 
 Owner: Platform team
-Last reviewed: 2026-04-08
+Last reviewed: 2026-04-11
 Last verified: 2026-04-08
 Applies to: dev, staging, prod
 
@@ -18,6 +18,12 @@ The gate covers:
 ## Drill evidence capture (TAR-67)
 
 When executing exit gates as a drill (not only local development), capture **dated** evidence: workflow run URLs, correlation ids, and the `run_id` / `document_id` pair used for Gate D assertions. Store screenshots or JSON exports under `docs/runbooks/evidence/` only when the path is already approved for that release window; otherwise attach artifacts to the Linear issue. Link this runbook from `docs/runbooks/phase-5-go-no-go-memo.md` when updating gate status.
+
+Related drill procedures (same evidence discipline):
+
+- [DLQ triage and replay](dlq-triage-and-replay.md#operational-drill-evidence-tar-67)
+- [Release and rollback](release-rollback.md#operational-drill-evidence-tar-67)
+- [Alert response](alert-response-playbook.md#operational-drill-evidence-tar-67)
 
 ## Required Runtime Wiring
 
