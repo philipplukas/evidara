@@ -212,8 +212,25 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Preflight — Cloud Run API enabled (prod)
+        id: preflight-prod
+        run: |
+          set -euo pipefail
+          if gcloud services list --enabled --project "${PROJECT_ID}" \
+            --filter='name:run.googleapis.com' --format='value(name)' | rg -q '^run.googleapis.com$'; then
+            echo "cloud_run_api_enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Cloud Run Admin API is enabled in ${PROJECT_ID}."
+          else
+            echo "::warning::Skipping prod deploy: run.googleapis.com is disabled in ${PROJECT_ID}."
+            echo "cloud_run_api_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "### Prod Deployment Skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Reason: \`run.googleapis.com\` is disabled in \`${PROJECT_ID}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "- Action: enable Cloud Run Admin API, then re-run this workflow." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       # Deploy the SAME image SHA that passed dev smoke tests
       - name: Deploy platform-control API (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
         run: |
           gcloud run services update "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
@@ -221,6 +238,7 @@ jobs:
             --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
 
       - name: Deploy platform-control worker (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
         run: |
           gcloud run services update "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
@@ -228,6 +246,7 @@ jobs:
             --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
 
       - name: Deploy legal-search API (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
         run: |
           gcloud run services update "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
@@ -235,6 +254,7 @@ jobs:
             --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:${IMAGE_TAG}"
 
       - name: Verify deployed revisions (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
         run: |
           PC_REV=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
@@ -252,6 +272,7 @@ jobs:
           echo "| image-tag | \`${IMAGE_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke test — platform-control health (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
         run: |
           PC_URL=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
@@ -265,6 +286,7 @@ jobs:
           fi
 
       - name: Smoke test — legal-search health (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
         run: |
           LS_URL=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
             --project "${PROJECT_ID}" \
