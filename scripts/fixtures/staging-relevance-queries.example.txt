@@ -1,0 +1,8 @@
+# One query per line (empty lines and # comments ignored).
+# Copy to staging-relevance-queries.txt (gitignored locally) or pass a custom path.
+# Replace with 5–10 queries representative of your staging corpus; see
+# docs/runbooks/staging-relevance-query-pack-suggestions.md
+
+Bundesgericht
+Art. 8 EMRK
+BVGE

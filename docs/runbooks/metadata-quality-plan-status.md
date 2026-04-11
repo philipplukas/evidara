@@ -1,8 +1,8 @@
 # Metadata & search quality — plan status report
 
 Owner: Platform / legal-search  
-Last reviewed: 2026-04-09 (staging evidence snapshots, 3.5.2 corpus inventory, TAR-89 staging honesty note)  
-Last verified: 2026-04-09  
+Last reviewed: 2026-04-11 (TAR-89 workstream doc link in §3.1)  
+Last verified: 2026-04-11  
 Applies to: MVP demo path, **Linear TAR-89** (search/detail metadata quality), related release gates
 
 This report ties together the **stated plan** (runbooks + Linear) and **repo reality** (what ships in code today). Update it when TAR-89 scope closes or gates move.
@@ -55,6 +55,8 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 | **LLM enrichment not a default path**           | Policy recorded in [document-intelligence README](../../document-intelligence/README.md) (“LLM extraction policy”): **default off**; pilot requires observability + cost bounds; BFF consumes `metadata.llm_extraction` when present |
 
 **Likely workstreams** (not all tracked as separate issues in this file): richer **source-acquisition** metadata into bundles; **DI** normalization improvements per corpus; **re-projection / re-index** for demo envs; **BFF mapper** labels/icons for `MetadataRow`; optional **LLM** rollout with guardrails and cost/quality metrics.
+
+**Sub-issue split (Linear):** use [TAR-89 workstreams](tar-89-workstreams.md) (data path / serving path / environment truth) when creating child issues so scope stays reviewable.
 
 ### 3.2 Relevance baselines (TAR-82 / TAR-68) — adjacent
 

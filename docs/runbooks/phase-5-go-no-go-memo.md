@@ -6,6 +6,8 @@ Last verified: 2026-04-11
 Applies to: dev → staging transition (Linear **TAR-69**)  
 Canonical template history: this file is the **working draft**; publish final recommendation in Linear **TAR-69** when all gates are green.
 
+**Operator entry point:** [Phase 5 evidence checklist](phase-5-evidence-checklist.md) (TAR-64 / TAR-77 / TAR-85 in one place).
+
 ## 1. Summary recommendation
 
 - **Recommendation:** **PENDING** — operator evidence still required for full dev smoke (TAR-64 ×2), branch protection proof (TAR-77), and fresh staging MVP acceptance (TAR-85). Repo implementation for search/metadata/relevance is merged.
@@ -69,6 +71,8 @@ From repo root: `bash scripts/check_docs.sh`, `bash scripts/check-legal-search.s
 
 ## 7. Phase 5 workstream schedule (recommended)
 
+Narrative + evidence pointers: [post-MVP engineering workstreams](post-mvp-engineering-workstreams.md).
+
 Execute after MVP path is credible (TAR-64 green):
 
 1. **[TAR-66](https://linear.app/tart-baozi/issue/TAR-66)** — Harden HTML parsing + corpus fixtures (ingest stability). **Repo:** header chrome skip + regression tests merged ([#195](https://github.com/philipplukas/evidara/pull/195)); extend or close in Linear if remaining scope is fixture-only.  
@@ -80,6 +84,7 @@ Optional parallel: [TAR-139](https://linear.app/tart-baozi/issue/TAR-139) (agent
 
 ## Related docs
 
+- [Phase 5 evidence checklist](phase-5-evidence-checklist.md) — single-page index for TAR-64, TAR-77, TAR-85
 - [M5 evidence checklist](m5-evidence-checklist.md) — step-by-step operator actions for TAR-64, TAR-77, TAR-85  
 - [Search relevance baseline](search-relevance-baseline.md) — staging eval pack for TAR-82 / TAR-68  
 - [First vertical slice exit gates](first-vertical-slice-exit-gates.md)  

@@ -1,11 +1,13 @@
 # M5 evidence checklist (operator)
 
 Owner: Platform team  
-Last reviewed: 2026-04-09  
-Last verified: 2026-04-09  
+Last reviewed: 2026-04-11  
+Last verified: 2026-04-11  
 Applies to: dev, staging (operator evidence for Linear TAR-64 / TAR-77 / TAR-85)
 
 Use this when closing phase-5 Linear items that need **run output or screenshots**, not repo code. GCP IAM and GitHub admin steps cannot be done from git alone.
+
+**Summary index:** [Phase 5 evidence checklist](phase-5-evidence-checklist.md) (links TAR-64 / TAR-77 / TAR-85 to this file’s sections below).
 
 ## TAR-64 — Dev e2e smoke (two runs)
 

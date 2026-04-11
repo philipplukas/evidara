@@ -75,6 +75,7 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.evidara-cloud-run.env
 *.pem
 *.key
 secrets/

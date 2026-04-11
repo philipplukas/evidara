@@ -1,8 +1,8 @@
 # Search relevance baseline (MVP)
 
 Owner: Legal-search / platform  
-Last reviewed: 2026-04-09  
-Last verified: 2026-04-09  
+Last reviewed: 2026-04-11  
+Last verified: 2026-04-11  
 Applies to: staging, prod
 
 This runbook defines how we **tune and regress** search relevance without changing API contracts. It pairs Linear **TAR-82** (relevance tuning) and **TAR-68** (locked baselines).
@@ -35,6 +35,7 @@ Run against the **staging** legal-search API with a fixed corpus snapshot:
 ## Automation hooks
 
 - **API smoke:** `evidara workflow mvp-acceptance` (when configured for staging) exercises the locked MVP path; extend evidence with manual top-N checks from the table above when tuning relevance.
+- **Query pack (staging):** from repo root, with `EVIDARA_LEGAL_SEARCH_URL` and `EVIDARA_LEGAL_SEARCH_TOKEN` set (same Bearer pattern as [GCP local Cloud Run auth](../setup/gcp-local-cloud-run-auth.md)), run [`scripts/run-staging-relevance-query-pack.sh`](../../scripts/run-staging-relevance-query-pack.sh). It reads one query per line (see [`scripts/fixtures/staging-relevance-queries.example.txt`](../../scripts/fixtures/staging-relevance-queries.example.txt)), calls `GET /v1/search`, and prints a Markdown table — paste into [relevance-eval-result-template.md](relevance-eval-result-template.md) and attach to **TAR-82** / **TAR-68**.
 - **CI:** unit tests cover projection + mapper behavior; full relevance requires OpenSearch integration (Testcontainers) or staging — do not block PRs on staging-only numbers.
 
 ## Related docs

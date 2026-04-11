@@ -66,6 +66,14 @@ uv run evidara workflow mvp-acceptance
 uv run evidara workflow mvp-acceptance --human
 ```
 
+Against **private Cloud Run** (staging/dev), prefer the repo helper that logs in, discovers URLs, mints tokens, then runs this workflow:
+
+```bash
+./scripts/evidara-cloud-run-operator-session.sh staging
+```
+
+See [`docs/setup/gcp-local-cloud-run-auth.md`](../../docs/setup/gcp-local-cloud-run-auth.md) §4.1.
+
 This command is the CLI-owned surface for scenarios 1–4 in [`docs/runbooks/mvp-acceptance-scenario-pack.md`](../../docs/runbooks/mvp-acceptance-scenario-pack.md):
 
 - platform-control health + sources reachability
