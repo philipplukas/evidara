@@ -45,6 +45,7 @@ def test_workflow_mvp_acceptance_emits_summary(
     payload = emit_mock.call_args.args[0]
     assert payload["ok"] is True
     assert payload["workflow"] == "mvp-acceptance"
+    assert payload["evidence_pack_version"] == "tar-85-2026-04-11"
     assert payload["scenario_1"]["platform_control_health_http_code"] == 200
     assert payload["scenario_2"]["queries"][0]["query"] == "art 754"
     assert payload["scenario_3"]["document_id"] == "doc_123"

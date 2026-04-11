@@ -1,3 +1,7 @@
+/**
+ * Browser smoke for MVP acceptance (TAR-85). Pair with `evidara workflow mvp-acceptance`
+ * for API-level evidence when filing release artifacts.
+ */
 import { expect, test } from "@playwright/test";
 import { mockSearchApi } from "./helpers/mock-api";
 

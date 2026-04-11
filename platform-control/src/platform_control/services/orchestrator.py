@@ -186,7 +186,11 @@ class TemporalOrchestrator:
         )
 
     async def start_scope_shard_workflow(
-        self, wizard_run_id: str, *, scope_shard_key: str = "default"
+        self,
+        wizard_run_id: str,
+        *,
+        scope_shard_key: str = "default",
+        resume_token: str | None = None,
     ) -> str:
         """Start a scope-shard workflow via API (separate id from parent-spawned children)."""
         safe_key = _sanitize_workflow_id_segment(scope_shard_key)
@@ -195,7 +199,7 @@ class TemporalOrchestrator:
         try:
             await client.start_workflow(
                 ScopeShardWorkflow.run,
-                args=[wizard_run_id, scope_shard_key],
+                args=[wizard_run_id, scope_shard_key, resume_token],
                 id=child_id,
                 task_queue=self.task_queue,
             )

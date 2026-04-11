@@ -15,6 +15,10 @@ The gate covers:
 2. `document-intelligence` bundle processing and publication events
 3. `legal-search` projection ingest and search/query behavior
 
+## Drill evidence capture (TAR-67)
+
+When executing exit gates as a drill (not only local development), capture **dated** evidence: workflow run URLs, correlation ids, and the `run_id` / `document_id` pair used for Gate D assertions. Store screenshots or JSON exports under `docs/runbooks/evidence/` only when the path is already approved for that release window; otherwise attach artifacts to the Linear issue. Link this runbook from `docs/runbooks/phase-5-go-no-go-memo.md` when updating gate status.
+
 ## Required Runtime Wiring
 
 - Runtime stack includes Cloud Run services for:

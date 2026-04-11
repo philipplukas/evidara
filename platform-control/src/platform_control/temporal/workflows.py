@@ -14,8 +14,16 @@ class ScopeShardWorkflow:
     """
 
     @workflow.run
-    async def run(self, wizard_run_id: str, scope_shard_key: str) -> str:
+    async def run(
+        self,
+        wizard_run_id: str,
+        scope_shard_key: str,
+        resume_token: str | None = None,
+    ) -> str:
         del wizard_run_id, scope_shard_key
+        if resume_token:
+            # Placeholder: durable activities would read frontier state from ``resume_token``.
+            await workflow.sleep(timedelta(seconds=0))
         await workflow.sleep(timedelta(seconds=0))
         return "shard_complete"
 
@@ -57,7 +65,7 @@ class WizardRunWorkflow:
 
         await workflow.execute_child_workflow(
             ScopeShardWorkflow.run,
-            args=[wizard_run_id, "pilot-shard"],
+            args=[wizard_run_id, "pilot-shard", None],
             id=f"{parent_wf_id}__scope_shard_pilot",
             task_queue=tq,
         )

@@ -17,6 +17,7 @@ description: >-
 | **Search / document** against live BFF | `evidara legal-search search`, `evidara legal-search document` |
 | **Wizard path** (if deployed) | `evidara platform-control wizard-smoke` |
 | **List OpenAPI paths** (no HTTP) | `evidara openapi paths platform-control` / `legal-search` |
+| **List OpenAPI operation tags** (no HTTP) | `evidara openapi tags platform-control` / `legal-search` |
 | **Browser journeys**, RBAC, screenshots, release evidence | Playwright — [interaction-flow-validation.md](../../../docs/runbooks/interaction-flow-validation.md), `scripts/run-interaction-flow-local.sh` |
 
 Do **not** use the CLI to assert **UI layout**, **client-side routing**, or **cross-surface header** behavior; use Playwright.

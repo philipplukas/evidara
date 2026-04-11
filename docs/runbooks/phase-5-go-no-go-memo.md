@@ -37,6 +37,7 @@ Canonical template history: this file is the **working draft**; publish final re
 | Branch protection not enforced | High | Complete TAR-77; block merge until required check appears on PRs | Repo admin |
 | Stale staging acceptance | Medium | Re-run MVP acceptance after each release candidate | Platform |
 | Dev smoke drift | Medium | Two smoke passes on current `main` for TAR-64 | Platform |
+| Acquisition replay resume gaps | Medium | Use `GET /v1/runs/{run_id}` `replay_checkpoint` plus provider reruns; treat Temporal `resume_token` as experimental until activities persist full frontiers | Platform |
 
 ## 5. Follow-ups (must be tracked issues)
 

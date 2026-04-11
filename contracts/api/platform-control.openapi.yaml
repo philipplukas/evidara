@@ -1548,6 +1548,14 @@ components:
           oneOf:
             - $ref: "#/components/schemas/RunReplay"
             - type: "null"
+        replay_checkpoint:
+          oneOf:
+            - $ref: "#/components/schemas/RunReplayCheckpoint"
+            - type: "null"
+          description: >
+            Optional monotonic acquisition progress snapshot. Populated from provider webhooks
+            (for example Firecrawl) and seeded from the parent run when ``replay.parent_run_id``
+            is set so partial reruns can resume from the last known frontier.
         status:
           type: string
           enum: [pending, running, completed, failed, cancelled]
@@ -1633,6 +1641,27 @@ components:
           oneOf:
             - type: string
             - type: "null"
+
+    RunReplayCheckpoint:
+      type: object
+      description: >
+        Durable replay frontier for acquisition runs. Stored in Postgres JSON metadata; additional
+        keys may appear as providers evolve.
+      additionalProperties: true
+      properties:
+        schema_version:
+          type: integer
+          minimum: 1
+        last_firecrawl_event_type:
+          type: string
+        pages_ingested:
+          type: integer
+          minimum: 0
+        updated_at:
+          type: string
+          format: date-time
+        terminal:
+          type: boolean
 
     RunListItem:
       type: object

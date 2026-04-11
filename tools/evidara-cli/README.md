@@ -36,6 +36,8 @@ Or install the package into an environment of your choice (`pip install -e .` / 
 # Discovery — finds monorepo root from cwd (e.g. tools/evidara-cli or repo root)
 evidara openapi paths platform-control
 evidara openapi paths legal-search
+evidara openapi tags platform-control
+evidara openapi tags legal-search
 
 # Platform-control
 evidara platform-control ping

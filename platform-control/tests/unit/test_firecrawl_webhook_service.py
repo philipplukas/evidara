@@ -125,6 +125,11 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
     await service.process(payload=crawl_page_payload, raw_body=page_body, signature=page_signature)
     await service.process(payload=crawl_page_payload, raw_body=page_body, signature=page_signature)
 
+    await session.refresh(run)
+    checkpoint = run.run_metadata.get("replay_checkpoint") or {}
+    assert checkpoint.get("last_firecrawl_event_type") == "crawl.page"
+    assert checkpoint.get("pages_ingested") == 1
+
     crawl_completed_payload = {"type": "crawl.completed", "id": "crawl_123", "data": {}}
     completed_body = json.dumps(crawl_completed_payload, sort_keys=True).encode("utf-8")
     completed_signature = (

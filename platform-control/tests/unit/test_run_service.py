@@ -345,6 +345,35 @@ async def test_create_run_persists_explicit_scope_and_replay_metadata(session) -
     assert run.run_metadata["replay"]["reason"] == "Fill January gap after provider outage"
 
 
+@pytest.mark.asyncio
+async def test_create_run_copies_parent_replay_checkpoint(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    run_service = RunService(session, StubProvider())
+    parent = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+    md = dict(parent.run_metadata or {})
+    md["replay_checkpoint"] = {"schema_version": 1, "pages_ingested": 7}
+    parent.run_metadata = md
+    await session.commit()
+
+    child = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+            replay={"mode": "partial_rerun", "parent_run_id": parent.run_id},
+        )
+    )
+
+    assert child.run_metadata["replay_checkpoint"]["pages_ingested"] == 7
+
+
 def test_partial_rerun_requires_parent_run_id() -> None:
     with pytest.raises(ValueError):
         CreateRunRequest(

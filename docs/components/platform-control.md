@@ -8,7 +8,7 @@ Own source lifecycle and operational control. Platform-control is the entry poin
 
 Platform-control now has a running FastAPI service with persisted entities and migration-backed schemas for source lifecycle, runs, webhook receipts, raw artifacts, bundle manifests, and DI status/lifecycle event consumption. Core API endpoints are implemented for sources, versions, runs, Firecrawl callbacks, and DI event ingest (`document.processing_status.updated`, `document.processed`, `document.withdrawn`) with run-scoped read surfaces.
 
-For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope_type` are frozen through source-version acquisition config and copied into bundle/event provenance. Run creation now also accepts explicit `scope` and `replay` metadata so partial reruns and backfills can be recorded on the control-plane side even though resumable frontier orchestration is still follow-on work. First-class corpus CRUD is still follow-on work.
+For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope_type` are frozen through source-version acquisition config and copied into bundle/event provenance. Run creation accepts explicit `scope` and `replay` metadata for partial reruns and backfills. Acquisition webhooks now persist a `replay_checkpoint` object on the run (Firecrawl-driven fields such as `last_firecrawl_event_type` and `pages_ingested`), and child runs created with `replay.parent_run_id` inherit the parent checkpoint when present so operators can reason about resume frontiers without direct database surgery. First-class corpus CRUD is still follow-on work.
 
 Wizard API v1 foundation is available with persisted project/run/review/ledger entities plus orchestration abstraction wiring (`in_memory` default, `temporal` backend). With `PLATFORM_CONTROL_WIZARD_ORCHESTRATOR_BACKEND=temporal`, the API starts a `WizardRunWorkflow` execution (workflow id `wizard-run-{wizard_run_id}`) and sends approve/reject signals; run `platform-control-temporal-worker` against the same `PLATFORM_CONTROL_TEMPORAL_*` settings so workflows make progress. Temporal workers register `WizardRunWorkflow`, `ScopeShardWorkflow`, and `ReviewDrainWorkflow`. After operator approve, the parent runs a pilot scope-shard child and a review-drain child (stubs today; real activities and multi-shard fan-out are follow-on). Pilot-completion-driven `HUMAN_GATE_APPROVAL` persistence remains follow-on; see ADR-0021 and `docs/architecture/temporal-argilla-wizard-architecture.md`.
 
@@ -48,13 +48,13 @@ Bundle manifests should be published as immutable JSON objects. If platform-cont
 - [x] Define `ArtifactBundleManifest` schema
 - [x] Create the initial `platform-control/` API scaffold
 - [x] Create the connector-worker scaffold under `platform-control/`
-- [~] Define run lifecycle and replay modes
-  Current API support exists for `scope` and `replay` metadata on run creation, but resumable checkpoints/frontier orchestration are not implemented yet.
+- [x] Define run lifecycle and replay modes
+  Runs expose `replay_checkpoint` on `GET /v1/runs/{run_id}` (see OpenAPI `Run`). Checkpoints advance on Firecrawl webhook progress; Temporal scope-shard starts accept an optional `resume_token` for future activity-backed resume wiring.
 - [x] Define approval states and transitions
 - [x] Define reference snapshot export mechanics for DI
 - [x] Document GCP service usage (Cloud Run, Cloud SQL, GCS, Pub/Sub)
 
-Replay/checkpoint constraint: checkpoint/frontier state is not yet persisted as a first-class model. Operators should treat replay as run-scoped metadata plus provider-side reruns until dedicated checkpoint orchestration lands.
+Replay/checkpoint constraint: checkpoints are JSON metadata on `runs`, not a separate table. Provider-specific keys may appear under `replay_checkpoint`; treat unknown keys as opaque operational hints until normalized in a later schema pass.
 
 ## Minimal v1 Outcome
 
