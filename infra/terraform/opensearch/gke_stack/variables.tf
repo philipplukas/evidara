@@ -56,9 +56,22 @@ variable "node_count" {
 }
 
 variable "opensearch_namespace" {
-  description = "Kubernetes namespace where OpenSearch is installed."
-  type        = string
-  default     = "opensearch"
+  description = <<-EOT
+    Kubernetes namespace where OpenSearch is installed.
+    Prefer evidare-dev, evidare-staging, or evidare-prod so workloads align with the vendored
+    MacConfig platform contract (vendor/platform-contract.yaml). The legacy default "opensearch"
+    remains valid for existing stacks until you migrate namespaces.
+  EOT
+  type    = string
+  default = "opensearch"
+
+  validation {
+    condition = (
+      var.opensearch_namespace == "opensearch"
+      || can(regex("^evidare-(dev|staging|prod)$", var.opensearch_namespace))
+    )
+    error_message = "opensearch_namespace must be \"opensearch\" (legacy) or evidare-dev, evidare-staging, evidare-prod."
+  }
 }
 
 variable "opensearch_chart_version" {

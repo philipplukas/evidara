@@ -21,6 +21,20 @@ Evidara is a monorepo containing all components of a document intelligence platf
 | [`infra/`](infra/) | Terraform, deployment definitions, environment setup, cloud resource provisioning |
 | [`docs/`](docs/) | Architecture, ADRs, onboarding, runbooks, implementation principles, component plans |
 | [`scripts/`](scripts/) | Shared utility scripts |
+| [`vendor/`](vendor/) | Vendored external pins (for example MacConfig platform contract) |
+| [`service-template/`](service-template/) | Conventions for future product (app) Kubernetes / GitOps manifests |
+| [`k8s/gitops/`](k8s/gitops/) | Product Kustomize roots for Argo CD (for example `prod/`) |
+
+## MacConfig platform contract
+
+Evidara vendors a pinned copy of the MacConfig cluster platform contract from
+`clusters/prod/platform-contract.yaml` in the [MacConfig](https://github.com/philipplukas/MacConfig)
+repository (`vendor/platform-contract.yaml` here). To refresh: in a MacConfig checkout run
+`make platform-contract-path` (prints the absolute path), copy that file here, then set the pin
+below to the same value as `contractVersion` in the YAML; CI enforces they stay in sync.
+Operator playbooks: [`docs/migration/`](docs/migration/README.md).
+
+**Pinned MacConfig platform contract:** `0.1.0`
 
 ## Main Interaction Flow
 

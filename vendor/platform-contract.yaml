@@ -1,0 +1,54 @@
+# Machine-readable platform contract (MacConfig owns this file).
+# Evidare repos should vendor a pinned copy and assert contractVersion in CI.
+#
+# Version semantics (intent):
+#   patch — docs/clarifications, no behavioral change for consumers
+#   minor — additive capability (new allowed kind, optional new field)
+#   major — breaking change (tightened rules, renamed stores, ingress class change)
+
+contractVersion: "0.1.0"
+
+metadata:
+  description: MacConfig platform contract (prod template — adjust per environment)
+  cluster: prod
+
+namespaces:
+  # Namespaces Evidare workloads may use (Evidare must not create Namespace objects).
+  allowedPattern: "^evidare-(dev|staging|prod)$"
+
+ingress:
+  class: nginx
+  tlsIssuer: letsencrypt-prod
+
+secrets:
+  externalSecrets:
+    enabled: true
+    # Product manifests must reference this ClusterSecretStore name only.
+    clusterSecretStore: shared-vault
+
+networkPolicy:
+  default: deny-all
+  profiles:
+    - restricted
+    - internal-only
+
+# Kinds Evidare may submit in allowed namespaces (subset; extend via minor bump).
+allowedResources:
+  - Deployment
+  - Service
+  - Ingress
+  - ExternalSecret
+  - HorizontalPodAutoscaler
+  - PodDisruptionBudget
+  - ConfigMap
+  - Secret
+
+forbiddenResources:
+  - Namespace
+  - ClusterRole
+  - ClusterRoleBinding
+  - CustomResourceDefinition
+  - ValidatingWebhookConfiguration
+  - MutatingWebhookConfiguration
+  - ClusterSecretStore
+  - SecretStore

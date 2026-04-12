@@ -1,0 +1,23 @@
+# Example Argo CD Application: Evidara *product* manifests (future path).
+# Rename to drop .template, create the Kustomize/Helm directory, then apply.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: evidara-product-prod
+  namespace: argocd
+  labels:
+    platform.macconfig.io/stack: product
+spec:
+  project: evidara-product
+  source:
+    repoURL: https://github.com/philipplukas/evidara.git
+    targetRevision: main
+    # Create this path when product GitOps manifests exist (Deployments, Services, …).
+    path: k8s/gitops/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: evidare-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,5 +1,8 @@
 environment = "staging"
 
+# Aligns with MacConfig platform contract namespace pattern (see vendor/platform-contract.yaml).
+opensearch_namespace = "evidare-staging"
+
 project_id = "your-gcp-project-id"
 region     = "europe-west6"
 

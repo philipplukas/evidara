@@ -14,6 +14,13 @@ Terraform scaffolding now exists for the `document-intelligence` Databricks laye
 - `infra/env/` for per-environment configuration
 - Terraform state (remote) for actual provisioned resources
 
+## MacConfig GitOps boundary
+
+Cluster **platform** YAML (namespaces, baseline `NetworkPolicy`, RBAC templates) is owned in
+[MacConfig](https://github.com/philipplukas/MacConfig). Evidara vendors the machine-readable contract
+at `vendor/platform-contract.yaml` and tracks **platform vs product** paths in
+[`../migration/platform-product-inventory.md`](../migration/platform-product-inventory.md).
+
 ## Structure
 
 ```text

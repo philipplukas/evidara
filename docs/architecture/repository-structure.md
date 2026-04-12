@@ -106,8 +106,34 @@ Evidara uses a monorepo with top-level domain folders. Each folder represents a 
 - `architecture/` — System-level architecture documentation
 - `adr/` — Architecture Decision Records
 - `components/` — Per-component documentation and plans
+- `migration/` — MacConfig GitOps migration maps, inventory, Argo cutover checklists
 - `runbooks/` — Operational procedures
 - `setup/` — Infrastructure and environment setup guides
+
+---
+
+### `service-template/`
+
+**Owns:**
+
+- Placeholder and future conventions for **product** Kubernetes manifests (Argo-synced workloads),
+  aligned with `vendor/platform-contract.yaml`.
+
+**Does NOT own:**
+
+- Platform namespaces, cluster RBAC, or admission policies (MacConfig).
+
+---
+
+### `k8s/gitops/`
+
+**Owns:**
+
+- Product-facing Kustomize roots (for example `prod/`) synced by Argo CD per `docs/migration/`.
+
+**Does NOT own:**
+
+- MacConfig platform namespaces, baseline `NetworkPolicy`, or cluster RBAC.
 
 ---
 

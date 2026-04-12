@@ -7,6 +7,7 @@ echo "Validating documentation..."
 python3 scripts/validate_openapi.py
 python3 scripts/validate_json_schemas.py
 python3 scripts/check_contract_manifest.py
+python3 scripts/check_platform_contract_vendor.py
 
 # 2. Check doc structure
 python3 scripts/check_component_docs.py

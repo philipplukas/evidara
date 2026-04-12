@@ -51,6 +51,7 @@ jobs:
         run: |
           python -m unittest discover -s scripts/tests -p "test_check_contract_version_bump.py"
           python -m unittest discover -s scripts/tests -p "test_check_contract_manifest.py"
+          python -m unittest discover -s scripts/tests -p "test_check_platform_contract_vendor.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay_at.py"
           python -m unittest discover -s scripts/tests -p "test_analyze_github_actions_queue.py"
@@ -60,6 +61,10 @@ jobs:
           python scripts/check_contract_version_bump.py \
             --base "${{ steps.contract_guard_range.outputs.base_ref }}" \
             --head "${{ steps.contract_guard_range.outputs.head_ref }}"
+
+      - name: Check vendored MacConfig platform contract pin
+        run: |
+          python scripts/check_platform_contract_vendor.py
 
       - name: Validate country overlays
         run: |

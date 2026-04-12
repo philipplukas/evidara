@@ -136,6 +136,15 @@ nav:
       - Interaction flow validation: runbooks/interaction-flow-validation.md
       - Search relevance baseline: runbooks/search-relevance-baseline.md
       - Runtime stack: runbooks/runtime-stack.md
+  - "Migration (MacConfig GitOps)":
+      - Overview: migration/README.md
+      - Git reconcile checklist: migration/git-reconcile-checklist.md
+      - Platform vs product inventory: migration/platform-product-inventory.md
+      - Argo cutover checklist: migration/argo-cutover-checklist.md
+      - Slim Evidara plan: migration/slim-evidara-plan.md
+      - Cluster enforcement plan: migration/cluster-enforcement-plan.md
+      - Platform contract changelog: migration/platform-contract-changelog.md
+      - Argo examples: migration/examples/README.md
   - Setup:
       - Environment Strategy: setup/environment-strategy.md
       - Nix dev shell: setup/nix.md
