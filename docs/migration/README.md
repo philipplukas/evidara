@@ -36,5 +36,4 @@ MacConfig product YAML): its own `k8s/overlays/` and Argo *product* app, while M
 platform. Local path next to this monorepo: `../rocky-agents` (push to
 `https://github.com/philipplukas/rocky-agents` when created).
 
-
 Start with [platform-product-inventory.md](platform-product-inventory.md) and [git-reconcile-checklist.md](git-reconcile-checklist.md).

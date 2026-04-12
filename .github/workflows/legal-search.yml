@@ -27,7 +27,9 @@ on:
 jobs:
   # ─── API quality gate ───
   api:
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    # GitHub-hosted runners keep Node tool bootstrap stable while self-hosted Nix
+    # runners are reserved for image builds and other runner-native flows.
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: legal-search/api
@@ -52,7 +54,7 @@ jobs:
 
   # ─── Frontend quality gate ───
   frontend:
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: legal-search/frontend
@@ -81,7 +83,7 @@ jobs:
 
   # ─── Interaction-flow evidence (Playwright smoke + contract) ───
   interaction-flow-evidence:
-    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ubuntu-latest
     env:
       SCREENSHOT_PACK_STATUS: not_run
       SCREENSHOT_PACK_RETRY_COUNT: "0"
@@ -178,27 +180,27 @@ jobs:
           cat <<EOF > interaction-flow-evidence.md
           # Interaction Flow Evidence
 
-          Source runbook: `docs/runbooks/interaction-flow-validation.md`
-          Source workflow: `.github/workflows/legal-search.yml`
-          Source job: `interaction-flow-evidence`
+          Source runbook: docs/runbooks/interaction-flow-validation.md
+          Source workflow: .github/workflows/legal-search.yml
+          Source job: interaction-flow-evidence
 
           Executed suites:
-          - `npm run e2e:smoke`
-          - `npm run e2e:contract`
-          - `npm run e2e:screenshot-pack`
+          - npm run e2e:smoke
+          - npm run e2e:contract
+          - npm run e2e:screenshot-pack
 
           Screenshot pack status:
-          - `${SCREENSHOT_PACK_STATUS}`
-          - retry_count: `${SCREENSHOT_PACK_RETRY_COUNT}`
-          - failure_reason: `${SCREENSHOT_PACK_FAILURE_REASON}`
-          - checklist_coverage: `${SCREENSHOT_CHECKLIST_COVERAGE}`
-          - if failed, inspect `test-results` traces and retry logs in this run.
+          - ${SCREENSHOT_PACK_STATUS}
+          - retry_count: ${SCREENSHOT_PACK_RETRY_COUNT}
+          - failure_reason: ${SCREENSHOT_PACK_FAILURE_REASON}
+          - checklist_coverage: ${SCREENSHOT_CHECKLIST_COVERAGE}
+          - if failed, inspect test-results traces and retry logs in this run.
 
           Evidence artifacts in this upload:
-          - `legal-search/frontend/playwright-report`
-          - `legal-search/frontend/test-results`
-          - `legal-search/frontend/screenshot-pack`
-          - `legal-search/frontend/interaction-flow-evidence.md`
+          - legal-search/frontend/playwright-report
+          - legal-search/frontend/test-results
+          - legal-search/frontend/screenshot-pack
+          - legal-search/frontend/interaction-flow-evidence.md
           EOF
 
       - name: Upload interaction-flow evidence artifacts

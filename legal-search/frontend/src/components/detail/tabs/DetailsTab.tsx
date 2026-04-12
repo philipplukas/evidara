@@ -2,6 +2,7 @@
 
 import DOMPurify from "dompurify";
 import { useMemo } from "react";
+import { MetadataSection } from "@/components/detail/MetadataSection";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 
@@ -23,27 +24,7 @@ export function DetailsTab({ detail }: DetailsTabProps) {
   return (
     <div className="p-5 space-y-5">
       {/* Metadata */}
-      {hasMetadata && (
-        <div className="space-y-2">
-          <SectionLabel>Metadata</SectionLabel>
-          <div className="space-y-1.5">
-            {detail.metadata.map((row, i) => (
-              <div key={i} className="flex items-baseline gap-2 text-xs">
-                <span className="text-muted-foreground w-28 shrink-0 font-medium">{row.label}</span>
-                <span
-                  className={
-                    row.value.trim().length > 0
-                      ? "text-foreground/80 flex items-center gap-1"
-                      : "text-muted-foreground/70 italic flex items-center gap-1"
-                  }
-                >
-                  {row.value.trim().length > 0 ? row.value : "Not available"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {hasMetadata && <MetadataSection rows={detail.metadata} />}
 
       {/* Content */}
       {hasContent && (

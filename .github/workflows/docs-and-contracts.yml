@@ -8,7 +8,9 @@ on:
 
 jobs:
   contract-validation:
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    # This job bootstraps both Python and Node; keep it on GitHub-hosted Linux
+    # until the self-hosted Nix runner path has a runner-native toolchain setup.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout

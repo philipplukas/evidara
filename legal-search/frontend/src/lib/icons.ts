@@ -13,6 +13,16 @@ const iconMap: Record<string, string> = {
   "ch-ge": "GE",
   "ch-vd": "VD",
   "ch-ti": "TI",
+  "dtype-law": "§",
+  "dtype-decision": "⚖",
+  "dtype-commentary": "💬",
+  "dtype-rechtssatz": "≡",
+  "meta-status": "●",
+  "meta-calendar": "📅",
+  "meta-citation": "↗",
+  "meta-official": "✓",
+  "meta-language": "🌐",
+  "meta-authority": "🏛",
 };
 
 export function getIcon(iconKey?: string): string | null {

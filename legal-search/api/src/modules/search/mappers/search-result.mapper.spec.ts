@@ -135,28 +135,43 @@ describe('composeMetadata', () => {
   it('should produce "In Kraft" row for law with effective_date', () => {
     const rows = composeMetadata(lawHit);
     expect(rows).toContainEqual({
+      label: 'Dokumenttyp',
+      value: 'Gesetz',
+      iconKey: 'dtype-law',
+    });
+    expect(rows).toContainEqual({
       label: 'In Kraft',
       value: '2024-01-01',
+      iconKey: 'meta-calendar',
     });
     expect(rows).toContainEqual({
       label: 'Fundstelle',
       value: 'SR 101',
+      iconKey: 'meta-citation',
     });
     expect(rows).toContainEqual({
       label: 'Quelle',
       value: 'Offizielle Quelle',
+      iconKey: 'meta-official',
     });
     expect(rows).toContainEqual({
       label: 'Sprache',
       value: 'DE',
+      iconKey: 'meta-language',
     });
   });
 
   it('should produce "Datum" row for decision', () => {
     const rows = composeMetadata(decisionHit);
     expect(rows).toContainEqual({
+      label: 'Dokumenttyp',
+      value: 'Gerichtsentscheid',
+      iconKey: 'dtype-decision',
+    });
+    expect(rows).toContainEqual({
       label: 'Datum',
       value: '2018-06-15',
+      iconKey: 'meta-calendar',
     });
   });
 
@@ -166,6 +181,7 @@ describe('composeMetadata', () => {
       {
         label: 'Sprache',
         value: 'FR',
+        iconKey: 'meta-language',
       },
     ]);
   });
@@ -175,6 +191,7 @@ describe('composeMetadata', () => {
     expect(rows[0]).toEqual({
       label: 'Status',
       value: 'Aufgehoben',
+      iconKey: 'meta-status',
     });
   });
 
@@ -260,7 +277,7 @@ describe('mapSearchHitToView', () => {
     expect(view.snippet).toBe('Art. 1 OR — Vertragsschluss');
     expect(view.structuralContext).toBe('OR › Gesellschaftsrecht › Verantwortlichkeit');
     expect(view.badges).toHaveLength(1);
-    expect(view.metadataRows).toHaveLength(4);
+    expect(view.metadataRows).toHaveLength(5);
     expect(view.relatedCounts).toHaveLength(3);
     expect(view.actions).toHaveLength(2);
     expect(view.contentLanguage?.display).toBe('de');
@@ -316,6 +333,7 @@ describe('locale-aware label resolution', () => {
 
   it('should render French metadata when locale is fr', () => {
     const rows = composeMetadata(lawHit, 'fr');
+    expect(rows.some((r) => r.label === 'Type de document' && r.value === 'Loi')).toBe(true);
     expect(rows.some((r) => r.label === 'En vigueur')).toBe(true);
     expect(rows.some((r) => r.label === 'Langue' && r.value === 'DE')).toBe(true);
   });
@@ -325,6 +343,7 @@ describe('locale-aware label resolution', () => {
     expect(rows[0]).toEqual({
       label: 'Statut',
       value: 'Abrogé',
+      iconKey: 'meta-status',
     });
   });
 

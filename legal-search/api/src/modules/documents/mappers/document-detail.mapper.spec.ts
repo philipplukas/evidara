@@ -76,24 +76,34 @@ describe('mapDocumentToDetailView', () => {
     const view = mapDocumentToDetailView(lawDoc, sections, citations);
     expect(view.metadata.length).toBeGreaterThan(0);
     expect(view.metadata).toContainEqual({
+      label: 'Dokumenttyp',
+      value: 'Gesetz',
+      iconKey: 'dtype-law',
+    });
+    expect(view.metadata).toContainEqual({
       label: 'In Kraft',
       value: '2024-01-01',
+      iconKey: 'meta-calendar',
     });
     expect(view.metadata).toContainEqual({
       label: 'Sprache',
       value: 'DE',
+      iconKey: 'meta-language',
     });
     expect(view.metadata).toContainEqual({
       label: 'Behörde',
       value: 'Fedlex',
+      iconKey: 'meta-authority',
     });
     expect(view.metadata).toContainEqual({
       label: 'Fundstelle',
       value: 'SR 101',
+      iconKey: 'meta-citation',
     });
     expect(view.metadata).toContainEqual({
       label: 'Quelle',
       value: 'Offizielle Quelle',
+      iconKey: 'meta-official',
     });
   });
 
@@ -106,6 +116,7 @@ describe('mapDocumentToDetailView', () => {
     expect(view.metadata[0]).toEqual({
       label: 'Status',
       value: 'Ersetzt',
+      iconKey: 'meta-status',
     });
   });
 

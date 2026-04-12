@@ -54,4 +54,15 @@ describe("DetailsTab", () => {
     expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
     expect(screen.getByText("Not available")).toBeInTheDocument();
   });
+
+  it("renders metadata icons when icon keys are present", () => {
+    const detail = buildDetail("", [
+      { label: "Document type", value: "Law", iconKey: "dtype-law" },
+    ]);
+    render(<DetailsTab detail={detail} />);
+
+    expect(screen.getByText("Document type")).toBeInTheDocument();
+    expect(screen.getByText("§")).toBeInTheDocument();
+    expect(screen.getByText("Law")).toBeInTheDocument();
+  });
 });
