@@ -1,7 +1,12 @@
-"""Scaffold for future DSPy-backed extraction modules.
+"""DSPy-backed extraction modules for AI-accelerated metadata enrichment.
 
-This package marks the place where optional LLM-assisted extractors will live
-once they are wired into the processing pipeline. The current document
-processing path remains deterministic; installing the ``llm`` extra only makes
-the DSPy / Vertex AI / OpenAI client dependencies available for follow-up work.
+Modules:
+    dspy_modules     — TitleExtractor, SourceFamilyClassifier, CommentaryExtractor
+    dspy_metadata_extractor — MetadataExtractor protocol implementation
+    profile_config   — Per-step toggle configuration
+    metadata         — MetadataExtractionCandidate and MetadataExtractor protocol
+
+The ``llm`` optional dependency group must be installed for DSPy modules
+to be importable at runtime. The rest of the pipeline remains deterministic.
+See ADR-0023 for design decisions.
 """

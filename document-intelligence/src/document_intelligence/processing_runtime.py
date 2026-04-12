@@ -21,6 +21,15 @@ from document_intelligence.persist.sinks import (
 from document_intelligence.pipeline import ProcessingPipeline
 
 
+def _build_llm_metadata_extractor():
+    """Lazily construct a DSPy-backed metadata extractor when LLM extraction is enabled."""
+    from document_intelligence.extractors.dspy_metadata_extractor import DspyMetadataExtractor
+    from document_intelligence.extractors.profile_config import ExtractionProfileConfig
+
+    profile = ExtractionProfileConfig.from_environment()
+    return DspyMetadataExtractor(profile=profile)
+
+
 def build_processing_pipeline(
     *,
     runtime_settings: RuntimeSettings,
@@ -32,6 +41,10 @@ def build_processing_pipeline(
         sink = SparkDeltaCanonicalSink(runtime_settings.surface_uris.to_delta_sink_config())
     else:
         sink = DeltaCanonicalSink(runtime_settings.surface_uris.to_delta_sink_config())
+    llm_metadata_extractor = None
+    if runtime_settings.enable_llm_extractor:
+        llm_metadata_extractor = _build_llm_metadata_extractor()
+
     return ProcessingPipeline(
         bundle_loader=bundle_loader,
         sink=sink,
@@ -43,6 +56,7 @@ def build_processing_pipeline(
         spacy_batch_size=runtime_settings.spacy_batch_size,
         enable_llm_extractor=runtime_settings.enable_llm_extractor,
         llm_confidence_threshold=runtime_settings.llm_confidence_threshold,
+        llm_metadata_extractor=llm_metadata_extractor,
     )
 
 
