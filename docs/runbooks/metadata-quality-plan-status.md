@@ -152,10 +152,19 @@ When **no** staging GCP project exists, paste **dev** legal-search base URL(s) a
 
 | Document ID | Environment URL (legal-search API or UI) | Notes |
 | ----------- | ------------------------------------------ | ----- |
-| _TBD_ | _e.g. `https://legal-search-api-dev-…run.app`_ | _operator fills after search/detail spot-check_ |
-| _TBD_ | same | |
+| `doc_4z04zjjg5e5vgd8knhhdwf4481` | `https://legal-search-api-dev-kxc5agexna-oa.a.run.app` | Dev search snapshot (`q=*`, 2026-04-12); list title fallback, `type=unknown`; detail spot-check matches fallback |
+| `doc_799svhq06kb35w910fd0d7jhzt` | same | Dev search snapshot (`q=*`, 2026-04-12); list title fallback, `type=unknown` |
+| `doc_2qpg1xgyd696tp0b1pdj7dtskx` | same | Dev search snapshot (`q=*`, 2026-04-12); list title fallback, `type=unknown` |
+| `doc_5wrn0gr0mm1g44k0zf374ysh1e` | same | Dev search snapshot (`q=*`, 2026-04-12); list title fallback, `type=unknown` |
+| `doc_57mdm7rnhen5fptysey5frcst8` | same | Dev search snapshot (`q=*`, 2026-04-12); list title fallback, `type=unknown` |
+| `doc_57wrvqb5cvtz4nne7ptpje2g82` | same | Dev search snapshot (`q=*`, 2026-04-12); list title fallback, `type=unknown` |
+| `doc_18kdbm14m6144jawy15k74t8sj` | same | Dev search snapshot (`q=*`, 2026-04-12); list title fallback, `type=unknown` |
+| `doc_1kjp9rtqzf2gc0c5nvfz8b86hb` | same | Dev search snapshot (`q=*`, 2026-04-12); list title fallback, `type=unknown` |
+| `doc_6sdym48pkwae29j1tez7m2pyx4` | same | Fresh remote smoke run `run_01kp1ersh7w1ahxpgdb2n80cr0` (2026-04-12); projection applied, but list/detail still show fallback title and `type=unknown` |
 
 **Procedure:** (1) Pick IDs from **dev** or staging search/detail that must read well for demos. (2) If projections are stale after a BFF/DI change, use [staging projection replay](staging-projection-replay.md) (same HTTP contract against whichever BFF you target) or full re-ingest. (3) Verify search + detail against section 3.5 **Search / list** and **Detail**. (4) Add a short **sign-off** comment on Linear **TAR-89** with date and link to this table row(s) (**3.5.3**) only when criteria are **actually met** (replay alone does not fix missing lean metadata).
+
+**Current status (2026-04-12):** dev inventory is now filled, but **none** of the listed rows meet section 3.5 acceptance. Search hits still use fallback titles (`Document <id>`) and `type=unknown`; detail spot-checks for `doc_4z04zjjg5e5vgd8knhhdwf4481` and `doc_6sdym48pkwae29j1tez7m2pyx4` show the same fallback state. Because `doc_6sdym48pkwae29j1tez7m2pyx4` came from a **fresh** smoke run with projection history `applied=1`, replay / re-index was **not** used here: the current issue is not a stale-row-only problem, so formal **3.5.3** sign-off remains blocked.
 
 Phase-1 local corpus (**3.5.1**) remains the **clean** reference for passing TAR-89 criteria in CI-like conditions; rows above are **inventory + honesty** about metadata quality on the **remote** environment referenced in the heading.
 
