@@ -168,6 +168,10 @@ async def test_webhook_processing_is_idempotent(session, tmp_path: Path) -> None
     manifest_uri = str(manifest_storage_ref["uri"])  # type: ignore[index]
     manifest_path = Path(manifest_uri.removeprefix("file://"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    extraction_hints = manifest["bundle_metadata"]["extraction_hints"]
+    assert extraction_hints["title_hint"] == "Decision 1"
+    assert extraction_hints["document_type_hint"] == "decision"
+    assert extraction_hints["authority_display_hint"] == "Zurich Administrative Court"
     assert manifest["source_defaults"]["language_codes"] == ["de"]
     assert manifest["source_defaults"]["document_type_hint"] == "decision"
     # Contract uses latest_approved policy => pinned ref must remain null.

@@ -127,10 +127,13 @@ class FlakyInlineDeterministicProvider:
 @dataclass
 class InMemoryArtifactStore:
     stored_pages: dict[str, dict] | None = None
+    stored_manifests: dict[str, dict] | None = None
 
     def __post_init__(self) -> None:
         if self.stored_pages is None:
             self.stored_pages = {}
+        if self.stored_manifests is None:
+            self.stored_manifests = {}
 
     async def store_page_payload(self, run_id: str, artifact_id: str, payload: dict) -> str:
         assert self.stored_pages is not None
@@ -143,7 +146,8 @@ class InMemoryArtifactStore:
         bundle_manifest_id: str,
         payload: dict,
     ) -> dict:
-        del payload
+        assert self.stored_manifests is not None
+        self.stored_manifests[bundle_manifest_id] = payload
         return {
             "uri": f"gs://test-manifests/{run_id}/{bundle_manifest_id}.json",
             "content_type": "application/json",
@@ -833,6 +837,12 @@ async def test_provider_registry_dispatches_deterministic_inline_runs(session) -
     assert len(publisher.bundle_events) == 1
     assert publisher.bundle_events[0]["event_type"] == "artifact_bundle.available"
     assert publisher.bundle_events[0]["payload"]["provenance"]["run_id"] == run.run_id
+    assert artifact_store.stored_manifests is not None
+    assert len(artifact_store.stored_manifests) == 1
+    manifest = next(iter(artifact_store.stored_manifests.values()))
+    assert manifest["bundle_metadata"]["extraction_hints"]["authority_display_hint"] == (
+        "Zurich Administrative Court"
+    )
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,8 @@
 # Metadata & search quality — plan status report
 
-Owner: Platform / legal-search  
-Last reviewed: 2026-04-11 (dev-first posture; TAR-85 / remote corpus wording)  
-Last verified: 2026-04-11  
+Owner: Platform / legal-search
+Last reviewed: 2026-04-12 (dev-first posture; TAR-85 / remote corpus wording)
+Last verified: 2026-04-12
 Applies to: MVP demo path, **Linear TAR-89** (search/detail metadata quality), related release gates
 
 This report ties together the **stated plan** (runbooks + Linear) and **repo reality** (what ships in code today). Update it when TAR-89 scope closes or gates move.
@@ -35,6 +35,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 - **Normalizer metadata** — Pipeline attaches `source_origin_kind`, `trust_tier`, `source_defaults`, optional `extracted_metadata`, `official_citation`, `original_language`, `translation_status`, parse fallback flags, optional **Docling** block.
 - **Optional LLM seam** — `MetadataExtractor` protocol + `MetadataExtractionCandidate`; pipeline merges LLM title/type when confidence ≥ threshold. **Default off** (`DI_ENABLE_LLM_EXTRACTOR=false`). See `document-intelligence/src/document_intelligence/extractors/metadata.py`, `pipeline.py`, and [document-intelligence README](../../document-intelligence/README.md) env section.
+- **Bundle hints** — platform-control now threads `bundle_metadata.extraction_hints` with a real `title_hint` where the acquisition payload exposes one, plus source-level `document_type_hint` / authority display context; the pipeline already consumes those hints for placeholder-title fallback and controlled type resolution.
 
 ### 2.3 Operator / release documentation
 
