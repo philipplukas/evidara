@@ -56,6 +56,7 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 | [Evidara CLI (API smoke)](https://github.com/philipplukas/evidara/blob/main/tools/evidara-cli/README.md) | `evidara` pings, OpenAPI discovery, env vars per environment |
 | [Phase 5 go / no-go memo](runbooks/phase-5-go-no-go-memo.md)                                     | Release gates, Linear evidence (TAR-64 / 77 / 85), M5 checklist |
 | [Phase 5 evidence checklist](runbooks/phase-5-evidence-checklist.md)                         | Single-page TAR-64 / TAR-77 / TAR-85 entry for TAR-69 |
+| [Linear M5 / Phase 5 handoff pack](runbooks/linear-milestone5-handoff-pack.md)               | Copy-paste issue bodies, child-issue map, agent prompts (Linear UI) |
 | [TAR-89 workstreams](runbooks/tar-89-workstreams.md)                                           | Child-issue split: data / serving / staging metadata credibility |
 | [Post-MVP engineering workstreams](runbooks/post-mvp-engineering-workstreams.md)               | TAR-66 → TAR-62 → TAR-63 → TAR-67 after TAR-64 green |
 | [MacConfig GitOps migration](migration/README.md)                                             | Platform vs product inventory, Argo cutover, slimming plan, contract changelog |

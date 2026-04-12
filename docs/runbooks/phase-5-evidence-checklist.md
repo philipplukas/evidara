@@ -38,6 +38,7 @@ All three rows below are done **and** the gate table in [phase-5-go-no-go-memo.m
 
 ## Related
 
+- [Linear M5 / Phase 5 handoff pack](linear-milestone5-handoff-pack.md) — issue templates and agent handoff text (paste into Linear)
 - [MVP demo package and release recommendation](mvp-demo-release-recommendation.md) — evidence packet template
 - [M5 evidence checklist](m5-evidence-checklist.md) — full operator steps including DI Pub/Sub debugging
 - [E2E Smoke Dev workflow](../../.github/workflows/e2e-smoke-dev.yml) — optional CI path for TAR-64
