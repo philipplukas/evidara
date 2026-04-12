@@ -36,13 +36,15 @@ Legend: **Platform** → candidate for MacConfig `clusters/<env>/…`; **Product
 
 | Path / artifact | Class | Merge owner | Notes |
 | --- | --- | --- | --- |
-| Cluster `Application` objects | Platform (orchestration) | Platform | **Not** in this repo today; see [examples](examples/) and [Argo cutover checklist](argo-cutover-checklist.md). |
+| [`k8s/gitops/{dev,staging,prod}/`](../../k8s/gitops/) | Product | Infra + service teams | Kustomize roots for Argo **product** app; start with **staging** (see [parallel workstreams](parallel-workstreams.md)). |
+| Cluster `Application` objects | Platform (orchestration) | Platform | **Not** applied by CI; see [examples](examples/) and [Argo cutover checklist](argo-cutover-checklist.md). |
 
 ## “What moved” (fill as you cut over)
 
 | Resource (kind / ns / name) | Old path / repo | New path (MacConfig) | Argo Application (or owner) |
 | --- | --- | --- | --- |
 | OpenSearch Helm namespace convention | Default `opensearch` in `gke_stack` | N/A (still Terraform Helm) | Examples + validation: use `evidare-<env>` (see `infra/env/*/opensearch.gke.tfvars.example` and `opensearch_namespace` variable validation). |
+| Product GitOps Kustomize roots | N/A (new) | [`k8s/gitops/`](../../k8s/gitops/) in Evidara | Argo **product** app `path:` → `k8s/gitops/<env>`; [staging example](examples/product-argocd-application-staging.template.yaml). |
 | *TBD* | | | |
 
 ## “What intentionally did not move”

@@ -138,6 +138,7 @@ nav:
       - Runtime stack: runbooks/runtime-stack.md
   - "Migration (MacConfig GitOps)":
       - Overview: migration/README.md
+      - Parallel workstreams: migration/parallel-workstreams.md
       - Git reconcile checklist: migration/git-reconcile-checklist.md
       - Platform vs product inventory: migration/platform-product-inventory.md
       - Argo cutover checklist: migration/argo-cutover-checklist.md

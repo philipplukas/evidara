@@ -5,6 +5,9 @@ This section tracks the **strangler migration** from Evidara-only provisioning t
 (namespaces, baseline `NetworkPolicy`, RBAC, future operators), while Evidara keeps
 **product** delivery (services, images, contracts) until GitOps paths exist.
 
+**Parallel execution map:** [Parallel workstreams (migration)](parallel-workstreams.md) — which
+lanes can run at the same time and what to serialize.
+
 Canonical sequence (mirrors MacConfig `docs/migration-map.md`):
 
 1. **Vendor platform contract** — [`../../vendor/platform-contract.yaml`](../../vendor/platform-contract.yaml) + README pin + CI (done).

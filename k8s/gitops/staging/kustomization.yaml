@@ -1,0 +1,5 @@
+# Product workloads for staging (Argo CD). Prefer first real manifests here before prod.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources: []

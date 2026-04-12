@@ -1,0 +1,21 @@
+# Example Argo CD Application: Evidara product manifests — staging (try this before prod).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: evidara-product-staging
+  namespace: argocd
+  labels:
+    platform.macconfig.io/stack: product
+spec:
+  project: evidara-product
+  source:
+    repoURL: https://github.com/philipplukas/evidara.git
+    targetRevision: main
+    path: k8s/gitops/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: evidare-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

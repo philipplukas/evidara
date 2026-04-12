@@ -59,6 +59,7 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 | [TAR-89 workstreams](runbooks/tar-89-workstreams.md)                                           | Child-issue split: data / serving / staging metadata credibility |
 | [Post-MVP engineering workstreams](runbooks/post-mvp-engineering-workstreams.md)               | TAR-66 → TAR-62 → TAR-63 → TAR-67 after TAR-64 green |
 | [MacConfig GitOps migration](migration/README.md)                                             | Platform vs product inventory, Argo cutover, slimming plan, contract changelog |
+| [Migration parallel workstreams](migration/parallel-workstreams.md)                           | Lanes A–G: what runs in parallel vs serialized seams |
 | [CI Actions duration metrics](runbooks/ci-actions-duration-metrics.md)                         | `analyze_github_actions_queue.py`, runner pool policy |
 | [API Reference](api/legal-search.md)                                                             | OpenAPI interactive docs (legal-search, document-intelligence, platform-control) |
 

@@ -1,7 +1,8 @@
 # Argo CD cutover checklist (platform vs product)
 
 Evidara does **not** commit live Argo `Application` objects today. Use this checklist when you
-register Applications in the cluster (or in a small GitOps “apps of apps” repo).
+register Applications in the cluster (or in a small GitOps “apps of apps” repo). For **which work
+can overlap**, see [parallel workstreams](parallel-workstreams.md).
 
 ## Preconditions
 
