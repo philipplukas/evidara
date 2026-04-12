@@ -224,3 +224,132 @@ async def test_crawl_failed_without_error_uses_default_failure_reason(
     assert run.status is RunStatus.FAILED
     assert run.failure_reason == "Firecrawl job failed."
     assert run.completed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_duplicate_webhook_replay_is_idempotent(session, tmp_path: Path) -> None:
+    """Identical payload delivered twice → second call is a no-op (dedupe by sha256)."""
+    await _seed_run_graph(session)
+    publisher = CollectingPublisher()
+    service = FirecrawlWebhookService(
+        session=session,
+        artifact_store=LocalArtifactStore(base_dir=tmp_path / "artifacts"),
+        publisher=publisher,
+        webhook_secret="test-secret",
+    )
+    payload = {"type": "crawl.failed", "id": "crawl_failure_123", "error": "timeout"}
+    body, signature = _signed_body(payload)
+
+    await service.process(payload=payload, raw_body=body, signature=signature)
+    await service.process(payload=payload, raw_body=body, signature=signature)
+
+    run = await session.get(Run, "run_failure_seed")
+    assert run is not None
+    assert run.status is RunStatus.FAILED
+    assert run.failure_reason == "timeout"
+
+
+@pytest.mark.asyncio
+async def test_missing_signature_raises_verification_error(session, tmp_path: Path) -> None:
+    from platform_control.errors import SignatureVerificationError
+
+    await _seed_run_graph(session)
+    publisher = CollectingPublisher()
+    service = FirecrawlWebhookService(
+        session=session,
+        artifact_store=LocalArtifactStore(base_dir=tmp_path / "artifacts"),
+        publisher=publisher,
+        webhook_secret="test-secret",
+    )
+    payload = {"type": "crawl.page", "id": "crawl_failure_123", "data": []}
+    body = json.dumps(payload, sort_keys=True).encode("utf-8")
+
+    with pytest.raises(SignatureVerificationError):
+        await service.process(payload=payload, raw_body=body, signature=None)
+
+
+@pytest.mark.asyncio
+async def test_invalid_signature_raises_verification_error(session, tmp_path: Path) -> None:
+    from platform_control.errors import SignatureVerificationError
+
+    await _seed_run_graph(session)
+    publisher = CollectingPublisher()
+    service = FirecrawlWebhookService(
+        session=session,
+        artifact_store=LocalArtifactStore(base_dir=tmp_path / "artifacts"),
+        publisher=publisher,
+        webhook_secret="test-secret",
+    )
+    payload = {"type": "crawl.page", "id": "crawl_failure_123", "data": []}
+    body = json.dumps(payload, sort_keys=True).encode("utf-8")
+    bad_signature = "sha256=0000000000000000000000000000000000000000000000000000000000000000"
+
+    with pytest.raises(SignatureVerificationError):
+        await service.process(payload=payload, raw_body=body, signature=bad_signature)
+
+
+@pytest.mark.asyncio
+async def test_crawl_started_sets_running_status(session, tmp_path: Path) -> None:
+    await _seed_run_graph(session)
+    publisher = CollectingPublisher()
+    service = FirecrawlWebhookService(
+        session=session,
+        artifact_store=LocalArtifactStore(base_dir=tmp_path / "artifacts"),
+        publisher=publisher,
+        webhook_secret="test-secret",
+    )
+    payload = {"type": "crawl.started", "id": "crawl_failure_123"}
+    body, signature = _signed_body(payload)
+
+    await service.process(payload=payload, raw_body=body, signature=signature)
+
+    provider_job = await session.scalar(
+        select(ProviderJob).where(ProviderJob.external_job_id == "crawl_failure_123")
+    )
+    run = await session.get(Run, "run_failure_seed")
+    assert provider_job is not None
+    assert run is not None
+    assert provider_job.status is ProviderJobStatus.RUNNING
+    assert run.status is RunStatus.RUNNING
+
+
+@pytest.mark.asyncio
+async def test_unknown_event_type_does_not_crash(session, tmp_path: Path) -> None:
+    """Gracefully handle an unrecognised event type without raising."""
+    await _seed_run_graph(session)
+    publisher = CollectingPublisher()
+    service = FirecrawlWebhookService(
+        session=session,
+        artifact_store=LocalArtifactStore(base_dir=tmp_path / "artifacts"),
+        publisher=publisher,
+        webhook_secret="test-secret",
+    )
+    payload = {"type": "crawl.unknown_future_event", "id": "crawl_failure_123"}
+    body, signature = _signed_body(payload)
+
+    await service.process(payload=payload, raw_body=body, signature=signature)
+
+    run = await session.get(Run, "run_failure_seed")
+    assert run is not None
+    assert run.status is RunStatus.RUNNING
+
+
+@pytest.mark.asyncio
+async def test_no_webhook_secret_configured_raises_verification_error(
+    session, tmp_path: Path
+) -> None:
+    from platform_control.errors import SignatureVerificationError
+
+    await _seed_run_graph(session)
+    publisher = CollectingPublisher()
+    service = FirecrawlWebhookService(
+        session=session,
+        artifact_store=LocalArtifactStore(base_dir=tmp_path / "artifacts"),
+        publisher=publisher,
+        webhook_secret=None,
+    )
+    payload = {"type": "crawl.page", "id": "crawl_failure_123", "data": []}
+    body, signature = _signed_body(payload)
+
+    with pytest.raises(SignatureVerificationError, match="not configured"):
+        await service.process(payload=payload, raw_body=body, signature=signature)

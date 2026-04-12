@@ -1,0 +1,39 @@
+{
+  "bundle_manifest_id": "abm_01kp0jp086tsgc8wep9rg2ajjx",
+  "source_snapshot_id": "snap_01kp0jp086s3ajybnbc3whexba",
+  "source_id": "src_01kp0jp086qwk2t46z1jabjhyb",
+  "source_version_id": "sv_01kp0jp086qnahptwygaz7npx6",
+  "run_id": "run_01kp0jp086cdv0c20a7fs9t7gj",
+  "tenant_id": "tenant_public",
+  "corpus_id": "corpus_public_ch_commentary",
+  "scope_type": "global_public",
+  "source_origin_kind": "licensed_provider",
+  "trust_tier": "supplemental",
+  "jurisdiction_id": "jur_ch_federal",
+  "authority_id": "auth_commentary_publisher",
+  "language_codes": ["de"],
+  "document_type_hint": "commentary",
+  "upstream_locator": "https://example.org/commentary/or-art-41",
+  "artifacts": [
+    {
+      "artifact_id": "art_01kp0jp086d5rc1nd08w490s4h",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01kp0jp086cdv0c20a7fs9t7gj/commentary.html",
+        "content_type": "text/html",
+        "byte_size": 28000,
+        "checksum": "ee11111111111111111111111111111111111111111111111111111111111111",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-12T10:05:00Z"
+      }
+    }
+  ],
+  "manifest_storage_ref": {
+    "uri": "gs://bucket/runs/run_01kp0jp086cdv0c20a7fs9t7gj/abm_01kp0jp086tsgc8wep9rg2ajjx.json",
+    "content_type": "application/json",
+    "byte_size": 4500,
+    "checksum": "ff11111111111111111111111111111111111111111111111111111111111111",
+    "checksum_algorithm": "sha256",
+    "created_at": "2026-04-12T10:05:05Z"
+  }
+}

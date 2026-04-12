@@ -1,0 +1,51 @@
+{
+  "bundle_manifest_id": "abm_01kp0jp08691qrjrfv73dpjf2j",
+  "source_snapshot_id": "snap_01kp0jp086nkrxz14xzv7aqz0d",
+  "source_id": "src_01kp0jp086b8w3ggvfb3t0w092",
+  "source_version_id": "sv_01kp0jp086cqznkpaansyb0dhz",
+  "run_id": "run_01kp0jp086et2jnp1jtfpm55zw",
+  "tenant_id": "tenant_public",
+  "corpus_id": "corpus_public_ch_federal_law",
+  "scope_type": "global_public",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "jurisdiction_id": "jur_ch_federal",
+  "authority_id": "auth_fedlex",
+  "language_codes": ["fr", "de"],
+  "document_type_hint": "law",
+  "upstream_locator": "https://www.fedlex.admin.ch/eli/cc/27/317_321_377/fr",
+  "artifacts": [
+    {
+      "artifact_id": "art_01kp0jp086vjdfkw66xm8axm70",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01kp0jp086et2jnp1jtfpm55zw/co_fr.html",
+        "content_type": "text/html",
+        "byte_size": 85000,
+        "checksum": "cc22222222222222222222222222222222222222222222222222222222222222",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-12T10:15:00Z"
+      }
+    },
+    {
+      "artifact_id": "art_01kp0jp086bxm4z7zzh5gh5xbg",
+      "artifact_role": "attachment",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01kp0jp086et2jnp1jtfpm55zw/co_de.html",
+        "content_type": "text/html",
+        "byte_size": 82000,
+        "checksum": "dd22222222222222222222222222222222222222222222222222222222222222",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-12T10:15:00Z"
+      }
+    }
+  ],
+  "manifest_storage_ref": {
+    "uri": "gs://bucket/runs/run_01kp0jp086et2jnp1jtfpm55zw/abm_01kp0jp08691qrjrfv73dpjf2j.json",
+    "content_type": "application/json",
+    "byte_size": 5200,
+    "checksum": "ee22222222222222222222222222222222222222222222222222222222222222",
+    "checksum_algorithm": "sha256",
+    "created_at": "2026-04-12T10:15:05Z"
+  }
+}

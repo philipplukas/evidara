@@ -65,8 +65,7 @@ N/A
 <!-- Complete this section when scraping/acquisition behavior changes. See docs/testing/scraping-qa-standard.md -->
 
 - [ ] Not applicable (no scraping/acquisition behavior change)
-- [ ] `scraping-qa` workflow is green on this PR (link run in Reviewer Notes)
-- [ ] Reviewer confirmed `scraping-qa` passed before merge (manual enforcement until branch protection is available)
+- [ ] `scraping-qa` workflow is green on this PR (required status check on `main`)
 - [ ] Contract validation updated/passing for bundle + `artifact_bundle.available` boundary
 - [ ] Golden fixture updated/added, or explicitly unchanged and verified
 - [ ] Provider canary/integration path covered by tests

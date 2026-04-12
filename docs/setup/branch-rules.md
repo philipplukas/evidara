@@ -85,12 +85,22 @@ After removing the last checkout of a `shelf/*` branch, delete the local branch 
 
 For **parallel streams** (which paths can merge independently), see [Parallel work streams](../process/parallel-work-streams.md).
 
-## Why convention-based
+## Required status checks
 
-The repo is private and on GitHub Free, which does not support branch protection rules. These conventions are enforced by:
+The following CI checks are configured as **required status checks** on `main` via GitHub branch protection:
 
+| Check | Workflow | Purpose |
+|---|---|---|
+| `release-readiness` | `.github/workflows/release-readiness.yml` | Full release readiness gate |
+| `scraping-qa` | `.github/workflows/scraping-qa.yml` | Scraping/acquisition contract and fixture gate |
+
+Both must pass before a PR can be merged to `main`.
+
+## Enforcement
+
+These rules are enforced by:
+
+- **Branch protection** — `release-readiness` and `scraping-qa` are required status checks on `main`
 - **CI** — the `pr-title` workflow blocks merge if the title format is wrong
 - **Team discipline** — every team member follows these rules
 - **CodeRabbit** — AI review catches rule violations
-
-When the repo moves to GitHub Pro or becomes public, these conventions can be enforced via branch protection rules.

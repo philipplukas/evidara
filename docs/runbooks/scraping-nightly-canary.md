@@ -2,7 +2,7 @@
 
 Owner: Platform team
 Last reviewed: 2026-04-05
-Last verified: Not yet verified
+Last verified: 2026-04-12
 Applies to: dev, staging
 
 ## Purpose
@@ -15,7 +15,7 @@ Run and triage the scheduled scraping/acquisition canary that validates end-to-e
 - Schedule: daily at 02:15 UTC
 - Manual trigger supported via `workflow_dispatch`
 
-The workflow runs `scripts/e2e-smoke-test.sh`, uploads evidence JSON, and posts a Slack notification when configured.
+The workflow mints audience-scoped Cloud Run ID tokens via `gcloud`, runs `scripts/e2e-smoke-test.sh`, uploads the evidence log as an artifact, and posts a Slack notification when configured.
 
 ## Canary Configuration
 

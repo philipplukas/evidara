@@ -23,6 +23,12 @@ class GoldenBundleTests(unittest.TestCase):
             "no_heading_fallback",
             "html_div_fallback",
             "ris_xml",
+            "ris_html_decision_vfgh",
+            "ris_html_decision_vwgh",
+            "ris_xml_decision_vfgh",
+            "ris_xml_decision_vwgh",
+            "ris_xml_law_consolidated",
+            "ris_xml_law_short",
         ]
         for fixture_name in fixture_names:
             with self.subTest(fixture=fixture_name):
@@ -30,15 +36,26 @@ class GoldenBundleTests(unittest.TestCase):
                 try:
                     result = ProcessingPipeline(processing_version="di_2026_03_29").process_event(event_payload)
 
-                    self.assertEqual(result.document.title, expected["title"])
-                    self.assertEqual(len(result.sections), expected["section_count"])
+                    if "title" in expected:
+                        self.assertEqual(result.document.title, expected["title"])
+                    if "title_contains" in expected:
+                        self.assertIn(expected["title_contains"], result.document.title or "")
+                    if "section_count" in expected:
+                        self.assertEqual(len(result.sections), expected["section_count"])
+                    if "section_count_min" in expected:
+                        self.assertGreaterEqual(len(result.sections), expected["section_count_min"])
                     self.assertEqual(
                         [event["payload"]["status"] for event in result.status_events],
                         expected["status_flow"],
                     )
-                    headings = [section.title for section in result.sections if section.title]
-                    for heading in expected["key_headings"]:
-                        self.assertIn(heading, headings)
+                    if "key_headings" in expected:
+                        headings = [section.title for section in result.sections if section.title]
+                        for heading in expected["key_headings"]:
+                            self.assertIn(heading, headings)
+                    if "key_content_contains" in expected:
+                        full_text = result.document.full_text or ""
+                        for fragment in expected["key_content_contains"]:
+                            self.assertIn(fragment, full_text, f"Missing content: {fragment}")
                     if "html_parse_used_fallback" in expected:
                         self.assertEqual(
                             result.document.metadata.get("html_parse_used_fallback"),

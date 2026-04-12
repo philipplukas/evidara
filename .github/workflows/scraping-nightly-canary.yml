@@ -42,34 +42,63 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Run nightly scraping canary
+      - name: Mint audience-scoped Cloud Run ID tokens
         run: |
-          bash scripts/e2e-smoke-test.sh \
-            --env "${TARGET_ENV}" \
-            --auth auto \
-            --evidence-out "${EVIDENCE_PATH}"
+          PC_URL=$(gcloud run services describe "platform-control-api-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+          LS_URL=$(gcloud run services describe "legal-search-api-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+          PC_ID_TOKEN=$(gcloud auth print-identity-token \
+            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
+            --audiences="${PC_URL}")
+          LS_ID_TOKEN=$(gcloud auth print-identity-token \
+            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
+            --audiences="${LS_URL}")
+
+          echo "::add-mask::${PC_ID_TOKEN}"
+          echo "::add-mask::${LS_ID_TOKEN}"
+          echo "E2E_PC_ID_TOKEN=${PC_ID_TOKEN}" >> "${GITHUB_ENV}"
+          echo "E2E_LS_ID_TOKEN=${LS_ID_TOKEN}" >> "${GITHUB_ENV}"
+        env:
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging') && secrets.GCP_SERVICE_ACCOUNT_STAGING || secrets.GCP_SERVICE_ACCOUNT_DEV }}
+
+      - name: Run nightly scraping canary
+        id: canary
+        run: |
+          mkdir -p "$(dirname "${EVIDENCE_PATH}")"
+          set +e
+          GCP_PROJECT_ID="${GCP_PROJECT_ID}" \
+          scripts/e2e-smoke-test.sh --env "${TARGET_ENV}" 2>&1 | tee "${LOG_PATH}"
+          exit_code=${PIPESTATUS[0]}
+          echo "exit_code=${exit_code}" >> "${GITHUB_OUTPUT}"
+          exit "${exit_code}"
+        env:
+          LOG_PATH: tmp/evidence/scraping-canary-${{ github.run_id }}.log
 
       - name: Upload canary evidence
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: scraping-canary-evidence-${{ github.run_id }}
-          path: ${{ env.EVIDENCE_PATH }}
+          path: tmp/evidence/
           if-no-files-found: warn
           retention-days: 14
 
       - name: Summarize canary outcome
         if: always()
         run: |
-          if [ -f "${EVIDENCE_PATH}" ]; then
-            echo "### Scraping Nightly Canary" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            jq --arg run_id "${GITHUB_RUN_ID}" -r '
-              "- Status: **\(.metadata.status)**\n- Environment: \(.metadata.environment)\n- Run ID: \(.entities.run_id // "n/a")\n- Source ID: \(.entities.source_id // "n/a")\n- Projection applied events: \(.observed.projection_applied_events // 0)\n- Search result count: \(.observed.search_result_count // 0)\n- Evidence artifact: scraping-canary-evidence-\($run_id)"
-            ' "${EVIDENCE_PATH}" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No canary evidence file found at ${EVIDENCE_PATH}" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          STATUS=${{ steps.canary.outcome == 'success' && 'PASSED' || 'FAILED' }}
+          {
+            echo "### Scraping Nightly Canary"
+            echo ""
+            echo "- Status: **${STATUS}**"
+            echo "- Environment: ${TARGET_ENV}"
+            echo "- Evidence artifact: scraping-canary-evidence-${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Notify Slack on failure
         if: failure() && env.SLACK_WEBHOOK_URL != ''

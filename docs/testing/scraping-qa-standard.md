@@ -113,16 +113,9 @@ For a 1-3 person team:
 
 Target PR check duration for scraping-focused changes: keep under 10 minutes.
 
-## Temporary Merge Enforcement (Until Branch Protection Is Available)
+## Merge Enforcement
 
-Because this repository currently cannot enforce required status checks via GitHub branch protection/rulesets on the active plan, use this manual policy:
-
-1. Any PR that changes scraping/acquisition behavior must have a successful `scraping-qa` workflow run.
-2. The PR author links the green `scraping-qa` run in the PR body under Reviewer Notes.
-3. Reviewer must explicitly confirm the green run before approving/merging.
-4. Do not merge scraping-impacting PRs with a missing, failed, or stale `scraping-qa` run.
-
-When branch protection/rulesets become available, replace this manual policy with required-check enforcement on `main`.
+The `scraping-qa` workflow is a **required status check** on `main` via GitHub branch protection. PRs that trigger the workflow must pass it before merging. See [Branch Rules](../setup/branch-rules.md) for the full list of required checks.
 
 ## Change Policy
 

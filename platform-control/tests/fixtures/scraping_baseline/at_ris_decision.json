@@ -1,0 +1,39 @@
+{
+  "bundle_manifest_id": "abm_01kp0jp086vyg2ebz5gthtam0c",
+  "source_snapshot_id": "snap_01kp0jp0867x46f6frbjvnx36z",
+  "source_id": "src_01kp0jp08664cva4kqn2mcqpbp",
+  "source_version_id": "sv_01kp0jp086rjdmn1gjm5q38j4k",
+  "run_id": "run_01kp0jp086fp6dqsamqakf6fp0",
+  "tenant_id": "tenant_public",
+  "corpus_id": "corpus_public_at_federal_decisions",
+  "scope_type": "global_public",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "jurisdiction_id": "jur_at_federal",
+  "authority_id": "auth_vfgh",
+  "language_codes": ["de"],
+  "document_type_hint": "decision",
+  "upstream_locator": "https://www.ris.bka.gv.at/Ergebnis.wxe?Abfrage=Vfgh&Geschaeftszahl=G+12/2025",
+  "artifacts": [
+    {
+      "artifact_id": "art_01kp0jp0863se01wwmqsthq86y",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://bucket/runs/run_01kp0jp086fp6dqsamqakf6fp0/decision_vfgh.xml",
+        "content_type": "application/xml",
+        "byte_size": 45000,
+        "checksum": "cc11111111111111111111111111111111111111111111111111111111111111",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-12T10:00:00Z"
+      }
+    }
+  ],
+  "manifest_storage_ref": {
+    "uri": "gs://bucket/runs/run_01kp0jp086fp6dqsamqakf6fp0/abm_01kp0jp086vyg2ebz5gthtam0c.json",
+    "content_type": "application/json",
+    "byte_size": 4800,
+    "checksum": "dd11111111111111111111111111111111111111111111111111111111111111",
+    "checksum_algorithm": "sha256",
+    "created_at": "2026-04-12T10:00:05Z"
+  }
+}
