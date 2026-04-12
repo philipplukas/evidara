@@ -12,7 +12,7 @@
 #   ./.evidara-cloud-run.env   (repo root; gitignored — see docs/setup/gcp-local-cloud-run-auth.md)
 #
 # Usage (repo root):
-#   ./scripts/evidara-cloud-run-operator-session.sh staging
+#   ./scripts/evidara-cloud-run-operator-session.sh dev
 #   ./scripts/evidara-cloud-run-operator-session.sh dev --mvp-only
 #   ./scripts/evidara-cloud-run-operator-session.sh staging --dry-run
 #   ./scripts/evidara-cloud-run-operator-session.sh prod --project evidara-prod --ack-prod
@@ -24,7 +24,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DISCOVER_PY="${ROOT}/scripts/evidara_discover_cloud_run_urls.py"
 
-ENV_NAME="staging"
+ENV_NAME="dev"
 GCP_PROJECT_ID=""
 GCP_REGION="${GCP_REGION:-europe-west6}"
 IMPERSONATE_SA="${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}"
@@ -41,7 +41,7 @@ Usage: scripts/evidara-cloud-run-operator-session.sh <dev|staging|prod> [options
 
 Ensures gcloud user login, discovers Cloud Run URLs (unless URLs already exported),
 mints Bearer tokens via impersonation, then runs:
-  - evidara workflow mvp-acceptance --json  (default)
+  - evidara workflow mvp-acceptance --human  (default)
   - scripts/run-staging-relevance-query-pack.sh  (default for staging/dev; skipped for prod unless --with-relevance)
 
 Options:
@@ -58,9 +58,9 @@ Options:
   -h, --help
 
 Examples:
-  ./scripts/evidara-cloud-run-operator-session.sh staging
+  ./scripts/evidara-cloud-run-operator-session.sh dev
   EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT='gha-...@project.iam.gserviceaccount.com' \\
-    ./scripts/evidara-cloud-run-operator-session.sh staging --no-relevance
+    ./scripts/evidara-cloud-run-operator-session.sh dev --no-relevance
 EOF
 }
 
@@ -122,9 +122,9 @@ fi
 
 default_project_for_env() {
   case "$1" in
-    dev) echo "data-platform-dev-492214" ;;
+    dev) echo "project-dacd6b7b-dc96-4534-b82" ;;
     staging) echo "project-dacd6b7b-dc96-4534-b82" ;;
-    prod) echo "" ;;
+    prod) echo "data-platform-prod-492214" ;;
   esac
 }
 
@@ -255,8 +255,8 @@ preflight_apis() {
 }
 
 run_mvp() {
-  echo "==> evidara workflow mvp-acceptance --json"
-  (cd "${ROOT}/tools/evidara-cli" && uv run evidara workflow mvp-acceptance --json)
+  echo "==> evidara workflow mvp-acceptance --human"
+  (cd "${ROOT}/tools/evidara-cli" && uv run evidara workflow mvp-acceptance --human)
 }
 
 run_relevance() {
