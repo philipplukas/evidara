@@ -72,7 +72,7 @@ jobs:
           import pathlib, os, stat, textwrap
           script = textwrap.dedent('''\
           #!/usr/bin/env python3
-          import sys, zipfile
+          import sys, zipfile, os, stat
           args, dest = sys.argv[1:], '.'
           i = 0
           while i < len(args):
@@ -80,7 +80,12 @@ jobs:
                   dest = args[i+1]; i += 2; continue
               if args[i].startswith('-'):
                   i += 1; continue
-              zipfile.ZipFile(args[i]).extractall(dest)
+              with zipfile.ZipFile(args[i]) as zf:
+                  zf.extractall(dest)
+                  for info in zf.infolist():
+                      out = os.path.join(dest, info.filename)
+                      if info.external_attr >> 16 & 0o111:
+                          os.chmod(out, os.stat(out).st_mode | stat.S_IEXEC)
               i += 1
           ''')
           p = pathlib.Path(os.path.expanduser('~/.local/bin/unzip'))
