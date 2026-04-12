@@ -49,6 +49,11 @@ variables:
   spacy_batch_size:
     description: Batch size for spaCy pipeline execution.
     default: "32"
+  use_spark_delta:
+    description: |
+      Use the PySpark DataFrame writer for Delta outputs instead of the Python
+      deltalake library. Set to "true" for production Databricks cluster jobs.
+    default: "false"
   compute_guardrails_policy_id:
     description: |
       Cluster policy ID applied to all job task new_cluster definitions.

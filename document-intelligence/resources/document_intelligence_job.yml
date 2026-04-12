@@ -21,6 +21,8 @@ resources:
           default: ${var.spacy_max_chars_per_section}
         - name: spacy_batch_size
           default: ${var.spacy_batch_size}
+        - name: use_spark_delta
+          default: ${var.use_spark_delta}
       tasks:
         - task_key: process_bundle
           python_wheel_task:
@@ -35,6 +37,7 @@ resources:
               spacy_model_name: "{{job.parameters.spacy_model_name}}"
               spacy_max_chars_per_section: "{{job.parameters.spacy_max_chars_per_section}}"
               spacy_batch_size: "{{job.parameters.spacy_batch_size}}"
+              use_spark_delta: "{{job.parameters.use_spark_delta}}"
           libraries:
             - whl: ./dist/*.whl
           new_cluster:

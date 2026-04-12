@@ -47,6 +47,7 @@ class RuntimeSettings:
     spacy_batch_size: int = 32
     enable_llm_extractor: bool = False
     llm_confidence_threshold: float = 0.7
+    use_spark_delta: bool = False
 
     @classmethod
     def from_mapping(
@@ -65,6 +66,7 @@ class RuntimeSettings:
         spacy_batch_size: Any | None = None,
         enable_llm_extractor: Any | None = None,
         llm_confidence_threshold: Any | None = None,
+        use_spark_delta: Any | None = None,
     ) -> "RuntimeSettings":
         effective_processing_version = processing_version or mapping.get("DI_PROCESSING_VERSION") or "0.1.0-dev"
         effective_parser_backend = (parser_backend or mapping.get("DI_PARSER_BACKEND") or "legacy").strip()
@@ -101,6 +103,11 @@ class RuntimeSettings:
             minimum=0.0,
             maximum=1.0,
         )
+        effective_use_spark_delta = (
+            _coerce_bool(use_spark_delta)
+            if use_spark_delta is not None
+            else _parse_bool(mapping.get("DI_USE_SPARK_DELTA", "false"))
+        )
 
         direct_documents_uri = published_documents_uri or mapping.get("DI_PUBLISHED_DOCUMENTS_URI")
         direct_sections_uri = published_sections_uri or mapping.get("DI_PUBLISHED_SECTIONS_URI")
@@ -130,6 +137,7 @@ class RuntimeSettings:
             spacy_batch_size=effective_spacy_batch_size,
             enable_llm_extractor=effective_enable_llm_extractor,
             llm_confidence_threshold=effective_llm_confidence_threshold,
+            use_spark_delta=effective_use_spark_delta,
         )
 
     @classmethod

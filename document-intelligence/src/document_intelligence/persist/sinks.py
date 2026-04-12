@@ -1,6 +1,7 @@
 """Persistence abstractions for canonical output."""
 
 import importlib
+import json
 import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -225,6 +226,103 @@ def _default_delta_writer() -> Callable[..., object]:
             "deltalake is required for Delta-backed canonical persistence",
         ) from error
     return deltalake_module.write_deltalake
+
+
+class SparkDeltaCanonicalSink(CanonicalSink):
+    """Append canonical rows to Delta tables using the PySpark DataFrame writer.
+
+    Designed for production Databricks jobs where a ``SparkSession`` is already
+    active.  Prefers the PySpark Delta writer over the Python ``deltalake``
+    library, which is driver-side only and not suitable for long-running cluster
+    jobs that benefit from Spark's built-in schema evolution and transaction log
+    management.
+
+    Pass an explicit *spark* session for testing.  When *spark* is ``None`` the
+    active ``SparkSession`` is resolved lazily via
+    ``SparkSession.builder.getOrCreate()``.
+    """
+
+    def __init__(
+        self,
+        config: DeltaSinkConfig,
+        *,
+        spark: object | None = None,
+    ) -> None:
+        self._config = config
+        self._spark = spark
+        self.status_events: list[dict[str, object]] = []
+        self.document_processed_events: list[dict[str, object]] = []
+
+    def _get_spark(self) -> object:
+        if self._spark is not None:
+            return self._spark
+        try:
+            from pyspark.sql import SparkSession  # type: ignore[import-not-found]
+        except ModuleNotFoundError as error:
+            raise ProcessingError(
+                "missing_pyspark_dependency",
+                "pyspark is required for Spark-backed canonical persistence",
+            ) from error
+        return SparkSession.builder.getOrCreate()  # type: ignore[attr-defined]
+
+    def persist(
+        self,
+        document: Document,
+        sections: list[Section],
+        manifest: ProcessingManifest,
+    ) -> None:
+        self._write_rows(
+            self._config.published_documents_uri,
+            [_document_dict_for_delta(document)],
+            always_present_keys=_PUBLISHED_DOCUMENTS_DELTA_KEYS,
+        )
+        # Published Delta tables predate `parent_section_id`; omit until schemas are migrated.
+        section_rows = []
+        for section in sections:
+            row = section.to_dict()
+            row.pop("parent_section_id", None)
+            section_rows.append(row)
+        self._write_rows(
+            self._config.published_sections_uri,
+            section_rows,
+            always_present_keys=_PUBLISHED_SECTIONS_DELTA_KEYS,
+        )
+        self._write_rows(
+            self._config.processing_manifests_uri,
+            [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
+        )
+
+    def record_status_events(self, status_events: list[dict[str, object]]) -> None:
+        self.status_events.extend(status_events)
+
+    def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
+        self.document_processed_events.append(document_processed_event)
+
+    def _write_rows(
+        self,
+        uri: str,
+        rows: Sequence[dict[str, object]],
+        *,
+        always_present_keys: frozenset[str] | None = None,
+    ) -> None:
+        if not rows:
+            return
+        try:
+            ready = _delta_ready_rows(rows, always_present_keys=always_present_keys)
+            spark = self._get_spark()
+            json_records = [json.dumps(row, default=str) for row in ready]
+            rdd = spark.sparkContext.parallelize(json_records)  # type: ignore[attr-defined]
+            df = spark.read.json(rdd)  # type: ignore[attr-defined]
+            writer = df.write.format("delta").mode("append")  # type: ignore[attr-defined]
+            writer.option("mergeSchema", "true").save(uri)
+        except ProcessingError:
+            raise
+        except Exception as error:  # pragma: no cover - library-specific
+            raise ProcessingError(
+                "spark_delta_write_failed",
+                f"failed to write canonical rows to Delta surface {uri} via PySpark",
+            ) from error
 
 
 def _delta_write_mode(uri: str) -> str:

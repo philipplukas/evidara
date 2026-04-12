@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from document_intelligence.canonical.ids import random_prefixed_id, stable_prefixed_id
+from document_intelligence.canonical.jurisdiction import resolve_jurisdiction_from_manifest
 from document_intelligence.canonical.models import (
     Document,
     ProcessingManifest,
@@ -413,7 +414,10 @@ def _build_document(
         processing_manifest_id=processing_manifest_id,
         provenance=provenance,
         primary_artifact_id=primary_artifact.artifact_id,
-        jurisdiction_id=manifest.source_defaults.get("jurisdiction_id"),
+        jurisdiction_id=resolve_jurisdiction_from_manifest(
+            manifest.source_defaults,
+            manifest.reference_context,
+        ),
         authority_id=manifest.source_defaults.get("authority_id"),
         title=title,
         processed_at=now,
@@ -472,6 +476,10 @@ def _build_sections(
 ) -> list[Section]:
     sections: list[Section] = []
     for ordinal, candidate in enumerate(section_candidates):
+        section_metadata = dict(candidate.metadata)
+        section_citations = extract_citations(candidate.content)
+        if section_citations:
+            section_metadata["citations"] = [c.to_dict() for c in section_citations]
         sections.append(
             Section(
                 section_id=stable_prefixed_id("sec", document_id, str(document_revision), str(ordinal)),
@@ -485,7 +493,7 @@ def _build_sections(
                 title=candidate.title,
                 content=candidate.content,
                 section_type=candidate.section_type,
-                metadata=dict(candidate.metadata),
+                metadata=section_metadata,
             )
         )
     return sections
