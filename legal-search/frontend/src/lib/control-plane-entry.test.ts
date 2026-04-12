@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { computeShowControlPlaneEntry } from "@/lib/control-plane-entry";
+import {
+  buildControlPanelHref,
+  CONTROL_PLANE_ITEM_PARAM,
+  CONTROL_PLANE_ORIGIN_PARAM,
+  CONTROL_PLANE_QUERY_PARAM,
+  CONTROL_PLANE_RETURN_TO_PARAM,
+  CONTROL_PLANE_SCOPE_PARAM,
+  computeShowControlPlaneEntry,
+} from "@/lib/control-plane-entry";
 
 describe("computeShowControlPlaneEntry", () => {
   it("returns false when no control panel URL is configured", () => {
@@ -70,5 +78,37 @@ describe("computeShowControlPlaneEntry", () => {
         envDefaultProfile: "admin",
       }),
     ).toBe(false);
+  });
+});
+
+describe("buildControlPanelHref", () => {
+  it("adds namespaced legal-search handoff context", () => {
+    const href = buildControlPanelHref({
+      controlPanelUrl: "https://ops.example/admin",
+      returnTo: "https://search.example/?q=Art%20754%20OR&item=doc-1",
+      query: "Art 754 OR",
+      scopeLabel: 'Results for "Art 754 OR"',
+      selectedId: "doc-1",
+    });
+
+    expect(href).toBeDefined();
+    const url = new URL(href!);
+    expect(`${url.origin}${url.pathname}`).toBe("https://ops.example/admin");
+    expect(url.searchParams.get(CONTROL_PLANE_ORIGIN_PARAM)).toBe("legal-search");
+    expect(url.searchParams.get(CONTROL_PLANE_RETURN_TO_PARAM)).toBe(
+      "https://search.example/?q=Art%20754%20OR&item=doc-1",
+    );
+    expect(url.searchParams.get(CONTROL_PLANE_QUERY_PARAM)).toBe("Art 754 OR");
+    expect(url.searchParams.get(CONTROL_PLANE_SCOPE_PARAM)).toBe('Results for "Art 754 OR"');
+    expect(url.searchParams.get(CONTROL_PLANE_ITEM_PARAM)).toBe("doc-1");
+  });
+
+  it("returns undefined when the control panel URL is missing", () => {
+    expect(
+      buildControlPanelHref({
+        controlPanelUrl: undefined,
+        returnTo: "https://search.example/",
+      }),
+    ).toBeUndefined();
   });
 });

@@ -15,6 +15,7 @@ const LEGAL_SEARCH_BASE_URL =
 const USE_REAL_BACKEND = process.env.PLAYWRIGHT_USE_REAL_BACKEND === "true";
 const REAL_BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:3102";
 const UI_PROFILE_COOKIE = "evidara-ui-profile";
+const EMPTY_DETAIL_LABEL = /no result selected|select a result/i;
 
 test.describe("Frontend smoke journeys", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -57,7 +58,7 @@ test.describe("Frontend smoke journeys", () => {
     const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
     await expect(searchInput).toHaveValue(/.+/);
     await expect(page.getByText(FILTERS_LABEL, { exact: true })).toHaveCount(1);
-    await expect(page.getByText("Select a result")).toBeVisible();
+    await expect(page.getByText(EMPTY_DETAIL_LABEL)).toBeVisible();
   });
 
   test("@smoke submits search and focuses a result", async ({ page }) => {
@@ -81,13 +82,18 @@ test.describe("Frontend smoke journeys", () => {
     await page.keyboard.press("Escape");
 
     await expect(page).not.toHaveURL(/item=/);
-    await expect(page.getByText("Select a result")).toBeVisible();
+    await expect(page.getByText(EMPTY_DETAIL_LABEL)).toBeVisible();
   });
 
   test("@smoke exposes control panel entrypoint in header", async ({ page }) => {
     const controlPanelLink = page.getByRole("link", { name: CONTROL_PANEL_LABEL });
     await expect(controlPanelLink).toBeVisible();
-    await expect(controlPanelLink).toHaveAttribute("href", EXPECTED_CONTROL_PANEL_URL);
+    const href = await controlPanelLink.getAttribute("href");
+    expect(href).toBeTruthy();
+    expect(href?.startsWith(EXPECTED_CONTROL_PANEL_URL)).toBe(true);
+    if (href && href !== EXPECTED_CONTROL_PANEL_URL) {
+      expect(href).toContain("from=legal-search");
+    }
   });
 
   test("@smoke @real-api applies filters against live /v1/search", async ({ page }) => {

@@ -34,20 +34,27 @@ export function ResultCard({
 }: ResultCardProps) {
   return (
     <article
+      aria-current={isSelected ? "true" : undefined}
       onClick={() => onFocus(result.id)}
-      className={`group px-5 py-4 border-b border-border/60 cursor-pointer transition-all rounded-sm
+      className={`group px-4 py-4 border-b border-border/60 cursor-pointer transition-all rounded-sm
+        sm:px-5
         ${
           isSelected
-            ? "bg-brand/[0.04] border-l-2 border-l-brand shadow-[inset_0_0_0_1px_rgba(15,76,129,0.18)]"
+            ? "bg-brand/[0.06] border-l-2 border-l-brand shadow-[inset_0_0_0_1px_rgba(15,76,129,0.22)]"
             : "hover:bg-muted/30 border-l-2 border-l-transparent hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]"
         }`}
     >
       {/* Title row */}
-      <div className="flex items-start gap-2 mb-1.5">
-        <h3 className="text-sm font-semibold text-foreground flex-1 leading-snug">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-2">
+        <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
           {result.title}
         </h3>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+          {isSelected && (
+            <span className="inline-flex items-center rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand">
+              Selected
+            </span>
+          )}
           {result.badges.map((badge, i) => {
             const icon = getIcon(badge.iconKey);
             return (
@@ -61,7 +68,7 @@ export function ResultCard({
       </div>
 
       {/* Subtitle */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span>{result.subtitle}</span>
         {result.contentLanguage?.isTranslation && (
           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-tiny font-medium">
@@ -99,7 +106,7 @@ export function ResultCard({
       )}
 
       {/* Bottom row: related counts (pivots) + actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
           {result.relatedCounts.map((rc, i) => (
             <button
@@ -117,7 +124,7 @@ export function ResultCard({
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+        <div className="flex flex-wrap items-center gap-1 opacity-70 transition-opacity group-hover:opacity-100">
           {onPin && (
             <AccentButton
               onClick={(e) => {

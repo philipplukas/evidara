@@ -13,10 +13,11 @@
  * - Loading state shows spinner
  */
 
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ResultList } from "@/components/results/ResultList";
 import type { SearchResultViewModel } from "@/lib/types";
+import { useWorkspace } from "@/lib/workspace-store";
 import { renderWithProviders } from "./helpers/render-with-providers";
 
 function makeResults(count: number): SearchResultViewModel[] {
@@ -78,7 +79,7 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("Searching…")).toBeInTheDocument();
+    expect(screen.getByText("Searching current scope…")).toBeInTheDocument();
   });
 
   it("renders result count and cards", () => {
@@ -93,7 +94,7 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("3 results")).toBeInTheDocument();
     expect(screen.getByText("Result 1")).toBeInTheDocument();
     expect(screen.getByText("Result 2")).toBeInTheDocument();
     expect(screen.getByText("Result 3")).toBeInTheDocument();
@@ -136,5 +137,48 @@ describe("ResultList", () => {
     expect(screen.getByText("Result 15")).toBeInTheDocument();
     // No more "Load more" button
     expect(screen.queryByText("Load more results")).not.toBeInTheDocument();
+  });
+
+  it("shows pivot-aware empty state when the current scope is empty", async () => {
+    function PivotEmptyHarness() {
+      const { state, dispatch } = useWorkspace();
+
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() =>
+              dispatch({
+                type: "PIVOT",
+                source: {
+                  type: "pivot",
+                  label: "Commentary",
+                  parentSource: state.resultSet.source,
+                },
+                results: [],
+                scopeLabel: "Commentary for Art. 754 OR",
+              })
+            }
+          >
+            pivot-empty
+          </button>
+          <ResultList
+            results={[]}
+            selectedId={null}
+            onFocus={vi.fn()}
+            onPivot={vi.fn()}
+            onPin={vi.fn()}
+            pinnedIds={new Set()}
+          />
+        </div>
+      );
+    }
+
+    renderWithProviders(<PivotEmptyHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "pivot-empty" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("No results in this pivot")).toBeInTheDocument();
+    });
   });
 });

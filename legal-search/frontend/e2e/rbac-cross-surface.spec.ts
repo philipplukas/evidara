@@ -28,6 +28,10 @@ async function setUiProfileCookie(context: BrowserContext, profile: "admin" | "s
   ]);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 test.describe("@contract RBAC cross-surface (legal-search header + admin denial)", () => {
   test.beforeEach(async ({ context }) => {
     await context.clearCookies();
@@ -41,7 +45,12 @@ test.describe("@contract RBAC cross-surface (legal-search header + admin denial)
 
     const controlPanelLink = page.getByRole("link", { name: CONTROL_PANEL_LABEL });
     await expect(controlPanelLink).toBeVisible();
-    await expect(controlPanelLink).toHaveAttribute("href", EXPECTED_CONTROL_PANEL_URL);
+    const href = await controlPanelLink.getAttribute("href");
+    expect(href).toBeTruthy();
+    expect(href?.startsWith(EXPECTED_CONTROL_PANEL_URL)).toBe(true);
+    if (href && href !== EXPECTED_CONTROL_PANEL_URL) {
+      expect(href).toMatch(new RegExp(`^${escapeRegExp(EXPECTED_CONTROL_PANEL_URL)}.*from=legal-search`));
+    }
   });
 
   test("standard profile does not show control panel entry when URL is configured", async ({
