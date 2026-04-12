@@ -16,7 +16,7 @@ Canonical template history: this file is the **working draft**; publish final re
 
 ### 1.1 TAR-214 — automated verification (2026-04-12)
 
-Executed on **`main` @ `ca5ca0f`** in an agent environment **without** Cloud Run / GitHub admin access. This **does not** replace TAR-64 / TAR-77 / TAR-85 operator evidence; it refreshes **local + repo contract** preflight for handoff.
+Executed on **`main`** (TAR-214 automation commit in git history) in an agent environment **without** Cloud Run / GitHub admin access. This **does not** replace TAR-64 / TAR-77 / TAR-85 operator evidence; it refreshes **local + repo contract** preflight for handoff.
 
 | Check | Command / scope | Result |
 |-------|-----------------|--------|
