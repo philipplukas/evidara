@@ -33,12 +33,12 @@ This file splits TAR-89 into **three implementation tracks** so work can be file
 
 ---
 
-## Track 3 — Environment truth (staging / demo)
+## Track 3 — Environment truth (remote dev / optional staging / demo)
 
 | Sub-issue idea | Scope | Primary docs |
 |----------------|-------|----------------|
 | **Re-projection** | Refresh OpenSearch after BFF/projection changes without full DI | [staging projection replay](staging-projection-replay.md) |
-| **Staging acceptance** | Verify **3.5.2** IDs; sign-off template **3.5.3** | [metadata quality plan §3.5.2–3.5.3](metadata-quality-plan-status.md#352-staging--extended-corpus-product-owned) |
+| **Remote acceptance** | Verify **3.5.2** IDs (dev or staging inventory); sign-off template **3.5.3** | [metadata quality plan](metadata-quality-plan-status.md) §3.5.2–3.5.3 |
 | **Local reference** | Lean stack + fixture trace | [legal-search lean local](../setup/legal-search-lean-local.md), plan §3.5.1 / §6.8 |
 
 **Exit (track):** Linear comment per **3.5.3** with date, IDs, replay/re-index note, owner — only when criteria are **actually** met (replay alone is insufficient if lean lacks hints; see staging projection replay runbook).

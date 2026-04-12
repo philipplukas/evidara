@@ -46,7 +46,9 @@ EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT='gha-deployer-staging@project-dacd6b7b-d
 Run:
 
 ```bash
-./scripts/evidara-cloud-run-operator-session.sh staging
+./scripts/evidara-cloud-run-operator-session.sh dev
+# or, when you operate staging:
+# ./scripts/evidara-cloud-run-operator-session.sh staging
 ```
 
 ## 5. Env vars (summary)

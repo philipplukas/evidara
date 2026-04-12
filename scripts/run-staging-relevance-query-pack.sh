@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Run the staging search relevance query pack (TAR-82 / TAR-68).
+# Run the search relevance query pack (TAR-82 / TAR-68) against a deployed legal-search API.
+# Works for **dev**, staging, or any URL — set EVIDARA_LEGAL_SEARCH_URL accordingly (dev-first teams use dev Cloud Run).
 # Outputs a Markdown table for docs/runbooks/relevance-eval-result-template.md
 #
 # Usage (from repo root):

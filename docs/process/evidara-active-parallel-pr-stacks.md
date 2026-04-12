@@ -28,7 +28,7 @@ As of **2026-04-11**, the **repo-side** splits below are largely landed on `main
 - **Lane 3 (`TAR-67` + `TAR-69`):** drill runbook alignment, readiness / staging evidence workflows, and phase-5 memo + MVP demo recommendation package (`#191`, `#192`, `#193`).
 - **Follow-on merges same window:** projection title enrichment (`#185`), HTML normalizer chrome skip for **TAR-66** (`#195`), and **Lane 5 PR 3** tag-only `agent-discovery` surface on both OpenAPI specs + manifest bump (`#196`).
 
-**Still outside git (operator / Linear):** fresh evidence for **TAR-64** (dev smokes), **TAR-77** (branch protection + release readiness), **TAR-85** (staging MVP acceptance), and **executed** **TAR-67** drills with workflow URLs and downloaded artifacts — see [phase-5 go / no-go memo](../runbooks/phase-5-go-no-go-memo.md) section 5 and [MVP demo release recommendation](../runbooks/mvp-demo-release-recommendation.md).
+**Still outside git (operator / Linear):** fresh evidence for **TAR-64** (dev smokes), **TAR-77** (branch protection + release readiness), **TAR-85** (remote MVP acceptance — **dev** when no staging GCP project), and **executed** **TAR-67** drills with workflow URLs and downloaded artifacts — see [phase-5 go / no-go memo](../runbooks/phase-5-go-no-go-memo.md) section 5 and [MVP demo release recommendation](../runbooks/mvp-demo-release-recommendation.md).
 
 **Later (only if needed):** new **HTTP** workflow or journal APIs for agents — contract-first PR; serialize on OpenAPI files per [max-parallel-execution](max-parallel-execution.md). The **`agent-discovery`** tag (`#196`) is metadata only and does not replace that work when mutating endpoints are required.
 

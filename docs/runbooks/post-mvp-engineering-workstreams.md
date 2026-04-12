@@ -13,7 +13,7 @@ This page restates the **recommended sequence** and evidence expectations so eng
 
 Start the numbered stream **after** [Phase 5 evidence checklist](phase-5-evidence-checklist.md) shows **TAR-64** (two dev smokes + Gate D IDs). Until then, prioritize wiring evidence over automating promotion.
 
-**Parallel work:** [TAR-89 workstreams](tar-89-workstreams.md) (metadata credibility) can continue alongside **TAR-66** once dev/staging smokes are not firefighting merges.
+**Parallel work:** [TAR-89 workstreams](tar-89-workstreams.md) (metadata credibility) can continue alongside **TAR-66** once **dev** smokes are not firefighting merges (staging optional).
 
 ---
 

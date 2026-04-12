@@ -55,7 +55,7 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 | [ADRs](adr/0001-monorepo-structure.md)                                                           | Architecture decisions                                                           |
 | [Components](components/legal-search.md)                                                         | Domain component documentation                                                   |
 | [Testing](testing/README.md)                                                                     | Testing strategy and guides                                                      |
-| [Setup](setup/environment-strategy.md)                                                           | Development and deployment setup                                                 |
+| [Setup / environment strategy](setup/environment-strategy.md)                                   | Dev, optional staging, prod; **dev-first** operator posture when staging GCP is absent |
 | [Evidara CLI (API smoke)](https://github.com/philipplukas/evidara/blob/main/tools/evidara-cli/README.md) | `evidara` pings, OpenAPI discovery, env vars per environment |
 | [Phase 5 go / no-go memo](runbooks/phase-5-go-no-go-memo.md)                                     | Release gates, Linear evidence (TAR-64 / 77 / 85), M5 checklist |
 | [Phase 5 evidence checklist](runbooks/phase-5-evidence-checklist.md)                         | Single-page TAR-64 / TAR-77 / TAR-85 entry for TAR-69 |

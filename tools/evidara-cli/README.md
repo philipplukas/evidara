@@ -69,7 +69,7 @@ uv run evidara workflow mvp-acceptance --human
 Against **private Cloud Run** (staging/dev), prefer the repo helper that logs in, discovers URLs, mints tokens, then runs this workflow:
 
 ```bash
-./scripts/evidara-cloud-run-operator-session.sh staging
+./scripts/evidara-cloud-run-operator-session.sh dev
 ```
 
 See [`docs/setup/gcp-local-cloud-run-auth.md`](../../docs/setup/gcp-local-cloud-run-auth.md) §4.1.

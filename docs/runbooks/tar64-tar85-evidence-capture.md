@@ -1,9 +1,9 @@
 # TAR-64 / TAR-85 — evidence capture (operator)
 
 Owner: Platform  
-Last reviewed: 2026-04-09  
-Last verified: 2026-04-09  
-Applies to: Linear **TAR-64** (dev e2e smoke ×2), **TAR-85** (staging MVP acceptance)
+Last reviewed: 2026-04-11  
+Last verified: 2026-04-11  
+Applies to: Linear **TAR-64** (dev e2e smoke ×2), **TAR-85** (remote MVP acceptance — **dev** when no staging GCP project)
 
 Use this when attaching **run output** to Linear so reviewers can find commands and expected artifacts without rereading the full M5 memo.
 
@@ -23,10 +23,10 @@ EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT='…' GCP_PROJECT_ID='…' \
   ./scripts/e2e-smoke-test.sh --env dev
 ```
 
-## TAR-85 — staging MVP acceptance
+## TAR-85 — remote MVP acceptance (dev-first)
 
 1. Follow [M5 evidence checklist](m5-evidence-checklist.md) (section **TAR-85**).
-2. Point CLI at **staging** base URLs and mint tokens per checklist.
+2. Point CLI at **dev** base URLs (or **staging** if you operate it) and mint tokens per checklist.
 3. Attach to **TAR-85**:
    - Redacted `evidara workflow mvp-acceptance` stdout **or** `--json` output file
    - Note which scenarios passed/failed vs [MVP acceptance scenario pack](mvp-acceptance-scenario-pack.md)
@@ -34,8 +34,10 @@ EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT='…' GCP_PROJECT_ID='…' \
 **Command:**
 
 ```bash
+./scripts/evidara-cloud-run-operator-session.sh dev --mvp-only
+# or manually:
 cd tools/evidara-cli && uv run evidara workflow mvp-acceptance --human
-# or: ... mvp-acceptance --json > /tmp/mvp-acceptance-staging.json
+# or: ... mvp-acceptance --json > /tmp/mvp-acceptance-dev.json
 ```
 
 ## Committed snapshots (2026-04-09)
@@ -45,4 +47,4 @@ See [`evidence/README.md`](evidence/README.md): staging MVP acceptance JSON (two
 ## Definition of done (for closing the Linear issues)
 
 - **TAR-64:** two successful runs + evidence linked in issue comments or attachments.
-- **TAR-85:** at least one green staging run with captured output linked on the issue.
+- **TAR-85:** at least one green **remote** run (typically **dev** Cloud Run) with captured output linked on the issue.

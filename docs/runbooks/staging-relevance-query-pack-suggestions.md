@@ -1,5 +1,7 @@
 # Staging relevance — suggested query seeds (MVP)
 
+> **Naming:** “staging” is historical. Use the same query list against **dev** legal-search when you operate [dev-first](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project); point `EVIDARA_LEGAL_SEARCH_URL` at your dev Cloud Run host.
+
 Owner: Legal-search / platform  
 Last reviewed: 2026-04-11  
 Last verified: 2026-04-11  

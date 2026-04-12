@@ -16,7 +16,7 @@ Copy the table below into a **Linear comment** on TAR-82 and/or TAR-68 (or attac
 
 ## Run metadata
 
-- **Environment:** staging legal-search API base URL: `________________`
+- **Environment:** dev or staging legal-search API base URL: `________________`
 - **Corpus snapshot / date:** `________________`
 - **Ranking / boost version:** (e.g. git SHA or release): `________________`
 - **Runner:** `________________`

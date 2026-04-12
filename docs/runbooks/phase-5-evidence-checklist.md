@@ -3,7 +3,8 @@
 Owner: Platform team  
 Last reviewed: 2026-04-11  
 Last verified: 2026-04-11  
-Applies to: **Linear TAR-69** (dev → staging go / no-go), **TAR-64**, **TAR-77**, **TAR-85**
+Applies to: **Linear TAR-69** (release readiness / promotion decision), **TAR-64**, **TAR-77**, **TAR-85**  
+**Posture note:** teams **without** a staging GCP project use **dev** for remote MVP acceptance (TAR-85); see [Environment strategy — dev-first](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project).
 
 This page is the **one entry point** for operator evidence that unblocks [phase 5 go / no-go memo](phase-5-go-no-go-memo.md). Detailed steps stay in the linked runbooks; file artifacts on the **matching Linear issue** (not only in git).
 
@@ -17,15 +18,15 @@ All three rows below are done **and** the gate table in [phase-5-go-no-go-memo.m
 |--------|------|-------------------|-----------|
 | **TAR-64** | Dev vertical slice smoke ×2 | Two successful runs on **separate** occasions (different days or `main` commits); each includes **Gate D** `run_id` / `document_id` narrative | [M5 evidence checklist — TAR-64](m5-evidence-checklist.md#tar-64--dev-e2e-smoke-two-runs), [TAR-64 / TAR-85 evidence capture](tar64-tar85-evidence-capture.md), [first vertical slice exit gates — TAR-64 block](first-vertical-slice-exit-gates.md#tar-64-dev-smoke-evidence-attach-to-linear) |
 | **TAR-77** | Branch protection | GitHub **main** requires **Release Readiness** (or your strict equivalent); **screenshot** of rule + **one green** strict workflow run URL | [M5 — TAR-77](m5-evidence-checklist.md#tar-77--required-check-on-main), [screenshot evidence discipline](screenshot-evidence-discipline.md) |
-| **TAR-85** | Staging MVP acceptance | Fresh `evidara workflow mvp-acceptance` JSON/stdout for **staging** (`evidence_pack_version` noted) | [M5 — TAR-85](m5-evidence-checklist.md#tar-85--staging-mvp-acceptance), [MVP acceptance scenario pack](mvp-acceptance-scenario-pack.md) |
+| **TAR-85** | Remote MVP acceptance | Fresh `evidara workflow mvp-acceptance` JSON/stdout against **dev** Cloud Run (or **staging** if you operate it) — note `evidence_pack_version` | [M5 — TAR-85](m5-evidence-checklist.md#tar-85--remote-mvp-acceptance-dev-or-staging), [MVP acceptance scenario pack](mvp-acceptance-scenario-pack.md) |
 
 ---
 
 ## Suggested order (dependencies)
 
 1. **TAR-77** first if merges are unprotected (high risk in phase-5 memo risk register).
-2. **TAR-64** in parallel with staging prep (needs GCP / dev wiring per M5 §TAR-64).
-3. **TAR-85** after staging URLs and tokens are confirmed (same auth patterns as e2e).
+2. **TAR-64** in parallel with remote env prep (needs GCP / dev wiring per M5 §TAR-64).
+3. **TAR-85** after **dev** (or staging) URLs and tokens are confirmed — same impersonation pattern as e2e.
 
 ---
 

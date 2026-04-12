@@ -3,7 +3,7 @@
 Owner: Legal-search / platform  
 Last reviewed: 2026-04-11  
 Last verified: 2026-04-11  
-Applies to: staging, prod
+Applies to: **dev** (default remote corpus for dev-first teams), **staging** when operated, **prod**
 
 This runbook defines how we **tune and regress** search relevance without changing API contracts. It pairs Linear **TAR-82** (relevance tuning) and **TAR-68** (locked baselines).
 
@@ -22,9 +22,9 @@ OpenSearch `multi_match` (see `legal-search/api/src/modules/search/opensearch.ad
 
 Changing boosts is a **pipeline-change** / **user-visible-behavior** decision: capture before/after evidence when adjusting.
 
-## Agreed eval pack (staging)
+## Agreed eval pack (remote)
 
-Run against the **staging** legal-search API with a fixed corpus snapshot:
+Run against a **deployed** legal-search API (**dev** Cloud Run when you have no staging GCP project; **staging** or **prod** when those exist) with a fixed corpus snapshot:
 
 1. Pick **5–10 queries** representative of MVP operator demos (exact titles, partial titles, article numbers, court abbreviations).
 2. For each query, record: top **3** `document_id` values, `relevance_score`, and whether the expected doc appears in top **5**.
@@ -34,9 +34,9 @@ Run against the **staging** legal-search API with a fixed corpus snapshot:
 
 ## Automation hooks
 
-- **API smoke:** `evidara workflow mvp-acceptance` (when configured for staging) exercises the locked MVP path; extend evidence with manual top-N checks from the table above when tuning relevance.
-- **Query pack (staging):** from repo root, with `EVIDARA_LEGAL_SEARCH_URL` and `EVIDARA_LEGAL_SEARCH_TOKEN` set (same Bearer pattern as [GCP local Cloud Run auth](../setup/gcp-local-cloud-run-auth.md)), run [`scripts/run-staging-relevance-query-pack.sh`](../../scripts/run-staging-relevance-query-pack.sh). It reads one query per line (see [`scripts/fixtures/staging-relevance-queries.example.txt`](../../scripts/fixtures/staging-relevance-queries.example.txt)), calls `GET /v1/search`, and prints a Markdown table — paste into [relevance-eval-result-template.md](relevance-eval-result-template.md) and attach to **TAR-82** / **TAR-68**.
-- **CI:** unit tests cover projection + mapper behavior; full relevance requires OpenSearch integration (Testcontainers) or staging — do not block PRs on staging-only numbers.
+- **API smoke:** `evidara workflow mvp-acceptance` (when configured for **dev** or staging URLs) exercises the locked MVP path; extend evidence with manual top-N checks from the table above when tuning relevance.
+- **Query pack:** from repo root, with `EVIDARA_LEGAL_SEARCH_URL` and `EVIDARA_LEGAL_SEARCH_TOKEN` set (same Bearer pattern as [GCP local Cloud Run auth](../setup/gcp-local-cloud-run-auth.md)), run [`scripts/run-staging-relevance-query-pack.sh`](../../scripts/run-staging-relevance-query-pack.sh) (works for any environment URL). It reads one query per line (see [`scripts/fixtures/staging-relevance-queries.example.txt`](../../scripts/fixtures/staging-relevance-queries.example.txt)), calls `GET /v1/search`, and prints a Markdown table — paste into [relevance-eval-result-template.md](relevance-eval-result-template.md) and attach to **TAR-82** / **TAR-68**.
+- **CI:** unit tests cover projection + mapper behavior; full relevance requires OpenSearch integration (Testcontainers) or a **deployed** index — do not block PRs on remote-only numbers.
 
 ## Related docs
 

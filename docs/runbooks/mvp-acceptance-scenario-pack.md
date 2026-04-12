@@ -1,8 +1,8 @@
-# MVP Acceptance Scenario Pack (Dev -> Staging)
+# MVP Acceptance Scenario Pack (dev-first; optional staging)
 
 Owner: Platform team
-Last reviewed: 2026-04-08
-Last verified: 2026-04-08
+Last reviewed: 2026-04-11  
+Last verified: 2026-04-11  
 Applies to: dev, staging
 
 ## Automation
@@ -33,7 +33,7 @@ The shell helper requires `curl`, `jq`, and `gcloud`. For **private** Cloud Run 
 
 API services use **audience-scoped Google ID tokens** at the Cloud Run layer. A normal `gcloud auth login` user often **cannot** run `gcloud auth print-identity-token --audiences=https://…run.app` (service account required). Use one of:
 
-1. **`EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT`** — set to the same service account email used in CI (GitHub secrets `GCP_SERVICE_ACCOUNT_DEV` / `GCP_SERVICE_ACCOUNT_STAGING`); your user needs `roles/iam.serviceAccountTokenCreator` on that SA. Then run `./scripts/mvp-acceptance-scenario-pack.sh staging` or [`scripts/e2e-smoke-test.sh`](../../scripts/e2e-smoke-test.sh) (see script headers).
+1. **`EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT`** — set to the same service account email used in CI (GitHub secrets `GCP_SERVICE_ACCOUNT_DEV` / `GCP_SERVICE_ACCOUNT_STAGING` when staging exists); your user needs `roles/iam.serviceAccountTokenCreator` on that SA. Then run `./scripts/mvp-acceptance-scenario-pack.sh dev` (or `staging`) or [`scripts/e2e-smoke-test.sh`](../../scripts/e2e-smoke-test.sh) (see script headers).
 2. **Pre-minted tokens for evidara-cli** — mint **two** tokens (platform-control and legal-search have **different** audiences = different base URLs), then:
 
    ```bash
@@ -63,8 +63,7 @@ Provide a repeatable acceptance pack for the locked MVP flow:
 
 `ingest source -> version approve -> run -> DI outputs -> searchable detail`
 
-This pack is designed to be executed in dev first, then repeated in staging
-with parity evidence.
+This pack is designed to be executed in **dev** first. Teams with a staging GCP project repeat there for parity evidence; **dev-first** teams attach the **dev** run as the remote acceptance record (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)).
 
 ## Preconditions
 

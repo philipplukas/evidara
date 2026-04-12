@@ -3,7 +3,7 @@
 Owner: Platform team
 Last reviewed: 2026-04-11
 Last verified: 2026-04-08
-Applies to: dev, staging, prod
+Applies to: **dev** (primary remote target for dev-first teams), **staging** when operated, **prod**
 
 This runbook defines the minimum verification set to declare the first Evidara vertical slice ready.
 

@@ -3,7 +3,7 @@
 Owner: Platform team  
 Last reviewed: 2026-04-11  
 Last verified: 2026-04-11  
-Applies to: dev, staging (operator evidence for Linear TAR-64 / TAR-77 / TAR-85)
+Applies to: **dev** (and **staging** when operated) — operator evidence for Linear TAR-64 / TAR-77 / TAR-85; dev-first posture: [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)
 
 Use this when closing phase-5 Linear items that need **run output or screenshots**, not repo code. GCP IAM and GitHub admin steps cannot be done from git alone.
 
@@ -12,7 +12,7 @@ Use this when closing phase-5 Linear items that need **run output or screenshots
 ## TAR-64 — Dev e2e smoke (two runs)
 
 1. Complete [GCP local Cloud Run auth](../setup/gcp-local-cloud-run-auth.md) if calling private Run.
-2. **Prerequisite — step 7 (DI signals):** Terraform must provision **push** subscriptions so `document-processing-status-updated` and `document-processed` reach `platform-control-api` (`/v1/di/events/...`). Defaults live in [`infra/terraform/gcp/runtime_stack/variables.tf`](../../infra/terraform/gcp/runtime_stack/variables.tf); environments with suffixed topic names must mirror [`infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example). After changing wiring, `terraform apply` the runtime stack, then confirm subscriptions in GCP console.
+2. **Prerequisite — step 7 (DI signals):** Terraform must provision **push** subscriptions so `document-processing-status-updated` and `document-processed` reach `platform-control-api` (`/v1/di/events/...`). Defaults live in [`infra/terraform/gcp/runtime_stack/variables.tf`](../../infra/terraform/gcp/runtime_stack/variables.tf); mirror the topic layout from [`infra/env/dev/runtime.gcp.tfvars.example`](../../infra/env/dev/runtime.gcp.tfvars.example) (or staging example if you run staging). After changing wiring, `terraform apply` the runtime stack, then confirm subscriptions in GCP console.
 3. Optional: set `SMOKE_SEED_URL` to a URL that returns stable `application/json` or HTML from Cloud Run (e.g. an npm registry `latest` JSON URL) if the default seed fails acquisition from the provider’s network.
 4. Run **twice** (separate runs for evidence):
    - GitHub: **Actions** → **E2E Smoke Dev** (workflow_dispatch or wait for schedule), **or**
@@ -36,10 +36,10 @@ Work top-down; the script fails when **both** `canonical_ready` processing-statu
 2. Require **Release Readiness** (or your strict gate workflow) as a required status check.
 3. Capture a **screenshot** of the rule + a **green** workflow run; attach to TAR-77.
 
-## TAR-85 — Staging MVP acceptance
+## TAR-85 — Remote MVP acceptance (dev or staging)
 
-1. Point CLI at staging base URLs (`EVIDARA_PLATFORM_CONTROL_URL`, `EVIDARA_LEGAL_SEARCH_URL`, frontend/admin URLs per [MVP acceptance scenario pack](mvp-acceptance-scenario-pack.md)).
-2. Mint tokens: `eval "$(… ./scripts/mint-cloud-run-tokens.sh)"` or manual `gcloud auth print-identity-token --impersonate-service-account=… --audiences=…` for **each** API host.
+1. Point CLI at **dev** Cloud Run base URLs by default (`EVIDARA_PLATFORM_CONTROL_URL`, `EVIDARA_LEGAL_SEARCH_URL`, frontend/admin URLs per [MVP acceptance scenario pack](mvp-acceptance-scenario-pack.md)). Use **staging** URLs only if your org operates a staging GCP project.
+2. Mint tokens: `eval "$(… ./scripts/mint-cloud-run-tokens.sh)"` or manual `gcloud auth print-identity-token --impersonate-service-account=… --audiences=…` for **each** API host (see [`scripts/evidara-cloud-run-operator-session.sh`](../../scripts/evidara-cloud-run-operator-session.sh) for an automated path).
 3. Add app-layer keys if the deployment requires them (`EVIDARA_PLATFORM_CONTROL_API_KEY`, etc.).
 4. Run: `cd tools/evidara-cli && uv run evidara workflow mvp-acceptance --human` (or `--json`).
 5. Attach stdout / JSON to TAR-85.
