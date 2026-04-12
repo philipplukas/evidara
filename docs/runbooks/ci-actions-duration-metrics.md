@@ -32,7 +32,8 @@ See `scripts/analyze_github_actions_queue.py --help` for filters (`--repo`, `--b
 
 Current exception:
 
-- Jobs that bootstrap generic Node or mixed Node/Python toolchains may still need `ubuntu-latest` while the self-hosted bridge path is being proven incrementally.
+- Jobs that depend on `actions/setup-node`, `actions/setup-python`, or mixed Node/Python bootstrap may still need `ubuntu-latest` while the self-hosted bridge path is being proven incrementally.
+- Python-only jobs can use `uv python install` as the bridge bootstrap on the legacy self-hosted pool before the Ubuntu-compatible runner target exists.
 - Use `.github/workflows/runner-pool-smoke.yml` for non-PR-blocking light/heavy pool verification while the bridge period is still active.
 
 ## Bridge policy while Hetzner K8s runners are being installed
@@ -57,7 +58,7 @@ These workflows intentionally use `ubuntu-latest` today because they rely on `ac
 | `evidara-cli-remote-smoke.yml` | `remote-smoke` | `setup-python` |
 | `interaction-flow-staging-evidence.yml` | `interaction-flow-staging-evidence` | `setup-node` + Playwright |
 
-As of 2026-04-12, `evidara-cli.yml` and `scraping-qa.yml` moved back to the light runner pool after `runner-pool-smoke.yml` landed and proved generic Python bootstrap on the bridge self-hosted labels.
+As of 2026-04-12, `evidara-cli.yml` and `scraping-qa.yml` moved back to the light runner pool after `runner-pool-smoke.yml` landed and proved the repo's `uv`-based Python bootstrap on the bridge self-hosted labels.
 
 ### Target Hetzner K8s label policy
 

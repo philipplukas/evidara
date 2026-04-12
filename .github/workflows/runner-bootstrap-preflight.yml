@@ -73,7 +73,7 @@ jobs:
           echo "Temp: ${RUNNER_TEMP:-unknown}"
           echo "Tool cache: ${RUNNER_TOOL_CACHE:-unknown}"
 
-          for cmd in bash git curl; do
+          for cmd in bash git curl uv; do
             if ! command -v "${cmd}" >/dev/null 2>&1; then
               echo "::error::Required bootstrap command missing: ${cmd}"
               exit 1
@@ -92,17 +92,15 @@ jobs:
           echo "node_version=$(node --version)" >> "${GITHUB_OUTPUT}"
           npm --version
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Verify Python bootstrap
+      - name: Bootstrap Python with uv
         id: python
         run: |
           set -euo pipefail
-          echo "python_version=$(python3 --version 2>&1 | awk '{print $2}')" >> "${GITHUB_OUTPUT}"
-          python3 --version
+          uv python install "${PYTHON_VERSION}"
+          PYTHON_BIN="$(uv python find "${PYTHON_VERSION}")"
+          echo "python_path=${PYTHON_BIN}" >> "${GITHUB_OUTPUT}"
+          echo "python_version=$("${PYTHON_BIN}" --version 2>&1 | awk '{print $2}')" >> "${GITHUB_OUTPUT}"
+          "${PYTHON_BIN}" --version
 
       - name: Install legal-search frontend dependencies
         if: ${{ inputs.frontend_playwright_smoke }}
