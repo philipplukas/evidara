@@ -33,11 +33,17 @@
       devShells = forAllSystems (
         system:
         let
-          # Several CLIs in this shell are marked unfree in current nixpkgs (Terraform BSL,
-          # Databricks license, 1Password). Restrict unfree allowance to this devShell import only.
+          # Unfree in current nixpkgs: Terraform (BSL), databricks-cli, 1password-cli. Allow only
+          # these by name; if `nix develop` fails on a new unfree dependency, add its `lib.getName`
+          # to the list (see nixpkgs eval error / package pname).
           pkgs = import nixpkgs {
             inherit system;
-            config.allowUnfree = true;
+            config.allowUnfreePredicate = pkg:
+              builtins.elem (nixpkgs.lib.getName pkg) [
+                "terraform"
+                "1password-cli"
+                "databricks-cli"
+              ];
           };
         in
         {

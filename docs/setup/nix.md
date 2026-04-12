@@ -31,9 +31,11 @@ If you use [direnv](https://direnv.net/), add a repo-root `.envrc` containing `u
 
 Declared in [`flake.nix`](../../flake.nix) (adjust there when something is still missing).
 
-The dev shell uses a **scoped** `import nixpkgs { config.allowUnfree = true; }` so Terraform
-(BSL in current nixpkgs), `databricks-cli`, and `1password-cli` evaluate cleanly. That setting applies
-only to this shell’s package set, not your system configuration.
+The dev shell uses a **scoped** `import nixpkgs { config.allowUnfreePredicate = …; }` so only
+Terraform (BSL in current nixpkgs), `databricks-cli`, and `1password-cli` may be unfree. That applies
+only to this shell’s package set, not your system configuration. If `nix develop` fails after a
+nixpkgs bump with “Refusing to evaluate package … unfree”, add that package’s `lib.getName` to the
+predicate in [`flake.nix`](../../flake.nix).
 
 | Tool | Role |
 |------|------|
