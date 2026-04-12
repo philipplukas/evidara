@@ -32,7 +32,9 @@ permissions:
 
 jobs:
   interaction-flow-staging-evidence:
-    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    # Playwright plus setup-node stays on GitHub-hosted Linux until the Hetzner
+    # heavy runner pool exists as an Ubuntu-compatible Kubernetes workload.
+    runs-on: ubuntu-latest
     environment: staging
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STAGING }}

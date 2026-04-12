@@ -1,0 +1,75 @@
+name: Runner Bootstrap Preflight
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Validate self-hosted bootstrap assumptions
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    timeout-minutes: 10
+
+    env:
+      NODE_VERSION: "22"
+      PYTHON_VERSION: "3.11"
+
+    steps:
+      - name: Snapshot runner
+        run: |
+          set -euo pipefail
+
+          echo "Runner: ${RUNNER_NAME:-unknown}"
+          echo "OS: ${RUNNER_OS:-unknown}"
+          echo "Arch: ${RUNNER_ARCH:-unknown}"
+          echo "Temp: ${RUNNER_TEMP:-unknown}"
+          echo "Tool cache: ${RUNNER_TOOL_CACHE:-unknown}"
+
+          for cmd in bash git curl; do
+            if ! command -v "${cmd}" >/dev/null 2>&1; then
+              echo "::error::Required bootstrap command missing: ${cmd}"
+              exit 1
+            fi
+          done
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Verify Node bootstrap
+        id: node
+        run: |
+          set -euo pipefail
+          echo "node_version=$(node --version)" >> "${GITHUB_OUTPUT}"
+          npm --version
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Verify Python bootstrap
+        id: python
+        run: |
+          set -euo pipefail
+          echo "python_version=$(python3 --version 2>&1 | awk '{print $2}')" >> "${GITHUB_OUTPUT}"
+          python3 --version
+
+      - name: Write summary
+        if: always()
+        run: |
+          {
+            echo "### Runner Bootstrap Preflight"
+            echo ""
+            echo "| Item | Value |"
+            echo "|------|-------|"
+            echo "| Runner | ${RUNNER_NAME:-unknown} |"
+            echo "| OS | ${RUNNER_OS:-unknown} |"
+            echo "| Arch | ${RUNNER_ARCH:-unknown} |"
+            echo "| Node | ${{ steps.node.outputs.node_version || 'n/a' }} |"
+            echo "| Python | ${{ steps.python.outputs.python_version || 'n/a' }} |"
+          } >> "${GITHUB_STEP_SUMMARY}"

@@ -35,7 +35,9 @@ on:
 
 jobs:
   document-intelligence-check:
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    # This job bootstraps both Python and Node; keep it on GitHub-hosted Linux
+    # until the Hetzner K8s runner pools replace the legacy NixOS VM path.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
