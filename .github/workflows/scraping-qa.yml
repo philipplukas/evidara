@@ -27,9 +27,9 @@ on:
 
 jobs:
   scraping-qa:
-    # setup-python currently belongs on GitHub-hosted Linux until the Hetzner
-    # K8s runner path is ready for generic Python bootstrap jobs.
-    runs-on: ubuntu-latest
+    # First light-cohort cutover after runner-pool smoke proved generic Python
+    # bootstrap on the bridge self-hosted labels.
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout

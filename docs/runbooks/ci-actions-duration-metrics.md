@@ -32,14 +32,15 @@ See `scripts/analyze_github_actions_queue.py --help` for filters (`--repo`, `--b
 
 Current exception:
 
-- Jobs that bootstrap generic Node or Python via `actions/setup-node` / `actions/setup-python` may need `ubuntu-latest` while the self-hosted Nix runner path is being hardened for those toolchains.
+- Jobs that bootstrap generic Node or mixed Node/Python toolchains may still need `ubuntu-latest` while the self-hosted bridge path is being proven incrementally.
 - Use `.github/workflows/runner-pool-smoke.yml` for non-PR-blocking light/heavy pool verification while the bridge period is still active.
 
 ## Bridge policy while Hetzner K8s runners are being installed
 
 MacConfig owns the Hetzner Kubernetes cluster and the cluster-scoped runner platform objects. Until that platform work lands, this repo uses a bridge policy:
 
-- Keep generic language bootstrap jobs on `ubuntu-latest`.
+- Migrate the smallest proven light-pool jobs back behind `LIGHT_RUNNER_RUNS_ON_JSON` first.
+- Keep larger mixed-toolchain or browser-heavy bootstrap jobs on `ubuntu-latest` until their pool proof exists.
 - Keep runner-native jobs on the existing self-hosted labels only when they do not depend on `actions/setup-node` or `actions/setup-python`.
 - After the Kubernetes runner pools exist, switch the org variables instead of hardcoding new labels across many workflows.
 
@@ -53,10 +54,10 @@ These workflows intentionally use `ubuntu-latest` today because they rely on `ac
 | `docs-and-contracts.yml` | `contract-validation` | `setup-python` + `setup-node` |
 | `platform-control.yml` | `check` | `setup-python` + `setup-node` |
 | `document-intelligence.yml` | `document-intelligence-check` | `setup-python` + `setup-node` |
-| `evidara-cli.yml` | `evidara-cli` | `setup-python` |
 | `evidara-cli-remote-smoke.yml` | `remote-smoke` | `setup-python` |
-| `scraping-qa.yml` | `scraping-qa` | `setup-python` |
 | `interaction-flow-staging-evidence.yml` | `interaction-flow-staging-evidence` | `setup-node` + Playwright |
+
+As of 2026-04-12, `evidara-cli.yml` and `scraping-qa.yml` moved back to the light runner pool after `runner-pool-smoke.yml` landed and proved generic Python bootstrap on the bridge self-hosted labels.
 
 ### Target Hetzner K8s label policy
 

@@ -21,9 +21,9 @@ on:
 
 jobs:
   evidara-cli:
-    # setup-python is more predictable on GitHub-hosted Linux while the
-    # self-hosted Hetzner runner path moves behind Kubernetes-managed runners.
-    runs-on: ubuntu-latest
+    # First light-cohort cutover after runner-pool smoke proved generic Python
+    # bootstrap on the bridge self-hosted labels.
+    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
 
     steps:
       - name: Checkout
