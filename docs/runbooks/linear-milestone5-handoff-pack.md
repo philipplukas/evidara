@@ -2,6 +2,7 @@
 
 Owner: Platform / release  
 Last reviewed: 2026-04-12  
+Last verified: 2026-04-12  
 Applies to: closing **M5 evidence** (TAR-64 / TAR-77 / TAR-85), **Phase 5** readiness (TAR-69), and follow-on gates through **full product GO** where applicable.
 
 ## Linear issues created from this pack (2026-04-12)
