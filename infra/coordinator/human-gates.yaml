@@ -1,0 +1,50 @@
+# Human gate configuration for the Evidara autonomous workflow coordinator.
+#
+# Each gate defines when async human approval is required before an autonomous
+# action proceeds.  Gates are evaluated by the coordinator's Temporal workflows:
+# the workflow posts a Slack message with approve/reject buttons, then waits for
+# a signal (or timeout).
+#
+# Fields:
+#   channel        — Slack channel for the approval request
+#   timeout        — how long to wait before applying `fallback`
+#   auto_approve   — condition under which the gate is skipped (string expression
+#                    evaluated by the coordinator; "never" = always require human)
+#   fallback       — action when timeout expires: "reject" | "hold" | "approve"
+
+gates:
+  merge_to_main:
+    channel: "#evidara-approvals"
+    timeout: "4h"
+    auto_approve: "ci_green"
+    fallback: "reject"
+
+  deploy_staging:
+    channel: "#evidara-approvals"
+    timeout: "2h"
+    auto_approve: "ci_green AND last_staging_deploy_age > 1h"
+    fallback: "hold"
+
+  deploy_prod:
+    channel: "#evidara-approvals"
+    timeout: "24h"
+    auto_approve: "never"
+    fallback: "reject"
+
+  llm_heavy_task:
+    channel: "#evidara-cost"
+    timeout: "1h"
+    auto_approve: "estimated_cost < 5"
+    fallback: "hold"
+
+  source_mutation:
+    channel: "#evidara-approvals"
+    timeout: "4h"
+    auto_approve: "never"
+    fallback: "reject"
+
+  infra_change:
+    channel: "#evidara-approvals"
+    timeout: "8h"
+    auto_approve: "never"
+    fallback: "reject"

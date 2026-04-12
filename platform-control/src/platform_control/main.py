@@ -27,6 +27,7 @@ from platform_control.routers import (
     reviews,
     runs,
     schedules,
+    slack_interactions,
     sources,
     versions,
     wizard,
@@ -98,6 +99,9 @@ def create_app() -> FastAPI:
     app.include_router(corpora_router, dependencies=_operator_auth)
     app.include_router(firecrawl.router, dependencies=_service_auth)
     app.include_router(di_events.router, dependencies=_service_auth)
+
+    # Slack interactions — unauthenticated (Slack signature verification handled in-route)
+    app.include_router(slack_interactions.router)
 
     @app.exception_handler(NotFoundError)
     async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:

@@ -1,3 +1,16 @@
+# Three NVMe drives:
+#   nvme0n1 — root (unencrypted, boots without passphrase)
+#   nvme1n1 — Docker state (LUKS-encrypted, unlocked via initrd SSH)
+#   nvme2n1 — runners/agent state (LUKS-encrypted, unlocked via initrd SSH)
+#
+# On reboot, SSH into initrd (port 2222) and run:
+#   systemd-tty-ask-password-agent
+# to provide the LUKS passphrase for both encrypted drives.
+#
+# First-time setup with nixos-anywhere:
+#   nixos-anywhere --disk-encryption-keys /tmp/luks-docker.key <passphrase-file> \
+#                  --disk-encryption-keys /tmp/luks-data.key <passphrase-file> \
+#                  --flake .#hetzner-runner root@88.99.26.120
 {
   disko.devices = {
     disk = {
@@ -14,8 +27,9 @@
             root = {
               size = "100%";
               content = {
-                type = "mdraid";
-                name = "root";
+                type = "filesystem";
+                format = "ext4";
+                mountpoint = "/";
               };
             };
           };
@@ -27,15 +41,20 @@
         content = {
           type = "gpt";
           partitions = {
-            bios = {
-              size = "1M";
-              type = "EF02";
-            };
-            root = {
+            docker = {
               size = "100%";
               content = {
-                type = "mdraid";
-                name = "root";
+                type = "luks";
+                name = "cryptdocker";
+                settings = {
+                  allowDiscards = true;
+                  keyFile = "/tmp/luks-docker.key";
+                };
+                content = {
+                  type = "filesystem";
+                  format = "ext4";
+                  mountpoint = "/var/lib/docker";
+                };
               };
             };
           };
@@ -47,26 +66,23 @@
         content = {
           type = "gpt";
           partitions = {
-            runners = {
+            data = {
               size = "100%";
               content = {
-                type = "filesystem";
-                format = "ext4";
-                mountpoint = "/var/lib/github-runners";
+                type = "luks";
+                name = "cryptdata";
+                settings = {
+                  allowDiscards = true;
+                  keyFile = "/tmp/luks-data.key";
+                };
+                content = {
+                  type = "filesystem";
+                  format = "ext4";
+                  mountpoint = "/var/lib/github-runners";
+                };
               };
             };
           };
-        };
-      };
-    };
-    mdadm = {
-      root = {
-        type = "mdadm";
-        level = 1;
-        content = {
-          type = "filesystem";
-          format = "ext4";
-          mountpoint = "/";
         };
       };
     };

@@ -1,0 +1,32 @@
+services:
+  coordinator-api:
+    build: .
+    command: ["uvicorn", "coordinator.app:app", "--host", "0.0.0.0", "--port", "8080"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      # On Hetzner: sops-nix assembles this from encrypted secrets at /run/secrets/
+      # Locally: use .env (copy from .env.example)
+      - ${COORDINATOR_ENV_FILE:-.env}
+    environment:
+      COORDINATOR_TEMPORAL_TARGET: "host.docker.internal:7233"
+      COORDINATOR_GATE_CONFIG_PATH: "/app/human-gates.yaml"
+    volumes:
+      - ./human-gates.yaml:/app/human-gates.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  coordinator-worker:
+    build: .
+    command: ["python", "-m", "coordinator.worker"]
+    env_file:
+      - ${COORDINATOR_ENV_FILE:-.env}
+    environment:
+      COORDINATOR_TEMPORAL_TARGET: "host.docker.internal:7233"
+      COORDINATOR_GATE_CONFIG_PATH: "/app/human-gates.yaml"
+    volumes:
+      - ./human-gates.yaml:/app/human-gates.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

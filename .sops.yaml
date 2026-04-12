@@ -1,0 +1,22 @@
+# sops configuration for Evidara secret management.
+#
+# Keys:
+#   - hetzner_host: age key derived from the server's SSH host ed25519 key
+#     Generate with: ssh-keyscan 88.99.26.120 | ssh-to-age
+#   - admin: your personal age key (from 1Password or age-keygen)
+#     Generate with: age-keygen -y ~/.config/sops/age/keys.txt
+#
+# After adding real keys, re-encrypt with: sops updatekeys <file>
+keys:
+  # Replace these placeholder keys with real ones before first encrypt.
+  # Server host key (run on server: cat /etc/ssh/ssh_host_ed25519_key.pub | ssh-to-age)
+  - &hetzner_host age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  # Admin personal key (run locally: age-keygen -y ~/.config/sops/age/keys.txt)
+  - &admin age1yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+
+creation_rules:
+  - path_regex: infra/nix/hetzner-runner/secrets/.*\.(yaml|json|env)$
+    key_groups:
+      - age:
+          - *hetzner_host
+          - *admin
