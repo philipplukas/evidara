@@ -1,8 +1,8 @@
 # Phase 5 go / no-go memo (draft)
 
 Owner: Platform lead  
-Last reviewed: 2026-04-11  
-Last verified: 2026-04-11  
+Last reviewed: 2026-04-12  
+Last verified: 2026-04-12  
 Applies to: release readiness / promotion (Linear **TAR-69**); **dev-first teams** use dev for TAR-85 — see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)  
 Canonical template history: this file is the **working draft**; publish final recommendation in Linear **TAR-69** when all gates are green.
 
@@ -11,15 +11,27 @@ Canonical template history: this file is the **working draft**; publish final re
 ## 1. Summary recommendation
 
 - **Recommendation:** **PENDING** — operator evidence still required for full dev smoke (TAR-64 ×2), branch protection proof (TAR-77), and fresh **remote** MVP acceptance (**TAR-85** — use **dev** Cloud Run when no staging GCP project exists). Repo implementation for search/metadata/relevance is merged.
-- **Date:** 2026-04-09 (draft)  
+- **Date:** 2026-04-09 (draft); **local re-verify ([TAR-214](https://linear.app/tart-baozi/issue/TAR-214)):** 2026-04-12 — see §1.1  
 - **Environment(s) covered:** **dev** (primary remote integration + TAR-85 target for dev-first posture); staging only if your org provisions it — **re-verify** MVP acceptance tables after each promotion batch on `main`
+
+### 1.1 TAR-214 — automated verification (2026-04-12)
+
+Executed on **`main` @ `ca5ca0f`** in an agent environment **without** Cloud Run / GitHub admin access. This **does not** replace TAR-64 / TAR-77 / TAR-85 operator evidence; it refreshes **local + repo contract** preflight for handoff.
+
+| Check | Command / scope | Result |
+|-------|-----------------|--------|
+| Vertical slice local bundle | `bash scripts/vertical-slice-exit-gates-local.sh` | **pass** — legal-search `projections.service.spec.ts` 9/9; platform-control `test_firecrawl_webhook_service` 3/3 |
+| Document intelligence tests | `cd document-intelligence && uv run pytest tests/` | **176 passed**, 11 skipped (optional `dspy` / `spacy`) |
+| Contract examples / schemas | `python3 scripts/validate_json_schemas.py` (repo root) | **pass** |
+
+Log row: [first-vertical-slice-exit-gates.md — Verification Log](first-vertical-slice-exit-gates.md#verification-log) (2026-04-12).
 
 ## 2. Gate outcomes
 
 | Gate | Source | Result | Evidence link |
 |------|--------|--------|----------------|
 | A–C vertical slice | `docs/runbooks/first-vertical-slice-exit-gates.md` | **PENDING** (dev smoke ×2) | See **TAR-64: dev smoke evidence** in that runbook |
-| Local pre-flight | `scripts/vertical-slice-exit-gates-local.sh` (2×) | pass | Rows 2026-04-09 in verification log |
+| Local pre-flight | `scripts/vertical-slice-exit-gates-local.sh` (2×) | pass | [Verification log](first-vertical-slice-exit-gates.md#verification-log) rows **2026-04-09** and **2026-04-12**; DI pytest + schema validate 2026-04-12 — §1.1 |
 | MVP acceptance (remote) | `docs/runbooks/mvp-acceptance-scenario-pack.md` | pass (last table **2026-04-08**) | [mvp-acceptance-scenario-pack.md](mvp-acceptance-scenario-pack.md#latest-verification-evidence-2026-04-08) — **refresh** with `evidara workflow mvp-acceptance` against **dev** (or staging if operated); payload includes `evidence_pack_version` |
 | Release Readiness (strict) | `Release Readiness` workflow | GO (historical) | Re-run on current `main`; download artifact **`release-readiness-<run_id>`** (JSON gate snapshots) and keep the run URL + GCS report path together in Linear (see section 2.1) |
 | Interaction flow | `docs/runbooks/interaction-flow-validation.md` | pass (historical) | Latest staging workflow run + GCS bundle; generated manifest now includes a **TAR-67 / TAR-69** drill block (see section 2.1) |

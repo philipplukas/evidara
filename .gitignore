@@ -99,3 +99,6 @@ build/
 target/
 # MkDocs default output (`mkdocs build`, `scripts/check_docs.sh`); do not commit
 site/
+
+# --- Operator-local scripts (host-specific paths / IPs; not part of default clone) ---
+scripts/deploy-hetzner-runner.sh

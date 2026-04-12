@@ -152,6 +152,7 @@ Recent closure evidence for this slice:
 | 2026-04-06 | Strict release-readiness verification (generated log-row flow) | Release Readiness run [24049226588](https://github.com/philipplukas/evidara/actions/runs/24049226588) passed and produced a copy/paste verification-log row referencing interaction-flow evidence run [24046042493](https://github.com/philipplukas/evidara/actions/runs/24046042493) |
 | 2026-04-09 | Local exit-gate bundle (run 1) | `scripts/vertical-slice-exit-gates-local.sh`: legal-search projections spec 6/6 pass; platform-control `test_firecrawl_webhook_service` 3/3 pass |
 | 2026-04-09 | Local exit-gate bundle (run 2) | Repeat of same script on separate invocation; same pass counts (reproducible pre-flight for TAR-64) |
+| 2026-04-12 | Local exit-gate bundle ([TAR-214](https://linear.app/tart-baozi/issue/TAR-214) refresh) | `main` @ `ca5ca0f`: `scripts/vertical-slice-exit-gates-local.sh` — legal-search `projections.service.spec.ts` **9/9** pass; platform-control `test_firecrawl_webhook_service` **3/3** pass; `document-intelligence` `uv run pytest tests/` **176** passed, **11** skipped; `python3 scripts/validate_json_schemas.py` OK |
 
 ## Ownership Handoff
 

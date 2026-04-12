@@ -21,6 +21,8 @@ These were filed via the **Linear MCP** into team **Tart-baozi**, project **Evid
 
 Comments added on **TAR-69** and **TAR-89** linking the umbrella and child split.
 
+**Repo hygiene:** `scripts/deploy-hetzner-runner.sh` is **gitignored** (operator-local host paths). Keep a personal copy outside the repo if you use it.
+
 ## Why this file exists
 
 The monorepo **does not** create Linear issues in CI by default. Operators or agents with the **Linear MCP / CLI** can sync from this document. Use this file to:
