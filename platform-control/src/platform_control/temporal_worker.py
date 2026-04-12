@@ -4,10 +4,16 @@ import asyncio
 import logging
 import sys
 
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from temporalio.client import Client
 from temporalio.worker import Worker
 
 from platform_control.config import get_settings
+from platform_control.temporal.activities import (
+    ReviewDrainActivities,
+    ScopeShardActivities,
+    WizardStateActivities,
+)
 from platform_control.temporal.workflows import (
     ReviewDrainWorkflow,
     ScopeShardWorkflow,
@@ -28,6 +34,19 @@ def _setup_logging() -> None:
 
 async def _async_main() -> None:
     settings = get_settings()
+
+    engine = create_async_engine(settings.database_url)
+    session_factory: async_sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+
+    wizard_state_acts = WizardStateActivities(session_factory=session_factory)
+    scope_shard_acts = ScopeShardActivities(session_factory=session_factory)
+    review_drain_acts = ReviewDrainActivities(
+        session_factory=session_factory,
+        argilla_api_base_url=settings.argilla_api_base_url,
+        argilla_api_key=settings.argilla_api_key,
+        argilla_dataset_id=settings.argilla_dataset_id,
+    )
+
     client = await Client.connect(
         settings.temporal_target,
         namespace=settings.temporal_namespace,
@@ -36,6 +55,14 @@ async def _async_main() -> None:
         client,
         task_queue=settings.temporal_task_queue,
         workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
+        activities=[
+            wizard_state_acts.persist_pilot_completed,
+            wizard_state_acts.fetch_scope_shards,
+            scope_shard_acts.run_shard_crawl,
+            scope_shard_acts.report_shard_progress,
+            review_drain_acts.enqueue_pending_reviews,
+            review_drain_acts.check_review_drain_complete,
+        ],
     )
     LOGGER.info(
         "Temporal worker listening (namespace=%s, task_queue=%s, target=%s)",
