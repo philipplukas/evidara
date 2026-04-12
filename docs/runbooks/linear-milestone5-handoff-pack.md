@@ -4,9 +4,26 @@ Owner: Platform / release
 Last reviewed: 2026-04-12  
 Applies to: closing **M5 evidence** (TAR-64 / TAR-77 / TAR-85), **Phase 5** readiness (TAR-69), and follow-on gates through **full product GO** where applicable.
 
+## Linear issues created from this pack (2026-04-12)
+
+These were filed via the **Linear MCP** into team **Tart-baozi**, project **Evidara**, milestone **M5 — Close P5/P6/P7 Open Items**:
+
+| Issue | Role |
+|-------|------|
+| [TAR-214](https://linear.app/tart-baozi/issue/TAR-214) | Operator — refresh M5 gate evidence (umbrella) |
+| [TAR-215](https://linear.app/tart-baozi/issue/TAR-215) | Agent — TAR-89 data path |
+| [TAR-216](https://linear.app/tart-baozi/issue/TAR-216) | Agent — TAR-89 serving path |
+| [TAR-217](https://linear.app/tart-baozi/issue/TAR-217) | Operator — TAR-89 environment truth |
+| [TAR-218](https://linear.app/tart-baozi/issue/TAR-218) | Agent — DI CI/CD bundle + Terraform (Backlog) |
+| [TAR-219](https://linear.app/tart-baozi/issue/TAR-219) | Agent — Release Readiness dev-first doc pairing |
+| [TAR-220](https://linear.app/tart-baozi/issue/TAR-220) | Operator — TAR-67 drills + artifacts |
+| [TAR-221](https://linear.app/tart-baozi/issue/TAR-221) | Operator — TAR-82 / TAR-68 relevance pack |
+
+Comments added on **TAR-69** and **TAR-89** linking the umbrella and child split.
+
 ## Why this file exists
 
-The monorepo **cannot create or update Linear issues without your Linear API credentials**. Use this document to:
+The monorepo **does not** create Linear issues in CI by default. Operators or agents with the **Linear MCP / CLI** can sync from this document. Use this file to:
 
 1. **Paste** the issue bodies below into Linear (new issues or comments on existing ones).
 2. **Assign** work type: **Operator** (GCP/GitHub/console), **Agent-code** (repo PRs), or **Doc** (markdown-only).
