@@ -1,6 +1,13 @@
 {
   "title": "Fallback Order",
+  "expected_source_family": "admin_guidance",
   "section_count": 1,
   "key_headings": [],
-  "status_flow": ["accepted", "processing", "canonical_ready"]
+  "status_flow": ["accepted", "processing", "canonical_ready"],
+  "metadata_eval": {
+    "expect": {
+      "title_contains": "Fallback Order",
+      "llm_invoked": false
+    }
+  }
 }

@@ -17,20 +17,22 @@ except ImportError:
     dspy = None  # type: ignore[assignment]
 
 
-SOURCE_FAMILY_VOCABULARY = frozenset({
-    "law",
-    "decision",
-    "commentary",
-    "admin_guidance",
-    "unknown",
-})
+SOURCE_FAMILY_VOCABULARY = frozenset(
+    {
+        "law",
+        "decision",
+        "commentary",
+        "admin_guidance",
+        "unknown",
+    }
+)
 
 
 def _require_dspy() -> None:
     if dspy is None:
         raise ImportError(
             "dspy is required for LLM extraction modules. "
-            "Install with: uv sync --group llm"
+            "Install with: uv sync --extra llm (see document-intelligence/pyproject.toml optional-dependencies)"
         )
 
 
@@ -38,7 +40,11 @@ class TitleExtractorSignature(dspy.Signature if dspy else object):  # type: igno
     """Extract the canonical legal document title from document text and metadata hints."""
 
     document_text: str = dspy.InputField(desc="First ~2000 chars of the document body") if dspy else ""  # type: ignore[assignment]
-    metadata_hints: str = dspy.InputField(desc="JSON string of available metadata hints (source_defaults, extracted_metadata)") if dspy else ""  # type: ignore[assignment]
+    metadata_hints: str = (
+        dspy.InputField(desc="JSON string of available metadata hints (source_defaults, extracted_metadata)")
+        if dspy
+        else ""
+    )  # type: ignore[assignment]
     title: str = dspy.OutputField(desc="Extracted canonical title for the legal document") if dspy else ""  # type: ignore[assignment]
     confidence: float = dspy.OutputField(desc="Confidence score between 0.0 and 1.0") if dspy else 0.0  # type: ignore[assignment]
 
@@ -48,7 +54,13 @@ class SourceFamilyClassifierSignature(dspy.Signature if dspy else object):  # ty
 
     document_text: str = dspy.InputField(desc="First ~2000 chars of the document body") if dspy else ""  # type: ignore[assignment]
     metadata_hints: str = dspy.InputField(desc="JSON string of available metadata hints") if dspy else ""  # type: ignore[assignment]
-    source_family: str = dspy.OutputField(desc="One of: law, decision, commentary, admin_guidance, unknown") if dspy else ""  # type: ignore[assignment]
+    source_family: str = (
+        dspy.OutputField(
+            desc="One of: law, decision, commentary, admin_guidance, unknown",
+        )
+        if dspy
+        else ""
+    )  # type: ignore[assignment]
     confidence: float = dspy.OutputField(desc="Confidence score between 0.0 and 1.0") if dspy else 0.0  # type: ignore[assignment]
 
 
@@ -56,7 +68,13 @@ class CommentaryExtractorSignature(dspy.Signature if dspy else object):  # type:
     """Extract commentary passages and referenced legal provisions from a commentary document."""
 
     document_text: str = dspy.InputField(desc="Full document body text") if dspy else ""  # type: ignore[assignment]
-    passages_json: str = dspy.OutputField(desc="JSON array of {passage, referenced_provision, section_ref}") if dspy else ""  # type: ignore[assignment]
+    passages_json: str = (
+        dspy.OutputField(
+            desc="JSON array of {passage, referenced_provision, section_ref}",
+        )
+        if dspy
+        else ""
+    )  # type: ignore[assignment]
 
 
 class TitleExtractor:
@@ -154,9 +172,11 @@ class CommentaryExtractor:
         validated: list[dict[str, Any]] = []
         for p in passages:
             if isinstance(p, dict) and p.get("passage"):
-                validated.append({
-                    "passage": str(p["passage"]),
-                    "referenced_provision": str(p.get("referenced_provision", "")),
-                    "section_ref": str(p.get("section_ref", "")),
-                })
+                validated.append(
+                    {
+                        "passage": str(p["passage"]),
+                        "referenced_provision": str(p.get("referenced_provision", "")),
+                        "section_ref": str(p.get("section_ref", "")),
+                    }
+                )
         return validated

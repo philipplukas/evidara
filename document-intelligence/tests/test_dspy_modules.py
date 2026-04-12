@@ -10,6 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytest.importorskip("dspy")
+
 
 @pytest.fixture(autouse=True)
 def _mock_dspy_lm():
@@ -35,12 +37,16 @@ class TestTitleExtractor:
             "__init__",
             lambda self, **kw: (
                 setattr(self, "_max_text_chars", 2000)
-                or setattr(self, "_predictor", MagicMock(
-                    return_value=_FakePrediction(
-                        title="Bundesgesetz über das Obligationenrecht",
-                        confidence=0.92,
-                    )
-                ))
+                or setattr(
+                    self,
+                    "_predictor",
+                    MagicMock(
+                        return_value=_FakePrediction(
+                            title="Bundesgesetz über das Obligationenrecht",
+                            confidence=0.92,
+                        )
+                    ),
+                )
             ),
         ):
             ext = TitleExtractor()
@@ -56,9 +62,7 @@ class TestTitleExtractor:
             "__init__",
             lambda self, **kw: (
                 setattr(self, "_max_text_chars", 2000)
-                or setattr(self, "_predictor", MagicMock(
-                    return_value=_FakePrediction(title="Test", confidence=1.5)
-                ))
+                or setattr(self, "_predictor", MagicMock(return_value=_FakePrediction(title="Test", confidence=1.5)))
             ),
         ):
             ext = TitleExtractor()
@@ -73,9 +77,7 @@ class TestTitleExtractor:
             "__init__",
             lambda self, **kw: (
                 setattr(self, "_max_text_chars", 2000)
-                or setattr(self, "_predictor", MagicMock(
-                    return_value=_FakePrediction(title="Test", confidence="high")
-                ))
+                or setattr(self, "_predictor", MagicMock(return_value=_FakePrediction(title="Test", confidence="high")))
             ),
         ):
             ext = TitleExtractor()
@@ -92,11 +94,9 @@ class TestSourceFamilyClassifier:
             "__init__",
             lambda self, **kw: (
                 setattr(self, "_max_text_chars", 2000)
-                or setattr(self, "_predictor", MagicMock(
-                    return_value=_FakePrediction(
-                        source_family="law", confidence=0.95
-                    )
-                ))
+                or setattr(
+                    self, "_predictor", MagicMock(return_value=_FakePrediction(source_family="law", confidence=0.95))
+                )
             ),
         ):
             clf = SourceFamilyClassifier()
@@ -112,11 +112,11 @@ class TestSourceFamilyClassifier:
             "__init__",
             lambda self, **kw: (
                 setattr(self, "_max_text_chars", 2000)
-                or setattr(self, "_predictor", MagicMock(
-                    return_value=_FakePrediction(
-                        source_family="regulation", confidence=0.3
-                    )
-                ))
+                or setattr(
+                    self,
+                    "_predictor",
+                    MagicMock(return_value=_FakePrediction(source_family="regulation", confidence=0.3)),
+                )
             ),
         ):
             clf = SourceFamilyClassifier()
@@ -142,11 +142,9 @@ class TestCommentaryExtractor:
             "__init__",
             lambda self, **kw: (
                 setattr(self, "_max_text_chars", 8000)
-                or setattr(self, "_predictor", MagicMock(
-                    return_value=_FakePrediction(
-                        passages_json=json.dumps(passages)
-                    )
-                ))
+                or setattr(
+                    self, "_predictor", MagicMock(return_value=_FakePrediction(passages_json=json.dumps(passages)))
+                )
             ),
         ):
             ext = CommentaryExtractor()
@@ -163,9 +161,7 @@ class TestCommentaryExtractor:
             "__init__",
             lambda self, **kw: (
                 setattr(self, "_max_text_chars", 8000)
-                or setattr(self, "_predictor", MagicMock(
-                    return_value=_FakePrediction(passages_json="not json")
-                ))
+                or setattr(self, "_predictor", MagicMock(return_value=_FakePrediction(passages_json="not json")))
             ),
         ):
             ext = CommentaryExtractor()
@@ -225,14 +221,11 @@ class TestDspyMetadataExtractor:
             llm_model="gpt-4o-mini",
         )
 
-        with patch(
-            "document_intelligence.extractors.dspy_metadata_extractor._configure_dspy_lm"
-        ):
-            with patch(
-                "document_intelligence.extractors.dspy_modules.TitleExtractor"
-            ) as MockTitle, patch(
-                "document_intelligence.extractors.dspy_modules.SourceFamilyClassifier"
-            ) as MockClassifier:
+        with patch("document_intelligence.extractors.dspy_metadata_extractor._configure_dspy_lm"):
+            with (
+                patch("document_intelligence.extractors.dspy_modules.TitleExtractor") as MockTitle,
+                patch("document_intelligence.extractors.dspy_modules.SourceFamilyClassifier") as MockClassifier,
+            ):
                 MockTitle.return_value.extract.return_value = {
                     "title": "Bundesgesetz",
                     "confidence": 0.9,
@@ -246,11 +239,11 @@ class TestDspyMetadataExtractor:
                 ir = MagicMock()
                 ir.full_text = "Art. 1 Dieses Gesetz..."
                 manifest = MagicMock()
-                manifest.provenance = MagicMock()
-                manifest.provenance.source_defaults = {}
-                manifest.di_overrides = None
+                manifest.di_overrides = {}
+                manifest.source_defaults = {}
+                manifest.bundle_metadata = {}
                 artifact = MagicMock()
-                artifact.metadata = {}
+                artifact.extra_fields = {}
 
                 candidate = extractor.extract(
                     normalized_document=ir,
@@ -264,3 +257,32 @@ class TestDspyMetadataExtractor:
                 assert candidate.confidence == pytest.approx(0.875)
                 assert candidate.provider == "openai"
                 assert candidate.model == "gpt-4o-mini"
+
+
+def test_gather_metadata_hints_for_llm_contract_aligned():
+    """Hints must come from manifest.source_defaults / bundle_metadata and artifact.extra_fields."""
+    import os
+    import sys
+    import tempfile
+
+    from document_intelligence.contracts.envelope import ArtifactBundleManifest
+    from document_intelligence.extractors.metadata import gather_metadata_hints_for_llm
+
+    sys.path.insert(0, os.path.dirname(__file__))
+    from support import build_manifest_payload
+
+    with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
+        f.write("<html><title>x</title></html>")
+        artifact_path = f.name
+    try:
+        payload = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        payload["bundle_metadata"] = {"extraction_hints": {"title_hint": "From bundle_metadata"}}
+        payload["artifacts"][0]["crawl_sidecar"] = {"page_title": "From artifact extra"}
+        manifest = ArtifactBundleManifest.from_dict(payload)
+        primary = manifest.artifacts[0]
+        hints = gather_metadata_hints_for_llm(manifest, primary)
+        assert "source_defaults" in hints
+        assert hints["bundle_metadata"]["extraction_hints"]["title_hint"] == "From bundle_metadata"
+        assert hints["artifact_extra_fields"]["crawl_sidecar"]["page_title"] == "From artifact extra"
+    finally:
+        os.unlink(artifact_path)

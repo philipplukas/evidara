@@ -33,10 +33,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: |
-          pip install pytest pyyaml
-          pip install -e document-intelligence[test] || echo "DI not installable; data check only"
+      - name: Install document-intelligence (pytest gate + DI import)
+        run: pip install -e "./document-intelligence[test]"
 
       - name: Validate eval CSV integrity
         run: python -m pytest eval/test_eval_pipeline.py -v -k "test_eval_data_integrity or test_query_task_type" --tb=short
@@ -53,12 +51,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install DI package
-        run: pip install -e document-intelligence[test]
-        continue-on-error: true
+        run: pip install -e "./document-intelligence[test]"
 
       - name: Run RIS golden fixture tests
         run: python -m pytest eval/test_eval_pipeline.py -v -k "test_ris_fixture" --tb=long
-        continue-on-error: true
 
       - name: Upload test results
         if: always()

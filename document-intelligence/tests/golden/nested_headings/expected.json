@@ -1,6 +1,13 @@
 {
   "title": "Nested Structure Act",
+  "expected_source_family": "law",
   "section_count": 3,
   "key_headings": ["Chapter 1", "Article 1", "Article 2"],
-  "status_flow": ["accepted", "processing", "canonical_ready"]
+  "status_flow": ["accepted", "processing", "canonical_ready"],
+  "metadata_eval": {
+    "expect": {
+      "title_contains": "Nested Structure Act",
+      "llm_invoked": false
+    }
+  }
 }

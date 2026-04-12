@@ -1,7 +1,8 @@
 """HTML-first bundle-based processing pipeline."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from document_intelligence.canonical.ids import random_prefixed_id, stable_prefixed_id
 from document_intelligence.canonical.jurisdiction import resolve_jurisdiction_from_manifest
@@ -22,7 +23,9 @@ from document_intelligence.events.document_processed import (
     build_document_processed_event,
 )
 from document_intelligence.events.status_updated import build_processing_status_event
+from document_intelligence.extractors.extraction_hints import extraction_hints_from_bundle_metadata
 from document_intelligence.extractors.metadata import (
+    FieldProvenanceAudit,
     MetadataExtractionCandidate,
     MetadataExtractor,
 )
@@ -154,6 +157,10 @@ class ProcessingPipeline:
         ]
 
         normalized_document = self._normalize_artifact(primary_artifact, artifact_text)
+        normalized_document = _merge_extraction_hints_into_ir(
+            selected_bundle.manifest,
+            normalized_document,
+        )
         sections = _build_sections(
             document_id=document_id,
             document_revision=document_revision,
@@ -255,6 +262,12 @@ class ProcessingPipeline:
     ) -> MetadataExtractionCandidate | None:
         if not self._enable_llm_extractor or self._llm_metadata_extractor is None:
             return None
+        if not _needs_llm_extraction(normalized_document, manifest):
+            return MetadataExtractionCandidate(
+                confidence=1.0,
+                summary="skipped_structured_sufficient",
+                raw={"reason": "title and document_type already resolved from structured extraction"},
+            )
         try:
             return self._llm_metadata_extractor.extract(
                 normalized_document=normalized_document,
@@ -343,6 +356,76 @@ def _resolve_document_type(
     return None
 
 
+def _merge_extraction_hints_into_ir(
+    manifest: ArtifactBundleManifest,
+    normalized_document: NormalizedDocumentIR,
+) -> NormalizedDocumentIR:
+    """Attach v1 ``extraction_hints`` from bundle_metadata onto normalized IR metadata."""
+    hints = extraction_hints_from_bundle_metadata(dict(manifest.bundle_metadata or {}))
+    if not hints:
+        return normalized_document
+    new_meta = dict(normalized_document.metadata)
+    new_meta["extraction_hints"] = hints
+    return replace(normalized_document, metadata=new_meta)
+
+
+def _is_placeholder_title(title: str | None) -> bool:
+    if title is None:
+        return True
+    t = title.strip()
+    if not t:
+        return True
+    lower = t.lower()
+    if lower in {"untitled document", "ris dokument"}:
+        return True
+    if lower.startswith("ris —") or lower.startswith("ris -"):
+        return True
+    return False
+
+
+def _effective_title_from_normalized(
+    normalized_document: NormalizedDocumentIR,
+) -> tuple[str, Literal["structured", "manifest", "heuristic"]]:
+    """Resolve display title: structured body, then acquisition hints, then headings."""
+    hints = normalized_document.metadata.get("extraction_hints")
+    hint_title: str | None = None
+    if isinstance(hints, dict):
+        raw = hints.get("title_hint")
+        if isinstance(raw, str) and raw.strip():
+            hint_title = raw.strip()
+
+    structured = normalized_document.metadata.get("title")
+    if isinstance(structured, str):
+        structured = structured.strip() or None
+
+    if hint_title and _is_placeholder_title(structured):
+        return hint_title, "manifest"
+    if structured and not _is_placeholder_title(structured):
+        return structured, "structured"
+    if hint_title:
+        return hint_title, "manifest"
+    for block in normalized_document.blocks:
+        if block.type == "heading":
+            return block.text, "structured"
+    if structured:
+        return structured, "structured"
+    return "Untitled document", "heuristic"
+
+
+def _compute_llm_invoked(
+    llm_metadata: MetadataExtractionCandidate | None,
+    *,
+    llm_extractor_enabled: bool,
+) -> bool:
+    """True when the configured extractor's ``extract()`` ran (not pre-skipped)."""
+    if not llm_extractor_enabled or llm_metadata is None:
+        return False
+    summary = (llm_metadata.summary or "").strip()
+    if summary == "skipped_structured_sufficient":
+        return False
+    return True
+
+
 def _build_document(
     *,
     normalized_document: NormalizedDocumentIR,
@@ -367,6 +450,9 @@ def _build_document(
     extracted_metadata = dict(normalized_document.metadata.get("extracted_metadata") or {})
     if extracted_metadata:
         metadata["extracted_metadata"] = extracted_metadata
+    eh = normalized_document.metadata.get("extraction_hints")
+    if isinstance(eh, dict) and eh:
+        metadata["extraction_hints"] = dict(eh)
     official_citation = _resolve_official_citation(normalized_document.metadata, extracted_metadata)
     if official_citation:
         metadata["official_citation"] = official_citation
@@ -397,16 +483,61 @@ def _build_document(
                 "applied": False,
                 "summary": "no_extractor_configured",
                 "confidence_threshold": llm_confidence_threshold,
+                "llm_invoked": False,
             }
         else:
             metadata["llm_extraction"] = llm_metadata.to_metadata(applied=applied_llm_metadata)
             metadata["llm_extraction"]["confidence_threshold"] = llm_confidence_threshold
-    title = _choose_document_title(normalized_document)
+            metadata["llm_extraction"]["llm_invoked"] = _compute_llm_invoked(
+                llm_metadata,
+                llm_extractor_enabled=llm_extractor_enabled,
+            )
+    provenance_audit = FieldProvenanceAudit()
+
+    title, title_tier = _effective_title_from_normalized(normalized_document)
+    title_source: Literal["structured", "manifest", "heuristic", "llm"] = title_tier
     if applied_llm_metadata and llm_metadata and llm_metadata.title:
         title = llm_metadata.title.strip() or title
+        title_source = "llm"
+    provenance_audit.set("title", title, title_source)  # type: ignore[arg-type]
+
     llm_document_type = None
     if applied_llm_metadata and llm_metadata:
         llm_document_type = _normalize_document_type(llm_metadata.document_type)
+
+    eh_for_type = normalized_document.metadata.get("extraction_hints")
+    eh_doc_hint = (
+        eh_for_type.get("document_type_hint")
+        if isinstance(eh_for_type, dict) and isinstance(eh_for_type.get("document_type_hint"), str)
+        else None
+    )
+    merged_type_hint = eh_doc_hint or manifest.source_defaults.get("document_type_hint")
+    resolved_doc_type = _resolve_document_type(
+        llm_document_type or normalized_document.metadata.get("document_type"),
+        merged_type_hint,
+    )
+    if llm_document_type and resolved_doc_type == llm_document_type:
+        conf = llm_metadata.confidence if llm_metadata else 0.0
+        provenance_audit.set("document_type", resolved_doc_type, "llm", conf)
+    elif normalized_document.metadata.get("document_type"):
+        provenance_audit.set("document_type", resolved_doc_type, "structured")
+    elif eh_doc_hint:
+        provenance_audit.set("document_type", resolved_doc_type, "manifest")
+    elif manifest.source_defaults.get("document_type_hint"):
+        provenance_audit.set("document_type", resolved_doc_type, "manifest")
+
+    source_family = normalized_document.metadata.get("source_family")
+    if source_family:
+        provenance_audit.set("source_family", source_family, "structured")
+    elif llm_metadata and llm_metadata.document_type and applied_llm_metadata:
+        provenance_audit.set("source_family", llm_metadata.document_type, "llm", llm_metadata.confidence)
+
+    for field_name in ("court_name", "decision_date", "ecli", "geschaeftszahl", "publication_organ"):
+        val = extracted_metadata.get(field_name)
+        if val:
+            provenance_audit.set(field_name, val, "structured")
+
+    metadata["field_provenance"] = provenance_audit.to_dict()
 
     return Document(
         document_id=document_id,
@@ -425,10 +556,7 @@ def _build_document(
         lifecycle_status="active",
         full_text=normalized_document.full_text,
         body_text=normalized_document.body_text,
-        document_type=_resolve_document_type(
-            llm_document_type or normalized_document.metadata.get("document_type"),
-            manifest.source_defaults.get("document_type_hint"),
-        ),
+        document_type=resolved_doc_type,
         metadata=metadata,
         extensions={},
     )
@@ -581,12 +709,28 @@ def _build_canonical_provenance(
 
 
 def _choose_document_title(normalized_document: NormalizedDocumentIR) -> str:
-    if normalized_document.title:
-        return normalized_document.title
-    for block in normalized_document.blocks:
-        if block.type == "heading":
-            return block.text
-    return "Untitled document"
+    """Backward-compatible title resolution; prefer :func:`_effective_title_from_normalized`."""
+    title, _tier = _effective_title_from_normalized(normalized_document)
+    return title
+
+
+def _needs_llm_extraction(
+    normalized_document: NormalizedDocumentIR,
+    manifest: ArtifactBundleManifest,
+) -> bool:
+    """Return True when structured extraction left gaps that an LLM should fill."""
+    md = normalized_document.metadata
+    hints = md.get("extraction_hints") if isinstance(md.get("extraction_hints"), dict) else {}
+    title_resolved, _tier = _effective_title_from_normalized(normalized_document)
+    has_title = bool(title_resolved) and title_resolved != "Untitled document"
+    hint_doc_type = hints.get("document_type_hint") if isinstance(hints.get("document_type_hint"), str) else None
+    has_doc_type = bool(
+        md.get("document_type")
+        or md.get("source_family")
+        or manifest.source_defaults.get("document_type_hint")
+        or (hint_doc_type and hint_doc_type.strip())
+    )
+    return not (has_title and has_doc_type)
 
 
 def _normalized_content_type(content_type: str) -> str:

@@ -145,6 +145,7 @@ class ContractSchemaValidationTests(unittest.TestCase):
         example_to_schema = {
             "artifact-bundle-available.json": "events/artifact-bundle-available.schema.json",
             "artifact-bundle-manifest.json": "schemas/artifact-bundle-manifest.schema.json",
+            "artifact-bundle-manifest-extraction-hints.json": "schemas/artifact-bundle-manifest.schema.json",
             "document.json": "schemas/document.schema.json",
             "document-processed.json": "events/document-processed.schema.json",
             "document-processing-status-updated.json": "events/document-processing-status-updated.schema.json",

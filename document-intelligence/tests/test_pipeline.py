@@ -486,12 +486,20 @@ class ProcessingPipelineTests(unittest.TestCase):
             os.unlink(manifest_path)
 
     def test_high_confidence_llm_metadata_can_override_title_and_document_type(self) -> None:
+        # Use HTML without a <title> tag so structured extraction leaves a gap,
+        # triggering the LLM extractor via the cascade conditional check.
+        html_no_title = """<html><body>
+            <h1>Section 1</h1><p>First section text.</p>
+            <h2>Section 2</h2><p>Second section text.</p>
+        </body></html>"""
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
-            html_handle.write(SAMPLE_HTML)
+            html_handle.write(html_no_title)
             artifact_path = html_handle.name
 
+        manifest_data = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        manifest_data["source_defaults"].pop("document_type_hint", None)
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
-            json.dump(build_manifest_payload(artifact_path, artifact_role="primary_document"), manifest_handle)
+            json.dump(manifest_data, manifest_handle)
             manifest_path = manifest_handle.name
 
         try:
@@ -514,6 +522,38 @@ class ProcessingPipelineTests(unittest.TestCase):
             self.assertEqual(result.document.document_type, "commentary")
             self.assertTrue(result.document.metadata["llm_extraction"]["applied"])
             self.assertEqual(result.document.metadata["llm_extraction"]["model"], "test-model")
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_llm_skipped_when_structured_extraction_sufficient(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(SAMPLE_HTML)
+            artifact_path = html_handle.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(build_manifest_payload(artifact_path, artifact_role="primary_document"), manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(
+                processing_version="di_2026_04_09",
+                enable_llm_extractor=True,
+                llm_confidence_threshold=0.8,
+                llm_metadata_extractor=StubMetadataExtractor(
+                    MetadataExtractionCandidate(
+                        title="Should Not Apply",
+                        document_type="commentary",
+                        confidence=0.95,
+                        model="test-model",
+                    )
+                ),
+            ).process_event(build_bundle_event(manifest_path))
+
+            self.assertEqual(result.document.title, "Sample Statute")
+            self.assertEqual(result.document.document_type, "law")
+            llm_meta = result.document.metadata.get("llm_extraction", {})
+            self.assertEqual(llm_meta.get("summary"), "skipped_structured_sufficient")
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)

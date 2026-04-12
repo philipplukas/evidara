@@ -9,12 +9,15 @@ Each fixture directory contains:
 
 The tests materialize each fixture into a temporary working directory, replace the path, size, and checksum placeholders, then run the normal bundle-based pipeline against the generated files.
 
+Optional `expected.json` field **`metadata_eval`**: when present, `tests/metadata_eval.py` (and `tests/test_metadata_eval.py` in CI) runs the pipeline and checks title substrings, `document_type`, `source_family`, and `llm_invoked` expectations, grouped by manifest `jurisdiction_id`.
+
 Current fixture coverage:
 
 - `simple_html`: straightforward title and heading extraction
 - `messy_html`: noisy HTML with navigation and footer content around the main body
 - `nested_headings`: top-level and nested heading ordering
 - `no_heading_fallback`: body-only content with no headings
+- `html_div_fallback`: HTML parsed via div fallback path
 - `ris_xml`: RIS-style XML with legal section labels and extracted metadata (synthetic)
 - `invalid_no_primary`: failure path when the bundle lacks a selectable primary artifact
 - `ris_xml_law_short`: real BGBl. II Nr. 74/2026 — short Verordnung (Notarstelle Wien-Favoriten)

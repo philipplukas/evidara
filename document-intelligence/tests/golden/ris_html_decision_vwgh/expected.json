@@ -1,4 +1,13 @@
 {
+  "expected_source_family": "decision",
   "section_count_min": 1,
-  "status_flow": ["accepted", "processing", "canonical_ready"]
+  "status_flow": ["accepted", "processing", "canonical_ready"],
+  "metadata_eval": {
+    "expect": {
+      "title_contains": "Gericht",
+      "document_type": "decision",
+      "source_family": "decision",
+      "llm_invoked": false
+    }
+  }
 }

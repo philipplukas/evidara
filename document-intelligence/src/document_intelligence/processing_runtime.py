@@ -22,12 +22,23 @@ from document_intelligence.pipeline import ProcessingPipeline
 
 
 def _build_llm_metadata_extractor():
-    """Lazily construct a DSPy-backed metadata extractor when LLM extraction is enabled."""
-    from document_intelligence.extractors.dspy_metadata_extractor import DspyMetadataExtractor
+    """Construct Instructor- or DSPy-backed metadata extractor, or None if neither stack is installed."""
     from document_intelligence.extractors.profile_config import ExtractionProfileConfig
 
     profile = ExtractionProfileConfig.from_environment()
-    return DspyMetadataExtractor(profile=profile)
+    try:
+        from document_intelligence.extractors.instructor_metadata_extractor import InstructorMetadataExtractor
+
+        return InstructorMetadataExtractor(profile=profile)
+    except ImportError:
+        pass
+
+    try:
+        from document_intelligence.extractors.dspy_metadata_extractor import DspyMetadataExtractor
+
+        return DspyMetadataExtractor(profile=profile)
+    except ImportError:
+        return None
 
 
 def build_processing_pipeline(

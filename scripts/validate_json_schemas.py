@@ -20,6 +20,7 @@ SCHEMA_DIRS = [
 
 EXAMPLE_TO_SCHEMA = {
     "artifact-bundle-manifest.json": "contracts/schemas/artifact-bundle-manifest.schema.json",
+    "artifact-bundle-manifest-extraction-hints.json": "contracts/schemas/artifact-bundle-manifest.schema.json",
     "processing-manifest.json": "contracts/schemas/processing-manifest.schema.json",
     "document.json": "contracts/schemas/document.schema.json",
     "section.json": "contracts/schemas/section.schema.json",

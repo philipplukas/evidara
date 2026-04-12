@@ -25,21 +25,11 @@ class ExtractionProfileConfig:
     def from_environment(cls, env: dict[str, Any] | None = None) -> ExtractionProfileConfig:
         source = env or os.environ
         return cls(
-            enable_title_extractor=_parse_bool(
-                source.get("DI_ENABLE_TITLE_EXTRACTOR", "true")
-            ),
-            enable_source_family_classifier=_parse_bool(
-                source.get("DI_ENABLE_SOURCE_FAMILY_CLASSIFIER", "true")
-            ),
-            enable_commentary_extractor=_parse_bool(
-                source.get("DI_ENABLE_COMMENTARY_EXTRACTOR", "false")
-            ),
-            llm_provider=str(
-                source.get("DI_LLM_PROVIDER", "vertexai")
-            ).strip().lower(),
-            llm_model=str(
-                source.get("DI_LLM_MODEL", "gemini-2.0-flash")
-            ).strip(),
+            enable_title_extractor=_parse_bool(source.get("DI_ENABLE_TITLE_EXTRACTOR", "true")),
+            enable_source_family_classifier=_parse_bool(source.get("DI_ENABLE_SOURCE_FAMILY_CLASSIFIER", "true")),
+            enable_commentary_extractor=_parse_bool(source.get("DI_ENABLE_COMMENTARY_EXTRACTOR", "false")),
+            llm_provider=str(source.get("DI_LLM_PROVIDER", "vertexai")).strip().lower(),
+            llm_model=str(source.get("DI_LLM_MODEL", "gemini-2.0-flash")).strip(),
         )
 
 

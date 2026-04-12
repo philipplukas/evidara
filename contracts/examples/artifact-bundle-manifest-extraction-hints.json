@@ -1,0 +1,64 @@
+{
+  "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fx",
+  "manifest_version": 1,
+  "provenance": {
+    "tenant_id": "tenant_public",
+    "corpus_id": "corpus_public_at_federal_decisions",
+    "scope_type": "global_public",
+    "source_id": "src_01jq79xv3wdd6yr8q5bn0m3zfk",
+    "source_version_id": "sv_01jq79zcskf4m3m4gm3t5s59xq",
+    "run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+    "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+    "bundle_manifest_id": "abm_01jq7ab8x4nm7m3qz3b8e9q2fx"
+  },
+  "source_snapshot_id": "snap_01jq7a7n3nbzj6sk7v95p9frz1",
+  "snapshot_external_id": "ris:example:vfgh-2026",
+  "upstream_locator": "https://www.ris.bka.gv.at/example",
+  "source_origin_kind": "official_primary",
+  "trust_tier": "authoritative",
+  "snapshot_captured_at": "2026-04-12T12:00:00Z",
+  "source_defaults": {
+    "jurisdiction_id": "jur_at_federal",
+    "authority_id": "auth_vfgh",
+    "authority_name": "Verfassungsgerichtshof",
+    "language_codes": ["de"],
+    "document_type_hint": "decision"
+  },
+  "parser_hints": {
+    "expected_modalities": ["html"],
+    "expected_content_types": ["text/html"],
+    "preferred_primary_artifact_roles": ["primary_document"],
+    "ocr_expected": false,
+    "attachment_policy": "ignore"
+  },
+  "di_overrides": {},
+  "reference_context": {
+    "reference_snapshot_policy": "latest_approved",
+    "reference_snapshot_set_ref": null
+  },
+  "artifacts": [
+    {
+      "artifact_id": "art_01jq7af3f8qqc46zc6xvkf9y4x",
+      "artifact_role": "primary_document",
+      "storage_ref": {
+        "uri": "gs://evidara-raw-artifacts-dev/example/primary.html",
+        "content_type": "text/html",
+        "byte_size": 12000,
+        "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checksum_algorithm": "sha256",
+        "created_at": "2026-04-12T12:00:01Z"
+      }
+    }
+  ],
+  "bundle_metadata": {
+    "http_status": 200,
+    "extraction_hints": {
+      "title_hint": "VfGH — Erkenntnis G 123/2025 zu Flächenwidmung",
+      "document_type_hint": "decision",
+      "authority_display_hint": "Verfassungsgerichtshof",
+      "effective_date_hint": "2026-03-15",
+      "docket_numbers": ["G 123/2025"],
+      "jurisdiction_hint": "jur_at_federal"
+    }
+  }
+}

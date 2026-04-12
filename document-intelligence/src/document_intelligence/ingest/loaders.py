@@ -185,6 +185,16 @@ def _parse_bundle_manifest(manifest_bytes: bytes, source_uri: str) -> ArtifactBu
     return ArtifactBundleManifest.from_dict(manifest_data)
 
 
+_CONTENT_TYPE_PREFERENCE = {
+    "application/xml": 0,
+    "text/xml": 0,
+    "text/html": 1,
+    "application/xhtml+xml": 1,
+    "application/pdf": 2,
+    "text/plain": 3,
+}
+
+
 def _select_primary_artifact(
     manifest: ArtifactBundleManifest,
 ) -> ArtifactBundleManifestArtifact:
@@ -199,9 +209,17 @@ def _select_primary_artifact(
         if matched is not None:
             return matched
 
-    for artifact in manifest.artifacts:
-        if _is_html_content_type(artifact.storage_ref.content_type):
-            return artifact
+    # Prefer structured formats (XML > HTML > PDF > plain text)
+    selectable = [
+        a
+        for a in manifest.artifacts
+        if (a.storage_ref.content_type or "").split(";", 1)[0].strip().lower() in _CONTENT_TYPE_PREFERENCE
+    ]
+    if selectable:
+        selectable.sort(
+            key=lambda a: _CONTENT_TYPE_PREFERENCE[(a.storage_ref.content_type or "").split(";", 1)[0].strip().lower()]
+        )
+        return selectable[0]
 
     raise BundleLoadError(
         "missing_primary_artifact",

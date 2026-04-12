@@ -1,6 +1,15 @@
 {
   "title": "Bundesgesetz über digitale Register",
+  "expected_source_family": "law",
   "section_count": 2,
   "key_headings": ["§ 1 Geltungsbereich", "§ 2 Begriffsbestimmungen"],
-  "status_flow": ["accepted", "processing", "canonical_ready"]
+  "status_flow": ["accepted", "processing", "canonical_ready"],
+  "metadata_eval": {
+    "expect": {
+      "title_contains": "digitale Register",
+      "document_type": "law",
+      "source_family": "law",
+      "llm_invoked": false
+    }
+  }
 }

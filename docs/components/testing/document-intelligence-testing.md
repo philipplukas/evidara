@@ -22,7 +22,7 @@ The MVP test plan assumes bundle ingestion, canonical `Document`, `Section`, and
 - **CI:** [`.github/workflows/document-intelligence.yml`](../../../.github/workflows/document-intelligence.yml) runs the same script on PR/push path filters.
 - **Script gate:** `scripts/check-document-intelligence.sh` performs:
   - contract/schema example validation
-  - `python3 -m unittest discover -s tests -v`
+  - `pip install -e ".[dev,service,test]"` (same extras as CI) then `python3 -m pytest tests/ -v`
   - `dbt deps` + `dbt parse --target dev`
 
 ---
@@ -108,7 +108,9 @@ Add citation count and canonical jurisdiction assertions once those capabilities
 4. Verify `document.processing_status.updated` and `document.processed` behaviors are validated for the relevant lifecycle path
 5. Verify lineage is traceable
 
-The default local quality gate for this component is [`../../../scripts/check-document-intelligence.sh`](../../../scripts/check-document-intelligence.sh). It runs Ruff plus the full unittest suite and should match the GitHub Actions check.
+The default local quality gate for this component is [`../../../scripts/check-document-intelligence.sh`](../../../scripts/check-document-intelligence.sh). It runs Ruff plus the full **pytest** suite under `document-intelligence/tests/` and should match the GitHub Actions check.
+
+For **eval** jobs and minimal installs from the repo root, use `pip install -e "./document-intelligence[test]"` (declared optional extra: `test` = pytest). That matches [`.github/workflows/eval-ris.yml`](../../../.github/workflows/eval-ris.yml).
 
 ### Adapter coverage
 

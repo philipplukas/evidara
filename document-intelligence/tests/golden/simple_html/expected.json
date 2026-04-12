@@ -1,6 +1,15 @@
 {
   "title": "Simple Statute",
+  "expected_source_family": "law",
   "section_count": 2,
   "key_headings": ["Scope", "Definitions"],
-  "status_flow": ["accepted", "processing", "canonical_ready"]
+  "status_flow": ["accepted", "processing", "canonical_ready"],
+  "metadata_eval": {
+    "expect": {
+      "title_contains": "Simple Statute",
+      "document_type": "law",
+      "source_family": "law",
+      "llm_invoked": false
+    }
+  }
 }

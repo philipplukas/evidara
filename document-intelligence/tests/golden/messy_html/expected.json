@@ -1,6 +1,13 @@
 {
   "title": "Messy Regulation",
+  "expected_source_family": "law",
   "section_count": 2,
   "key_headings": ["General Provisions", "Exceptions"],
-  "status_flow": ["accepted", "processing", "canonical_ready"]
+  "status_flow": ["accepted", "processing", "canonical_ready"],
+  "metadata_eval": {
+    "expect": {
+      "title_contains": "Messy Regulation",
+      "llm_invoked": false
+    }
+  }
 }

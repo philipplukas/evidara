@@ -20,7 +20,7 @@ All gates are exercised by `scripts/check-document-intelligence.sh`.
 | JSON schema validation | `validate_json_schemas.py` | Broken contract schemas in `contracts/` |
 | Lint | `ruff check` | Python code quality issues |
 | Format | `ruff format --check` | Code style drift |
-| Unit tests | `unittest discover` | Functional regressions |
+| Unit / integration tests | `pytest tests/` | Functional regressions (same as pre-commit / `check-document-intelligence.sh`) |
 | OpenAPI contract lint | `@redocly/cli lint` | Invalid OpenAPI specs for DI APIs |
 | dbt deps + parse | `dbt parse` | Broken dbt model definitions |
 

@@ -1,7 +1,16 @@
 {
   "title": "Verordnung über Muster",
+  "expected_source_family": "law",
   "section_count": 1,
   "key_headings": [],
   "status_flow": ["accepted", "processing", "canonical_ready"],
-  "html_parse_used_fallback": true
+  "html_parse_used_fallback": true,
+  "metadata_eval": {
+    "expect": {
+      "title_contains": "Verordnung über Muster",
+      "document_type": "law",
+      "source_family": "law",
+      "llm_invoked": false
+    }
+  }
 }

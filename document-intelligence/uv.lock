@@ -913,15 +913,20 @@ docling = [
 llm = [
     { name = "dspy" },
     { name = "google-cloud-aiplatform" },
+    { name = "instructor" },
     { name = "openai" },
 ]
 nlp = [
     { name = "spacy" },
+    { name = "spacy-llm" },
 ]
 service = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "uvicorn" },
+]
+test = [
+    { name = "pytest" },
 ]
 
 [package.dev-dependencies]
@@ -939,15 +944,18 @@ requires-dist = [
     { name = "google-cloud-pubsub", specifier = ">=2.31.0,<3" },
     { name = "google-cloud-storage", specifier = ">=2.16.0" },
     { name = "httpx", marker = "extra == 'service'", specifier = ">=0.27.0" },
+    { name = "instructor", marker = "extra == 'llm'", specifier = ">=1.7.0" },
     { name = "jsonschema", specifier = ">=4.14.0" },
     { name = "openai", marker = "extra == 'llm'", specifier = ">=1.30.0" },
     { name = "pyarrow", specifier = ">=14.0.0" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=9.0.2" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
     { name = "spacy", marker = "extra == 'nlp'", specifier = ">=3.7.0" },
+    { name = "spacy-llm", marker = "extra == 'nlp'", specifier = ">=0.7.0" },
     { name = "uvicorn", marker = "extra == 'service'", specifier = ">=0.30.0" },
 ]
-provides-extras = ["dev", "service", "docling", "nlp", "llm"]
+provides-extras = ["dev", "service", "docling", "nlp", "llm", "test"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.2" }]
@@ -1630,6 +1638,28 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730", size = 20503, upload-time = "2025-10-18T21:55:43.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
+]
+
+[[package]]
+name = "instructor"
+version = "1.15.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "docstring-parser" },
+    { name = "jinja2" },
+    { name = "jiter" },
+    { name = "openai" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "requests" },
+    { name = "rich" },
+    { name = "tenacity" },
+    { name = "typer" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dc/a4/832cfb15420360e26d2d85bd9d5fe1e4b839d52587574d389bc31284bf6f/instructor-1.15.1.tar.gz", hash = "sha256:c72406469d9025b742e83cf0c13e914b317db2089d08d889944e74fcd659ef94", size = 69948370, upload-time = "2026-04-03T01:51:30.107Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/c8/36c5d9b80aaf40ba9a7084a8fc18c967db6bf248a4cc8d0f0816b14284be/instructor-1.15.1-py3-none-any.whl", hash = "sha256:be81d17ba2b154a04ab4720808f24f9d6b598f80992f82eaf9cc79006099cf6c", size = 178156, upload-time = "2026-04-03T01:51:23.098Z" },
 ]
 
 [[package]]
@@ -3909,6 +3939,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d9/79/91f9d7cc8db5642acad830dcc4b49ba65a7790152832c4eceb305e46d681/spacy-legacy-3.0.12.tar.gz", hash = "sha256:b37d6e0c9b6e1d7ca1cf5bc7152ab64a4c4671f59c85adaf7a3fcb870357a774", size = 23806, upload-time = "2023-01-23T09:04:15.104Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c3/55/12e842c70ff8828e34e543a2c7176dac4da006ca6901c9e8b43efab8bc6b/spacy_legacy-3.0.12-py2.py3-none-any.whl", hash = "sha256:476e3bd0d05f8c339ed60f40986c07387c0a71479245d6d0f4298dbd52cda55f", size = 29971, upload-time = "2023-01-23T09:04:13.45Z" },
+]
+
+[[package]]
+name = "spacy-llm"
+version = "0.7.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "confection" },
+    { name = "jinja2" },
+    { name = "spacy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/92/9b/2c7d0c7cf024c3968d3510d9fc099696a52cd373afa14fca9d88367116bd/spacy_llm-0.7.4.tar.gz", hash = "sha256:ced03732d180040ee4693c1193981ba316f28eb667d5e7d22dd14176871ad365", size = 150226, upload-time = "2026-03-24T22:39:27.207Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/72/fa857ae593da8fd6b4e8fbd59359e7c8adb77ac4d28a5c6e16aec89a8fc7/spacy_llm-0.7.4-py2.py3-none-any.whl", hash = "sha256:65e1a710ebfec9ae27c69e579c7d195b6c83f48bb8204f16e6f0cf8e88341e6e", size = 256121, upload-time = "2026-03-24T22:39:25.587Z" },
 ]
 
 [[package]]

@@ -39,16 +39,27 @@ Initial Python scaffold for the Evidara `document-intelligence` component.
 
 ## Local setup
 
+Minimal lint + editor tooling:
+
 ```bash
 cd document-intelligence
 python3 -m pip install -e ".[dev]"
 ```
 
-For experimental LLM extractor work, install the optional extra instead:
+Match **CI / pre-commit** (Ruff + pytest + service deps + dbt gate via repo script):
 
 ```bash
 cd document-intelligence
-python3 -m pip install -e ".[dev,llm]"
+python3 -m pip install -e ".[dev,service,test]"
+```
+
+The optional **`test`** extra adds `pytest` and is used by `scripts/check-document-intelligence.sh` and by the repo-root workflow `.github/workflows/eval-ris.yml` (`pip install -e "./document-intelligence[test]"`).
+
+For experimental LLM extractor work, add the `llm` extra:
+
+```bash
+cd document-intelligence
+python3 -m pip install -e ".[dev,service,test,llm]"
 ```
 
 ## Local quality gate

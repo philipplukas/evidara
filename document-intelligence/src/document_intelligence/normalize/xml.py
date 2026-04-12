@@ -57,6 +57,31 @@ _METADATA_TAGS = {
     "typ": "document_type",
     "dokumenttyp": "document_type",
 }
+_RIS_CT_MAP = {
+    "kurztitel": "title_short",
+    "langtitel": "title_long",
+    "gericht": "court_name",
+    "entscheidungsdatum": "decision_date",
+    "gz": "geschaeftszahl",
+    "ecli": "ecli",
+    "typ": "document_type",
+    "leitsatz": "headnote",
+    "rechtssatz": "headnote",
+    "strs": "headnote",
+    "hinweisstrs": "headnote_reference",
+    "kundmachungsorgan": "publication_organ",
+    "ikra": "in_force_from",
+    "akra": "in_force_to",
+    "schlagworte": "keywords",
+    "gesnr": "gesetzesnummer",
+    "doknr": "dokumentnummer",
+    "adoknr": "alt_dokumentnummer",
+    "index": "index",
+    "aenderung": "amendments",
+    "geaendert": "last_amended",
+    "prae_promul": "preamble",
+    "artikel_anlage": "article_annex",
+}
 _SKIPPED_CONTAINER_TAGS = {
     "metadata",
     "metadaten",
@@ -100,17 +125,22 @@ def normalize_xml_document(xml_text: str, artifact_id: str) -> NormalizedDocumen
 
     extracted_metadata = _extract_metadata(root)
     title = _choose_title(root, blocks)
+    is_ris = _looks_like_ris(root, extracted_metadata)
     metadata = {
         "title": title,
         "normalizer": "xml_v1",
         "source_profile_ref": "default_xml_v1",
         "normalization_profile_ref": "xml_v1",
-        "source_flavor": "ris_like" if _looks_like_ris(root, extracted_metadata) else "generic_xml",
+        "source_flavor": "ris_like" if is_ris else "generic_xml",
         "root_tag": _local_name(root.tag),
         "extracted_metadata": extracted_metadata,
     }
     if extracted_metadata.get("document_type"):
         metadata["document_type"] = extracted_metadata["document_type"]
+    if is_ris:
+        source_family = _resolve_ris_source_family(extracted_metadata, title)
+        if source_family:
+            metadata["source_family"] = source_family
 
     return NormalizedDocumentIR(blocks=blocks, metadata=metadata)
 
@@ -247,6 +277,16 @@ class _XmlIrBuilder:
 
 
 def _choose_title(root, blocks) -> str | None:
+    # Highest priority: ct-attributed langtitel/kurztitel from RIS consolidated docs
+    for ct_value in ("langtitel", "kurztitel"):
+        for element in root.iter():
+            if _local_name(element.tag) != "absatz":
+                continue
+            if element.attrib.get("ct") == ct_value:
+                text = _normalize_whitespace(" ".join(element.itertext()))
+                if text:
+                    return text
+
     for candidate_tag in ("langtitel", "kurztitel", "titel", "title"):
         for element in root.iter():
             if _local_name(element.tag) != candidate_tag:
@@ -285,6 +325,35 @@ def _extract_metadata(root) -> dict[str, str]:
         text = _normalize_whitespace(" ".join(element.itertext()))
         if text:
             output[key] = text
+
+    ct_fields = _extract_ris_ct_metadata(root)
+    for key, value in ct_fields.items():
+        if key not in output:
+            output[key] = value
+
+    return output
+
+
+def _extract_ris_ct_metadata(root) -> dict[str, str]:
+    """Extract structured metadata from RIS absatz[@ct] content-type attributes.
+
+    RIS consolidated laws and court decisions encode rich metadata in
+    ``<absatz ct="...">`` elements. This function maps known ``ct`` values
+    to canonical field names via ``_RIS_CT_MAP``.
+    """
+    output: dict[str, str] = {}
+    for element in root.iter():
+        if _local_name(element.tag) != "absatz":
+            continue
+        ct = element.attrib.get("ct")
+        if ct is None:
+            continue
+        key = _RIS_CT_MAP.get(ct)
+        if key is None or key in output:
+            continue
+        text = _normalize_whitespace(" ".join(element.itertext()))
+        if text:
+            output[key] = text
     return output
 
 
@@ -295,6 +364,51 @@ def _looks_like_ris(root, extracted_metadata: dict[str, str]) -> bool:
         return True
     observed_tags = {_local_name(element.tag) for element in root.iter()}
     return bool(observed_tags & {"paragraf", "absatz", "artikel", "anlage", "kundmachungsorgan", "nutzdaten"})
+
+
+_RIS_DECISION_TYPE_CODES = {"E", "RS", "T", "B"}
+_RIS_LAW_TYPE_CODES = {"BG", "V", "K", "NR", "G", "StF"}
+
+
+def _resolve_ris_source_family(
+    extracted_metadata: dict[str, str],
+    title: str | None = None,
+) -> str | None:
+    """Deterministically classify a RIS document into a source family.
+
+    Uses structured metadata fields (court_name, document_type codes,
+    publication_organ patterns) to avoid LLM classification.
+    """
+    if extracted_metadata.get("court_name"):
+        return "decision"
+    if extracted_metadata.get("geschaeftszahl") or extracted_metadata.get("ecli"):
+        return "decision"
+
+    doc_type = (extracted_metadata.get("document_type") or "").strip()
+    if doc_type in _RIS_DECISION_TYPE_CODES:
+        return "decision"
+    if doc_type in _RIS_LAW_TYPE_CODES:
+        return "law"
+
+    pub_organ = extracted_metadata.get("publication_organ") or extracted_metadata.get("kundmachungsorgan") or ""
+    if "BGBl" in pub_organ or "LGBl" in pub_organ:
+        return "law"
+    if extracted_metadata.get("gesetzesnummer"):
+        return "law"
+
+    # Heuristic from title keywords common in BGBl short-form documents
+    if title:
+        title_lower = title.lower()
+        _LAW_KEYWORDS = ("verordnung", "bundesgesetz", "erlass", "kundmachung", "staatsvertrag")
+        _DECISION_KEYWORDS = ("erkenntnis", "beschluss", "rechtssatz", "urteil")
+        for kw in _DECISION_KEYWORDS:
+            if kw in title_lower:
+                return "decision"
+        for kw in _LAW_KEYWORDS:
+            if kw in title_lower:
+                return "law"
+
+    return None
 
 
 def _extract_heading_text(element) -> str | None:

@@ -31,11 +31,18 @@ docling = [
 ]
 nlp = [
   "spacy>=3.7.0",
+  "spacy-llm>=0.7.0",
 ]
 llm = [
   "dspy>=2.5.0",
   "google-cloud-aiplatform>=1.60.0",
+  "instructor>=1.7.0",
   "openai>=1.30.0",
+]
+# Pytest + anything eval/CI needs to import the package without the full dev stack.
+# Used by: scripts/check-document-intelligence.sh, eval-ris workflow, local `make eval-*`.
+test = [
+  "pytest>=9.0.2",
 ]
 
 [project.scripts]

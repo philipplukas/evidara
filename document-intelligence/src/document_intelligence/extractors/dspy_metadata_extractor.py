@@ -6,7 +6,6 @@ behind the MetadataExtractor protocol. Provider configuration follows ADR-0023.
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -14,7 +13,10 @@ from document_intelligence.contracts.envelope import (
     ArtifactBundleManifest,
     ArtifactBundleManifestArtifact,
 )
-from document_intelligence.extractors.metadata import MetadataExtractionCandidate
+from document_intelligence.extractors.metadata import (
+    MetadataExtractionCandidate,
+    gather_metadata_hints_for_llm,
+)
 from document_intelligence.extractors.profile_config import ExtractionProfileConfig
 from document_intelligence.normalize.ir import NormalizedDocumentIR
 
@@ -28,31 +30,18 @@ def _configure_dspy_lm(profile: ExtractionProfileConfig) -> None:
     provider = profile.llm_provider
     model = profile.llm_model
 
-    if provider == "vertexai":
-        lm = dspy.LM(f"google/vertexai/{model}")
-    elif provider == "openai":
-        lm = dspy.LM(f"openai/{model}")
-    else:
+    provider_prefixes = {
+        "vertexai": "vertex_ai",
+        "vertex_ai": "vertex_ai",
+        "gemini": "gemini",
+        "openai": "openai",
+    }
+    prefix = provider_prefixes.get(provider)
+    if prefix is None:
         raise ValueError(f"Unsupported LLM provider: {provider}")
+    lm = dspy.LM(f"{prefix}/{model}")
 
     dspy.configure(lm=lm)
-
-
-def _gather_metadata_hints(
-    manifest: ArtifactBundleManifest,
-    primary_artifact: ArtifactBundleManifestArtifact,
-) -> dict[str, Any]:
-    """Collect metadata hints from manifest and artifact for LLM context."""
-    hints: dict[str, Any] = {}
-    if hasattr(manifest, "di_overrides") and manifest.di_overrides:
-        hints["di_overrides"] = manifest.di_overrides
-    if hasattr(manifest, "provenance") and manifest.provenance:
-        prov = manifest.provenance
-        if hasattr(prov, "source_defaults") and prov.source_defaults:
-            hints["source_defaults"] = prov.source_defaults
-    if hasattr(primary_artifact, "metadata") and primary_artifact.metadata:
-        hints["artifact_metadata"] = primary_artifact.metadata
-    return hints
 
 
 class DspyMetadataExtractor:
@@ -75,19 +64,9 @@ class DspyMetadataExtractor:
         self._profile = profile or ExtractionProfileConfig.from_environment()
         _configure_dspy_lm(self._profile)
 
-        self._title_extractor = (
-            TitleExtractor() if self._profile.enable_title_extractor else None
-        )
-        self._classifier = (
-            SourceFamilyClassifier()
-            if self._profile.enable_source_family_classifier
-            else None
-        )
-        self._commentary_extractor = (
-            CommentaryExtractor()
-            if self._profile.enable_commentary_extractor
-            else None
-        )
+        self._title_extractor = TitleExtractor() if self._profile.enable_title_extractor else None
+        self._classifier = SourceFamilyClassifier() if self._profile.enable_source_family_classifier else None
+        self._commentary_extractor = CommentaryExtractor() if self._profile.enable_commentary_extractor else None
 
     def extract(
         self,
@@ -96,17 +75,19 @@ class DspyMetadataExtractor:
         manifest: ArtifactBundleManifest,
         primary_artifact: ArtifactBundleManifestArtifact,
     ) -> MetadataExtractionCandidate | None:
-        hints = _gather_metadata_hints(manifest, primary_artifact)
+        hints = gather_metadata_hints_for_llm(manifest, primary_artifact)
         body = normalized_document.full_text
 
         title: str | None = None
         document_type: str | None = None
         title_confidence = 0.0
         classifier_confidence = 0.0
-        raw: dict[str, Any] = {"profile": {
-            "provider": self._profile.llm_provider,
-            "model": self._profile.llm_model,
-        }}
+        raw: dict[str, Any] = {
+            "profile": {
+                "provider": self._profile.llm_provider,
+                "model": self._profile.llm_model,
+            }
+        }
 
         if self._title_extractor:
             try:
@@ -138,12 +119,8 @@ class DspyMetadataExtractor:
                 logger.exception("CommentaryExtractor failed")
                 raw["commentary_passages"] = {"error": "extractor_failed"}
 
-        confidences = [
-            c for c in [title_confidence, classifier_confidence] if c > 0
-        ]
-        overall_confidence = (
-            sum(confidences) / len(confidences) if confidences else 0.0
-        )
+        confidences = [c for c in [title_confidence, classifier_confidence] if c > 0]
+        overall_confidence = sum(confidences) / len(confidences) if confidences else 0.0
 
         return MetadataExtractionCandidate(
             title=title,

@@ -16,6 +16,16 @@ eval/
   runs/                  # output from eval runs
 ```
 
+## Prerequisites
+
+From the **repository root**, install document-intelligence with the **`test`** extra (pytest + package deps). CI uses the same extra in `.github/workflows/eval-ris.yml`.
+
+```bash
+pip install -e "./document-intelligence[test]"
+```
+
+For the full DI quality gate (Ruff, all component tests, dbt parse), run `bash scripts/check-document-intelligence.sh` from the repo root instead.
+
 ## Quick start
 
 ```bash
