@@ -1,0 +1,28 @@
+name: Runner Pool Smoke
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  light-runner-smoke:
+    name: Light runner smoke
+    uses: ./.github/workflows/runner-bootstrap-preflight.yml
+    with:
+      runner_labels_json: ${{ vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]' }}
+      node_version: "22"
+      python_version: "3.11"
+      frontend_playwright_smoke: false
+
+  heavy-runner-smoke:
+    name: Heavy runner smoke
+    uses: ./.github/workflows/runner-bootstrap-preflight.yml
+    with:
+      runner_labels_json: ${{ vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]' }}
+      node_version: "22"
+      python_version: "3.11"
+      frontend_playwright_smoke: true

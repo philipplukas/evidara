@@ -2,7 +2,49 @@ name: Runner Bootstrap Preflight
 
 on:
   workflow_dispatch:
+    inputs:
+      runner_labels_json:
+        description: "JSON array used for runs-on labels"
+        required: false
+        type: string
+        default: '["self-hosted","linux","x64"]'
+      node_version:
+        description: "Node.js version to validate"
+        required: false
+        type: string
+        default: "22"
+      python_version:
+        description: "Python version to validate"
+        required: false
+        type: string
+        default: "3.11"
+      frontend_playwright_smoke:
+        description: "Install legal-search frontend deps and launch Chromium"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      runner_labels_json:
+        description: "JSON array used for runs-on labels"
+        required: false
+        type: string
+        default: '["self-hosted","linux","x64"]'
+      node_version:
+        description: "Node.js version to validate"
+        required: false
+        type: string
+        default: "22"
+      python_version:
+        description: "Python version to validate"
+        required: false
+        type: string
+        default: "3.11"
+      frontend_playwright_smoke:
+        description: "Install legal-search frontend deps and launch Chromium"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -10,14 +52,17 @@ permissions:
 jobs:
   preflight:
     name: Validate self-hosted bootstrap assumptions
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ fromJSON(inputs.runner_labels_json) }}
     timeout-minutes: 10
 
     env:
-      NODE_VERSION: "22"
-      PYTHON_VERSION: "3.11"
+      NODE_VERSION: ${{ inputs.node_version }}
+      PYTHON_VERSION: ${{ inputs.python_version }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Snapshot runner
         run: |
           set -euo pipefail
@@ -59,6 +104,35 @@ jobs:
           echo "python_version=$(python3 --version 2>&1 | awk '{print $2}')" >> "${GITHUB_OUTPUT}"
           python3 --version
 
+      - name: Install legal-search frontend dependencies
+        if: ${{ inputs.frontend_playwright_smoke }}
+        working-directory: legal-search/frontend
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        if: ${{ inputs.frontend_playwright_smoke }}
+        working-directory: legal-search/frontend
+        run: npx playwright install chromium
+
+      - name: Verify Playwright browser smoke
+        if: ${{ inputs.frontend_playwright_smoke }}
+        working-directory: legal-search/frontend
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const { chromium } = require("playwright");
+
+          (async () => {
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+            await page.goto("about:blank");
+            await browser.close();
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
       - name: Write summary
         if: always()
         run: |
@@ -72,4 +146,5 @@ jobs:
             echo "| Arch | ${RUNNER_ARCH:-unknown} |"
             echo "| Node | ${{ steps.node.outputs.node_version || 'n/a' }} |"
             echo "| Python | ${{ steps.python.outputs.python_version || 'n/a' }} |"
+            echo "| Playwright smoke | ${{ inputs.frontend_playwright_smoke && 'enabled' || 'disabled' }} |"
           } >> "${GITHUB_STEP_SUMMARY}"
