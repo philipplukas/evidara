@@ -33,7 +33,7 @@ See `scripts/analyze_github_actions_queue.py --help` for filters (`--repo`, `--b
 Current exception:
 
 - Jobs that depend on `actions/setup-node`, `actions/setup-python`, or mixed Node/Python bootstrap may still need `ubuntu-latest` while the self-hosted bridge path is being proven incrementally.
-- Python-only jobs can use `uv python install` as the bridge bootstrap on the legacy self-hosted pool before the Ubuntu-compatible runner target exists.
+- Python-only jobs can use `astral-sh/setup-uv` plus `uv python install` as the bridge bootstrap on the legacy self-hosted pool before the Ubuntu-compatible runner target exists.
 - Use `.github/workflows/runner-pool-smoke.yml` for non-PR-blocking light/heavy pool verification while the bridge period is still active.
 
 ## Bridge policy while Hetzner K8s runners are being installed

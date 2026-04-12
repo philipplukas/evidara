@@ -73,7 +73,7 @@ jobs:
           echo "Temp: ${RUNNER_TEMP:-unknown}"
           echo "Tool cache: ${RUNNER_TOOL_CACHE:-unknown}"
 
-          for cmd in bash git curl uv; do
+          for cmd in bash git curl; do
             if ! command -v "${cmd}" >/dev/null 2>&1; then
               echo "::error::Required bootstrap command missing: ${cmd}"
               exit 1
@@ -91,6 +91,9 @@ jobs:
           set -euo pipefail
           echo "node_version=$(node --version)" >> "${GITHUB_OUTPUT}"
           npm --version
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Bootstrap Python with uv
         id: python
