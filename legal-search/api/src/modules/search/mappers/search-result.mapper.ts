@@ -21,6 +21,10 @@ import {
   formatMessage,
   t,
 } from '../../../core/i18n';
+import {
+  iconKeyForDocumentType,
+  METADATA_ROW_ICONS,
+} from '../../../core/presentation/metadata-icons';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { SearchHitEntity } from '../entities/search.entities';
@@ -190,28 +194,45 @@ export function composeMetadata(
   locale: SupportedLocale = DEFAULT_LOCALE,
 ): MetadataRowView[] {
   const rows: MetadataRowView[] = [];
+  const documentTypeLabel = hit.document_type
+    ? getDocumentTypeLabel(hit.document_type, locale)
+    : undefined;
 
   if (hit.lifecycle_status && hit.lifecycle_status !== 'active') {
     rows.push({
       label: t('metadata.status', locale),
       value: formatLifecycleStatus(hit.lifecycle_status, locale),
+      iconKey: METADATA_ROW_ICONS.status,
+    });
+  }
+  if (hit.document_type && documentTypeLabel && documentTypeLabel !== hit.document_type) {
+    rows.push({
+      label: t('facets.documentType', locale),
+      value: documentTypeLabel,
+      iconKey: iconKeyForDocumentType(hit.document_type),
     });
   }
   if (hit.effective_date) {
     const label =
       hit.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
-    rows.push({ label, value: hit.effective_date });
+    rows.push({
+      label,
+      value: hit.effective_date,
+      iconKey: METADATA_ROW_ICONS.calendar,
+    });
   }
   if (hit.official_citation) {
     rows.push({
       label: t('metadata.citation', locale),
       value: hit.official_citation,
+      iconKey: METADATA_ROW_ICONS.citation,
     });
   }
   if (hit.is_official) {
     rows.push({
       label: t('metadata.source', locale),
       value: t('metadata.officialSource', locale),
+      iconKey: METADATA_ROW_ICONS.official,
     });
   }
 
@@ -219,6 +240,7 @@ export function composeMetadata(
     rows.push({
       label: t('metadata.language', locale),
       value: formatLanguageDisplay(hit.language),
+      iconKey: METADATA_ROW_ICONS.language,
     });
   }
 

@@ -14,6 +14,10 @@ import {
   formatMessage,
   t,
 } from '../../../core/i18n';
+import {
+  iconKeyForDocumentType,
+  METADATA_ROW_ICONS,
+} from '../../../core/presentation/metadata-icons';
 import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/document.entities';
@@ -99,34 +103,52 @@ function composeMetadata(
   locale: SupportedLocale,
 ): { label: string; value: string; iconKey?: string }[] {
   const rows: { label: string; value: string; iconKey?: string }[] = [];
+  const documentTypeLabel = doc.document_type
+    ? getDocumentTypeLabel(doc.document_type, locale)
+    : undefined;
 
   if (doc.lifecycle_status && doc.lifecycle_status !== 'active') {
     rows.push({
       label: t('metadata.status', locale),
       value: formatLifecycleStatus(doc.lifecycle_status, locale),
+      iconKey: METADATA_ROW_ICONS.status,
+    });
+  }
+  if (doc.document_type && documentTypeLabel && documentTypeLabel !== doc.document_type) {
+    rows.push({
+      label: t('facets.documentType', locale),
+      value: documentTypeLabel,
+      iconKey: iconKeyForDocumentType(doc.document_type),
     });
   }
   if (doc.effective_date) {
     const label =
       doc.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
-    rows.push({ label, value: doc.effective_date });
+    rows.push({
+      label,
+      value: doc.effective_date,
+      iconKey: METADATA_ROW_ICONS.calendar,
+    });
   }
   if (doc.authority_name) {
     rows.push({
       label: t('metadata.authority', locale),
       value: doc.authority_name,
+      iconKey: METADATA_ROW_ICONS.authority,
     });
   }
   if (doc.official_citation) {
     rows.push({
       label: t('metadata.citation', locale),
       value: doc.official_citation,
+      iconKey: METADATA_ROW_ICONS.citation,
     });
   }
   if (doc.is_official) {
     rows.push({
       label: t('metadata.source', locale),
       value: t('metadata.officialSource', locale),
+      iconKey: METADATA_ROW_ICONS.official,
     });
   }
   if (doc.jurisdiction) {
@@ -141,6 +163,7 @@ function composeMetadata(
     rows.push({
       label: t('metadata.language', locale),
       value: formatLanguageDisplay(doc.language),
+      iconKey: METADATA_ROW_ICONS.language,
     });
   }
 
