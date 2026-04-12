@@ -20,6 +20,7 @@ from platform_control.errors import (
 from platform_control.events.artifact_bundle import (
     build_artifact_bundle_available_event,
     build_artifact_bundle_manifest,
+    build_bundle_extraction_hints,
 )
 from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.ids import generate_prefixed_id
@@ -972,6 +973,13 @@ class RunService:
             trust_tier=trust_tier,
             language_codes=acquisition_spec.get("language_codes") or [],
             document_type_hint=acquisition_spec.get("document_type_hint"),
+            bundle_metadata={
+                "extraction_hints": build_bundle_extraction_hints(
+                    artifact_metadata=artifacts[0].artifact_metadata,
+                    document_type_hint=acquisition_spec.get("document_type_hint"),
+                    authority_display_hint=authority_name,
+                ),
+            },
             snapshot_captured_at=run.completed_at or datetime.now(UTC),
         )
         reference_snapshot_set = self._build_reference_snapshot_set(
@@ -1076,6 +1084,13 @@ class RunService:
                 trust_tier=trust_tier,
                 language_codes=acquisition_spec.get("language_codes") or [],
                 document_type_hint=acquisition_spec.get("document_type_hint"),
+                bundle_metadata={
+                    "extraction_hints": build_bundle_extraction_hints(
+                        artifact_metadata=artifact.artifact_metadata,
+                        document_type_hint=acquisition_spec.get("document_type_hint"),
+                        authority_display_hint=authority_name,
+                    ),
+                },
                 snapshot_captured_at=run.completed_at or datetime.now(UTC),
             )
             manifest_storage_ref = await self.artifact_store.store_bundle_manifest(

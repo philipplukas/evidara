@@ -10,6 +10,7 @@ from referencing.jsonschema import DRAFT202012
 from platform_control.events.artifact_bundle import (
     build_artifact_bundle_available_event,
     build_artifact_bundle_manifest,
+    build_bundle_extraction_hints,
 )
 
 
@@ -58,6 +59,15 @@ def test_artifact_bundle_manifest_matches_contract_schema() -> None:
                 },
             }
         ],
+        bundle_metadata={
+            "extraction_hints": build_bundle_extraction_hints(
+                artifact_metadata={
+                    "metadata": {"title": "Decision 1"},
+                },
+                document_type_hint="decision",
+                authority_display_hint="Zurich Administrative Court",
+            )
+        },
     )
 
     Draft202012Validator(schema, registry=registry).validate(manifest)

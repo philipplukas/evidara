@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from platform_control.events.artifact_bundle import build_artifact_bundle_manifest
+from platform_control.events.artifact_bundle import (
+    build_artifact_bundle_manifest,
+    build_bundle_extraction_hints,
+)
 
 
 def test_build_manifest_skips_invalid_content_type_entries() -> None:
@@ -27,3 +30,21 @@ def test_build_manifest_skips_invalid_content_type_entries() -> None:
 
     assert manifest["parser_hints"]["expected_content_types"] == ["text/html"]
     assert manifest["source_defaults"]["authority_name"] == "Fedlex"
+
+
+def test_build_bundle_extraction_hints_prefers_page_title_metadata() -> None:
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "metadata": {
+                "title": "Decision 1",
+            },
+        },
+        document_type_hint="decision",
+        authority_display_hint="Zurich Administrative Court",
+    )
+
+    assert hints == {
+        "title_hint": "Decision 1",
+        "document_type_hint": "decision",
+        "authority_display_hint": "Zurich Administrative Court",
+    }

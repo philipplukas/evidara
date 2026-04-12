@@ -6,6 +6,36 @@ from typing import Any
 from platform_control.ids import generate_prefixed_id
 
 
+def build_bundle_extraction_hints(
+    *,
+    artifact_metadata: dict[str, Any] | None = None,
+    document_type_hint: str | None = None,
+    authority_display_hint: str | None = None,
+) -> dict[str, Any]:
+    """Build a compact, DI-friendly hint payload for bundle metadata.
+
+    The helper stays intentionally small and only copies hints we can derive
+    from acquisition context already present at manifest creation time.
+    """
+    hints: dict[str, Any] = {}
+
+    title_hint = _extract_title_hint(artifact_metadata)
+    if title_hint is not None:
+        hints["title_hint"] = title_hint
+
+    if document_type_hint is not None:
+        stripped = document_type_hint.strip()
+        if stripped:
+            hints["document_type_hint"] = stripped
+
+    if authority_display_hint is not None:
+        stripped = authority_display_hint.strip()
+        if stripped:
+            hints["authority_display_hint"] = stripped
+
+    return hints
+
+
 def build_artifact_bundle_manifest(
     *,
     bundle_manifest_id: str,
@@ -26,9 +56,13 @@ def build_artifact_bundle_manifest(
     snapshot_external_id: str | None = None,
     language_codes: list[str] | None = None,
     document_type_hint: str | None = None,
+    bundle_metadata: dict[str, Any] | None = None,
     snapshot_captured_at: datetime | None = None,
 ) -> dict[str, Any]:
     captured_at = snapshot_captured_at or datetime.now(UTC)
+    bundle_metadata_payload: dict[str, Any] = {"generated_by": "platform-control"}
+    if bundle_metadata:
+        bundle_metadata_payload.update(bundle_metadata)
     return {
         "bundle_manifest_id": bundle_manifest_id,
         "manifest_version": 1,
@@ -73,7 +107,7 @@ def build_artifact_bundle_manifest(
             "reference_snapshot_set_ref": None,
         },
         "artifacts": artifacts,
-        "bundle_metadata": {"generated_by": "platform-control"},
+        "bundle_metadata": bundle_metadata_payload,
     }
 
 
@@ -105,3 +139,30 @@ def build_artifact_bundle_available_event(
             "bundle_manifest_ref": bundle_manifest_ref,
         },
     }
+
+
+def _extract_title_hint(artifact_metadata: dict[str, Any] | None) -> str | None:
+    if not isinstance(artifact_metadata, dict):
+        return None
+
+    candidates: list[Any] = [
+        artifact_metadata.get("title"),
+        artifact_metadata.get("pageTitle"),
+        artifact_metadata.get("page_title"),
+    ]
+    nested_metadata = artifact_metadata.get("metadata")
+    if isinstance(nested_metadata, dict):
+        candidates.extend(
+            [
+                nested_metadata.get("title"),
+                nested_metadata.get("pageTitle"),
+                nested_metadata.get("page_title"),
+            ]
+        )
+
+    for candidate in candidates:
+        if isinstance(candidate, str):
+            stripped = candidate.strip()
+            if stripped:
+                return stripped
+    return None
