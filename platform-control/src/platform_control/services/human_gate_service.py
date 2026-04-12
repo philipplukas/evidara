@@ -108,7 +108,15 @@ class HumanGateService:
         timeout_display = f"{hours}h {minutes}m" if minutes else f"{hours}h"
 
         blocks.append(
-            {"type": "context", "elements": [{"type": "mrkdwn", "text": f"Timeout: {timeout_display} | Fallback: {gate.fallback}"}]}
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"Timeout: {timeout_display} | Fallback: {gate.fallback}",
+                    }
+                ],
+            }
         )
         blocks.append(
             {
