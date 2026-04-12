@@ -14,6 +14,7 @@ Operator-focused entry points (from repo root unless noted).
 | [`sync-github-cd-config.sh`](sync-github-cd-config.sh) | Syncs GitHub Actions variables/secrets from **gcloud** + **Databricks**; **staging** env, optional **`--sync-databricks-compute-policy-ids`**, `--databricks-token-source profile`. |
 | [`smoke-evidara-cli.sh`](smoke-evidara-cli.sh) | Local/API `evidara` pings when `EVIDARA_CLI_SMOKE=1`. |
 | [`analyze_github_actions_queue.py`](analyze_github_actions_queue.py) | Summarize GitHub Actions **queue vs run** time via `gh` (`--csv`, `--per-job`, `--aggregate-jobs`). See [CI Actions duration metrics](../docs/runbooks/ci-actions-duration-metrics.md). |
+| [`validate_k8s_gitops_kustomize.sh`](validate_k8s_gitops_kustomize.sh) | Renders `k8s/gitops/{dev,staging,prod}` with `kubectl kustomize` (skips if `kubectl` missing locally; required in CI). |
 | [`run-staging-relevance-query-pack.sh`](run-staging-relevance-query-pack.sh) | Staging `GET /v1/search` top-3 table for **TAR-82** / **TAR-68** (needs `EVIDARA_LEGAL_SEARCH_URL` + token). |
 
 Auth details: [docs/setup/gcp-local-cloud-run-auth.md](../docs/setup/gcp-local-cloud-run-auth.md) and [docs/runbooks/mvp-acceptance-scenario-pack.md](../docs/runbooks/mvp-acceptance-scenario-pack.md).

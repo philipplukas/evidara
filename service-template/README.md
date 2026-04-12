@@ -15,6 +15,8 @@ k8s/gitops/<env>/
   …
 ```
 
+**dev** and **staging** already include a placeholder `ConfigMap` you can replace.
+
 The [product Argo example](../docs/migration/examples/product-argocd-application.template.yaml) uses
 `path: k8s/gitops/prod` as a convention.
 

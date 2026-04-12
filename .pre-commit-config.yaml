@@ -57,6 +57,13 @@ repos:
         pass_filenames: false
         files: ^(README\.md|vendor/platform-contract\.yaml)$
 
+      - id: validate-k8s-gitops-kustomize
+        name: Validate k8s GitOps kustomizations
+        entry: bash scripts/validate_k8s_gitops_kustomize.sh
+        language: system
+        pass_filenames: false
+        files: ^k8s/gitops/
+
       - id: check-component-doc-headings
         name: Check component doc headings
         entry: python scripts/check_component_docs.py

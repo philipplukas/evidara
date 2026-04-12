@@ -1,0 +1,7 @@
+# Safe placeholder for first Argo sync to evidare-staging. Delete when real workloads land.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: evidara-gitops-staging-placeholder
+data:
+  note: "GitOps slice bootstrap — see docs/migration/parallel-workstreams.md"

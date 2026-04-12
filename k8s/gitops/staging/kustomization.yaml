@@ -1,5 +1,8 @@
-# Product workloads for staging (Argo CD). Prefer first real manifests here before prod.
+# Product workloads for staging (Argo CD). Placeholder ConfigMap until real manifests land.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources: []
+namespace: evidare-staging
+
+resources:
+  - evidara-gitops-placeholder.configmap.yaml

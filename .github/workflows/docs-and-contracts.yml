@@ -66,6 +66,14 @@ jobs:
         run: |
           python scripts/check_platform_contract_vendor.py
 
+      - name: Set up kubectl (kustomize)
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.31.6"
+
+      - name: Validate k8s GitOps kustomizations
+        run: bash scripts/validate_k8s_gitops_kustomize.sh
+
       - name: Validate country overlays
         run: |
           python scripts/check_country_overlay.py --country AT

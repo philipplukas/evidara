@@ -8,11 +8,11 @@ This tree holds **product** manifests intended for Argo CD `Application` objects
 
 | Path | Use |
 | --- | --- |
-| [`dev/`](dev/) | Development cluster product slice (empty Kustomize root until you add resources). |
-| [`staging/`](staging/) | **Preferred first** environment for real manifests before prod. |
-| [`prod/`](prod/) | Production product slice (keep empty until staging Argo path is proven). |
+| [`dev/`](dev/) | Dev slice: includes a **placeholder `ConfigMap`** for first Argo sync; replace with real workloads. |
+| [`staging/`](staging/) | **Preferred first** environment for real manifests before prod (also ships a placeholder `ConfigMap`). |
+| [`prod/`](prod/) | Prod slice: **empty** `resources` until staging Argo path is proven. |
 
-Each `*/kustomization.yaml` starts with `resources: []` so the path exists and Argo can sync
-without pruning unexpected resources. Add `Deployment`, `Service`, and other allowed kinds per
+**dev** and **staging** use `namespace: evidare-*` in `kustomization.yaml` so rendered objects target
+contract-allowed namespaces. Add `Deployment`, `Service`, and other allowed kinds per
 [`../../vendor/platform-contract.yaml`](../../vendor/platform-contract.yaml) as you cut over from
-Terraform-only delivery.
+Terraform-only delivery. CI renders all trees with `kubectl kustomize` (`scripts/validate_k8s_gitops_kustomize.sh`).

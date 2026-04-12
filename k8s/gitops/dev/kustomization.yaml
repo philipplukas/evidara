@@ -1,5 +1,8 @@
-# Product workloads for dev (Argo CD). Add resources as you split manifests from Terraform.
+# Product workloads for dev (Argo CD). Placeholder ConfigMap until real manifests land.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources: []
+namespace: evidare-dev
+
+resources:
+  - evidara-gitops-placeholder.configmap.yaml
