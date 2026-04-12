@@ -251,12 +251,13 @@ variable "runtime_secret_ids" {
   description = "Secret Manager secret IDs required by runtime services."
   type        = map(string)
   default = {
-    opensearch_node      = "opensearch-node"
-    opensearch_username  = "opensearch-username"
-    opensearch_password  = "opensearch-password"
-    firecrawl_api_key    = "firecrawl-api-key"
-    firecrawl_webhook    = "firecrawl-webhook-secret"
-    platform_control_dsn = "platform-control-database-url"
+    opensearch_node               = "opensearch-node"
+    opensearch_username           = "opensearch-username"
+    opensearch_password           = "opensearch-password"
+    document_service_bearer_token = "document-service-bearer-token"
+    firecrawl_api_key             = "firecrawl-api-key"
+    firecrawl_webhook             = "firecrawl-webhook-secret"
+    platform_control_dsn          = "platform-control-database-url"
   }
 }
 

@@ -112,7 +112,7 @@ cloud_run_services = {
     env_vars = {
       OPENSEARCH_ALIAS_READ              = "evidara-documents-read-staging"
       OPENSEARCH_ALIAS_WRITE             = "evidara-documents-write-staging"
-      DOCUMENT_INTELLIGENCE_BASE_URL     = ""
+      DOCUMENT_INTELLIGENCE_BASE_URL     = "https://document-intelligence-document-service-staging.example.run.app"
     }
     secret_env_vars = {
       OPENSEARCH_NODE = {
@@ -123,6 +123,27 @@ cloud_run_services = {
       }
       OPENSEARCH_PASSWORD = {
         secret_name = "opensearch_password"
+      }
+      DOCUMENT_INTELLIGENCE_API_KEY = {
+        secret_name = "document_service_bearer_token"
+      }
+    }
+    vpc_connector = "projects/project-dacd6b7b-dc96-4534-b82/locations/europe-west6/connectors/evidara-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
+  }
+
+  "document-intelligence-document-service" = {
+    image                 = "europe-west6-docker.pkg.dev/project-dacd6b7b-dc96-4534-b82/runtime/document-intelligence-document-service:latest"
+    service_account_key   = "document_intelligence"
+    allow_unauthenticated = true
+    startup_probe_path    = "/health"
+    liveness_probe_path   = "/health"
+    env_vars = {
+      DI_SURFACES_ROOT_URI = "gs://evidara-document-intelligence-surfaces-staging/published"
+    }
+    secret_env_vars = {
+      DOCUMENT_SERVICE_BEARER_TOKEN = {
+        secret_name = "document_service_bearer_token"
       }
     }
     vpc_connector = "projects/project-dacd6b7b-dc96-4534-b82/locations/europe-west6/connectors/evidara-connector"

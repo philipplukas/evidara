@@ -40,6 +40,8 @@ build_image "." "legal-search/api/Dockerfile" "legal-search-api" &
 pids+=($!)
 build_image "." "document-intelligence/Dockerfile" "di-consumer" &
 pids+=($!)
+build_image "." "document-intelligence/Dockerfile.document-service" "document-intelligence-document-service" &
+pids+=($!)
 
 exit_status=0
 for pid in "${pids[@]}"; do

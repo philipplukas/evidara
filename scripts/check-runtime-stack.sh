@@ -64,6 +64,18 @@ for env in dev staging prod; do
     echo "Missing or unexpected DI_PROCESSED_TOPIC_NAME in ${runtime_tfvars_file}" >&2
     exit 1
   fi
+  if ! grep -Eq "\"document-intelligence-document-service\"[[:space:]]*=[[:space:]]*\\{" "${runtime_tfvars_file}"; then
+    echo "Missing document-intelligence-document-service in ${runtime_tfvars_file}" >&2
+    exit 1
+  fi
+  if ! grep -Eq "DOCUMENT_INTELLIGENCE_BASE_URL[[:space:]]*=[[:space:]]*\"https://document-intelligence-document-service-${env}\\.example\\.run\\.app\"" "${runtime_tfvars_file}"; then
+    echo "Missing or unexpected DOCUMENT_INTELLIGENCE_BASE_URL in ${runtime_tfvars_file}" >&2
+    exit 1
+  fi
+  if ! grep -Eq "DI_SURFACES_ROOT_URI[[:space:]]*=[[:space:]]*\"gs://.*document-intelligence-surfaces-${env}/published\"" "${runtime_tfvars_file}"; then
+    echo "Missing or unexpected DI_SURFACES_ROOT_URI for document service in ${runtime_tfvars_file}" >&2
+    exit 1
+  fi
 
   opensearch_tfvars_file="infra/env/${env}/opensearch.gke.tfvars.example"
   if [[ ! -f "${opensearch_tfvars_file}" ]]; then
