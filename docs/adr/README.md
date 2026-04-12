@@ -23,6 +23,8 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0016 | [Cloud Run services vs jobs](0016-cloud-run-services-vs-jobs.md) |
 | ADR-0020 | [API authentication](adr-0020-api-authentication.md) |
 | ADR-0021 | [Wizard orchestration abstraction](adr-0021-wizard-orchestration-abstraction.md) |
+| ADR-0022 | [Agentic CLI workflow control surface](adr-0022-agentic-cli-workflow-control-surface.md) |
+| ADR-0023 | [DSPy extraction acceleration](adr-0023-dspy-extraction-acceleration.md) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.
