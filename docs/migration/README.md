@@ -31,10 +31,10 @@ Canonical sequence (mirrors MacConfig `docs/migration-map.md`):
 - Editing **MacConfig** for new platform YAML, Kyverno policies, or Argo project rules.
 - **Terraform** state moves when OpenSearch-on-GKE stops being Helm-applied from Terraform.
 
-**Internal agent / OpenHands GitOps** should live in a **separate repository** (not Evidara, not
-MacConfig product YAML): a small `agent-platform`-style repo with its own `k8s/overlays/` and Argo
-*product* app, while MacConfig keeps cluster platform. A scaffold exists next to this monorepo at
-`../agent-platform` on disk until you create the GitHub remote and push.
+**Internal agent / OpenHands GitOps** lives in **`rocky-agents`** (separate repo, not Evidara / not
+MacConfig product YAML): its own `k8s/overlays/` and Argo *product* app, while MacConfig keeps cluster
+platform. Local path next to this monorepo: `../rocky-agents` (push to
+`https://github.com/philipplukas/rocky-agents` when created).
 
 
 Start with [platform-product-inventory.md](platform-product-inventory.md) and [git-reconcile-checklist.md](git-reconcile-checklist.md).
