@@ -29,7 +29,11 @@ If you use [direnv](https://direnv.net/), add a repo-root `.envrc` containing `u
 
 ## What is in the shell today
 
-Declared in [`flake.nix`](../../flake.nix) (adjust there when something is still missing):
+Declared in [`flake.nix`](../../flake.nix) (adjust there when something is still missing).
+
+The dev shell uses a **scoped** `import nixpkgs { config.allowUnfree = true; }` so Terraform
+(BSL in current nixpkgs), `databricks-cli`, and `1password-cli` evaluate cleanly. That setting applies
+only to this shell’s package set, not your system configuration.
 
 | Tool | Role |
 |------|------|

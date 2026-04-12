@@ -33,7 +33,12 @@
       devShells = forAllSystems (
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          # Several CLIs in this shell are marked unfree in current nixpkgs (Terraform BSL,
+          # Databricks license, 1Password). Restrict unfree allowance to this devShell import only.
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
         in
         {
           default = pkgs.mkShell {
