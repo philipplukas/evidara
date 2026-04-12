@@ -71,7 +71,7 @@ async def test_wizard_state_guards_and_transitions(session) -> None:
 
 @pytest.mark.asyncio
 async def test_temporal_orchestrator_starts_workflow_and_signals(
-    session, session_maker: async_sessionmaker[AsyncSession]
+    session_maker: async_sessionmaker[AsyncSession],
 ) -> None:
     state_acts, shard_acts, drain_acts = _make_test_activities(session_maker)
     async with await WorkflowEnvironment.start_time_skipping() as env:
@@ -93,28 +93,31 @@ async def test_temporal_orchestrator_starts_workflow_and_signals(
                 task_queue="wizard",
                 client=env.client,
             )
-            service = WizardService(session, orch)
-            project = await service.create_project(CreateWizardProjectRequest(name="Wizard DE"))
-            await service.update_scope(project.wizard_project_id, {"domains": ["example.de"]})
-            await service.update_discovery_plan(
-                project.wizard_project_id,
-                {"seed_urls": ["https://example.de"], "max_depth": 1},
-            )
-            run = await service.start_pilot_run(project.wizard_project_id)
-            assert run.workflow_id is not None
-            assert run.state is WizardRunState.PILOT_RUN
+            async with session_maker() as session:
+                service = WizardService(session, orch)
+                project = await service.create_project(CreateWizardProjectRequest(name="Wizard DE"))
+                await service.update_scope(project.wizard_project_id, {"domains": ["example.de"]})
+                await service.update_discovery_plan(
+                    project.wizard_project_id,
+                    {"seed_urls": ["https://example.de"], "max_depth": 1},
+                )
+                run = await service.start_pilot_run(project.wizard_project_id)
+                assert run.workflow_id is not None
+                assert run.state is WizardRunState.PILOT_RUN
 
             # Allow the workflow's persist_pilot_completed activity to commit the
             # PilotRun → HumanGateApproval transition before we signal approve.
-            for _ in range(50):
-                await asyncio.sleep(0)
-                session.expire_all()
-                current = await service.get_run(run.wizard_run_id)
-                if current.state is WizardRunState.HUMAN_GATE_APPROVAL:
-                    break
+            async with session_maker() as session:
+                service = WizardService(session, orch)
+                for _ in range(50):
+                    await asyncio.sleep(0)
+                    session.expire_all()
+                    current = await service.get_run(run.wizard_run_id)
+                    if current.state is WizardRunState.HUMAN_GATE_APPROVAL:
+                        break
 
-            approved = await service.approve_run(run.wizard_run_id, reason="ok")
-            assert approved.state is WizardRunState.SCALED_RUN
+                approved = await service.approve_run(run.wizard_run_id, reason="ok")
+                assert approved.state is WizardRunState.SCALED_RUN
 
             handle = env.client.get_workflow_handle(approved.workflow_id)
             assert await handle.result() == "scaled"

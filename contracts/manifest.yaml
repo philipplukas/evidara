@@ -1,5 +1,5 @@
-version: "1.4.3"
-last_reviewed: "2026-04-11"
+version: "1.5.0"
+last_reviewed: "2026-04-12"
 owner: "Platform Team"
 
 mvp_flow:
@@ -18,7 +18,7 @@ mvp_flow:
 apis:
   platform_control:
     file: "contracts/api/platform-control.openapi.yaml"
-    version: "0.3.4"
+    version: "0.4.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
@@ -27,6 +27,9 @@ apis:
       - "/v1/runs/{run_id}"
       - "/v1/runs/{run_id}/processing-status"
       - "/v1/runs/{run_id}/document-lifecycle"
+      - "/v1/corpora"
+      - "/v1/corpora/{corpus_id}"
+      - "/v1/corpora/{corpus_id}/archive"
   document_intelligence:
     file: "contracts/api/document-intelligence-runtime.openapi.yaml"
     version: "0.1.0"
