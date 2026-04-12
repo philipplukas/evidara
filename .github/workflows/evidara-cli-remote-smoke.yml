@@ -36,7 +36,9 @@ permissions:
 
 jobs:
   remote-smoke:
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    # Keep Python bootstrap on GitHub-hosted Linux until the Hetzner K8s runner
+    # pools are available for generic setup-python jobs.
+    runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.github_environment }}
     env:
       EVIDARA_PLATFORM_CONTROL_URL: ${{ github.event.inputs.platform_control_url }}

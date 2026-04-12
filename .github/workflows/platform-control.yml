@@ -15,7 +15,9 @@ on:
 
 jobs:
   check:
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    # GitHub-hosted keeps setup-node/setup-python stable until Hetzner K8s
+    # runners provide an Ubuntu-compatible bootstrap path for both toolchains.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
