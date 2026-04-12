@@ -386,6 +386,7 @@ jobs:
       - name: Upload release readiness report to GCS
         id: release_report_upload
         if: ${{ always() }}
+        continue-on-error: true
         run: |
           set -euo pipefail
           if [[ -z "${INTERACTION_FLOW_EVIDENCE_GCS_ROOT}" ]]; then
