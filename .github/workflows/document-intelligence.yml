@@ -65,7 +65,29 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Ensure unzip is available
-        run: which unzip || sudo apt-get update -qq && sudo apt-get install -y -qq unzip
+        run: |
+          if command -v unzip &>/dev/null; then exit 0; fi
+          mkdir -p "$HOME/.local/bin"
+          python3 -c "
+          import pathlib, os, stat, textwrap
+          script = textwrap.dedent('''\
+          #!/usr/bin/env python3
+          import sys, zipfile
+          args, dest = sys.argv[1:], '.'
+          i = 0
+          while i < len(args):
+              if args[i] == '-d':
+                  dest = args[i+1]; i += 2; continue
+              if args[i].startswith('-'):
+                  i += 1; continue
+              zipfile.ZipFile(args[i]).extractall(dest)
+              i += 1
+          ''')
+          p = pathlib.Path(os.path.expanduser('~/.local/bin/unzip'))
+          p.write_text(script)
+          p.chmod(p.stat().st_mode | stat.S_IEXEC)
+          "
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
