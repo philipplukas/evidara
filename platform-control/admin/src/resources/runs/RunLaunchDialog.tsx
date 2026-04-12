@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   MenuItem,
+  Paper,
   Stack,
   TextField,
   Typography,
@@ -81,11 +82,21 @@ const readinessActionByCode: Record<string, string> = {
     "Update acquisition spec with at least one seed_url or seed_urls entry.",
 };
 
+export function describeReadinessAction(code: string): string {
+  return readinessActionByCode[code] ?? "Review the selected source/version pair and retry.";
+}
+
 const RUN_READINESS_CONFIRMED_KEY_PREFIX = "evidara_run_readiness_confirmed:";
 const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_codes:";
 
 const normalizeReadinessCodes = (checks: RunReadiness["checks"]): string[] =>
   Array.from(new Set(checks.filter((check) => !check.ok).map((check) => check.code))).sort();
+
+const formatModeLabel = (mode: "preview" | "production"): string =>
+  mode === "production" ? "Production" : "Preview";
+
+const modeChipColor = (mode: "preview" | "production"): "info" | "success" =>
+  mode === "production" ? "success" : "info";
 
 export function RunLaunchButton({
   label,
@@ -118,6 +129,17 @@ export function RunLaunchButton({
     sort: { field: "created_at", order: "DESC" as const },
     filter: { source_id: formState.source_id || "__none__" },
   });
+  const selectedSource = useMemo(
+    () => (sources.data ?? []).find((source) => source.source_id === formState.source_id) ?? null,
+    [formState.source_id, sources.data],
+  );
+  const selectedVersion = useMemo(
+    () =>
+      (sourceVersions.data ?? []).find(
+        (version) => version.source_version_id === formState.source_version_id,
+      ) ?? null,
+    [formState.source_version_id, sourceVersions.data],
+  );
 
   const versionChoices = useMemo(() => {
     const versions = sourceVersions.data ?? [];
@@ -259,91 +281,138 @@ export function RunLaunchButton({
       </Button>
 
       <Dialog open={open} onClose={closeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Create Run</DialogTitle>
+        <DialogTitle>
+          <Stack spacing={0.5}>
+            <Typography variant="h6" component="div">
+              Create Run
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Pick a source/version pair, then review the preflight result before launch.
+            </Typography>
+          </Stack>
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
             {sources.error ? <Alert severity="error">Unable to load sources.</Alert> : null}
 
-            <TextField
-              select
-              label="Run mode"
-              value={formState.mode}
-              onChange={(event) => {
-                const mode = event.target.value as RunLaunchFormState["mode"];
-                setFormState((prev) => {
-                  const versions = sourceVersions.data ?? [];
-                  const allowedIds = new Set(
-                    versions
-                      .filter((v) => versionAllowedForMode(v.status, mode))
-                      .map((v) => v.source_version_id),
-                  );
-                  return {
-                    ...prev,
-                    mode,
-                    source_version_id: allowedIds.has(prev.source_version_id)
-                      ? prev.source_version_id
-                      : "",
-                  };
-                });
-              }}
-              fullWidth
-              disabled={allowedModes.length === 1}
-            >
-              {allowedModes.map((mode) => (
-                <MenuItem key={mode} value={mode}>
-                  {mode}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Paper variant="outlined" sx={{ p: 1.5 }}>
+              <Stack spacing={1.25}>
+                <Typography variant="subtitle2">Launch summary</Typography>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  <Chip
+                    size="small"
+                    color={modeChipColor(formState.mode)}
+                    label={`${formatModeLabel(formState.mode)} mode`}
+                  />
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`Source ${selectedSource?.name ?? "not selected"}`}
+                  />
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={
+                      selectedVersion
+                        ? `Version ${selectedVersion.version_label} (${selectedVersion.status})`
+                        : "Version not selected"
+                    }
+                  />
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {formState.mode === "production"
+                    ? "Production runs require an approved version and should be used when the source is ready for operator verification."
+                    : "Preview runs let you inspect capture quality and readiness before promotion."}
+                </Typography>
+              </Stack>
+            </Paper>
 
-            <TextField
-              select
-              label="Source"
-              value={formState.source_id}
-              onChange={(event) =>
-                setFormState({
-                  ...formState,
-                  source_id: event.target.value,
-                  source_version_id: "",
-                })
-              }
-              fullWidth
-            >
-              {(sources.data ?? []).map((source) => (
-                <MenuItem key={source.source_id} value={source.source_id}>
-                  {source.name}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Paper variant="outlined" sx={{ p: 1.5 }}>
+              <Stack spacing={2}>
+                <Typography variant="subtitle2">Launch inputs</Typography>
 
-            <TextField
-              select
-              label="Source version"
-              value={formState.source_version_id}
-              onChange={(event) =>
-                setFormState({
-                  ...formState,
-                  source_version_id: event.target.value,
-                })
-              }
-              fullWidth
-              disabled={!formState.source_id}
-              helperText="Production runs require an approved version."
-            >
-              {versionChoices.map((version) => (
-                <MenuItem key={version.value} value={version.value}>
-                  {version.label}
-                </MenuItem>
-              ))}
-            </TextField>
+                <TextField
+                  select
+                  label="Run mode"
+                  value={formState.mode}
+                  onChange={(event) => {
+                    const mode = event.target.value as RunLaunchFormState["mode"];
+                    setFormState((prev) => {
+                      const versions = sourceVersions.data ?? [];
+                      const allowedIds = new Set(
+                        versions
+                          .filter((v) => versionAllowedForMode(v.status, mode))
+                          .map((v) => v.source_version_id),
+                      );
+                      return {
+                        ...prev,
+                        mode,
+                        source_version_id: allowedIds.has(prev.source_version_id)
+                          ? prev.source_version_id
+                          : "",
+                      };
+                    });
+                  }}
+                  fullWidth
+                  disabled={allowedModes.length === 1}
+                >
+                  {allowedModes.map((mode) => (
+                    <MenuItem key={mode} value={mode}>
+                      {formatModeLabel(mode)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  label="Source"
+                  value={formState.source_id}
+                  onChange={(event) =>
+                    setFormState({
+                      ...formState,
+                      source_id: event.target.value,
+                      source_version_id: "",
+                    })
+                  }
+                  fullWidth
+                >
+                  {(sources.data ?? []).map((source) => (
+                    <MenuItem key={source.source_id} value={source.source_id}>
+                      {source.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  label="Source version"
+                  value={formState.source_version_id}
+                  onChange={(event) =>
+                    setFormState({
+                      ...formState,
+                      source_version_id: event.target.value,
+                    })
+                  }
+                  fullWidth
+                  disabled={!formState.source_id}
+                  helperText="Production runs require an approved version."
+                >
+                  {versionChoices.map((version) => (
+                    <MenuItem key={version.value} value={version.value}>
+                      {version.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
+            </Paper>
 
             {isCheckingReadiness ? (
               <Alert
                 severity="info"
                 icon={false}
-                action={<Chip size="small" color="info" variant="outlined" label="in_progress" />}
+                action={<Chip size="small" color="info" variant="outlined" label="running" />}
               >
-                Running run preflight checks...
+                Checking preflight readiness...
               </Alert>
             ) : null}
             {readinessError ? <Alert severity="error">{readinessError}</Alert> : null}
@@ -353,31 +422,53 @@ export function RunLaunchButton({
                 icon={false}
                 action={<Chip size="small" color="warning" variant="outlined" label="blocked" />}
               >
-                Run is blocked until preflight checks pass:
-                <ul style={{ margin: "8px 0 0", paddingInlineStart: "20px" }}>
-                  {failingChecks.map((check) => (
-                    <li key={check.code}>
-                      <Typography component="span" sx={{ fontWeight: 600 }}>
-                        {check.detail}
-                      </Typography>
-                      <Typography component="span" sx={{ color: "text.secondary" }}>
-                        {" "}
-                        Next action:{" "}
-                        {readinessActionByCode[check.code] ??
-                          "Review source/version configuration and retry."}
-                      </Typography>
-                    </li>
-                  ))}
-                </ul>
+                <Stack spacing={1.25}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    Preflight is blocking launch. Resolve the items below to enable Create Run.
+                  </Typography>
+                  <Stack spacing={1}>
+                    {failingChecks.map((check) => (
+                      <Paper key={check.code} variant="outlined" sx={{ p: 1.25 }}>
+                        <Stack spacing={0.75}>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            useFlexGap
+                            flexWrap="wrap"
+                          >
+                            <Chip size="small" label={check.code} variant="outlined" />
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {check.detail}
+                            </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            Next action: {describeReadinessAction(check.code)}
+                          </Typography>
+                        </Stack>
+                      </Paper>
+                    ))}
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary">
+                    {failingChecks.length} blocked check
+                    {failingChecks.length === 1 ? "" : "s"} need attention before the run can be
+                    created.
+                  </Typography>
+                  {selectedVersion ? (
+                    <Typography variant="caption" color="text.secondary">
+                      Selected version status: {selectedVersion.status}
+                    </Typography>
+                  ) : null}
+                </Stack>
               </Alert>
             ) : null}
             {readiness?.ready ? (
               <Alert
                 severity="success"
                 icon={false}
-                action={<Chip size="small" color="success" variant="outlined" label="ok" />}
+                action={<Chip size="small" color="success" variant="outlined" label="ready" />}
               >
-                Preflight checks passed.
+                Preflight checks passed. The current source/version pair is ready to launch.
               </Alert>
             ) : null}
           </Stack>

@@ -86,7 +86,7 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.getByRole("option", { name: "Swiss Federal Court" }).click();
     await createRunDialog.getByRole("combobox", { name: "Source version" }).click();
     await page.getByRole("option", { name: /2026.04.06/ }).click();
-    await expect(page.getByText(/Run is blocked until preflight checks pass/i)).toBeVisible();
+    await expect(page.getByText(/Preflight is blocking launch/i)).toBeVisible();
     await saveScreenshot(page, "admin-run-launch-preflight.png");
 
     await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs/run_01/show`);

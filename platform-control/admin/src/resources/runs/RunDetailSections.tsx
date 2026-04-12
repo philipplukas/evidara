@@ -74,6 +74,33 @@ const formatJson = (value: unknown): string => JSON.stringify(value, null, 2);
 
 const renderInlineValue = (value: string | number | null | undefined): ReactNode => value ?? "—";
 
+const overallSeverityByStatus = (
+  status: RunPipelineHealth["overall_status"],
+): "success" | "warning" | "error" | "info" => {
+  if (status === "ok") return "success";
+  if (status === "blocked") return "warning";
+  if (status === "failed") return "error";
+  return "info";
+};
+
+export const overallSummaryByStatus = (status: RunPipelineHealth["overall_status"]): string => {
+  if (status === "ok") return "Pipeline stages are healthy.";
+  if (status === "blocked")
+    return "One or more stages need remediation before the run can progress.";
+  if (status === "failed") return "A downstream stage failed and needs operator attention.";
+  return "At least one stage is still moving through the pipeline.";
+};
+
+const stageBorderColorByStatus = (
+  status: RunPipelineHealth["stages"][number]["status"],
+): string => {
+  if (status === "failed") return "error.main";
+  if (status === "blocked") return "warning.main";
+  if (status === "in_progress") return "info.main";
+  if (status === "ok") return "success.main";
+  return "divider";
+};
+
 const renderCodeBlock = (value: unknown): ReactNode => {
   const json = formatJson(value);
   return (
@@ -292,6 +319,37 @@ function PreviewSummarySection({ run }: { run: RunRecord }) {
   );
 }
 
+function RunSectionNav() {
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack spacing={1.5}>
+        <Box>
+          <Typography variant="h6">Lifecycle sections</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Jump straight to the stage that needs attention.
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+          <Button component="a" href="#provider-jobs-section" variant="outlined" size="small">
+            Provider jobs
+          </Button>
+          <Button
+            component="a"
+            href="#di-processing-status-section"
+            variant="outlined"
+            size="small"
+          >
+            DI processing
+          </Button>
+          <Button component="a" href="#document-lifecycle-section" variant="outlined" size="small">
+            Document lifecycle
+          </Button>
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
+
 function pipelineChipColor(status: string): "default" | "info" | "warning" | "error" | "success" {
   if (status === "ok") return "success";
   if (status === "failed") return "error";
@@ -300,7 +358,7 @@ function pipelineChipColor(status: string): "default" | "info" | "warning" | "er
   return "default";
 }
 
-function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
+export function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
   if (stage.status === "ok") return "No action required.";
   if (stage.stage === "acquisition") {
     return "Check provider jobs for dispatch/crawl status and retry or cancel when stuck.";
@@ -314,18 +372,18 @@ function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
   return "Verify lifecycle search disposition and confirm indexed document visibility in legal-search.";
 }
 
-function stageActionTarget(
+export function stageActionTarget(
   stage: RunPipelineHealth["stages"][number],
   options: { legalSearchUrl?: string; evidenceRunbookPath: string },
 ): { label: string; href: string } {
   if (stage.stage === "acquisition") {
-    return { label: "Open provider jobs", href: "#provider-jobs-section" };
+    return { label: "Jump to provider jobs", href: "#provider-jobs-section" };
   }
   if (stage.stage === "document_intelligence") {
-    return { label: "Open DI processing status", href: "#di-processing-status-section" };
+    return { label: "Jump to DI processing", href: "#di-processing-status-section" };
   }
   if (stage.stage === "projection") {
-    return { label: "Open document lifecycle", href: "#document-lifecycle-section" };
+    return { label: "Jump to document lifecycle", href: "#document-lifecycle-section" };
   }
   if (options.legalSearchUrl) {
     return { label: "Open legal-search verification", href: options.legalSearchUrl };
@@ -439,7 +497,7 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
         <Box>
           <Typography variant="h6">Pipeline Health</Typography>
           <Typography variant="body2" color="text.secondary">
-            Operational status contract for acquisition, DI, projection, and search stages.
+            Use the anchors below to jump from overview into the stage that needs attention.
           </Typography>
         </Box>
 
@@ -460,6 +518,35 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
 
         {!isPending && !error && health ? (
           <Stack spacing={2}>
+            <Alert
+              severity={overallSeverityByStatus(health.overall_status)}
+              icon={false}
+              sx={{ alignItems: "flex-start" }}
+            >
+              <Stack spacing={1}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {overallSummaryByStatus(health.overall_status)}
+                </Typography>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  <Chip
+                    size="small"
+                    label={`Overall ${health.overall_status}`}
+                    color={pipelineChipColor(health.overall_status)}
+                    variant="outlined"
+                  />
+                  <Chip size="small" label={`Run ${health.run_status}`} variant="outlined" />
+                  <Chip
+                    size="small"
+                    label={`Processing events ${health.processing_status_event_count}`}
+                  />
+                  <Chip
+                    size="small"
+                    label={`Lifecycle events ${health.document_lifecycle_event_count}`}
+                  />
+                </Stack>
+              </Stack>
+            </Alert>
+
             <Paper variant="outlined" sx={{ p: 1.5 }}>
               <Stack spacing={1}>
                 <Typography variant="subtitle2">Operator Checklist</Typography>
@@ -511,16 +598,6 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
               </Stack>
             </Paper>
 
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} flexWrap="wrap">
-              <Chip
-                label={`Overall ${health.overall_status}`}
-                color={pipelineChipColor(health.overall_status)}
-                variant="outlined"
-              />
-              <Chip label={`Processing events ${health.processing_status_event_count}`} />
-              <Chip label={`Lifecycle events ${health.document_lifecycle_event_count}`} />
-            </Stack>
-
             <Stack spacing={1.5}>
               {health.stages.map((stage) => {
                 const actionTarget = stageActionTarget(stage, {
@@ -528,10 +605,26 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                   evidenceRunbookPath,
                 });
                 const isInPageAnchor = actionTarget.href.startsWith("#");
+                const isHealthy = stage.status === "ok";
                 return (
-                  <Paper key={stage.stage} variant="outlined" sx={{ p: 1.5 }}>
-                    <Stack spacing={0.5}>
-                      <Stack direction="row" spacing={1} alignItems="center">
+                  <Paper
+                    key={stage.stage}
+                    variant="outlined"
+                    sx={{
+                      p: 1.5,
+                      borderLeftWidth: 4,
+                      borderLeftStyle: "solid",
+                      borderLeftColor: stageBorderColorByStatus(stage.status),
+                    }}
+                  >
+                    <Stack spacing={1}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        useFlexGap
+                        flexWrap="wrap"
+                      >
                         <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
                           {stage.stage.replace("_", " ")}
                         </Typography>
@@ -545,41 +638,51 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                       <Typography variant="body2" color="text.secondary">
                         {stage.detail}
                       </Typography>
-                      {stage.status !== "ok" ? (
-                        <Stack
-                          direction={{ xs: "column", md: "row" }}
-                          spacing={1}
-                          alignItems="start"
+                      {isHealthy ? (
+                        <Typography variant="caption" color="success.main">
+                          No remediation required.
+                        </Typography>
+                      ) : (
+                        <Alert
+                          severity={stage.status === "failed" ? "error" : "warning"}
+                          icon={false}
                         >
-                          <Typography variant="caption" color="text.secondary">
-                            Recommended next action: {stageNextAction(stage)}
-                          </Typography>
-                          <Button
-                            component="a"
-                            href={actionTarget.href}
-                            target={isInPageAnchor ? undefined : "_blank"}
-                            rel={isInPageAnchor ? undefined : "noreferrer"}
-                            size="small"
-                            variant="text"
-                            onClick={() => {
-                              if (!firstRemediationEventEmittedRef.current) {
-                                emitOperatorJourneyEvent("remediation_action_clicked", {
-                                  run_id: run.run_id,
-                                  source_id: run.source_id,
-                                  source_version_id: run.source_version_id,
-                                  mode: run.mode,
-                                  stage: stage.stage,
-                                  action_label: actionTarget.label,
-                                  action_href: actionTarget.href,
-                                });
-                                firstRemediationEventEmittedRef.current = true;
-                              }
-                            }}
+                          <Stack
+                            direction={{ xs: "column", md: "row" }}
+                            spacing={1}
+                            alignItems="center"
+                            justifyContent="space-between"
                           >
-                            {actionTarget.label}
-                          </Button>
-                        </Stack>
-                      ) : null}
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              Next action: {stageNextAction(stage)}
+                            </Typography>
+                            <Button
+                              component="a"
+                              href={actionTarget.href}
+                              target={isInPageAnchor ? undefined : "_blank"}
+                              rel={isInPageAnchor ? undefined : "noreferrer"}
+                              size="small"
+                              variant="contained"
+                              onClick={() => {
+                                if (!firstRemediationEventEmittedRef.current) {
+                                  emitOperatorJourneyEvent("remediation_action_clicked", {
+                                    run_id: run.run_id,
+                                    source_id: run.source_id,
+                                    source_version_id: run.source_version_id,
+                                    mode: run.mode,
+                                    stage: stage.stage,
+                                    action_label: actionTarget.label,
+                                    action_href: actionTarget.href,
+                                  });
+                                  firstRemediationEventEmittedRef.current = true;
+                                }
+                              }}
+                            >
+                              {actionTarget.label}
+                            </Button>
+                          </Stack>
+                        </Alert>
+                      )}
                       <Typography variant="caption" color="text.secondary">
                         Updated: {formatDateTime(stage.updated_at)}
                       </Typography>
@@ -661,7 +764,7 @@ function RunTableSection<TRecord extends { id: Identifier }>({
           <Stack direction="row" spacing={1.5} alignItems="center">
             <CircularProgress size={18} />
             <Typography variant="body2" color="text.secondary">
-              Loading {title.toLowerCase()}...
+              Loading {title.toLowerCase()} rows...
             </Typography>
           </Stack>
         ) : null}
@@ -755,6 +858,7 @@ export function RunDetailSections() {
 
   return (
     <Stack spacing={3} sx={{ pt: 2 }}>
+      <RunSectionNav />
       <PipelineHealthSection run={run} />
       <PreviewSummarySection run={run} />
 

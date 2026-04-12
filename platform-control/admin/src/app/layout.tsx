@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import { Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
-const ibmPlexSans = IBM_Plex_Sans({
+const inter = Inter({
   variable: "--font-admin-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
 });
 
 const sourceSerif = Source_Serif_4({
@@ -25,10 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${ibmPlexSans.variable} ${sourceSerif.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${inter.variable} ${sourceSerif.variable} h-full antialiased`}>
       <body>{children}</body>
     </html>
   );

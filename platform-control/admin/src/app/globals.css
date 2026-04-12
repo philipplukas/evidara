@@ -1,9 +1,14 @@
 :root {
   --background: #f4efe7;
-  --background-panel: rgba(255, 252, 245, 0.92);
+  --background-panel: rgba(255, 253, 248, 0.92);
   --foreground: #1d293d;
+  --foreground-muted: rgba(29, 41, 61, 0.72);
   --accent: #0f4c81;
-  --accent-soft: #d9e8f4;
+  --accent-hover: #0b3d68;
+  --accent-strong: #1d293d;
+  --accent-soft: rgba(15, 76, 129, 0.1);
+  --highlight: #9a7a4a;
+  --highlight-soft: rgba(154, 122, 74, 0.14);
   --border: rgba(29, 41, 61, 0.12);
 }
 
@@ -12,16 +17,207 @@ body {
   min-height: 100%;
 }
 
+html {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
   color: var(--foreground);
   background:
     radial-gradient(circle at top left, rgba(15, 76, 129, 0.16), transparent 36%),
-    radial-gradient(circle at top right, rgba(188, 143, 78, 0.18), transparent 30%),
-    linear-gradient(180deg, #f9f6ef 0%, var(--background) 100%);
+    radial-gradient(circle at top right, rgba(154, 122, 74, 0.18), transparent 30%),
+    linear-gradient(180deg, #faf7f1 0%, var(--background) 100%);
   font-family: var(--font-admin-sans), system-ui, sans-serif;
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(255, 253, 248, 0.24), transparent 35%),
+    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.54), transparent 28%);
+  opacity: 0.75;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(15, 76, 129, 0.42);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(15, 76, 129, 0.18);
+  color: var(--foreground);
+}
+
+a {
+  color: inherit;
+}
+
+.evidara-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(15, 76, 129, 0.16), transparent 36%),
+    radial-gradient(circle at top right, rgba(154, 122, 74, 0.18), transparent 30%),
+    linear-gradient(180deg, #faf7f1 0%, var(--background) 100%);
+}
+
+.evidara-shell__panel {
+  width: min(720px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 32px;
+  background: var(--background-panel);
+  box-shadow: 0 28px 64px rgba(29, 41, 61, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.evidara-shell__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 28px;
+  background: linear-gradient(120deg, rgba(15, 76, 129, 0.98), rgba(11, 61, 104, 0.94));
+  color: #fffdf8;
+}
+
+.evidara-shell__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.evidara-shell__mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 253, 248, 0.2);
+  background: linear-gradient(135deg, rgba(255, 253, 248, 0.98), rgba(255, 253, 248, 0.72));
+  color: var(--accent);
+  box-shadow: 0 12px 24px rgba(7, 23, 40, 0.12);
+  font-family: var(--font-admin-serif), Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.evidara-shell__eyebrow {
+  color: rgba(255, 253, 248, 0.78);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  line-height: 1.15;
+}
+
+.evidara-shell__title {
+  margin: 2px 0 0;
+  color: #fffdf8;
+  font-family: var(--font-admin-serif), Georgia, serif;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.evidara-shell__copy {
+  margin: 4px 0 0;
+  color: rgba(255, 253, 248, 0.74);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.evidara-shell__body {
+  padding: 28px;
+}
+
+.evidara-shell__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(15, 76, 129, 0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.evidara-shell__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 253, 248, 0.28);
+  background: rgba(255, 253, 248, 0.08);
+  color: #fffdf8;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.evidara-shell__button:hover {
+  border-color: rgba(255, 253, 248, 0.42);
+  background: rgba(255, 253, 248, 0.16);
+  transform: translateY(-1px);
+}
+
+.evidara-shell__spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 3px solid rgba(29, 41, 61, 0.12);
+  border-top-color: var(--accent);
+  animation: evidara-spin 0.8s linear infinite;
+}
+
+@keyframes evidara-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    background-attachment: scroll;
+  }
+
+  .evidara-shell {
+    padding: 16px;
+  }
+
+  .evidara-shell__panel {
+    border-radius: 24px;
+  }
+
+  .evidara-shell__header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 20px;
+  }
+
+  .evidara-shell__body {
+    padding: 20px;
+  }
+
+  .evidara-shell__button {
+    width: 100%;
+  }
 }
