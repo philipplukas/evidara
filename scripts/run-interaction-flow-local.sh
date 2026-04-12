@@ -20,10 +20,16 @@ ADMIN="${REPO_ROOT}/platform-control/admin"
 if [[ "${1:-}" == "--record" ]]; then
   export PLAYWRIGHT_TRACE="on"
   export PLAYWRIGHT_VIDEO="on"
+  export SCREENSHOT_PACK_VIDEO_MODE="enabled"
   shift
 fi
 
 export PLAYWRIGHT_TRACE="${PLAYWRIGHT_TRACE:-retain-on-failure}"
+if [[ "${PLAYWRIGHT_VIDEO:-retain-on-failure}" == "on" ]]; then
+  export SCREENSHOT_PACK_VIDEO_MODE="enabled"
+else
+  export SCREENSHOT_PACK_VIDEO_MODE="${SCREENSHOT_PACK_VIDEO_MODE:-disabled}"
+fi
 
 echo "Installing dependencies (frontend + admin for Playwright webServer)..." >&2
 (cd "${FRONTEND}" && npm ci)

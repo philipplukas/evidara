@@ -98,7 +98,7 @@ else
     --output-dir "${OUTPUT_DIR}"
 fi
 
-latest_dir="$(ls -1d "${OUTPUT_DIR}"/* 2>/dev/null | sort | tail -n 1 || true)"
+latest_dir="$(ls -1d "${OUTPUT_DIR}"/* 2>/dev/null | sort -n | tail -n 1 || true)"
 if [[ -z "${latest_dir}" ]]; then
   echo "No downloaded run directory found under ${OUTPUT_DIR}" >&2
   exit 2
@@ -112,6 +112,7 @@ fi
 report_dir="${latest_dir}/legal-search/frontend/playwright-report"
 screenshot_pack_dir="${latest_dir}/legal-search/frontend/screenshot-pack"
 runbook_path="${latest_dir}/docs/runbooks/interaction-flow-validation.md"
+video_mode="$(awk -F': ' '/video_mode:/{print $2; exit}' "${manifest_path}" 2>/dev/null || true)"
 
 if [[ ! -f "${manifest_path}" ]]; then
   echo "Missing manifest: ${manifest_path}" >&2
@@ -129,6 +130,10 @@ if [[ ! -f "${runbook_path}" ]]; then
   echo "Missing runbook snapshot: ${runbook_path}" >&2
   exit 2
 fi
+if [[ "${video_mode}" == "enabled" && ! -f "${latest_dir}/legal-search/frontend/screenshot-pack/cross-surface-journey.webm" ]]; then
+  echo "Missing canonical journey video while manifest declares video_mode=enabled" >&2
+  exit 2
+fi
 
 echo "Evidence quick-check passed."
 echo "Mode: ${MODE}"
@@ -136,6 +141,7 @@ echo "Run dir: ${latest_dir}"
 echo "Manifest: ${manifest_path}"
 echo "Playwright report: ${report_dir}"
 echo "Screenshot pack: ${screenshot_pack_dir}"
+echo "Video mode: ${video_mode:-unknown}"
 echo "Runbook snapshot: ${runbook_path}"
 
 run_id="$(basename "${latest_dir}")"
