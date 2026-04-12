@@ -3,13 +3,6 @@ name: Runner Bootstrap Preflight
 on:
   workflow_dispatch:
   workflow_call:
-  pull_request:
-    paths:
-      - ".github/workflows/runner-bootstrap-preflight.yml"
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/runner-bootstrap-preflight.yml"
 
 permissions:
   contents: read
