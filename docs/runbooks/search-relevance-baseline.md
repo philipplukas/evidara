@@ -1,8 +1,8 @@
 # Search relevance baseline (MVP)
 
-Owner: Legal-search / platform  
-Last reviewed: 2026-04-11  
-Last verified: 2026-04-11  
+Owner: Legal-search / platform
+Last reviewed: 2026-04-13
+Last verified: 2026-04-13
 Applies to: **dev** (default remote corpus for dev-first teams), **staging** when operated, **prod**
 
 This runbook defines how we **tune and regress** search relevance without changing API contracts. It pairs Linear **TAR-82** (relevance tuning) and **TAR-68** (locked baselines).
@@ -37,6 +37,26 @@ Run against a **deployed** legal-search API (**dev** Cloud Run when you have no 
 - **API smoke:** `evidara workflow mvp-acceptance` (when configured for **dev** or staging URLs) exercises the locked MVP path; extend evidence with manual top-N checks from the table above when tuning relevance.
 - **Query pack:** from repo root, with `EVIDARA_LEGAL_SEARCH_URL` and `EVIDARA_LEGAL_SEARCH_TOKEN` set (same Bearer pattern as [GCP local Cloud Run auth](../setup/gcp-local-cloud-run-auth.md)), run [`scripts/run-staging-relevance-query-pack.sh`](../../scripts/run-staging-relevance-query-pack.sh) (works for any environment URL). It reads one query per line (see [`scripts/fixtures/staging-relevance-queries.example.txt`](../../scripts/fixtures/staging-relevance-queries.example.txt)), calls `GET /v1/search`, and prints a Markdown table — paste into [relevance-eval-result-template.md](relevance-eval-result-template.md) and attach to **TAR-82** / **TAR-68**.
 - **CI:** unit tests cover projection + mapper behavior; full relevance requires OpenSearch integration (Testcontainers) or a **deployed** index — do not block PRs on remote-only numbers.
+
+## Next runnable pass
+
+Use this exact sequence for the next baseline run:
+
+1. Pick the corpus and query list.
+   - For the agreed seed list, use [`scripts/fixtures/staging-relevance-queries.example.txt`](../../scripts/fixtures/staging-relevance-queries.example.txt).
+   - If you need a custom local list, keep it outside the repo or pass the file path directly to the query-pack script.
+2. Mint Cloud Run tokens and run the pack against the target environment.
+   - Dev/staging one-shot:
+     ```bash
+     ./scripts/evidara-cloud-run-operator-session.sh dev --relevance-only
+     ```
+   - Or, if you already have `EVIDARA_LEGAL_SEARCH_URL` and `EVIDARA_LEGAL_SEARCH_TOKEN` exported:
+     ```bash
+     ./scripts/run-staging-relevance-query-pack.sh scripts/fixtures/staging-relevance-queries.example.txt
+     ```
+3. Paste the generated Markdown table into [relevance-eval-result-template.md](relevance-eval-result-template.md).
+4. Attach the same table to Linear `TAR-82` and `TAR-68`.
+5. Record exactly one allowed regression slot, or state `none`.
 
 ## Related docs
 

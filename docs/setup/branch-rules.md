@@ -87,20 +87,22 @@ For **parallel streams** (which paths can merge independently), see [Parallel wo
 
 ## Required status checks
 
-The following CI checks are configured as **required status checks** on `main` via GitHub branch protection:
+Keep the required-check model aligned to the TAR-70 emitted-check matrix:
 
-| Check | Workflow | Purpose |
-|---|---|---|
-| `release-readiness` | `.github/workflows/release-readiness.yml` | Full release readiness gate |
-| `scraping-qa` | `.github/workflows/scraping-qa.yml` | Scraping/acquisition contract and fixture gate |
+- universal required checks should stay limited to checks that emit on every PR
+- path-scoped component checks should only gate the PRs that trigger them
+- release-lane checks such as `release-readiness` and `scraping-qa` should stay
+  release-scoped unless they are wrapped by an always-on aggregator
 
-Both must pass before a PR can be merged to `main`.
+For the current operator view of which PR types emit which checks, see
+[TAR-70 emitted-check matrix](../runbooks/tar-70-emitted-check-matrix.md).
 
 ## Enforcement
 
 These rules are enforced by:
 
-- **Branch protection** — `release-readiness` and `scraping-qa` are required status checks on `main`
+- **Branch protection** — keep live required checks aligned with the TAR-70 matrix and
+  avoid requiring release-only checks universally
 - **CI** — the `pr-title` workflow blocks merge if the title format is wrong
 - **Team discipline** — every team member follows these rules
 - **CodeRabbit** — AI review catches rule violations
