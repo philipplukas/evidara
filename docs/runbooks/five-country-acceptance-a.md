@@ -16,15 +16,47 @@ Canonical source context:
 
 - [Five-Country Content Rollout](../components/five-country-content-rollout.md)
 - [Platform-Control Multi-Country Operator Playbook](platform-control-multi-country-operator-playbook.md)
+- [CH + AT Thin-Slice Execution](ch-at-thin-slice-execution.md)
 - [Metadata quality plan status](metadata-quality-plan-status.md)
 - Linear umbrella: `TAR-160`
 
 ## Current state
 
-- The lane is ready to execute, but the CH/AT evidence has not yet been refreshed into the GA packet.
-- The shared country model is already in place; this lane now needs current search/detail/operator evidence only.
+- The lane is no longer just theoretical: CH/AT overlay and seed consistency checks now pass in-repo.
+- The shared country model is already in place; this lane now has repo-backed fixture evidence, but still needs live browser/operator evidence if we want a full operator proof packet.
 - The umbrella target is `TAR-160`; this note should produce a compact summary that can be pasted there verbatim.
 - Do not expand scope into DE / FR / IT or into branch-policy / runner work.
+
+## 2026-04-13 execution snapshot
+
+- `python3 scripts/check_country_overlay.py --country CH` -> pass.
+- `python3 scripts/check_country_overlay.py --country AT` -> pass.
+- `python3 scripts/check_country_overlay_at.py` -> pass.
+- Live CH deterministic preview run executed on dev:
+  - evidence: [2026-04-13 CH Fedlex Thin Slice Run 1](evidence/2026-04-13-ch-fedlex-thin-slice-run1.md)
+  - result: technical pass with `config-change-needed`
+  - key finding: provider captured the Fedlex homepage shell only, not a legislation page
+  - key mapping note: live dev required `jur_ch_federal` + `auth_fedlex`, not `jur_ch` + `auth_ch_fedlex`
+  - follow-up finding: Fedlex metadata is publicly queryable via `https://fedlex.data.admin.ch/sparqlendpoint`, which strengthens the case for a deterministic CH discovery layer, but not via the current `deterministic_http` homepage blueprint
+- `platform-control/tests/fixtures/scraping_baseline/ch_commentary_html.json` anchors CH commentary evidence with `jurisdiction_id: jur_ch_federal`, `authority_id: auth_commentary_publisher`, `document_type_hint: commentary`, `language_codes: de`.
+- `platform-control/tests/fixtures/scraping_baseline/clean_html.json`, `xml_primary.json`, and `multi_language_fr_de.json` provide additional CH law fixtures, including multilingual `fr,de,it` coverage for the structured-law slice.
+- `platform-control/tests/fixtures/scraping_baseline/at_ris_decision.json` anchors AT decision evidence with `jurisdiction_id: jur_at_federal`, `authority_id: auth_vfgh`, `document_type_hint: decision`, `language_codes: de`.
+- `platform-control/hierarchies/jurisdictions.yaml` contains canonical `ch`, `ch/federal`, `at`, and `at/federal` hierarchy paths, and `platform-control/seeds/reference/{jurisdictions,authorities}.yaml` contains the corresponding CH/AT seed rows.
+- `contracts/vocabularies/jurisdiction.json` and the search/projection contracts already constrain the canonical jurisdiction and projection fields used by these fixtures.
+- Not executed here: live browser screenshots, operator workflow URLs, and `uv run pytest platform-control/tests/unit/test_scraping_fixture_baseline.py -q` in this shell (the current Python environment cannot spawn `pytest`).
+
+## Pass / fail snapshot
+
+| Check | Sample | Result | Evidence |
+|------|--------|--------|----------|
+| CH overlay consistency | `country-overlays/at/*` + CH source blueprints | pass | `python3 scripts/check_country_overlay.py --country CH` |
+| AT overlay consistency | `country-overlays/at/*` + AT source blueprints | pass | `python3 scripts/check_country_overlay.py --country AT` |
+| AT contract + seed consistency | `contracts/vocabularies/jurisdiction.json` + `platform-control/seeds/reference/{jurisdictions,authorities}.yaml` | pass | `python3 scripts/check_country_overlay_at.py` |
+| CH fixture anchors | `ch_commentary_html.json`, `clean_html.json`, `xml_primary.json`, `multi_language_fr_de.json` | pass | repo-backed fixture files with canonical CH jurisdiction / authority fields |
+| CH live deterministic thin slice | `run_01kp3rqx5nw6gyyrtnzcy48z3y` | partial pass / config-change-needed | [2026-04-13 CH Fedlex Thin Slice Run 1](evidence/2026-04-13-ch-fedlex-thin-slice-run1.md) |
+| AT fixture anchors | `at_ris_decision.json` | pass | repo-backed fixture file with canonical AT jurisdiction / authority fields |
+| Live browser/operator evidence | CH/AT screenshots, workflow URLs, run IDs | missing | not executed in this lane |
+| Fixture baseline pytest | `platform-control/tests/unit/test_scraping_fixture_baseline.py` | not run | current shell cannot spawn `pytest` |
 
 ## Scope
 
@@ -134,11 +166,11 @@ Capture rule:
 Paste this into `TAR-160` when the slice is complete:
 
 > CH + AT acceptance complete.
-> Representative CH and AT docs were checked for taxonomy, filters, subtitles, detail rows, and operator flow.
-> Result: `<pass/fail>` overall.
-> Evidence: `<run URLs / screenshot anchors / workflow URLs>`.
-> Gaps: `<none>` or `<short follow-up list>`.
-> Next action: `<link to follow-up issue if any>`.
+> Representative CH and AT docs were checked for overlay/model consistency and repo-backed fixture anchors.
+> Result: partial pass for repo-backed evidence; live browser/operator evidence still pending.
+> Evidence: `python3 scripts/check_country_overlay.py --country CH`, `python3 scripts/check_country_overlay.py --country AT`, `python3 scripts/check_country_overlay_at.py`, `platform-control/tests/fixtures/scraping_baseline/ch_commentary_html.json`, `platform-control/tests/fixtures/scraping_baseline/at_ris_decision.json`, `platform-control/tests/fixtures/scraping_baseline/clean_html.json`, `platform-control/tests/fixtures/scraping_baseline/xml_primary.json`, `platform-control/tests/fixtures/scraping_baseline/multi_language_fr_de.json`.
+> Gaps: live browser screenshots, operator workflow URLs, and a runnable `pytest` path in this shell.
+> Next action: capture CH/AT operator evidence and paste the run URLs/screenshots into `TAR-160`.
 
 ## Likely risks
 
