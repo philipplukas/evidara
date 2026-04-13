@@ -92,8 +92,8 @@ test.describe("Canonical screenshot evidence pack", () => {
     await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs/run_01/show`);
     await expect(page.getByRole("heading", { name: "Pipeline Health" })).toBeVisible();
     await expect(page.getByText("Operator Checklist")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open DI processing status" })).toBeVisible();
-    await expect(page.getByText("Operational status contract", { exact: false })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Jump to DI processing" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open related evidence runbook" })).toBeVisible();
     await saveScreenshot(page, "admin-run-lifecycle-visibility.png");
     await saveOperatorJourneyEvents(page);
   });
