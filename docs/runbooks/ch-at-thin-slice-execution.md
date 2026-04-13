@@ -123,6 +123,8 @@ Operational implication:
 - keep the CH posture deterministic-first at the evidence/authority level
 - do not assume `deterministic_http` against raw Fedlex page URLs is sufficient for legislation
   text capture
+- the new `fedlex_sparql` path proves the technical handoff through DI, but it currently emits a
+  metadata-plus-Turtle JSON bundle rather than a text-bearing law artifact
 - if we stay purely deterministic, the stronger long-term option is a CH API/SPARQL-aware
   acquisition path
 - use Temporal above that provider for hierarchy traversal, retries, and backfills rather than
@@ -239,6 +241,15 @@ Use this for:
 
 Always preview the overlay/template first.
 
+### CH SPARQL preview
+
+```bash
+curl -X POST "$EVIDARA_PLATFORM_CONTROL_URL/v1/sources/blueprint-preview" \
+  -H "Authorization: Bearer $EVIDARA_PLATFORM_CONTROL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"overlay_id":"ch","provider_template_id":"fedlex_sparql_constitution_de"}'
+```
+
 ### CH deterministic preview
 
 ```bash
@@ -274,6 +285,7 @@ Expected result:
   - `deterministic_http`
   - `ris_ogd`
   - `firecrawl`
+  - `fedlex_sparql`
 
 ## Step 4: Create source + initial version
 
@@ -306,6 +318,35 @@ Latest evidence:
 - [2026-04-13 CH Fedlex Thin Slice Run 1](evidence/2026-04-13-ch-fedlex-thin-slice-run1.md)
 - current judgment: `config-change-needed`
 - key blocker: homepage shell capture rather than legislation-page capture
+
+### CH slice 1b: Fedlex SPARQL constitution
+
+```bash
+curl -X POST "$EVIDARA_PLATFORM_CONTROL_URL/v1/sources/with-version" \
+  -H "Authorization: Bearer $EVIDARA_PLATFORM_CONTROL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": {
+      "name": "CH Fedlex SPARQL constitution thin slice",
+      "jurisdiction_id": "jur_ch_federal",
+      "authority_id": "auth_fedlex",
+      "source_type": "api",
+      "document_family": "law"
+    },
+    "source_version": {
+      "version_label": "ch-fedlex-sparql-v1",
+      "overlay_id": "ch",
+      "provider_template_id": "fedlex_sparql_constitution_de"
+    }
+  }'
+```
+
+Latest evidence:
+
+- [2026-04-13 CH Fedlex SPARQL Preview Run 1](evidence/2026-04-13-ch-fedlex-sparql-preview-run1.md)
+- current judgment: `config-change-needed`
+- key blocker: metadata/Turtle JSON captured successfully, but the provider does not yet emit a
+  text-bearing law artifact
 
 ### AT slice 1: RIS Bundesrecht
 
@@ -409,6 +450,14 @@ Use bounded preview when:
 - you are exploring a broad portal
 - you want path/classification signal before full coverage
 - you are testing retries without re-running a large job
+
+Operator note:
+
+- for the current CH SPARQL path, treat downstream `processing-status` and `document-lifecycle`
+  as eventually consistent
+- wait roughly `20-30s` after run completion before concluding DI is missing
+- if DI rows appear but the artifact is still JSON metadata only, that is a provider-output issue,
+  not a transport issue
 
 ## Step 7: Inspect and classify the run
 

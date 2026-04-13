@@ -38,6 +38,12 @@ Canonical source context:
   - key finding: provider captured the Fedlex homepage shell only, not a legislation page
   - key mapping note: live dev required `jur_ch_federal` + `auth_fedlex`, not `jur_ch` + `auth_ch_fedlex`
   - follow-up finding: Fedlex metadata is publicly queryable via `https://fedlex.data.admin.ch/sparqlendpoint`, which strengthens the case for a deterministic CH discovery layer, but not via the current `deterministic_http` homepage blueprint
+- Live CH SPARQL preview run executed on dev:
+  - evidence: [2026-04-13 CH Fedlex SPARQL Preview Run 1](evidence/2026-04-13-ch-fedlex-sparql-preview-run1.md)
+  - result: technical pass with `config-change-needed`
+  - key finding: acquisition, DI ingress, and DI callback paths all worked
+  - key caveat: the provider currently emits metadata-plus-Turtle JSON, not a text-bearing Swiss law artifact
+  - operator note: the first manual lifecycle poll was too early; downstream rows appeared after the Pub/Sub round-trip completed
 - `platform-control/tests/fixtures/scraping_baseline/ch_commentary_html.json` anchors CH commentary evidence with `jurisdiction_id: jur_ch_federal`, `authority_id: auth_commentary_publisher`, `document_type_hint: commentary`, `language_codes: de`.
 - `platform-control/tests/fixtures/scraping_baseline/clean_html.json`, `xml_primary.json`, and `multi_language_fr_de.json` provide additional CH law fixtures, including multilingual `fr,de,it` coverage for the structured-law slice.
 - `platform-control/tests/fixtures/scraping_baseline/at_ris_decision.json` anchors AT decision evidence with `jurisdiction_id: jur_at_federal`, `authority_id: auth_vfgh`, `document_type_hint: decision`, `language_codes: de`.
