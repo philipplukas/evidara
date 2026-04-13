@@ -45,7 +45,7 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: "npm run dev -- --port 3101",
+          command: "env -u NO_COLOR npm run dev -- --port 3101",
           port: 3101,
           timeout: 120_000,
           reuseExistingServer: true,
@@ -56,7 +56,7 @@ export default defineConfig({
           },
         },
         {
-          command: "npm run dev -- --port 3100",
+          command: "env -u NO_COLOR npm run dev -- --port 3100",
           cwd: "../../platform-control/admin",
           port: 3100,
           timeout: 120_000,

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { mockAdminRunFlowApi } from "./helpers/mock-admin-api";
@@ -11,7 +11,9 @@ const LEGAL_SEARCH_BASE_URL =
 const ADMIN_BASE_URL = process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://localhost:3100";
 const UI_PROFILE_COOKIE = "evidara-ui-profile";
 const ADMIN_LOCAL_STORAGE_ROLE_KEY = "evidara_user_role";
+const CANONICAL_VIEWPORT = { width: 1600, height: 900 };
 const OUTPUT_DIR = "screenshot-pack";
+const VIDEO_MODE = process.env.SCREENSHOT_PACK_VIDEO_MODE?.trim().toLowerCase() || "disabled";
 
 async function saveScreenshot(page: Page, name: string) {
   await mkdir(OUTPUT_DIR, { recursive: true });
@@ -29,6 +31,19 @@ async function saveOperatorJourneyEvents(page: Page) {
   });
   await mkdir(OUTPUT_DIR, { recursive: true });
   await writeFile(join(OUTPUT_DIR, "operator-journey-events.json"), JSON.stringify(events, null, 2));
+}
+
+async function saveJourneyVideo(page: Page, name: string, enabled: boolean) {
+  if (!enabled) {
+    return;
+  }
+  const video = page.video();
+  if (!video) {
+    return;
+  }
+  await mkdir(OUTPUT_DIR, { recursive: true });
+  await page.close();
+  await video.saveAs(join(OUTPUT_DIR, name));
 }
 
 async function gotoWithRetry(page: Page, url: string, attempts = 3) {
@@ -49,6 +64,8 @@ async function gotoWithRetry(page: Page, url: string, attempts = 3) {
 
 test.describe("Canonical screenshot evidence pack", () => {
   test.beforeEach(async ({ page, context }) => {
+    await rm(OUTPUT_DIR, { recursive: true, force: true });
+    await page.setViewportSize(CANONICAL_VIEWPORT);
     await context.addCookies([
       {
         name: UI_PROFILE_COOKIE,
@@ -96,5 +113,6 @@ test.describe("Canonical screenshot evidence pack", () => {
     await expect(page.getByRole("link", { name: "Open related evidence runbook" })).toBeVisible();
     await saveScreenshot(page, "admin-run-lifecycle-visibility.png");
     await saveOperatorJourneyEvents(page);
+    await saveJourneyVideo(page, "cross-surface-journey.webm", VIDEO_MODE === "enabled");
   });
 });

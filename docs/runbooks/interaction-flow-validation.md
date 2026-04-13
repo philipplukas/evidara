@@ -79,6 +79,7 @@ This runbook should not become a second home for API-only acceptance evidence.
   - control panel link is visible when `NEXT_PUBLIC_CONTROL_PANEL_URL` is configured **and** the UI profile is `admin` (see `NEXT_PUBLIC_DEFAULT_UI_PROFILE` and `evidara-ui-profile` in `legal-search/frontend/README.md`)
   - non-admin users who open admin directly see explicit **403-style** denial copy and a recovery link (`AdminShell`)
   - link points to configured admin surface URL for authorized profiles
+  - the jump carries namespaced handoff context (`ls_return_to`, `ls_query`, `ls_scope`, `ls_item`) so admin can orient the operator and return to the originating search state
 - Evidence: browser-visible header link with expected href; Playwright `@contract` in `legal-search/frontend/e2e/rbac-cross-surface.spec.ts`
 
 ### Journey 6: Surface health checks
@@ -126,6 +127,7 @@ bash scripts/run-interaction-flow-local.sh
 
 - **Traces** default to `retain-on-failure` (inspect with [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer)). Same as above without `--record`: `PLAYWRIGHT_TRACE=on PLAYWRIGHT_VIDEO=on bash scripts/run-interaction-flow-local.sh`
 - **Videos** default to retain-on-failure unless `--record` / `PLAYWRIGHT_VIDEO=on`; disable with `PLAYWRIGHT_VIDEO=off`
+- The canonical `cross-surface-journey.webm` is emitted when `SCREENSHOT_PACK_VIDEO_MODE=enabled` is set. The local record path and the `e2e:interaction-flow:record` npm script set that flag automatically.
 - **HTML report**: `legal-search/frontend/playwright-report/index.html`
 - **Against staging URLs** (no local `webServer`): set `PLAYWRIGHT_EXTERNAL_BASE_URL`, `PLAYWRIGHT_ADMIN_BASE_URL`, and `PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL` then run `npm run e2e:interaction-flow` from `legal-search/frontend` after `npm ci` + `npx playwright install chromium`
 - **Record a new journey** (human-in-the-loop → generated steps): `cd legal-search/frontend && npm run e2e:codegen:local` after dev servers are up (`localhost:3101` legal-search, `3100` admin via Playwright or manual), or `npm run e2e:codegen` with a URL you pass on the CLI. Then move generated steps into `e2e/*.spec.ts` and tag with `@smoke` / `@contract` / `@screenshots` as appropriate.
@@ -144,6 +146,8 @@ In **CI**, `CI=1` enables **one Playwright retry per test** so flaky journeys ca
 - Current staging parity scope:
   - runs full smoke and full cross-surface RBAC contract suite in staging
   - validates admin-visible link, standard hidden link, and admin denial/recovery UX on staging surfaces
+- Staging operator summary:
+  - the workflow writes a GitHub Actions job summary with the run URL, evidence GCS prefix, retry counts, and screenshot-pack coverage status
 - Published artifacts:
   - local: `interaction-flow-evidence-${run_id}`
   - staging: `interaction-flow-staging-evidence-${run_id}`
@@ -152,6 +156,7 @@ In **CI**, `CI=1` enables **one Playwright retry per test** so flaky journeys ca
   - staging evidence: `scripts/fetch-interaction-flow-evidence.sh --workflow "Interaction Flow Staging Evidence" --artifact-prefix interaction-flow-staging-evidence`
   - quick-check (recommended): `scripts/check-latest-interaction-flow-evidence.sh --mode staging`
   - screenshot pack output path: `legal-search/frontend/screenshot-pack`
+  - canonical journey video: `legal-search/frontend/screenshot-pack/cross-surface-journey.webm` when screenshot-pack video mode is enabled
 - Companion API acceptance evidence:
   - runbook: `docs/runbooks/mvp-acceptance-scenario-pack.md`
   - preferred command: `uv run evidara workflow mvp-acceptance`
@@ -163,8 +168,9 @@ Capture this pack once per release candidate and store it alongside the evidence
 Automation baseline:
 
 - CI now publishes `legal-search/frontend/screenshot-pack` in both local/PR and staging evidence artifacts.
-- Run `scripts/check-latest-interaction-flow-evidence.sh --mode staging` to verify manifest, Playwright report, runbook snapshot, and screenshot pack presence.
-- Screenshot pack now includes admin captures for run launch preflight and run lifecycle visibility in addition to legal-search captures.
+- Run `scripts/check-latest-interaction-flow-evidence.sh --mode staging` to verify manifest, Playwright report, runbook snapshot, screenshot pack presence, and the canonical video when the manifest declares video mode is enabled.
+- Screenshot pack now includes admin captures for run launch preflight and run lifecycle visibility, plus a canonical cross-surface journey video when recording mode is enabled.
+- In staging, enable `full_playwright_trace` on the workflow dispatch when you want the `.webm` artifact bundled with the screenshot pack.
 
 | Capture point | Target surface | What to capture |
 | --- | --- | --- |
