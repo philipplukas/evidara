@@ -9,7 +9,7 @@ Applies to: repository **Actions → Evidara CLI remote smoke** (`.github/workfl
 
 The workflow is **workflow_dispatch only**. It runs `evidara platform-control ping` and `evidara legal-search ping` against **URLs you type** into the form.
 
-**Cloud Run IAM (Bearer):** the workflow authenticates with **Google OIDC** (Workload Identity Federation), impersonates the environment service account (`GCP_SERVICE_ACCOUNT_DEV` or `GCP_SERVICE_ACCOUNT_STAGING`), and **mints** audience-scoped ID tokens for the two base URLs you enter. You do **not** need repository secrets `EVIDARA_PLATFORM_CONTROL_TOKEN` / `EVIDARA_LEGAL_SEARCH_TOKEN` for private Cloud Run in CI.
+**Cloud Run IAM (Bearer):** the workflow authenticates with **Google OIDC** (Workload Identity Federation) as the environment service account (`GCP_SERVICE_ACCOUNT_DEV` or `GCP_SERVICE_ACCOUNT_STAGING`) and then **mints** audience-scoped ID tokens for the two base URLs you enter from the active CI credentials. You do **not** need repository secrets `EVIDARA_PLATFORM_CONTROL_TOKEN` / `EVIDARA_LEGAL_SEARCH_TOKEN` for private Cloud Run in CI.
 
 **Terraform:** manage GitHub environments and secrets with [`infra/terraform/github/repo_settings`](../../infra/terraform/github/repo_settings/README.md) (`environment_secrets` for WIF + SA email; optional `repository_secrets` for API keys — see README warning on short-lived Google ID tokens).
 

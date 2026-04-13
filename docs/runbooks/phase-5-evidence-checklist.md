@@ -1,12 +1,14 @@
 # Phase 5 — single-page evidence checklist (TAR-69)
 
-Owner: Platform team  
-Last reviewed: 2026-04-11  
-Last verified: 2026-04-11  
-Applies to: **Linear TAR-69** (release readiness / promotion decision), **TAR-64**, **TAR-77**, **TAR-85**  
+Owner: Platform team
+Last reviewed: 2026-04-13
+Last verified: 2026-04-13
+Applies to: **Linear TAR-69** (release readiness / promotion decision), **TAR-64**, **TAR-77**, **TAR-85**
 **Posture note:** teams **without** a staging GCP project use **dev** for remote MVP acceptance (TAR-85); see [Environment strategy — dev-first](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project).
 
 This page is the **one entry point** for operator evidence that unblocks [phase 5 go / no-go memo](phase-5-go-no-go-memo.md). Detailed steps stay in the linked runbooks; file artifacts on the **matching Linear issue** (not only in git).
+
+For the current release-packet refresh, start with [TAR-214 release evidence refresh](tar-214-release-evidence-refresh.md). That note sequences the exact evidence refresh and synthesis steps so the TAR-69 summary comment can be updated last.
 
 ---
 

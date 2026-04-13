@@ -48,7 +48,7 @@ API services use **audience-scoped Google ID tokens** at the Cloud Run layer. A 
 
 3. **Helper:** `source` the output of [`scripts/mint-cloud-run-tokens.sh`](../../scripts/mint-cloud-run-tokens.sh) (see script usage).
 
-Reference: audience-scoped token step in [`.github/workflows/e2e-smoke-staging.yml`](../../.github/workflows/e2e-smoke-staging.yml) (`--impersonate-service-account` + `--audiences`).
+Reference: audience-scoped token step in [`.github/workflows/e2e-smoke-staging.yml`](../../.github/workflows/e2e-smoke-staging.yml) (WIF auth in CI, then `gcloud auth print-identity-token --audiences=…` from the active credentials).
 
 ### Shell helper output modes (`mvp-acceptance-scenario-pack.sh`)
 

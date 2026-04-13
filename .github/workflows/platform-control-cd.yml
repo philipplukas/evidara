@@ -56,9 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           REPO_PATH="${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}"
-          # Runtime Images builds the shared deployable set used by this workflow.
-          # Document Service is deployed below, but it is not part of the image wait loop.
-          for image in platform-control platform-control-worker legal-search-api di-consumer; do
+          for image in platform-control platform-control-worker legal-search-api di-consumer document-intelligence-document-service; do
             echo "Waiting for ${REPO_PATH}/${image}:${IMAGE_TAG} ..."
             found=""
             for i in $(seq 1 90); do
@@ -187,7 +185,6 @@ jobs:
             --format='value(status.url)')
           echo "Checking ${DI_URL}/health ..."
           TOKEN=$(gcloud auth print-identity-token \
-            --impersonate-service-account="${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}" \
             --audiences="${DI_URL}" \
             --include-email)
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \

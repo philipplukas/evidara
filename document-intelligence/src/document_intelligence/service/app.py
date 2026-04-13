@@ -57,7 +57,8 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     @app.get("/v1/documents/{document_id}", tags=["documents"])
     async def get_document_docling_full(
         document_id: str,
-        processing_manifest_id: Annotated[str | None, Query()] = None,
+        document_revision: Annotated[int | None, Query(ge=1)] = None,
+        processing_manifest_id: Annotated[str | None, Query(include_in_schema=False)] = None,
         _auth: None = Depends(verify_bearer),
         st: PublishedDocumentStore = Depends(get_store),
     ) -> dict[str, Any]:
@@ -65,7 +66,7 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
             raise _bad_id("Invalid document_id")
         if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
             raise _bad_id("Invalid processing_manifest_id")
-        body = st.get_full(document_id, processing_manifest_id)
+        body = st.get_full(document_id, document_revision, processing_manifest_id)
         if body is None:
             raise HTTPException(status_code=404, detail="Document revision not found")
         return body
@@ -73,7 +74,8 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     @app.get("/v1/documents/{document_id}/lean", tags=["documents"])
     async def get_document_docling_lean(
         document_id: str,
-        processing_manifest_id: Annotated[str | None, Query()] = None,
+        document_revision: Annotated[int | None, Query(ge=1)] = None,
+        processing_manifest_id: Annotated[str | None, Query(include_in_schema=False)] = None,
         _auth: None = Depends(verify_bearer),
         st: PublishedDocumentStore = Depends(get_store),
     ) -> dict[str, Any]:
@@ -81,7 +83,7 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
             raise _bad_id("Invalid document_id")
         if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
             raise _bad_id("Invalid processing_manifest_id")
-        body = st.get_full(document_id, processing_manifest_id)
+        body = st.get_full(document_id, document_revision, processing_manifest_id)
         if body is None:
             raise HTTPException(status_code=404, detail="Document revision not found")
         return to_lean_dict(body)
@@ -93,7 +95,8 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
     )
     async def get_document_plain_text(
         document_id: str,
-        processing_manifest_id: Annotated[str | None, Query()] = None,
+        document_revision: Annotated[int | None, Query(ge=1)] = None,
+        processing_manifest_id: Annotated[str | None, Query(include_in_schema=False)] = None,
         _auth: None = Depends(verify_bearer),
         st: PublishedDocumentStore = Depends(get_store),
     ) -> PlainTextResponse:
@@ -101,7 +104,7 @@ def create_app(store: PublishedDocumentStore | None = None) -> FastAPI:
             raise _bad_id("Invalid document_id")
         if processing_manifest_id is not None and not _PM_ID_RE.fullmatch(processing_manifest_id):
             raise _bad_id("Invalid processing_manifest_id")
-        body = st.get_full(document_id, processing_manifest_id)
+        body = st.get_full(document_id, document_revision, processing_manifest_id)
         if body is None:
             raise HTTPException(status_code=404, detail="Document revision not found")
         text = to_plain_text(body)

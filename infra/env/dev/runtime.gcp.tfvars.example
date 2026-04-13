@@ -72,6 +72,7 @@ cloud_run_services = {
       OPENSEARCH_INDEX_SECTIONS           = "evidara-sections-read-dev"
       OPENSEARCH_INDEX_CITATIONS          = "evidara-citations-read-dev"
       OPENSEARCH_INDEX_PROJECTION_HISTORY = "evidara-projection-history-dev"
+      DOCUMENT_INTELLIGENCE_BASE_URL      = "https://document-intelligence-document-service-dev.example.run.app"
     }
     secret_env_vars = {
       OPENSEARCH_NODE = {
@@ -82,6 +83,25 @@ cloud_run_services = {
       }
       OPENSEARCH_PASSWORD = {
         secret_name = "opensearch_password"
+      }
+      DOCUMENT_INTELLIGENCE_API_KEY = {
+        secret_name = "document_service_bearer_token"
+      }
+    }
+  }
+
+  "document-intelligence-document-service" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-dev/runtime/document-intelligence-document-service:latest"
+    service_account_key   = "document_intelligence"
+    allow_unauthenticated = true
+    startup_probe_path    = "/health"
+    liveness_probe_path   = "/health"
+    env_vars = {
+      DI_SURFACES_ROOT_URI = "gs://evidara-document-intelligence-surfaces-dev/published"
+    }
+    secret_env_vars = {
+      DOCUMENT_SERVICE_BEARER_TOKEN = {
+        secret_name = "document_service_bearer_token"
       }
     }
   }
@@ -329,4 +349,3 @@ runtime_service_account_ids = {
   legal_search_frontend   = "evd-ls-frontend"
   document_intelligence   = "evd-di-consumer"
 }
-

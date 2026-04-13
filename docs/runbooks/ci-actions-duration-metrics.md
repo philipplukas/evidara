@@ -1,8 +1,8 @@
 # CI — Actions duration and runner tuning
 
 Owner: Platform / DevEx  
-Last reviewed: 2026-04-12  
-Last verified: 2026-04-12  
+Last reviewed: 2026-04-13
+Last verified: 2026-04-13
 Applies to: GitHub Actions queue vs run time; org vars `LIGHT_RUNNER_RUNS_ON_JSON`, `HEAVY_RUNNER_RUNS_ON_JSON`
 
 ## Why measure first
@@ -86,6 +86,69 @@ After the K8s runner pools are live and the org variables are updated:
 5. Only after that decision, move any remaining bridge workflows back behind `LIGHT_RUNNER_RUNS_ON_JSON` / `HEAVY_RUNNER_RUNS_ON_JSON`.
 
 If self-hosted queues starve PRs, **scale runner count** or **split labels** (e.g. dedicated Playwright vs Docker-heavy) instead of moving every job to one pool.
+
+## Runner reliability checklist
+
+Use this when the ARC / self-hosted pools drift, queue jobs, or re-register with unexpected labels.
+
+### Current stable target
+
+- Light pool should resolve to `["self-hosted","linux","x64","evidara","light","k8s"]`.
+- Heavy pool should resolve to `["self-hosted","linux","x64","evidara","heavy","k8s"]`.
+- `runner-bootstrap-preflight.yml` is the canonical bootstrap smoke for both pools.
+- `runner-pool-smoke.yml` is the recurring light/heavy health check.
+- `runtime-images.yml` should stay separate from the generic light/heavy pools until a Docker-capable runner class is proven stable.
+
+### Likely failure modes seen recently
+
+- Label drift after ARC pod or runner rotation, including runners coming back with empty or partial label sets.
+- Ghost-busy or stale registration state, where GitHub shows runners online but jobs still do not dequeue reliably.
+- Docker/buildx readiness gaps on the heavy pool, especially for repeated `docker/setup-buildx-action` + `docker/build-push-action` jobs.
+- Terraform wrapper bootstrap failures on self-hosted Linux when `hashicorp/setup-terraform` assumes a Node wrapper that is not available.
+
+### Remediation checklist
+
+1. Confirm both pools are online and advertising the full target label set.
+2. Verify light-pool jobs can bootstrap Node 22, Python 3.11, `git`, `curl`, and `unzip` with `runner-bootstrap-preflight.yml`.
+3. Verify heavy-pool jobs can launch Chromium and complete the Playwright smoke path with `runner-bootstrap-preflight.yml` and `runner-pool-smoke.yml`.
+4. Verify Docker/buildx availability before routing image jobs to heavy. If Docker is not guaranteed, keep `runtime-images.yml` off that pool.
+5. Keep `terraform.yml` on a bootstrap path that does not depend on the Terraform wrapper assuming Node is present on the runner.
+6. If labels disappear on rotation, fix the runner class / scale-set registration before changing workflow selectors again.
+7. Do not use required-check workarounds as a substitute for runner health; they only hide queueing problems.
+
+### Verification plan
+
+Run these checks after any runner pool change or ARC recycle:
+
+```bash
+gh workflow run runner-bootstrap-preflight.yml \
+  -f runner_scale_set='evidara-light' \
+  -f node_version='22' \
+  -f python_version='3.11' \
+  -f frontend_playwright_smoke=false
+
+gh workflow run runner-bootstrap-preflight.yml \
+  -f runner_scale_set='evidara-heavy' \
+  -f node_version='22' \
+  -f python_version='3.11' \
+  -f frontend_playwright_smoke=true
+
+gh workflow run runner-pool-smoke.yml
+```
+
+Pass criteria:
+
+- both bootstrap workflows leave `queued` state and start promptly
+- light pool completes the Node / Python bootstrap steps without wrapper or missing-binary errors
+- heavy pool completes the browser smoke path and does not regress to label-less or busy-stuck runners
+- `runtime-images.yml` only moves back onto the self-hosted path after the pool can sustain Docker/buildx builds repeatedly
+
+### Related issues
+
+- `TAR-70` — gate policy hardening and required-check alignment
+- `TAR-214` — release evidence refresh, including runner-facing verification artifacts
+- `TAR-160` — GA sign-off, once the pools are stable enough to trust for release evidence
+- `runner-trust-verification-checklist.md` — copy-paste verification, incident response, and cutover readiness matrix
 
 ## Related
 

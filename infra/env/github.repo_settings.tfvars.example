@@ -18,6 +18,7 @@ repository_variables = {
   PLATFORM_CONTROL_WORKER_SERVICE_NAME = "platform-control-worker"
   LEGAL_SEARCH_API_SERVICE_NAME        = "legal-search-api"
   DI_CONSUMER_SERVICE_NAME             = "document-intelligence-consumer"
+  DOCUMENT_INTELLIGENCE_DOCUMENT_SERVICE_NAME = "document-intelligence-document-service"
   DI_SURFACES_ROOT_URI_DEV             = "gs://evidara-document-intelligence-surfaces-dev/published"
   DI_SURFACES_ROOT_URI_STAGING         = "gs://evidara-document-intelligence-surfaces-staging/published"
   SMOKE_SEED_URL_DEV                   = "http://example.org"

@@ -1,17 +1,17 @@
 # Phase 5 go / no-go memo (draft)
 
-Owner: Platform lead  
-Last reviewed: 2026-04-12  
-Last verified: 2026-04-12  
-Applies to: release readiness / promotion (Linear **TAR-69**); **dev-first teams** use dev for TAR-85 — see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)  
+Owner: Platform lead
+Last reviewed: 2026-04-13
+Last verified: 2026-04-13
+Applies to: release readiness / promotion (Linear **TAR-69**); **dev-first teams** use dev for TAR-85 — see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)
 Canonical template history: this file is the **working draft**; publish final recommendation in Linear **TAR-69** when all gates are green.
 
-**Operator entry point:** [Phase 5 evidence checklist](phase-5-evidence-checklist.md) (TAR-64 / TAR-77 / TAR-85 in one place).
+**Operator entry points:** [TAR-214 release evidence refresh](tar-214-release-evidence-refresh.md) for the current refresh path; [Phase 5 evidence checklist](phase-5-evidence-checklist.md) remains the index for TAR-64 / TAR-77 / TAR-85.
 
 ## 1. Summary recommendation
 
 - **Recommendation:** **PENDING** — operator evidence still required for full dev smoke (TAR-64 ×2), branch protection proof (TAR-77), and fresh **remote** MVP acceptance (**TAR-85** — use **dev** Cloud Run when no staging GCP project exists). Repo implementation for search/metadata/relevance is merged.
-- **Date:** 2026-04-09 (draft); **local re-verify ([TAR-214](https://linear.app/tart-baozi/issue/TAR-214)):** 2026-04-12 — see §1.1  
+- **Date:** 2026-04-09 (draft); **local re-verify ([TAR-214](https://linear.app/tart-baozi/issue/TAR-214)):** 2026-04-12 — see §1.1
 - **Environment(s) covered:** **dev** (primary remote integration + TAR-85 target for dev-first posture); staging only if your org provisions it — **re-verify** MVP acceptance tables after each promotion batch on `main`
 
 ### 1.1 TAR-214 — automated verification (2026-04-12)
@@ -25,6 +25,17 @@ Executed on **`main`** (TAR-214 automation commit in git history) in an agent en
 | Contract examples / schemas | `python3 scripts/validate_json_schemas.py` (repo root) | **pass** |
 
 Log row: [first-vertical-slice-exit-gates.md — Verification Log](first-vertical-slice-exit-gates.md#verification-log) (2026-04-12).
+
+### 1.2 TAR-214 — release evidence refresh (2026-04-13)
+
+Use [TAR-214 release evidence refresh](tar-214-release-evidence-refresh.md) as the operator path for the current release packet.
+
+| Step | Current status | What to do next |
+|------|----------------|-----------------|
+| `TAR-77` branch protection proof | stale because `main` changed on 2026-04-13 and the required-check model was simplified to always-on checks only | Capture a fresh GitHub protection screenshot and one green strict `Release Readiness` run URL; link the policy drift back to `TAR-70` |
+| `TAR-64` dev smoke evidence | blocked on a fresh green `E2E Smoke Dev` after the Cloud Run token mint path failed on self-hosted runner egress | Merge the CI/auth fix from `#220`, rerun `E2E Smoke Dev`, then attach the run URL, timestamp, exit code, and Gate D IDs |
+| `TAR-85` remote MVP acceptance | present but not yet re-linked into the refreshed packet | Re-run `evidara workflow mvp-acceptance` against `dev` or staging and capture stdout / JSON with `evidence_pack_version` |
+| `TAR-69` synthesis | pending | Post one summary comment linking the refreshed evidence and update §2 with the final run URLs |
 
 ## 2. Gate outcomes
 
@@ -55,7 +66,8 @@ These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, an
 | Topic | Status | Notes |
 |-------|--------|--------|
 | Projection fields (title, type, dates, structural path) | **Shipped** | `ProjectionsService` maps canonical DI lean rows; see `search-relevance-baseline.md` |
-| Relevance eval pack | **PENDING** | Run query pack in `search-relevance-baseline.md` against **dev** (or staging) legal-search API; attach top-N table to TAR-82 / TAR-68 |
+| Relevance eval pack | **PENDING** | Run query pack in `search-relevance-baseline.md` against **dev** (or staging) legal-search API, include the `q=*` control row, and attach the table to TAR-82 / TAR-68 |
+| Platform trust proof | **PARTIAL GO** | Hetzner + Tailscale + Argo path is proven via the `rocky-agents` staging smoke and live image verification; explicit Temporal execution ID still missing in the evidence packet |
 | Open issues | | TAR-64, TAR-77, TAR-85 until evidence attached |
 
 ## 4. Risk register

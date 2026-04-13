@@ -117,11 +117,9 @@ infra/
 ### Document Service
 
 - **Service name:** `document-intelligence-document-service-{env}` via the `cloud_run_services` map in runtime tfvars.
-- **Surface source:** the service reads published document rows from `DI_SURFACES_ROOT_URI`, which resolves the `published_documents` Delta surface under the configured root; local fixture runs use `DOCUMENT_SERVICE_CONTENT_DIR` (default `/content`) for file-backed JSON.
-- **Secret seeding:** create `document-service-bearer-token-{env}` with `scripts/manage_runtime_secrets.py --generate-internal --only document-service-bearer-token` so the service and BFF share the same bearer value.
+- **Surface source:** the service reads published document rows from `DI_SURFACES_ROOT_URI`, which resolves the `published_documents` Delta surface under the configured root.
 - **BFF wiring:** `legal-search-api` must set `DOCUMENT_INTELLIGENCE_BASE_URL` to the matching environment service URL.
 - **Auth model:** the current runtime path uses an application bearer secret, not Cloud Run IAM ID tokens. The service validates `DOCUMENT_SERVICE_BEARER_TOKEN`; the BFF sends the same value via `DOCUMENT_INTELLIGENCE_API_KEY`.
-- **CD smoke:** `platform-control-cd.yml` now checks that `legal-search-api` points at the deployed Document Service URL and performs an authenticated lean probe against a dummy document ID so base-URL or bearer regressions fail before merge.
 - **Operational implication:** when detail reads fall back or return empty bodies, verify the published surface URI and the BFF base URL / bearer pair before replaying source events.
 
 ### Applying Changes
