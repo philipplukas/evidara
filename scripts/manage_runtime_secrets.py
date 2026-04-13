@@ -31,6 +31,7 @@ SECRET_SPECS: tuple[SecretSpec, ...] = (
     SecretSpec("opensearch-node", "OPENSEARCH_NODE", "upstream"),
     SecretSpec("opensearch-username", "OPENSEARCH_USERNAME", "upstream"),
     SecretSpec("opensearch-password", "OPENSEARCH_PASSWORD", "upstream"),
+    SecretSpec("document-service-bearer-token", "DOCUMENT_SERVICE_BEARER_TOKEN", "internal"),
     SecretSpec("firecrawl-api-key", "FIRECRAWL_API_KEY", "upstream"),
     SecretSpec("firecrawl-webhook-secret", "FIRECRAWL_WEBHOOK_SECRET", "upstream"),
     SecretSpec("platform-control-database-url", "PLATFORM_CONTROL_DATABASE_URL", "upstream"),

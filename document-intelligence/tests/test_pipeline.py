@@ -11,7 +11,7 @@ from document_intelligence.extractors.metadata import (
     MetadataExtractionCandidate,
 )
 from document_intelligence.persist.sinks import InMemoryCanonicalSink
-from document_intelligence.pipeline import ProcessingPipeline
+from document_intelligence.pipeline import ProcessingPipeline, _resolve_official_citation
 from document_intelligence.validate.schema_validation import (
     validate_instance_against_contract,
 )
@@ -77,6 +77,13 @@ class StubMetadataExtractor:
 
 
 class ProcessingPipelineTests(unittest.TestCase):
+    def test_official_citation_uses_publication_organ_from_ris_metadata(self) -> None:
+        citation = _resolve_official_citation(
+            {},
+            {"publication_organ": "BGBl. I Nr. 12/2026"},
+        )
+        self.assertEqual(citation, "BGBl. I Nr. 12/2026")
+
     def test_processes_local_html_bundle_into_contract_valid_outputs(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
             html_handle.write(SAMPLE_HTML)

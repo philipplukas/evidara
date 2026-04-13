@@ -50,7 +50,6 @@ async function gotoWithRetry(page: Page, url: string, attempts = 3) {
 
   throw lastError;
 }
-
 test.describe("@contract RBAC cross-surface (legal-search header + admin denial)", () => {
   test.beforeEach(async ({ context }) => {
     await context.clearCookies();

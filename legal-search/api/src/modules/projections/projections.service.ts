@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { normalizeDocumentType } from '../../core/vocabularies';
 import {
   DOCUMENT_INTELLIGENCE_CLIENT,
   type DocumentIntelligenceClient,
@@ -171,6 +172,7 @@ export class ProjectionsService {
     const citationsCount = this.countArrayLike(citationCandidatesWithExtensions);
     const meta = this.asRecord(doc.metadata);
     const extractedMeta = meta ? this.asRecord(meta.extracted_metadata) : undefined;
+    const sourceDefaults = meta ? this.asRecord(meta.source_defaults) : undefined;
     const llmMeta = meta ? this.asRecord(meta.llm_extraction) : undefined;
 
     const llmPreview =
@@ -188,10 +190,12 @@ export class ProjectionsService {
           ? doc.full_text
           : undefined;
 
-    const documentType =
-      typeof doc.document_type === 'string' && doc.document_type.trim()
-        ? doc.document_type.trim()
-        : undefined;
+    const documentType = this.firstNormalizedDocumentType([
+      doc.document_type,
+      meta?.document_type,
+      sourceDefaults?.document_type_hint,
+      extractedMeta?.document_type,
+    ]);
     const effectiveDate =
       typeof doc.effective_date === 'string' && doc.effective_date.trim()
         ? doc.effective_date.trim()
@@ -311,6 +315,16 @@ export class ProjectionsService {
     for (const value of values) {
       if (typeof value === 'string' && value.trim()) {
         return value.trim();
+      }
+    }
+    return undefined;
+  }
+
+  private firstNormalizedDocumentType(values: unknown[]): string | undefined {
+    for (const value of values) {
+      const normalized = normalizeDocumentType(typeof value === 'string' ? value : undefined);
+      if (normalized) {
+        return normalized;
       }
     }
     return undefined;

@@ -103,14 +103,14 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.getByRole("option", { name: "Swiss Federal Court" }).click();
     await createRunDialog.getByRole("combobox", { name: "Source version" }).click();
     await page.getByRole("option", { name: /2026.04.06/ }).click();
-    await expect(page.getByText(/Run is blocked until preflight checks pass/i)).toBeVisible();
+    await expect(page.getByText(/Preflight is blocking launch/i)).toBeVisible();
     await saveScreenshot(page, "admin-run-launch-preflight.png");
 
     await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs/run_01/show`);
     await expect(page.getByRole("heading", { name: "Pipeline Health" })).toBeVisible();
     await expect(page.getByText("Operator Checklist")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open DI processing status" })).toBeVisible();
-    await expect(page.getByText("Operational status contract", { exact: false })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Jump to DI processing" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open related evidence runbook" })).toBeVisible();
     await saveScreenshot(page, "admin-run-lifecycle-visibility.png");
     await saveOperatorJourneyEvents(page);
     await saveJourneyVideo(page, "cross-surface-journey.webm", VIDEO_MODE === "enabled");

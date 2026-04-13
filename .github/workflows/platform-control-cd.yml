@@ -37,6 +37,8 @@ jobs:
       PLATFORM_CONTROL_WORKER_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_WORKER_SERVICE_NAME }}
       LEGAL_SEARCH_API_SERVICE_NAME: ${{ vars.LEGAL_SEARCH_API_SERVICE_NAME }}
       DI_CONSUMER_SERVICE_NAME: ${{ vars.DI_CONSUMER_SERVICE_NAME }}
+      DOCUMENT_SERVICE_NAME: ${{ vars.DOCUMENT_INTELLIGENCE_DOCUMENT_SERVICE_NAME || 'document-intelligence-document-service' }}
+      DOCUMENT_SERVICE_BEARER_TOKEN_SECRET: document-service-bearer-token-dev
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,6 +56,8 @@ jobs:
         run: |
           set -euo pipefail
           REPO_PATH="${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}"
+          # Runtime Images builds the shared deployable set used by this workflow.
+          # Document Service is deployed below, but it is not part of the image wait loop.
           for image in platform-control platform-control-worker legal-search-api di-consumer; do
             echo "Waiting for ${REPO_PATH}/${image}:${IMAGE_TAG} ..."
             found=""
@@ -99,6 +103,13 @@ jobs:
             --region "${REGION}" \
             --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/di-consumer:${IMAGE_TAG}"
 
+      - name: Deploy document-intelligence document service (dev)
+        run: |
+          gcloud run services update "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/document-intelligence-document-service:${IMAGE_TAG}"
+
       - name: Verify deployed revisions (dev)
         id: verify-dev
         run: |
@@ -110,13 +121,19 @@ jobs:
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
             --format='value(status.latestReadyRevisionName)')
+          DS_REV=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.latestReadyRevisionName)')
           echo "platform_control_revision=${PC_REV}" >> "$GITHUB_OUTPUT"
           echo "legal_search_revision=${LS_REV}" >> "$GITHUB_OUTPUT"
+          echo "document_service_revision=${DS_REV}" >> "$GITHUB_OUTPUT"
           echo "### Dev Deployment" >> "$GITHUB_STEP_SUMMARY"
           echo "| Service | Revision |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---------|----------|" >> "$GITHUB_STEP_SUMMARY"
           echo "| platform-control | \`${PC_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| legal-search-api | \`${LS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| document-intelligence-document-service | \`${DS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke test — platform-control health (dev)
         run: |
@@ -181,6 +198,71 @@ jobs:
             exit 1
           fi
 
+      - name: Smoke test — Document Service health (dev)
+        run: |
+          DS_URL=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          echo "Checking ${DS_URL}/health ..."
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${DS_URL}/health" || echo "000")
+          echo "HTTP ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Document Service health check failed (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      - name: Smoke test — Document Service auth and lean wiring (dev)
+        run: |
+          set -euo pipefail
+          DS_URL=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          LS_BASE_URL=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DOCUMENT_INTELLIGENCE_BASE_URL") | .value // empty')
+          if [ "${LS_BASE_URL}" != "${DS_URL}" ]; then
+            echo "::error::legal-search API DOCUMENT_INTELLIGENCE_BASE_URL is '${LS_BASE_URL:-<empty>}', expected '${DS_URL}'"
+            exit 1
+          fi
+          DS_CONTENT_DIR=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DOCUMENT_SERVICE_CONTENT_DIR") | .value // empty')
+          DS_SURFACES_ROOT_URI=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DI_SURFACES_ROOT_URI") | .value // empty')
+          if [ -z "${DS_CONTENT_DIR}" ] && [ -z "${DS_SURFACES_ROOT_URI}" ]; then
+            echo "::error::Document Service has neither DOCUMENT_SERVICE_CONTENT_DIR nor DI_SURFACES_ROOT_URI configured"
+            exit 1
+          fi
+          echo "Document Service source: ${DS_CONTENT_DIR:+DOCUMENT_SERVICE_CONTENT_DIR=${DS_CONTENT_DIR}}${DS_SURFACES_ROOT_URI:+DI_SURFACES_ROOT_URI=${DS_SURFACES_ROOT_URI}}"
+
+          TOKEN=$(gcloud secrets versions access latest \
+            --project "${PROJECT_ID}" \
+            --secret "${DOCUMENT_SERVICE_BEARER_TOKEN_SECRET}")
+          DUMMY_DOCUMENT_ID="doc_00000000000000000000000000"
+          LEAN_PATH="/v1/documents/${DUMMY_DOCUMENT_ID}/lean?document_revision=1"
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${DS_URL}${LEAN_PATH}" || echo "000")
+          echo "Unauthenticated lean probe: HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "401" ]; then
+            echo "::error::Document Service accepted an unauthenticated lean probe (expected HTTP 401, got ${HTTP_CODE})"
+            exit 1
+          fi
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${DS_URL}${LEAN_PATH}" || echo "000")
+          echo "Authenticated lean probe: HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "404" ]; then
+            echo "::error::Authenticated Document Service lean probe failed (expected HTTP 404, got ${HTTP_CODE})"
+            exit 1
+          fi
+
   # ── Promotion Gate ──────────────────────────────
   # The prod job requires the dev environment to pass.
   # GitHub environment protection rules can add manual approval.
@@ -199,6 +281,8 @@ jobs:
       PLATFORM_CONTROL_WORKER_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_WORKER_SERVICE_NAME }}
       LEGAL_SEARCH_API_SERVICE_NAME: ${{ vars.LEGAL_SEARCH_API_SERVICE_NAME }}
       DI_CONSUMER_SERVICE_NAME: ${{ vars.DI_CONSUMER_SERVICE_NAME }}
+      DOCUMENT_SERVICE_NAME: ${{ vars.DOCUMENT_INTELLIGENCE_DOCUMENT_SERVICE_NAME || 'document-intelligence-document-service' }}
+      DOCUMENT_SERVICE_BEARER_TOKEN_SECRET: document-service-bearer-token-prod
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -253,6 +337,14 @@ jobs:
             --region "${REGION}" \
             --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/legal-search-api:${IMAGE_TAG}"
 
+      - name: Deploy document-intelligence document service (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
+        run: |
+          gcloud run services update "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/document-intelligence-document-service:${IMAGE_TAG}"
+
       - name: Verify deployed revisions (prod)
         if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
         run: |
@@ -264,11 +356,16 @@ jobs:
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
             --format='value(status.latestReadyRevisionName)')
+          DS_REV=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.latestReadyRevisionName)')
           echo "### Prod Deployment" >> "$GITHUB_STEP_SUMMARY"
           echo "| Service | Revision |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---------|----------|" >> "$GITHUB_STEP_SUMMARY"
           echo "| platform-control | \`${PC_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| legal-search-api | \`${LS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| document-intelligence-document-service | \`${DS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| image-tag | \`${IMAGE_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke test — platform-control health (prod)
@@ -296,5 +393,71 @@ jobs:
           echo "legal-search health: HTTP ${HTTP_CODE}"
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::error::legal-search health check failed in prod (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      - name: Smoke test — Document Service health (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
+        run: |
+          DS_URL=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${DS_URL}/health" || echo "000")
+          echo "document-service health: HTTP ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Document Service health check failed in prod (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      - name: Smoke test — Document Service auth and lean wiring (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
+        run: |
+          set -euo pipefail
+          DS_URL=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          LS_BASE_URL=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DOCUMENT_INTELLIGENCE_BASE_URL") | .value // empty')
+          if [ "${LS_BASE_URL}" != "${DS_URL}" ]; then
+            echo "::error::legal-search API DOCUMENT_INTELLIGENCE_BASE_URL is '${LS_BASE_URL:-<empty>}', expected '${DS_URL}'"
+            exit 1
+          fi
+          DS_CONTENT_DIR=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DOCUMENT_SERVICE_CONTENT_DIR") | .value // empty')
+          DS_SURFACES_ROOT_URI=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DI_SURFACES_ROOT_URI") | .value // empty')
+          if [ -z "${DS_CONTENT_DIR}" ] && [ -z "${DS_SURFACES_ROOT_URI}" ]; then
+            echo "::error::Document Service has neither DOCUMENT_SERVICE_CONTENT_DIR nor DI_SURFACES_ROOT_URI configured"
+            exit 1
+          fi
+          echo "Document Service source: ${DS_CONTENT_DIR:+DOCUMENT_SERVICE_CONTENT_DIR=${DS_CONTENT_DIR}}${DS_SURFACES_ROOT_URI:+DI_SURFACES_ROOT_URI=${DS_SURFACES_ROOT_URI}}"
+
+          TOKEN=$(gcloud secrets versions access latest \
+            --project "${PROJECT_ID}" \
+            --secret "${DOCUMENT_SERVICE_BEARER_TOKEN_SECRET}")
+          DUMMY_DOCUMENT_ID="doc_00000000000000000000000000"
+          LEAN_PATH="/v1/documents/${DUMMY_DOCUMENT_ID}/lean?document_revision=1"
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${DS_URL}${LEAN_PATH}" || echo "000")
+          echo "Unauthenticated lean probe: HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "401" ]; then
+            echo "::error::Document Service accepted an unauthenticated lean probe (expected HTTP 401, got ${HTTP_CODE})"
+            exit 1
+          fi
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${DS_URL}${LEAN_PATH}" || echo "000")
+          echo "Authenticated lean probe: HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "404" ]; then
+            echo "::error::Authenticated Document Service lean probe failed (expected HTTP 404, got ${HTTP_CODE})"
             exit 1
           fi
