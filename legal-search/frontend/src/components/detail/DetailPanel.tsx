@@ -23,13 +23,18 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
 
   if (!detail) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-6">
+      <div
+        className="flex h-full flex-col items-center justify-center px-4 text-center sm:px-6"
+        role="status"
+        aria-live="polite"
+      >
         <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
           <FileText className="w-6 h-6 text-muted-foreground/40" />
         </div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-1">Select a result</h3>
-        <p className="text-xs text-muted-foreground/70 max-w-[200px]">
-          Click on a search result to view its details, related materials, and references.
+        <h3 className="text-sm font-medium text-foreground mb-1">No result selected</h3>
+        <p className="max-w-[220px] text-xs text-muted-foreground/70">
+          Choose a result to open the document detail, related materials, and references. The URL
+          will stay in sync with your selection.
         </p>
       </div>
     );

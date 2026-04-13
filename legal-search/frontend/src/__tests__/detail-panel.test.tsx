@@ -78,8 +78,8 @@ describe("DetailPanel", () => {
   it("shows empty state when detail is null", () => {
     renderWithProviders(<DetailPanel detail={null} />);
 
-    expect(screen.getByText("Select a result")).toBeInTheDocument();
-    expect(screen.getByText(/Click on a search result to view its details/)).toBeInTheDocument();
+    expect(screen.getByText("No result selected")).toBeInTheDocument();
+    expect(screen.getByText(/Choose a result to open the document detail/)).toBeInTheDocument();
   });
 
   it("renders title and subtitle when detail is provided", () => {
