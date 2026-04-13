@@ -93,6 +93,7 @@ jobs:
           PY
 
       - name: Verify latest interaction-flow staging evidence run
+        if: ${{ env.RR_GITHUB_ENVIRONMENT != 'dev' }}
         id: interaction_flow_gate
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
         env:
@@ -153,6 +154,7 @@ jobs:
           PY
 
       - name: Verify interaction-flow evidence artifact completeness
+        if: ${{ env.RR_GITHUB_ENVIRONMENT != 'dev' }}
         id: interaction_flow_artifact_gate
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}
         env:
@@ -306,25 +308,41 @@ jobs:
             fi
             echo "| Latest ${E2E_SMOKE_WORKFLOW_NAME} | ${smoke_status} | [run](${{ steps.smoke_gate.outputs.smoke_url }}) @ ${{ steps.smoke_gate.outputs.smoke_created_at }} |"
 
-            if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" ]]; then
-              interaction_flow_status="PASS"
+            if [[ "${RR_GITHUB_ENVIRONMENT}" == "dev" ]]; then
+              interaction_flow_status="SEPARATE"
             else
-              interaction_flow_status="FAIL"
+              if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" ]]; then
+                interaction_flow_status="PASS"
+              else
+                interaction_flow_status="FAIL"
+              fi
             fi
-            echo "| Latest interaction-flow staging evidence | ${interaction_flow_status} | [run](${{ steps.interaction_flow_gate.outputs.interaction_flow_url }}) @ ${{ steps.interaction_flow_gate.outputs.interaction_flow_created_at }} |"
+            if [[ "${RR_GITHUB_ENVIRONMENT}" == "dev" ]]; then
+              interaction_flow_evidence="Tracked separately for dev-first release readiness; attach latest successful staging interaction-flow run in TAR-214 / TAR-69."
+            else
+              interaction_flow_evidence="[run](${{ steps.interaction_flow_gate.outputs.interaction_flow_url }}) @ ${{ steps.interaction_flow_gate.outputs.interaction_flow_created_at }}"
+            fi
+            echo "| Latest interaction-flow staging evidence | ${interaction_flow_status} | ${interaction_flow_evidence} |"
 
-            if [[ "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
-              interaction_flow_artifact_status="PASS"
+            if [[ "${RR_GITHUB_ENVIRONMENT}" == "dev" ]]; then
+              interaction_flow_artifact_status="SEPARATE"
+              interaction_flow_artifact_evidence='Skipped in dev-first mode; do not look for staging artifacts in the dev evidence bucket.'
             else
-              interaction_flow_artifact_status="FAIL"
-            fi
-            interaction_flow_artifact_evidence='`scripts/check-latest-interaction-flow-evidence.sh --mode staging`'
-            if [[ -n "${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}" ]]; then
-              interaction_flow_artifact_evidence="[run ${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_id }}](${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}) + ${interaction_flow_artifact_evidence}"
+              if [[ "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+                interaction_flow_artifact_status="PASS"
+              else
+                interaction_flow_artifact_status="FAIL"
+              fi
+              interaction_flow_artifact_evidence='`scripts/check-latest-interaction-flow-evidence.sh --mode staging`'
+              if [[ -n "${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}" ]]; then
+                interaction_flow_artifact_evidence="[run ${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_id }}](${{ steps.interaction_flow_artifact_gate.outputs.evidence_run_url }}) + ${interaction_flow_artifact_evidence}"
+              fi
             fi
             echo "| Interaction-flow artifact completeness | ${interaction_flow_artifact_status} | ${interaction_flow_artifact_evidence} |"
 
-            if [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+            if [[ "${RR_GITHUB_ENVIRONMENT}" == "dev" ]]; then
+              evidence_quality_score="SEPARATE"
+            elif [[ "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
               evidence_quality_score="PASS"
             else
               evidence_quality_score="FAIL"
@@ -352,13 +370,19 @@ jobs:
             fi
             echo "| DLQ depth (15m max) | ${dlq_status} | max=\`${{ steps.dlq_gate.outputs.dlq_max_depth }}\`, subs=\`${{ steps.dlq_gate.outputs.dlq_subscription_count }}\`, regex=\`${DLQ_SUBSCRIPTION_REGEX}\` |"
             echo
-            if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
+            if [[ "${RR_GITHUB_ENVIRONMENT}" == "dev" ]]; then
+              if [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
+                overall="GO"
+              else
+                overall="NO-GO"
+              fi
+            elif [[ "${{ steps.smoke_gate.outcome }}" == "success" && "${{ steps.interaction_flow_gate.outcome }}" == "success" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" && "${{ steps.tf_gate.outcome }}" == "success" && "${{ steps.di_drift.outcome }}" == "success" && "${{ steps.dlq_gate.outcome }}" == "success" ]]; then
               overall="GO"
             else
               overall="NO-GO"
             fi
             echo "Go/No-Go: **${overall}**"
-            if [[ "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
+            if [[ "${RR_GITHUB_ENVIRONMENT}" != "dev" && "${{ steps.interaction_flow_artifact_gate.outcome }}" == "success" ]]; then
               echo
               echo "## Runbook Verification Log Row (copy/paste)"
               echo
