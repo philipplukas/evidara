@@ -26,7 +26,7 @@ Use this checklist once per engineer (or when minting starts failing) before run
 | Shell checks with impersonation | `export EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT='sa@project.iam.gserviceaccount.com'` then run the scripts (see script headers). |
 | CLI Bearer tokens | [`scripts/mint-cloud-run-tokens.sh`](../../scripts/mint-cloud-run-tokens.sh) → sets `EVIDARA_PLATFORM_CONTROL_TOKEN`, `EVIDARA_LEGAL_SEARCH_TOKEN`, and optional `E2E_*` for smoke. |
 | Full MVP acceptance | [MVP acceptance scenario pack](../runbooks/mvp-acceptance-scenario-pack.md) — **Cloud Run auth** section. |
-| CI reference | [`.github/workflows/e2e-smoke-dev.yml`](../../.github/workflows/e2e-smoke-dev.yml), [`e2e-smoke-staging.yml`](../../.github/workflows/e2e-smoke-staging.yml) (`--impersonate-service-account` + `--audiences`). |
+| CI reference | [`.github/workflows/e2e-smoke-dev.yml`](../../.github/workflows/e2e-smoke-dev.yml), [`e2e-smoke-staging.yml`](../../.github/workflows/e2e-smoke-staging.yml) (authenticate with WIF, then mint audience-scoped ID tokens from the active CI credentials). |
 
 ### 4.1 One-shot operator session (recommended)
 

@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   smoke-staging:
-    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: staging
     env:
       TARGET_ENV: staging
@@ -88,12 +88,12 @@ jobs:
             exit 1
           fi
 
-          PC_ID_TOKEN=$(gcloud auth print-identity-token \
-            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
-            --audiences="${PC_URL}")
-          LS_ID_TOKEN=$(gcloud auth print-identity-token \
-            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
-            --audiences="${LS_URL}")
+          # The workflow is already authenticated as the staging deployer service
+          # account via Workload Identity Federation above; mint audience-scoped ID
+          # tokens directly from the active credentials instead of impersonating the
+          # same service account again.
+          PC_ID_TOKEN=$(gcloud auth print-identity-token --audiences="${PC_URL}")
+          LS_ID_TOKEN=$(gcloud auth print-identity-token --audiences="${LS_URL}")
 
           if [[ -z "${PC_ID_TOKEN}" ]]; then
             echo "::error::Failed to mint ID token for platform-control-api audience"
@@ -108,9 +108,6 @@ jobs:
           echo "::add-mask::${LS_ID_TOKEN}"
           echo "E2E_PC_ID_TOKEN=${PC_ID_TOKEN}" >> "${GITHUB_ENV}"
           echo "E2E_LS_ID_TOKEN=${LS_ID_TOKEN}" >> "${GITHUB_ENV}"
-        env:
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
-
       - name: Run E2E smoke test (staging)
         id: smoke
         run: |

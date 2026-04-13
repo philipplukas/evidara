@@ -45,7 +45,6 @@ jobs:
       EVIDARA_LEGAL_SEARCH_URL: ${{ github.event.inputs.legal_search_url }}
       EVIDARA_PLATFORM_CONTROL_API_KEY: ${{ secrets.EVIDARA_PLATFORM_CONTROL_API_KEY }}
       EVIDARA_LEGAL_SEARCH_API_KEY: ${{ secrets.EVIDARA_LEGAL_SEARCH_API_KEY }}
-      GCP_SERVICE_ACCOUNT_EMAIL: ${{ github.event.inputs.github_environment == 'dev' && secrets.GCP_SERVICE_ACCOUNT_DEV || secrets.GCP_SERVICE_ACCOUNT_STAGING }}
 
     steps:
       - name: Checkout
@@ -72,12 +71,8 @@ jobs:
           PC_AUDIENCE="$(audience_for "${PC_INPUT}")"
           LS_AUDIENCE="$(audience_for "${LS_INPUT}")"
 
-          PC_TOKEN="$(gcloud auth print-identity-token \
-            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
-            --audiences="${PC_AUDIENCE}")"
-          LS_TOKEN="$(gcloud auth print-identity-token \
-            --impersonate-service-account="${GCP_SERVICE_ACCOUNT_EMAIL}" \
-            --audiences="${LS_AUDIENCE}")"
+          PC_TOKEN="$(gcloud auth print-identity-token --audiences="${PC_AUDIENCE}")"
+          LS_TOKEN="$(gcloud auth print-identity-token --audiences="${LS_AUDIENCE}")"
 
           if [[ -z "${PC_TOKEN}" || -z "${LS_TOKEN}" ]]; then
             echo "::error::Failed to mint ID tokens (check invoker IAM and URL origins)."

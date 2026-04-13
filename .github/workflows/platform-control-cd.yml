@@ -38,6 +38,7 @@ jobs:
       LEGAL_SEARCH_API_SERVICE_NAME: ${{ vars.LEGAL_SEARCH_API_SERVICE_NAME }}
       DI_CONSUMER_SERVICE_NAME: ${{ vars.DI_CONSUMER_SERVICE_NAME }}
       DOCUMENT_SERVICE_NAME: ${{ vars.DOCUMENT_INTELLIGENCE_DOCUMENT_SERVICE_NAME || 'document-intelligence-document-service' }}
+      DOCUMENT_SERVICE_BEARER_TOKEN_SECRET: document-service-bearer-token-dev
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -184,7 +185,6 @@ jobs:
             --format='value(status.url)')
           echo "Checking ${DI_URL}/health ..."
           TOKEN=$(gcloud auth print-identity-token \
-            --impersonate-service-account="${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}" \
             --audiences="${DI_URL}" \
             --include-email)
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
@@ -209,6 +209,57 @@ jobs:
             exit 1
           fi
 
+      - name: Smoke test — Document Service auth and lean wiring (dev)
+        run: |
+          set -euo pipefail
+          DS_URL=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          LS_BASE_URL=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DOCUMENT_INTELLIGENCE_BASE_URL") | .value // empty')
+          if [ "${LS_BASE_URL}" != "${DS_URL}" ]; then
+            echo "::error::legal-search API DOCUMENT_INTELLIGENCE_BASE_URL is '${LS_BASE_URL:-<empty>}', expected '${DS_URL}'"
+            exit 1
+          fi
+          DS_CONTENT_DIR=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DOCUMENT_SERVICE_CONTENT_DIR") | .value // empty')
+          DS_SURFACES_ROOT_URI=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DI_SURFACES_ROOT_URI") | .value // empty')
+          if [ -z "${DS_CONTENT_DIR}" ] && [ -z "${DS_SURFACES_ROOT_URI}" ]; then
+            echo "::error::Document Service has neither DOCUMENT_SERVICE_CONTENT_DIR nor DI_SURFACES_ROOT_URI configured"
+            exit 1
+          fi
+          echo "Document Service source: ${DS_CONTENT_DIR:+DOCUMENT_SERVICE_CONTENT_DIR=${DS_CONTENT_DIR}}${DS_SURFACES_ROOT_URI:+DI_SURFACES_ROOT_URI=${DS_SURFACES_ROOT_URI}}"
+
+          TOKEN=$(gcloud secrets versions access latest \
+            --project "${PROJECT_ID}" \
+            --secret "${DOCUMENT_SERVICE_BEARER_TOKEN_SECRET}")
+          DUMMY_DOCUMENT_ID="doc_00000000000000000000000000"
+          LEAN_PATH="/v1/documents/${DUMMY_DOCUMENT_ID}/lean?document_revision=1"
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${DS_URL}${LEAN_PATH}" || echo "000")
+          echo "Unauthenticated lean probe: HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "401" ]; then
+            echo "::error::Document Service accepted an unauthenticated lean probe (expected HTTP 401, got ${HTTP_CODE})"
+            exit 1
+          fi
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${DS_URL}${LEAN_PATH}" || echo "000")
+          echo "Authenticated lean probe: HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "404" ]; then
+            echo "::error::Authenticated Document Service lean probe failed (expected HTTP 404, got ${HTTP_CODE})"
+            exit 1
+          fi
+
   # ── Promotion Gate ──────────────────────────────
   # The prod job requires the dev environment to pass.
   # GitHub environment protection rules can add manual approval.
@@ -228,6 +279,7 @@ jobs:
       LEGAL_SEARCH_API_SERVICE_NAME: ${{ vars.LEGAL_SEARCH_API_SERVICE_NAME }}
       DI_CONSUMER_SERVICE_NAME: ${{ vars.DI_CONSUMER_SERVICE_NAME }}
       DOCUMENT_SERVICE_NAME: ${{ vars.DOCUMENT_INTELLIGENCE_DOCUMENT_SERVICE_NAME || 'document-intelligence-document-service' }}
+      DOCUMENT_SERVICE_BEARER_TOKEN_SECRET: document-service-bearer-token-prod
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -352,5 +404,57 @@ jobs:
           echo "document-service health: HTTP ${HTTP_CODE}"
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::error::Document Service health check failed in prod (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      - name: Smoke test — Document Service auth and lean wiring (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
+        run: |
+          set -euo pipefail
+          DS_URL=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          LS_BASE_URL=$(gcloud run services describe "${LEGAL_SEARCH_API_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DOCUMENT_INTELLIGENCE_BASE_URL") | .value // empty')
+          if [ "${LS_BASE_URL}" != "${DS_URL}" ]; then
+            echo "::error::legal-search API DOCUMENT_INTELLIGENCE_BASE_URL is '${LS_BASE_URL:-<empty>}', expected '${DS_URL}'"
+            exit 1
+          fi
+          DS_CONTENT_DIR=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DOCUMENT_SERVICE_CONTENT_DIR") | .value // empty')
+          DS_SURFACES_ROOT_URI=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DI_SURFACES_ROOT_URI") | .value // empty')
+          if [ -z "${DS_CONTENT_DIR}" ] && [ -z "${DS_SURFACES_ROOT_URI}" ]; then
+            echo "::error::Document Service has neither DOCUMENT_SERVICE_CONTENT_DIR nor DI_SURFACES_ROOT_URI configured"
+            exit 1
+          fi
+          echo "Document Service source: ${DS_CONTENT_DIR:+DOCUMENT_SERVICE_CONTENT_DIR=${DS_CONTENT_DIR}}${DS_SURFACES_ROOT_URI:+DI_SURFACES_ROOT_URI=${DS_SURFACES_ROOT_URI}}"
+
+          TOKEN=$(gcloud secrets versions access latest \
+            --project "${PROJECT_ID}" \
+            --secret "${DOCUMENT_SERVICE_BEARER_TOKEN_SECRET}")
+          DUMMY_DOCUMENT_ID="doc_00000000000000000000000000"
+          LEAN_PATH="/v1/documents/${DUMMY_DOCUMENT_ID}/lean?document_revision=1"
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${DS_URL}${LEAN_PATH}" || echo "000")
+          echo "Unauthenticated lean probe: HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "401" ]; then
+            echo "::error::Document Service accepted an unauthenticated lean probe (expected HTTP 401, got ${HTTP_CODE})"
+            exit 1
+          fi
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${DS_URL}${LEAN_PATH}" || echo "000")
+          echo "Authenticated lean probe: HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "404" ]; then
+            echo "::error::Authenticated Document Service lean probe failed (expected HTTP 404, got ${HTTP_CODE})"
             exit 1
           fi
