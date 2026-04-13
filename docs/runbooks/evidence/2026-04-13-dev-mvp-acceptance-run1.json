@@ -1,0 +1,60 @@
+{
+  "evidence_pack_version": "tar-85-2026-04-11",
+  "notes": {
+    "scenario_5_browser_evidence_runbook": "docs/runbooks/interaction-flow-validation.md",
+    "scenario_5_browser_smoke_test": "legal-search/frontend/e2e/smoke.spec.ts"
+  },
+  "ok": true,
+  "scenario_1": {
+    "platform_control_health_http_code": 200,
+    "platform_control_sources_http_code": 200
+  },
+  "scenario_2": {
+    "queries": [
+      {
+        "http_code": 200,
+        "query": "art 754",
+        "total_results": 9
+      },
+      {
+        "http_code": 200,
+        "query": "haftung",
+        "total_results": 9
+      },
+      {
+        "http_code": 200,
+        "query": "obligationenrecht",
+        "total_results": 9
+      },
+      {
+        "http_code": 200,
+        "query": "switzerland",
+        "total_results": 9
+      }
+    ]
+  },
+  "scenario_3": {
+    "checks": {
+      "id_matches_request": true,
+      "metadata_is_array": true,
+      "subtitle_present": true,
+      "tabs_is_array": true,
+      "title_present": true
+    },
+    "document_http_code": 200,
+    "document_id": "doc_4z04zjjg5e5vgd8knhhdwf4481"
+  },
+  "scenario_4": {
+    "admin_ui_root_http_code": 200,
+    "admin_ui_sources_http_code": 200,
+    "legal_search_ui_root_http_code": 200,
+    "legal_search_ui_search_http_code": 200
+  },
+  "surfaces": {
+    "legal_search_api": "https://legal-search-api-dev-kxc5agexna-oa.a.run.app",
+    "legal_search_frontend": "https://legal-search-frontend-dev-kxc5agexna-oa.a.run.app",
+    "platform_control_admin": "https://platform-control-admin-dev-kxc5agexna-oa.a.run.app",
+    "platform_control_api": "https://platform-control-api-dev-kxc5agexna-oa.a.run.app"
+  },
+  "workflow": "mvp-acceptance"
+}

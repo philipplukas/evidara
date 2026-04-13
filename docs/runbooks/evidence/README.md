@@ -11,5 +11,7 @@ Refresh when staging URLs or corpus change. URLs are taken from [`infra/env/stag
 | `2026-04-09-staging-mvp-acceptance-run2.json` | Same workflow, second run (correlation id varied) |
 | `2026-04-09-staging-relevance-pack.md` | Staging search top-3 IDs per suggested query |
 | `2026-04-09-staging-relevance-pack-rerun.md` | Same, regenerated via `scripts/capture-staging-relevance-pack.sh` |
+| `2026-04-13-dev-mvp-acceptance-run1.json` | Fresh dev `evidara workflow mvp-acceptance` capture after the CI/auth fix landed |
+| `2026-04-13-dev-relevance-pack.md` | Dev relevance pack with `q=*` control row; points to alias/index/corpus drift |
 | `2026-04-09-e2e-github-dispatch-tar64.md` | Two `gh workflow run` E2E Smoke Dev attempts + outcomes |
 | `2026-04-09-e2e-step7-investigation.md` | Dev: Pub/Sub wiring OK; `di-consumer-dev` HTTP 500 on bundle ingress; DLQ note; next actions |

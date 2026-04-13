@@ -42,9 +42,9 @@ What is not yet true:
 - Runner stability is improved but not yet trusted as a solved problem.
 - Five-country acceptance and relevance still need current evidence attached to the GA
   umbrella.
-- The current dev relevance signal still points at empty seed-query results and is being
-  tracked as follow-up `TAR-242` until the `q=*` control run confirms whether this is
-  ranking or alias/index drift.
+- The current dev relevance signal now includes an empty `q=*` control row, which points
+  to alias/index/corpus drift rather than a pure ranking regression; the follow-up stays
+  on `TAR-242`.
 
 ## Board status
 
@@ -135,13 +135,13 @@ Immediate operator actions:
 1. Run the agreed query pack from
    [`staging-relevance-query-pack-suggestions.md`](staging-relevance-query-pack-suggestions.md)
    with [`scripts/run-staging-relevance-query-pack.sh`](../../scripts/run-staging-relevance-query-pack.sh).
-2. Add a `q=*` control row and record `totalResults` so we can distinguish ranking issues
-   from alias/index/corpus drift.
+2. Keep the `q=*` control row in the pack and record `totalResults` so we can distinguish
+   ranking issues from alias/index/corpus drift.
 3. Record results using
    [`relevance-eval-result-template.md`](relevance-eval-result-template.md).
 4. Attach the result table to `TAR-82` and `TAR-68`.
-5. Keep `TAR-242` as the follow-up sink for empty dev results unless the control row proves
-   this is just ranking.
+5. Keep `TAR-242` as the follow-up sink for the current empty-dev control result and route
+   the next operator step through replay / alias verification before retuning ranking.
 
 ## What stays tracked in parallel
 
