@@ -17,7 +17,8 @@ Canonical sequence (mirrors MacConfig `docs/migration-map.md`):
 5. **Argo cutover** — [Argo cutover checklist](argo-cutover-checklist.md) + [examples](examples/).
 6. **Slim Evidara** — [Slim Evidara plan](slim-evidara-plan.md) (after GitOps owns the workloads).
 7. **Cluster enforcement** — [Cluster enforcement plan](cluster-enforcement-plan.md).
-8. **Stability** — [Platform contract changelog](platform-contract-changelog.md) + [`../../service-template/README.md`](../../service-template/README.md).
+8. **Runner migration** — [Hetzner runner secret capture](../runbooks/hetzner-runner-secret-capture.md), [checklist](../runbooks/hetzner-runner-secret-capture-checklist.md), then [ARC runner migration matrix](arc-runner-migration-matrix.md).
+9. **Stability** — [Platform contract changelog](platform-contract-changelog.md) + [`../../service-template/README.md`](../../service-template/README.md).
 
 ## What Evidara can do in-repo today
 
@@ -37,3 +38,9 @@ platform. Local path next to this monorepo: `../rocky-agents` (push to
 `https://github.com/philipplukas/rocky-agents` when created).
 
 Start with [platform-product-inventory.md](platform-product-inventory.md) and [git-reconcile-checklist.md](git-reconcile-checklist.md).
+
+Related operator docs:
+
+- [ARC runner migration matrix](arc-runner-migration-matrix.md)
+- [Hetzner runner secret capture](../runbooks/hetzner-runner-secret-capture.md)
+- [Hetzner runner secret capture checklist](../runbooks/hetzner-runner-secret-capture-checklist.md)
