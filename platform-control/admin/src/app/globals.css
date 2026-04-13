@@ -164,18 +164,24 @@ a {
   gap: 8px;
   padding: 11px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 253, 248, 0.28);
-  background: rgba(255, 253, 248, 0.08);
+  border: 1px solid rgba(255, 253, 248, 0.14);
+  background: linear-gradient(120deg, var(--accent), var(--accent-hover));
   color: #fffdf8;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
-  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  box-shadow: 0 16px 30px rgba(15, 76, 129, 0.22);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .evidara-shell__button:hover {
-  border-color: rgba(255, 253, 248, 0.42);
-  background: rgba(255, 253, 248, 0.16);
+  border-color: rgba(255, 253, 248, 0.2);
+  background: linear-gradient(120deg, var(--accent-hover), #092f52);
+  box-shadow: 0 18px 34px rgba(15, 76, 129, 0.28);
   transform: translateY(-1px);
 }
 

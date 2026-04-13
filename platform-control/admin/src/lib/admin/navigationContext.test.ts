@@ -6,12 +6,12 @@ describe("navigationContext", () => {
     const handoff = resolveLegalSearchHandoff(
       new URLSearchParams({
         from: "legal-search",
-        ls_return_to: "https://search.example/?q=Art%20754%20OR&item=doc-1",
+        ls_return_to: "/?q=Art%20754%20OR&item=doc-1",
         ls_query: "Art 754 OR",
         ls_scope: 'Results for "Art 754 OR"',
         ls_item: "doc-1",
       }),
-      "https://search.example/",
+      "https://search.example/search",
     );
 
     expect(handoff).toEqual({
@@ -26,7 +26,19 @@ describe("navigationContext", () => {
     );
   });
 
-  it("falls back to the configured legal-search URL when returnTo is invalid", () => {
+  it("falls back to the configured legal-search URL when returnTo targets another origin", () => {
+    const handoff = resolveLegalSearchHandoff(
+      new URLSearchParams({
+        from: "legal-search",
+        ls_return_to: "https://evil.example/?q=steal",
+      }),
+      "https://search.example/",
+    );
+
+    expect(handoff.returnToUrl).toBe("https://search.example/");
+  });
+
+  it("falls back to the configured legal-search URL when returnTo is malformed", () => {
     const handoff = resolveLegalSearchHandoff(
       new URLSearchParams({
         from: "legal-search",
