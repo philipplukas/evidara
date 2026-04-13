@@ -3,11 +3,11 @@ name: Runner Bootstrap Preflight
 on:
   workflow_dispatch:
     inputs:
-      runner_labels_json:
-        description: "JSON array used for runs-on labels"
+      runner_scale_set:
+        description: "Runner scale-set name used for runs-on"
         required: false
         type: string
-        default: '["self-hosted","linux","x64"]'
+        default: "evidara-light"
       node_version:
         description: "Node.js version to validate"
         required: false
@@ -25,11 +25,11 @@ on:
         default: false
   workflow_call:
     inputs:
-      runner_labels_json:
-        description: "JSON array used for runs-on labels"
+      runner_scale_set:
+        description: "Runner scale-set name used for runs-on"
         required: false
         type: string
-        default: '["self-hosted","linux","x64"]'
+        default: "evidara-light"
       node_version:
         description: "Node.js version to validate"
         required: false
@@ -52,7 +52,7 @@ permissions:
 jobs:
   preflight:
     name: Validate self-hosted bootstrap assumptions
-    runs-on: ${{ fromJSON(inputs.runner_labels_json) }}
+    runs-on: ${{ inputs.runner_scale_set }}
     timeout-minutes: 10
 
     env:
