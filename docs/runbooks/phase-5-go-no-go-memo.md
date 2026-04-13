@@ -34,7 +34,7 @@ Use [TAR-214 release evidence refresh](tar-214-release-evidence-refresh.md) as t
 |------|----------------|-----------------|
 | `TAR-77` branch protection proof | stale because `main` changed on 2026-04-13 and the required-check model was simplified to always-on checks only | Capture a fresh GitHub protection screenshot and one green strict `Release Readiness` run URL; link the policy drift back to `TAR-70` |
 | `TAR-64` dev smoke evidence | blocked on a fresh green `E2E Smoke Dev` after the Cloud Run token mint path failed on self-hosted runner egress | Merge the CI/auth fix from `#220`, rerun `E2E Smoke Dev`, then attach the run URL, timestamp, exit code, and Gate D IDs |
-| `TAR-85` remote MVP acceptance | present but not yet re-linked into the refreshed packet | Re-run `evidara workflow mvp-acceptance` against `dev` or staging and capture stdout / JSON with `evidence_pack_version` |
+| `TAR-85` remote MVP acceptance | fresh dev run captured on 2026-04-13 with `evidence_pack_version=tar-85-2026-04-11` | Attach [2026-04-13-dev-mvp-acceptance-run1.json](evidence/2026-04-13-dev-mvp-acceptance-run1.json) to `TAR-85`, then link it from `TAR-69` |
 | `TAR-69` synthesis | pending | Post one summary comment linking the refreshed evidence and update §2 with the final run URLs |
 
 ## 2. Gate outcomes
@@ -43,7 +43,7 @@ Use [TAR-214 release evidence refresh](tar-214-release-evidence-refresh.md) as t
 |------|--------|--------|----------------|
 | A–C vertical slice | `docs/runbooks/first-vertical-slice-exit-gates.md` | **PENDING** (dev smoke ×2) | See **TAR-64: dev smoke evidence** in that runbook |
 | Local pre-flight | `scripts/vertical-slice-exit-gates-local.sh` (2×) | pass | [Verification log](first-vertical-slice-exit-gates.md#verification-log) rows **2026-04-09** and **2026-04-12**; DI pytest + schema validate 2026-04-12 — §1.1 |
-| MVP acceptance (remote) | `docs/runbooks/mvp-acceptance-scenario-pack.md` | pass (last table **2026-04-08**) | [mvp-acceptance-scenario-pack.md](mvp-acceptance-scenario-pack.md#latest-verification-evidence-2026-04-08) — **refresh** with `evidara workflow mvp-acceptance` against **dev** (or staging if operated); payload includes `evidence_pack_version` |
+| MVP acceptance (remote) | `docs/runbooks/mvp-acceptance-scenario-pack.md` | pass (**2026-04-13 dev refresh**) | [2026-04-13-dev-mvp-acceptance-run1.json](evidence/2026-04-13-dev-mvp-acceptance-run1.json) — `evidara workflow mvp-acceptance` against **dev** with `evidence_pack_version=tar-85-2026-04-11` |
 | Release Readiness (strict) | `Release Readiness` workflow | GO (historical) | Re-run on current `main`; download artifact **`release-readiness-<run_id>`** (JSON gate snapshots) and keep the run URL + GCS report path together in Linear (see section 2.1) |
 | Interaction flow | `docs/runbooks/interaction-flow-validation.md` | pass (historical) | Latest staging workflow run + GCS bundle; generated manifest now includes a **TAR-67 / TAR-69** drill block (see section 2.1) |
 
@@ -66,7 +66,7 @@ These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, an
 | Topic | Status | Notes |
 |-------|--------|--------|
 | Projection fields (title, type, dates, structural path) | **Shipped** | `ProjectionsService` maps canonical DI lean rows; see `search-relevance-baseline.md` |
-| Relevance eval pack | **PENDING** | Run query pack in `search-relevance-baseline.md` against **dev** (or staging) legal-search API, include the `q=*` control row, and attach the table to TAR-82 / TAR-68 |
+| Relevance eval pack | **PENDING follow-up** | The 2026-04-13 dev pack is empty for the seed queries **and** `q=*`; see [2026-04-13-dev-relevance-pack.md](evidence/2026-04-13-dev-relevance-pack.md). Treat this as alias/index/corpus drift and track the follow-up on `TAR-242` before calling it a ranking regression |
 | Platform trust proof | **PARTIAL GO** | Hetzner + Tailscale + Argo path is proven via the `rocky-agents` staging smoke and live image verification; explicit Temporal execution ID still missing in the evidence packet |
 | Open issues | | TAR-64, TAR-77, TAR-85 until evidence attached |
 
