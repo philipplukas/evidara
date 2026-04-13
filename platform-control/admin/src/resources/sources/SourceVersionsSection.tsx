@@ -34,6 +34,7 @@ import {
 import type {
   AcquisitionSpec,
   DeterministicHttpAcquisitionSpec,
+  FedlexSparqlAcquisitionSpec,
   FirecrawlAcquisitionSpec,
   RisOgdAcquisitionSpec,
   RunRecord,
@@ -42,7 +43,7 @@ import type {
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 
-type ProviderType = "firecrawl" | "deterministic_http" | "ris_ogd";
+type ProviderType = "firecrawl" | "deterministic_http" | "ris_ogd" | "fedlex_sparql";
 
 type SourceVersionFormState = {
   version_label: string;
@@ -65,6 +66,10 @@ type SourceVersionFormState = {
   preferred_formats_text: string;
   page_size: string;
   max_pages: string;
+  sparql_endpoint: string;
+  preferred_languages_text: string;
+  query_mode: "work_to_expression";
+  max_expressions: string;
 };
 
 const LIST_PARAMS = {
@@ -93,6 +98,10 @@ const emptyFormState = (): SourceVersionFormState => ({
   preferred_formats_text: "Xml, Html",
   page_size: "20",
   max_pages: "50",
+  sparql_endpoint: "https://fedlex.data.admin.ch/sparqlendpoint",
+  preferred_languages_text: "de",
+  query_mode: "work_to_expression",
+  max_expressions: "1",
 });
 
 const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: string }>> = {
@@ -101,7 +110,10 @@ const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: st
     { value: "firecrawl_justice_portal", label: "AT Justice portal crawl" },
   ],
   de: [{ value: "deterministic_http_bundesrecht", label: "DE Bundesrecht deterministic HTTP" }],
-  ch: [],
+  ch: [
+    { value: "deterministic_http_fedlex_legislation", label: "CH Fedlex legislation (legacy)" },
+    { value: "fedlex_sparql_constitution_de", label: "CH Fedlex constitution (SPARQL)" },
+  ],
   fr: [],
   it: [],
 };
@@ -145,6 +157,24 @@ const toFormState = (version?: SourceVersionRecord | null): SourceVersionFormSta
       preferred_formats_text: listToText(ris.preferred_formats ?? []),
       page_size: String(ris.page_size ?? 20),
       max_pages: String(ris.max_pages ?? 50),
+    };
+  }
+
+  if (spec.provider === "fedlex_sparql") {
+    const fedlex = spec as FedlexSparqlAcquisitionSpec;
+    const seedUrls = fedlex.seed_url
+      ? [fedlex.seed_url, ...(fedlex.seed_urls ?? [])]
+      : (fedlex.seed_urls ?? []);
+    return {
+      ...emptyFormState(),
+      ...common,
+      provider: "fedlex_sparql",
+      seed_url: fedlex.seed_url ?? "",
+      seed_urls_text: listToText(seedUrls),
+      sparql_endpoint: fedlex.sparql_endpoint ?? "https://fedlex.data.admin.ch/sparqlendpoint",
+      preferred_languages_text: listToText(fedlex.preferred_languages ?? []),
+      query_mode: fedlex.query_mode ?? "work_to_expression",
+      max_expressions: String(fedlex.max_expressions ?? 1),
     };
   }
 
@@ -217,6 +247,21 @@ const toAcquisitionSpec = (state: SourceVersionFormState): Partial<AcquisitionSp
     };
   }
 
+  if (state.provider === "fedlex_sparql") {
+    return {
+      ...base,
+      seed_url: state.seed_url.trim().length > 0 ? state.seed_url.trim() : null,
+      seed_urls: textToList(state.seed_urls_text),
+      sparql_endpoint: state.sparql_endpoint.trim(),
+      preferred_languages: textToList(state.preferred_languages_text),
+      query_mode: state.query_mode,
+      max_expressions: parseIntegerField(state.max_expressions, "Max expressions", {
+        min: 1,
+        max: 10,
+      }),
+    };
+  }
+
   return {
     ...base,
     seed_url: state.seed_url.trim().length > 0 ? state.seed_url.trim() : null,
@@ -257,6 +302,20 @@ const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
     return [
       `provider: ${provider}`,
       seeds.length > 0 ? `seeds: ${seeds.join(", ")}` : "seeds: none",
+    ];
+  }
+
+  if (provider === "fedlex_sparql") {
+    const fedlex = spec as FedlexSparqlAcquisitionSpec;
+    const seeds = fedlex.seed_url
+      ? [fedlex.seed_url, ...(fedlex.seed_urls ?? [])]
+      : (fedlex.seed_urls ?? []);
+    return [
+      `provider: ${provider}`,
+      `work URIs: ${seeds.join(", ") || "none"}`,
+      `SPARQL endpoint: ${fedlex.sparql_endpoint ?? "n/a"}`,
+      `preferred languages: ${(fedlex.preferred_languages ?? []).join(", ") || "n/a"}`,
+      `query mode / max expressions: ${fedlex.query_mode ?? "n/a"} / ${fedlex.max_expressions ?? "n/a"}`,
     ];
   }
 
@@ -391,9 +450,10 @@ function SourceVersionDialog({
                   })
                 }
                 fullWidth
-              >
+                >
                 <MenuItem value="firecrawl">Firecrawl (website crawl)</MenuItem>
                 <MenuItem value="deterministic_http">Deterministic HTTP</MenuItem>
+                <MenuItem value="fedlex_sparql">Fedlex SPARQL</MenuItem>
                 <MenuItem value="ris_ogd">RIS OGD API (Austrian law)</MenuItem>
               </TextField>
 
@@ -444,6 +504,69 @@ function SourceVersionDialog({
                       fullWidth
                     />
                   </Stack>
+                </>
+              ) : formState.provider === "fedlex_sparql" ? (
+                <>
+                  <TextField
+                    label="Seed work URI"
+                    value={formState.seed_url}
+                    onChange={(event) => onChange({ ...formState, seed_url: event.target.value })}
+                    fullWidth
+                    helperText="Canonical Fedlex work URI, e.g. https://fedlex.data.admin.ch/eli/cc/1999/404"
+                  />
+                  <TextField
+                    label="Additional seed work URIs"
+                    value={formState.seed_urls_text}
+                    onChange={(event) =>
+                      onChange({ ...formState, seed_urls_text: event.target.value })
+                    }
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    helperText="Optional comma or newline separated additional Fedlex work URIs."
+                  />
+                  <TextField
+                    label="SPARQL endpoint"
+                    value={formState.sparql_endpoint}
+                    onChange={(event) =>
+                      onChange({ ...formState, sparql_endpoint: event.target.value })
+                    }
+                    fullWidth
+                    helperText="Defaults to the public Fedlex SPARQL endpoint."
+                  />
+                  <TextField
+                    label="Preferred languages"
+                    value={formState.preferred_languages_text}
+                    onChange={(event) =>
+                      onChange({ ...formState, preferred_languages_text: event.target.value })
+                    }
+                    fullWidth
+                    helperText="Comma or newline separated language codes."
+                  />
+                  <TextField
+                    select
+                    label="Query mode"
+                    value={formState.query_mode}
+                    onChange={(event) =>
+                      onChange({
+                        ...formState,
+                        query_mode: event.target.value as SourceVersionFormState["query_mode"],
+                      })
+                    }
+                    fullWidth
+                  >
+                    <MenuItem value="work_to_expression">work_to_expression</MenuItem>
+                  </TextField>
+                  <TextField
+                    label="Max expressions"
+                    type="number"
+                    value={formState.max_expressions}
+                    onChange={(event) =>
+                      onChange({ ...formState, max_expressions: event.target.value })
+                    }
+                    fullWidth
+                    helperText="How many expressions to resolve per work URI."
+                  />
                 </>
               ) : (
                 <>

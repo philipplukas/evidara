@@ -58,7 +58,7 @@ def _validate_template(
     payload: dict,
 ) -> list[str]:
     provider = payload.get("provider")
-    if provider not in {"firecrawl", "deterministic_http", "ris_ogd"}:
+    if provider not in {"firecrawl", "deterministic_http", "fedlex_sparql", "ris_ogd"}:
         return [
             f"Overlay '{overlay_id}' template '{template_id}' has unsupported provider '{provider}'."
         ]
@@ -94,6 +94,16 @@ def _validate_template(
         ):
             return [
                 f"Overlay '{overlay_id}' template '{template_id}' deterministic_http requires seed_url or seed_urls."
+            ]
+        return []
+
+    if provider == "fedlex_sparql":
+        if not (
+            _has_nonempty_str(payload.get("seed_url"))
+            or _has_nonempty_str_list(payload.get("seed_urls"))
+        ):
+            return [
+                f"Overlay '{overlay_id}' template '{template_id}' fedlex_sparql requires seed_url or seed_urls."
             ]
         return []
 

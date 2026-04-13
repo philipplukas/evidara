@@ -92,10 +92,21 @@ export type RisOgdAcquisitionSpec = SharedAcquisitionSpec & {
   max_pages: number;
 };
 
+export type FedlexSparqlAcquisitionSpec = SharedAcquisitionSpec & {
+  provider: "fedlex_sparql";
+  seed_url: string | null;
+  seed_urls: string[];
+  sparql_endpoint: string;
+  preferred_languages: string[];
+  query_mode: "work_to_expression";
+  max_expressions: number;
+};
+
 export type AcquisitionSpec =
   | FirecrawlAcquisitionSpec
   | DeterministicHttpAcquisitionSpec
-  | RisOgdAcquisitionSpec;
+  | RisOgdAcquisitionSpec
+  | FedlexSparqlAcquisitionSpec;
 
 type Source = {
   source_id: string;
@@ -194,7 +205,7 @@ export type SourceBlueprintPreview = SourceBlueprintPreviewInput & {
 export type SourceBlueprintTemplate = {
   overlay_id: string;
   provider_template_id: string;
-  provider: "firecrawl" | "deterministic_http" | "ris_ogd";
+  provider: "firecrawl" | "deterministic_http" | "ris_ogd" | "fedlex_sparql";
 };
 
 type CapturedResource = {

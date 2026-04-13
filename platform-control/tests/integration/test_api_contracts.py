@@ -17,7 +17,6 @@ import pytest
 from platform_control.database import get_session
 from platform_control.main import create_app
 from platform_control.models.authority import Authority, Jurisdiction
-from platform_control.models.source_version import SourceVersion
 from platform_control.routers.runs import get_firecrawl_provider
 from platform_control.services.firecrawl_provider import ProviderStartResult
 
@@ -68,6 +67,27 @@ async def seed_reference_data(session_maker):
                 jurisdiction_id="jur_ch",
                 name="Federal Supreme Court",
                 slug="bger",
+            )
+        )
+        await session.commit()
+
+
+@pytest.fixture
+async def seed_fedlex_reference_data(session_maker):
+    async with session_maker() as session:
+        session.add(
+            Jurisdiction(
+                jurisdiction_id="jur_ch_federal",
+                name="Switzerland Federal",
+                slug="ch-federal",
+            )
+        )
+        session.add(
+            Authority(
+                authority_id="auth_fedlex",
+                jurisdiction_id="jur_ch_federal",
+                name="Fedlex",
+                slug="fedlex",
             )
         )
         await session.commit()
@@ -171,6 +191,24 @@ async def test_source_blueprint_preview_returns_expanded_acquisition_spec(client
 
 
 @pytest.mark.asyncio
+async def test_source_blueprint_preview_returns_fedlex_sparql_spec(client) -> None:
+    response = await client.post(
+        "/v1/sources/blueprint-preview",
+        json={
+            "overlay_id": "ch",
+            "provider_template_id": "fedlex_sparql_constitution_de",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["overlay_id"] == "ch"
+    assert body["provider_template_id"] == "fedlex_sparql_constitution_de"
+    assert body["acquisition_spec"]["provider"] == "fedlex_sparql"
+    assert body["acquisition_spec"]["seed_url"] == "https://fedlex.data.admin.ch/eli/cc/1999/404"
+    assert body["acquisition_spec"]["preferred_languages"] == ["de"]
+
+
+@pytest.mark.asyncio
 async def test_source_blueprint_preview_unknown_template_returns_404(client) -> None:
     response = await client.post(
         "/v1/sources/blueprint-preview",
@@ -220,6 +258,35 @@ async def test_create_source_version_rejects_mixed_spec_and_blueprint(
         },
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_source_with_initial_version_returns_201_for_fedlex_sparql(
+    client, seed_fedlex_reference_data
+) -> None:
+    response = await client.post(
+        "/v1/sources/with-version",
+        json={
+            "source": {
+                "name": "CH Fedlex legislation thin slice",
+                "jurisdiction_id": "jur_ch_federal",
+                "authority_id": "auth_fedlex",
+                "source_type": "website",
+            },
+            "source_version": {
+                "version_label": "ch-fedlex-v1",
+                "overlay_id": "ch",
+                "provider_template_id": "fedlex_sparql_constitution_de",
+            },
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source"]["jurisdiction_id"] == "jur_ch_federal"
+    assert body["source_version"]["acquisition_spec"]["provider"] == "fedlex_sparql"
+    assert body["source_version"]["acquisition_spec"]["seed_url"] == (
+        "https://fedlex.data.admin.ch/eli/cc/1999/404"
+    )
 
 
 @pytest.mark.asyncio

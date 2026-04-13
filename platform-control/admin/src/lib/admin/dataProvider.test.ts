@@ -967,6 +967,52 @@ describe("controlPlaneDataProvider", () => {
     });
   });
 
+  it("loads fedlex sparql source blueprint previews through the preview endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          overlay_id: "ch",
+          provider_template_id: "fedlex_sparql_constitution_de",
+          acquisition_spec: {
+            provider: "fedlex_sparql",
+            seed_url: "https://fedlex.data.admin.ch/eli/cc/1999/404",
+            seed_urls: [],
+            sparql_endpoint: "https://fedlex.data.admin.ch/sparqlendpoint",
+            preferred_languages: ["de"],
+            query_mode: "work_to_expression",
+            max_expressions: 1,
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneActions.previewSourceBlueprint({
+      overlay_id: "ch",
+      provider_template_id: "fedlex_sparql_constitution_de",
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/sources/blueprint-preview",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          overlay_id: "ch",
+          provider_template_id: "fedlex_sparql_constitution_de",
+        }),
+      }),
+    );
+    expect(result.acquisition_spec).toMatchObject({
+      provider: "fedlex_sparql",
+      seed_url: "https://fedlex.data.admin.ch/eli/cc/1999/404",
+    });
+  });
+
   it("loads source blueprint templates through the templates endpoint", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(
@@ -981,6 +1027,11 @@ describe("controlPlaneDataProvider", () => {
               overlay_id: "de",
               provider_template_id: "deterministic_http_bundesrecht",
               provider: "deterministic_http",
+            },
+            {
+              overlay_id: "ch",
+              provider_template_id: "fedlex_sparql_constitution_de",
+              provider: "fedlex_sparql",
             },
           ],
         }),
@@ -1003,8 +1054,9 @@ describe("controlPlaneDataProvider", () => {
         },
       }),
     );
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3);
     expect(result[0]?.overlay_id).toBe("at");
+    expect(result[2]?.provider).toBe("fedlex_sparql");
   });
 
   it("fills missing preview summary collections and normalizes drift status", async () => {
