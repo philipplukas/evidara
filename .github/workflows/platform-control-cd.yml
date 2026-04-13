@@ -44,13 +44,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
 
       - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Wait for runtime images (Artifact Registry)
         run: |
@@ -177,16 +177,31 @@ jobs:
             echo "::warning::platform-control readiness is degraded"
           fi
 
-      - name: Smoke test — DI consumer health (dev)
+      - name: Resolve DI consumer URL (dev)
+        id: di_consumer_dev_url
         run: |
           DI_URL=$(gcloud run services describe "${DI_CONSUMER_SERVICE_NAME}-dev" \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
             --format='value(status.url)')
+          echo "di_url=${DI_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Mint DI consumer ID token (dev)
+        id: di_consumer_dev_token
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+          token_format: id_token
+          id_token_audience: ${{ steps.di_consumer_dev_url.outputs.di_url }}
+          id_token_include_email: true
+
+      - name: Smoke test — DI consumer health (dev)
+        env:
+          DI_URL: ${{ steps.di_consumer_dev_url.outputs.di_url }}
+          TOKEN: ${{ steps.di_consumer_dev_token.outputs.id_token }}
+        run: |
           echo "Checking ${DI_URL}/health ..."
-          TOKEN=$(gcloud auth print-identity-token \
-            --audiences="${DI_URL}" \
-            --include-email)
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
             -H "Authorization: Bearer ${TOKEN}" "${DI_URL}/health" || echo "000")
           echo "HTTP ${HTTP_CODE}"
@@ -285,13 +300,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_PROD }}
 
       - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Preflight — Cloud Run API enabled (prod)
         id: preflight-prod

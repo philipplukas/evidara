@@ -67,7 +67,8 @@ jobs:
             exit 1
           fi
 
-      - name: Mint audience-scoped Cloud Run ID tokens
+      - name: Resolve Cloud Run service URLs
+        id: service_urls
         run: |
           set -euo pipefail
           PC_URL=$(gcloud run services describe "platform-control-api-${TARGET_ENV}" \
@@ -88,13 +89,32 @@ jobs:
             exit 1
           fi
 
-          # The workflow is already authenticated as the staging deployer service
-          # account via Workload Identity Federation above; mint audience-scoped ID
-          # tokens directly from the active credentials instead of impersonating the
-          # same service account again.
-          PC_ID_TOKEN=$(gcloud auth print-identity-token --audiences="${PC_URL}")
-          LS_ID_TOKEN=$(gcloud auth print-identity-token --audiences="${LS_URL}")
+          echo "pc_url=${PC_URL}" >> "${GITHUB_OUTPUT}"
+          echo "ls_url=${LS_URL}" >> "${GITHUB_OUTPUT}"
 
+      - name: Mint platform-control ID token
+        id: pc_id_token
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+          token_format: id_token
+          id_token_audience: ${{ steps.service_urls.outputs.pc_url }}
+
+      - name: Mint legal-search ID token
+        id: ls_id_token
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_STAGING }}
+          token_format: id_token
+          id_token_audience: ${{ steps.service_urls.outputs.ls_url }}
+
+      - name: Export audience-scoped Cloud Run ID tokens
+        env:
+          PC_ID_TOKEN: ${{ steps.pc_id_token.outputs.id_token }}
+          LS_ID_TOKEN: ${{ steps.ls_id_token.outputs.id_token }}
+        run: |
           if [[ -z "${PC_ID_TOKEN}" ]]; then
             echo "::error::Failed to mint ID token for platform-control-api audience"
             exit 1
