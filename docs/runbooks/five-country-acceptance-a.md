@@ -3,11 +3,12 @@
 Owner: Platform / GA
 Last reviewed: 2026-04-13
 Last verified: 2026-04-13
+Status: Active evidence execution note
 Applies to: country slice 1-2 only
 
 ## Purpose
 
-Define the acceptance lane for the first country slice of the five-country GA umbrella.
+Define the execution lane for the first country slice of the five-country GA umbrella.
 This lane covers Switzerland (CH) and Austria (AT) only and stays out of the DE / FR / IT
 content-lane work so we can validate the shared model without overlap.
 
@@ -17,6 +18,13 @@ Canonical source context:
 - [Platform-Control Multi-Country Operator Playbook](platform-control-multi-country-operator-playbook.md)
 - [Metadata quality plan status](metadata-quality-plan-status.md)
 - Linear umbrella: `TAR-160`
+
+## Current state
+
+- The lane is ready to execute, but the CH/AT evidence has not yet been refreshed into the GA packet.
+- The shared country model is already in place; this lane now needs current search/detail/operator evidence only.
+- The umbrella target is `TAR-160`; this note should produce a compact summary that can be pasted there verbatim.
+- Do not expand scope into DE / FR / IT or into branch-policy / runner work.
 
 ## Scope
 
@@ -87,7 +95,31 @@ Out of scope:
 3. Verify the search results and detail view against the shared acceptance checklist.
 4. Run the operator playbook for CH and AT and capture the onboarding / triage artifacts.
 5. Record any gaps as follow-up issues rather than expanding this lane to DE / FR / IT.
-6. Publish a short lane summary into `TAR-160` once the slice is complete.
+6. Publish the `TAR-160` summary block below once the slice is complete.
+
+## Exact next checks
+
+- Confirm the CH corpus returns the expected canonical jurisdiction, source-family, and authority labels.
+- Confirm the AT corpus returns the same canonical labels without country-specific alias drift.
+- Confirm result subtitles and detail rows match the shared subtitle rules and do not fall back to `unknown`.
+- Confirm the operator flow can select the country overlay, onboard the source, and complete triage end to end.
+- Confirm any mismatch is recorded as a follow-up issue instead of being patched in this lane.
+
+## Pass / fail capture format
+
+Use one row per checked document or operator step:
+
+| Check | Sample | Result | Evidence |
+|------|--------|--------|----------|
+| CH taxonomy / filters | `<doc-id or query>` | pass / fail | `<run URL, screenshot, or log anchor>` |
+| AT taxonomy / filters | `<doc-id or query>` | pass / fail | `<run URL, screenshot, or log anchor>` |
+| Subtitle / detail rows | `<doc-id or query>` | pass / fail | `<screenshot or note>` |
+| Operator flow | `<step name>` | pass / fail | `<workflow URL or log anchor>` |
+
+Capture rule:
+
+- If a check fails, add the exact symptom, the smallest reproducible sample, and a follow-up issue reference.
+- If a check passes, keep the evidence pointer short and copyable so it can be pasted into `TAR-160`.
 
 ## Expected evidence artifacts
 
@@ -96,6 +128,17 @@ Out of scope:
 - Operator checklist output for CH and AT
 - Run IDs or workflow URLs for any acceptance smoke or replay commands
 - A compact gap list for anything that needs a follow-up issue
+
+## TAR-160 summary block
+
+Paste this into `TAR-160` when the slice is complete:
+
+> CH + AT acceptance complete.
+> Representative CH and AT docs were checked for taxonomy, filters, subtitles, detail rows, and operator flow.
+> Result: `<pass/fail>` overall.
+> Evidence: `<run URLs / screenshot anchors / workflow URLs>`.
+> Gaps: `<none>` or `<short follow-up list>`.
+> Next action: `<link to follow-up issue if any>`.
 
 ## Likely risks
 

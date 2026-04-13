@@ -29,6 +29,7 @@ Run against a **deployed** legal-search API (**dev** Cloud Run when you have no 
 1. Pick **5–10 queries** representative of MVP operator demos (exact titles, partial titles, article numbers, court abbreviations).
 2. For each query, record: top **3** `document_id` values, `relevance_score`, and whether the expected doc appears in top **5**.
 3. Store results in the release checkpoint (spreadsheet or Linear issue comment) and link from the weekly readiness note.
+4. Add one control query `q=*` and record `totalResults` for that row as a corpus-health check.
 
 **Regression expectation:** after ranking changes, re-run the pack; **no more than one** agreed “allowed regression” slot per release candidate (document explicitly in the checkpoint).
 
@@ -45,18 +46,24 @@ Use this exact sequence for the next baseline run:
 1. Pick the corpus and query list.
    - For the agreed seed list, use [`scripts/fixtures/staging-relevance-queries.example.txt`](../../scripts/fixtures/staging-relevance-queries.example.txt).
    - If you need a custom local list, keep it outside the repo or pass the file path directly to the query-pack script.
+   - Add a final `*` control row and record `totalResults` for it alongside the seed queries.
 2. Mint Cloud Run tokens and run the pack against the target environment.
    - Dev/staging one-shot:
+
      ```bash
      ./scripts/evidara-cloud-run-operator-session.sh dev --relevance-only
      ```
+
    - Or, if you already have `EVIDARA_LEGAL_SEARCH_URL` and `EVIDARA_LEGAL_SEARCH_TOKEN` exported:
+
      ```bash
      ./scripts/run-staging-relevance-query-pack.sh scripts/fixtures/staging-relevance-queries.example.txt
      ```
+
 3. Paste the generated Markdown table into [relevance-eval-result-template.md](relevance-eval-result-template.md).
 4. Attach the same table to Linear `TAR-82` and `TAR-68`.
 5. Record exactly one allowed regression slot, or state `none`.
+6. If `q=*` is also empty, treat the result as alias/index/corpus drift and route the next step through [staging-projection-replay.md](staging-projection-replay.md) and [metadata-quality-plan-status.md](metadata-quality-plan-status.md) instead of calling it a ranking regression.
 
 ## Related docs
 

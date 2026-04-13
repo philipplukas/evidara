@@ -2,7 +2,7 @@
 
 ## Status
 
-Convention-based (not enforced by GitHub branch protection — requires GitHub Pro for private repos).
+Enforced by GitHub branch protection on `main` and team discipline. Current live state: `strict: true` with no universal required checks; only always-on checks belong in the universal list.
 
 ## Rules for `main`
 
@@ -93,6 +93,12 @@ Keep the required-check model aligned to the TAR-70 emitted-check matrix:
 - path-scoped component checks should only gate the PRs that trigger them
 - release-lane checks such as `release-readiness` and `scraping-qa` should stay
   release-scoped unless they are wrapped by an always-on aggregator
+
+Current steady state on `main`:
+
+- `strict: true`
+- no universal required checks beyond always-on contexts
+- `release-readiness` and `scraping-qa` are release gates, not generic PR gates
 
 For the current operator view of which PR types emit which checks, see
 [TAR-70 emitted-check matrix](../runbooks/tar-70-emitted-check-matrix.md).

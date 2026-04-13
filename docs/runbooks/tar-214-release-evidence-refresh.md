@@ -17,22 +17,26 @@ Use this checklist when you need to turn the merged implementation stack into a 
 ## Exact next actions
 
 1. Re-verify `TAR-77`.
+
 - Capture the current GitHub `main` branch-protection screenshot.
 - Capture one green `Release Readiness` run URL from the current `main`.
 - If `release-readiness` and `scraping-qa` are no longer universally required, note that as policy drift in `TAR-77` and link it back to `TAR-70`.
 
-2. Refresh `TAR-64`.
+1. Refresh `TAR-64`.
+
 - Run two dev smokes on separate occasions or separate `main` SHAs.
 - For each run, capture the UTC timestamp, run URL, final exit code, and Gate D `run_id` / `document_id` narrative.
 - Attach the evidence to `TAR-64`, then link the refreshed runs from `TAR-69`.
 
-3. Refresh `TAR-85`.
+1. Refresh `TAR-85`.
+
 - Run `evidara workflow mvp-acceptance` against `dev` Cloud Run unless you operate staging.
 - Capture stdout or `--json` output.
 - Make sure the output includes `evidence_pack_version`.
 - Attach the refreshed acceptance output to `TAR-85`, then link it from `TAR-69`.
 
-4. Close the loop on `TAR-69`.
+1. Close the loop on `TAR-69`.
+
 - Add a summary comment that links the refreshed `TAR-64`, `TAR-77`, and `TAR-85` evidence.
 - Update the phase-5 go / no-go memo gate table with the current run URLs and artifact pointers.
 - If the recommendation changes, record the date and owner in `TAR-69`.

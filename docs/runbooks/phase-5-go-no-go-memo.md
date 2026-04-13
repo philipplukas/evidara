@@ -32,8 +32,8 @@ Use [TAR-214 release evidence refresh](tar-214-release-evidence-refresh.md) as t
 
 | Step | Current status | What to do next |
 |------|----------------|-----------------|
-| `TAR-77` branch protection proof | stale because `main` changed today | Capture a fresh GitHub protection screenshot and one green `Release Readiness` run URL; if the required-check model changed, record it as policy drift |
-| `TAR-64` dev smoke evidence | present but not yet re-linked into the refreshed packet | Run two new dev smoke passes and attach the run URLs, timestamps, and Gate D IDs |
+| `TAR-77` branch protection proof | stale because `main` changed on 2026-04-13 and the required-check model was simplified to always-on checks only | Capture a fresh GitHub protection screenshot and one green strict `Release Readiness` run URL; link the policy drift back to `TAR-70` |
+| `TAR-64` dev smoke evidence | blocked on a fresh green `E2E Smoke Dev` after the Cloud Run token mint path failed on self-hosted runner egress | Merge the CI/auth fix from `#220`, rerun `E2E Smoke Dev`, then attach the run URL, timestamp, exit code, and Gate D IDs |
 | `TAR-85` remote MVP acceptance | present but not yet re-linked into the refreshed packet | Re-run `evidara workflow mvp-acceptance` against `dev` or staging and capture stdout / JSON with `evidence_pack_version` |
 | `TAR-69` synthesis | pending | Post one summary comment linking the refreshed evidence and update §2 with the final run URLs |
 
@@ -66,7 +66,8 @@ These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, an
 | Topic | Status | Notes |
 |-------|--------|--------|
 | Projection fields (title, type, dates, structural path) | **Shipped** | `ProjectionsService` maps canonical DI lean rows; see `search-relevance-baseline.md` |
-| Relevance eval pack | **PENDING** | Run query pack in `search-relevance-baseline.md` against **dev** (or staging) legal-search API; attach top-N table to TAR-82 / TAR-68 |
+| Relevance eval pack | **PENDING** | Run query pack in `search-relevance-baseline.md` against **dev** (or staging) legal-search API, include the `q=*` control row, and attach the table to TAR-82 / TAR-68 |
+| Platform trust proof | **PARTIAL GO** | Hetzner + Tailscale + Argo path is proven via the `rocky-agents` staging smoke and live image verification; explicit Temporal execution ID still missing in the evidence packet |
 | Open issues | | TAR-64, TAR-77, TAR-85 until evidence attached |
 
 ## 4. Risk register

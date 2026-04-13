@@ -7,7 +7,13 @@ Applies to: GitHub branch protection, PR-required checks, release-lane gating
 
 ## Purpose
 
-This runbook captures the recovery plan after the merge-wave branch-protection drift that blocked `main` during the TAR-89 / release-evidence stack. It is intentionally narrow: it documents the required-check model we want going forward and the rollout/validation steps, without changing live branch protection itself.
+This runbook captures the steady-state required-check model after the merge-wave branch-protection drift that blocked `main` during the TAR-89 / release-evidence stack. The live GitHub state we want to preserve is:
+
+- `main` stays strict (`strict: true`)
+- universal required checks are always-on checks only
+- `Release Readiness` and `scraping-qa` stay release gates unless we add an always-on aggregator workflow
+
+It is intentionally narrow: it documents the required-check model we want going forward and the rollout/validation steps, without changing live branch protection itself.
 
 ## 1. Current policy problem
 
@@ -26,9 +32,9 @@ The repo has two different kinds of CI signals:
 
 During the merge wave, `main` branch protection was effectively asking GitHub to require contexts that do not exist on every PR. That produced blocked merges even when the visible PR checks were green.
 
-The recovery lesson is simple: do not make a path-filtered or release-only workflow a universal required status check unless the workflow emits a stable context on every PR.
+The steady-state rule is simple: keep `main` strict, but require only checks that emit on every PR. Do not make a path-filtered or release-only workflow a universal required status check unless the workflow emits a stable context on every PR.
 
-## 2. Recommended target model
+## 2. Steady-state target model
 
 Use three layers instead of one overloaded branch-protection rule:
 
@@ -56,7 +62,7 @@ For a concrete operator matrix of PR types versus emitted checks, see
 
 1. Audit the workflows that currently emit on every PR versus only on selected paths.
 2. Keep the universal required-check list limited to checks that always emit.
-3. Remove release-only and path-filtered contexts from branch protection unless they are wrapped by an always-on aggregator.
+3. Keep release-only and path-filtered contexts out of universal branch protection unless they are wrapped by an always-on aggregator.
 4. Keep `Release Readiness` and `scraping-qa` as release evidence gates, not generic PR blockers.
 5. Align `docs/setup/branch-rules.md`, `docs/runbooks/runtime-stack.md`, and the release memo after the policy is finalized.
 6. If we decide to add an aggregator, implement it as a new workflow that always runs on PRs and emits one stable required context.

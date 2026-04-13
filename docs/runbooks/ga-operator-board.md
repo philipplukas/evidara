@@ -29,6 +29,9 @@ What is already true:
 
 - The implementation merge wave is complete.
 - The immediate shift is from shipping code to proving release readiness and GA quality.
+- The `rocky-agents` staging proof is now strong enough to count as platform evidence:
+  `rocky-agents-staging` is back on `main`, Argo is `Healthy` / `Synced`, and live
+  `github-app` is on `ghcr.io/philipplukas/rocky-agents-github-app:sha-c7f70ad135cd`.
 - The main remaining work is evidence, branch-gate policy hardening, runner trust, and
   five-country acceptance confidence.
 
@@ -39,6 +42,9 @@ What is not yet true:
 - Runner stability is improved but not yet trusted as a solved problem.
 - Five-country acceptance and relevance still need current evidence attached to the GA
   umbrella.
+- The current dev relevance signal still points at empty seed-query results and is being
+  tracked as follow-up `TAR-242` until the `q=*` control run confirms whether this is
+  ranking or alias/index drift.
 
 ## Board status
 
@@ -49,7 +55,7 @@ What is not yet true:
 | Runner reliability | `TAR-238` | active | yes | light/heavy pools are stable across rotation and preflight checks pass reliably |
 | Five-country acceptance A (CH + AT) | `TAR-239` | ready | track in parallel | CH/AT checklist is executed and evidence is attached into `TAR-160` |
 | Five-country acceptance B (DE + FR) | `TAR-240` | ready | track in parallel | DE/FR checklist is executed and evidence is attached into `TAR-160` |
-| Relevance baseline | `TAR-241` | active | yes | query pack is rerun, result table is attached, and regressions are split into follow-up issues |
+| Relevance baseline | `TAR-241` | active | yes | query pack is rerun with the `q=*` control row, result table is attached, and regressions are split into follow-up issues |
 | GA umbrella / final sign-off | `TAR-160` | collecting | no, assemble after inputs land | consolidated GA evidence pack and release decision are ready |
 
 ## What to push now
@@ -75,6 +81,7 @@ Immediate operator actions:
 4. Mirror the refreshed links into
    [`phase-5-go-no-go-memo.md`](phase-5-go-no-go-memo.md).
 5. Post the final summary linkage comment into `TAR-69`.
+6. Treat [PR #220](https://github.com/philipplukas/evidara/pull/220) as the current CI/auth unblocker for fresh `main` evidence runs.
 
 ### 2. `TAR-70` - gate policy hardening
 
@@ -105,12 +112,16 @@ Immediate operator actions:
 
 1. Use the runner reliability checklist in
    [`ci-actions-duration-metrics.md`](ci-actions-duration-metrics.md#runner-reliability-checklist).
-2. Prove both light and heavy pools with `runner-bootstrap-preflight.yml`.
-3. Re-run `runner-pool-smoke.yml` after any recycle or scale-set change.
-4. Keep `runtime-images.yml` off the generic pool until Docker/buildx is repeatedly
+2. Keep the Hetzner + Tailscale kubeconfig path as the standard cluster access path for
+   `evidare-staging`; the live proof is recorded in
+   [`github-app-proof-rerun-checklist.md`](github-app-proof-rerun-checklist.md).
+3. Prove both light and heavy pools with `runner-bootstrap-preflight.yml`.
+4. Re-run `runner-pool-smoke.yml` after any recycle or scale-set change.
+5. Keep `runtime-images.yml` off the generic pool until Docker/buildx is repeatedly
    stable.
-5. Treat label drift, ghost-busy state, or queue stalls as runner-registration issues
+6. Treat label drift, ghost-busy state, or queue stalls as runner-registration issues
    first, not workflow-selector issues.
+7. Keep the remaining proof gap explicit: no named Temporal execution ID has been captured yet.
 
 ### 4. `TAR-241` - relevance baseline
 
@@ -124,10 +135,13 @@ Immediate operator actions:
 1. Run the agreed query pack from
    [`staging-relevance-query-pack-suggestions.md`](staging-relevance-query-pack-suggestions.md)
    with [`scripts/run-staging-relevance-query-pack.sh`](../../scripts/run-staging-relevance-query-pack.sh).
-2. Record results using
+2. Add a `q=*` control row and record `totalResults` so we can distinguish ranking issues
+   from alias/index/corpus drift.
+3. Record results using
    [`relevance-eval-result-template.md`](relevance-eval-result-template.md).
-3. Attach the result table to `TAR-82` and `TAR-68`.
-4. Split any regression into a dedicated follow-up ticket instead of expanding this lane.
+4. Attach the result table to `TAR-82` and `TAR-68`.
+5. Keep `TAR-242` as the follow-up sink for empty dev results unless the control row proves
+   this is just ranking.
 
 ## What stays tracked in parallel
 
@@ -184,6 +198,7 @@ Do not parallelize these across multiple owners at once:
 | Evidence checklist for TAR-64 / TAR-77 / TAR-85 | [`phase-5-evidence-checklist.md`](phase-5-evidence-checklist.md) |
 | Gate policy recovery plan | [`tar-70-gate-policy-hardening.md`](tar-70-gate-policy-hardening.md) |
 | Runner stabilization and verification | [`ci-actions-duration-metrics.md`](ci-actions-duration-metrics.md#runner-reliability-checklist) |
+| Hetzner / Tailscale / Argo platform proof | [`github-app-proof-rerun-checklist.md`](github-app-proof-rerun-checklist.md) |
 | CH + AT acceptance lane | [`five-country-acceptance-a.md`](five-country-acceptance-a.md) |
 | DE + FR acceptance lane | [`five-country-acceptance-de-fr.md`](five-country-acceptance-de-fr.md) |
 | Relevance baseline and result template | [`search-relevance-baseline.md`](search-relevance-baseline.md), [`relevance-eval-result-template.md`](relevance-eval-result-template.md) |
