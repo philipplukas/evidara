@@ -113,6 +113,11 @@ report_dir="${latest_dir}/legal-search/frontend/playwright-report"
 screenshot_pack_dir="${latest_dir}/legal-search/frontend/screenshot-pack"
 runbook_path="${latest_dir}/docs/runbooks/interaction-flow-validation.md"
 video_mode="$(awk -F': ' '/video_mode:/{print $2; exit}' "${manifest_path}" 2>/dev/null || true)"
+video_mode="${video_mode//$'\r'/}"
+video_mode="${video_mode//\`/}"
+video_mode="${video_mode//\"/}"
+video_mode="${video_mode#${video_mode%%[![:space:]]*}}"
+video_mode="${video_mode%${video_mode##*[![:space:]]}}"
 
 if [[ ! -f "${manifest_path}" ]]; then
   echo "Missing manifest: ${manifest_path}" >&2

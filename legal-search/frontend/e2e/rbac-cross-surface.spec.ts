@@ -66,7 +66,9 @@ test.describe("@contract RBAC cross-surface (legal-search header + admin denial)
     await expect(controlPanelLink).toBeVisible();
     const href = await controlPanelLink.getAttribute("href");
     expect(href).toBeTruthy();
-    expect(href?.startsWith(EXPECTED_CONTROL_PANEL_URL)).toBe(true);
+    expect(new URL(href ?? "", LEGAL_SEARCH_BASE_URL).origin).toBe(
+      new URL(EXPECTED_CONTROL_PANEL_URL).origin,
+    );
     if (href && href !== EXPECTED_CONTROL_PANEL_URL) {
       expect(href).toMatch(new RegExp(`^${escapeRegExp(EXPECTED_CONTROL_PANEL_URL)}.*from=legal-search`));
     }
