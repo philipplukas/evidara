@@ -45,7 +45,7 @@ jobs:
   fmt-check:
     name: Terraform fmt check
     if: github.event_name == 'pull_request'
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
 
     steps:
       - name: Checkout
@@ -55,6 +55,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~> 1.9"
+          terraform_wrapper: false
 
       - name: Terraform fmt check
         run: terraform fmt -check -recursive -diff
@@ -64,7 +65,7 @@ jobs:
     name: Terraform plan (dev)
     if: github.event_name == 'pull_request'
     needs: fmt-check
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     environment: dev
 
     steps:
@@ -86,6 +87,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~> 1.9"
+          terraform_wrapper: false
 
       - name: Terraform init
         id: init
@@ -188,7 +190,7 @@ jobs:
     name: Terraform plan (staging)
     if: github.event_name == 'pull_request'
     needs: fmt-check
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     environment: staging
 
     steps:
@@ -210,6 +212,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~> 1.9"
+          terraform_wrapper: false
 
       - name: Terraform init
         id: init
@@ -312,7 +315,7 @@ jobs:
   apply-dev:
     name: Terraform apply (dev)
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     environment: dev
     outputs:
       staging_apply_enabled: ${{ steps.meta.outputs.staging_apply_enabled }}
@@ -340,6 +343,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~> 1.9"
+          terraform_wrapper: false
 
       - name: Terraform init
         run: terraform init -input=false
@@ -375,7 +379,7 @@ jobs:
       always() &&
       needs.apply-dev.result == 'success' &&
       needs.apply-dev.outputs.staging_apply_enabled == 'true'
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     environment: staging
 
     steps:
@@ -392,6 +396,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~> 1.9"
+          terraform_wrapper: false
 
       - name: Terraform init
         run: terraform init -input=false
@@ -435,7 +440,7 @@ jobs:
         (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED_PROD == 'true') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
       )
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     environment: prod
 
     steps:
@@ -452,6 +457,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~> 1.9"
+          terraform_wrapper: false
 
       - name: Terraform init
         run: terraform init -input=false

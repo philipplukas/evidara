@@ -570,9 +570,10 @@ def _resolve_official_citation(
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
 
-    kundmachungsorgan = extracted_metadata.get("kundmachungsorgan")
-    if isinstance(kundmachungsorgan, str) and kundmachungsorgan.strip():
-        return kundmachungsorgan.strip()
+    for field_name in ("publication_organ", "kundmachungsorgan"):
+        candidate = extracted_metadata.get(field_name)
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
 
     return None
 

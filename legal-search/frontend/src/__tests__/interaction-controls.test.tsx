@@ -101,7 +101,10 @@ describe("High-impact interaction controls", () => {
 
     const backButton = screen.getByRole("button", { name: /Back/ });
     expect(backButton).toBeInTheDocument();
+    expect(screen.getByText("Current scope")).toBeInTheDocument();
     expect(screen.getByText("Commentary for Art. 754 OR")).toBeInTheDocument();
+    expect(screen.getByText(/Search for "Art 754 OR" · Commentary/)).toBeInTheDocument();
+    expect(screen.getByText(/Previous scope: Results for "Art 754 OR"/)).toBeInTheDocument();
 
     act(() => {
       fireEvent.click(backButton);

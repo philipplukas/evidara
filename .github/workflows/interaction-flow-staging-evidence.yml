@@ -47,10 +47,10 @@ jobs:
       SCREENSHOT_PACK_RETRY_COUNT: "0"
       SCREENSHOT_PACK_FAILURE_REASON: "none"
       SCREENSHOT_CHECKLIST_COVERAGE: "unknown"
+      SCREENSHOT_PACK_VIDEO_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.full_playwright_trace && 'enabled' || 'disabled' }}
       SMOKE_RETRY_COUNT: "0"
       CONTRACT_RETRY_COUNT: "0"
       PLAYWRIGHT_TRACE: ${{ github.event_name == 'workflow_dispatch' && inputs.full_playwright_trace && 'on' || 'retain-on-failure' }}
-      PLAYWRIGHT_VIDEO: ${{ github.event_name == 'workflow_dispatch' && inputs.full_playwright_trace && 'on' || 'retain-on-failure' }}
 
     steps:
       - name: Checkout
@@ -136,6 +136,8 @@ jobs:
           exit 1
 
       - name: Capture staging canonical screenshot evidence pack
+        env:
+          PLAYWRIGHT_VIDEO: ${{ github.event_name == 'workflow_dispatch' && inputs.full_playwright_trace && 'on' || 'retain-on-failure' }}
         working-directory: legal-search/frontend
         run: |
           set -euo pipefail
@@ -170,6 +172,9 @@ jobs:
             "screenshot-pack/admin-run-lifecycle-visibility.png"
             "screenshot-pack/operator-journey-events.json"
           )
+          if [[ "${SCREENSHOT_PACK_VIDEO_MODE}" == "enabled" ]]; then
+            required+=("screenshot-pack/cross-surface-journey.webm")
+          fi
           missing=0
           for file in "${required[@]}"; do
             if [[ ! -f "${file}" ]]; then
@@ -216,6 +221,7 @@ jobs:
           - retry_count: `${SCREENSHOT_PACK_RETRY_COUNT}`
           - failure_reason: `${SCREENSHOT_PACK_FAILURE_REASON}`
           - checklist_coverage: `${SCREENSHOT_CHECKLIST_COVERAGE}`
+          - video_mode: `${SCREENSHOT_PACK_VIDEO_MODE}`
           - if failed, inspect `test-results` traces and retry logs in this run.
 
           Target URLs and expected contracts:
@@ -265,6 +271,28 @@ jobs:
           EVIDENCE_GCS_PREFIX="${INTERACTION_FLOW_EVIDENCE_GCS_ROOT%/}/interaction-flow-evidence/staging/${GITHUB_RUN_ID}"
           gcloud storage cp --recursive "${BUNDLE_ROOT}"/* "${EVIDENCE_GCS_PREFIX}/"
           echo "STAGING_EVIDENCE_GCS_PREFIX=${EVIDENCE_GCS_PREFIX}" >> "${GITHUB_ENV}"
+
+      - name: Publish staging evidence summary
+        if: always()
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          EVIDENCE_GCS_PREFIX="${INTERACTION_FLOW_EVIDENCE_GCS_ROOT%/}/interaction-flow-evidence/staging/${GITHUB_RUN_ID}"
+          {
+            echo "### Interaction Flow Staging Evidence"
+            echo ""
+            echo "| Detail | Value |"
+            echo "|--------|-------|"
+            echo "| Run URL | [${RUN_URL}](${RUN_URL}) |"
+            echo "| Evidence prefix | \`${EVIDENCE_GCS_PREFIX}\` |"
+            echo "| Smoke retry count | \`${SMOKE_RETRY_COUNT}\` |"
+            echo "| Contract retry count | \`${CONTRACT_RETRY_COUNT}\` |"
+            echo "| Screenshot pack status | \`${SCREENSHOT_PACK_STATUS}\` |"
+            echo "| Screenshot pack retry count | \`${SCREENSHOT_PACK_RETRY_COUNT}\` |"
+            echo "| Checklist coverage | \`${SCREENSHOT_CHECKLIST_COVERAGE}\` |"
+            echo "| Video mode | \`${SCREENSHOT_PACK_VIDEO_MODE}\` |"
+            echo ""
+            echo "Use the uploaded GCS bundle for the Playwright report, screenshot pack, and runbook snapshot."
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Notify Slack on failure
         if: failure() && env.SLACK_WEBHOOK_URL != ''

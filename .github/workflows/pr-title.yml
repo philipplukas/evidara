@@ -6,7 +6,7 @@ on:
 
 jobs:
   check-title:
-    runs-on: ${{ fromJSON(vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     permissions:
       pull-requests: read
     steps:

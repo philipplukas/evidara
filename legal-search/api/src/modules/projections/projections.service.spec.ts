@@ -212,6 +212,48 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('normalizes aliased document type hints from lean metadata before indexing', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const service = new ProjectionsService(repository, diClient);
+
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      metadata: {
+        source_defaults: {
+          document_type_hint: 'statute',
+        },
+      },
+    });
+    await service.applyDocumentProcessed({
+      ...baseProcessedEvent,
+      event_id: 'evt_5',
+      payload: { ...baseProcessedEvent.payload, document_id: 'doc_4' },
+    });
+    expect(repository.upsertProjection).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        document_type: 'law',
+      }),
+    );
+
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      metadata: {
+        extracted_metadata: {
+          document_type: 'urteil',
+        },
+      },
+    });
+    await service.applyDocumentProcessed({
+      ...baseProcessedEvent,
+      event_id: 'evt_6',
+      payload: { ...baseProcessedEvent.payload, document_id: 'doc_5' },
+    });
+    expect(repository.upsertProjection).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        document_type: 'decision',
+      }),
+    );
+  });
+
   it('falls back to LLM title when canonical title is a placeholder', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();

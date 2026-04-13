@@ -13,7 +13,7 @@ jobs:
     name: Light runner smoke
     uses: ./.github/workflows/runner-bootstrap-preflight.yml
     with:
-      runner_labels_json: ${{ vars.LIGHT_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]' }}
+      runner_scale_set: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
       node_version: "22"
       python_version: "3.11"
       frontend_playwright_smoke: false
@@ -22,7 +22,7 @@ jobs:
     name: Heavy runner smoke
     uses: ./.github/workflows/runner-bootstrap-preflight.yml
     with:
-      runner_labels_json: ${{ vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]' }}
+      runner_scale_set: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
       node_version: "22"
       python_version: "3.11"
       frontend_playwright_smoke: true

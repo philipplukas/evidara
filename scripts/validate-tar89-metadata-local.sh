@@ -38,6 +38,7 @@ Env:
   OPENSEARCH_ALIAS_WRITE (default documents-write)
   OPENSEARCH_ALIAS_READ (default documents-read)
   DOCUMENT_INTELLIGENCE_BASE_URL — for --replay/--search API process (you must export when starting the API)
+  DOCUMENT_SERVICE_AUTH_MODE — optional note for evidence output, e.g. none, bearer, file-backed-bearer
   LEGAL_SEARCH_API_URL — default http://127.0.0.1:3102
   DOCUMENT_SERVICE_PORT — default 8090 for --smoke-di
 
@@ -202,12 +203,19 @@ do_bootstrap() {
   echo ""
   echo "Start legal-search API (terminal 2) with DOCUMENT_INTELLIGENCE_BASE_URL=http://127.0.0.1:8090"
   echo "  and OPENSEARCH_ALIAS_READ=$READ_ALIAS OPENSEARCH_ALIAS_WRITE=$WRITE_INDEX OPENSEARCH_NODE=$OS"
+  echo "  Optional for sign-off notes: export DOCUMENT_SERVICE_AUTH_MODE=none"
 }
 
 do_smoke_di() {
   local port="${DOCUMENT_SERVICE_PORT:-8090}"
   local base="http://127.0.0.1:$port"
+  local auth_mode="none"
+  if [[ -n "${DOCUMENT_SERVICE_BEARER_TOKEN:-}" ]]; then
+    auth_mode="bearer"
+  fi
   echo "== Smoke Document Service (GET /lean) =="
+  echo "  Document Service base URL: $base"
+  echo "  Document Service auth mode: $auth_mode"
   if ! command -v uv >/dev/null 2>&1; then
     echo "error: uv not found; run Document Service manually" >&2
     exit 1
@@ -228,10 +236,22 @@ do_smoke_di() {
   trap - RETURN
 }
 
+require_document_service_context() {
+  local ds="${DOCUMENT_INTELLIGENCE_BASE_URL:-}"
+  if [[ -z "$ds" ]]; then
+    echo "error: DOCUMENT_INTELLIGENCE_BASE_URL must be exported for --replay/--search so the run records the intended Document Service origin" >&2
+    exit 1
+  fi
+  ds="${ds%/}"
+  echo "  Expected Document Service base URL: $ds"
+  echo "  Declared Document Service auth mode: ${DOCUMENT_SERVICE_AUTH_MODE:-unset (export DOCUMENT_SERVICE_AUTH_MODE=none|bearer|file-backed-bearer)}"
+}
+
 do_replay() {
   local api="${LEGAL_SEARCH_API_URL:-http://127.0.0.1:3102}"
   api="${api%/}"
   echo "== Replay projection =="
+  require_document_service_context
   LEGAL_SEARCH_API_URL="$api" "$REPLAY" "$TEMPLATE"
 }
 
@@ -239,6 +259,7 @@ do_search() {
   local api="${LEGAL_SEARCH_API_URL:-http://127.0.0.1:3102}"
   api="${api%/}"
   echo "== Search API (expect updated title after replay) =="
+  require_document_service_context
   curl -fsS "$api/v1/search?q=Bundesgericht&page_size=5" | jq ".results[] | select(.id==\"$DOC_ID\") | {id, type, title, metadataRows}"
 }
 
@@ -274,5 +295,6 @@ fi
 [[ "$DO_SEARCH" == 1 ]] && do_search
 
 echo ""
-echo "Done. If title in search is still the stale placeholder, confirm API has DOCUMENT_INTELLIGENCE_BASE_URL"
+echo "Done. Record DOCUMENT_INTELLIGENCE_BASE_URL and DOCUMENT_SERVICE_AUTH_MODE with the replay result."
+echo "If title in search is still the stale placeholder, confirm API has DOCUMENT_INTELLIGENCE_BASE_URL"
 echo "and replay returned {\"status\":\"applied\"}."

@@ -41,7 +41,7 @@ resource "google_billing_budget" "project_spend" {
   amount {
     specified_amount {
       currency_code = var.billing_budget_currency_code
-      units           = var.billing_budget_amount_units
+      units         = var.billing_budget_amount_units
     }
   }
 
