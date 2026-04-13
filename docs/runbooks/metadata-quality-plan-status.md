@@ -33,7 +33,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 ### 2.2 Document-intelligence pipeline (canonical metadata)
 
-- **Normalizer metadata** — Pipeline attaches `source_origin_kind`, `trust_tier`, `source_defaults`, optional `extracted_metadata`, `official_citation`, `original_language`, `translation_status`, parse fallback flags, optional **Docling** block.
+- **Normalizer metadata** — Pipeline attaches `source_origin_kind`, `trust_tier`, `source_defaults`, optional `extracted_metadata`, `official_citation` (including RIS `publication_organ` / `kundmachungsorgan` fallbacks), `original_language`, `translation_status`, parse fallback flags, optional **Docling** block.
 - **Optional LLM seam** — `MetadataExtractor` protocol + `MetadataExtractionCandidate`; pipeline merges LLM title/type when confidence ≥ threshold. **Default off** (`DI_ENABLE_LLM_EXTRACTOR=false`). See `document-intelligence/src/document_intelligence/extractors/metadata.py`, `pipeline.py`, and [document-intelligence README](../../document-intelligence/README.md) env section.
 - **Bundle hints** — platform-control now threads `bundle_metadata.extraction_hints` with a real `title_hint` where the acquisition payload exposes one, plus source-level `document_type_hint` / authority display context; the pipeline already consumes those hints for placeholder-title fallback and controlled type resolution.
 
@@ -155,15 +155,15 @@ When **no** staging GCP project exists, paste **dev** legal-search base URL(s) a
 | _TBD_ | _e.g. `https://legal-search-api-dev-…run.app`_ | _operator fills after search/detail spot-check_ |
 | _TBD_ | same | |
 
-**Procedure:** (1) Pick IDs from **dev** or staging search/detail that must read well for demos. (2) If projections are stale after a BFF/DI change, use [staging projection replay](staging-projection-replay.md) (same HTTP contract against whichever BFF you target) or full re-ingest. (3) Verify search + detail against section 3.5 **Search / list** and **Detail**. (4) Add a short **sign-off** comment on Linear **TAR-89** with date and link to this table row(s) (**3.5.3**) only when criteria are **actually met** (replay alone does not fix missing lean metadata).
+**Procedure:** (1) Pick IDs from **dev** or staging search/detail that must read well for demos. (2) If projections are stale after a BFF/DI change, use [staging projection replay](staging-projection-replay.md) (same HTTP contract against whichever BFF you target) or full re-ingest. (3) Record the exact `DOCUMENT_INTELLIGENCE_BASE_URL` used by that BFF and whether the Document Service path was **bearer-protected** or **unauthenticated / file-backed** for this verification run. (4) Verify search + detail against section 3.5 **Search / list** and **Detail**. (5) Add a short **sign-off** comment on Linear **TAR-89** with date and link to this table row(s) (**3.5.3**) only when criteria are **actually met** (replay alone does not fix missing lean metadata).
 
 Phase-1 local corpus (**3.5.1**) remains the **clean** reference for passing TAR-89 criteria in CI-like conditions; rows above are **inventory + honesty** about metadata quality on the **remote** environment referenced in the heading.
 
 ### 3.5.3 Formal sign-off (Linear TAR-89)
 
-Post a short comment on **TAR-89** when **3.5.2** remote rows are verified, for example:
+Post a short comment on **TAR-89** when **3.5.2** remote rows are verified. Always include the exact Document Service origin and auth model used for the check, for example:
 
-> TAR-89 acceptance sign-off — **YYYY-MM-DD** — Environment: **dev** (or **staging**) — Document IDs: **…** — Replay/re-index: **yes** (how) — Checked search + detail against section 3.5 criteria: **pass** — Owner: **name**
+> TAR-89 acceptance sign-off — **YYYY-MM-DD** — Environment: **dev** (or **staging**) — Document IDs: **…** — Replay/re-index: **yes** (how) — Document Service base URL: **https://...** — Document Service auth: **bearer** (or **none / file-backed**) — Checked search + detail against section 3.5 criteria: **pass** — Owner: **name**
 
 ---
 

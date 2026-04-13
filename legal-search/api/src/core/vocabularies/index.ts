@@ -57,7 +57,9 @@ for (const [key, entry] of Object.entries(docTypeVocab.properties.values.propert
 
 /** Locale-keyed document type labels loaded from vocabulary. */
 const DOCUMENT_TYPE_LOCALE_LABELS: Record<string, Record<string, string>> = {};
+const DOCUMENT_TYPE_NORMALIZED_BY_ALIAS: Record<string, string> = {};
 for (const [key, entry] of Object.entries(docTypeVocab.properties.values.properties)) {
+  DOCUMENT_TYPE_NORMALIZED_BY_ALIAS[key.toLowerCase()] = key;
   const props = (
     entry as { properties?: { labels?: { properties?: Record<string, { const?: string }> } } }
   ).properties;
@@ -68,6 +70,21 @@ for (const [key, entry] of Object.entries(docTypeVocab.properties.values.propert
     }
   }
   DOCUMENT_TYPE_LOCALE_LABELS[key] = labels;
+
+  const aliases = (
+    entry as {
+      properties?: { aliases?: { default?: string[] } };
+    }
+  ).properties?.aliases?.default;
+  if (Array.isArray(aliases)) {
+    for (const alias of aliases) {
+      if (typeof alias !== 'string') continue;
+      const normalizedAlias = alias.trim().toLowerCase();
+      if (normalizedAlias) {
+        DOCUMENT_TYPE_NORMALIZED_BY_ALIAS[normalizedAlias] = key;
+      }
+    }
+  }
 }
 
 /**
@@ -85,6 +102,14 @@ export function getDocumentTypeLabel(
     DOCUMENT_TYPE_LABELS[typeCode] ??
     typeCode
   );
+}
+
+/** Normalize a document type alias to its canonical controlled value. */
+export function normalizeDocumentType(type: string | undefined): string | undefined {
+  if (typeof type !== 'string') return undefined;
+  const normalized = type.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return DOCUMENT_TYPE_NORMALIZED_BY_ALIAS[normalized];
 }
 
 // ─── Jurisdiction Vocabulary ───
