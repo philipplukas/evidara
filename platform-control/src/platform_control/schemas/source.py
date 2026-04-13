@@ -82,6 +82,22 @@ class DeterministicHttpAcquisitionSpec(BaseAcquisitionSpec):
         return self
 
 
+class FedlexSparqlAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.FEDLEX_SPARQL] = AcquisitionProvider.FEDLEX_SPARQL
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+    sparql_endpoint: HttpUrl = "https://fedlex.data.admin.ch/sparqlendpoint"
+    preferred_languages: list[LanguageCode] = Field(default_factory=list)
+    query_mode: Literal["work_to_expression"] = "work_to_expression"
+    max_expressions: int = Field(default=1, ge=1, le=10)
+
+    @model_validator(mode="after")
+    def validate_fedlex_sparql_config(self) -> FedlexSparqlAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("fedlex_sparql provider requires seed_url or seed_urls")
+        return self
+
+
 class RisOgdAcquisitionSpec(BaseAcquisitionSpec):
     provider: Literal[AcquisitionProvider.RIS_OGD] = AcquisitionProvider.RIS_OGD
     base_url: HttpUrl
@@ -92,7 +108,10 @@ class RisOgdAcquisitionSpec(BaseAcquisitionSpec):
 
 
 AcquisitionSpec = Annotated[
-    FirecrawlAcquisitionSpec | DeterministicHttpAcquisitionSpec | RisOgdAcquisitionSpec,
+    FirecrawlAcquisitionSpec
+    | DeterministicHttpAcquisitionSpec
+    | FedlexSparqlAcquisitionSpec
+    | RisOgdAcquisitionSpec,
     Field(discriminator="provider"),
 ]
 AcquisitionSpecAdapter = TypeAdapter(AcquisitionSpec)

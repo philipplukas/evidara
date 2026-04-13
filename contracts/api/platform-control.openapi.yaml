@@ -1527,6 +1527,79 @@ components:
         document_type_hint:
           type: string
 
+    FedlexSparqlAcquisitionSpec:
+      type: object
+      additionalProperties: false
+      required: [provider]
+      properties:
+        provider:
+          type: string
+          enum: [fedlex_sparql]
+        seed_url:
+          oneOf:
+            - type: string
+              format: uri
+            - type: "null"
+        seed_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+        sparql_endpoint:
+          type: string
+          format: uri
+          default: https://fedlex.data.admin.ch/sparqlendpoint
+        preferred_languages:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-z]{2}(?:-[A-Z]{2})?$"
+          default: []
+        query_mode:
+          type: string
+          enum: [work_to_expression]
+          default: work_to_expression
+        max_expressions:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        tenant_id:
+          type: string
+          pattern: "^tenant_[a-z0-9_]+$"
+          default: tenant_public
+        corpus_id:
+          type: string
+          pattern: "^corpus_[a-z0-9_]+$"
+          default: corpus_public_default
+        scope_type:
+          type: string
+          enum: [global_public, tenant_private, tenant_shared]
+          default: global_public
+        source_origin_kind:
+          type: string
+          enum:
+            [
+              official_primary,
+              official_mirror,
+              licensed_provider,
+              community_curated,
+              tenant_internal,
+            ]
+          default: official_primary
+        trust_tier:
+          type: string
+          enum: [authoritative, preferred, supplemental, untrusted]
+          default: authoritative
+        language_codes:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-z]{2}(?:-[A-Z]{2})?$"
+          default: []
+        document_type_hint:
+          type: string
+
     RisOgdAcquisitionSpec:
       type: object
       additionalProperties: false
@@ -1596,6 +1669,7 @@ components:
       oneOf:
         - $ref: "#/components/schemas/FirecrawlAcquisitionSpec"
         - $ref: "#/components/schemas/DeterministicHttpAcquisitionSpec"
+        - $ref: "#/components/schemas/FedlexSparqlAcquisitionSpec"
         - $ref: "#/components/schemas/RisOgdAcquisitionSpec"
       discriminator:
         propertyName: provider
@@ -1726,7 +1800,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [firecrawl, deterministic_http, ris_ogd]
+          enum: [firecrawl, deterministic_http, fedlex_sparql, ris_ogd]
 
     SourceBlueprintTemplateListResponse:
       type: object

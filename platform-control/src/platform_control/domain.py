@@ -58,6 +58,7 @@ class FirecrawlMode(StrEnum):
 class AcquisitionProvider(StrEnum):
     FIRECRAWL = "firecrawl"
     DETERMINISTIC_HTTP = "deterministic_http"
+    FEDLEX_SPARQL = "fedlex_sparql"
     RIS_OGD = "ris_ogd"
 
 

@@ -16,6 +16,7 @@ import {
 import { useWatch } from "react-hook-form";
 import {
   controlPlaneActions,
+  type FedlexSparqlAcquisitionSpec,
   type SourceBlueprintPreview,
   type SourceBlueprintTemplate,
 } from "../../lib/admin/dataProvider";
@@ -56,6 +57,19 @@ const summarizePreview = (preview: SourceBlueprintPreview): string[] => {
       `Applikation: ${spec.applikation ?? "all"}`,
       `Preferred formats: ${(spec.preferred_formats ?? []).join(", ") || "n/a"}`,
       `Page size/max pages: ${spec.page_size ?? "n/a"} / ${spec.max_pages ?? "n/a"}`,
+    ];
+  }
+  if (spec.provider === "fedlex_sparql") {
+    const fedlex = spec as FedlexSparqlAcquisitionSpec;
+    const seeds = fedlex.seed_url
+      ? [fedlex.seed_url, ...(fedlex.seed_urls ?? [])]
+      : (fedlex.seed_urls ?? []);
+    return [
+      `Provider: ${fedlex.provider}`,
+      `Seed work URIs: ${seeds.join(", ") || "n/a"}`,
+      `SPARQL endpoint: ${fedlex.sparql_endpoint ?? "n/a"}`,
+      `Preferred languages: ${(fedlex.preferred_languages ?? []).join(", ") || "n/a"}`,
+      `Query mode/max expressions: ${fedlex.query_mode ?? "n/a"} / ${fedlex.max_expressions ?? "n/a"}`,
     ];
   }
   if (spec.provider === "deterministic_http") {

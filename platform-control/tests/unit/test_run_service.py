@@ -44,6 +44,31 @@ class StubProvider:
 
 
 @dataclass
+class FedlexSparqlProviderStub:
+    provider_name: str = "fedlex_sparql"
+
+    async def start_run(self, source, source_version, run) -> ProviderStartResult:
+        del source, run
+        work_uri = str(source_version.acquisition_spec["seed_url"])
+        expression_uris = [
+            "https://fedlex.data.admin.ch/eli/cc/1999/404/de",
+            "https://fedlex.data.admin.ch/eli/cc/1999/404/fr",
+        ]
+        return ProviderStartResult(
+            provider=self.provider_name,
+            external_job_id="sparql_job_001",
+            request_payload={
+                "work_uri": work_uri,
+                "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+            },
+            response_payload={
+                "work_uri": work_uri,
+                "expression_uris": expression_uris,
+            },
+        )
+
+
+@dataclass
 class InlineJsonDeterministicProvider:
     """Simulates deterministic_http capturing a single JSON document (no HTML)."""
 
@@ -843,6 +868,44 @@ async def test_provider_registry_dispatches_deterministic_inline_runs(session) -
     assert manifest["bundle_metadata"]["extraction_hints"]["authority_display_hint"] == (
         "Zurich Administrative Court"
     )
+
+
+@pytest.mark.asyncio
+async def test_provider_registry_dispatches_fedlex_sparql_runs(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "fedlex_sparql",
+        "seed_url": "https://fedlex.data.admin.ch/eli/cc/1999/404",
+        "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+        "language_codes": ["de", "fr", "it"],
+        "document_type_hint": "legislation",
+    }
+    await session.commit()
+
+    registry = ProviderRegistry()
+    registry.register(StubProvider())
+    registry.register(FedlexSparqlProviderStub())
+
+    run_service = RunService(session, provider_registry=registry)
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+
+    assert run.status is RunStatus.RUNNING
+    assert provider_job is not None
+    assert provider_job.provider == "fedlex_sparql"
+    assert provider_job.external_job_id == "sparql_job_001"
+    assert provider_job.request_payload["work_uri"] == "https://fedlex.data.admin.ch/eli/cc/1999/404"
+    assert provider_job.response_payload["expression_uris"] == [
+        "https://fedlex.data.admin.ch/eli/cc/1999/404/de",
+        "https://fedlex.data.admin.ch/eli/cc/1999/404/fr",
+    ]
 
 
 @pytest.mark.asyncio
