@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from datetime import UTC, datetime
 from urllib.parse import urlparse
@@ -18,10 +17,7 @@ from platform_control.services.acquisition_provider import (
 )
 
 _FEDLEX_HOST = "fedlex.data.admin.ch"
-_TITLE_PATTERN = re.compile(r'jolux:title\s+"([^"]+)"')
-_TITLE_SHORT_PATTERN = re.compile(r'jolux:titleShort\s+"([^"]+)"')
-
-
+_FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
 class FedlexSparqlProvider:
     provider_name = AcquisitionProvider.FEDLEX_SPARQL.value
     _EXPRESSION_QUERY = """
@@ -31,6 +27,15 @@ WHERE {{
   <{work_uri}> jolux:isRealizedBy ?expr .
 }}
 ORDER BY ?expr
+""".strip()
+
+    _MEMBER_QUERY = """
+PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
+SELECT ?member
+WHERE {{
+  ?member jolux:isMemberOf <{work_uri}> .
+}}
+ORDER BY ?member
 """.strip()
 
     _TITLE_QUERY = """
@@ -66,10 +71,15 @@ LIMIT 1
         async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
             for work_uri in work_uris:
                 try:
-                    expression_uris = await self._query_expression_uris(
+                    concrete_work_uri = await self._resolve_concrete_work_uri(
                         client=client,
                         sparql_endpoint=sparql_endpoint,
                         work_uri=work_uri,
+                    )
+                    expression_uris = await self._query_expression_uris(
+                        client=client,
+                        sparql_endpoint=sparql_endpoint,
+                        work_uri=concrete_work_uri,
                     )
                     selected_expression_uris = self._select_expression_uris(
                         expression_uris=expression_uris,
@@ -79,7 +89,7 @@ LIMIT 1
                     describe_turtle = await self._describe_graph(
                         client=client,
                         sparql_endpoint=sparql_endpoint,
-                        work_uri=work_uri,
+                        work_uri=concrete_work_uri,
                         expression_uris=selected_expression_uris,
                         max_content_bytes=max_content_bytes,
                     )
@@ -88,34 +98,37 @@ LIMIT 1
                         sparql_endpoint=sparql_endpoint,
                         expression_uris=selected_expression_uris,
                     )
-                    body = json.dumps(
-                        {
-                            "provider": self.provider_name,
-                            "work_uri": work_uri,
-                            "sparql_endpoint": sparql_endpoint,
-                            "preferred_languages": preferred_languages,
-                            "expression_uris": selected_expression_uris,
-                            "title": title,
-                            "title_short": title_short,
-                            "describe_turtle": describe_turtle,
-                        },
-                        ensure_ascii=False,
-                        indent=2,
+                    html_url = self._filestore_html_url(selected_expression_uris[0], concrete_work_uri)
+                    resolved_url, response, body = await self._fetch_text_manifestation(
+                        client=client,
+                        url=html_url,
+                        max_content_bytes=max_content_bytes,
                     )
+                    content_type = response.headers.get("content-type", "text/html").split(";", 1)[0].strip().lower()
+                    charset = response.charset_encoding or "utf-8"
+                    if not body:
+                        raise ProviderConfigurationError(
+                            f"fedlex_sparql manifestation response was empty for {html_url}"
+                        )
+                    body_text = body.decode(charset, errors="replace")
+                    html_title = self._title_from_html(body_text)
                     resources.append(
                         ProviderResource(
                             source_url=work_uri,
-                            final_url=work_uri,
-                            content_type="application/json",
-                            body=body,
-                            title=title or title_short or work_uri.rsplit("/", 1)[-1],
-                            http_status=200,
+                            final_url=resolved_url,
+                            content_type=content_type,
+                            body=body_text,
+                            title=title or html_title or title_short or work_uri.rsplit("/", 1)[-1],
+                            http_status=response.status_code,
                             discovery_depth=0,
                             metadata={
                                 "provider": self.provider_name,
                                 "sparql_endpoint": sparql_endpoint,
+                                "concrete_work_uri": concrete_work_uri,
                                 "expression_uris": selected_expression_uris,
+                                "manifestation_url": resolved_url,
                                 "title_short": title_short,
+                                "describe_turtle": describe_turtle,
                                 "fetched_at": datetime.now(UTC).isoformat(),
                             },
                         )
@@ -142,6 +155,7 @@ LIMIT 1
                 "sparql_endpoint": sparql_endpoint,
                 "preferred_languages": preferred_languages,
                 "max_expressions": max_expressions,
+                "manifestation_format": "html",
             },
             response_payload=response_payload,
             inline_resources=resources,
@@ -180,6 +194,47 @@ LIMIT 1
             fallback = acquisition_spec.get("language_codes")
             languages = [str(item).strip().lower()[:2] for item in fallback or [] if str(item).strip()]
         return [language for language in languages if language]
+
+    async def _resolve_concrete_work_uri(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        sparql_endpoint: str,
+        work_uri: str,
+    ) -> str:
+        member_uris = await self._query_member_work_uris(
+            client=client,
+            sparql_endpoint=sparql_endpoint,
+            work_uri=work_uri,
+        )
+        if member_uris:
+            return member_uris[-1]
+        return work_uri
+
+    async def _query_member_work_uris(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        sparql_endpoint: str,
+        work_uri: str,
+    ) -> list[str]:
+        response = await client.get(
+            sparql_endpoint,
+            params={
+                "query": self._MEMBER_QUERY.format(work_uri=work_uri),
+                "format": "application/sparql-results+json",
+            },
+            headers={"Accept": "application/sparql-results+json"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        bindings = payload.get("results", {}).get("bindings", [])
+        member_uris: list[str] = []
+        for binding in bindings:
+            member = binding.get("member", {}).get("value")
+            if isinstance(member, str) and member.startswith(f"https://{_FEDLEX_HOST}/"):
+                member_uris.append(member)
+        return member_uris
 
     async def _query_expression_uris(
         self,
@@ -258,7 +313,13 @@ LIMIT 1
         sparql_endpoint: str,
         expression_uris: list[str],
     ) -> tuple[str | None, str | None]:
+        candidate_uris: list[str] = []
         for expression_uri in expression_uris:
+            candidate_uris.append(expression_uri)
+            abstract_expression_uri = self._abstract_expression_uri(expression_uri)
+            if abstract_expression_uri is not None:
+                candidate_uris.append(abstract_expression_uri)
+        for expression_uri in dict.fromkeys(candidate_uris):
             response = await client.get(
                 sparql_endpoint,
                 params={
@@ -278,6 +339,22 @@ LIMIT 1
                     title_short if isinstance(title_short, str) else None,
                 )
         return None, None
+
+    async def _fetch_text_manifestation(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        url: str,
+        max_content_bytes: int,
+    ) -> tuple[str, httpx.Response, bytes]:
+        response = await client.get(url, headers={"Accept": "text/html"})
+        response.raise_for_status()
+        body = await self._read_body_limited(response=response, max_content_bytes=max_content_bytes)
+        if body is None:
+            raise ProviderConfigurationError(
+                f"fedlex_sparql manifestation exceeded max_content_bytes={max_content_bytes}"
+            )
+        return str(response.url), response, body
 
     async def _read_body_limited(
         self,
@@ -299,3 +376,41 @@ LIMIT 1
                 f"fedlex_sparql provider only supports https://{_FEDLEX_HOST} URLs: {url}"
             )
         return url
+
+    def _filestore_html_url(self, expression_uri: str, concrete_work_uri: str) -> str:
+        expression = self._validate_fedlex_url(expression_uri)
+        concrete_work = self._validate_fedlex_url(concrete_work_uri)
+        expression_parts = urlparse(expression).path.strip("/").split("/")
+        work_parts = urlparse(concrete_work).path.strip("/").split("/")
+        if len(expression_parts) < 6 or len(work_parts) < 5:
+            raise ProviderConfigurationError(
+                f"fedlex_sparql could not derive filestore HTML path from {expression_uri}"
+            )
+        path_parts = work_parts + [expression_parts[-1], "html"]
+        filename = "-".join(["fedlex", "data", "admin", "ch", *path_parts]) + ".html"
+        return (
+            f"https://{_FEDLEX_FILESTORE_HOST}/filestore/fedlex.data.admin.ch/"
+            f"{'/'.join(path_parts)}/{filename}"
+        )
+
+    def _abstract_expression_uri(self, expression_uri: str) -> str | None:
+        expression = self._validate_fedlex_url(expression_uri)
+        parts = urlparse(expression).path.strip("/").split("/")
+        if len(parts) < 6 or not parts[-2].isdigit():
+            return None
+        abstract_parts = parts[:-2] + [parts[-1]]
+        return f"https://{_FEDLEX_HOST}/{'/'.join(abstract_parts)}"
+
+    def _title_from_html(self, body: str) -> str | None:
+        h1_match = re.search(r"<h1[^>]*>(.*?)</h1>", body, flags=re.IGNORECASE | re.DOTALL)
+        if h1_match:
+            title = re.sub(r"<[^>]+>", " ", h1_match.group(1))
+            normalized = " ".join(title.split()).strip()
+            if normalized:
+                return normalized
+        title_match = re.search(r"<title[^>]*>(.*?)</title>", body, flags=re.IGNORECASE | re.DOTALL)
+        if title_match:
+            normalized = " ".join(title_match.group(1).split()).strip()
+            if normalized and not normalized.lower().startswith("input-"):
+                return normalized
+        return None
