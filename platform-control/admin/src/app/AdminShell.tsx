@@ -8,35 +8,30 @@ import {
   parseAllowedRoles,
   resolveUserRole,
 } from "../lib/admin/accessControl";
+import { resolveLegalSearchHandoff } from "../lib/admin/navigationContext";
 
 const AdminApp = dynamic(() => import("./AdminApp"), {
   loading: () => (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        fontFamily: "system-ui, sans-serif",
-        color: "#64748b",
-      }}
-    >
-      <div style={{ textAlign: "center" }}>
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            margin: "0 auto 16px",
-            border: "3px solid #e2e8f0",
-            borderTopColor: "#0f4c81",
-            borderRadius: "50%",
-            animation: "spin 0.8s linear infinite",
-          }}
-        />
-        <p style={{ margin: 0, fontSize: 14 }}>Loading Control Plane...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      </div>
-    </div>
+    <main className="evidara-shell">
+      <section className="evidara-shell__panel" aria-label="Loading Control Plane">
+        <header className="evidara-shell__header">
+          <div className="evidara-shell__brand">
+            <div className="evidara-shell__mark">E</div>
+            <div>
+              <div className="evidara-shell__eyebrow">Evidara</div>
+              <div className="evidara-shell__title">Platform control</div>
+            </div>
+          </div>
+          <span className="evidara-shell__badge">Loading</span>
+        </header>
+        <div className="evidara-shell__body">
+          <div className="evidara-shell__spinner" />
+          <p style={{ margin: "16px 0 0", fontSize: 14, color: "var(--foreground-muted)" }}>
+            Loading control plane...
+          </p>
+        </div>
+      </section>
+    </main>
   ),
   ssr: false,
 });
@@ -49,11 +44,18 @@ export default function AdminShell() {
   const effectiveAllowedRoles = allowedRoles.length > 0 ? allowedRoles : ["admin"];
   const legalSearchUrl =
     process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
+  const [handoff, setHandoff] = useState(() => resolveLegalSearchHandoff(null, legalSearchUrl));
 
   useEffect(() => {
     setUserRole(resolveUserRole(fallbackRole));
     setIsRoleResolved(true);
   }, [fallbackRole]);
+
+  useEffect(() => {
+    setHandoff(
+      resolveLegalSearchHandoff(new URLSearchParams(window.location.search), legalSearchUrl),
+    );
+  }, [legalSearchUrl]);
 
   if (!isRoleResolved) {
     return null;
@@ -61,23 +63,43 @@ export default function AdminShell() {
 
   if (!isRoleAuthorized(userRole, effectiveAllowedRoles)) {
     return (
-      <main className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-6">
-        <section className="max-w-xl w-full rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
-            403 Forbidden
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-900">Access denied</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            This control-panel surface is restricted to authorized operators. If you believe you
-            should have access, contact your administrator.
-          </p>
-          <div className="mt-6">
-            <a
-              href={legalSearchUrl}
-              className="inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+      <main className="evidara-shell">
+        <section className="evidara-shell__panel" aria-labelledby="access-denied-title">
+          <header className="evidara-shell__header">
+            <div className="evidara-shell__brand">
+              <div className="evidara-shell__mark">E</div>
+              <div>
+                <div className="evidara-shell__eyebrow">Evidara</div>
+                <div className="evidara-shell__title">Control plane</div>
+              </div>
+            </div>
+            <span className="evidara-shell__badge">403 Forbidden</span>
+          </header>
+          <div className="evidara-shell__body">
+            <h1
+              id="access-denied-title"
+              style={{ margin: 0, fontSize: 22, fontWeight: 600, color: "var(--foreground)" }}
             >
-              Return to legal search
-            </a>
+              Access denied
+            </h1>
+            <p
+              style={{
+                margin: "12px 0 0",
+                fontSize: 14,
+                lineHeight: 1.7,
+                color: "var(--foreground-muted)",
+              }}
+            >
+              This control-plane surface is restricted to authorized operators. If you believe you
+              should have access, contact your administrator.
+            </p>
+            <div style={{ marginTop: 24 }}>
+              <a href={handoff.returnToUrl} className="evidara-shell__button">
+                {handoff.query
+                  ? `Return to search for "${handoff.query}"`
+                  : "Return to legal search"}
+              </a>
+            </div>
           </div>
         </section>
       </main>
