@@ -32,9 +32,11 @@ infrastructure.
 │  platform-control    │    │  platform-control-worker-{env}          │
 │  platform-control-   │    │  legal-search-api-{env}                 │
 │    worker            │    │  di-consumer-{env} (HTTP DI ingress)    │
-│  legal-search-api    │    │                                         │
-│  di-consumer         │    └──────┬──────────────┬───────────────────┘
-│                      │           │              │
+│  legal-search-api    │    │  document-intelligence-document-         │
+│  di-consumer         │    │    service-{env}                         │
+│  document-           │    │                                         │
+│    intelligence-     │    └──────┬──────────────┬───────────────────┘
+│    document-service  │           │              │
 └──────────────────────┘           │              │
                                    ▼              ▼
                           ┌──────────────┐  ┌───────────┐
@@ -69,6 +71,7 @@ infrastructure.
 | platform-control-worker | `platform-control-worker` | 8080 | `/health` | Pub/Sub pull consumer, connector execution |
 | legal-search-api | `legal-search-api` | 3000 | `/health` | NestJS search API, OpenSearch proxy |
 | di-consumer | `di-consumer` (image `runtime/di-consumer`) | 8080 | `/health` | HTTP ingress: Pub/Sub **push** to `/internal/events/artifact-bundles:process`, Delta publish + outbound status/processed topics |
+| document-intelligence-document-service | `document-intelligence-document-service` | 8080 | `/health` | Read-only Document Service for full, lean, and text reads backed by published document surfaces |
 
 ## Infrastructure (Terraform)
 
@@ -95,7 +98,7 @@ infra/
 
 | Resource | Type | Purpose |
 |----------|------|---------|
-| `google_cloud_run_v2_service.runtime` | Cloud Run | Runtime services from tfvars (e.g. platform-control-api, legal-search-api, di-consumer) |
+| `google_cloud_run_v2_service.runtime` | Cloud Run | Runtime services from tfvars (e.g. platform-control-api, legal-search-api, di-consumer, document-intelligence-document-service) |
 | `google_pubsub_topic.events` | Pub/Sub | Event mesh topics |
 | `google_pubsub_subscription.events` | Pub/Sub | Pull subscriptions with DLQ |
 | `google_storage_bucket.raw_artifacts` | GCS | Raw crawl artifact storage |
@@ -110,6 +113,16 @@ infra/
 - **Published surfaces bucket:** Set `document_intelligence_published_bucket_name` in tfvars (e.g. `evidara-document-intelligence-surfaces-dev`). The bucket must already exist; Terraform only attaches IAM.
 - **Pub/Sub push:** Set `artifact_bundle_subscription_push` with the subscription map key for `artifact-bundle-available` in that environment and `target_service = "di-consumer"`. That merges `push_config` onto the existing pull-style subscription definition without duplicating the whole `event_subscriptions` block.
 - **CI plans:** `infra/env/dev/runtime.gcp.ci.tfvars` and `infra/env/staging/runtime.gcp.ci.tfvars` set `document_intelligence_published_bucket_name = null` and `artifact_bundle_subscription_push = null` so plans against the CI GCP project do not assume environment buckets or push endpoints.
+
+### Document Service
+
+- **Service name:** `document-intelligence-document-service-{env}` via the `cloud_run_services` map in runtime tfvars.
+- **Surface source:** the service reads published document rows from `DI_SURFACES_ROOT_URI`, which resolves the `published_documents` Delta surface under the configured root; local fixture runs use `DOCUMENT_SERVICE_CONTENT_DIR` (default `/content`) for file-backed JSON.
+- **Secret seeding:** create `document-service-bearer-token-{env}` with `scripts/manage_runtime_secrets.py --generate-internal --only document-service-bearer-token` so the service and BFF share the same bearer value.
+- **BFF wiring:** `legal-search-api` must set `DOCUMENT_INTELLIGENCE_BASE_URL` to the matching environment service URL.
+- **Auth model:** the current runtime path uses an application bearer secret, not Cloud Run IAM ID tokens. The service validates `DOCUMENT_SERVICE_BEARER_TOKEN`; the BFF sends the same value via `DOCUMENT_INTELLIGENCE_API_KEY`.
+- **CD smoke:** `platform-control-cd.yml` now checks that `legal-search-api` points at the deployed Document Service URL and performs an authenticated lean probe against a dummy document ID so base-URL or bearer regressions fail before merge.
+- **Operational implication:** when detail reads fall back or return empty bodies, verify the published surface URI and the BFF base URL / bearer pair before replaying source events.
 
 ### Applying Changes
 
@@ -160,7 +173,7 @@ To optimize **main** pushes further (build only what changed), CD would need to 
 
 **Trigger**: Push to `main` affecting service source or infra config.
 
-1. **Dev**: Deploy all 4 services → smoke test health endpoints
+1. **Dev**: Deploy all runtime services → smoke test health endpoints
 2. **Prod**: Deploy same image SHA that passed dev → smoke test
 3. Uses `GCP_ARTIFACT_PROJECT_ID` for image registry (shared across envs)
 
@@ -176,7 +189,7 @@ To optimize **main** pushes further (build only what changed), CD would need to 
 
 **Post-merge verification (Artifact Registry + CD):**
 
-1. For the same commit on `main`, confirm **`Runtime Images`** finished successfully before or in parallel with **`Runtime Cloud Run CD`** (CD polls Artifact Registry for the four deployed images: `platform-control`, `platform-control-worker`, `legal-search-api`, `di-consumer` at tag `${github.sha}`).
+1. For the same commit on `main`, confirm **`Runtime Images`** finished successfully before or in parallel with **`Runtime Cloud Run CD`** (CD polls Artifact Registry for the deployed runtime images: `platform-control`, `platform-control-worker`, `legal-search-api`, `di-consumer`, and `document-intelligence-document-service` at tag `${github.sha}`).
 2. Example checks: `gh run list --workflow=runtime-images.yml --branch main --limit 3` and `gh run list --workflow=platform-control-cd.yml --branch main --limit 3`; open the paired runs for the merge commit.
 3. **Tfvars / examples:** runtime service images belong under the **`runtime/`** repository in Artifact Registry (see [`infra/env/dev/runtime.gcp.tfvars.example`](../../infra/env/dev/runtime.gcp.tfvars.example) and [`infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example)). Replace any legacy `cloud-run-source-deploy/…` image URLs when updating real tfvars.
 4. If CD fails **after** the wait step with **startup probe** errors on `document-intelligence-consumer-*`, the container is exiting or not passing `/health` on `PORT` — this is **not** fixed by retagging alone. Inspect the failing revision logs in Cloud Logging; common causes include invalid `DI_*` env (see `RuntimeSettings` in `document-intelligence`) or IAM for Pub/Sub / GCS. The image built by `runtime-images.yml` uses [`document-intelligence/Dockerfile`](../../document-intelligence/Dockerfile) (`document_intelligence_runtime_ingress` — the push-based FastAPI consumer).
@@ -214,7 +227,7 @@ gcloud builds submit . \
   --substitutions=_TAG="${TAG}"
 ```
 
-**Batch helper:** `scripts/build-runtime-images.sh` runs parallel Cloud Build jobs (see `scripts/cloudbuild.runtime-image.yaml`) for `platform-control`, `platform-control-worker`, `legal-search-api`, and `di-consumer` with the same tagging defaults.
+**Batch helper:** `scripts/build-runtime-images.sh` runs parallel Cloud Build jobs (see `scripts/cloudbuild.runtime-image.yaml`) for `platform-control`, `platform-control-worker`, `legal-search-api`, `di-consumer`, and `document-intelligence-document-service` with the same tagging defaults.
 
 **DI HTTP ingress only:** the main `document-intelligence/Dockerfile` (used by `runtime-images.yml` for `di-consumer`) now runs the push-based `document_intelligence_runtime_ingress`. `document-intelligence/Dockerfile.runtime-ingress` is equivalent but uses a different build context (for standalone `gcloud builds submit` from the `document-intelligence/` directory; see `cloudbuild.runtime-ingress.yaml`).
 
