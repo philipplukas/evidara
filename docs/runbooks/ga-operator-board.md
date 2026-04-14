@@ -136,12 +136,26 @@ Immediate operator actions:
    [`staging-relevance-query-pack-suggestions.md`](staging-relevance-query-pack-suggestions.md)
    with [`scripts/run-staging-relevance-query-pack.sh`](../../scripts/run-staging-relevance-query-pack.sh).
 2. Keep the `q=*` control row in the pack and record `totalResults` so we can distinguish
-   ranking issues from alias/index/corpus drift.
-3. Record results using
+   ranking issues from serving / corpus drift.
+3. Replay at least one known-good CH/AT document when projection logic changes so we can
+   separate metadata/title regressions from broad ranking debt.
+4. Record results using
    [`relevance-eval-result-template.md`](relevance-eval-result-template.md).
-4. Attach the result table to `TAR-82` and `TAR-68`.
-5. Keep `TAR-242` as the follow-up sink for the current empty-dev control result and route
-   the next operator step through replay / alias verification before retuning ranking.
+5. Attach the result table to `TAR-82` and `TAR-68`.
+6. Keep `TAR-242` only for true serving / corpus drift. The current dev issue is broader
+   ranking quality, not an empty control row.
+
+Current April 14 status:
+
+- Dev Document Service wiring is restored.
+- Targeted replays now prove that CH/AT metadata is materially healthier:
+  - `doc_7m5fzs4ksj057ft0sgzqaecpyh` (AT RIS) now indexes as `law` and stays rank 1 for
+    `Produktdeklaration`, `BGBl. Nr. 43/1975`, and `RIS Dokument`.
+  - `doc_1wxstrwdxtwh0zaxag6x37hya2` (CH Fedlex) now indexes as `law`, and title extraction
+    uses the embedded Fedlex title:
+    `Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999`.
+- The remaining weak results for `Bundesgericht`, `Art. 8 EMRK`, and `BVGE` are therefore
+  ranking / wider-corpus quality debt, not metadata/title drift on the replayed docs.
 
 ## What stays tracked in parallel
 
