@@ -406,6 +406,43 @@ async def test_preview_source_blueprint_returns_fedlex_sparql_spec(session) -> N
 
 
 @pytest.mark.asyncio
+async def test_preview_source_blueprint_returns_fedlex_sparql_vwvg_spec(session) -> None:
+    service = SourceService(session)
+    spec = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_vwvg_de",
+        )
+    )
+
+    assert spec.provider == "fedlex_sparql"
+    assert str(spec.seed_url) == "https://fedlex.data.admin.ch/eli/cc/1969/737_757_755"
+    assert str(spec.sparql_endpoint) == "https://fedlex.data.admin.ch/sparqlendpoint"
+    assert spec.preferred_languages == ["de"]
+    assert spec.document_type_hint == "legislation"
+
+
+@pytest.mark.asyncio
+async def test_preview_source_blueprint_returns_fedlex_sparql_small_batch_spec(session) -> None:
+    service = SourceService(session)
+    spec = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_federal_law_batch_de",
+        )
+    )
+
+    assert spec.provider == "fedlex_sparql"
+    assert [str(url) for url in spec.seed_urls] == [
+        "https://fedlex.data.admin.ch/eli/cc/1999/404",
+        "https://fedlex.data.admin.ch/eli/cc/1969/737_757_755",
+    ]
+    assert str(spec.sparql_endpoint) == "https://fedlex.data.admin.ch/sparqlendpoint"
+    assert spec.preferred_languages == ["de"]
+    assert spec.document_type_hint == "legislation"
+
+
+@pytest.mark.asyncio
 async def test_create_source_with_initial_version_from_fedlex_sparql_blueprint(
     session,
 ) -> None:

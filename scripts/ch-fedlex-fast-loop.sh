@@ -303,7 +303,12 @@ captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
 title_ok="$(jq -r '[.data[]? | select((.title // "") | test("Bundesverfassung"))] | length' < "${RUN_DIR}/captured-resources.json")"
 fedlex_html_ok="$(jq -r '[.data[]? | select((.final_url // "") | test("fedlex\\.admin\\.ch/filestore/.+\\.html$"))] | length' < "${RUN_DIR}/captured-resources.json")"
-art1_ok="$(jq -r '[.data[]? | select(((.artifact_metadata.body // "") | test("Art\\. 1")) or ((.artifact_metadata.provider_metadata.body // "") | test("Art\\. 1")))] | length' < "${RUN_DIR}/raw-artifacts.json")"
+art1_ok="$(jq -r '[.data[]? | select(
+  ((.artifact_metadata.inline_body // "") | test("Art\\. 1"))
+  or ((.artifact_metadata.body // "") | test("Art\\. 1"))
+  or ((.artifact_metadata.provider_metadata.inline_body // "") | test("Art\\. 1"))
+  or ((.artifact_metadata.provider_metadata.body // "") | test("Art\\. 1"))
+)] | length' < "${RUN_DIR}/raw-artifacts.json")"
 accepted_count="$(jq -r '[.data[]? | select(.status=="accepted")] | length' < "${RUN_DIR}/processing-status.json")"
 processing_count="$(jq -r '[.data[]? | select(.status=="processing")] | length' < "${RUN_DIR}/processing-status.json")"
 canonical_ready_count="$(jq -r '[.data[]? | select(.status=="canonical_ready")] | length' < "${RUN_DIR}/processing-status.json")"

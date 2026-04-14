@@ -210,6 +210,47 @@ async def test_source_blueprint_preview_returns_fedlex_sparql_spec(client) -> No
 
 
 @pytest.mark.asyncio
+async def test_source_blueprint_preview_returns_fedlex_sparql_vwvg_spec(client) -> None:
+    response = await client.post(
+        "/v1/sources/blueprint-preview",
+        json={
+            "overlay_id": "ch",
+            "provider_template_id": "fedlex_sparql_vwvg_de",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["overlay_id"] == "ch"
+    assert body["provider_template_id"] == "fedlex_sparql_vwvg_de"
+    assert body["acquisition_spec"]["provider"] == "fedlex_sparql"
+    assert body["acquisition_spec"]["seed_url"] == (
+        "https://fedlex.data.admin.ch/eli/cc/1969/737_757_755"
+    )
+    assert body["acquisition_spec"]["preferred_languages"] == ["de"]
+
+
+@pytest.mark.asyncio
+async def test_source_blueprint_preview_returns_fedlex_sparql_small_batch_spec(client) -> None:
+    response = await client.post(
+        "/v1/sources/blueprint-preview",
+        json={
+            "overlay_id": "ch",
+            "provider_template_id": "fedlex_sparql_federal_law_batch_de",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["overlay_id"] == "ch"
+    assert body["provider_template_id"] == "fedlex_sparql_federal_law_batch_de"
+    assert body["acquisition_spec"]["provider"] == "fedlex_sparql"
+    assert body["acquisition_spec"]["seed_urls"] == [
+        "https://fedlex.data.admin.ch/eli/cc/1999/404",
+        "https://fedlex.data.admin.ch/eli/cc/1969/737_757_755",
+    ]
+    assert body["acquisition_spec"]["preferred_languages"] == ["de"]
+
+
+@pytest.mark.asyncio
 async def test_source_blueprint_preview_unknown_template_returns_404(client) -> None:
     response = await client.post(
         "/v1/sources/blueprint-preview",
