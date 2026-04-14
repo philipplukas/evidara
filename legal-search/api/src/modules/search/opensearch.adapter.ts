@@ -49,6 +49,8 @@ const PHRASE_BOOST_FIELDS = [
   ['docket_number', 4],
 ] as const;
 
+type QueryShape = 'wildcard' | 'short_legal' | 'free_text';
+
 @Injectable()
 export class SearchOpenSearchAdapter implements SearchRepository {
   private readonly logger = new Logger(SearchOpenSearchAdapter.name);
@@ -68,6 +70,7 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     const pageSize = options?.pageSize ?? 20;
     const from = (page - 1) * pageSize;
     const normalizedQuery = query.trim();
+    const queryShape = this.classifyQuery(normalizedQuery);
 
     // Build filter clauses
     const filters: Record<string, unknown>[] = [];
@@ -93,20 +96,11 @@ export class SearchOpenSearchAdapter implements SearchRepository {
       query: {
         bool: {
           must:
-            normalizedQuery === '*' || normalizedQuery.length === 0
+            queryShape === 'wildcard'
               ? [{ match_all: {} }]
-              : [
-                  {
-                    multi_match: {
-                      query: normalizedQuery,
-                      fields: [...SEARCH_FIELD_WEIGHTS],
-                      type: 'best_fields' as const,
-                      fuzziness: 'AUTO',
-                    },
-                  },
-                ],
+              : [this.buildPrimaryQuery(normalizedQuery, queryShape)],
           should:
-            normalizedQuery === '*' || normalizedQuery.length === 0
+            queryShape === 'wildcard'
               ? []
               : PHRASE_BOOST_FIELDS.map(([field, boost]) => ({
                   match_phrase: {
@@ -228,6 +222,42 @@ export class SearchOpenSearchAdapter implements SearchRepository {
   }
 
   // ─── Helpers ───
+
+  private classifyQuery(query: string): QueryShape {
+    if (query === '*' || query.length === 0) return 'wildcard';
+
+    const tokens = query.split(/\s+/).filter(Boolean);
+    const looksCitationLike = /(?:\bart\.?\b|\bbge\b|\bbvge\b|\bemrk\b|\d|\/|§)/i.test(query);
+    const shortLegalQuery = tokens.length <= 3 && query.length <= 32;
+
+    if (looksCitationLike || shortLegalQuery) {
+      return 'short_legal';
+    }
+
+    return 'free_text';
+  }
+
+  private buildPrimaryQuery(query: string, shape: Exclude<QueryShape, 'wildcard'>): Record<string, unknown> {
+    if (shape === 'short_legal') {
+      return {
+        multi_match: {
+          query,
+          fields: [...SEARCH_FIELD_WEIGHTS],
+          type: 'best_fields' as const,
+          operator: 'and' as const,
+        },
+      };
+    }
+
+    return {
+      multi_match: {
+        query,
+        fields: [...SEARCH_FIELD_WEIGHTS],
+        type: 'best_fields' as const,
+        fuzziness: 'AUTO',
+      },
+    };
+  }
 
   private mapRefinementsToFilters(refinements: SearchRefinement[]): Record<string, unknown>[] {
     const mapped: Record<string, unknown>[] = [];
