@@ -106,17 +106,18 @@ LANES: tuple[LaneConfig, ...] = (
         title="Relevance baseline",
         primary_doc="docs/runbooks/search-relevance-baseline.md",
         evidence_paths=(
-            "docs/runbooks/evidence/2026-04-13-dev-relevance-pack.md",
+            "docs/runbooks/evidence/2026-04-14-dev-relevance-pack.md",
             "docs/runbooks/staging-relevance-query-pack-suggestions.md",
         ),
         blocker_override=(
-            "The current dev relevance signal no longer has an empty q=* control row, but the "
-            "seed queries still collapse to generic top hits, so the open issue now looks more "
-            "like retrieval / projection quality than pure alias emptiness."
+            "The current dev relevance signal now has a non-empty q=* control row, but the "
+            "seed queries still collapse to generic top hits. The open issue is ranking "
+            "discrimination on broad legal queries, with residual AT title cleanup tracked "
+            "separately."
         ),
         next_action_override=(
-            "Rerun the relevance query pack with the q=* control row, attach the result table, "
-            "and route the next step through projection / replay verification before retuning ranking."
+            "Use the 2026-04-14 relevance pack as the canonical evidence refresh, then keep "
+            "the ranking follow-up on TAR-241 and the AT RIS Dokument title cleanup on TAR-242."
         ),
     ),
     LaneConfig(
