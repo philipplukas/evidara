@@ -450,7 +450,7 @@ function SourceVersionDialog({
                   })
                 }
                 fullWidth
-                >
+              >
                 <MenuItem value="firecrawl">Firecrawl (website crawl)</MenuItem>
                 <MenuItem value="deterministic_http">Deterministic HTTP</MenuItem>
                 <MenuItem value="fedlex_sparql">Fedlex SPARQL</MenuItem>
