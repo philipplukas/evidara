@@ -147,11 +147,11 @@ def _extract_title_hint(artifact_metadata: dict[str, Any] | None) -> str | None:
     if not isinstance(artifact_metadata, dict):
         return None
 
-    for key in ("title", "title_hint", "pageTitle", "page_title"):
+    for key in ("short_title", "title", "title_hint", "pageTitle", "page_title"):
         candidate = artifact_metadata.get(key)
         if isinstance(candidate, str):
             stripped = candidate.strip()
-            if stripped:
+            if stripped and not _is_placeholder_title(stripped):
                 return stripped
 
     for nested_key in ("metadata", "provider_metadata"):
@@ -162,3 +162,12 @@ def _extract_title_hint(artifact_metadata: dict[str, Any] | None) -> str | None:
         if nested_title is not None:
             return nested_title
     return None
+
+
+def _is_placeholder_title(title: str) -> bool:
+    lower = title.strip().lower()
+    if not lower:
+        return True
+    if lower in {"untitled document", "ris dokument"}:
+        return True
+    return lower.startswith("ris —") or lower.startswith("ris -")

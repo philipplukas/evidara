@@ -50,12 +50,13 @@ def test_build_bundle_extraction_hints_prefers_page_title_metadata() -> None:
     }
 
 
-def test_build_bundle_extraction_hints_prefers_provider_metadata_title() -> None:
+def test_build_bundle_extraction_hints_prefers_short_title_and_skips_placeholder_title() -> None:
     hints = build_bundle_extraction_hints(
         artifact_metadata={
             "provider_metadata": {
                 "provider": "fedlex_sparql",
-                "title": "Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999",
+                "title": "RIS Dokument",
+                "short_title": "Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999",
             }
         }
     )
