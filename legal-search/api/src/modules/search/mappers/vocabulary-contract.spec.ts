@@ -14,6 +14,7 @@ import {
   DOCUMENT_TYPE_VALUES,
   JURISDICTION_META,
   JURISDICTION_VALUES,
+  normalizeDocumentType,
 } from '../../../core/vocabularies';
 
 // ─── Document Type Vocabulary Completeness ───
@@ -77,6 +78,10 @@ describe('unknown vocabulary value handling', () => {
   it('should not have "statute" in document type vocabulary', () => {
     // "statute" is an alias, not a normalized value
     expect(DOCUMENT_TYPE_VALUES).not.toContain('statute');
+  });
+
+  it('should normalize "legislation" to the canonical "law" type', () => {
+    expect(normalizeDocumentType('legislation')).toBe('law');
   });
 
   it('should not have lowercase jurisdiction codes', () => {
