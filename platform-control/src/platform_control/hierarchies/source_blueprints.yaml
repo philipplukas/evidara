@@ -14,6 +14,34 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: decision
+      ris_ogd_bundesrecht_narrow_html:
+        provider: ris_ogd
+        base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
+        applikation: BrKons
+        preferred_formats: [Html, Xml]
+        page_size: 1
+        max_pages: 1
+        tenant_id: tenant_public
+        corpus_id: corpus_public_at_bundesrecht_narrow
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+      ris_ogd_bundesrecht_small_batch_html:
+        provider: ris_ogd
+        base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
+        applikation: BrKons
+        preferred_formats: [Html, Xml]
+        page_size: 5
+        max_pages: 1
+        tenant_id: tenant_public
+        corpus_id: corpus_public_at_bundesrecht_small_batch
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
       firecrawl_justice_portal:
         provider: firecrawl
         mode: crawl

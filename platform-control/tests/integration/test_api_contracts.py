@@ -192,6 +192,46 @@ async def test_source_blueprint_preview_returns_expanded_acquisition_spec(client
 
 
 @pytest.mark.asyncio
+async def test_source_blueprint_preview_returns_ris_ogd_narrow_html_spec(client) -> None:
+    response = await client.post(
+        "/v1/sources/blueprint-preview",
+        json={
+            "overlay_id": "at",
+            "provider_template_id": "ris_ogd_bundesrecht_narrow_html",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["overlay_id"] == "at"
+    assert body["provider_template_id"] == "ris_ogd_bundesrecht_narrow_html"
+    assert body["acquisition_spec"]["provider"] == "ris_ogd"
+    assert body["acquisition_spec"]["applikation"] == "BrKons"
+    assert body["acquisition_spec"]["preferred_formats"] == ["Html", "Xml"]
+    assert body["acquisition_spec"]["page_size"] == 1
+    assert body["acquisition_spec"]["max_pages"] == 1
+
+
+@pytest.mark.asyncio
+async def test_source_blueprint_preview_returns_ris_ogd_small_batch_html_spec(client) -> None:
+    response = await client.post(
+        "/v1/sources/blueprint-preview",
+        json={
+            "overlay_id": "at",
+            "provider_template_id": "ris_ogd_bundesrecht_small_batch_html",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["overlay_id"] == "at"
+    assert body["provider_template_id"] == "ris_ogd_bundesrecht_small_batch_html"
+    assert body["acquisition_spec"]["provider"] == "ris_ogd"
+    assert body["acquisition_spec"]["applikation"] == "BrKons"
+    assert body["acquisition_spec"]["preferred_formats"] == ["Html", "Xml"]
+    assert body["acquisition_spec"]["page_size"] == 5
+    assert body["acquisition_spec"]["max_pages"] == 1
+
+
+@pytest.mark.asyncio
 async def test_source_blueprint_preview_returns_fedlex_sparql_spec(client) -> None:
     response = await client.post(
         "/v1/sources/blueprint-preview",

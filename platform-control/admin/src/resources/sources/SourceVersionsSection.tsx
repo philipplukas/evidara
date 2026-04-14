@@ -107,6 +107,8 @@ const emptyFormState = (): SourceVersionFormState => ({
 const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: string }>> = {
   at: [
     { value: "ris_ogd_bundesrecht", label: "AT RIS OGD Bundesrecht" },
+    { value: "ris_ogd_bundesrecht_narrow_html", label: "AT RIS Bundesrecht narrow HTML" },
+    { value: "ris_ogd_bundesrecht_small_batch_html", label: "AT RIS Bundesrecht small batch HTML" },
     { value: "firecrawl_justice_portal", label: "AT Justice portal crawl" },
   ],
   de: [{ value: "deterministic_http_bundesrecht", label: "DE Bundesrecht deterministic HTTP" }],
