@@ -43,9 +43,12 @@ What is not yet true:
 - Five-country acceptance and relevance still need current evidence attached to the GA
   umbrella, but CH and AT now have live fast-loop run evidence on dev.
 - The current dev relevance signal no longer has an empty `q=*` control row; the dev
-  index returns results again, but the agreed seed queries still collapse to generic
-  top hits, which now points more to retrieval / projection quality than pure alias
-  emptiness. The follow-up stays on `TAR-242`.
+  index returns results again, the replayed CH/AT proof docs are visible under
+  paginated `q=*` search, the CH proof doc now carries the corrected title and
+  controlled type, and the agreed seed queries still collapse to generic top
+  hits. The remaining follow-up is broader ranking / wider-corpus quality on
+  `TAR-241`, while `TAR-242` keeps the replay/projection sink for residual
+  issues such as the AT doc still rendering as `RIS Dokument`.
 
 ## Board status
 
@@ -56,7 +59,7 @@ What is not yet true:
 | Runner reliability | `TAR-238` | active | yes | light/heavy pools are stable across rotation and preflight checks pass reliably |
 | Five-country acceptance A (CH + AT) | `TAR-239` | active | track in parallel | CH/AT checklist is executed and evidence is attached into `TAR-160` |
 | Five-country acceptance B (DE + FR) | `TAR-240` | ready | track in parallel | DE/FR checklist is executed and evidence is attached into `TAR-160` |
-| Relevance baseline | `TAR-241` | active | yes | query pack is rerun with the `q=*` control row, result table is attached, and regressions are split into follow-up issues |
+| Relevance baseline | `TAR-241` | active | yes | query pack is rerun with the `q=*` control row, replayed CH/AT proof docs stay visible, broad seed queries are attached, and regressions are split into follow-up issues |
 | GA umbrella / final sign-off | `TAR-160` | collecting | no, assemble after inputs land | consolidated GA evidence pack and release decision are ready |
 
 ## What to push now

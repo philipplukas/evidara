@@ -41,6 +41,14 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 - Demo packet expectations, interaction-flow hooks, and **phase 5** workstream list (TAR-66 → TAR-62 → TAR-63 → TAR-67) documented in runbooks above.
 
+### 2.4 Current proof state (2026-04-14)
+
+- Targeted CH/AT replay on dev is visible again through legal-search: both proof docs are reachable by ID and also surface under paginated `q=*` search on page 6.
+- The CH proof doc `doc_1wxstrwdxtwh0zaxag6x37hya2` resolves to `Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999` with `document_type=law`.
+- The AT proof doc `doc_7m5fzs4ksj057ft0sgzqaecpyh` resolves as `law`, but its current title is still the generic `RIS Dokument`; that residual title cleanup remains a projection-quality follow-up.
+- The remaining broader issue is relevance quality: `Bundesgericht`, `Art. 8 EMRK`, and `BVGE` still return generic top docs even though the `q=*` control row is non-empty again.
+- Therefore the current debt is split more cleanly: alias / empty-index drift is materially improved, one CH proof doc now renders correctly, residual AT title polish stays on the projection track, and broader ranking / discrimination across the wider corpus remains open.
+
 ---
 
 ## 3. Outstanding (explicit gaps)
@@ -60,6 +68,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 | **Generic titles / weak document typing in UI** | [mvp-website-walkthrough.md](mvp-website-walkthrough.md) — materially improved for replayed CH/AT proofs after Document Service restore + projection replay; broad corpus still needs ranking / re-projection follow-through |
 | **Trust/explainability**                        | [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) — “demo-quality polish (metadata credibility)”; **BFF** `MetadataRow` labels/icons still thin where facets are sparse |
 | **LLM enrichment not a default path**           | Policy recorded in [document-intelligence README](../../document-intelligence/README.md) (“LLM extraction policy”): **default off**; pilot requires observability + cost bounds; BFF consumes `metadata.llm_extraction` when present |
+| **Broad relevance / wider-corpus ranking**     | `Bundesgericht`, `Art. 8 EMRK`, and `BVGE` still return generic top docs in the dev relevance pack even after proof-doc replay fixes; track this as ranking quality on TAR-241 rather than metadata/title drift |
 
 **Likely workstreams** (not all tracked as separate issues in this file): richer **source-acquisition** metadata into bundles; **DI** normalization improvements per corpus; **re-projection / re-index** for demo envs; **BFF mapper** labels/icons for `MetadataRow`; optional **LLM** rollout with guardrails and cost/quality metrics.
 
