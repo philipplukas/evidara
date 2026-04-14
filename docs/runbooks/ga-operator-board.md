@@ -207,6 +207,7 @@ Do not parallelize these across multiple owners at once:
 |------|--------|
 | Release packet and go/no-go wording | [`phase-5-go-no-go-memo.md`](phase-5-go-no-go-memo.md) |
 | Evidence checklist for TAR-64 / TAR-77 / TAR-85 | [`phase-5-evidence-checklist.md`](phase-5-evidence-checklist.md) |
+| Friction and acceleration priorities | [`friction-and-acceleration-map.md`](friction-and-acceleration-map.md) |
 | Gate policy recovery plan | [`tar-70-gate-policy-hardening.md`](tar-70-gate-policy-hardening.md) |
 | Runner stabilization and verification | [`ci-actions-duration-metrics.md`](ci-actions-duration-metrics.md#runner-reliability-checklist) |
 | Hetzner / Tailscale / Argo platform proof | [`github-app-proof-rerun-checklist.md`](github-app-proof-rerun-checklist.md) |
