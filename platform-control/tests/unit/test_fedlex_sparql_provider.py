@@ -22,7 +22,10 @@ class FakeAsyncClient:
         del headers
         query = (params or {}).get("query", "")
         request = httpx.Request("GET", url, params=params)
-        if url == "https://www.fedlex.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/404/20240303/de/html/fedlex-data-admin-ch-eli-cc-1999-404-20240303-de-html.html":
+        if (
+            url
+            == "https://www.fedlex.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/404/20240303/de/html/fedlex-data-admin-ch-eli-cc-1999-404-20240303-de-html.html"
+        ):
             return httpx.Response(
                 200,
                 text=(
@@ -98,8 +101,8 @@ class FakeAsyncClient:
             return httpx.Response(
                 200,
                 text=(
-                    '<https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/de> '
-                    '<http://data.legilux.public.lu/resource/ontology/jolux#title> '
+                    "<https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/de> "
+                    "<http://data.legilux.public.lu/resource/ontology/jolux#title> "
                     '"Bundesverfassung" .'
                 ),
                 headers={"content-type": "text/turtle; charset=utf-8"},
@@ -123,7 +126,11 @@ async def test_minimal_work_to_expression_flow_extracts_expression_uris(
         }
     )
 
-    result = await provider.start_run(SimpleNamespace(), source_version, SimpleNamespace(run_id="run_123"))
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_123"),
+    )
 
     assert result.provider == "fedlex_sparql"
     assert result.request_payload["work_uris"] == ["https://fedlex.data.admin.ch/eli/cc/1999/404"]
@@ -143,7 +150,10 @@ async def test_minimal_work_to_expression_flow_extracts_expression_uris(
     assert "<article>" in payload.body
     assert "Art. 1" in payload.body
     assert "Bundesverfassung" in payload.body
-    assert payload.metadata["concrete_work_uri"] == "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303"
+    assert (
+        payload.metadata["concrete_work_uri"]
+        == "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303"
+    )
     assert payload.metadata["expression_uris"] == [
         "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/de"
     ]

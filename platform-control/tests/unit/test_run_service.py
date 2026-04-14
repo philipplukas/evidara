@@ -901,7 +901,9 @@ async def test_provider_registry_dispatches_fedlex_sparql_runs(session) -> None:
     assert provider_job is not None
     assert provider_job.provider == "fedlex_sparql"
     assert provider_job.external_job_id == "sparql_job_001"
-    assert provider_job.request_payload["work_uri"] == "https://fedlex.data.admin.ch/eli/cc/1999/404"
+    assert (
+        provider_job.request_payload["work_uri"] == "https://fedlex.data.admin.ch/eli/cc/1999/404"
+    )
     assert provider_job.response_payload["expression_uris"] == [
         "https://fedlex.data.admin.ch/eli/cc/1999/404/de",
         "https://fedlex.data.admin.ch/eli/cc/1999/404/fr",

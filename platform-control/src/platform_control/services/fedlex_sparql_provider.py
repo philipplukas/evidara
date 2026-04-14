@@ -18,6 +18,8 @@ from platform_control.services.acquisition_provider import (
 
 _FEDLEX_HOST = "fedlex.data.admin.ch"
 _FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
+
+
 class FedlexSparqlProvider:
     provider_name = AcquisitionProvider.FEDLEX_SPARQL.value
     _EXPRESSION_QUERY = """
@@ -98,13 +100,21 @@ LIMIT 1
                         sparql_endpoint=sparql_endpoint,
                         expression_uris=selected_expression_uris,
                     )
-                    html_url = self._filestore_html_url(selected_expression_uris[0], concrete_work_uri)
+                    html_url = self._filestore_html_url(
+                        selected_expression_uris[0],
+                        concrete_work_uri,
+                    )
                     resolved_url, response, body = await self._fetch_text_manifestation(
                         client=client,
                         url=html_url,
                         max_content_bytes=max_content_bytes,
                     )
-                    content_type = response.headers.get("content-type", "text/html").split(";", 1)[0].strip().lower()
+                    content_type = (
+                        response.headers.get("content-type", "text/html")
+                        .split(";", 1)[0]
+                        .strip()
+                        .lower()
+                    )
                     charset = response.charset_encoding or "utf-8"
                     if not body:
                         raise ProviderConfigurationError(
@@ -192,7 +202,9 @@ LIMIT 1
             languages = [str(item).strip().lower() for item in raw if str(item).strip()]
         else:
             fallback = acquisition_spec.get("language_codes")
-            languages = [str(item).strip().lower()[:2] for item in fallback or [] if str(item).strip()]
+            languages = [
+                str(item).strip().lower()[:2] for item in fallback or [] if str(item).strip()
+            ]
         return [language for language in languages if language]
 
     async def _resolve_concrete_work_uri(
