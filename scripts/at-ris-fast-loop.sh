@@ -5,6 +5,7 @@ ENVIRONMENT="dev"
 TEMPLATE_ID="ris_ogd_bundesrecht_narrow_html"
 JURISDICTION_ID="jur_at_federal"
 AUTHORITY_ID="auth_ris"
+AUTHORITY_ID_EXPLICIT=0
 MAX_RESOURCES=5
 KEEP_SOURCE=0
 JSON_OUTPUT=0
@@ -35,7 +36,7 @@ Options:
   --pc-url <url>                 Platform-control URL override
   --template <template-id>       Source blueprint template (default: ris_ogd_bundesrecht_narrow_html)
   --jurisdiction-id <id>         Jurisdiction ID override (default: jur_at_federal)
-  --authority-id <id>            Authority ID override (default: auth_at_ris)
+  --authority-id <id>            Authority ID override (default: auto-detect live RIS authority, preferring auth_ris)
   --max-resources <n>            Preview scope max_resources (default: 5)
   --max-polls <n>                Maximum run polls (default: 60)
   --poll-interval <seconds>      Run poll interval (default: 5)
@@ -64,6 +65,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --authority-id)
       AUTHORITY_ID="${2:?missing value for --authority-id}"
+      AUTHORITY_ID_EXPLICIT=1
       shift 2
       ;;
     --project)
@@ -171,6 +173,42 @@ log() {
   printf '%s\n' "$*" >&2
 }
 
+resolve_authority_id() {
+  local authorities_json resolved_by_id resolved_by_slug resolved_by_name
+  authorities_json="$(curl_json "${PC_URL}/v1/reference-data/authorities")"
+  printf '%s\n' "${authorities_json}" > "${RUN_DIR}/authorities.json"
+
+  resolved_by_id="$(jq -r \
+    --arg authority_id "${AUTHORITY_ID}" \
+    --arg jurisdiction_id "${JURISDICTION_ID}" \
+    '.data[]? | select(.authority_id == $authority_id and .jurisdiction_id == $jurisdiction_id) | .authority_id' \
+    < "${RUN_DIR}/authorities.json" | head -n1)"
+  if [[ -n "${resolved_by_id}" ]]; then
+    printf '%s' "${resolved_by_id}"
+    return 0
+  fi
+
+  resolved_by_slug="$(jq -r \
+    --arg jurisdiction_id "${JURISDICTION_ID}" \
+    '.data[]? | select(.jurisdiction_id == $jurisdiction_id and (.slug // "") == "ris") | .authority_id' \
+    < "${RUN_DIR}/authorities.json" | head -n1)"
+  if [[ -n "${resolved_by_slug}" ]]; then
+    printf '%s' "${resolved_by_slug}"
+    return 0
+  fi
+
+  resolved_by_name="$(jq -r \
+    --arg jurisdiction_id "${JURISDICTION_ID}" \
+    '.data[]? | select(.jurisdiction_id == $jurisdiction_id and ((.name // "") | test("Rechtsinformationssystem|\\bRIS\\b"; "i"))) | .authority_id' \
+    < "${RUN_DIR}/authorities.json" | head -n1)"
+  if [[ -n "${resolved_by_name}" ]]; then
+    printf '%s' "${resolved_by_name}"
+    return 0
+  fi
+
+  return 1
+}
+
 expected_title_regex() {
   case "${TEMPLATE_ID}" in
     ris_ogd_bundesrecht_narrow_html|ris_ogd_bundesrecht_small_batch_html)
@@ -223,6 +261,17 @@ if [[ "${DRY_RUN}" -eq 1 ]]; then
 fi
 
 curl_json "${PC_URL}/health" | save_json "platform-control-health.json"
+
+if [[ "${AUTHORITY_ID_EXPLICIT}" -eq 0 ]]; then
+  if RESOLVED_AUTHORITY_ID="$(resolve_authority_id)"; then
+    if [[ "${RESOLVED_AUTHORITY_ID}" != "${AUTHORITY_ID}" ]]; then
+      log "==> Resolved live AT RIS authority_id=${RESOLVED_AUTHORITY_ID} (from default ${AUTHORITY_ID})"
+    fi
+    AUTHORITY_ID="${RESOLVED_AUTHORITY_ID}"
+  else
+    log "==> Could not auto-resolve live RIS authority_id for jurisdiction_id=${JURISDICTION_ID}; using ${AUTHORITY_ID}"
+  fi
+fi
 
 VERSION_LABEL="at-ris-fast-loop-$(date -u +%Y%m%dT%H%M%SZ)"
 CREATE_PAYLOAD="$(jq -n \
@@ -284,10 +333,22 @@ RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${S
 }')"
 
 log "==> Launching preview run"
-curl -fsS -X POST "${PC_URL}/v1/runs" \
-  -H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "${RUN_PAYLOAD}" | tee "${RUN_DIR}/run-create.json" >/dev/null
+RUN_HTTP_CODE="$(
+  curl -sS -o "${RUN_DIR}/run-create.json" -w '%{http_code}' \
+    -X POST "${PC_URL}/v1/runs" \
+    -H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "${RUN_PAYLOAD}" || true
+)"
+if [[ "${RUN_HTTP_CODE}" != "200" && "${RUN_HTTP_CODE}" != "201" ]]; then
+  echo "error: run creation failed with HTTP ${RUN_HTTP_CODE:-000}" >&2
+  if [[ -s "${RUN_DIR}/run-create.json" ]]; then
+    cat "${RUN_DIR}/run-create.json" >&2
+  else
+    echo "No response body captured. This usually means the platform request timed out before returning a run_id." >&2
+  fi
+  exit 1
+fi
 
 RUN_ID="$(jq -r '.run_id // .id // empty' < "${RUN_DIR}/run-create.json")"
 if [[ -z "${RUN_ID}" ]]; then

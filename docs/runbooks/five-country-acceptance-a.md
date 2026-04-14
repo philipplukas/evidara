@@ -1,8 +1,8 @@
 # Five-Country Acceptance A (CH + AT)
 
 Owner: Platform / GA
-Last reviewed: 2026-04-13
-Last verified: 2026-04-13
+Last reviewed: 2026-04-14
+Last verified: 2026-04-14
 Status: Active evidence execution note
 Applies to: country slice 1-2 only
 
@@ -52,6 +52,30 @@ Canonical source context:
 - `contracts/vocabularies/jurisdiction.json` and the search/projection contracts already constrain the canonical jurisdiction and projection fields used by these fixtures.
 - Not executed here: live browser screenshots, operator workflow URLs, and `uv run pytest platform-control/tests/unit/test_scraping_fixture_baseline.py -q` in this shell (the current Python environment cannot spawn `pytest`).
 
+## 2026-04-14 AT fast-loop status
+
+- Branch `codex/at-ris-fast-loop` carries:
+  - the AT narrow/small-batch templates
+  - the AT fast-loop script
+  - the RIS async-dispatch + fail-fast timeout patch
+- Live `dev` now proves two clean AT fast-loop passes:
+  - narrow:
+    - template `ris_ogd_bundesrecht_narrow_html`
+    - run `run_01kp5xqgrfyqq2abez3r666d9h`
+  - tiny widened batch:
+    - template `ris_ogd_bundesrecht_small_batch_html`
+    - run `run_01kp5xrqvh61xfdace1x9sqed1`
+- Evidence:
+  - [2026-04-14 AT RIS Fast Loop Run 1](evidence/2026-04-14-at-ris-fast-loop-run1.md)
+- Root cause recovered during execution:
+  - the first AT rerun failed downstream because `platform-control-worker-dev` was missing the
+    GCS artifact-store and Pub/Sub env vars that `platform-control-api-dev` already had
+  - once worker env parity was restored, DI and lifecycle rows appeared as expected
+- Operational note:
+  - live dev uses `authority_id=auth_ris`
+  - the AT fast loop now auto-detects the live RIS authority instead of assuming the older
+    `auth_at_ris` seed name
+
 ## Pass / fail snapshot
 
 | Check | Sample | Result | Evidence |
@@ -62,7 +86,9 @@ Canonical source context:
 | CH fixture anchors | `ch_commentary_html.json`, `clean_html.json`, `xml_primary.json`, `multi_language_fr_de.json` | pass | repo-backed fixture files with canonical CH jurisdiction / authority fields |
 | CH live deterministic thin slice | `run_01kp3rqx5nw6gyyrtnzcy48z3y` | partial pass / config-change-needed | [2026-04-13 CH Fedlex Thin Slice Run 1](evidence/2026-04-13-ch-fedlex-thin-slice-run1.md) |
 | AT fixture anchors | `at_ris_decision.json` | pass | repo-backed fixture file with canonical AT jurisdiction / authority fields |
-| Live browser/operator evidence | CH/AT screenshots, workflow URLs, run IDs | missing | not executed in this lane |
+| AT live narrow fast loop | `run_01kp5xqgrfyqq2abez3r666d9h` | pass | [2026-04-14 AT RIS Fast Loop Run 1](evidence/2026-04-14-at-ris-fast-loop-run1.md) |
+| AT live tiny batch fast loop | `run_01kp5xrqvh61xfdace1x9sqed1` | pass | [2026-04-14 AT RIS Fast Loop Run 1](evidence/2026-04-14-at-ris-fast-loop-run1.md) |
+| Live browser/operator evidence | CH/AT screenshots, workflow URLs, run IDs | partial pass | run IDs are captured for CH and AT; browser screenshots are still outside this lane |
 | Fixture baseline pytest | `platform-control/tests/unit/test_scraping_fixture_baseline.py` | not run | current shell cannot spawn `pytest` |
 
 ## Scope
@@ -172,12 +198,12 @@ Capture rule:
 
 Paste this into `TAR-160` when the slice is complete:
 
-> CH + AT acceptance complete.
+> CH + AT acceptance is materially advanced.
 > Representative CH and AT docs were checked for overlay/model consistency and repo-backed fixture anchors.
-> Result: partial pass for repo-backed evidence; live browser/operator evidence still pending.
-> Evidence: `python3 scripts/check_country_overlay.py --country CH`, `python3 scripts/check_country_overlay.py --country AT`, `python3 scripts/check_country_overlay_at.py`, `platform-control/tests/fixtures/scraping_baseline/ch_commentary_html.json`, `platform-control/tests/fixtures/scraping_baseline/at_ris_decision.json`, `platform-control/tests/fixtures/scraping_baseline/clean_html.json`, `platform-control/tests/fixtures/scraping_baseline/xml_primary.json`, `platform-control/tests/fixtures/scraping_baseline/multi_language_fr_de.json`.
-> Gaps: live browser screenshots, operator workflow URLs, and a runnable `pytest` path in this shell.
-> Next action: capture CH/AT operator evidence and paste the run URLs/screenshots into `TAR-160`.
+> Result: CH live fast-loop evidence exists, and AT now has clean live narrow and tiny-batch RIS fast-loop passes on dev.
+> Evidence: `python3 scripts/check_country_overlay.py --country CH`, `python3 scripts/check_country_overlay.py --country AT`, `python3 scripts/check_country_overlay_at.py`, [2026-04-13 CH Fedlex SPARQL Preview Run 1](evidence/2026-04-13-ch-fedlex-sparql-preview-run1.md), [2026-04-14 AT RIS Fast Loop Run 1](evidence/2026-04-14-at-ris-fast-loop-run1.md), `platform-control/tests/fixtures/scraping_baseline/ch_commentary_html.json`, `platform-control/tests/fixtures/scraping_baseline/at_ris_decision.json`, `platform-control/tests/fixtures/scraping_baseline/clean_html.json`, `platform-control/tests/fixtures/scraping_baseline/xml_primary.json`, `platform-control/tests/fixtures/scraping_baseline/multi_language_fr_de.json`.
+> Gaps: browser screenshots and any additional operator UI captures remain optional follow-on evidence, not current blockers for the fast-loop lane.
+> Next action: sync the CH/AT run IDs and operator judgment into `TAR-160`, then decide whether to widen AT or move to the next country lane.
 
 ## Likely risks
 
