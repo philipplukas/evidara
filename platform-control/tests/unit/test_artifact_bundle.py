@@ -55,7 +55,10 @@ def test_build_bundle_extraction_hints_prefers_provider_metadata_title() -> None
         artifact_metadata={
             "provider_metadata": {
                 "provider": "fedlex_sparql",
-                "title": "Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999",
+                "title": (
+                    "Bundesverfassung der Schweizerischen Eidgenossenschaft "
+                    "vom 18. April 1999"
+                ),
             }
         }
     )
