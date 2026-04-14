@@ -23,7 +23,7 @@
             "aliases": {
               "type": "array",
               "items": { "type": "string" },
-              "default": ["statute", "act", "gesetz", "loi", "legge", "bundesgesetz"]
+              "default": ["statute", "act", "gesetz", "loi", "legge", "bundesgesetz", "legislation"]
             },
             "sortOrder": { "const": 10 }
           }

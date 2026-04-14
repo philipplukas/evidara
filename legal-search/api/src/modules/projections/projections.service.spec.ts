@@ -237,6 +237,24 @@ describe('ProjectionsService', () => {
 
     (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
       metadata: {
+        source_defaults: {
+          document_type_hint: 'legislation',
+        },
+      },
+    });
+    await service.applyDocumentProcessed({
+      ...baseProcessedEvent,
+      event_id: 'evt_5b',
+      payload: { ...baseProcessedEvent.payload, document_id: 'doc_4b' },
+    });
+    expect(repository.upsertProjection).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        document_type: 'law',
+      }),
+    );
+
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      metadata: {
         extracted_metadata: {
           document_type: 'urteil',
         },
