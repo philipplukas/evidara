@@ -342,7 +342,15 @@ export class ProjectionsService {
   private normalizeTitle(value: string): string | undefined {
     const title = value.trim();
     if (!title) return undefined;
-    if (title.toLowerCase() === 'untitled document') return undefined;
+    const lower = title.toLowerCase();
+    if (
+      lower === 'untitled document' ||
+      lower === 'ris dokument' ||
+      lower.startsWith('ris -') ||
+      lower.startsWith('ris —')
+    ) {
+      return undefined;
+    }
     return title;
   }
 

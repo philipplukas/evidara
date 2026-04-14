@@ -342,6 +342,27 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('treats RIS placeholder titles as missing and falls back to embedded JSON titles', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'RIS Dokument',
+      body_text: JSON.stringify({
+        title: 'Bundesgesetz über das Bundesgericht',
+        body: 'BGG ...',
+      }),
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Bundesgesetz über das Bundesgericht',
+      }),
+    );
+  });
+
   it('falls back to citation, substantive text, and structural-path tail for missing titles', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
