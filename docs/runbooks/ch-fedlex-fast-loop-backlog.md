@@ -57,47 +57,57 @@ in under 10 minutes.
 #### Task 1.1: Build a `platform-control-only` image workflow
 
 Goal:
+
 - build and publish only `platform-control`
 
 Scope:
+
 - new GitHub Actions workflow dedicated to `platform-control` image build
 - tags with full SHA, matching current Artifact Registry conventions
 - no dependency on frontend, admin, legal-search, or document-service images
 
 Definition of done:
+
 - dispatchable on `main` and manually
 - publishes `platform-control:${sha}` to Artifact Registry
 - completes without waiting on unrelated image jobs
 
 Acceptance checks:
+
 - artifact exists in Artifact Registry under the full SHA tag
 - workflow summary includes image reference
 
 #### Task 1.2: Build a `platform-control-only` dev deploy workflow
 
 Goal:
+
 - deploy only `platform-control-api-dev`
 
 Scope:
+
 - new workflow or split path in existing CD
 - update only `platform-control-api-dev`
 - optional separate support for `platform-control-worker-dev`, but not required for the first loop
 
 Definition of done:
+
 - manual dispatch deploys a given SHA tag to `platform-control-api-dev`
 - workflow verifies latest ready revision after deploy
 - workflow runs `/health` and `/ready`
 
 Acceptance checks:
+
 - `gcloud run services describe platform-control-api-dev` shows the requested tag
 - health and readiness steps pass
 
 #### Task 1.3: Document when to use fast deploy vs full runtime CD
 
 Goal:
+
 - stop mixing provider iteration with full platform release workflows
 
 Definition of done:
+
 - short runbook section in the operator docs
 - clear rule:
   - provider iteration -> fast deploy path
@@ -108,9 +118,11 @@ Definition of done:
 #### Task 2.1: Add `scripts/ch-fedlex-fast-loop.sh`
 
 Goal:
+
 - make the successful CH preview sequence reproducible with one command
 
 Script responsibilities:
+
 - resolve dev URLs
 - mint Cloud Run tokens
 - create source + source version
@@ -125,11 +137,13 @@ Script responsibilities:
 - print a single verdict block
 
 Definition of done:
+
 - one command runs the full narrow preview against `dev`
 - writes all API payloads to a timestamped temp directory
 - exits nonzero on failed gates
 
 Expected outputs:
+
 - `source_id`
 - `source_version_id`
 - `run_id`
@@ -141,6 +155,7 @@ Expected outputs:
 #### Task 2.2: Add flags for iterative use
 
 Required flags:
+
 - `--env`
 - `--template`
 - `--max-resources`
@@ -148,19 +163,23 @@ Required flags:
 - `--keep-source`
 
 Nice-to-have later:
+
 - `--source-id`
 - `--source-version-id`
 - `--reuse-existing`
 
 Definition of done:
+
 - operator can rerun the same template without editing the script
 
 #### Task 2.3: Persist evidence locally
 
 Goal:
+
 - make each run inspectable after failure
 
 Persist at minimum:
+
 - `create.json`
 - `readiness.json`
 - `approve.json`
@@ -174,6 +193,7 @@ Persist at minimum:
 - `document-lifecycle.json`
 
 Definition of done:
+
 - every loop execution writes a timestamped bundle under a predictable temp path
 
 ### Track 3: machine-checkable gates
@@ -181,6 +201,7 @@ Definition of done:
 #### Task 3.1: Add acquisition gates
 
 The loop must fail unless:
+
 - run reaches `completed`
 - at least one provider job exists
 - provider job status is `completed`
@@ -191,24 +212,29 @@ The loop must fail unless:
 #### Task 3.2: Add downstream gates
 
 The loop must fail unless processing includes:
+
 - `accepted`
 - `processing`
 - `canonical_ready`
 
 The loop must fail unless lifecycle includes:
+
 - `document.processed`
 
 #### Task 3.3: Add minimum content gates
 
 The loop must fail unless:
+
 - title contains `Bundesverfassung`
 - final URL points at a Fedlex filestore HTML manifestation
 - fetched content contains `Art. 1`
 
 Definition of done:
+
 - the loop returns a useful verdict, not just raw JSON
 
 Suggested verdicts:
+
 - `pass`
 - `pipeline_pass_content_suspect`
 - `provider_failed`
@@ -219,26 +245,31 @@ Suggested verdicts:
 #### Task 4.1: Add a real Fedlex provider smoke
 
 Goal:
+
 - catch provider regressions before Cloud Run deploy
 
 Smoke responsibilities:
+
 - resolve work URI -> expression URI
 - resolve expression URI -> manifestation URL
 - fetch manifestation HTML
 - assert body contains `Art. 1`
 
 Definition of done:
+
 - explicit local test or smoke command runs against the real Fedlex surface
 
 #### Task 4.2: Add a metadata fixture snapshot
 
 Capture at minimum:
+
 - title
 - short title
 - final URL pattern
 - preferred language
 
 Definition of done:
+
 - provider output shape regressions are visible in a narrow diff
 
 ### Track 5: narrow CH expansion
@@ -246,27 +277,33 @@ Definition of done:
 #### Task 5.1: Add one more narrow CH template
 
 Goal:
+
 - prove the path is not constitution-only
 
 Constraints:
+
 - one known federal law
 - German first
 - one work URI
 
 Definition of done:
+
 - second CH template passes the same fast loop
 
 #### Task 5.2: Add a tiny bounded batch
 
 Goal:
+
 - test small-batch stability before any broadening
 
 Constraints:
+
 - `max_resources=5`
 - no broad discovery
 - no homepage roots
 
 Definition of done:
+
 - five-resource preview passes acquisition, DI, lifecycle, and minimal content gates
 
 ### Track 6: runner and deploy reliability
@@ -274,32 +311,39 @@ Definition of done:
 #### Task 6.1: Fix heavy runner label churn
 
 Goal:
+
 - keep both heavy runners schedulable
 
 Definition of done:
+
 - heavy runners remain labeled through rotation
 - image jobs no longer starve on a single usable runner
 
 #### Task 6.2: Fix runner egress for image builds
 
 Observed failures:
+
 - `docker.io` BuildKit bootstrap pull
 - `docker.pkg.dev` push during `platform-control` image export
 
 Goal:
+
 - eliminate manual registry-copy workarounds
 
 Definition of done:
+
 - image build and Artifact Registry push succeed repeatedly from self-hosted heavy runners
 
 #### Task 6.3: Add an image-push preflight
 
 Check at minimum:
+
 - Buildx bootstrap
 - `docker.io` reachability
 - Artifact Registry push reachability
 
 Definition of done:
+
 - runner failures are caught before long runtime image workflows are dispatched
 
 ### Track 7: Temporal preparation after loop stability
@@ -307,6 +351,7 @@ Definition of done:
 #### Task 7.1: Design Temporal around the proven run path
 
 Temporal should own:
+
 - shard enumeration
 - run fan-out
 - retry failed shards
@@ -314,16 +359,19 @@ Temporal should own:
 - backfills
 
 Temporal should not replace:
+
 - provider logic
 - expression resolution
 - manifestation fetch
 
 Definition of done:
+
 - one design note maps `Temporal -> platform-control run -> fedlex_sparql provider -> DI`
 
 #### Task 7.2: Delay Temporal implementation until the fast loop is stable
 
 Rule:
+
 - do not add orchestration while the narrow slice still depends on manual deploy workarounds
 
 ## Recommended execution order
