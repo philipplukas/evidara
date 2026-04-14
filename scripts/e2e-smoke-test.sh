@@ -384,6 +384,8 @@ SEARCH_RETRY_SECONDS=5
 found_document=0
 matched_title=""
 result_count=0
+search_total_results=0
+last_checked_page=0
 
 for attempt in $(seq 1 ${MAX_SEARCH_ATTEMPTS}); do
   search_response=$(curl_json --get \
@@ -392,12 +394,38 @@ for attempt in $(seq 1 ${MAX_SEARCH_ATTEMPTS}); do
     --data-urlencode "page_size=${SEARCH_PAGE_SIZE}" \
     "${LS_URL}/v1/search")
   result_count=$(echo "${search_response}" | jq -r '.results | length')
-  matching_result_count=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '[.results[] | select(.id == $doc)] | length')
-  echo "  [${attempt}/${MAX_SEARCH_ATTEMPTS}] Search results: ${result_count} (matching run document=${matching_result_count})"
+  search_total_results=$(echo "${search_response}" | jq -r '.totalResults // (.results | length)')
+  total_pages=$(((search_total_results + SEARCH_PAGE_SIZE - 1) / SEARCH_PAGE_SIZE))
+  if [ "${total_pages}" -lt 1 ]; then
+    total_pages=1
+  fi
 
-  if [ "${matching_result_count}" -gt 0 ]; then
-    found_document=1
-    matched_title=$(echo "${search_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | head -n 1)
+  echo "  [${attempt}/${MAX_SEARCH_ATTEMPTS}] Search totalResults=${search_total_results} (page_size=${SEARCH_PAGE_SIZE}, pages=${total_pages})"
+
+  for page in $(seq 1 "${total_pages}"); do
+    if [ "${page}" -eq 1 ]; then
+      page_response="${search_response}"
+    else
+      page_response=$(curl_json --get \
+        --data-urlencode "q=*" \
+        --data-urlencode "page=${page}" \
+        --data-urlencode "page_size=${SEARCH_PAGE_SIZE}" \
+        "${LS_URL}/v1/search")
+    fi
+
+    last_checked_page="${page}"
+    matching_result_count=$(echo "${page_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '[.results[] | select(.id == $doc)] | length')
+    echo "    page ${page}/${total_pages}: results=$(echo "${page_response}" | jq -r '.results | length') matching_run_document=${matching_result_count}"
+
+    if [ "${matching_result_count}" -gt 0 ]; then
+      found_document=1
+      matched_title=$(echo "${page_response}" | jq -r --arg doc "${RUN_DOCUMENT_ID}" '.results[] | select(.id == $doc) | .title' | head -n 1)
+      search_response="${page_response}"
+      break
+    fi
+  done
+
+  if [ "${found_document}" -eq 1 ]; then
     break
   fi
 
@@ -407,7 +435,7 @@ for attempt in $(seq 1 ${MAX_SEARCH_ATTEMPTS}); do
 done
 
 if [ "${found_document}" -eq 1 ]; then
-  echo "  ✅ Found run-scoped indexed document: ${matched_title}"
+  echo "  ✅ Found run-scoped indexed document: ${matched_title} (page ${last_checked_page})"
 else
   echo "  ❌ Run-scoped search failed for document ${RUN_DOCUMENT_ID}."
   echo "  Last search page payload:"
