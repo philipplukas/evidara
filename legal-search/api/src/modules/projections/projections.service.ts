@@ -189,6 +189,14 @@ export class ProjectionsService {
         : typeof doc.full_text === 'string' && doc.full_text.trim()
           ? doc.full_text
           : undefined;
+    const structuredTitle = this.extractStructuredTitle([
+      doc.title,
+      doc.body_text,
+      doc.full_text,
+      doc.content_text,
+      doc.text,
+      doc.summary,
+    ]);
 
     const documentType = this.firstNormalizedDocumentType([
       doc.document_type,
@@ -212,6 +220,7 @@ export class ProjectionsService {
         typeof doc.title === 'string' && doc.title.trim()
           ? this.normalizeTitle(doc.title)
           : undefined,
+      structuredTitle,
       llmTitle:
         llmMeta?.applied === true &&
         typeof llmMeta.title === 'string' &&
@@ -248,6 +257,7 @@ export class ProjectionsService {
 
   private deriveTitle(args: {
     title?: string;
+    structuredTitle?: string;
     llmTitle?: string;
     officialCitation?: string;
     previewText?: string;
@@ -257,11 +267,64 @@ export class ProjectionsService {
     const structuralTail = args.structuralPath?.split('›').at(-1)?.trim();
     return this.firstString([
       args.title,
+      args.structuredTitle,
       args.llmTitle,
       args.officialCitation,
       this.firstSubstantiveLine(args.previewText ?? args.bodyPreviewFallback),
       structuralTail,
     ]);
+  }
+
+  private extractStructuredTitle(values: unknown[]): string | undefined {
+    for (const value of values) {
+      const title = this.extractStructuredTitleFromValue(value);
+      if (title) {
+        return title;
+      }
+    }
+    return undefined;
+  }
+
+  private extractStructuredTitleFromValue(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return undefined;
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      return this.extractStructuredTitleFromObject(parsed);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private extractStructuredTitleFromObject(value: unknown): string | undefined {
+    const record = this.asRecord(value);
+    if (!record) return undefined;
+
+    const directTitle =
+      typeof record.title === 'string' ? this.normalizeTitle(record.title) : undefined;
+    if (directTitle) {
+      return directTitle;
+    }
+
+    const nestedInlineTitle =
+      typeof record.inline_body === 'string'
+        ? this.extractStructuredTitleFromValue(record.inline_body)
+        : undefined;
+    if (nestedInlineTitle) {
+      return nestedInlineTitle;
+    }
+
+    const providerMetadata = this.asRecord(record.provider_metadata);
+    const providerTitle =
+      typeof providerMetadata?.title === 'string'
+        ? this.normalizeTitle(providerMetadata.title)
+        : undefined;
+    if (providerTitle) {
+      return providerTitle;
+    }
+
+    return undefined;
   }
 
   private firstSubstantiveLine(value: string | undefined): string | undefined {

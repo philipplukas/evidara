@@ -344,6 +344,43 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('extracts structured Fedlex titles from JSON body payloads before using raw text fallback', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const service = new ProjectionsService(repository, diClient);
+
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Untitled document',
+      body_text: JSON.stringify({
+        final_url: 'https://fedlex.data.admin.ch/eli/cc/1999/404',
+        inline_body: JSON.stringify({
+          provider: 'fedlex_sparql',
+          title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999',
+          title_short: 'BV',
+        }),
+      }),
+      metadata: {
+        source_defaults: {
+          authority_id: 'auth_fedlex',
+          document_type_hint: 'legislation',
+        },
+      },
+    });
+
+    await service.applyDocumentProcessed({
+      ...baseProcessedEvent,
+      event_id: 'evt_4b',
+      payload: { ...baseProcessedEvent.payload, document_id: 'doc_fedlex' },
+    });
+
+    expect(repository.upsertProjection).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999',
+        document_type: 'law',
+      }),
+    );
+  });
+
   it('applies projection with fallback fields when DI enrichment is unavailable', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
