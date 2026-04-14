@@ -113,6 +113,8 @@ const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: st
   ch: [
     { value: "deterministic_http_fedlex_legislation", label: "CH Fedlex legislation (legacy)" },
     { value: "fedlex_sparql_constitution_de", label: "CH Fedlex constitution (SPARQL)" },
+    { value: "fedlex_sparql_vwvg_de", label: "CH Fedlex VwVG (SPARQL)" },
+    { value: "fedlex_sparql_federal_law_batch_de", label: "CH Fedlex small batch (SPARQL)" },
   ],
   fr: [],
   it: [],

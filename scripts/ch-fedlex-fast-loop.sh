@@ -166,6 +166,23 @@ log() {
   printf '%s\n' "$*" >&2
 }
 
+expected_title_regex() {
+  case "${TEMPLATE_ID}" in
+    fedlex_sparql_constitution_de)
+      printf '%s' 'Bundesverfassung'
+      ;;
+    fedlex_sparql_vwvg_de)
+      printf '%s' 'Verwaltungsverfahren'
+      ;;
+    fedlex_sparql_federal_law_batch_de)
+      printf '%s' '(Bundesverfassung|Verwaltungsverfahren)'
+      ;;
+    *)
+      printf '%s' '.+'
+      ;;
+  esac
+}
+
 save_json() {
   local path="$1"
   cat >"${RUN_DIR}/${path}"
@@ -298,12 +315,18 @@ for i in $(seq 1 24); do
   sleep 5
 done
 
+TITLE_REGEX="$(expected_title_regex)"
 content_type_count="$(jq -r '[.content_type_breakdown[]? | select(.content_type=="text/html") | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
 captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
-title_ok="$(jq -r '[.data[]? | select((.title // "") | test("Bundesverfassung"))] | length' < "${RUN_DIR}/captured-resources.json")"
+title_ok="$(jq -r --arg title_regex "${TITLE_REGEX}" '[.data[]? | select((.title // "") | test($title_regex))] | length' < "${RUN_DIR}/captured-resources.json")"
 fedlex_html_ok="$(jq -r '[.data[]? | select((.final_url // "") | test("fedlex\\.admin\\.ch/filestore/.+\\.html$"))] | length' < "${RUN_DIR}/captured-resources.json")"
-art1_ok="$(jq -r '[.data[]? | select(((.artifact_metadata.body // "") | test("Art\\. 1")) or ((.artifact_metadata.provider_metadata.body // "") | test("Art\\. 1")))] | length' < "${RUN_DIR}/raw-artifacts.json")"
+art1_ok="$(jq -r '[.data[]? | select(
+  ((.artifact_metadata.inline_body // "") | test("Art\\. 1"))
+  or ((.artifact_metadata.body // "") | test("Art\\. 1"))
+  or ((.artifact_metadata.provider_metadata.inline_body // "") | test("Art\\. 1"))
+  or ((.artifact_metadata.provider_metadata.body // "") | test("Art\\. 1"))
+)] | length' < "${RUN_DIR}/raw-artifacts.json")"
 accepted_count="$(jq -r '[.data[]? | select(.status=="accepted")] | length' < "${RUN_DIR}/processing-status.json")"
 processing_count="$(jq -r '[.data[]? | select(.status=="processing")] | length' < "${RUN_DIR}/processing-status.json")"
 canonical_ready_count="$(jq -r '[.data[]? | select(.status=="canonical_ready")] | length' < "${RUN_DIR}/processing-status.json")"
