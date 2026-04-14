@@ -353,31 +353,31 @@ Unsafe AI uses:
 
 ### P1 - do soon
 
-5. Add stronger content-quality gates:
+1. Add stronger content-quality gates:
    - language agreement
    - URL pattern agreement
    - structure density heuristics
    Tags: `gate`
 
-6. Add an AI reviewer that classifies each captured artifact set as likely usable or suspect.
+2. Add an AI reviewer that classifies each captured artifact set as likely usable or suspect.
    Tags: `augment-with-ai`
 
-7. Generate ready-to-paste Linear summary blocks from successful fast-loop runs.
+3. Generate ready-to-paste Linear summary blocks from successful fast-loop runs.
    Tags: `automate`, `remove`
 
-8. Add a post-deploy end-to-end canary step to the narrow deploy path.
+4. Add a post-deploy end-to-end canary step to the narrow deploy path.
    Tags: `gate`, `automate`
 
 ### P2 - after the loop is stable
 
-9. Use Temporal above the deterministic providers for:
+1. Use Temporal above the deterministic providers for:
    - shard scheduling
    - retries
    - backfills
    - checkpointing
    Tags: `automate`
 
-10. Add broader exploratory AI-assisted discovery only for new corpora or poorly structured portals.
+2. Add broader exploratory AI-assisted discovery only for new corpora or poorly structured portals.
    Tags: `augment-with-ai`
 
 ## Suggested parallel worker lanes
