@@ -65,7 +65,7 @@ echo "  project: ${PROJECT_ID}"
 echo "  root:    ${SURFACES_ROOT_URI}"
 echo "  defs:    ${SURFACE_DEFINITIONS_FILE}"
 
-PROJECT_ID="${PROJECT_ID}" SURFACES_ROOT_URI="${SURFACES_ROOT_URI}" SURFACE_DEFINITIONS_FILE="${SURFACE_DEFINITIONS_FILE}" python3 - <<'PY'
+PROJECT_ID="${PROJECT_ID}" SURFACES_ROOT_URI="${SURFACES_ROOT_URI}" SURFACE_DEFINITIONS_FILE="${SURFACE_DEFINITIONS_FILE}" python3 -u - <<'PY'
 from __future__ import annotations
 
 import ast
@@ -202,6 +202,7 @@ for surface_name, columns in SURFACE_COLUMNS.items():
     required = columns["required"]
     optional = columns["optional"]
     expected_all = required + optional
+    print(f"[CHECK] {surface_name}: listing Delta logs...", flush=True)
     logs = list_delta_logs(surface_name)
     if not logs:
         print(
@@ -209,6 +210,10 @@ for surface_name, columns in SURFACE_COLUMNS.items():
             "Skipping (surface not initialized yet)."
         )
         continue
+    print(
+        f"[CHECK] {surface_name}: inspecting metadata schema from {len(logs)} Delta log file(s)...",
+        flush=True,
+    )
     schema_string = extract_latest_metadata_schema(logs)
     if schema_string is None:
         print(
