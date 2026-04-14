@@ -4,7 +4,7 @@ set -euo pipefail
 ENVIRONMENT="dev"
 TEMPLATE_ID="ris_ogd_bundesrecht_narrow_html"
 JURISDICTION_ID="jur_at_federal"
-AUTHORITY_ID="auth_at_ris"
+AUTHORITY_ID="auth_ris"
 MAX_RESOURCES=5
 KEEP_SOURCE=0
 JSON_OUTPUT=0
