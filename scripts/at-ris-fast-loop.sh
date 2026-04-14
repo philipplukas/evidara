@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/fast-loop-evidence.sh
+source "${SCRIPT_DIR}/fast-loop-evidence.sh"
+
 ENVIRONMENT="dev"
 TEMPLATE_ID="ris_ogd_bundesrecht_narrow_html"
 JURISDICTION_ID="jur_at_federal"
@@ -17,6 +21,7 @@ RUN_DIR=""
 SOURCE_ID=""
 SOURCE_VERSION_ID=""
 RUN_ID=""
+STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 usage() {
   cat <<'EOF'
@@ -418,6 +423,8 @@ SUMMARY_JSON="$(jq -n \
   --arg run_id "${RUN_ID}" \
   --arg verdict "${verdict}" \
   --arg run_dir "${RUN_DIR}" \
+  --arg started_at_utc "${STARTED_AT_UTC}" \
+  --arg completed_at_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --argjson max_resources "${MAX_RESOURCES}" \
   --argjson captured_count "${captured_count}" \
   --argjson raw_artifact_count "${raw_artifact_count}" \
@@ -440,6 +447,8 @@ SUMMARY_JSON="$(jq -n \
     max_resources: $max_resources,
     verdict: $verdict,
     run_dir: $run_dir,
+    started_at_utc: $started_at_utc,
+    completed_at_utc: $completed_at_utc,
     checks: {
       captured_count: $captured_count,
       raw_artifact_count: $raw_artifact_count,
@@ -455,12 +464,15 @@ SUMMARY_JSON="$(jq -n \
   }')"
 
 printf '%s\n' "${SUMMARY_JSON}" > "${RUN_DIR}/summary.json"
+render_fast_loop_evidence_markdown "${RUN_DIR}/summary.json" "${RUN_DIR}/evidence-summary.md" "AT RIS"
 
 if [[ "${JSON_OUTPUT}" -eq 1 ]]; then
   cat "${RUN_DIR}/summary.json"
 else
   log "==> Summary"
   jq . < "${RUN_DIR}/summary.json" >&2
+  log "==> Evidence markdown"
+  cat "${RUN_DIR}/evidence-summary.md" >&2
   if [[ "${KEEP_SOURCE}" -eq 0 ]]; then
     log "==> Note: created source_id=${SOURCE_ID} source_version_id=${SOURCE_VERSION_ID}"
   fi
