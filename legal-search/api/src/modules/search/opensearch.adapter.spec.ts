@@ -49,6 +49,8 @@ describe('SearchOpenSearchAdapter', () => {
     expect(must).toBeDefined();
     expect(must![0].multi_match.fields).toEqual([
       'title^4',
+      'authority_name^3',
+      'official_citation^3',
       'structural_path^2',
       'regeste^2',
       'content',

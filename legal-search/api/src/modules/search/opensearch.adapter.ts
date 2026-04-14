@@ -4,6 +4,7 @@
  *
  * Query strategy:
  * - multi_match across title, content, regeste with boosted title
+ * - authority_name and official_citation boosts for legal-series and court-name queries
  * - keyword filters for jurisdiction, document_type
  * - aggregations for facets (jurisdiction, document_type, language)
  * - highlight on content for snippet generation
@@ -28,6 +29,17 @@ type OpenSearchHit = {
     regeste?: string[];
   };
 };
+
+const SEARCH_FIELD_WEIGHTS = [
+  'title^4',
+  'authority_name^3',
+  'official_citation^3',
+  'structural_path^2',
+  'regeste^2',
+  'content',
+  'content_preview',
+  'docket_number^2',
+] as const;
 
 @Injectable()
 export class SearchOpenSearchAdapter implements SearchRepository {
@@ -79,14 +91,7 @@ export class SearchOpenSearchAdapter implements SearchRepository {
                   {
                     multi_match: {
                       query: normalizedQuery,
-                      fields: [
-                        'title^4',
-                        'structural_path^2',
-                        'regeste^2',
-                        'content',
-                        'content_preview',
-                        'docket_number^2',
-                      ],
+                      fields: [...SEARCH_FIELD_WEIGHTS],
                       type: 'best_fields' as const,
                       fuzziness: 'AUTO',
                     },
