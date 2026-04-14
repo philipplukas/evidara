@@ -17,6 +17,7 @@ Canonical source context:
 - [Five-Country Content Rollout](../components/five-country-content-rollout.md)
 - [Platform-Control Multi-Country Operator Playbook](platform-control-multi-country-operator-playbook.md)
 - [CH + AT Thin-Slice Execution](ch-at-thin-slice-execution.md)
+- [CH Fedlex Fast-Loop Backlog](ch-fedlex-fast-loop-backlog.md)
 - [Metadata quality plan status](metadata-quality-plan-status.md)
 - Linear umbrella: `TAR-160`
 

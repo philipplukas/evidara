@@ -1,0 +1,148 @@
+name: Platform Control Fast Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target runtime environment.
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+      image_tag:
+        description: Optional image tag override. Defaults to the triggering commit SHA.
+        required: false
+        type: string
+      deploy_worker:
+        description: Also deploy platform-control-worker for this tag.
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/platform-control-fast-deploy.yml"
+      - "platform-control/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: platform-control-fast-deploy-${{ github.ref }}-${{ inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+env:
+  TARGET_ENV: ${{ inputs.environment || 'dev' }}
+  IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+
+jobs:
+  deploy-platform-control:
+    name: Deploy platform-control to ${{ inputs.environment || 'dev' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'dev' }}
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      ARTIFACT_PROJECT_ID: ${{ vars.GCP_ARTIFACT_PROJECT_ID }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      PLATFORM_CONTROL_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_SERVICE_NAME }}
+      PLATFORM_CONTROL_WORKER_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_WORKER_SERVICE_NAME }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Wait for platform-control image
+        run: |
+          set -euo pipefail
+          IMAGE_PATH="${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
+          echo "Waiting for ${IMAGE_PATH} ..."
+          for i in $(seq 1 90); do
+            if gcloud artifacts docker images describe "${IMAGE_PATH}" >/dev/null 2>&1; then
+              echo "Found ${IMAGE_PATH}"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Timeout waiting for ${IMAGE_PATH}"
+          exit 1
+
+      - name: Wait for platform-control worker image
+        if: inputs.deploy_worker == true
+        run: |
+          set -euo pipefail
+          IMAGE_PATH="${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
+          echo "Waiting for ${IMAGE_PATH} ..."
+          for i in $(seq 1 90); do
+            if gcloud artifacts docker images describe "${IMAGE_PATH}" >/dev/null 2>&1; then
+              echo "Found ${IMAGE_PATH}"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Timeout waiting for ${IMAGE_PATH}"
+          exit 1
+
+      - name: Deploy platform-control API
+        run: |
+          gcloud run services update "${PLATFORM_CONTROL_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control:${IMAGE_TAG}"
+
+      - name: Deploy platform-control worker
+        if: inputs.deploy_worker == true
+        run: |
+          gcloud run services update "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --image "${REGION}-docker.pkg.dev/${ARTIFACT_PROJECT_ID}/${ARTIFACT_REPOSITORY}/platform-control-worker:${IMAGE_TAG}"
+
+      - name: Verify deployed revision
+        id: verify
+        run: |
+          PC_REV=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.latestReadyRevisionName)')
+          PC_URL=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(status.url)')
+          echo "platform_control_revision=${PC_REV}" >> "$GITHUB_OUTPUT"
+          echo "platform_control_url=${PC_URL}" >> "$GITHUB_OUTPUT"
+          echo "### Platform-control fast deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Revision: \`${PC_REV}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${PC_URL}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test health
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+            "${{ steps.verify.outputs.platform_control_url }}/health" || echo "000")
+          echo "HTTP ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "::error::platform-control health check failed (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      - name: Smoke test readiness
+        continue-on-error: true
+        run: |
+          BODY=$(curl -s --max-time 10 "${{ steps.verify.outputs.platform_control_url }}/ready" || echo '{"status":"unreachable"}')
+          echo "${BODY}" | jq .
+          STATUS=$(echo "${BODY}" | jq -r '.status // "unknown"')
+          echo "Readiness status: ${STATUS}"
+          if [ "${STATUS}" = "degraded" ]; then
+            echo "::warning::platform-control readiness is degraded"
+          fi
