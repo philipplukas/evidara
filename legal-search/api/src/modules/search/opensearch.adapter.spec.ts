@@ -57,6 +57,13 @@ describe('SearchOpenSearchAdapter', () => {
       'content_preview',
       'docket_number^2',
     ]);
+    expect(firstCall.body.query.bool.should).toEqual([
+      { match_phrase: { title: { query: 'verantwortlichkeit', boost: 8 } } },
+      { match_phrase: { official_citation: { query: 'verantwortlichkeit', boost: 6 } } },
+      { match_phrase: { authority_name: { query: 'verantwortlichkeit', boost: 5 } } },
+      { match_phrase: { structural_path: { query: 'verantwortlichkeit', boost: 4 } } },
+      { match_phrase: { docket_number: { query: 'verantwortlichkeit', boost: 4 } } },
+    ]);
   });
 
   it('maps toggle, range, date_range, and text refinements', async () => {
@@ -200,5 +207,28 @@ describe('SearchOpenSearchAdapter', () => {
         is_official: true,
       }),
     );
+  });
+
+  it('does not fall back to match_all when a non-wildcard query returns zero hits', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    const result = await adapter.search('Bundesgericht');
+
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(result.total).toBe(0);
+    expect(result.hits).toEqual([]);
   });
 });

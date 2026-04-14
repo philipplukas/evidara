@@ -41,6 +41,14 @@ const SEARCH_FIELD_WEIGHTS = [
   'docket_number^2',
 ] as const;
 
+const PHRASE_BOOST_FIELDS = [
+  ['title', 8],
+  ['official_citation', 6],
+  ['authority_name', 5],
+  ['structural_path', 4],
+  ['docket_number', 4],
+] as const;
+
 @Injectable()
 export class SearchOpenSearchAdapter implements SearchRepository {
   private readonly logger = new Logger(SearchOpenSearchAdapter.name);
@@ -97,6 +105,17 @@ export class SearchOpenSearchAdapter implements SearchRepository {
                     },
                   },
                 ],
+          should:
+            normalizedQuery === '*' || normalizedQuery.length === 0
+              ? []
+              : PHRASE_BOOST_FIELDS.map(([field, boost]) => ({
+                  match_phrase: {
+                    [field]: {
+                      query: normalizedQuery,
+                      boost,
+                    },
+                  },
+                })),
           filter: filters,
         },
       },
@@ -126,34 +145,14 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     this.logger.debug(`Searching "${query}" in ${this.indexDocuments}`);
 
     try {
-      let response = await this.client.search({
+      const response = await this.client.search({
         index: this.indexDocuments,
         body,
       });
 
-      let result = response.body;
-      let total =
+      const result = response.body;
+      const total =
         typeof result.hits.total === 'number' ? result.hits.total : (result.hits.total?.value ?? 0);
-      if (total === 0 && normalizedQuery !== '*' && normalizedQuery.length > 0) {
-        // Fallback keeps search usable when indexed docs have sparse text fields.
-        response = await this.client.search({
-          index: this.indexDocuments,
-          body: {
-            ...body,
-            query: {
-              bool: {
-                must: [{ match_all: {} }],
-                filter: filters,
-              },
-            },
-          },
-        });
-        result = response.body;
-        total =
-          typeof result.hits.total === 'number'
-            ? result.hits.total
-            : (result.hits.total?.value ?? 0);
-      }
 
       const hits: SearchHitEntity[] = (result.hits.hits as OpenSearchHit[])
         .filter((hit) => hit._source != null)
