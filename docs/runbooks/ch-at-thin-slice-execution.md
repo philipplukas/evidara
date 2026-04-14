@@ -1,8 +1,8 @@
 # CH + AT Thin-Slice Execution
 
-Owner: Platform / GA  
-Last reviewed: 2026-04-13  
-Last verified: 2026-04-13  
+Owner: Platform / GA
+Last reviewed: 2026-04-14
+Last verified: 2026-04-14
 Applies to: CH and AT first-country execution toward GA
 
 ## Purpose
@@ -50,15 +50,44 @@ clean.
 1. `AT slice 1` — deterministic federal legal content
    - overlay: `at`
    - template: `ris_ogd_bundesrecht`
-   - authority: `auth_at_ris`
+   - authority: live dev currently resolves to `auth_ris`
    - goal: prove high-trust acquisition and readiness on the RIS-backed path
 
 2. `AT slice 2` — exploratory justice-portal crawl
    - overlay: `at`
    - template: `firecrawl_justice_portal`
-   - authority: usually still `auth_at_ris` for the first discovery pass
+   - authority: usually still `auth_ris` for the first discovery pass
    - goal: discover decision/commentary boundaries, path patterns, and authority labels before
      locking a more precise source version
+
+## AT RIS reality check from live dev
+
+The live AT fast-loop runs on `2026-04-14` clarified the right steady-state shape for RIS-backed
+acquisition:
+
+- `POST /v1/runs` must return quickly with a `pending` run
+- the worker should own the actual RIS fetch
+- the worker must share the same artifact-store and event-publisher settings as the API
+
+Confirmed live signals:
+
+- narrow pass:
+  - `run_01kp5xqgrfyqq2abez3r666d9h`
+- tiny batch pass:
+  - `run_01kp5xrqvh61xfdace1x9sqed1`
+- evidence:
+  - [2026-04-14 AT RIS Fast Loop Run 1](evidence/2026-04-14-at-ris-fast-loop-run1.md)
+
+Operational implication:
+
+- keep AT RIS on the async worker-backed path
+- keep fail-fast provider timeouts so slow RIS fetches produce failed runs, not hanging HTTP calls
+- require worker env parity for:
+  - `PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND`
+  - `PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND`
+  - raw artifact bucket and Pub/Sub topics
+- without that parity, the worker writes `file:///app/...` bundle manifests that DI cannot read
+  cross-service
 
 ## AI-first vs deterministic
 
@@ -143,7 +172,8 @@ Operational implication:
 - `platform-control/seeds/reference/authorities.yaml`
   - `auth_ch_fedlex`
   - `auth_zh_admin`
-  - `auth_at_ris`
+- `auth_at_ris`
+- `auth_ris`
   - `auth_at_ogh`
   - `auth_at_vfgh`
   - `auth_at_vwgh`
@@ -158,6 +188,14 @@ and runtime tests are aligned on the stricter federal pair:
 
 Use the live canonical pair when executing the first deterministic CH Fedlex slice against dev.
 Treat the seed/runtime mismatch as evidence to capture, not as something to silently normalize away.
+
+AT has the same practical wrinkle on dev:
+
+- repo seed naming may still reference `auth_at_ris`
+- live dev currently resolves the RIS authority as `auth_ris`
+
+The AT fast loop should prefer `auth_ris` and auto-detect the live RIS authority by slug/name if
+the exact ID drifts again.
 
 ### API paths
 
@@ -359,7 +397,7 @@ curl -X POST "$EVIDARA_PLATFORM_CONTROL_URL/v1/sources/with-version" \
     "source": {
       "name": "AT RIS Bundesrecht thin slice",
       "jurisdiction_id": "jur_at",
-      "authority_id": "auth_at_ris",
+      "authority_id": "auth_ris",
       "source_type": "api",
       "document_family": "law"
     },
@@ -381,7 +419,7 @@ curl -X POST "$EVIDARA_PLATFORM_CONTROL_URL/v1/sources/with-version" \
     "source": {
       "name": "AT justice portal discovery slice",
       "jurisdiction_id": "jur_at",
-      "authority_id": "auth_at_ris",
+      "authority_id": "auth_ris",
       "source_type": "website",
       "document_family": "decision"
     },
@@ -544,8 +582,8 @@ For CH/AT specifically:
 ## Recommended execution order for right now
 
 1. `CH deterministic`: `auth_ch_fedlex` + `deterministic_http_fedlex_legislation`
-2. `AT deterministic`: `auth_at_ris` + `ris_ogd_bundesrecht`
-3. `AT AI-assisted discovery`: `auth_at_ris` + `firecrawl_justice_portal` with
+2. `AT deterministic`: `auth_ris` + `ris_ogd_bundesrecht`
+3. `AT AI-assisted discovery`: `auth_ris` + `firecrawl_justice_portal` with
    `scope.kind=discovered_subset`
 4. review findings
 5. add or tighten authority mappings and path rules

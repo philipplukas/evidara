@@ -65,6 +65,7 @@ class PendingDispatchPublications:
 
 
 class RunService:
+    _ASYNC_PROVIDER_NAMES = frozenset({"ris_ogd"})
     _DECISION_PATTERN = re.compile(
         r"\b(decision|judg(?:e)?ment|order|case|ruling)\b",
         re.IGNORECASE,
@@ -90,6 +91,21 @@ class RunService:
         self.artifact_store = artifact_store or get_artifact_store()
         self.publisher = publisher or get_raw_artifact_publisher()
         self.run_dispatch_backend = run_dispatch_backend
+
+    def _resolve_provider_for_source_version(
+        self, source_version: SourceVersion
+    ) -> AcquisitionProvider | None:
+        provider = self.provider
+        if provider is None and self.provider_registry is not None:
+            provider = self.provider_registry.resolve_for_spec(source_version.acquisition_spec)
+        return provider
+
+    def _should_dispatch_via_worker(self, source_version: SourceVersion) -> bool:
+        if self.run_dispatch_backend == "worker":
+            return True
+        provider = self._resolve_provider_for_source_version(source_version)
+        provider_name = getattr(provider, "provider_name", None)
+        return isinstance(provider_name, str) and provider_name in self._ASYNC_PROVIDER_NAMES
 
     async def list_runs(
         self,
@@ -176,7 +192,7 @@ class RunService:
         self.session.add(run)
         await self.session.flush()
 
-        if self.run_dispatch_backend == "worker":
+        if self._should_dispatch_via_worker(source_version):
             await self.session.commit()
             await self.session.refresh(run)
             return run

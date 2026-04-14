@@ -1,8 +1,8 @@
 # GA operator board
 
-Owner: Platform / release  
-Last reviewed: 2026-04-13  
-Last verified: 2026-04-13  
+Owner: Platform / release
+Last reviewed: 2026-04-14
+Last verified: 2026-04-14
 Applies to: GA readiness coordination after the 2026-04-13 merge wave
 
 ## Purpose
@@ -41,7 +41,7 @@ What is not yet true:
 - The branch-gate model is not yet in its intended steady state.
 - Runner stability is improved but not yet trusted as a solved problem.
 - Five-country acceptance and relevance still need current evidence attached to the GA
-  umbrella.
+  umbrella, but CH and AT now have live fast-loop run evidence on dev.
 - The current dev relevance signal now includes an empty `q=*` control row, which points
   to alias/index/corpus drift rather than a pure ranking regression; the follow-up stays
   on `TAR-242`.
@@ -53,7 +53,7 @@ What is not yet true:
 | Release evidence refresh | `TAR-214` | active | yes | `TAR-64`, `TAR-77`, `TAR-85`, phase-5 memo, and `TAR-69` are refreshed and linked |
 | Gate policy hardening | `TAR-70` | active | yes | required-check model is agreed, documented, and validated against representative PR types |
 | Runner reliability | `TAR-238` | active | yes | light/heavy pools are stable across rotation and preflight checks pass reliably |
-| Five-country acceptance A (CH + AT) | `TAR-239` | ready | track in parallel | CH/AT checklist is executed and evidence is attached into `TAR-160` |
+| Five-country acceptance A (CH + AT) | `TAR-239` | active | track in parallel | CH/AT checklist is executed and evidence is attached into `TAR-160` |
 | Five-country acceptance B (DE + FR) | `TAR-240` | ready | track in parallel | DE/FR checklist is executed and evidence is attached into `TAR-160` |
 | Relevance baseline | `TAR-241` | active | yes | query pack is rerun with the `q=*` control row, result table is attached, and regressions are split into follow-up issues |
 | GA umbrella / final sign-off | `TAR-160` | collecting | no, assemble after inputs land | consolidated GA evidence pack and release decision are ready |
@@ -160,6 +160,17 @@ Use this lane to:
 - capture CH/AT-specific gaps for canton aliases, authority naming, and multilingual drift
 - attach a compact summary into `TAR-160`
 
+Current evidence highlights:
+
+- CH live SPARQL fast-loop proof is already recorded in
+  [`2026-04-13-ch-fedlex-sparql-preview-run1.md`](evidence/2026-04-13-ch-fedlex-sparql-preview-run1.md)
+- AT now has clean live RIS fast-loop proof for:
+  - narrow run `run_01kp5xqgrfyqq2abez3r666d9h`
+  - tiny batch run `run_01kp5xrqvh61xfdace1x9sqed1`
+- AT recovery also surfaced an important operator invariant:
+  `platform-control-worker` must keep GCS artifact-store and Pub/Sub env parity with
+  `platform-control-api`, or DI cannot read worker-published bundle manifests
+
 ### `TAR-240` - five-country acceptance B (DE + FR)
 
 Working note:
@@ -196,6 +207,7 @@ Do not parallelize these across multiple owners at once:
 |------|--------|
 | Release packet and go/no-go wording | [`phase-5-go-no-go-memo.md`](phase-5-go-no-go-memo.md) |
 | Evidence checklist for TAR-64 / TAR-77 / TAR-85 | [`phase-5-evidence-checklist.md`](phase-5-evidence-checklist.md) |
+| Friction and acceleration priorities | [`friction-and-acceleration-map.md`](friction-and-acceleration-map.md) |
 | Gate policy recovery plan | [`tar-70-gate-policy-hardening.md`](tar-70-gate-policy-hardening.md) |
 | Runner stabilization and verification | [`ci-actions-duration-metrics.md`](ci-actions-duration-metrics.md#runner-reliability-checklist) |
 | Hetzner / Tailscale / Argo platform proof | [`github-app-proof-rerun-checklist.md`](github-app-proof-rerun-checklist.md) |

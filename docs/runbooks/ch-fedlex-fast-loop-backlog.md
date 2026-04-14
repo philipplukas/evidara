@@ -24,6 +24,7 @@ This backlog is the execution companion to:
 - [CH Fedlex SPARQL Provider and Temporal Orchestration](../architecture/ch-fedlex-sparql-temporal-architecture.md)
 - [CH + AT Thin-Slice Execution](ch-at-thin-slice-execution.md)
 - [Five-Country Acceptance A (CH + AT)](five-country-acceptance-a.md)
+- [Friction and Acceleration Map](friction-and-acceleration-map.md)
 
 ## Current baseline
 

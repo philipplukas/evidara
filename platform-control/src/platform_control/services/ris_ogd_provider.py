@@ -78,6 +78,7 @@ class RisOgdProvider:
         page_size = int(acquisition_spec.get("page_size") or _DEFAULT_PAGE_SIZE)
         max_pages = int(acquisition_spec.get("max_pages") or _MAX_PAGES)
         max_content_bytes = int(acquisition_spec.get("max_content_bytes") or 5_000_000)
+        request_timeout_seconds = float(acquisition_spec.get("request_timeout_seconds") or 15.0)
 
         run_scope = run.scope or {}
         since_date = run_scope.get("since")
@@ -89,7 +90,10 @@ class RisOgdProvider:
         skipped_duplicates = 0
 
         async with httpx.AsyncClient(
-            timeout=60.0,
+            timeout=httpx.Timeout(
+                timeout=request_timeout_seconds,
+                connect=min(10.0, request_timeout_seconds),
+            ),
             headers={"User-Agent": _USER_AGENT},
             follow_redirects=True,
         ) as client:
@@ -109,6 +113,17 @@ class RisOgdProvider:
                     listing = await client.get(base_url, params=params)
                     listing.raise_for_status()
                     listing_json = listing.json()
+                except httpx.TimeoutException:
+                    failures.append(
+                        {
+                            "url": base_url,
+                            "error": (
+                                "listing page "
+                                f"{page_number}: timed out after {request_timeout_seconds:.1f}s"
+                            ),
+                        }
+                    )
+                    break
                 except Exception as exc:
                     failures.append(
                         {
@@ -145,6 +160,7 @@ class RisOgdProvider:
                         ref=ref,
                         preferred_formats=preferred_formats,
                         max_content_bytes=max_content_bytes,
+                        request_timeout_seconds=request_timeout_seconds,
                         run=run,
                     )
                     if isinstance(doc_result, ProviderResource):
@@ -273,6 +289,7 @@ async def _fetch_single_document(
     ref: dict[str, Any],
     preferred_formats: list[str],
     max_content_bytes: int,
+    request_timeout_seconds: float,
     run: Run,
 ) -> ProviderResource | dict[str, str]:
     """Fetch a single document. Returns ProviderResource on success, failure dict otherwise."""
@@ -289,6 +306,8 @@ async def _fetch_single_document(
     try:
         response = await client.get(url)
         response.raise_for_status()
+    except httpx.TimeoutException:
+        return {"url": url, "error": f"timed out after {request_timeout_seconds:.1f}s"}
     except Exception as exc:
         return {"url": url, "error": str(exc)}
 

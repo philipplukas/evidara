@@ -126,6 +126,30 @@ jobs:
           echo "- Revision: \`${PC_REV}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- URL: ${PC_URL}" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Verify worker artifact/event env parity
+        if: inputs.deploy_worker == true
+        run: |
+          set -euo pipefail
+          WORKER_JSON=$(gcloud run services describe "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json)
+          for var in \
+            PLATFORM_CONTROL_GCP_PROJECT_ID \
+            PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND \
+            PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND \
+            PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET \
+            PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC \
+            PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC
+          do
+            if ! echo "${WORKER_JSON}" | jq -e --arg name "${var}" '.spec.template.spec.containers[0].env // [] | any(.name == $name)' >/dev/null; then
+              echo "::error::platform-control worker is missing required env ${var}"
+              exit 1
+            fi
+          done
+          WORKER_REV=$(echo "${WORKER_JSON}" | jq -r '.status.latestReadyRevisionName')
+          echo "- Worker revision: \`${WORKER_REV}\`" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Smoke test health
         run: |
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \

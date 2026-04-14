@@ -389,6 +389,46 @@ async def test_preview_source_blueprint_returns_expanded_spec(session) -> None:
 
 
 @pytest.mark.asyncio
+async def test_preview_source_blueprint_returns_ris_ogd_narrow_html_spec(session) -> None:
+    service = SourceService(session)
+    spec = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="at",
+            provider_template_id="ris_ogd_bundesrecht_narrow_html",
+        )
+    )
+
+    assert spec.provider == "ris_ogd"
+    assert str(spec.base_url) == "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht"
+    assert spec.applikation == "BrKons"
+    assert spec.preferred_formats == ["Html", "Xml"]
+    assert spec.request_timeout_seconds == 15.0
+    assert spec.page_size == 1
+    assert spec.max_pages == 1
+    assert spec.document_type_hint == "legislation"
+
+
+@pytest.mark.asyncio
+async def test_preview_source_blueprint_returns_ris_ogd_small_batch_html_spec(session) -> None:
+    service = SourceService(session)
+    spec = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="at",
+            provider_template_id="ris_ogd_bundesrecht_small_batch_html",
+        )
+    )
+
+    assert spec.provider == "ris_ogd"
+    assert str(spec.base_url) == "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht"
+    assert spec.applikation == "BrKons"
+    assert spec.preferred_formats == ["Html", "Xml"]
+    assert spec.request_timeout_seconds == 15.0
+    assert spec.page_size == 5
+    assert spec.max_pages == 1
+    assert spec.document_type_hint == "legislation"
+
+
+@pytest.mark.asyncio
 async def test_preview_source_blueprint_returns_fedlex_sparql_spec(session) -> None:
     service = SourceService(session)
     spec = await service.preview_source_blueprint(

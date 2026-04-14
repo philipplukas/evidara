@@ -179,6 +179,12 @@ cloud_run_services = {
     vpc_egress    = "PRIVATE_RANGES_ONLY"
     cloud_sql_instances = ["project-dacd6b7b-dc96-4534-b82:europe-west6:evidara-control-staging"]
     env_vars = {
+      PLATFORM_CONTROL_GCP_PROJECT_ID = "project-dacd6b7b-dc96-4534-b82"
+      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND = "gcs"
+      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND = "pubsub"
+      PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET = "evidara-raw-artifacts-staging"
+      PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC = "raw-artifact-available-staging"
+      PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC = "artifact-bundle-available-staging"
       PLATFORM_CONTROL_RUN_DISPATCH_BACKEND = "worker"
     }
     secret_env_vars = {

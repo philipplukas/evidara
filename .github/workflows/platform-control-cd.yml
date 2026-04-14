@@ -133,6 +133,29 @@ jobs:
           echo "| legal-search-api | \`${LS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| document-intelligence-document-service | \`${DS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Verify platform-control worker env parity (dev)
+        run: |
+          set -euo pipefail
+          WORKER_JSON=$(gcloud run services describe "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json)
+          for var in \
+            PLATFORM_CONTROL_GCP_PROJECT_ID \
+            PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND \
+            PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND \
+            PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET \
+            PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC \
+            PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC
+          do
+            if ! echo "${WORKER_JSON}" | jq -e --arg name "${var}" '.spec.template.spec.containers[0].env // [] | any(.name == $name)' >/dev/null; then
+              echo "::error::platform-control worker is missing required env ${var} in dev"
+              exit 1
+            fi
+          done
+          WORKER_REV=$(echo "${WORKER_JSON}" | jq -r '.status.latestReadyRevisionName')
+          echo "| platform-control-worker | \`${WORKER_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Smoke test — platform-control health (dev)
         run: |
           PC_URL=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-dev" \
@@ -379,6 +402,30 @@ jobs:
           echo "| legal-search-api | \`${LS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| document-intelligence-document-service | \`${DS_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| image-tag | \`${IMAGE_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify platform-control worker env parity (prod)
+        if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'
+        run: |
+          set -euo pipefail
+          WORKER_JSON=$(gcloud run services describe "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-prod" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json)
+          for var in \
+            PLATFORM_CONTROL_GCP_PROJECT_ID \
+            PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND \
+            PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND \
+            PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET \
+            PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC \
+            PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC
+          do
+            if ! echo "${WORKER_JSON}" | jq -e --arg name "${var}" '.spec.template.spec.containers[0].env // [] | any(.name == $name)' >/dev/null; then
+              echo "::error::platform-control worker is missing required env ${var} in prod"
+              exit 1
+            fi
+          done
+          WORKER_REV=$(echo "${WORKER_JSON}" | jq -r '.status.latestReadyRevisionName')
+          echo "| platform-control-worker | \`${WORKER_REV}\` |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke test — platform-control health (prod)
         if: steps.preflight-prod.outputs.cloud_run_api_enabled == 'true'

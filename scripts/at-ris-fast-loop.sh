@@ -6,14 +6,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/fast-loop-evidence.sh"
 
 ENVIRONMENT="dev"
-TEMPLATE_ID="fedlex_sparql_constitution_de"
-MAX_RESOURCES=25
+TEMPLATE_ID="ris_ogd_bundesrecht_narrow_html"
+JURISDICTION_ID="jur_at_federal"
+AUTHORITY_ID="auth_ris"
+AUTHORITY_ID_EXPLICIT=0
+MAX_RESOURCES=5
 KEEP_SOURCE=0
 JSON_OUTPUT=0
 DRY_RUN=0
 MAX_POLLS=60
 POLL_INTERVAL=5
-WORKDIR_ROOT="${TMPDIR:-/tmp}/ch-fedlex-fast-loop"
+WORKDIR_ROOT="${TMPDIR:-/tmp}/at-ris-fast-loop"
 RUN_DIR=""
 SOURCE_ID=""
 SOURCE_VERSION_ID=""
@@ -22,13 +25,13 @@ STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/ch-fedlex-fast-loop.sh [options]
+Usage: scripts/at-ris-fast-loop.sh [options]
 
-Run a narrow CH Fedlex preview against platform-control on Cloud Run and verify:
-  - text/html capture
+Run a narrow AT RIS preview against platform-control on Cloud Run and verify:
+  - RIS HTML capture
   - DI accepted / processing / canonical_ready
   - document.processed lifecycle
-  - minimum content quality gates
+  - minimum Austrian legal-text quality gates
 
 Options:
   --env <dev|staging|prod>       Target environment (default: dev)
@@ -36,9 +39,10 @@ Options:
   --region <region>              Cloud Run region override
   --impersonate-sa <email>       Service account override
   --pc-url <url>                 Platform-control URL override
-  --ls-url <url>                 Legal-search URL override
-  --template <template-id>       Source blueprint template (default: fedlex_sparql_constitution_de)
-  --max-resources <n>            Preview scope max_resources (default: 25)
+  --template <template-id>       Source blueprint template (default: ris_ogd_bundesrecht_narrow_html)
+  --jurisdiction-id <id>         Jurisdiction ID override (default: jur_at_federal)
+  --authority-id <id>            Authority ID override (default: auto-detect live RIS authority, preferring auth_ris)
+  --max-resources <n>            Preview scope max_resources (default: 5)
   --max-polls <n>                Maximum run polls (default: 60)
   --poll-interval <seconds>      Run poll interval (default: 5)
   --out-dir <path>               Exact directory for persisted evidence bundle
@@ -60,6 +64,15 @@ while [[ $# -gt 0 ]]; do
       TEMPLATE_ID="${2:?missing value for --template}"
       shift 2
       ;;
+    --jurisdiction-id)
+      JURISDICTION_ID="${2:?missing value for --jurisdiction-id}"
+      shift 2
+      ;;
+    --authority-id)
+      AUTHORITY_ID="${2:?missing value for --authority-id}"
+      AUTHORITY_ID_EXPLICIT=1
+      shift 2
+      ;;
     --project)
       GCP_PROJECT_ID="${2:?missing value for --project}"
       shift 2
@@ -74,10 +87,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pc-url)
       EVIDARA_PLATFORM_CONTROL_URL="${2:?missing value for --pc-url}"
-      shift 2
-      ;;
-    --ls-url)
-      EVIDARA_LEGAL_SEARCH_URL="${2:?missing value for --ls-url}"
       shift 2
       ;;
     --max-resources)
@@ -151,11 +160,9 @@ fi
 mkdir -p "${RUN_DIR}"
 
 PC_URL="${EVIDARA_PLATFORM_CONTROL_URL:-$(gcloud run services describe "platform-control-api-${ENVIRONMENT}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')}"
-LS_URL="${EVIDARA_LEGAL_SEARCH_URL:-$(gcloud run services describe "legal-search-api-${ENVIRONMENT}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')}"
 
 export EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT="${SA}"
 export EVIDARA_PLATFORM_CONTROL_URL="${PC_URL%/}"
-export EVIDARA_LEGAL_SEARCH_URL="${LS_URL%/}"
 
 eval "$(
   ./scripts/mint-cloud-run-tokens.sh
@@ -171,16 +178,46 @@ log() {
   printf '%s\n' "$*" >&2
 }
 
+resolve_authority_id() {
+  local authorities_json resolved_by_id resolved_by_slug resolved_by_name
+  authorities_json="$(curl_json "${PC_URL}/v1/reference-data/authorities")"
+  printf '%s\n' "${authorities_json}" > "${RUN_DIR}/authorities.json"
+
+  resolved_by_id="$(jq -r \
+    --arg authority_id "${AUTHORITY_ID}" \
+    --arg jurisdiction_id "${JURISDICTION_ID}" \
+    '.data[]? | select(.authority_id == $authority_id and .jurisdiction_id == $jurisdiction_id) | .authority_id' \
+    < "${RUN_DIR}/authorities.json" | head -n1)"
+  if [[ -n "${resolved_by_id}" ]]; then
+    printf '%s' "${resolved_by_id}"
+    return 0
+  fi
+
+  resolved_by_slug="$(jq -r \
+    --arg jurisdiction_id "${JURISDICTION_ID}" \
+    '.data[]? | select(.jurisdiction_id == $jurisdiction_id and (.slug // "") == "ris") | .authority_id' \
+    < "${RUN_DIR}/authorities.json" | head -n1)"
+  if [[ -n "${resolved_by_slug}" ]]; then
+    printf '%s' "${resolved_by_slug}"
+    return 0
+  fi
+
+  resolved_by_name="$(jq -r \
+    --arg jurisdiction_id "${JURISDICTION_ID}" \
+    '.data[]? | select(.jurisdiction_id == $jurisdiction_id and ((.name // "") | test("Rechtsinformationssystem|\\bRIS\\b"; "i"))) | .authority_id' \
+    < "${RUN_DIR}/authorities.json" | head -n1)"
+  if [[ -n "${resolved_by_name}" ]]; then
+    printf '%s' "${resolved_by_name}"
+    return 0
+  fi
+
+  return 1
+}
+
 expected_title_regex() {
   case "${TEMPLATE_ID}" in
-    fedlex_sparql_constitution_de)
-      printf '%s' 'Bundesverfassung'
-      ;;
-    fedlex_sparql_vwvg_de)
-      printf '%s' 'Verwaltungsverfahren'
-      ;;
-    fedlex_sparql_federal_law_batch_de)
-      printf '%s' '(Bundesverfassung|Verwaltungsverfahren)'
+    ris_ogd_bundesrecht_narrow_html|ris_ogd_bundesrecht_small_batch_html)
+      printf '%s' '(Bundesgesetz|Verordnung|Kundmachung|Gesetz)'
       ;;
     *)
       printf '%s' '.+'
@@ -211,11 +248,13 @@ poll_terminal_run_status() {
   return 0
 }
 
-log "==> CH Fedlex fast loop"
+log "==> AT RIS fast loop"
 log "    environment=${ENVIRONMENT}"
 log "    project=${PROJECT_ID}"
 log "    region=${REGION}"
 log "    template=${TEMPLATE_ID}"
+log "    jurisdiction_id=${JURISDICTION_ID}"
+log "    authority_id=${AUTHORITY_ID}"
 log "    max_resources=${MAX_RESOURCES}"
 log "    max_polls=${MAX_POLLS}"
 log "    poll_interval=${POLL_INTERVAL}"
@@ -228,21 +267,37 @@ fi
 
 curl_json "${PC_URL}/health" | save_json "platform-control-health.json"
 
-VERSION_LABEL="ch-fedlex-fast-loop-$(date -u +%Y%m%dT%H%M%SZ)"
-CREATE_PAYLOAD="$(jq -n --arg version_label "${VERSION_LABEL}" --arg template_id "${TEMPLATE_ID}" '{
-  source: {
-    name: "CH Fedlex SPARQL fast-loop source",
-    jurisdiction_id: "jur_ch_federal",
-    authority_id: "auth_fedlex",
-    source_type: "api",
-    document_family: "law"
-  },
-  source_version: {
-    version_label: $version_label,
-    overlay_id: "ch",
-    provider_template_id: $template_id
-  }
-}')"
+if [[ "${AUTHORITY_ID_EXPLICIT}" -eq 0 ]]; then
+  if RESOLVED_AUTHORITY_ID="$(resolve_authority_id)"; then
+    if [[ "${RESOLVED_AUTHORITY_ID}" != "${AUTHORITY_ID}" ]]; then
+      log "==> Resolved live AT RIS authority_id=${RESOLVED_AUTHORITY_ID} (from default ${AUTHORITY_ID})"
+    fi
+    AUTHORITY_ID="${RESOLVED_AUTHORITY_ID}"
+  else
+    log "==> Could not auto-resolve live RIS authority_id for jurisdiction_id=${JURISDICTION_ID}; using ${AUTHORITY_ID}"
+  fi
+fi
+
+VERSION_LABEL="at-ris-fast-loop-$(date -u +%Y%m%dT%H%M%SZ)"
+CREATE_PAYLOAD="$(jq -n \
+  --arg version_label "${VERSION_LABEL}" \
+  --arg template_id "${TEMPLATE_ID}" \
+  --arg jurisdiction_id "${JURISDICTION_ID}" \
+  --arg authority_id "${AUTHORITY_ID}" \
+  '{
+    source: {
+      name: "AT RIS fast-loop source",
+      jurisdiction_id: $jurisdiction_id,
+      authority_id: $authority_id,
+      source_type: "api",
+      document_family: "law"
+    },
+    source_version: {
+      version_label: $version_label,
+      overlay_id: "at",
+      provider_template_id: $template_id
+    }
+  }')"
 
 log "==> Creating source + version"
 curl -fsS -X POST "${PC_URL}/v1/sources/with-version" \
@@ -283,10 +338,22 @@ RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${S
 }')"
 
 log "==> Launching preview run"
-curl -fsS -X POST "${PC_URL}/v1/runs" \
-  -H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "${RUN_PAYLOAD}" | tee "${RUN_DIR}/run-create.json" >/dev/null
+RUN_HTTP_CODE="$(
+  curl -sS -o "${RUN_DIR}/run-create.json" -w '%{http_code}' \
+    -X POST "${PC_URL}/v1/runs" \
+    -H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "${RUN_PAYLOAD}" || true
+)"
+if [[ "${RUN_HTTP_CODE}" != "200" && "${RUN_HTTP_CODE}" != "201" ]]; then
+  echo "error: run creation failed with HTTP ${RUN_HTTP_CODE:-000}" >&2
+  if [[ -s "${RUN_DIR}/run-create.json" ]]; then
+    cat "${RUN_DIR}/run-create.json" >&2
+  else
+    echo "No response body captured. This usually means the platform request timed out before returning a run_id." >&2
+  fi
+  exit 1
+fi
 
 RUN_ID="$(jq -r '.run_id // .id // empty' < "${RUN_DIR}/run-create.json")"
 if [[ -z "${RUN_ID}" ]]; then
@@ -321,16 +388,16 @@ for i in $(seq 1 24); do
 done
 
 TITLE_REGEX="$(expected_title_regex)"
-content_type_count="$(jq -r '[.content_type_breakdown[]? | select(.content_type=="text/html") | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
+content_type_html_count="$(jq -r '[.content_type_breakdown[]? | select(.content_type=="text/html") | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
 captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
-title_ok="$(jq -r --arg title_regex "${TITLE_REGEX}" '[.data[]? | select((.title // "") | test($title_regex))] | length' < "${RUN_DIR}/captured-resources.json")"
-fedlex_html_ok="$(jq -r '[.data[]? | select((.final_url // "") | test("fedlex\\.admin\\.ch/filestore/.+\\.html$"))] | length' < "${RUN_DIR}/captured-resources.json")"
-art1_ok="$(jq -r '[.data[]? | select(
-  ((.artifact_metadata.inline_body // "") | test("Art\\. 1"))
-  or ((.artifact_metadata.body // "") | test("Art\\. 1"))
-  or ((.artifact_metadata.provider_metadata.inline_body // "") | test("Art\\. 1"))
-  or ((.artifact_metadata.provider_metadata.body // "") | test("Art\\. 1"))
+title_ok="$(jq -r --arg title_regex "${TITLE_REGEX}" '[.data[]? | select((.title // "") | test($title_regex; "i"))] | length' < "${RUN_DIR}/captured-resources.json")"
+ris_html_ok="$(jq -r '[.data[]? | select((.final_url // "") | test("ris\\.bka\\.gv\\.at/Dokumente/Bundesnormen/.+\\.html$"))] | length' < "${RUN_DIR}/captured-resources.json")"
+section_gate_ok="$(jq -r '[.data[]? | select(
+  ((.artifact_metadata.inline_body // "") | test("(§\\s*1|Art\\.\\s*1)"))
+  or ((.artifact_metadata.body // "") | test("(§\\s*1|Art\\.\\s*1)"))
+  or ((.artifact_metadata.provider_metadata.inline_body // "") | test("(§\\s*1|Art\\.\\s*1)"))
+  or ((.artifact_metadata.provider_metadata.body // "") | test("(§\\s*1|Art\\.\\s*1)"))
 )] | length' < "${RUN_DIR}/raw-artifacts.json")"
 accepted_count="$(jq -r '[.data[]? | select(.status=="accepted")] | length' < "${RUN_DIR}/processing-status.json")"
 processing_count="$(jq -r '[.data[]? | select(.status=="processing")] | length' < "${RUN_DIR}/processing-status.json")"
@@ -338,17 +405,19 @@ canonical_ready_count="$(jq -r '[.data[]? | select(.status=="canonical_ready")] 
 processed_count="$(jq -r '[.data[]? | select(.event_type=="document.processed")] | length' < "${RUN_DIR}/document-lifecycle.json")"
 
 verdict="pass"
-if [[ "${content_type_count}" -lt 1 || "${captured_count}" -lt 1 || "${raw_artifact_count}" -lt 1 ]]; then
+if [[ "${content_type_html_count}" -lt 1 || "${captured_count}" -lt 1 || "${raw_artifact_count}" -lt 1 ]]; then
   verdict="provider_failed"
 elif [[ "${accepted_count}" -lt 1 || "${processing_count}" -lt 1 || "${canonical_ready_count}" -lt 1 || "${processed_count}" -lt 1 ]]; then
   verdict="downstream_failed"
-elif [[ "${title_ok}" -lt 1 || "${fedlex_html_ok}" -lt 1 || "${art1_ok}" -lt 1 ]]; then
+elif [[ "${title_ok}" -lt 1 || "${ris_html_ok}" -lt 1 || "${section_gate_ok}" -lt 1 ]]; then
   verdict="pipeline_pass_content_suspect"
 fi
 
 SUMMARY_JSON="$(jq -n \
   --arg environment "${ENVIRONMENT}" \
   --arg template_id "${TEMPLATE_ID}" \
+  --arg jurisdiction_id "${JURISDICTION_ID}" \
+  --arg authority_id "${AUTHORITY_ID}" \
   --arg source_id "${SOURCE_ID}" \
   --arg source_version_id "${SOURCE_VERSION_ID}" \
   --arg run_id "${RUN_ID}" \
@@ -359,17 +428,19 @@ SUMMARY_JSON="$(jq -n \
   --argjson max_resources "${MAX_RESOURCES}" \
   --argjson captured_count "${captured_count}" \
   --argjson raw_artifact_count "${raw_artifact_count}" \
-  --argjson content_type_html_count "${content_type_count}" \
+  --argjson content_type_html_count "${content_type_html_count}" \
   --argjson accepted_count "${accepted_count}" \
   --argjson processing_count "${processing_count}" \
   --argjson canonical_ready_count "${canonical_ready_count}" \
   --argjson processed_count "${processed_count}" \
   --argjson title_ok "${title_ok}" \
-  --argjson fedlex_html_ok "${fedlex_html_ok}" \
-  --argjson art1_ok "${art1_ok}" \
+  --argjson ris_html_ok "${ris_html_ok}" \
+  --argjson section_gate_ok "${section_gate_ok}" \
   '{
     environment: $environment,
     template_id: $template_id,
+    jurisdiction_id: $jurisdiction_id,
+    authority_id: $authority_id,
     source_id: $source_id,
     source_version_id: $source_version_id,
     run_id: $run_id,
@@ -387,13 +458,13 @@ SUMMARY_JSON="$(jq -n \
       canonical_ready_count: $canonical_ready_count,
       processed_count: $processed_count,
       title_ok: $title_ok,
-      fedlex_html_ok: $fedlex_html_ok,
-      art1_ok: $art1_ok
+      ris_html_ok: $ris_html_ok,
+      section_gate_ok: $section_gate_ok
     }
   }')"
 
 printf '%s\n' "${SUMMARY_JSON}" > "${RUN_DIR}/summary.json"
-render_fast_loop_evidence_markdown "${RUN_DIR}/summary.json" "${RUN_DIR}/evidence-summary.md" "CH Fedlex"
+render_fast_loop_evidence_markdown "${RUN_DIR}/summary.json" "${RUN_DIR}/evidence-summary.md" "AT RIS"
 
 if [[ "${JSON_OUTPUT}" -eq 1 ]]; then
   cat "${RUN_DIR}/summary.json"

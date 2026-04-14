@@ -1,0 +1,611 @@
+name: Platform Control Provider Canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target runtime environment.
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+      corpus:
+        description: Narrow provider canary to run after deploy.
+        required: true
+        default: ch
+        type: choice
+        options:
+          - ch
+          - at
+      template:
+        description: Optional template override. Uses the corpus default when blank.
+        required: false
+        default: ""
+        type: string
+      max_resources:
+        description: Optional preview scope override. Uses the corpus default when blank.
+        required: false
+        default: ""
+        type: string
+      max_polls:
+        description: Maximum run-status polls before timing out.
+        required: false
+        default: "60"
+        type: string
+      poll_interval:
+        description: Seconds between run-status polls.
+        required: false
+        default: "5"
+        type: string
+      upload_artifact:
+        description: Upload the canary evidence bundle even on success.
+        required: false
+        default: true
+        type: boolean
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        default: dev
+        type: string
+      corpus:
+        required: true
+        type: string
+      template:
+        required: false
+        default: ""
+        type: string
+      max_resources:
+        required: false
+        default: ""
+        type: string
+      max_polls:
+        required: false
+        default: "60"
+        type: string
+      poll_interval:
+        required: false
+        default: "5"
+        type: string
+      upload_artifact:
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: platform-control-provider-canary-${{ github.ref }}-${{ inputs.environment || 'dev' }}-${{ inputs.corpus }}
+  cancel-in-progress: false
+
+jobs:
+  provider-canary:
+    name: Provider canary (${{ inputs.corpus }}) on ${{ inputs.environment || 'dev' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'dev' }}
+    timeout-minutes: 30
+    env:
+      TARGET_ENV: ${{ inputs.environment || 'dev' }}
+      TARGET_CORPUS: ${{ inputs.corpus }}
+      TEMPLATE_OVERRIDE: ${{ inputs.template || '' }}
+      MAX_RESOURCES_OVERRIDE: ${{ inputs.max_resources || '' }}
+      MAX_POLLS: ${{ inputs.max_polls || '60' }}
+      POLL_INTERVAL: ${{ inputs.poll_interval || '5' }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'europe-west6' }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      PLATFORM_CONTROL_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_SERVICE_NAME }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Resolve platform-control service URL and revision
+        id: platform_control
+        run: |
+          set -euo pipefail
+          PC_URL=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')
+          PC_REV=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.latestReadyRevisionName)')
+          echo "pc_url=${PC_URL}" >> "${GITHUB_OUTPUT}"
+          echo "pc_revision=${PC_REV}" >> "${GITHUB_OUTPUT}"
+
+      - name: Mint platform-control ID token
+        id: pc_id_token
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+          token_format: id_token
+          id_token_audience: ${{ steps.platform_control.outputs.pc_url }}
+
+      - name: Run narrow provider canary
+        id: canary
+        continue-on-error: true
+        env:
+          EVIDARA_PLATFORM_CONTROL_URL: ${{ steps.platform_control.outputs.pc_url }}
+          EVIDARA_PLATFORM_CONTROL_TOKEN: ${{ steps.pc_id_token.outputs.id_token }}
+          PLATFORM_CONTROL_REVISION: ${{ steps.platform_control.outputs.pc_revision }}
+          GITHUB_STEP_SUMMARY_PATH: ${{ github.step_summary }}
+        run: |
+          set -euo pipefail
+          RUN_ROOT="${RUNNER_TEMP}/provider-canary"
+          mkdir -p "${RUN_ROOT}"
+          CANARY_DIR="${RUN_ROOT}/${TARGET_CORPUS}-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "${CANARY_DIR}"
+          export CANARY_DIR
+
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          import time
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          pc_url = os.environ["EVIDARA_PLATFORM_CONTROL_URL"].rstrip("/")
+          token = os.environ["EVIDARA_PLATFORM_CONTROL_TOKEN"]
+          target_env = os.environ["TARGET_ENV"]
+          corpus = os.environ["TARGET_CORPUS"]
+          template_override = os.environ.get("TEMPLATE_OVERRIDE", "").strip()
+          max_resources_override = os.environ.get("MAX_RESOURCES_OVERRIDE", "").strip()
+          max_polls = int(os.environ.get("MAX_POLLS", "60"))
+          poll_interval = int(os.environ.get("POLL_INTERVAL", "5"))
+          platform_control_revision = os.environ["PLATFORM_CONTROL_REVISION"]
+          canary_dir = Path(os.environ["CANARY_DIR"])
+
+          def request_json(path: str, *, method: str = "GET", payload: dict | None = None, timeout: int = 60) -> tuple[int, object]:
+              url = f"{pc_url}{path}"
+              data = None
+              headers = {
+                  "Authorization": f"Bearer {token}",
+              }
+              if payload is not None:
+                  data = json.dumps(payload).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(url, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=timeout) as resp:
+                      body = resp.read().decode("utf-8")
+                      return resp.getcode(), json.loads(body) if body else {}
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode("utf-8", errors="replace")
+                  try:
+                      parsed = json.loads(body) if body else {"detail": exc.reason}
+                  except json.JSONDecodeError:
+                      parsed = {"detail": body or str(exc.reason)}
+                  return exc.code, parsed
+
+          def save_json(name: str, payload: object) -> None:
+              (canary_dir / name).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+          def corpus_defaults() -> dict:
+              if corpus == "ch":
+                  return {
+                      "overlay_id": "ch",
+                      "template_id": template_override or "fedlex_sparql_constitution_de",
+                      "max_resources": int(max_resources_override or "25"),
+                      "jurisdiction_id": "jur_ch_federal",
+                      "authority_id": "auth_fedlex",
+                      "source_type": "api",
+                      "document_family": "law",
+                      "source_name": "CH provider canary source",
+                  }
+              if corpus == "at":
+                  return {
+                      "overlay_id": "at",
+                      "template_id": template_override or "ris_ogd_bundesrecht_narrow_html",
+                      "max_resources": int(max_resources_override or "5"),
+                      "jurisdiction_id": "jur_at_federal",
+                      "authority_id": "auth_ris",
+                      "source_type": "api",
+                      "document_family": "law",
+                      "source_name": "AT provider canary source",
+                  }
+              raise ValueError(f"Unsupported corpus '{corpus}'")
+
+          def resolve_at_authority_id(default_authority_id: str, jurisdiction_id: str) -> str:
+              status, payload = request_json("/v1/reference-data/authorities")
+              save_json("authorities.json", payload)
+              if status != 200:
+                  return default_authority_id
+              rows = payload.get("data") or []
+              exact = next(
+                  (
+                      row.get("authority_id")
+                      for row in rows
+                      if row.get("authority_id") == default_authority_id and row.get("jurisdiction_id") == jurisdiction_id
+                  ),
+                  None,
+              )
+              if exact:
+                  return exact
+              slug_match = next(
+                  (
+                      row.get("authority_id")
+                      for row in rows
+                      if row.get("jurisdiction_id") == jurisdiction_id and (row.get("slug") or "") == "ris"
+                  ),
+                  None,
+              )
+              if slug_match:
+                  return slug_match
+              name_match = next(
+                  (
+                      row.get("authority_id")
+                      for row in rows
+                      if row.get("jurisdiction_id") == jurisdiction_id
+                      and re.search(r"Rechtsinformationssystem|\bRIS\b", row.get("name") or "", re.IGNORECASE)
+                  ),
+                  None,
+              )
+              return name_match or default_authority_id
+
+          def poll_run(run_id: str) -> dict:
+              terminal_status = ""
+              run_state = {}
+              for _ in range(max_polls):
+                  status, run_state = request_json(f"/v1/runs/{run_id}")
+                  save_json("run-state.json", run_state)
+                  if status != 200:
+                      raise RuntimeError(f"GET /v1/runs/{run_id} returned HTTP {status}")
+                  terminal_status = run_state.get("status") or ""
+                  if terminal_status in {"completed", "failed", "cancelled"}:
+                      return run_state
+                  time.sleep(poll_interval)
+              raise RuntimeError(f"Run {run_id} did not reach a terminal state after {max_polls} polls")
+
+          def poll_downstream(run_id: str) -> tuple[dict, dict]:
+              processing_status = {}
+              lifecycle = {}
+              for _ in range(24):
+                  _, processing_status = request_json(f"/v1/runs/{run_id}/processing-status")
+                  _, lifecycle = request_json(f"/v1/runs/{run_id}/document-lifecycle")
+                  save_json("processing-status.json", processing_status)
+                  save_json("document-lifecycle.json", lifecycle)
+                  canonical_ready = sum(1 for row in processing_status.get("data") or [] if row.get("status") == "canonical_ready")
+                  processed = sum(1 for row in lifecycle.get("data") or [] if row.get("event_type") == "document.processed")
+                  if canonical_ready > 0 and processed > 0:
+                      break
+                  time.sleep(5)
+              return processing_status, lifecycle
+
+          def match_any(raw_artifacts: dict, pattern: str) -> int:
+              compiled = re.compile(pattern)
+              count = 0
+              for row in raw_artifacts.get("data") or []:
+                  artifact_metadata = row.get("artifact_metadata") or {}
+                  provider_metadata = artifact_metadata.get("provider_metadata") or {}
+                  for candidate in (
+                      artifact_metadata.get("inline_body"),
+                      artifact_metadata.get("body"),
+                      provider_metadata.get("inline_body"),
+                      provider_metadata.get("body"),
+                  ):
+                      if isinstance(candidate, str) and compiled.search(candidate):
+                          count += 1
+                          break
+              return count
+
+          def title_match_count(captured_resources: dict, pattern: str, *, flags: int = 0) -> int:
+              compiled = re.compile(pattern, flags)
+              return sum(
+                  1
+                  for row in captured_resources.get("data") or []
+                  if compiled.search(row.get("title") or "")
+              )
+
+          def final_url_match_count(captured_resources: dict, pattern: str) -> int:
+              compiled = re.compile(pattern)
+              return sum(
+                  1
+                  for row in captured_resources.get("data") or []
+                  if compiled.search(row.get("final_url") or "")
+              )
+
+          def build_evidence(summary: dict) -> str:
+              checks = summary["checks"]
+              lines = [
+                  f"### Platform-control provider canary ({summary['corpus'].upper()})",
+                  "",
+                  f"- Environment: `{summary['environment']}`",
+                  f"- Revision: `{summary['platform_control_revision']}`",
+                  f"- URL: {summary['platform_control_url']}",
+                  f"- Template: `{summary['template_id']}`",
+                  f"- Jurisdiction ID: `{summary['jurisdiction_id']}`",
+                  f"- Authority ID: `{summary['authority_id']}`",
+                  f"- Source ID: `{summary['source_id']}`",
+                  f"- Source version ID: `{summary['source_version_id']}`",
+                  f"- Run ID: `{summary['run_id']}`",
+                  f"- Verdict: **{summary['verdict']}**",
+                  f"- Captured resources: `{checks['captured_count']}`",
+                  f"- Raw artifacts: `{checks['raw_artifact_count']}`",
+                  f"- HTML captures: `{checks['content_type_html_count']}`",
+                  f"- DI states: `accepted={checks['accepted_count']}`, `processing={checks['processing_count']}`, `canonical_ready={checks['canonical_ready_count']}`",
+                  f"- Lifecycle `document.processed`: `{checks['processed_count']}`",
+                ]
+              if summary["corpus"] == "ch":
+                  lines.extend(
+                      [
+                          f"- Title gate: `{checks['title_ok']}`",
+                          f"- Fedlex HTML URL gate: `{checks['fedlex_html_ok']}`",
+                          f"- `Art. 1` gate: `{checks['art1_ok']}`",
+                      ]
+                  )
+              else:
+                  lines.extend(
+                      [
+                          f"- Title gate: `{checks['title_ok']}`",
+                          f"- RIS HTML URL gate: `{checks['ris_html_ok']}`",
+                          f"- Section gate: `{checks['section_gate_ok']}`",
+                      ]
+                  )
+              return "\n".join(lines) + "\n"
+
+          config = corpus_defaults()
+          if corpus == "at":
+              config["authority_id"] = resolve_at_authority_id(config["authority_id"], config["jurisdiction_id"])
+
+          version_label = f"{corpus}-provider-canary-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}"
+          summary = {
+              "environment": target_env,
+              "corpus": corpus,
+              "template_id": config["template_id"],
+              "jurisdiction_id": config["jurisdiction_id"],
+              "authority_id": config["authority_id"],
+              "platform_control_revision": platform_control_revision,
+              "platform_control_url": pc_url,
+              "run_dir": str(canary_dir),
+          }
+
+          exit_code = 0
+          try:
+              health_status, health_payload = request_json("/health")
+              save_json("platform-control-health.json", health_payload)
+              if health_status != 200:
+                  raise RuntimeError(f"/health returned HTTP {health_status}")
+
+              create_payload = {
+                  "source": {
+                      "name": config["source_name"],
+                      "jurisdiction_id": config["jurisdiction_id"],
+                      "authority_id": config["authority_id"],
+                      "source_type": config["source_type"],
+                      "document_family": config["document_family"],
+                  },
+                  "source_version": {
+                      "version_label": version_label,
+                      "overlay_id": config["overlay_id"],
+                      "provider_template_id": config["template_id"],
+                  },
+              }
+
+              create_status, create_response = request_json("/v1/sources/with-version", method="POST", payload=create_payload)
+              save_json("create.json", create_response)
+              if create_status not in {200, 201}:
+                  raise RuntimeError(f"POST /v1/sources/with-version returned HTTP {create_status}")
+
+              source_id = (
+                  create_response.get("source", {}).get("source_id")
+                  or create_response.get("source", {}).get("id")
+                  or create_response.get("source_id")
+              )
+              source_version_id = (
+                  create_response.get("source_version", {}).get("source_version_id")
+                  or create_response.get("source_version", {}).get("id")
+                  or create_response.get("source_version_id")
+              )
+              if not source_id or not source_version_id:
+                  raise RuntimeError("Source creation did not return source/source_version ids")
+
+              summary["source_id"] = source_id
+              summary["source_version_id"] = source_version_id
+
+              readiness_status, readiness = request_json(
+                  f"/v1/runs/readiness?source_id={source_id}&source_version_id={source_version_id}&mode=preview"
+              )
+              save_json("readiness.json", readiness)
+              if readiness_status != 200 or readiness.get("ready") is not True:
+                  raise RuntimeError("Readiness did not return ready=true")
+
+              approve_status, approve = request_json(f"/v1/versions/{source_version_id}/approve", method="POST")
+              save_json("approve.json", approve)
+              if approve_status not in {200, 201}:
+                  raise RuntimeError(f"POST /v1/versions/{source_version_id}/approve returned HTTP {approve_status}")
+
+              run_payload = {
+                  "source_id": source_id,
+                  "source_version_id": source_version_id,
+                  "mode": "preview",
+                  "scope": {
+                      "kind": "discovered_subset",
+                      "max_resources": config["max_resources"],
+                  },
+              }
+              run_create_status, run_create = request_json("/v1/runs", method="POST", payload=run_payload, timeout=90)
+              save_json("run-create.json", run_create)
+              if run_create_status not in {200, 201}:
+                  raise RuntimeError(f"POST /v1/runs returned HTTP {run_create_status}")
+              run_id = run_create.get("run_id") or run_create.get("id")
+              if not run_id:
+                  raise RuntimeError("Run creation did not return run_id")
+
+              summary["run_id"] = run_id
+              summary["max_resources"] = config["max_resources"]
+
+              run_state = poll_run(run_id)
+              if (run_state.get("status") or "") != "completed":
+                  raise RuntimeError(f"Run {run_id} finished with status={run_state.get('status')}")
+
+              endpoints = {
+                  "provider-jobs.json": f"/v1/runs/{run_id}/provider-jobs",
+                  "preview-summary.json": f"/v1/runs/{run_id}/preview-summary",
+                  "captured-resources.json": f"/v1/runs/{run_id}/captured-resources",
+                  "raw-artifacts.json": f"/v1/runs/{run_id}/raw-artifacts",
+              }
+              diagnostics = {}
+              for filename, path in endpoints.items():
+                  status, payload = request_json(path)
+                  if status != 200:
+                      raise RuntimeError(f"GET {path} returned HTTP {status}")
+                  diagnostics[filename] = payload
+                  save_json(filename, payload)
+
+              processing_status, lifecycle = poll_downstream(run_id)
+              diagnostics["processing-status.json"] = processing_status
+              diagnostics["document-lifecycle.json"] = lifecycle
+
+              preview_summary = diagnostics["preview-summary.json"]
+              captured_resources = diagnostics["captured-resources.json"]
+              raw_artifacts = diagnostics["raw-artifacts.json"]
+
+              content_type_html_count = sum(
+                  row.get("count", 0)
+                  for row in preview_summary.get("content_type_breakdown") or []
+                  if row.get("content_type") == "text/html"
+              )
+              captured_count = preview_summary.get("captured_resources_count")
+              if captured_count is None:
+                  captured_count = len(captured_resources.get("data") or [])
+              raw_artifact_count = raw_artifacts.get("total")
+              if raw_artifact_count is None:
+                  raw_artifact_count = len(raw_artifacts.get("data") or [])
+
+              accepted_count = sum(1 for row in processing_status.get("data") or [] if row.get("status") == "accepted")
+              processing_count = sum(1 for row in processing_status.get("data") or [] if row.get("status") == "processing")
+              canonical_ready_count = sum(1 for row in processing_status.get("data") or [] if row.get("status") == "canonical_ready")
+              processed_count = sum(1 for row in lifecycle.get("data") or [] if row.get("event_type") == "document.processed")
+
+              checks = {
+                  "captured_count": captured_count,
+                  "raw_artifact_count": raw_artifact_count,
+                  "content_type_html_count": content_type_html_count,
+                  "accepted_count": accepted_count,
+                  "processing_count": processing_count,
+                  "canonical_ready_count": canonical_ready_count,
+                  "processed_count": processed_count,
+              }
+
+              verdict = "pass"
+              if content_type_html_count < 1 or captured_count < 1 or raw_artifact_count < 1:
+                  verdict = "provider_failed"
+              elif accepted_count < 1 or processing_count < 1 or canonical_ready_count < 1 or processed_count < 1:
+                  verdict = "downstream_failed"
+              elif corpus == "ch":
+                  checks["title_ok"] = title_match_count(captured_resources, r"Bundesverfassung")
+                  checks["fedlex_html_ok"] = final_url_match_count(captured_resources, r"fedlex\.admin\.ch/filestore/.+\.html$")
+                  checks["art1_ok"] = match_any(raw_artifacts, r"Art\.\s*1")
+                  if checks["title_ok"] < 1 or checks["fedlex_html_ok"] < 1 or checks["art1_ok"] < 1:
+                      verdict = "pipeline_pass_content_suspect"
+              else:
+                  checks["title_ok"] = title_match_count(captured_resources, r"(Bundesgesetz|Verordnung|Kundmachung|Gesetz)", flags=re.IGNORECASE)
+                  checks["ris_html_ok"] = final_url_match_count(captured_resources, r"ris\.bka\.gv\.at/Dokumente/Bundesnormen/.+\.html$")
+                  checks["section_gate_ok"] = match_any(raw_artifacts, r"(§\s*1|Art\.\s*1)")
+                  if checks["title_ok"] < 1 or checks["ris_html_ok"] < 1 or checks["section_gate_ok"] < 1:
+                      verdict = "pipeline_pass_content_suspect"
+
+              summary["checks"] = checks
+              summary["verdict"] = verdict
+          except Exception as exc:  # noqa: BLE001
+              exit_code = 1
+              summary["verdict"] = "workflow_error"
+              summary["failure"] = {"message": str(exc)}
+          finally:
+              summary_path = canary_dir / "summary.json"
+              summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+              evidence_path = canary_dir / "evidence-snippet.md"
+              evidence_path.write_text(build_evidence(summary), encoding="utf-8")
+              github_output = os.environ.get("GITHUB_OUTPUT")
+              if github_output:
+                  with open(github_output, "a", encoding="utf-8") as handle:
+                      handle.write(f"canary_dir={canary_dir}\n")
+                      handle.write(f"summary_path={summary_path}\n")
+                      handle.write(f"evidence_path={evidence_path}\n")
+                      handle.write(f"verdict={summary.get('verdict', 'workflow_error')}\n")
+                      handle.write(f"run_id={summary.get('run_id', '')}\n")
+                      handle.write(f"source_id={summary.get('source_id', '')}\n")
+                      handle.write(f"source_version_id={summary.get('source_version_id', '')}\n")
+              print(summary_path.read_text(encoding="utf-8"), end="")
+              if summary.get("verdict") != "pass":
+                  sys.exit(1 if exit_code == 0 else exit_code)
+          PY
+
+      - name: Upload canary evidence bundle
+        if: always() && (inputs.upload_artifact == true || inputs.upload_artifact == 'true')
+        uses: actions/upload-artifact@v5
+        with:
+          name: platform-control-provider-canary-${{ inputs.corpus }}-${{ github.run_id }}
+          path: ${{ steps.canary.outputs.canary_dir }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Summarize canary result
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = Path(os.environ["SUMMARY_PATH"])
+          step_summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          if not summary_path.exists():
+              step_summary.write_text(
+                  "### Platform-control provider canary\n\n- Verdict: **workflow_error**\n- Summary file was not created.\n",
+                  encoding="utf-8",
+              )
+              raise SystemExit(0)
+
+          summary = json.loads(summary_path.read_text(encoding="utf-8"))
+          checks = summary.get("checks", {})
+          lines = [
+              f"### Platform-control provider canary ({summary.get('corpus', 'unknown').upper()})",
+              "",
+              f"- Environment: `{summary.get('environment', 'n/a')}`",
+              f"- Revision: `{summary.get('platform_control_revision', 'n/a')}`",
+              f"- URL: {summary.get('platform_control_url', 'n/a')}",
+              f"- Template: `{summary.get('template_id', 'n/a')}`",
+              f"- Run ID: `{summary.get('run_id', 'n/a')}`",
+              f"- Verdict: **{summary.get('verdict', 'workflow_error')}**",
+              f"- Source ID: `{summary.get('source_id', 'n/a')}`",
+              f"- Source version ID: `{summary.get('source_version_id', 'n/a')}`",
+              f"- Captured resources: `{checks.get('captured_count', 'n/a')}`",
+              f"- Raw artifacts: `{checks.get('raw_artifact_count', 'n/a')}`",
+              f"- HTML captures: `{checks.get('content_type_html_count', 'n/a')}`",
+              f"- DI: `accepted={checks.get('accepted_count', 'n/a')}`, `processing={checks.get('processing_count', 'n/a')}`, `canonical_ready={checks.get('canonical_ready_count', 'n/a')}`",
+              f"- Lifecycle document.processed: `{checks.get('processed_count', 'n/a')}`",
+          ]
+          if "failure" in summary:
+              lines.extend(["", f"- Failure: `{summary['failure'].get('message', 'unknown')}`"])
+          artifact_name = f"platform-control-provider-canary-{os.environ.get('TARGET_CORPUS', 'unknown')}-{os.environ.get('GITHUB_RUN_ID', 'n/a')}"
+          lines.extend(["", f"- Artifact: `{artifact_name}`"])
+          step_summary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+        env:
+          SUMMARY_PATH: ${{ steps.canary.outputs.summary_path }}
+
+      - name: Fail workflow on canary verdict
+        if: steps.canary.outputs.verdict != 'pass'
+        run: |
+          echo "::error::Provider canary failed with verdict=${{ steps.canary.outputs.verdict }}"
+          exit 1
