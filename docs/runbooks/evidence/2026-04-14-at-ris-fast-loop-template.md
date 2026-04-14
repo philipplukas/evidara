@@ -10,7 +10,7 @@ patched API + worker deploy is live
 - `platform-control-api-dev` deployed to the patched branch SHA
 - `platform-control-worker-dev` deployed to the patched branch SHA
 - AT fast loop script:
-  - [scripts/at-ris-fast-loop.sh](/Users/philipp/Work/Tart/evidara/scripts/at-ris-fast-loop.sh)
+  - [scripts/at-ris-fast-loop.sh](../../../scripts/at-ris-fast-loop.sh)
 
 ## Narrow rerun
 
