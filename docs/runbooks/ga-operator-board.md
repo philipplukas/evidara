@@ -42,9 +42,10 @@ What is not yet true:
 - Runner stability is improved but not yet trusted as a solved problem.
 - Five-country acceptance and relevance still need current evidence attached to the GA
   umbrella, but CH and AT now have live fast-loop run evidence on dev.
-- The current dev relevance signal now includes an empty `q=*` control row, which points
-  to alias/index/corpus drift rather than a pure ranking regression; the follow-up stays
-  on `TAR-242`.
+- The current dev relevance signal no longer has an empty `q=*` control row; the dev
+  index returns results again, but the agreed seed queries still collapse to generic
+  top hits, which now points more to retrieval / projection quality than pure alias
+  emptiness. The follow-up stays on `TAR-242`.
 
 ## Board status
 
@@ -140,8 +141,8 @@ Immediate operator actions:
 3. Record results using
    [`relevance-eval-result-template.md`](relevance-eval-result-template.md).
 4. Attach the result table to `TAR-82` and `TAR-68`.
-5. Keep `TAR-242` as the follow-up sink for the current empty-dev control result and route
-   the next operator step through replay / alias verification before retuning ranking.
+5. Keep `TAR-242` as the follow-up sink for the current dev-quality regression and route
+   the next operator step through projection / replay verification before retuning ranking.
 
 ## What stays tracked in parallel
 

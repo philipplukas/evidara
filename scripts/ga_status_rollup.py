@@ -110,12 +110,13 @@ LANES: tuple[LaneConfig, ...] = (
             "docs/runbooks/staging-relevance-query-pack-suggestions.md",
         ),
         blocker_override=(
-            "The current dev relevance signal includes an empty q=* control row, so the open "
-            "issue still looks like alias/index/corpus drift rather than a pure ranking problem."
+            "The current dev relevance signal no longer has an empty q=* control row, but the "
+            "seed queries still collapse to generic top hits, so the open issue now looks more "
+            "like retrieval / projection quality than pure alias emptiness."
         ),
         next_action_override=(
             "Rerun the relevance query pack with the q=* control row, attach the result table, "
-            "and route the next step through alias/index verification before retuning ranking."
+            "and route the next step through projection / replay verification before retuning ranking."
         ),
     ),
     LaneConfig(
