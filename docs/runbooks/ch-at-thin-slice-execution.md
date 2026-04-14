@@ -24,6 +24,7 @@ Use this as the operational companion to:
 - [Firecrawl Preview Run](firecrawl-preview-run.md)
 - [First Vertical Slice Exit Gates](first-vertical-slice-exit-gates.md)
 - [CH Fedlex SPARQL Provider and Temporal Orchestration](../architecture/ch-fedlex-sparql-temporal-architecture.md)
+- [CH Fedlex Fast-Loop Backlog](ch-fedlex-fast-loop-backlog.md)
 
 ## Recommended posture
 

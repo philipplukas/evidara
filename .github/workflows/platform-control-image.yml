@@ -1,0 +1,98 @@
+name: Platform Control Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional image tag override. Defaults to the triggering commit SHA.
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - ".github/workflows/platform-control-image.yml"
+      - "platform-control/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/platform-control-image.yml"
+      - "platform-control/**"
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+concurrency:
+  group: platform-control-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+
+jobs:
+  build-platform-control:
+    name: Build platform-control image
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+          token_format: access_token
+
+      - name: Login to Artifact Registry
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Docker metadata (platform-control)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository_owner }}/evidara-platform-control
+            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/platform-control
+          tags: |
+            type=raw,value=${{ env.IMAGE_TAG }}
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and optionally push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./platform-control/Dockerfile
+          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summarize image reference
+        run: |
+          echo "### Platform-control image" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact Registry: \`${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/platform-control:${IMAGE_TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- GHCR: \`ghcr.io/${{ github.repository_owner }}/evidara-platform-control:${IMAGE_TAG}\`" >> "$GITHUB_STEP_SUMMARY"
