@@ -402,6 +402,7 @@ async def test_preview_source_blueprint_returns_ris_ogd_narrow_html_spec(session
     assert str(spec.base_url) == "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht"
     assert spec.applikation == "BrKons"
     assert spec.preferred_formats == ["Html", "Xml"]
+    assert spec.request_timeout_seconds == 15.0
     assert spec.page_size == 1
     assert spec.max_pages == 1
     assert spec.document_type_hint == "legislation"
@@ -421,6 +422,7 @@ async def test_preview_source_blueprint_returns_ris_ogd_small_batch_html_spec(se
     assert str(spec.base_url) == "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht"
     assert spec.applikation == "BrKons"
     assert spec.preferred_formats == ["Html", "Xml"]
+    assert spec.request_timeout_seconds == 15.0
     assert spec.page_size == 5
     assert spec.max_pages == 1
     assert spec.document_type_hint == "legislation"

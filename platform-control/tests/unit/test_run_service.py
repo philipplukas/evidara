@@ -69,6 +69,24 @@ class FedlexSparqlProviderStub:
 
 
 @dataclass
+class RisOgdProviderStub:
+    provider_name: str = "ris_ogd"
+    external_job_id: str | None = None
+    calls: int = 0
+
+    async def start_run(self, source, source_version, run) -> ProviderStartResult:
+        del source, source_version
+        self.calls += 1
+        external_job_id = self.external_job_id or f"ris_job_{run.run_id}_{self.calls}"
+        return ProviderStartResult(
+            provider=self.provider_name,
+            external_job_id=external_job_id,
+            request_payload={"base_url": "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht"},
+            response_payload={"id": external_job_id, "success": True},
+        )
+
+
+@dataclass
 class InlineJsonDeterministicProvider:
     """Simulates deterministic_http capturing a single JSON document (no HTML)."""
 
@@ -794,6 +812,70 @@ async def test_create_run_worker_backend_keeps_run_pending(session) -> None:
 
     assert run.status is RunStatus.PENDING
     assert provider_job is None
+
+
+@pytest.mark.asyncio
+async def test_create_run_ris_ogd_keeps_run_pending_even_when_backend_is_inline(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "ris_ogd",
+        "base_url": "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht",
+        "applikation": "BrKons",
+        "preferred_formats": ["Html", "Xml"],
+        "page_size": 1,
+        "max_pages": 1,
+    }
+    await session.commit()
+
+    run_service = RunService(session, RisOgdProviderStub(), run_dispatch_backend="inline")
+
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+
+    assert run.status is RunStatus.PENDING
+    assert provider_job is None
+
+
+@pytest.mark.asyncio
+async def test_dispatch_pending_runs_promotes_ris_ogd_runs_after_async_create(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "ris_ogd",
+        "base_url": "https://data.bka.gv.at/ris/api/v2.6/Bundesrecht",
+        "applikation": "BrKons",
+        "preferred_formats": ["Html", "Xml"],
+        "page_size": 1,
+        "max_pages": 1,
+    }
+    await session.commit()
+
+    provider = RisOgdProviderStub()
+    run_service = RunService(session, provider, run_dispatch_backend="inline")
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+
+    dispatched = await run_service.dispatch_pending_runs()
+    provider_job = await session.scalar(select(ProviderJob).where(ProviderJob.run_id == run.run_id))
+    refreshed = await run_service.get_run(run.run_id)
+
+    assert dispatched == 1
+    assert provider.calls == 1
+    assert refreshed.status is RunStatus.RUNNING
+    assert provider_job is not None
+    assert provider_job.provider == "ris_ogd"
 
 
 @pytest.mark.asyncio

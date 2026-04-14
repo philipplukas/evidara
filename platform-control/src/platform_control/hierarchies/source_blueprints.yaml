@@ -19,6 +19,7 @@ overlays:
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
         applikation: BrKons
         preferred_formats: [Html, Xml]
+        request_timeout_seconds: 15.0
         page_size: 1
         max_pages: 1
         tenant_id: tenant_public
@@ -33,6 +34,7 @@ overlays:
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
         applikation: BrKons
         preferred_formats: [Html, Xml]
+        request_timeout_seconds: 15.0
         page_size: 5
         max_pages: 1
         tenant_id: tenant_public

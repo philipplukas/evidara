@@ -207,6 +207,7 @@ async def test_source_blueprint_preview_returns_ris_ogd_narrow_html_spec(client)
     assert body["acquisition_spec"]["provider"] == "ris_ogd"
     assert body["acquisition_spec"]["applikation"] == "BrKons"
     assert body["acquisition_spec"]["preferred_formats"] == ["Html", "Xml"]
+    assert body["acquisition_spec"]["request_timeout_seconds"] == 15.0
     assert body["acquisition_spec"]["page_size"] == 1
     assert body["acquisition_spec"]["max_pages"] == 1
 
@@ -227,6 +228,7 @@ async def test_source_blueprint_preview_returns_ris_ogd_small_batch_html_spec(cl
     assert body["acquisition_spec"]["provider"] == "ris_ogd"
     assert body["acquisition_spec"]["applikation"] == "BrKons"
     assert body["acquisition_spec"]["preferred_formats"] == ["Html", "Xml"]
+    assert body["acquisition_spec"]["request_timeout_seconds"] == 15.0
     assert body["acquisition_spec"]["page_size"] == 5
     assert body["acquisition_spec"]["max_pages"] == 1
 
