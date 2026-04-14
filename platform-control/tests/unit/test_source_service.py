@@ -447,4 +447,6 @@ async def test_create_source_with_initial_version_from_fedlex_sparql_blueprint(
     assert version.version_label == "ch-fedlex-v1"
     assert version.acquisition_spec["provider"] == "fedlex_sparql"
     assert version.acquisition_spec["seed_url"] == "https://fedlex.data.admin.ch/eli/cc/1999/404"
-    assert version.acquisition_spec["sparql_endpoint"] == "https://fedlex.data.admin.ch/sparqlendpoint"
+    assert (
+        version.acquisition_spec["sparql_endpoint"] == "https://fedlex.data.admin.ch/sparqlendpoint"
+    )

@@ -22,6 +22,43 @@ class FakeAsyncClient:
         del headers
         query = (params or {}).get("query", "")
         request = httpx.Request("GET", url, params=params)
+        if (
+            url
+            == "https://www.fedlex.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/404/20240303/de/html/fedlex-data-admin-ch-eli-cc-1999-404-20240303-de-html.html"
+        ):
+            return httpx.Response(
+                200,
+                text=(
+                    "<html><body><h1>Bundesverfassung der Schweizerischen Eidgenossenschaft</h1>"
+                    "<article><h2>Art. 1</h2><p>Das Schweizervolk und die Kantone ...</p></article>"
+                    "</body></html>"
+                ),
+                headers={"content-type": "text/html; charset=utf-8"},
+                request=request,
+            )
+        if "SELECT ?member" in query:
+            return httpx.Response(
+                200,
+                json={
+                    "results": {
+                        "bindings": [
+                            {
+                                "member": {
+                                    "type": "uri",
+                                    "value": "https://fedlex.data.admin.ch/eli/cc/1999/404/20240101",
+                                }
+                            },
+                            {
+                                "member": {
+                                    "type": "uri",
+                                    "value": "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303",
+                                }
+                            },
+                        ]
+                    }
+                },
+                request=request,
+            )
         if "SELECT ?expr" in query:
             return httpx.Response(
                 200,
@@ -31,13 +68,13 @@ class FakeAsyncClient:
                             {
                                 "expr": {
                                     "type": "uri",
-                                    "value": "https://fedlex.data.admin.ch/eli/cc/1999/404/de",
+                                    "value": "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/de",
                                 }
                             },
                             {
                                 "expr": {
                                     "type": "uri",
-                                    "value": "https://fedlex.data.admin.ch/eli/cc/1999/404/fr",
+                                    "value": "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/fr",
                                 }
                             },
                         ]
@@ -64,8 +101,8 @@ class FakeAsyncClient:
             return httpx.Response(
                 200,
                 text=(
-                    '<https://fedlex.data.admin.ch/eli/cc/1999/404/de> '
-                    '<http://data.legilux.public.lu/resource/ontology/jolux#title> '
+                    "<https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/de> "
+                    "<http://data.legilux.public.lu/resource/ontology/jolux#title> "
                     '"Bundesverfassung" .'
                 ),
                 headers={"content-type": "text/turtle; charset=utf-8"},
@@ -89,17 +126,34 @@ async def test_minimal_work_to_expression_flow_extracts_expression_uris(
         }
     )
 
-    result = await provider.start_run(SimpleNamespace(), source_version, SimpleNamespace(run_id="run_123"))
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_123"),
+    )
 
     assert result.provider == "fedlex_sparql"
     assert result.request_payload["work_uris"] == ["https://fedlex.data.admin.ch/eli/cc/1999/404"]
     assert result.request_payload["preferred_languages"] == ["de"]
+    assert result.request_payload["manifestation_format"] == "html"
     assert result.response_payload["captured"] == 1
     assert result.response_payload["failed"] == 0
     assert len(result.inline_resources) == 1
     payload = result.inline_resources[0]
     assert payload.source_url == "https://fedlex.data.admin.ch/eli/cc/1999/404"
-    assert payload.final_url == "https://fedlex.data.admin.ch/eli/cc/1999/404"
-    assert payload.content_type == "application/json"
-    assert "https://fedlex.data.admin.ch/eli/cc/1999/404/de" in payload.body
+    assert payload.final_url == (
+        "https://www.fedlex.admin.ch/filestore/fedlex.data.admin.ch/"
+        "eli/cc/1999/404/20240303/de/html/"
+        "fedlex-data-admin-ch-eli-cc-1999-404-20240303-de-html.html"
+    )
+    assert payload.content_type == "text/html"
+    assert "<article>" in payload.body
+    assert "Art. 1" in payload.body
     assert "Bundesverfassung" in payload.body
+    assert (
+        payload.metadata["concrete_work_uri"]
+        == "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303"
+    )
+    assert payload.metadata["expression_uris"] == [
+        "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/de"
+    ]

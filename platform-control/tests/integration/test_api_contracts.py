@@ -17,6 +17,7 @@ import pytest
 from platform_control.database import get_session
 from platform_control.main import create_app
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.source_version import SourceVersion
 from platform_control.routers.runs import get_firecrawl_provider
 from platform_control.services.firecrawl_provider import ProviderStartResult
 
