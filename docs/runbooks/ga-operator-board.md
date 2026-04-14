@@ -42,9 +42,10 @@ What is not yet true:
 - Runner stability is improved but not yet trusted as a solved problem.
 - Five-country acceptance and relevance still need current evidence attached to the GA
   umbrella, but CH and AT now have live fast-loop run evidence on dev.
-- The current dev relevance signal now includes an empty `q=*` control row, which points
-  to alias/index/corpus drift rather than a pure ranking regression; the follow-up stays
-  on `TAR-242`.
+- The current dev relevance signal no longer has an empty `q=*` control row; the dev
+  index returns results again, but the agreed seed queries still collapse to generic
+  top hits, which now points more to retrieval / projection quality than pure alias
+  emptiness. The follow-up stays on `TAR-242`.
 
 ## Board status
 
