@@ -1,8 +1,8 @@
 # Five-Country Acceptance A (CH + AT)
 
 Owner: Platform / GA
-Last reviewed: 2026-04-13
-Last verified: 2026-04-13
+Last reviewed: 2026-04-14
+Last verified: 2026-04-14
 Status: Active evidence execution note
 Applies to: country slice 1-2 only
 
@@ -52,6 +52,29 @@ Canonical source context:
 - `contracts/vocabularies/jurisdiction.json` and the search/projection contracts already constrain the canonical jurisdiction and projection fields used by these fixtures.
 - Not executed here: live browser screenshots, operator workflow URLs, and `uv run pytest platform-control/tests/unit/test_scraping_fixture_baseline.py -q` in this shell (the current Python environment cannot spawn `pytest`).
 
+## 2026-04-14 fast-loop expansion snapshot
+
+- Narrow `platform-control`-only image and fast deploy workflows passed on branch `codex/ch-fedlex-second-template`:
+  - image: `24386956747`
+  - deploy: `24386956738`
+  - deployed dev revision: `platform-control-api-dev-00041-pck`
+- Live CH second narrow SPARQL template passed on dev:
+  - template: `fedlex_sparql_vwvg_de`
+  - run: `run_01kp5f0na3mnrjgmk642gmgf2j`
+  - evidence bundle: `/tmp/ch-fedlex-fast-loop/20260414T074133Z`
+  - verdict: `pass`
+  - checks: `captured_count=1`, `raw_artifact_count=1`, `content_type_html_count=1`, `accepted_count=1`, `processing_count=1`, `canonical_ready_count=1`, `processed_count=1`
+- Tiny widened CH batch also passed on dev:
+  - template: `fedlex_sparql_federal_law_batch_de`
+  - run: `run_01kp5f18zhggnbtdf14rvt8k73`
+  - evidence bundle: `/tmp/ch-fedlex-fast-loop/20260414T074153Z`
+  - verdict: `pass`
+  - checks: `captured_count=2`, `raw_artifact_count=2`, `content_type_html_count=2`, `title_ok=2`, `fedlex_html_ok=2`, `art1_ok=2`
+- Operational conclusion:
+  - CH is no longer constitution-only at the fast-loop layer
+  - the narrow build/deploy path cuts provider iteration down to minutes
+  - the next widening step should stay bounded and evidence-driven rather than jumping to broad discovery
+
 ## Pass / fail snapshot
 
 | Check | Sample | Result | Evidence |
@@ -61,6 +84,8 @@ Canonical source context:
 | AT contract + seed consistency | `contracts/vocabularies/jurisdiction.json` + `platform-control/seeds/reference/{jurisdictions,authorities}.yaml` | pass | `python3 scripts/check_country_overlay_at.py` |
 | CH fixture anchors | `ch_commentary_html.json`, `clean_html.json`, `xml_primary.json`, `multi_language_fr_de.json` | pass | repo-backed fixture files with canonical CH jurisdiction / authority fields |
 | CH live deterministic thin slice | `run_01kp3rqx5nw6gyyrtnzcy48z3y` | partial pass / config-change-needed | [2026-04-13 CH Fedlex Thin Slice Run 1](evidence/2026-04-13-ch-fedlex-thin-slice-run1.md) |
+| CH live SPARQL narrow template 2 | `run_01kp5f0na3mnrjgmk642gmgf2j` | pass | `/tmp/ch-fedlex-fast-loop/20260414T074133Z` |
+| CH live SPARQL tiny batch | `run_01kp5f18zhggnbtdf14rvt8k73` | pass | `/tmp/ch-fedlex-fast-loop/20260414T074153Z` |
 | AT fixture anchors | `at_ris_decision.json` | pass | repo-backed fixture file with canonical AT jurisdiction / authority fields |
 | Live browser/operator evidence | CH/AT screenshots, workflow URLs, run IDs | missing | not executed in this lane |
 | Fixture baseline pytest | `platform-control/tests/unit/test_scraping_fixture_baseline.py` | not run | current shell cannot spawn `pytest` |

@@ -1,8 +1,8 @@
 # CH + AT Thin-Slice Execution
 
 Owner: Platform / GA  
-Last reviewed: 2026-04-13  
-Last verified: 2026-04-13  
+Last reviewed: 2026-04-14
+Last verified: 2026-04-14
 Applies to: CH and AT first-country execution toward GA
 
 ## Purpose
@@ -31,16 +31,46 @@ Use this as the operational companion to:
 Start CH and AT with the narrowest credible slices, then widen only after preview evidence is
 clean.
 
+## Latest verified CH state
+
+As of 2026-04-14, the CH Fedlex fast loop is proven on `dev` through the narrow deploy path:
+
+- `fedlex_sparql_constitution_de` previously passed the full loop end to end
+- `fedlex_sparql_vwvg_de` also passed:
+  - run `run_01kp5f0na3mnrjgmk642gmgf2j`
+  - evidence bundle `/tmp/ch-fedlex-fast-loop/20260414T074133Z`
+- `fedlex_sparql_federal_law_batch_de` passed as a tiny widened batch:
+  - run `run_01kp5f18zhggnbtdf14rvt8k73`
+  - evidence bundle `/tmp/ch-fedlex-fast-loop/20260414T074153Z`
+- both runs proved:
+  - `text/html` manifestation capture
+  - downstream `accepted -> processing -> canonical_ready`
+  - lifecycle `document.processed`
+  - minimal content gates including `Art. 1`
+
+Operational implication:
+
+- CH is ready for bounded federal-law expansion
+- do not jump from this state to broad CH discovery or canton/court crawling yet
+- keep widening in tiny, evidence-backed steps
+
 ### CH recommended sequence
 
 1. `CH slice 1` — deterministic federal legislation
    - overlay: `ch`
-   - template: `deterministic_http_fedlex_legislation`
+   - templates:
+     - `fedlex_sparql_constitution_de`
+     - `fedlex_sparql_vwvg_de`
    - live canonical pair: `jur_ch_federal` + `auth_fedlex`
    - goal: prove canonical jurisdiction/language/subtitle/detail handling on a trusted source
 
-2. `CH slice 2` — exploratory canton / court discovery
-   - use only after slice 1 is stable
+2. `CH slice 2` — tiny deterministic bounded batch
+   - template: `fedlex_sparql_federal_law_batch_de`
+   - keep `max_resources` tiny, currently `5`
+   - goal: prove small-batch stability before any broader widening
+
+3. `CH slice 3` — exploratory canton / court discovery
+   - use only after slices 1-2 stay stable
    - current repo does not yet ship a dedicated CH crawl blueprint, so this is a follow-on setup
    - goal: discover canton/court path structure before freezing a deterministic or tightly
      constrained crawl spec
