@@ -401,6 +401,7 @@ jobs:
       - name: Upload release readiness gate snapshots (drill evidence)
         if: ${{ always() }}
         uses: actions/upload-artifact@v5
+        continue-on-error: true
         with:
           name: release-readiness-${{ github.run_id }}
           path: tmp/release-readiness/

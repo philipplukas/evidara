@@ -115,6 +115,7 @@ jobs:
       - name: Upload smoke log
         if: always()
         uses: actions/upload-artifact@v5
+        continue-on-error: true
         with:
           name: e2e-smoke-dev-log-${{ github.run_id }}
           path: ${{ env.LOG_PATH }}
