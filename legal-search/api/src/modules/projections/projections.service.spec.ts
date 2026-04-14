@@ -296,6 +296,52 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('extracts embedded Fedlex titles from JSON-shaped lean bodies when the canonical title is a placeholder', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Untitled document',
+      body_text: JSON.stringify({
+        title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999',
+        body: 'Bundesverfassung ...',
+      }),
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999',
+      }),
+    );
+  });
+
+  it('extracts embedded titles from array-shaped JSON lean bodies when the canonical title is a placeholder', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Untitled document',
+      body_text: JSON.stringify([
+        {
+          section: {
+            title: 'Bundesgesetz über das Bundesgericht',
+            body: 'BGG ...',
+          },
+        },
+      ]),
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Bundesgesetz über das Bundesgericht',
+      }),
+    );
+  });
+
   it('falls back to citation, substantive text, and structural-path tail for missing titles', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
