@@ -48,3 +48,18 @@ def test_build_bundle_extraction_hints_prefers_page_title_metadata() -> None:
         "document_type_hint": "decision",
         "authority_display_hint": "Zurich Administrative Court",
     }
+
+
+def test_build_bundle_extraction_hints_prefers_provider_metadata_title() -> None:
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "provider_metadata": {
+                "provider": "fedlex_sparql",
+                "title": "Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999",
+            }
+        }
+    )
+
+    assert hints == {
+        "title_hint": "Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999",
+    }
