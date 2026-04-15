@@ -409,8 +409,6 @@ def _effective_title_from_normalized(
     for block in normalized_document.blocks:
         if block.type == "heading":
             return block.text, "structured"
-    if structured:
-        return structured, "structured"
     return "Untitled document", "heuristic"
 
 
