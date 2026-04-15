@@ -134,5 +134,6 @@ Good pattern:
 ## Related docs
 
 - [GA operator board](ga-operator-board.md)
+- [Milestone planning rubric](milestone-planning-rubric.md)
 - [Friction and acceleration map](friction-and-acceleration-map.md)
 - [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md)
