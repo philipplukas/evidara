@@ -24,15 +24,13 @@ export default function Loading() {
         </div>
       </header>
 
-      {/* Body */}
-      <div className="flex-1 flex min-h-0">
-        {/* Filters */}
-        <div className="w-[18%] min-w-[180px] border-r border-border bg-surface-panel overflow-hidden">
+      {/* Body — single column on small viewports to match mobile workspace; filters appear in sheet when loaded */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <div className="hidden min-h-0 w-[18%] min-w-[180px] border-r border-border bg-surface-panel overflow-hidden lg:block">
           <FilterPanelSkeleton />
         </div>
 
-        {/* Results */}
-        <div className="flex-1 bg-surface-panel overflow-hidden">
+        <div className="min-h-0 flex-1 bg-surface-panel overflow-hidden">
           <ResultListSkeleton count={6} />
         </div>
       </div>

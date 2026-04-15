@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   Clock,
   Loader2,
   Lock,
@@ -319,15 +318,11 @@ export function AppHeader({
           {hasControlPanelAccess ? (
             <a href={controlPlaneHref} className="app-header__control-plane">
               <span className="app-header__control-plane-icon">
-                <Settings2 className="h-4 w-4" />
+                <Settings2 className="h-3.5 w-3.5" />
               </span>
               <span className="app-header__control-plane-copy">
-                <span className="app-header__control-plane-kicker">
-                  {t("header.profileOperator")}
-                </span>
                 <span className="app-header__control-plane-text">{t("header.controlPanel")}</span>
               </span>
-              <ArrowRight className="h-3.5 w-3.5 shrink-0" />
             </a>
           ) : hasControlPanelUrl ? (
             <button

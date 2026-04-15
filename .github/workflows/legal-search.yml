@@ -215,3 +215,36 @@ jobs:
             legal-search/frontend/interaction-flow-evidence.md
             docs/runbooks/interaction-flow-validation.md
           if-no-files-found: warn
+
+  # ─── Playwright pixel baselines (optional gate) ───
+  # After generating Linux snapshots (see scripts/playwright-visual-update-docker.sh), set `if: true`.
+  frontend-visual-regression:
+    if: false
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legal-search/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: legal-search/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install platform-control admin dependencies (Playwright webServer)
+        working-directory: platform-control/admin
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Visual pixel regression
+        run: npm run e2e:visual

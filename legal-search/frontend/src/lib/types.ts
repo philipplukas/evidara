@@ -20,6 +20,13 @@ export interface MetadataRow {
   iconKey?: string;
 }
 
+export type MetadataVisibility = "always" | "default" | "expanded";
+export type MetadataDensity = "compact" | "default" | "expanded";
+
+export interface MetadataField extends MetadataRow {
+  visibility: MetadataVisibility;
+}
+
 export interface RelatedCount {
   label: string;
   count: number;

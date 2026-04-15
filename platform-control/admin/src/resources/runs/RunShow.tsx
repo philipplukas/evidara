@@ -17,21 +17,10 @@ import {
   type LegalSearchHandoff,
   readLegalSearchHandoff,
 } from "../../lib/admin/navigationContext";
+import { PageContextBar } from "../shared/PageContextBar";
+import { runModeToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
 import { RunActionStack } from "./RunActions";
 import { RunDetailSections } from "./RunDetailSections";
-
-const statusChipColor = (
-  status: RunRecord["status"],
-): "default" | "info" | "success" | "warning" | "error" => {
-  if (status === "completed") return "success";
-  if (status === "running") return "info";
-  if (status === "failed") return "error";
-  if (status === "cancelled") return "warning";
-  return "default";
-};
-
-const modeChipColor = (mode: RunRecord["mode"]): "info" | "success" =>
-  mode === "production" ? "success" : "info";
 
 export type RunDecisionSupport = {
   whyItMatters: string;
@@ -167,6 +156,48 @@ function RunDurationField() {
   return <Typography variant="body2">{formatDuration(record)}</Typography>;
 }
 
+function RunPageContextBar() {
+  const run = useRecordContext<RunRecord>();
+  if (!run) {
+    return null;
+  }
+
+  return (
+    <PageContextBar>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        justifyContent="space-between"
+        alignItems={{ xs: "flex-start", md: "center" }}
+      >
+        <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="overline" color="text.secondary">
+            Run overview
+          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Run {run.run_id}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {run.source_id} · {run.source_version_id}
+          </Typography>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <StatusBadge level={runRecordStatusToLevel(run.status)} label={run.status} />
+            <StatusBadge level={runModeToLevel(run.mode)} label={run.mode} />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`Source version ${run.source_version_id}`}
+            />
+          </Stack>
+        </Stack>
+        <Box sx={{ alignSelf: { xs: "stretch", md: "flex-start" } }}>
+          <RunActionStack />
+        </Box>
+      </Stack>
+    </PageContextBar>
+  );
+}
+
 function RunOverviewCard() {
   const run = useRecordContext<RunRecord>();
 
@@ -186,37 +217,6 @@ function RunOverviewCard() {
       }}
     >
       <Stack spacing={2}>
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={2}
-          justifyContent="space-between"
-          alignItems="stretch"
-        >
-          <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="overline" color="text.secondary">
-              Run overview
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Run {run.run_id}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {run.source_id} · {run.source_version_id}
-            </Typography>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              <Chip size="small" color={statusChipColor(run.status)} label={run.status} />
-              <Chip size="small" color={modeChipColor(run.mode)} label={run.mode} />
-              <Chip
-                size="small"
-                variant="outlined"
-                label={`Source version ${run.source_version_id}`}
-              />
-            </Stack>
-          </Stack>
-          <Box sx={{ alignSelf: { xs: "stretch", md: "flex-start" } }}>
-            <RunActionStack />
-          </Box>
-        </Stack>
-
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
           <Chip
             size="small"
@@ -339,6 +339,7 @@ export function RunShow() {
     <Show resource="runs" title="Run Detail">
       <SimpleShowLayout>
         <RunHandoffCard />
+        <RunPageContextBar />
         <RunOverviewCard />
         <TextField source="run_id" label="Run" />
         <TextField source="source_id" label="Source ID" />

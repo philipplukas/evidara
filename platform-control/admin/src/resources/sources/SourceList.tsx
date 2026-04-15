@@ -8,6 +8,7 @@ import type {
   SourceRecord,
 } from "../../lib/admin/dataProvider";
 import { formatReferenceLabel } from "../shared/referenceUtils";
+import { StatusBadge, sourceStatusToLevel } from "../shared/StatusBadge";
 
 const SOURCE_STATUS_META = {
   active: {
@@ -59,7 +60,10 @@ export function SourceList() {
             return (
               <Stack spacing={0.5}>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  <Chip size="small" color={statusMeta.color} label={statusMeta.label} />
+                  <StatusBadge
+                    level={sourceStatusToLevel(record.status)}
+                    label={statusMeta.label}
+                  />
                   <Chip size="small" variant="outlined" label={record.source_type} />
                 </Stack>
                 <Typography variant="caption" color="text.secondary">

@@ -1,10 +1,11 @@
 "use client";
 
-import { Button, Chip, Paper, Stack, Typography } from "@mui/material";
+import { Chip, Paper, Stack, Typography } from "@mui/material";
 import { useState } from "react";
 import { useNotify, useRecordContext, useRefresh } from "react-admin";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { ConfirmButton } from "../shared/ConfirmButton";
 
 type CancelRunButtonProps = {
   size?: "small" | "medium" | "large";
@@ -42,20 +43,20 @@ export function CancelRunButton({
   };
 
   return (
-    <Button
+    <ConfirmButton
+      tier="destructive"
+      color="error"
       size={size}
-      color="warning"
       variant={variant}
       fullWidth={fullWidth}
-      onClick={(event) => {
-        event.stopPropagation();
-        event.preventDefault();
-        void cancelRun();
-      }}
+      confirmTitle="Cancel this run?"
+      confirmDescription="Cancelling will stop all in-progress pipeline work. Any incomplete artifacts may be lost."
+      confirmLabel="Cancel run"
+      onConfirm={cancelRun}
       disabled={isSubmitting}
     >
       {isSubmitting ? "Cancelling..." : "Cancel"}
-    </Button>
+    </ConfirmButton>
   );
 }
 

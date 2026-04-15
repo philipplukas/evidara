@@ -270,4 +270,4 @@ Production milestone: replace with SVG flag components or `circle-flags` library
 
 - **Dark Mode:** Brand/surface/interactive tokens need `.dark {}` overrides in globals.css
 - **Docling Renderer Migration:** Replace HTML-string rendering in `DetailsTab.tsx` with structured Docling components when the BFF returns canonical document blocks
-- **Additional Primitives:** `Chip` component for ContextBar/FilterPanel chip patterns
+- **Component Contracts:** See [ADR-0016](../../../docs/adr/adr-0016-design-system-component-contracts.md) for 8 design-system component contracts (`StatusBadge`, `FilterBar`, `MetadataList`, `PageContextBar`, `Tabs` enhancement, `Stat` threshold, `ResultsControlRegion`, `Button` consequence tier) identified in the April 2026 UX review

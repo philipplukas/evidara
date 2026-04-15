@@ -11,6 +11,7 @@ import { MobileWorkspace } from "@/components/layout/MobileWorkspace";
 import { ResultContextHeader } from "@/components/results/ResultContextHeader";
 import { ResultList } from "@/components/results/ResultList";
 import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
+import { ResultsControlRegion } from "@/components/results/ResultsControlRegion";
 import { DetailPanelSkeleton } from "@/components/skeletons";
 import {
   type PanelImperativeHandle,
@@ -256,20 +257,22 @@ export default function WorkspaceClient({
           {/* Center: Results */}
           <ResizablePanel defaultSize={isDetailOpen ? 46 : 78} minSize={30}>
             <div className="h-full overflow-y-auto rounded-[1.6rem] border border-border/70 bg-surface-panel shadow-[0_20px_48px_rgb(15_23_42_/_0.08)]">
-              <ResultSetScopeBar />
-              <ResultContextHeader
-                exactMatches={searchContext.exactMatches}
-                onSelect={handleSelect}
-              />
+              <ResultsControlRegion>
+                <ResultSetScopeBar />
+                <ResultContextHeader
+                  exactMatches={searchContext.exactMatches}
+                  onSelect={handleSelect}
+                />
 
-              <ResultList
-                results={state.resultSet.items}
-                selectedId={selectedId}
-                onFocus={handleSelect}
-                onPivot={handlePivot}
-                onPin={handlePin}
-                pinnedIds={pinnedIds}
-              />
+                <ResultList
+                  results={state.resultSet.items}
+                  selectedId={selectedId}
+                  onFocus={handleSelect}
+                  onPivot={handlePivot}
+                  onPin={handlePin}
+                  pinnedIds={pinnedIds}
+                />
+              </ResultsControlRegion>
             </div>
           </ResizablePanel>
 

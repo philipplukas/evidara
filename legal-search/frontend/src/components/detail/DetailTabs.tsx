@@ -1,6 +1,7 @@
 "use client";
 
 import { parseAsString, useQueryState } from "nuqs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TabViewModel } from "@/lib/types";
 
 interface DetailTabsProps {
@@ -12,41 +13,42 @@ export function DetailTabs({ tabs }: DetailTabsProps) {
 
   return (
     <div className="border-b border-border/60 px-3 py-2">
-      <div className="flex gap-1 overflow-x-auto rounded-2xl bg-surface-shell/40 p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.key;
-
-          return (
-            <button
-              type="button"
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value === "details" ? null : value)}
+      >
+        <TabsList variant="line" className="h-auto w-full justify-start gap-1 p-0">
+          {tabs.map((tab) => (
+            <TabsTrigger
               key={tab.key}
-              onClick={() => setActiveTab(tab.key === "details" ? null : tab.key)}
-              aria-current={isActive ? "page" : undefined}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
-                isActive
-                  ? "bg-surface-panel text-brand shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
-                  : "text-muted-foreground hover:bg-surface-panel/80 hover:text-foreground"
-              }`}
+              value={tab.key}
+              className="group gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-[color,font-weight,opacity] data-[state=inactive]:text-muted-foreground/70 data-[state=inactive]:opacity-85 data-[state=active]:font-bold data-[state=active]:text-foreground data-[state=active]:opacity-100"
             >
               <span>{tab.label}</span>
               {tab.count != null && (
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-tiny font-semibold ${
-                    isActive ? "bg-brand/10 text-brand" : "bg-muted text-muted-foreground/70"
-                  }`}
-                >
+                <span className="rounded-full px-1.5 py-0.5 text-tiny font-semibold group-data-[state=active]:bg-brand/10 group-data-[state=active]:text-brand bg-muted text-muted-foreground/70">
                   {tab.count}
                 </span>
               )}
-            </button>
-          );
-        })}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {tabs.map((tab) => (
+          <TabsContent
+            key={`${tab.key}-panel`}
+            value={tab.key}
+            forceMount
+            hidden={activeTab !== tab.key}
+            tabIndex={activeTab === tab.key ? 0 : -1}
+            className="m-0 min-h-0 border-0 p-0 shadow-none outline-none data-[state=inactive]:hidden"
+            aria-hidden={activeTab !== tab.key}
+          />
+        ))}
+      </Tabs>
     </div>
   );
 }
 
-/** Read the active tab from URL search params via nuqs */
 export function useActiveTab(): string {
   const [tab] = useQueryState("tab", parseAsString.withDefault("details"));
   return tab;

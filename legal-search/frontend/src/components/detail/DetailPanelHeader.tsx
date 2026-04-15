@@ -1,6 +1,8 @@
 "use client";
 
 import { Copy, MapPin } from "lucide-react";
+import { MetadataList } from "@/components/detail/MetadataList";
+import { enrichMetadataRows } from "@/lib/metadata-visibility";
 import type { DetailViewModel } from "@/lib/types";
 import { AccentButton } from "../primitives";
 import { Breadcrumbs } from "./Breadcrumbs";
@@ -29,10 +31,20 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{safeSubtitle}</p>
 
           {detail.contentLanguage?.isTranslation && (
-            <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-tiny font-medium text-amber-700">
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-attention-border bg-attention-subtle px-2.5 py-1 text-tiny font-medium text-attention">
               {translationLabel}
             </div>
           )}
+
+          {detail.metadata.length > 0 ? (
+            <div className="mt-3 border-t border-border/50 pt-3">
+              <MetadataList
+                showHeading={false}
+                fields={enrichMetadataRows(detail.metadata, detail.type)}
+                initialDensity="compact"
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-1 pt-0.5">

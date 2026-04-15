@@ -78,7 +78,7 @@ export function ResultCard({
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         <span className="min-w-0">{result.subtitle}</span>
         {result.contentLanguage?.isTranslation && (
-          <span className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-tiny font-medium text-amber-700">
+          <span className="inline-flex items-center gap-0.5 rounded bg-attention-subtle px-1.5 py-0.5 text-tiny font-medium text-attention">
             <Globe className="h-2.5 w-2.5" />
             {result.contentLanguage.label}
           </span>

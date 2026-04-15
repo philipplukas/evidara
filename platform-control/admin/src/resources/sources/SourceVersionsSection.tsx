@@ -43,6 +43,8 @@ import type {
   SourceVersionRecord,
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { ConfirmButton } from "../shared/ConfirmButton";
+import { StatusBadge, sourceVersionStatusToLevel } from "../shared/StatusBadge";
 
 type ProviderType = "firecrawl" | "deterministic_http" | "ris_ogd" | "fedlex_sparql";
 
@@ -1100,7 +1102,10 @@ export function SourceVersionsSection() {
                       </TableCell>
                       <TableCell>
                         <Stack spacing={0.5} alignItems="flex-start">
-                          <Chip size="small" color={statusMeta.color} label={statusMeta.label} />
+                          <StatusBadge
+                            level={sourceVersionStatusToLevel(version.status)}
+                            label={statusMeta.label}
+                          />
                           <Typography variant="caption" color="text.secondary">
                             {statusMeta.detail}
                           </Typography>
@@ -1130,20 +1135,37 @@ export function SourceVersionsSection() {
                           <Button
                             size="small"
                             variant="contained"
+                            color="primary"
                             onClick={() => createRun("preview", version)}
                             disabled={!canPreview || isActing}
                           >
                             Preview Run
                           </Button>
-                          <Button
+                          <Box
+                            component="span"
+                            sx={{
+                              alignSelf: "center",
+                              display: { xs: "none", sm: "inline-block" },
+                              width: "1px",
+                              height: 24,
+                              mx: 0.75,
+                              bgcolor: "divider",
+                            }}
+                            aria-hidden
+                          />
+                          <ConfirmButton
+                            tier="notable"
                             size="small"
                             variant="contained"
-                            color="secondary"
-                            onClick={() => createRun("production", version)}
+                            color="warning"
+                            confirmTitle="Launch production run?"
+                            confirmDescription={`This will start a production pipeline for ${version.version_label}. Production runs create real artifacts.`}
+                            confirmLabel="Launch production"
+                            onConfirm={() => createRun("production", version)}
                             disabled={!canProduction || isActing}
                           >
                             Production Run
-                          </Button>
+                          </ConfirmButton>
                           <Button
                             size="small"
                             variant="outlined"
@@ -1152,15 +1174,19 @@ export function SourceVersionsSection() {
                           >
                             Approve
                           </Button>
-                          <Button
+                          <ConfirmButton
+                            tier="destructive"
                             size="small"
                             variant="outlined"
-                            color="warning"
-                            onClick={() => runVersionAction("reject", version)}
+                            color="error"
+                            confirmTitle="Reject this version?"
+                            confirmDescription={`Rejecting ${version.version_label} will permanently block it from production use. This cannot be undone.`}
+                            confirmLabel="Reject version"
+                            onConfirm={() => runVersionAction("reject", version)}
                             disabled={!canReview || isActing}
                           >
                             Reject
-                          </Button>
+                          </ConfirmButton>
                         </Stack>
                       </TableCell>
                     </TableRow>

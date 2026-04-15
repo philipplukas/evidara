@@ -128,7 +128,7 @@ describe("DetailPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Switzerland")).toBeInTheDocument();
+    expect(screen.getAllByText("Switzerland").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Obligationenrecht (OR)")).toBeInTheDocument();
   });
 

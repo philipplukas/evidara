@@ -180,6 +180,92 @@ export async function mockAdminRunFlowApi(page: Page) {
       return;
     }
 
+    if (apiPath === "/v1/sources/src_01") {
+      await fulfillJson(route, {
+        source_id: "src_01",
+        name: "Swiss Federal Court",
+        description:
+          "Official publication platform for decisions of the Swiss Federal Court (Bundesgericht / Tribunal fédéral).",
+        jurisdiction_id: "jur_ch",
+        authority_id: "auth_bger",
+        source_type: "website",
+        document_family: null,
+        status: "active",
+        created_at: "2026-03-15T08:00:00Z",
+        updated_at: "2026-04-06T09:00:00Z",
+      });
+      return;
+    }
+
+    if (apiPath === "/v1/reference-data/jurisdictions") {
+      await fulfillJson(route, {
+        data: [
+          {
+            jurisdiction_id: "jur_ch",
+            name: "Switzerland",
+            slug: "ch",
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+        ],
+      });
+      return;
+    }
+
+    if (apiPath === "/v1/reference-data/authorities") {
+      await fulfillJson(route, {
+        data: [
+          {
+            authority_id: "auth_bger",
+            jurisdiction_id: "jur_ch",
+            name: "Bundesgericht",
+            slug: "bger",
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+        ],
+      });
+      return;
+    }
+
+    if (apiPath === "/stats") {
+      await fulfillJson(route, {
+        source_count: 4,
+        total_runs: 12,
+        run_by_status: {
+          completed: 8,
+          running: 1,
+          failed: 2,
+          pending: 1,
+        },
+        total_artifacts: 1847,
+        recent_runs: [
+          {
+            run_id: "run_01",
+            status: "running",
+            artifacts_count: 3,
+            created_at: "2026-04-06T10:00:00Z",
+            completed_at: null,
+          },
+          {
+            run_id: "run_02",
+            status: "completed",
+            artifacts_count: 247,
+            created_at: "2026-04-05T14:30:00Z",
+            completed_at: "2026-04-05T15:12:00Z",
+          },
+          {
+            run_id: "run_03",
+            status: "failed",
+            artifacts_count: 0,
+            created_at: "2026-04-04T09:00:00Z",
+            completed_at: "2026-04-04T09:02:00Z",
+          },
+        ],
+      });
+      return;
+    }
+
     await route.fallback();
   });
 }

@@ -77,9 +77,21 @@
       "back": "Zum vorherigen Bereich",
       "reopen": "{scope} erneut öffnen",
       "pivotDescription": "Der Bereich wurde gegenüber der vorherigen Ergebnismenge eingegrenzt, damit die aktuellen Belege fokussierter bleiben."
+    },
+    "sourceTypes": {
+      "all": "Alle",
+      "law": "Gesetze",
+      "decision": "Urteile",
+      "rechtssatz": "Rechtssätze",
+      "commentary": "Kommentare"
+    },
+    "list": {
+      "sortedByRelevance": "Nach Relevanz sortiert",
+      "sortedByRelevanceHelp": "Treffer sind nach algorithmischer Relevanz geordnet (keine manuelle Prüfung jedes Ergebnisses)."
     }
   },
   "workspace": {
-    "detailLoadFailed": "Dokumentdetails konnten nicht geladen werden."
+    "detailLoadFailed": "Dokumentdetails konnten nicht geladen werden.",
+    "resultsControlRegion": "Suchergebnisse und Steuerelemente"
   }
 }

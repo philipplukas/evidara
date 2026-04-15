@@ -26,6 +26,7 @@ import type {
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
+import { describeReadinessDetail } from "../../lib/admin/readiness-messages";
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 250 },
@@ -72,20 +73,6 @@ const versionAllowedForMode = (
   }
   return status !== "rejected" && status !== "superseded";
 };
-
-const readinessActionByCode: Record<string, string> = {
-  source_exists: "Select an existing source from the catalog.",
-  source_version_exists: "Select an existing source version for the selected source.",
-  source_version_belongs_to_source: "Use a source/version pair from the same source.",
-  mode_compatible_with_version_status:
-    "For production runs, approve the selected version before launch.",
-  acquisition_seed_present:
-    "Update acquisition spec with at least one seed_url or seed_urls entry.",
-};
-
-export function describeReadinessAction(code: string): string {
-  return readinessActionByCode[code] ?? "Review the selected source/version pair and retry.";
-}
 
 const RUN_READINESS_CONFIRMED_KEY_PREFIX = "evidara_run_readiness_confirmed:";
 const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_codes:";
@@ -432,27 +419,24 @@ export function RunLaunchButton({
                     Preflight is blocking launch. Resolve the items below to enable Create Run.
                   </Typography>
                   <Stack spacing={1}>
-                    {failingChecks.map((check) => (
-                      <Paper key={check.code} variant="outlined" sx={{ p: 1.25 }}>
-                        <Stack spacing={0.75}>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                            useFlexGap
-                            flexWrap="wrap"
-                          >
-                            <Chip size="small" label={check.code} variant="outlined" />
+                    {failingChecks.map((check) => {
+                      const info = describeReadinessDetail(check.code);
+                      return (
+                        <Paper key={check.code} variant="outlined" sx={{ p: 1.25 }}>
+                          <Stack spacing={0.75}>
                             <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {info.title}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
                               {check.detail}
                             </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Next action: {info.action}
+                            </Typography>
                           </Stack>
-                          <Typography variant="caption" color="text.secondary">
-                            Next action: {describeReadinessAction(check.code)}
-                          </Typography>
-                        </Stack>
-                      </Paper>
-                    ))}
+                        </Paper>
+                      );
+                    })}
                   </Stack>
                   <Typography variant="caption" color="text.secondary">
                     {failingChecks.length} blocked check

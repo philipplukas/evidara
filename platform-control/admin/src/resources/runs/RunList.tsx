@@ -14,18 +14,11 @@ import {
   useRedirect,
 } from "react-admin";
 import type { RunRecord } from "../../lib/admin/dataProvider";
+import { runModeToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
 import { CancelRunButton } from "./RunActions";
 import { RunLaunchButton } from "./RunLaunchDialog";
 
 type RunQueueFilterValues = Partial<Pick<RunRecord, "mode" | "status">>;
-
-const STATUS_TONES: Record<string, "success" | "error" | "warning" | "info" | "default"> = {
-  completed: "success",
-  failed: "error",
-  running: "info",
-  pending: "warning",
-  cancelled: "default",
-};
 
 const ACTIONABLE_STATUSES: RunRecord["status"][] = ["failed", "running", "pending"];
 
@@ -517,11 +510,7 @@ function RunStateField() {
       label="State"
       render={(record) => (
         <Stack spacing={0.5}>
-          <Chip
-            size="small"
-            label={record.status}
-            color={STATUS_TONES[record.status] ?? "default"}
-          />
+          <StatusBadge level={runRecordStatusToLevel(record.status)} label={record.status} />
           <Typography variant="caption" color="text.secondary">
             {describeRunState(record)}
           </Typography>
@@ -547,13 +536,13 @@ function RunListGrid() {
             <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
               {record.run_id}
             </Typography>
-            <Chip
-              size="small"
-              label={record.mode}
-              color={record.mode === "production" ? "success" : "info"}
-              variant="outlined"
-              sx={{ alignSelf: "flex-start" }}
-            />
+            <Box sx={{ alignSelf: "flex-start" }}>
+              <StatusBadge
+                level={runModeToLevel(record.mode)}
+                label={record.mode}
+                emphasis="subtle"
+              />
+            </Box>
           </Stack>
         )}
       />

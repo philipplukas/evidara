@@ -77,9 +77,21 @@
       "back": "Retour au périmètre précédent",
       "reopen": "Rouvrir {scope}",
       "pivotDescription": "Le périmètre a été resserré par rapport au jeu de résultats précédent pour garder les éléments actuels plus ciblés."
+    },
+    "sourceTypes": {
+      "all": "Tout",
+      "law": "Lois",
+      "decision": "Arrêts",
+      "rechtssatz": "Rechtssätze",
+      "commentary": "Commentaires"
+    },
+    "list": {
+      "sortedByRelevance": "Tri par pertinence",
+      "sortedByRelevanceHelp": "Les résultats sont classés par pertinence algorithmique (aucune validation manuelle de chaque résultat)."
     }
   },
   "workspace": {
-    "detailLoadFailed": "Impossible de charger les détails du document."
+    "detailLoadFailed": "Impossible de charger les détails du document.",
+    "resultsControlRegion": "Résultats de recherche et commandes"
   }
 }

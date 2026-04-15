@@ -66,6 +66,23 @@
   /* ─── Focus ─── */
   --color-focus-ring: var(--focus-ring);
 
+  /* ─── Attention ─── */
+  --color-attention: var(--attention);
+  --color-attention-subtle: var(--attention-subtle);
+  --color-attention-border: var(--attention-border);
+
+  /* ─── Status ─── */
+  --color-status-healthy: var(--status-healthy);
+  --color-status-healthy-subtle: var(--status-healthy-subtle);
+  --color-status-degraded: var(--status-degraded);
+  --color-status-degraded-subtle: var(--status-degraded-subtle);
+  --color-status-critical: var(--status-critical);
+  --color-status-critical-subtle: var(--status-critical-subtle);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-neutral-subtle: var(--status-neutral-subtle);
+  --color-status-info: var(--status-info);
+  --color-status-info-subtle: var(--status-info-subtle);
+
   /* ─── Typography ─── */
   --text-micro: 0.6875rem;  /* 11px */
   --text-tiny: 0.625rem;    /* 10px */
@@ -123,6 +140,24 @@
 
   /* ─── Focus ─── */
   --focus-ring: rgb(15 76 129 / 24%);
+
+  /* ─── Attention (warm highlight, distinct from brand) ─── */
+  --attention: #92400e;
+  --attention-subtle: #fef3c7;
+  --attention-border: #fde68a;
+
+  /* ─── Status ─── */
+  --status-healthy: #166534;
+  --status-healthy-subtle: #f0fdf4;
+  --status-degraded: #92400e;
+  --status-degraded-subtle: #fffbeb;
+  --status-critical: #991b1b;
+  --status-critical-subtle: #fef2f2;
+  --status-neutral: #525252;
+  --status-neutral-subtle: #f5f5f5;
+  --status-info: #1e40af;
+  --status-info-subtle: #eff6ff;
+
   --shadow-shell: 0 18px 56px rgb(15 23 42 / 8%);
   --shadow-control-plane: 0 18px 40px rgb(15 76 129 / 18%);
 }
@@ -251,24 +286,25 @@
   }
 
   .app-header__control-plane {
-    @apply inline-flex min-w-0 w-full basis-full items-center justify-between gap-3 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand to-brand-hover px-4 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-px hover:border-brand/30 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring sm:w-auto sm:basis-auto sm:max-w-full sm:whitespace-nowrap;
-    box-shadow: var(--shadow-control-plane);
+    @apply inline-flex min-w-0 max-w-full items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+    @apply border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground;
+    @apply lg:border-brand/15 lg:bg-interactive-accent-subtle lg:text-brand lg:hover:border-brand/25 lg:hover:bg-interactive-accent-muted;
   }
 
   .app-header__control-plane-icon {
-    @apply flex h-9 w-9 items-center justify-center rounded-xl bg-white/12 ring-1 ring-white/15;
+    @apply flex h-5 w-5 items-center justify-center;
   }
 
   .app-header__control-plane-copy {
-    @apply flex min-w-0 flex-1 flex-col items-start leading-none;
+    @apply flex min-w-0 items-center gap-1.5 leading-none;
   }
 
   .app-header__control-plane-kicker {
-    @apply text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-white/72;
+    @apply hidden;
   }
 
   .app-header__control-plane-text {
-    @apply mt-1 flex min-w-0 items-center gap-1.5 truncate;
+    @apply flex min-w-0 items-center gap-1 truncate;
   }
 
   .app-header__status {
@@ -289,7 +325,7 @@
   }
 
   .context-bar__layout {
-    @apply mx-auto flex max-w-[1600px] flex-col gap-3 lg:flex-row lg:items-center lg:justify-between;
+    @apply mx-auto flex max-w-[1600px] flex-col gap-3 lg:flex-row lg:items-center;
   }
 
   .context-bar__clusters {

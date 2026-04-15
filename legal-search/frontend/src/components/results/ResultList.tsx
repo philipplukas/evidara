@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import type { ResultSetSource, SearchResultViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
@@ -62,6 +63,7 @@ export function ResultList({
 }: ResultListProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { state } = useWorkspace();
+  const tList = useTranslations("results.list");
   const resultSignature = results.map((result) => result.id).join("|");
   const previousResultSignatureRef = useRef(resultSignature);
 
@@ -78,10 +80,11 @@ export function ResultList({
   const hasMore = visibleCount < results.length;
   const currentSource = state.resultSet.source;
   const scopeTrail = describeScopeTrail(currentSource);
+  const resultsWord = results.length === 1 ? "result" : "results";
   const resultsSummary =
     visibleResults.length === results.length
-      ? `${results.length} results`
-      : `Showing ${visibleResults.length} of ${results.length} results`;
+      ? `${results.length} ${resultsWord}`
+      : `Showing ${visibleResults.length} of ${results.length} ${resultsWord}`;
 
   if (isLoading) {
     return (
@@ -123,8 +126,11 @@ export function ResultList({
           <span className="block text-xs font-semibold text-foreground">{resultsSummary}</span>
           <span className="block truncate text-[11px] text-muted-foreground">{scopeTrail}</span>
         </div>
-        <span className="inline-flex shrink-0 items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
-          Sorted by relevance
+        <span
+          className="inline-flex shrink-0 items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80"
+          title={tList("sortedByRelevanceHelp")}
+        >
+          {tList("sortedByRelevance")}
         </span>
       </div>
 

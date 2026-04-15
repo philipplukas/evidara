@@ -69,4 +69,16 @@ describe("DetailsTab", () => {
     expect(screen.getByText("§")).toBeInTheDocument();
     expect(screen.getByText("Law")).toBeInTheDocument();
   });
+
+  it("hides expanded-only metadata until the expand control is used", () => {
+    const detail = buildDetail("", [
+      { label: "Jurisdiction", value: "CH" },
+      { label: "Custom field", value: "Extra" },
+    ]);
+    renderWithProviders(<DetailsTab detail={detail} />);
+
+    expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
+    expect(screen.queryByText("Custom field")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Show 1 more field/ })).toBeInTheDocument();
+  });
 });

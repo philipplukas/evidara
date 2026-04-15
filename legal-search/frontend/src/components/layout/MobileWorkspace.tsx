@@ -8,6 +8,7 @@ import { FiltersSheet } from "@/components/layout/FiltersSheet";
 import { ExactMatchStrip } from "@/components/results/ExactMatchStrip";
 import { ResultList } from "@/components/results/ResultList";
 import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
+import { ResultsControlRegion } from "@/components/results/ResultsControlRegion";
 import type {
   DetailViewModel,
   FilterViewModel,
@@ -60,21 +61,23 @@ export function MobileWorkspace({
 
       <div className="flex-1 min-h-0 overflow-y-auto bg-surface-page">
         <div className="mobile-workspace__sheet">
-          <ResultSetScopeBar />
-          {searchContext.exactMatches && searchContext.exactMatches.length > 0 && (
-            <div className="px-5 pt-4">
-              <ExactMatchStrip matches={searchContext.exactMatches} onSelect={onFocus} />
-            </div>
-          )}
+          <ResultsControlRegion>
+            <ResultSetScopeBar />
+            {searchContext.exactMatches && searchContext.exactMatches.length > 0 && (
+              <div className="px-5 pt-4">
+                <ExactMatchStrip matches={searchContext.exactMatches} onSelect={onFocus} />
+              </div>
+            )}
 
-          <ResultList
-            results={results}
-            selectedId={selectedId}
-            onFocus={onFocus}
-            onPivot={onPivot}
-            onPin={onPin}
-            pinnedIds={pinnedIds}
-          />
+            <ResultList
+              results={results}
+              selectedId={selectedId}
+              onFocus={onFocus}
+              onPivot={onPivot}
+              onPin={onPin}
+              pinnedIds={pinnedIds}
+            />
+          </ResultsControlRegion>
         </div>
       </div>
 

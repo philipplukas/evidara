@@ -7,10 +7,10 @@ test.describe("Visual regressions", () => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
+    await expect(page.locator("article").first()).toBeVisible();
 
     await expect(page).toHaveScreenshot("workspace-desktop.png", {
       fullPage: true,
-      animations: "disabled",
     });
   });
 
@@ -19,10 +19,10 @@ test.describe("Visual regressions", () => {
     await page.setViewportSize({ width: 430, height: 932 });
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
+    await expect(page.locator("article").first()).toBeVisible();
 
     await expect(page).toHaveScreenshot("workspace-mobile.png", {
       fullPage: true,
-      animations: "disabled",
     });
   });
 });

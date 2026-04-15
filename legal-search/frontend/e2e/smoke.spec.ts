@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import { mockSearchApi } from "./helpers/mock-api";
 
 const SEARCH_PLACEHOLDER = /search article, case, commentary, citation|nach artikel, urteil, kommentar oder zitat|rechercher un article, un arrêt, un commentaire ou une citation/i;
-const FILTERS_LABEL = /filters|filter|filtres/i;
+const FILTERS_LABEL = /^(filters|filter|filtres)$/i;
 const CONTROL_PANEL_LABEL = /control panel|kontrollbereich|panneau de contr[oô]le/i;
 const EXPECTED_CONTROL_PANEL_URL =
   process.env.PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL?.trim() || "http://localhost:3100";
@@ -57,8 +57,8 @@ test.describe("Frontend smoke journeys", () => {
   test("@smoke renders app shell and default query", async ({ page }) => {
     const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
     await expect(searchInput).toHaveValue(/.+/);
-    await expect(page.getByText(FILTERS_LABEL, { exact: true })).toHaveCount(1);
-    await expect(page.getByText(EMPTY_DETAIL_LABEL)).toBeVisible();
+    await expect(page.getByText(FILTERS_LABEL, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(EMPTY_DETAIL_LABEL)).toBeAttached();
   });
 
   test("@smoke submits search and focuses a result", async ({ page }) => {
@@ -82,7 +82,7 @@ test.describe("Frontend smoke journeys", () => {
     await page.keyboard.press("Escape");
 
     await expect(page).not.toHaveURL(/item=/);
-    await expect(page.getByText(EMPTY_DETAIL_LABEL)).toBeVisible();
+    await expect(page.getByText(EMPTY_DETAIL_LABEL)).toBeAttached();
   });
 
   test("@smoke exposes control panel entrypoint in header", async ({ page }) => {

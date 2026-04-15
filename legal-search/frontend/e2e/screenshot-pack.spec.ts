@@ -12,6 +12,7 @@ const ADMIN_BASE_URL = process.env.PLAYWRIGHT_ADMIN_BASE_URL?.trim() || "http://
 const UI_PROFILE_COOKIE = "evidara-ui-profile";
 const ADMIN_LOCAL_STORAGE_ROLE_KEY = "evidara_user_role";
 const CANONICAL_VIEWPORT = { width: 1600, height: 900 };
+const MOBILE_VIEWPORT = { width: 430, height: 932 };
 const OUTPUT_DIR = "screenshot-pack";
 const VIDEO_MODE = process.env.SCREENSHOT_PACK_VIDEO_MODE?.trim().toLowerCase() || "disabled";
 
@@ -62,9 +63,18 @@ async function gotoWithRetry(page: Page, url: string, attempts = 3) {
   throw lastError;
 }
 
+async function setupAdmin(page: Page) {
+  await page.addInitScript(([key]) => {
+    window.localStorage.setItem(key, "admin");
+  }, [ADMIN_LOCAL_STORAGE_ROLE_KEY]);
+}
+
 test.describe("Canonical screenshot evidence pack", () => {
-  test.beforeEach(async ({ page, context }) => {
+  test.beforeAll(async () => {
     await rm(OUTPUT_DIR, { recursive: true, force: true });
+  });
+
+  test.beforeEach(async ({ page, context }) => {
     await page.setViewportSize(CANONICAL_VIEWPORT);
     await context.addCookies([
       {
@@ -73,16 +83,15 @@ test.describe("Canonical screenshot evidence pack", () => {
         url: new URL(LEGAL_SEARCH_BASE_URL).origin,
       },
     ]);
-    await mockSearchApi(page);
-    await mockAdminRunFlowApi(page);
-    await page.addInitScript(([key]) => {
-      window.localStorage.setItem(key, "admin");
-    }, [ADMIN_LOCAL_STORAGE_ROLE_KEY]);
-    await page.goto("/");
-    await expect(page.getByRole("banner")).toBeVisible();
   });
 
   test("@screenshots captures legal-search and admin canonical surfaces", async ({ page }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+    await page.goto("/");
+    await expect(page.getByRole("banner")).toBeVisible();
+
     await saveScreenshot(page, "cross-surface-header-navigation.png");
     await saveScreenshot(page, "legal-search-result-list.png");
 
@@ -114,5 +123,89 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-run-lifecycle-visibility.png");
     await saveOperatorJourneyEvents(page);
     await saveJourneyVideo(page, "cross-surface-journey.webm", VIDEO_MODE === "enabled");
+  });
+
+  test("@screenshots captures admin dashboard", async ({ page }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/`);
+    await expect(page.getByText("Control Plane Overview")).toBeVisible();
+    await expect(page.getByText("Recent Runs")).toBeVisible();
+    await saveScreenshot(page, "admin-dashboard.png");
+  });
+
+  test("@screenshots captures admin source detail", async ({ page }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources/src_01/show`);
+    await expect(page.getByText("Swiss Federal Court", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Source lifecycle" })).toBeVisible();
+    await saveScreenshot(page, "admin-source-detail.png");
+  });
+
+  test("@screenshots captures filter panel with data", async ({ page }) => {
+    await mockSearchApi(page, { richFacets: true });
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+    await page.goto("/");
+    await expect(page.getByRole("banner")).toBeVisible();
+
+    const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
+    await searchInput.fill("Art. 754");
+    await searchInput.press("Enter");
+    await expect(page.locator("article").first()).toBeVisible();
+    await saveScreenshot(page, "legal-search-filter-panel-populated.png");
+  });
+
+  test("@screenshots captures detail panel secondary tabs", async ({ page }) => {
+    await mockSearchApi(page, { richFacets: true, richDetail: true });
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+    await page.goto("/");
+    await expect(page.getByRole("banner")).toBeVisible();
+
+    const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
+    await searchInput.fill("Art. 754");
+    await searchInput.press("Enter");
+    await page.locator("article").first().click();
+    await expect(page).toHaveURL(/item=/);
+
+    await saveScreenshot(page, "detail-tab-details.png");
+
+    const currentUrl = new URL(page.url());
+    currentUrl.searchParams.set("tab", "related");
+    await page.goto(currentUrl.toString());
+    await expect(page.getByText("Applied norms")).toBeVisible();
+    await saveScreenshot(page, "detail-tab-related.png");
+
+    currentUrl.searchParams.set("tab", "references");
+    await page.goto(currentUrl.toString());
+    await expect(page.getByText("Cited by")).toBeVisible();
+    await saveScreenshot(page, "detail-tab-references.png");
+  });
+
+  test("@screenshots captures mobile responsive layout", async ({ page }) => {
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await mockSearchApi(page, { richFacets: true });
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+    await page.goto("/");
+    await expect(page.getByRole("banner")).toBeVisible();
+
+    await saveScreenshot(page, "mobile-search-home.png");
+
+    const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
+    await searchInput.fill("Art. 754");
+    await searchInput.press("Enter");
+    await expect(page.locator("article").first()).toBeVisible();
+    await saveScreenshot(page, "mobile-result-list.png");
+
+    await page.locator("article").first().click();
+    await expect(page).toHaveURL(/item=/);
+    await saveScreenshot(page, "mobile-detail-sheet.png");
   });
 });

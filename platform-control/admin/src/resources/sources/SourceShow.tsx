@@ -21,7 +21,9 @@ import {
   type LegalSearchHandoff,
   readLegalSearchHandoff,
 } from "../../lib/admin/navigationContext";
+import { PageContextBar } from "../shared/PageContextBar";
 import { formatReferenceLabel } from "../shared/referenceUtils";
+import { StatusBadge, sourceStatusToLevel } from "../shared/StatusBadge";
 import { SourceVersionsSection } from "./SourceVersionsSection";
 
 const SOURCE_STATUS_META = {
@@ -88,30 +90,12 @@ function SourceLifecyclePanel() {
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack spacing={1.5}>
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", md: "center" }}
-          spacing={1.5}
-        >
-          <Box>
-            <Typography variant="subtitle2">Source lifecycle</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Status, operating posture, and the main attention cue for this source.
-            </Typography>
-          </Box>
-          <Chip size="small" color={statusMeta.color} label={statusMeta.label} />
-        </Stack>
-
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          <Chip size="small" variant="outlined" label={`Type: ${source.source_type}`} />
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`Family: ${source.document_family ?? "none"}`}
-          />
-          <Chip size="small" variant="outlined" label={`Source ID: ${source.source_id}`} />
-        </Stack>
+        <Box>
+          <Typography variant="subtitle2">Source lifecycle</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Status, operating posture, and the main attention cue for this source.
+          </Typography>
+        </Box>
 
         <Alert severity={statusMeta.severity} icon={false}>
           <AlertTitle>{statusMeta.title}</AlertTitle>
@@ -119,6 +103,36 @@ function SourceLifecyclePanel() {
         </Alert>
       </Stack>
     </Paper>
+  );
+}
+
+function SourcePageContextBar() {
+  const source = useRecordContext<SourceRecord>();
+
+  if (!source) {
+    return null;
+  }
+
+  return (
+    <PageContextBar>
+      <Stack spacing={1.25}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          {source.name}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+          {source.source_id}
+        </Typography>
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+          <StatusBadge level={sourceStatusToLevel(source.status)} label={source.status} />
+          <Chip size="small" variant="outlined" label={`Type: ${source.source_type}`} />
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Family: ${source.document_family ?? "none"}`}
+          />
+        </Stack>
+      </Stack>
+    </PageContextBar>
   );
 }
 
@@ -184,6 +198,7 @@ export function SourceShow() {
     <Show resource="sources" title="Source">
       <SimpleShowLayout>
         <SourceHandoffPanel />
+        <SourcePageContextBar />
         <SourceLifecyclePanel />
         <TextField source="source_id" label="Source ID" />
         <TextField source="name" label="Name" />

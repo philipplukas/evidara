@@ -7,15 +7,15 @@ import { getIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel } from "@/lib/types";
 import { SectionLabel } from "../primitives";
+import { FilterBar } from "./FilterBar";
 
 interface FilterPanelProps {
   filters: FilterViewModel[];
 }
 
 export function FilterPanel({ filters }: FilterPanelProps) {
-  const { state: constraints, dispatch } = useSearchConstraints();
+  const { dispatch } = useSearchConstraints();
   const t = useTranslations();
-  const hasRefinements = constraints.refinements.length > 0;
 
   if (filters.length === 0) {
     return (
@@ -36,18 +36,11 @@ export function FilterPanel({ filters }: FilterPanelProps) {
 
   return (
     <div className="space-y-2 py-3">
+      <FilterBar filters={filters} />
       <div className="px-4 pb-2">
         <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
           <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
           <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "CLEAR_ALL_REFINEMENTS" })}
-              disabled={!hasRefinements}
-              className="inline-flex items-center rounded-full border border-border/70 bg-surface-panel px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t("filter.clearAll")}
-            </button>
             <button
               type="button"
               onClick={() => dispatch({ type: "RESET_ALL" })}

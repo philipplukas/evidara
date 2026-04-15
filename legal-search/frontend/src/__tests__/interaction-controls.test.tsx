@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DetailPanelHeader } from "@/components/detail/DetailPanelHeader";
 import { DetailTabs } from "@/components/detail/DetailTabs";
@@ -18,7 +18,7 @@ describe("High-impact interaction controls", () => {
     fireEvent.click(austriaChip);
     expect(austriaChip.className).toContain("bg-brand-strong");
 
-    const decisionsTab = screen.getByRole("button", { name: "Court decisions" });
+    const decisionsTab = screen.getByRole("button", { name: /Court decisions|Urteile/ });
     fireEvent.click(decisionsTab);
     expect(decisionsTab.className).toContain("text-brand");
 
@@ -29,16 +29,22 @@ describe("High-impact interaction controls", () => {
     expect(officialToggle.className).toContain("text-brand");
   });
 
-  it("writes selected detail tab to URL state", () => {
+  it("writes selected detail tab to URL state", async () => {
     renderWithProviders(<DetailTabs tabs={articleDetail.tabs} />, {
       searchParams: { tab: "related" },
     });
 
-    const relatedTab = screen.getByRole("button", { name: /Related/ });
-    expect(relatedTab.className).toContain("text-brand");
+    const relatedTab = screen.getByRole("tab", { name: /Related/ });
+    expect(relatedTab).toHaveAttribute("aria-selected", "true");
 
-    fireEvent.click(screen.getByRole("button", { name: /^Details$/ }));
-    expect(screen.getByRole("button", { name: /^Details$/ }).className).toContain("text-brand");
+    // Radix TabsTrigger commits selection on mouseDown (not click).
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Details$/ }), { button: 0 });
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /^Details$/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    });
   });
 
   it("fires pin and copy actions in detail header", async () => {

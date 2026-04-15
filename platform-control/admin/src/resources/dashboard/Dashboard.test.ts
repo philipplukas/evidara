@@ -54,7 +54,9 @@ describe("Dashboard helpers", () => {
   });
 
   it("falls back to recent run status when health is unavailable", () => {
-    expect(selectDashboardAttentionRun([], [{ run_id: "run-3", status: "pending" }] as never)).toEqual({
+    expect(
+      selectDashboardAttentionRun([], [{ run_id: "run-3", status: "pending" }] as never),
+    ).toEqual({
       run_id: "run-3",
       reason: "pending run status",
     });

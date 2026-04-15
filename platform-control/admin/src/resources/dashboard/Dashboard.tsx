@@ -7,7 +7,6 @@ import {
   Card,
   CardActions,
   CardContent,
-  Chip,
   CircularProgress,
   Divider,
   Paper,
@@ -24,6 +23,8 @@ import { useRedirect } from "react-admin";
 import type { RunPipelineHealth } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { RunLaunchButton } from "../runs/RunLaunchDialog";
+import { StatCard, type StatTone, successRateTone, TONE_ACCENTS } from "../shared/Stat";
+import { pipelineHealthToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
 
 type DashboardStats = {
   source_count: number;
@@ -58,30 +59,7 @@ type AttentionRun = {
   reason: string;
 };
 
-const STATUS_COLORS: Record<string, "success" | "error" | "warning" | "info" | "default"> = {
-  completed: "success",
-  failed: "error",
-  running: "info",
-  pending: "warning",
-  cancelled: "default",
-};
-
-const HEALTH_COLORS: Record<string, "success" | "error" | "warning" | "info" | "default"> = {
-  ok: "success",
-  blocked: "warning",
-  failed: "error",
-  in_progress: "info",
-};
-
 const MAX_HEALTH_PROBES = 5;
-
-const TONE_ACCENTS: Record<"success" | "error" | "warning" | "info" | "default", string> = {
-  success: "#2e7d32",
-  error: "#c62828",
-  warning: "#ed6c02",
-  info: "#0288d1",
-  default: "rgba(29, 41, 61, 0.22)",
-};
 
 const formatDuration = (start: string | null, end: string | null): string => {
   if (!start || !end) return "-";
@@ -156,50 +134,6 @@ export const selectDashboardAttentionRun = (
   return null;
 };
 
-function StatCard({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "success" | "error" | "warning" | "info" | "default";
-}) {
-  return (
-    <Card
-      sx={{
-        flex: 1,
-        minWidth: 160,
-        borderTop: "4px solid",
-        borderTopColor: TONE_ACCENTS[tone],
-      }}
-    >
-      <CardContent
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
-          gap: 0.75,
-          py: 2.5,
-        }}
-      >
-        <Typography
-          variant="overline"
-          sx={{ letterSpacing: "0.14em", color: "text.secondary", lineHeight: 1.1 }}
-        >
-          {label}
-        </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1 }}>
-          {value}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.45 }}>
-          At a glance
-        </Typography>
-      </CardContent>
-    </Card>
-  );
-}
-
 function ActionCard({
   eyebrow,
   title,
@@ -211,7 +145,7 @@ function ActionCard({
   title: string;
   description: string;
   action: ReactNode;
-  tone?: "success" | "error" | "warning" | "info" | "default";
+  tone?: StatTone;
 }) {
   return (
     <Card
@@ -424,7 +358,7 @@ export function Dashboard() {
               <StatCard
                 label="Success Rate"
                 value={successRate}
-                tone={successRate === "-" ? "default" : "success"}
+                tone={successRateTone(successRate)}
               />
             </Stack>
           </Stack>
@@ -443,12 +377,11 @@ export function Dashboard() {
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 {Object.entries(stats.run_by_status).map(([status, count]) => (
-                  <Chip
+                  <StatusBadge
                     key={status}
+                    level={runRecordStatusToLevel(status)}
                     label={`${status}: ${count}`}
-                    color={STATUS_COLORS[status] ?? "default"}
-                    variant="outlined"
-                    size="small"
+                    emphasis="subtle"
                   />
                 ))}
                 {Object.keys(stats.run_by_status).length === 0 && (
@@ -483,34 +416,30 @@ export function Dashboard() {
                 </Alert>
               ) : (
                 <Stack direction="row" spacing={1} flexWrap="wrap">
-                  <Chip
+                  <StatusBadge
+                    level={pipelineHealthToLevel("ok")}
                     label={`ok: ${recentHealthSummary.ok}`}
-                    color="success"
-                    variant="outlined"
-                    size="small"
+                    emphasis="subtle"
                   />
-                  <Chip
+                  <StatusBadge
+                    level={pipelineHealthToLevel("blocked")}
                     label={`blocked: ${recentHealthSummary.blocked}`}
-                    color="warning"
-                    variant="outlined"
-                    size="small"
+                    emphasis="subtle"
                   />
-                  <Chip
+                  <StatusBadge
+                    level={pipelineHealthToLevel("failed")}
                     label={`failed: ${recentHealthSummary.failed}`}
-                    color="error"
-                    variant="outlined"
-                    size="small"
+                    emphasis="subtle"
                   />
-                  <Chip
+                  <StatusBadge
+                    level={pipelineHealthToLevel("in_progress")}
                     label={`in progress: ${recentHealthSummary.in_progress}`}
-                    color="info"
-                    variant="outlined"
-                    size="small"
+                    emphasis="subtle"
                   />
-                  <Chip
+                  <StatusBadge
+                    level="neutral"
                     label={`unavailable: ${recentHealthSummary.unavailable}`}
-                    variant="outlined"
-                    size="small"
+                    emphasis="subtle"
                   />
                 </Stack>
               )}
@@ -589,17 +518,15 @@ export function Dashboard() {
                         </TableCell>
                         <TableCell>
                           <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip
-                              size="small"
+                            <StatusBadge
+                              level={runRecordStatusToLevel(run.status)}
                               label={run.status}
-                              color={STATUS_COLORS[run.status] ?? "default"}
                             />
                             {health ? (
-                              <Chip
-                                size="small"
+                              <StatusBadge
+                                level={pipelineHealthToLevel(health.overall_status)}
                                 label={health.overall_status}
-                                color={HEALTH_COLORS[health.overall_status] ?? "default"}
-                                variant="outlined"
+                                emphasis="subtle"
                               />
                             ) : null}
                           </Stack>

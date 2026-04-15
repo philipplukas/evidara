@@ -10,6 +10,8 @@ interface ContextBarProps {
   context: SearchContextViewModel;
 }
 
+const SOURCE_TYPE_I18N_KEYS = new Set(["all", "law", "decision", "rechtssatz", "commentary"]);
+
 /**
  * Top-level, high-signal search constraints.
  * Reads/writes through SearchConstraintsProvider dispatch actions.
@@ -17,11 +19,22 @@ interface ContextBarProps {
 export function ContextBar({ context }: ContextBarProps) {
   const { state: constraints, dispatch } = useSearchConstraints();
   const t = useTranslations();
+  const tSourceTypes = useTranslations("results.sourceTypes");
+
+  const translatedSourceTypes = context.sourceTypes.map((item) => ({
+    ...item,
+    label: SOURCE_TYPE_I18N_KEYS.has(item.key)
+      ? tSourceTypes(item.key as "all" | "law" | "decision" | "rechtssatz" | "commentary")
+      : item.label,
+  }));
 
   return (
     <div className="context-bar">
       <div className="context-bar__layout">
-        <div className="context-bar__clusters">
+        <span className="text-micro shrink-0 font-medium text-muted-foreground">
+          {t("filter.filtersTitle")}
+        </span>
+        <div className="context-bar__clusters min-w-0 flex-1">
           <div className="context-bar__cluster">
             <ChipGroup
               items={context.jurisdictions.map((j) => ({
@@ -44,11 +57,11 @@ export function ContextBar({ context }: ContextBarProps) {
 
           <div className="context-bar__cluster">
             <TabGroup
-              items={context.sourceTypes.map((t) => ({
-                ...t,
+              items={translatedSourceTypes.map((st) => ({
+                ...st,
                 active:
-                  constraints.context.sourceType === t.key ||
-                  (constraints.context.sourceType === null && t.key === "all"),
+                  constraints.context.sourceType === st.key ||
+                  (constraints.context.sourceType === null && st.key === "all"),
               }))}
               onSelect={(key) =>
                 dispatch({
@@ -58,24 +71,34 @@ export function ContextBar({ context }: ContextBarProps) {
               }
             />
           </div>
+
+          <div className="context-bar__cluster">
+            <button
+              type="button"
+              onClick={() =>
+                dispatch({
+                  type: "SET_OFFICIAL_ONLY",
+                  value: !constraints.context.officialOnly,
+                })
+              }
+              className={`context-bar__official-toggle ${
+                constraints.context.officialOnly
+                  ? "context-bar__official-toggle--active border-brand/20 bg-interactive-accent-subtle text-brand"
+                  : "context-bar__official-toggle--idle border border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <Shield className="h-3.5 w-3.5" />
+              {t("context.officialSourcesOnly")}
+            </button>
+          </div>
         </div>
 
         <button
           type="button"
-          onClick={() =>
-            dispatch({
-              type: "SET_OFFICIAL_ONLY",
-              value: !constraints.context.officialOnly,
-            })
-          }
-          className={`context-bar__official-toggle ${
-            constraints.context.officialOnly
-              ? "context-bar__official-toggle--active border-brand/20 bg-interactive-accent-subtle text-brand"
-              : "context-bar__official-toggle--idle border border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
-          }`}
+          className="text-micro shrink-0 rounded-sm px-1 py-0.5 font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          onClick={() => dispatch({ type: "RESET_ALL" })}
         >
-          <Shield className="h-3.5 w-3.5" />
-          {t("context.officialSourcesOnly")}
+          {t("filter.resetAll")}
         </button>
       </div>
     </div>

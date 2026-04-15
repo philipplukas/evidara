@@ -3,7 +3,8 @@
 import DOMPurify from "dompurify";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
-import { MetadataSection } from "@/components/detail/MetadataSection";
+import { MetadataList } from "@/components/detail/MetadataList";
+import { enrichMetadataRows } from "@/lib/metadata-visibility";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 import { TabEmptyState } from "./TabEmptyState";
@@ -33,7 +34,12 @@ export function DetailsTab({ detail }: DetailsTabProps) {
         </p>
       </div>
 
-      {hasMetadata && <MetadataSection rows={detail.metadata} />}
+      {hasMetadata && (
+        <MetadataList
+          fields={enrichMetadataRows(detail.metadata, detail.type)}
+          initialDensity="default"
+        />
+      )}
 
       {hasContent && (
         <section className="space-y-3">

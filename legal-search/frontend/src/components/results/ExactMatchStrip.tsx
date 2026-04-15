@@ -66,7 +66,7 @@ export function ExactMatchStrip({ matches, onSelect }: ExactMatchStripProps) {
                   </div>
                 )}
                 {match.contentLanguage?.isTranslation && (
-                  <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                  <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-attention-subtle px-1.5 py-0.5 text-[10px] font-medium text-attention">
                     <Globe className="h-2.5 w-2.5" />
                     {match.contentLanguage.label ?? t("translatedFallback")}
                   </div>
