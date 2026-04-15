@@ -1,8 +1,8 @@
 # Metadata & search quality — plan status report
 
 Owner: Platform / legal-search
-Last reviewed: 2026-04-14 (dev replay pass; CH/AT metadata drift narrowed to ranking debt)
-Last verified: 2026-04-14
+Last reviewed: 2026-04-15 (dev replay pass; CH/AT metadata drift narrowed to ranking debt)
+Last verified: 2026-04-15
 Applies to: MVP demo path, **Linear TAR-89** (search/detail metadata quality), related release gates
 
 This report ties together the **stated plan** (runbooks + Linear) and **repo reality** (what ships in code today). Update it when TAR-89 scope closes or gates move.
@@ -41,13 +41,14 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 - Demo packet expectations, interaction-flow hooks, and **phase 5** workstream list (TAR-66 → TAR-62 → TAR-63 → TAR-67) documented in runbooks above.
 
-### 2.4 Current proof state (2026-04-14)
+### 2.4 Current proof state (2026-04-15)
 
 - Targeted CH/AT replay on dev is visible again through legal-search: both proof docs are reachable by ID and also surface under paginated `q=*` search on page 6.
 - The CH proof doc `doc_1wxstrwdxtwh0zaxag6x37hya2` resolves to `Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999` with `document_type=law`.
-- The AT proof doc `doc_7m5fzs4ksj057ft0sgzqaecpyh` resolves as `law`, but its current title is still the generic `RIS Dokument`; that residual title cleanup remains a projection-quality follow-up.
+- The 2026-04-15 runtime rerun (`run_01kp8aek9590wsaas3patxbct7`) proves the AT worker-backed replay path is healthy again after the runtime fix and `di-consumer-dev` redeploy.
+- The AT proof doc `doc_7m5fzs4ksj057ft0sgzqaecpyh` still resolves with the generic `RIS Dokument` title on legal-search detail; that residual title cleanup remains an active metadata / DI follow-up.
 - The remaining broader issue is relevance quality: `Bundesgericht`, `Art. 8 EMRK`, and `BVGE` still return generic top docs even though the `q=*` control row is non-empty again.
-- Therefore the current debt is split more cleanly: alias / empty-index drift is materially improved, one CH proof doc now renders correctly, residual AT title polish stays on the projection track, and broader ranking / discrimination across the wider corpus remains open.
+- Therefore the current debt is split more cleanly: alias / empty-index drift is materially improved, one CH proof doc now renders correctly, the AT runtime path is recovered, residual AT title polish stays on the DI / metadata track, and broader ranking / discrimination across the wider corpus remains open.
 
 ---
 
@@ -57,7 +58,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 **Projection layer (legal-search):** inferring type from bundle hints and richer title fallbacks is implemented in `ProjectionsService` (2026-04-09). **Existing OpenSearch rows** still show old titles/types until projections are replayed or documents are re-processed and re-indexed.
 
-**Current dev snapshot (2026-04-14):** the major metadata drift identified in `TAR-241` is now materially reduced for the replayed CH/AT proof documents. After restoring Document Service wiring and replaying known-good documents:
+**Current dev snapshot (2026-04-15):** the major metadata drift identified in `TAR-241` is now materially reduced for the replayed CH/AT proof documents. The 2026-04-15 rerun proves the AT runtime path is healthy again after the worker / `di-consumer` refresh. After restoring Document Service wiring and replaying known-good documents:
 
 - AT RIS doc `doc_7m5fzs4ksj057ft0sgzqaecpyh` now indexes as canonical type `law` and is rank 1 for `Produktdeklaration`, `BGBl. Nr. 43/1975`, and `RIS Dokument`.
 - CH Fedlex doc `doc_1wxstrwdxtwh0zaxag6x37hya2` now indexes as canonical type `law`, and projection title extraction now uses the embedded Fedlex title (`Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999`) instead of the raw JSON blob.

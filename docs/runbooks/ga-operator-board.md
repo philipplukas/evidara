@@ -1,9 +1,9 @@
 # GA operator board
 
 Owner: Platform / release
-Last reviewed: 2026-04-14
-Last verified: 2026-04-14
-Applies to: GA readiness coordination after the 2026-04-13 merge wave
+Last reviewed: 2026-04-15
+Last verified: 2026-04-15
+Applies to: GA readiness coordination after the 2026-04-15 dev runtime and AT rerun refresh
 
 ## Purpose
 
@@ -41,14 +41,16 @@ What is not yet true:
 - The branch-gate model is not yet in its intended steady state.
 - Runner stability is improved but not yet trusted as a solved problem.
 - Five-country acceptance and relevance still need current evidence attached to the GA
-  umbrella, but CH and AT now have live fast-loop run evidence on dev.
+  umbrella, but CH and AT now have live fast-loop run evidence on dev and the AT
+  runtime blocker is no longer the active issue.
 - The current dev relevance signal no longer has an empty `q=*` control row; the dev
   index returns results again, the replayed CH/AT proof docs are visible under
-  paginated `q=*` search, the CH proof doc now carries the corrected title and
+  paginated `q=*` search, the CH proof doc carries the corrected title and
   controlled type, and the agreed seed queries still collapse to generic top
-  hits. The remaining follow-up is broader ranking / wider-corpus quality on
-  `TAR-241`, while `TAR-242` keeps the replay/projection sink for residual
-  issues such as the AT doc still rendering as `RIS Dokument`.
+  hits. The 2026-04-15 rerun proves the AT runtime path is healthy again, but the
+  AT proof doc still renders as `RIS Dokument`, so the active follow-up split is:
+  `TAR-241` for wider-corpus ranking / sparse-row quality and `TAR-242` for residual
+  title / projection / metadata cleanup.
 
 ## Board status
 
@@ -185,9 +187,14 @@ Current evidence highlights:
 - AT now has clean live RIS fast-loop proof for:
   - narrow run `run_01kp5xqgrfyqq2abez3r666d9h`
   - tiny batch run `run_01kp5xrqvh61xfdace1x9sqed1`
+  - post-runtime-fix rerun `run_01kp8aek9590wsaas3patxbct7`
 - AT recovery also surfaced an important operator invariant:
   `platform-control-worker` must keep GCS artifact-store and Pub/Sub env parity with
   `platform-control-api`, or DI cannot read worker-published bundle manifests
+- Current AT status after the 2026-04-15 rerun:
+  - replay path: healthy
+  - proof-doc title: still `RIS Dokument`
+  - next engineering lane: DI / metadata title cleanup, not worker dispatch
 
 ### `TAR-240` - five-country acceptance B (DE + FR)
 

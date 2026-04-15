@@ -1,8 +1,8 @@
 # Phase 5 go / no-go memo (draft)
 
 Owner: Platform lead
-Last reviewed: 2026-04-14
-Last verified: 2026-04-14
+Last reviewed: 2026-04-15
+Last verified: 2026-04-15
 Applies to: release readiness / promotion (Linear **TAR-69**); **dev-first teams** use dev for TAR-85 — see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)
 Canonical template history: this file is the **working draft**; publish final recommendation in Linear **TAR-69** when all gates are green.
 
@@ -66,7 +66,7 @@ These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, an
 | Topic | Status | Notes |
 |-------|--------|--------|
 | Projection fields (title, type, dates, structural path) | **Shipped** | `ProjectionsService` maps canonical DI lean rows; see `search-relevance-baseline.md` |
-| Relevance eval pack | **PARTIAL PASS** | The 2026-04-14 dev pack shows `q=*` is non-empty, the CH proof doc now resolves with the corrected title, the AT proof doc still surfaces as `RIS Dokument`, and the seed queries still collapse to generic top hits; see [2026-04-14-dev-relevance-pack.md](evidence/2026-04-14-dev-relevance-pack.md). Treat broad-query ranking as `TAR-241` and residual title cleanup as `TAR-242` |
+| Relevance eval pack | **PARTIAL PASS** | The 2026-04-14 dev pack still stands as the latest full relevance snapshot, and the 2026-04-15 AT rerun confirms the runtime path is fixed while the proof doc title is still `RIS Dokument`; see [2026-04-14-dev-relevance-pack.md](evidence/2026-04-14-dev-relevance-pack.md) and [2026-04-15-at-ris-fast-loop-rerun.md](evidence/2026-04-15-at-ris-fast-loop-rerun.md). Treat broad-query ranking as `TAR-241` and residual title cleanup as `TAR-242` |
 | Platform trust proof | **PARTIAL GO** | Hetzner + Tailscale + Argo path is proven via the `rocky-agents` staging smoke and live image verification; explicit Temporal execution ID still missing in the evidence packet |
 | Open issues | | TAR-64, TAR-77, TAR-85 until evidence attached |
 

@@ -1,8 +1,8 @@
 # Connector Worker Operations Runbook
 
 Owner: Platform team
-Last reviewed: 2026-04-03
-Last verified: Not yet verified
+Last reviewed: 2026-04-15
+Last verified: 2026-04-15
 Applies to: dev, staging, prod
 
 ## Overview
@@ -63,6 +63,14 @@ but uses a different entrypoint.
 `minScale=0` is not safe for the current Cloud Run Service design. The worker only polls while an
 instance is already running, so a scale-to-zero worker may only come up during deploy rollouts or
 manual traffic and will not reliably pick up newly created `pending` runs.
+
+**Live verification (2026-04-15):**
+
+- `platform-control-api-dev` and `platform-control-worker-dev` were re-aligned for worker-backed
+  dispatch
+- `python3 scripts/check_connector_worker_runtime.py --project-id project-dacd6b7b-dc96-4534-b82 --region europe-west6 --env dev`
+  passed
+- a fresh AT RIS rerun completed successfully on dev after the fix
 
 ### Required Secrets
 
