@@ -20,39 +20,39 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
       : "Translated content";
 
   return (
-    <div className="px-5 py-4 border-b border-border/60">
-      {/* Breadcrumbs */}
+    <div className="border-b border-border/60 px-5 py-3.5">
       {detail.breadcrumbs.length > 0 && <Breadcrumbs items={detail.breadcrumbs} />}
 
-      <div className="flex items-start gap-2 mt-2">
-        <h2 className="text-base font-semibold text-foreground flex-1 leading-snug">{safeTitle}</h2>
-        {/* Pin + actions */}
-        <div className="flex items-center gap-1 shrink-0">
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold leading-snug text-foreground">{safeTitle}</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{safeSubtitle}</p>
+
+          {detail.contentLanguage?.isTranslation && (
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-tiny font-medium text-amber-700">
+              {translationLabel}
+            </div>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 pt-0.5">
           {onPin && (
             <AccentButton
               onClick={() => onPin(detail.id, safeTitle, detail.type)}
               active={isPinned}
               title={isPinned ? "Unpin" : "Pin"}
             >
-              <MapPin className="w-3 h-3" />
+              <MapPin className="h-3 w-3" />
             </AccentButton>
           )}
           <AccentButton
             onClick={() => navigator.clipboard.writeText(safeTitle)}
             title="Copy citation"
           >
-            <Copy className="w-3 h-3" />
+            <Copy className="h-3 w-3" />
           </AccentButton>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground mt-1">{safeSubtitle}</p>
-
-      {/* Content language indicator */}
-      {detail.contentLanguage?.isTranslation && (
-        <div className="mt-2 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-micro text-amber-700 inline-flex items-center gap-1">
-          {translationLabel}
-        </div>
-      )}
     </div>
   );
 }

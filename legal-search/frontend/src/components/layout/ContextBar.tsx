@@ -19,66 +19,65 @@ export function ContextBar({ context }: ContextBarProps) {
   const t = useTranslations();
 
   return (
-    <div className="border-b border-border bg-surface-panel px-6 py-2 flex items-center gap-6 text-sm">
-      {/* Jurisdiction chips */}
-      <ChipGroup
-        items={context.jurisdictions.map((j) => ({
-          ...j,
-          active: constraints.context.jurisdictions.includes(j.key),
-        }))}
-        onToggle={(key) => dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: key })}
-      />
+    <div className="context-bar">
+      <div className="context-bar__layout">
+        <div className="context-bar__clusters">
+          <div className="context-bar__cluster">
+            <ChipGroup
+              items={context.jurisdictions.map((j) => ({
+                ...j,
+                active: constraints.context.jurisdictions.includes(j.key),
+              }))}
+              onToggle={(key) => dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: key })}
+            />
+          </div>
 
-      <div className="w-px h-5 bg-border" />
+          <div className="context-bar__cluster">
+            <ChipGroup
+              items={context.languages.map((l) => ({
+                ...l,
+                active: constraints.context.languages.includes(l.key),
+              }))}
+              onToggle={(key) => dispatch({ type: "TOGGLE_LANGUAGE", language: key })}
+            />
+          </div>
 
-      {/* Language chips */}
-      <ChipGroup
-        items={context.languages.map((l) => ({
-          ...l,
-          active: constraints.context.languages.includes(l.key),
-        }))}
-        onToggle={(key) => dispatch({ type: "TOGGLE_LANGUAGE", language: key })}
-      />
+          <div className="context-bar__cluster">
+            <TabGroup
+              items={context.sourceTypes.map((t) => ({
+                ...t,
+                active:
+                  constraints.context.sourceType === t.key ||
+                  (constraints.context.sourceType === null && t.key === "all"),
+              }))}
+              onSelect={(key) =>
+                dispatch({
+                  type: "SET_SOURCE_TYPE",
+                  sourceType: key === "all" ? null : key,
+                })
+              }
+            />
+          </div>
+        </div>
 
-      <div className="w-px h-5 bg-border" />
-
-      {/* Source type tabs */}
-      <TabGroup
-        items={context.sourceTypes.map((t) => ({
-          ...t,
-          active:
-            constraints.context.sourceType === t.key ||
-            (constraints.context.sourceType === null && t.key === "all"),
-        }))}
-        onSelect={(key) =>
-          dispatch({
-            type: "SET_SOURCE_TYPE",
-            sourceType: key === "all" ? null : key,
-          })
-        }
-      />
-
-      <div className="flex-1" />
-
-      {/* Official sources toggle */}
-      <button
-        type="button"
-        onClick={() =>
-          dispatch({
-            type: "SET_OFFICIAL_ONLY",
-            value: !constraints.context.officialOnly,
-          })
-        }
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors
-          ${
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: "SET_OFFICIAL_ONLY",
+              value: !constraints.context.officialOnly,
+            })
+          }
+          className={`context-bar__official-toggle ${
             constraints.context.officialOnly
-              ? "text-brand bg-interactive-accent-subtle border border-brand/20"
-              : "text-muted-foreground hover:text-foreground border border-transparent"
+              ? "context-bar__official-toggle--active border-brand/20 bg-interactive-accent-subtle text-brand"
+              : "context-bar__official-toggle--idle border border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
           }`}
-      >
-        <Shield className="w-3.5 h-3.5" />
-        {t("context.officialSourcesOnly")}
-      </button>
+        >
+          <Shield className="h-3.5 w-3.5" />
+          {t("context.officialSourcesOnly")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -91,7 +90,7 @@ function ChipGroup({
   onToggle: (key: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="context-bar__chip-group">
       {items.map((item) => {
         const icon = getIcon(item.iconKey);
         return (
@@ -99,12 +98,11 @@ function ChipGroup({
             type="button"
             key={item.key}
             onClick={() => onToggle(item.key)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all
-              ${
-                item.active
-                  ? "bg-brand-strong text-white shadow-sm"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              }`}
+            className={`context-bar__chip ${
+              item.active
+                ? "context-bar__chip--active bg-brand-strong text-white shadow-sm ring-1 ring-brand/10"
+                : "context-bar__chip--idle bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            }`}
           >
             {icon && <span className="text-sm leading-none">{icon}</span>}
             {item.label}
@@ -123,18 +121,17 @@ function TabGroup({
   onSelect: (key: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="context-bar__tab-group">
       {items.map((item) => (
         <button
           type="button"
           key={item.key}
           onClick={() => onSelect(item.key)}
-          className={`px-3 py-1 rounded-md text-xs font-medium transition-all
-            ${
-              item.active
-                ? "text-brand bg-interactive-accent-subtle"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
+          className={`context-bar__tab ${
+            item.active
+              ? "context-bar__tab--active bg-interactive-accent-subtle text-brand ring-1 ring-brand/10"
+              : "context-bar__tab--idle text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
         >
           {item.label}
         </button>

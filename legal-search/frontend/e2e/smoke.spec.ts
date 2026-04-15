@@ -90,6 +90,7 @@ test.describe("Frontend smoke journeys", () => {
     await expect(controlPanelLink).toBeVisible();
     const href = await controlPanelLink.getAttribute("href");
     expect(href).toBeTruthy();
+    expect(await controlPanelLink.getAttribute("target")).toBeNull();
     expect(href?.startsWith(EXPECTED_CONTROL_PANEL_URL)).toBe(true);
     if (href && href !== EXPECTED_CONTROL_PANEL_URL) {
       expect(href).toContain("from=legal-search");

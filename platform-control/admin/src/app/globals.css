@@ -1,15 +1,19 @@
 :root {
-  --background: #f4efe7;
+  --background: #eef2f6;
   --background-panel: rgba(255, 253, 248, 0.92);
+  --surface: rgba(255, 253, 248, 0.88);
+  --surface-strong: rgba(255, 253, 248, 0.98);
   --foreground: #1d293d;
   --foreground-muted: rgba(29, 41, 61, 0.72);
   --accent: #0f4c81;
   --accent-hover: #0b3d68;
   --accent-strong: #1d293d;
   --accent-soft: rgba(15, 76, 129, 0.1);
-  --highlight: #9a7a4a;
-  --highlight-soft: rgba(154, 122, 74, 0.14);
+  --highlight: #5c6b7e;
+  --highlight-soft: rgba(92, 107, 126, 0.14);
   --border: rgba(29, 41, 61, 0.12);
+  --shadow-soft: 0 18px 44px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 28px 64px rgba(15, 23, 42, 0.12);
 }
 
 html,
@@ -25,9 +29,9 @@ body {
   margin: 0;
   color: var(--foreground);
   background:
-    radial-gradient(circle at top left, rgba(15, 76, 129, 0.16), transparent 36%),
-    radial-gradient(circle at top right, rgba(154, 122, 74, 0.18), transparent 30%),
-    linear-gradient(180deg, #faf7f1 0%, var(--background) 100%);
+    radial-gradient(circle at top left, rgba(15, 76, 129, 0.1), transparent 30%),
+    radial-gradient(circle at top right, rgba(92, 107, 126, 0.08), transparent 26%),
+    linear-gradient(180deg, #fbfcfe 0%, var(--background) 44%, #e8eef4 100%);
   font-family: var(--font-admin-sans), system-ui, sans-serif;
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
@@ -44,8 +48,8 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(135deg, rgba(255, 253, 248, 0.24), transparent 35%),
-    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.54), transparent 28%);
+    linear-gradient(135deg, rgba(15, 76, 129, 0.1), transparent 35%),
+    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.45), transparent 28%);
   opacity: 0.75;
 }
 
@@ -69,9 +73,9 @@ a {
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at top left, rgba(15, 76, 129, 0.16), transparent 36%),
-    radial-gradient(circle at top right, rgba(154, 122, 74, 0.18), transparent 30%),
-    linear-gradient(180deg, #faf7f1 0%, var(--background) 100%);
+    radial-gradient(circle at top left, rgba(15, 76, 129, 0.1), transparent 30%),
+    radial-gradient(circle at top right, rgba(92, 107, 126, 0.08), transparent 26%),
+    linear-gradient(180deg, #fbfcfe 0%, var(--background) 44%, #e8eef4 100%);
 }
 
 .evidara-shell__panel {
@@ -80,7 +84,7 @@ a {
   border: 1px solid var(--border);
   border-radius: 32px;
   background: var(--background-panel);
-  box-shadow: 0 28px 64px rgba(29, 41, 61, 0.12);
+  box-shadow: var(--shadow-strong);
   backdrop-filter: blur(18px);
 }
 
@@ -107,10 +111,10 @@ a {
   display: grid;
   place-items: center;
   border-radius: 14px;
-  border: 1px solid rgba(255, 253, 248, 0.2);
-  background: linear-gradient(135deg, rgba(255, 253, 248, 0.98), rgba(255, 253, 248, 0.72));
-  color: var(--accent);
-  box-shadow: 0 12px 24px rgba(7, 23, 40, 0.12);
+  border: 1px solid rgba(255, 253, 248, 0.18);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fffdf8;
+  box-shadow: 0 12px 24px rgba(7, 23, 40, 0.16);
   font-family: var(--font-admin-serif), Georgia, serif;
   font-size: 18px;
   font-weight: 700;
@@ -134,15 +138,12 @@ a {
   line-height: 1.1;
 }
 
-.evidara-shell__copy {
-  margin: 4px 0 0;
-  color: rgba(255, 253, 248, 0.74);
-  font-size: 14px;
-  line-height: 1.45;
-}
-
 .evidara-shell__body {
   padding: 28px;
+}
+
+.evidara-shell__meta {
+  margin-top: 16px;
 }
 
 .evidara-shell__badge {
@@ -155,6 +156,20 @@ a {
   color: var(--accent);
   font-size: 12px;
   font-weight: 600;
+}
+
+.evidara-shell__copy {
+  margin: 0;
+  color: var(--foreground-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.evidara-shell__fineprint {
+  margin: 8px 0 0;
+  color: rgba(29, 41, 61, 0.56);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .evidara-shell__button {

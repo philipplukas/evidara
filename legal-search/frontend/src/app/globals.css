@@ -72,7 +72,7 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
+  --background: oklch(0.985 0.01 250);
   --foreground: oklch(0.31 0.04 250);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.31 0.04 250);
@@ -173,6 +173,18 @@
       linear-gradient(180deg, #fbfcfe 0%, var(--surface-page) 44%, #e8eef4 100%);
     background-attachment: fixed;
   }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, rgb(15 76 129 / 8%), transparent 35%),
+      radial-gradient(circle at 50% -10%, rgb(255 255 255 / 45%), transparent 28%);
+    opacity: 0.7;
+  }
+
   html {
     @apply font-sans;
   }
@@ -185,11 +197,16 @@
   }
 
   .app-header__inner {
-    @apply mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-3 lg:flex-nowrap lg:px-6;
+    @apply mx-auto grid max-w-[1600px] items-center gap-3 px-4 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:gap-4 lg:px-6;
+    grid-template-areas:
+      "brand utility"
+      "search search"
+      "nav nav";
   }
 
   .app-header__brand {
     @apply flex shrink-0 items-center gap-2.5 rounded-2xl border border-border/60 px-3 py-2 transition-transform duration-200 hover:-translate-y-px;
+    grid-area: brand;
     background-color: var(--surface-shell);
   }
 
@@ -202,7 +219,8 @@
   }
 
   .app-header__search {
-    @apply order-3 min-w-0 flex-1 basis-[22rem] lg:order-none lg:min-w-[28rem] lg:flex-[1.7] lg:max-w-[56rem];
+    @apply min-w-0 lg:min-w-[28rem];
+    grid-area: search;
   }
 
   .app-header__search-shell {
@@ -211,16 +229,17 @@
   }
 
   .app-header__search-input {
-    @apply h-11 w-full rounded-2xl border border-border/70 bg-surface-input/95 pl-10 pr-4 text-sm shadow-inner transition placeholder:text-muted-foreground/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-focus-ring;
+    @apply h-12 w-full rounded-2xl border border-border/70 bg-surface-input/95 pl-10 pr-4 text-sm shadow-inner transition placeholder:text-muted-foreground/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-focus-ring;
   }
 
   .app-header__nav {
-    @apply flex shrink-0 items-center gap-1 rounded-2xl border border-border/60 p-1 transition-shadow;
+    @apply flex min-w-0 w-full flex-wrap items-center gap-1 rounded-2xl border border-border/60 p-1 transition-shadow lg:w-auto lg:justify-self-end;
+    grid-area: nav;
     background-color: var(--surface-shell);
   }
 
   .app-header__nav-button {
-    @apply inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+    @apply inline-flex min-h-10 whitespace-nowrap items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
   }
 
   .app-header__nav-button--idle {
@@ -232,7 +251,7 @@
   }
 
   .app-header__control-plane {
-    @apply inline-flex min-w-[13.5rem] items-center gap-3 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand to-brand-hover px-4 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-px hover:border-brand/30 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+    @apply inline-flex min-w-0 w-full basis-full items-center justify-between gap-3 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand to-brand-hover px-4 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-px hover:border-brand/30 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring sm:w-auto sm:basis-auto sm:max-w-full sm:whitespace-nowrap;
     box-shadow: var(--shadow-control-plane);
   }
 
@@ -260,8 +279,77 @@
   }
 
   .app-header__utility-strip {
-    @apply flex shrink-0 items-center gap-2 rounded-2xl border border-border/60 px-1.5 py-1.5;
+    @apply flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2 rounded-2xl border border-border/60 px-2 py-2 lg:justify-self-end;
+    grid-area: utility;
     background-color: var(--surface-shell);
+  }
+
+  .context-bar {
+    @apply border-b border-border bg-surface-panel/95 px-4 py-3 backdrop-blur-sm sm:px-5;
+  }
+
+  .context-bar__layout {
+    @apply mx-auto flex max-w-[1600px] flex-col gap-3 lg:flex-row lg:items-center lg:justify-between;
+  }
+
+  .context-bar__clusters {
+    @apply flex min-w-0 flex-col gap-2 md:flex-row md:flex-wrap md:items-center;
+  }
+
+  .context-bar__cluster {
+    @apply flex min-w-0 flex-wrap items-center gap-1.5;
+  }
+
+  .context-bar__official-toggle {
+    @apply inline-flex min-h-9 whitespace-nowrap items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+  }
+
+  .context-bar__official-toggle--active {
+    @apply border-brand/20 bg-interactive-accent-subtle text-brand;
+  }
+
+  .context-bar__official-toggle--idle {
+    @apply text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground;
+  }
+
+  .context-bar__chip-group {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+
+  .context-bar__chip {
+    @apply inline-flex min-h-9 whitespace-nowrap items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all;
+  }
+
+  .context-bar__chip--active {
+    @apply bg-brand-strong text-white shadow-sm ring-1 ring-brand/10;
+  }
+
+  .context-bar__chip--idle {
+    @apply bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground;
+  }
+
+  .context-bar__tab-group {
+    @apply flex flex-wrap items-center gap-1;
+  }
+
+  .context-bar__tab {
+    @apply inline-flex min-h-9 whitespace-nowrap items-center rounded-full px-3 py-1.5 text-xs font-medium transition-all;
+  }
+
+  .context-bar__tab--active {
+    @apply bg-interactive-accent-subtle text-brand ring-1 ring-brand/10;
+  }
+
+  .context-bar__tab--idle {
+    @apply text-muted-foreground hover:bg-muted hover:text-foreground;
+  }
+
+  .mobile-workspace__shell {
+    @apply flex h-[100dvh] flex-col overflow-hidden bg-surface-page;
+  }
+
+  .mobile-workspace__sheet {
+    @apply min-h-full overflow-hidden rounded-t-[1.75rem] border border-border/60 border-b-0 bg-surface-panel/95 shadow-[0_-12px_40px_rgb(15_23_42/6%)];
   }
 }
 

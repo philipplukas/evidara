@@ -65,7 +65,11 @@ describe("High-impact interaction controls", () => {
     const onSelect = vi.fn();
     renderWithProviders(<ExactMatchStrip matches={[searchResults[0]]} onSelect={onSelect} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Art\. 754 OR/ }));
+    expect(screen.getByText("Exakte Treffer")).toBeInTheDocument();
+    expect(screen.getByText("Hohe Übereinstimmung")).toBeInTheDocument();
+    expect(screen.getByText("1 gefunden")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Exakten Treffer Art\. 754 OR öffnen/ }));
     expect(onSelect).toHaveBeenCalledWith(searchResults[0].id);
   });
 
@@ -99,12 +103,19 @@ describe("High-impact interaction controls", () => {
     renderWithProviders(<ScopeHarness />);
     fireEvent.click(screen.getByRole("button", { name: "pivot-now" }));
 
-    const backButton = screen.getByRole("button", { name: /Back/ });
+    const backButton = screen.getByRole("button", { name: /Zum vorherigen Bereich/ });
     expect(backButton).toBeInTheDocument();
-    expect(screen.getByText("Current scope")).toBeInTheDocument();
+    expect(screen.getByText("Aktueller Bereich")).toBeInTheDocument();
+    expect(screen.getByText("Eingegrenzter Bereich")).toBeInTheDocument();
     expect(screen.getByText("Commentary for Art. 754 OR")).toBeInTheDocument();
     expect(screen.getByText(/Search for "Art 754 OR" · Commentary/)).toBeInTheDocument();
-    expect(screen.getByText(/Previous scope: Results for "Art 754 OR"/)).toBeInTheDocument();
+    expect(screen.getByText("Vorheriger Bereich")).toBeInTheDocument();
+    expect(screen.getByText(/Results for "Art 754 OR" erneut öffnen/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Der Bereich wurde gegenüber der vorherigen Ergebnismenge eingegrenzt, damit die aktuellen Belege fokussierter bleiben\./,
+      ),
+    ).toBeInTheDocument();
 
     act(() => {
       fireEvent.click(backButton);

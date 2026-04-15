@@ -2,6 +2,7 @@
 
 import {
   Alert,
+  AlertTitle,
   Button,
   Chip,
   Dialog,
@@ -266,6 +267,15 @@ export function RunLaunchButton({
     () => readiness?.checks.filter((check) => !check.ok) ?? [],
     [readiness],
   );
+  const readinessStatusLabel = isCheckingReadiness
+    ? "Preflight checking"
+    : readinessError
+      ? "Preflight error"
+      : readiness?.ready
+        ? "Preflight ready"
+        : readiness
+          ? "Preflight blocked"
+          : "Preflight pending";
   const isReadyToCreate =
     !!formState.source_id &&
     !!formState.source_version_id &&
@@ -318,6 +328,7 @@ export function RunLaunchButton({
                         : "Version not selected"
                     }
                   />
+                  <Chip size="small" label={readinessStatusLabel} variant="outlined" />
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
                   {formState.mode === "production"
@@ -407,22 +418,16 @@ export function RunLaunchButton({
             </Paper>
 
             {isCheckingReadiness ? (
-              <Alert
-                severity="info"
-                icon={false}
-                action={<Chip size="small" color="info" variant="outlined" label="running" />}
-              >
-                Checking preflight readiness...
+              <Alert severity="info" icon={false}>
+                <AlertTitle>Checking preflight readiness</AlertTitle>
+                The launch dialog is validating the selected source/version pair.
               </Alert>
             ) : null}
             {readinessError ? <Alert severity="error">{readinessError}</Alert> : null}
             {readiness && !readiness.ready ? (
-              <Alert
-                severity="warning"
-                icon={false}
-                action={<Chip size="small" color="warning" variant="outlined" label="blocked" />}
-              >
+              <Alert severity="warning" icon={false}>
                 <Stack spacing={1.25}>
+                  <AlertTitle>Preflight blocks launch</AlertTitle>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     Preflight is blocking launch. Resolve the items below to enable Create Run.
                   </Typography>
@@ -463,12 +468,9 @@ export function RunLaunchButton({
               </Alert>
             ) : null}
             {readiness?.ready ? (
-              <Alert
-                severity="success"
-                icon={false}
-                action={<Chip size="small" color="success" variant="outlined" label="ready" />}
-              >
-                Preflight checks passed. The current source/version pair is ready to launch.
+              <Alert severity="success" icon={false}>
+                <AlertTitle>Preflight ready</AlertTitle>
+                The current source/version pair is ready to launch.
               </Alert>
             ) : null}
           </Stack>

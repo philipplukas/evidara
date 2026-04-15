@@ -2,6 +2,7 @@
 
 import {
   Alert,
+  AlertTitle,
   Box,
   Button,
   Checkbox,
@@ -122,6 +123,39 @@ const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: st
   it: [],
 };
 
+const VERSION_STATUS_META = {
+  draft: {
+    label: "Draft",
+    color: "warning" as const,
+    detail: "Needs review before approval.",
+    attention: true,
+  },
+  pending_approval: {
+    label: "Pending approval",
+    color: "info" as const,
+    detail: "Waiting on operator review.",
+    attention: true,
+  },
+  approved: {
+    label: "Approved",
+    color: "success" as const,
+    detail: "Ready for preview or production runs.",
+    attention: false,
+  },
+  rejected: {
+    label: "Rejected",
+    color: "error" as const,
+    detail: "Needs revision or replacement.",
+    attention: true,
+  },
+  superseded: {
+    label: "Superseded",
+    color: "default" as const,
+    detail: "Read-only history.",
+    attention: false,
+  },
+} as const;
+
 const listToText = (values: string[]): string => values.join("\n");
 
 const textToList = (value: string): string[] =>
@@ -135,6 +169,101 @@ const formatDateTime = (value: string): string =>
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+
+export const describeSourceVersionStatus = (status: SourceVersionRecord["status"]) =>
+  VERSION_STATUS_META[status];
+
+export type SourceVersionLifecycleSummary = {
+  total: number;
+  counts: Record<SourceVersionRecord["status"], number>;
+  attentionCount: number;
+  latestVersion: SourceVersionRecord | null;
+  nextAction: string;
+  nextActionDetail: string;
+};
+
+export const summarizeSourceVersionLifecycle = (
+  versions: SourceVersionRecord[],
+): SourceVersionLifecycleSummary => {
+  const counts: SourceVersionLifecycleSummary["counts"] = {
+    draft: 0,
+    pending_approval: 0,
+    approved: 0,
+    rejected: 0,
+    superseded: 0,
+  };
+
+  for (const version of versions) {
+    counts[version.status] += 1;
+  }
+
+  const attentionCount = counts.draft + counts.pending_approval + counts.rejected;
+
+  if (versions.length === 0) {
+    return {
+      total: 0,
+      counts,
+      attentionCount,
+      latestVersion: null,
+      nextAction: "Create the first source version.",
+      nextActionDetail: "Start with a draft so the source has a reviewable lifecycle.",
+    };
+  }
+
+  if (counts.draft > 0) {
+    return {
+      total: versions.length,
+      counts,
+      attentionCount,
+      latestVersion: versions[0] ?? null,
+      nextAction: "Finish the draft version.",
+      nextActionDetail: "Draft versions need review before they can move into approval.",
+    };
+  }
+
+  if (counts.pending_approval > 0) {
+    return {
+      total: versions.length,
+      counts,
+      attentionCount,
+      latestVersion: versions[0] ?? null,
+      nextAction: "Review pending approval versions.",
+      nextActionDetail: "Pending versions are waiting on an operator decision before launch.",
+    };
+  }
+
+  if (counts.rejected > 0) {
+    return {
+      total: versions.length,
+      counts,
+      attentionCount,
+      latestVersion: versions[0] ?? null,
+      nextAction: "Replace or revise the rejected version.",
+      nextActionDetail: "Rejected versions should be corrected or superseded before new runs.",
+    };
+  }
+
+  if (counts.approved > 0) {
+    return {
+      total: versions.length,
+      counts,
+      attentionCount,
+      latestVersion: versions[0] ?? null,
+      nextAction: "Launch preview or production from the approved version.",
+      nextActionDetail: "Approved versions are ready for operator use and run creation.",
+    };
+  }
+
+  return {
+    total: versions.length,
+    counts,
+    attentionCount,
+    latestVersion: versions[0] ?? null,
+    nextAction: "Use the latest history as the baseline for a new version.",
+    nextActionDetail:
+      "Superseded versions are read-only, so new work should start from a fresh draft.",
+  };
+};
 
 const toFormState = (version?: SourceVersionRecord | null): SourceVersionFormState => {
   if (!version) {
@@ -702,6 +831,25 @@ export function SourceVersionsSection() {
     sort: LIST_PARAMS.sort,
     filter: { source_id: source?.source_id },
   });
+  const lifecycleSummary = summarizeSourceVersionLifecycle(versions.data ?? []);
+  const lifecycleAttentionColor =
+    lifecycleSummary.total === 0
+      ? ("info" as const)
+      : lifecycleSummary.attentionCount > 0
+        ? ("warning" as const)
+        : ("success" as const);
+  const lifecycleAttentionLabel =
+    lifecycleSummary.total === 0
+      ? "Awaiting first version"
+      : lifecycleSummary.attentionCount > 0
+        ? `${lifecycleSummary.attentionCount} need attention`
+        : "No attention needed";
+  const lifecycleAlertSeverity =
+    lifecycleSummary.total === 0
+      ? ("info" as const)
+      : lifecycleSummary.attentionCount > 0
+        ? ("warning" as const)
+        : ("success" as const);
 
   if (!source) {
     return null;
@@ -843,15 +991,83 @@ export function SourceVersionsSection() {
 
         {versions.error ? <Alert severity="error">Unable to load source versions.</Alert> : null}
 
-        {!versions.isPending && !versions.error && (versions.data?.length ?? 0) === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            No source versions exist for this source yet.
-          </Typography>
+        {!versions.isPending && !versions.error ? (
+          <Paper variant="outlined" sx={{ p: 1.5 }}>
+            <Stack spacing={1.25}>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                <Chip size="small" variant="outlined" label={`${lifecycleSummary.total} total`} />
+                <Chip
+                  size="small"
+                  color="warning"
+                  label={`${lifecycleSummary.counts.draft} draft`}
+                />
+                <Chip
+                  size="small"
+                  color="info"
+                  label={`${lifecycleSummary.counts.pending_approval} pending`}
+                />
+                <Chip
+                  size="small"
+                  color="success"
+                  label={`${lifecycleSummary.counts.approved} approved`}
+                />
+                <Chip
+                  size="small"
+                  color="error"
+                  label={`${lifecycleSummary.counts.rejected} rejected`}
+                />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`${lifecycleSummary.counts.superseded} superseded`}
+                />
+                <Chip
+                  size="small"
+                  color={lifecycleAttentionColor}
+                  label={lifecycleAttentionLabel}
+                />
+              </Stack>
+
+              <Alert severity={lifecycleAlertSeverity} icon={false}>
+                <Stack spacing={0.75}>
+                  <AlertTitle>{lifecycleSummary.nextAction}</AlertTitle>
+                  <Typography variant="body2">{lifecycleSummary.nextActionDetail}</Typography>
+                  {lifecycleSummary.latestVersion ? (
+                    <Typography variant="caption" color="text.secondary">
+                      Latest version: {lifecycleSummary.latestVersion.version_label} (
+                      {describeSourceVersionStatus(lifecycleSummary.latestVersion.status).label}) ·
+                      updated {formatDateTime(lifecycleSummary.latestVersion.updated_at)}
+                    </Typography>
+                  ) : null}
+                </Stack>
+              </Alert>
+            </Stack>
+          </Paper>
+        ) : null}
+
+        {versions.isPending && !versions.error ? (
+          <Alert severity="info">Loading source versions...</Alert>
+        ) : null}
+
+        {!versions.isPending && !versions.error && lifecycleSummary.total === 0 ? (
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Stack spacing={1}>
+              <Typography variant="subtitle2">No source versions yet</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Create the first draft version to establish the lifecycle for this source.
+              </Typography>
+              <Box>
+                <Button variant="contained" onClick={openCreateDialog}>
+                  Create Version
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
         ) : null}
 
         {versions.data && versions.data.length > 0 ? (
           <Box sx={{ overflowX: "auto" }}>
-            <Table size="small">
+            <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
                   <TableCell>Version</TableCell>
@@ -871,6 +1087,7 @@ export function SourceVersionsSection() {
                     version.status !== "rejected" && version.status !== "superseded";
                   const canProduction = version.status === "approved";
                   const isActing = actionVersionId === version.source_version_id;
+                  const statusMeta = describeSourceVersionStatus(version.status);
                   return (
                     <TableRow key={version.id}>
                       <TableCell>
@@ -882,7 +1099,12 @@ export function SourceVersionsSection() {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip size="small" label={version.status} />
+                        <Stack spacing={0.5} alignItems="flex-start">
+                          <Chip size="small" color={statusMeta.color} label={statusMeta.label} />
+                          <Typography variant="caption" color="text.secondary">
+                            {statusMeta.detail}
+                          </Typography>
+                        </Stack>
                       </TableCell>
                       <TableCell>{version.extractor_profile_id ?? "—"}</TableCell>
                       <TableCell>

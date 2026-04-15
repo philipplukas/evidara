@@ -122,6 +122,101 @@ const renderCodeBlock = (value: unknown): ReactNode => {
   );
 };
 
+export type PipelineDecisionSupport = {
+  whyItMatters: string;
+  whatIsBlocked: string;
+  whatChangedRecently: string;
+  whatHappensIfIgnored: string;
+};
+
+const stageLabel = (stage: RunPipelineHealth["stages"][number]): string =>
+  stage.stage.replace("_", " ");
+
+const mostRecentStage = (
+  stages: RunPipelineHealth["stages"],
+): RunPipelineHealth["stages"][number] | null =>
+  stages.reduce<RunPipelineHealth["stages"][number] | null>((latest, stage) => {
+    if (!stage.updated_at) {
+      return latest;
+    }
+    if (!latest?.updated_at) {
+      return stage;
+    }
+    return new Date(stage.updated_at).getTime() > new Date(latest.updated_at).getTime()
+      ? stage
+      : latest;
+  }, null);
+
+export function buildPipelineDecisionSupport(options: {
+  run: RunRecord;
+  health: RunPipelineHealth | null;
+}): PipelineDecisionSupport {
+  const { run, health } = options;
+
+  const whyItMatters =
+    run.mode === "production"
+      ? "This production run determines whether the source version can safely flow into the live operator surface."
+      : "This preview run is the gate before promotion, so the result tells operators whether the version is ready.";
+
+  if (!health) {
+    return {
+      whyItMatters,
+      whatIsBlocked: "Pipeline health has not loaded yet, so the blocked state is still unknown.",
+      whatChangedRecently:
+        "The latest stage movement will appear once the pipeline health snapshot loads.",
+      whatHappensIfIgnored:
+        "Without an operator check, the run will remain in its current state and no remediation guidance will surface.",
+    };
+  }
+
+  const blockedStages = health.stages.filter(
+    (stage) => stage.status === "blocked" || stage.status === "failed",
+  );
+  const latestStage = mostRecentStage(health.stages);
+
+  const whatIsBlocked =
+    health.overall_status === "ok"
+      ? "No stage is blocked right now."
+      : blockedStages.length > 0
+        ? `Blocked stages: ${blockedStages.map(stageLabel).join(", ")}.`
+        : "No stage is blocked, but the pipeline is still moving and may need operator attention soon.";
+
+  const whatChangedRecently = latestStage
+    ? `Most recent stage update: ${stageLabel(latestStage)} is ${latestStage.status.replace("_", " ")}.`
+    : `Health snapshot recorded ${health.processing_status_event_count} processing events and ${health.document_lifecycle_event_count} lifecycle events.`;
+
+  const whatHappensIfIgnored =
+    health.overall_status === "ok"
+      ? "Nothing urgent happens; the run remains a completed audit trail unless someone investigates it later."
+      : health.overall_status === "blocked"
+        ? "The run stays blocked until the relevant stage is remediated."
+        : health.overall_status === "failed"
+          ? "The failure remains unresolved and downstream progress will not clear itself."
+          : "The pipeline continues to advance and may still require intervention if a later stage stops.";
+
+  return {
+    whyItMatters,
+    whatIsBlocked,
+    whatChangedRecently,
+    whatHappensIfIgnored,
+  };
+}
+
+function DecisionSupportItem({ label, value }: { label: string; value: string }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, background: "rgba(15, 76, 129, 0.03)" }}>
+      <Stack spacing={0.5}>
+        <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+          {label}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {value}
+        </Typography>
+      </Stack>
+    </Paper>
+  );
+}
+
 function PreviewSummarySection({ run }: { run: RunRecord }) {
   const [summary, setSummary] = useState<RunPreviewSummary | null>(null);
   const [isPending, setIsPending] = useState(run.mode === "preview");
@@ -450,6 +545,28 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
     [run, health, readinessConfirmed, readinessBlockedCodes, verificationOpened],
   );
 
+  const stageSummary = useMemo(
+    () =>
+      health?.stages.reduce(
+        (counts, stage) => {
+          counts[stage.status] = (counts[stage.status] ?? 0) + 1;
+          return counts;
+        },
+        {
+          ok: 0,
+          blocked: 0,
+          failed: 0,
+          in_progress: 0,
+          pending: 0,
+        } as Record<string, number>,
+      ) ?? null,
+    [health],
+  );
+  const decisionSupport = useMemo(
+    () => buildPipelineDecisionSupport({ run, health }),
+    [health, run],
+  );
+
   useEffect(() => {
     let cancelled = false;
     setIsPending(true);
@@ -547,6 +664,67 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
               </Stack>
             </Alert>
 
+            <Paper variant="outlined" sx={{ p: 1.5, background: "rgba(15, 76, 129, 0.03)" }}>
+              <Stack spacing={1.25}>
+                <Box>
+                  <Typography variant="subtitle2">Decision support</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    The cues below translate the health snapshot into operator decisions.
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gap: 1,
+                    gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+                  }}
+                >
+                  <DecisionSupportItem
+                    label="Why this matters"
+                    value={decisionSupport.whyItMatters}
+                  />
+                  <DecisionSupportItem
+                    label="What is blocked"
+                    value={decisionSupport.whatIsBlocked}
+                  />
+                  <DecisionSupportItem
+                    label="What changed recently"
+                    value={decisionSupport.whatChangedRecently}
+                  />
+                  <DecisionSupportItem
+                    label="If you do nothing"
+                    value={decisionSupport.whatHappensIfIgnored}
+                  />
+                </Box>
+              </Stack>
+            </Paper>
+
+            {stageSummary ? (
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2">Stage summary</Typography>
+                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                    <Chip size="small" label={`Healthy ${stageSummary.ok ?? 0}`} color="success" />
+                    <Chip
+                      size="small"
+                      label={`Needs action ${(stageSummary.blocked ?? 0) + (stageSummary.failed ?? 0)}`}
+                      color="warning"
+                    />
+                    <Chip
+                      size="small"
+                      label={`In progress ${stageSummary.in_progress ?? 0}`}
+                      color="info"
+                    />
+                    <Chip
+                      size="small"
+                      label={`Pending ${stageSummary.pending ?? 0}`}
+                      variant="outlined"
+                    />
+                  </Stack>
+                </Stack>
+              </Paper>
+            ) : null}
+
             <Paper variant="outlined" sx={{ p: 1.5 }}>
               <Stack spacing={1}>
                 <Typography variant="subtitle2">Operator Checklist</Typography>
@@ -621,19 +799,33 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                       <Stack
                         direction="row"
                         spacing={1}
-                        alignItems="center"
+                        alignItems="flex-start"
+                        justifyContent="space-between"
                         useFlexGap
                         flexWrap="wrap"
                       >
-                        <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
-                          {stage.stage.replace("_", " ")}
-                        </Typography>
-                        <Chip
-                          size="small"
-                          label={stage.status}
-                          color={pipelineChipColor(stage.status)}
-                          variant="outlined"
-                        />
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
+                            {stage.stage.replace("_", " ")}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDateTime(stage.updated_at)}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                          <Chip
+                            size="small"
+                            label={stage.status}
+                            color={pipelineChipColor(stage.status)}
+                            variant="outlined"
+                          />
+                          <Chip
+                            size="small"
+                            label={isHealthy ? "No action required" : "Action required"}
+                            color={isHealthy ? "success" : "warning"}
+                            variant={isHealthy ? "outlined" : "filled"}
+                          />
+                        </Stack>
                       </Stack>
                       <Typography variant="body2" color="text.secondary">
                         {stage.detail}
@@ -643,19 +835,30 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                           No remediation required.
                         </Typography>
                       ) : (
-                        <Alert
-                          severity={stage.status === "failed" ? "error" : "warning"}
-                          icon={false}
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 1.25,
+                            background:
+                              stage.status === "failed"
+                                ? "rgba(211, 47, 47, 0.04)"
+                                : "rgba(245, 158, 11, 0.06)",
+                          }}
                         >
                           <Stack
                             direction={{ xs: "column", md: "row" }}
-                            spacing={1}
-                            alignItems="center"
+                            spacing={1.25}
+                            alignItems={{ xs: "stretch", md: "center" }}
                             justifyContent="space-between"
                           >
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              Next action: {stageNextAction(stage)}
-                            </Typography>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                Next action: {stageNextAction(stage)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                The button on the right opens the most relevant remediation surface.
+                              </Typography>
+                            </Box>
                             <Button
                               component="a"
                               href={actionTarget.href}
@@ -681,11 +884,8 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                               {actionTarget.label}
                             </Button>
                           </Stack>
-                        </Alert>
+                        </Paper>
                       )}
-                      <Typography variant="caption" color="text.secondary">
-                        Updated: {formatDateTime(stage.updated_at)}
-                      </Typography>
                     </Stack>
                   </Paper>
                 );

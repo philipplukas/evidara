@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { getIcon } from "@/lib/icons";
@@ -16,26 +16,46 @@ export function FilterPanel({ filters }: FilterPanelProps) {
   const { state: constraints, dispatch } = useSearchConstraints();
   const t = useTranslations();
   const hasRefinements = constraints.refinements.length > 0;
+
+  if (filters.length === 0) {
+    return (
+      <div className="px-4 py-4">
+        <div className="rounded-2xl border border-dashed border-border/70 bg-surface-shell/45 px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-interactive-accent-subtle text-brand">
+            <SlidersHorizontal className="h-4 w-4" />
+          </div>
+          <SectionLabel className="mb-1">{t("filter.filtersTitle")}</SectionLabel>
+          <p className="text-sm font-medium text-foreground">No filters available</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            The current result set does not expose any refinements yet.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="py-4 space-y-1">
-      <div className="px-4 pb-3 space-y-2">
-        <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
-        <div className="flex items-center gap-3 text-xs">
-          <button
-            type="button"
-            onClick={() => dispatch({ type: "CLEAR_ALL_REFINEMENTS" })}
-            disabled={!hasRefinements}
-            className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {t("filter.clearAll")}
-          </button>
-          <button
-            type="button"
-            onClick={() => dispatch({ type: "RESET_ALL" })}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {t("filter.resetAll")}
-          </button>
+    <div className="space-y-2 py-3">
+      <div className="px-4 pb-2">
+        <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
+          <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "CLEAR_ALL_REFINEMENTS" })}
+              disabled={!hasRefinements}
+              className="inline-flex items-center rounded-full border border-border/70 bg-surface-panel px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t("filter.clearAll")}
+            </button>
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "RESET_ALL" })}
+              className="inline-flex items-center rounded-full border border-border/70 bg-surface-panel px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {t("filter.resetAll")}
+            </button>
+          </div>
         </div>
       </div>
       {filters.map((filter) => (
@@ -53,6 +73,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
 
   const refinement = constraints.refinements.find((r) => r.field === filter.key);
   const selected = refinement?.values ?? filter.selected;
+  const selectedCount = selected.length;
 
   const toggle = (value: string) => {
     const next = selected.includes(value)
@@ -96,160 +117,180 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
   );
 
   return (
-    <div className="border-b border-border/60 last:border-0">
+    <div className="overflow-hidden rounded-2xl border border-border/70 bg-surface-shell/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium
-          text-foreground hover:bg-muted/50 transition-colors"
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-3.5 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-interactive-accent-subtle/70"
       >
-        <span>{filter.label}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">{filter.label}</span>
+          {selectedCount > 0 && (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand/10 px-1.5 text-tiny font-semibold text-brand">
+              {selectedCount}
+            </span>
+          )}
+        </span>
         {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         )}
       </button>
 
       {expanded && (
-        <div className="px-4 pb-3">
+        <div className="border-t border-border/60 px-3.5 pb-3 pt-3">
           {filter.type === "checkbox" && filter.options.length > 5 && (
-            <div className="relative mb-2">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+            <div className="relative mb-2.5">
+              <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
                 placeholder={t("filter.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-7 pl-7 pr-2 text-xs rounded border border-border bg-surface-panel
-                  focus:outline-none focus:ring-1 focus:ring-focus-ring"
+                className="h-8 w-full rounded-xl border border-border bg-surface-input/95 pl-8 pr-3 text-xs shadow-inner transition placeholder:text-muted-foreground/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-focus-ring"
               />
             </div>
           )}
 
-          {filter.type === "chip" && (
-            <div className="flex flex-wrap gap-1.5">
-              {filteredOptions.map((opt) => {
-                const icon = getIcon(opt.iconKey);
-                const isSelected = selected.includes(opt.value);
-                return (
+          {filteredOptions.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/70 bg-muted/25 px-3 py-4 text-center">
+              <p className="text-xs font-medium text-foreground/75">No matching options</p>
+              <p className="mt-1 text-tiny text-muted-foreground">Try a different search term.</p>
+            </div>
+          ) : (
+            <>
+              {filter.type === "chip" && (
+                <div className="flex flex-wrap gap-1.5">
+                  {filteredOptions.map((opt) => {
+                    const icon = getIcon(opt.iconKey);
+                    const isSelected = selected.includes(opt.value);
+                    return (
+                      <button
+                        type="button"
+                        key={opt.value}
+                        onClick={() => toggle(opt.value)}
+                        aria-pressed={isSelected}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
+                          isSelected
+                            ? "border-brand bg-brand-strong text-white shadow-sm"
+                            : "border-border/70 bg-surface-panel text-muted-foreground hover:border-brand/30 hover:text-foreground"
+                        }`}
+                      >
+                        {icon && <span className="text-xs">{icon}</span>}
+                        <span>{opt.label}</span>
+                        {opt.count != null && (
+                          <span
+                            className={`text-tiny ${
+                              isSelected ? "text-white/60" : "text-muted-foreground/60"
+                            }`}
+                          >
+                            {opt.count.toLocaleString()}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {filter.type === "checkbox" && (
+                <div className="space-y-0.5">
+                  {filteredOptions.map((opt) => {
+                    const isSelected = selected.includes(opt.value);
+                    return (
+                      <label
+                        key={opt.value}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-muted/45 group"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          aria-checked={isSelected}
+                          onChange={() => toggle(opt.value)}
+                          className="sr-only"
+                        />
+                        <div
+                          className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-all ${
+                            isSelected
+                              ? "border-brand bg-brand"
+                              : "border-border group-hover:border-muted-foreground"
+                          }`}
+                        >
+                          {isSelected && (
+                            <svg
+                              className="h-2.5 w-2.5 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={3}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="flex-1 text-xs text-foreground/80 transition-colors group-hover:text-foreground">
+                          {opt.label}
+                        </span>
+                        {opt.count != null && (
+                          <span className="text-tiny text-muted-foreground">
+                            {opt.count.toLocaleString()}
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              {filter.type === "dropdown" && (
+                <select
+                  aria-label={filter.label}
+                  value={selected[0] || ""}
+                  onChange={(e) => setSelected([e.target.value])}
+                  className="h-9 w-full rounded-xl border border-border bg-surface-input/95 px-3 text-xs shadow-inner transition focus:border-brand focus:outline-none focus:ring-2 focus:ring-focus-ring"
+                >
+                  {filter.options.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {filter.type === "toggle" && (
+                <div className="flex items-center justify-between rounded-xl border border-border/70 bg-surface-input/70 px-3 py-2.5">
                   <button
                     type="button"
-                    key={opt.value}
-                    onClick={() => toggle(opt.value)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all
-                      ${
-                        isSelected
-                          ? "bg-brand-strong text-white"
-                          : "bg-muted text-muted-foreground hover:text-foreground"
-                      }`}
+                    aria-label={`${filter.label} toggle`}
+                    aria-pressed={selected.length > 0}
+                    onClick={() => setSelected(selected.length > 0 ? [] : ["true"])}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelected(selected.length > 0 ? [] : ["true"]);
+                      }
+                    }}
+                    className={`relative h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
+                      selected.length > 0 ? "bg-brand" : "bg-muted-foreground/20"
+                    }`}
                   >
-                    {icon && <span className="text-xs">{icon}</span>}
-                    {opt.label}
-                    {opt.count != null && (
-                      <span
-                        className={`text-tiny ${isSelected ? "text-white/60" : "text-muted-foreground/60"}`}
-                      >
-                        {opt.count.toLocaleString()}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {filter.type === "checkbox" && (
-            <div className="space-y-1">
-              {filteredOptions.map((opt) => {
-                const isSelected = selected.includes(opt.value);
-                return (
-                  <label
-                    key={opt.value}
-                    className="flex items-center gap-2 py-1 cursor-pointer group w-full text-left"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      aria-checked={isSelected}
-                      onChange={() => toggle(opt.value)}
-                      className="sr-only"
-                    />
                     <div
-                      className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all
-                        ${
-                          isSelected
-                            ? "bg-brand border-brand"
-                            : "border-border group-hover:border-muted-foreground"
-                        }`}
-                    >
-                      {isSelected && (
-                        <svg
-                          className="w-2.5 h-2.5 text-white"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className="text-xs text-foreground/80 group-hover:text-foreground flex-1">
-                      {opt.label}
-                    </span>
-                    {opt.count != null && (
-                      <span className="text-tiny text-muted-foreground">
-                        {opt.count.toLocaleString()}
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          )}
-
-          {filter.type === "dropdown" && (
-            <select
-              aria-label={filter.label}
-              value={selected[0] || ""}
-              onChange={(e) => setSelected([e.target.value])}
-              className="w-full h-8 px-2 text-xs rounded border border-border bg-surface-panel
-                focus:outline-none focus:ring-1 focus:ring-focus-ring"
-            >
-              {filter.options.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {filter.type === "toggle" && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <button
-                type="button"
-                aria-label={`${filter.label} toggle`}
-                aria-pressed={selected.length > 0}
-                onClick={() => setSelected(selected.length > 0 ? [] : ["true"])}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    setSelected(selected.length > 0 ? [] : ["true"]);
-                  }
-                }}
-                className={`w-8 h-4.5 rounded-full relative transition-colors cursor-pointer
-                  ${selected.length > 0 ? "bg-brand" : "bg-muted-foreground/20"}`}
-              >
-                <div
-                  className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform
-                    ${selected.length > 0 ? "translate-x-4" : "translate-x-0.5"}`}
-                />
-              </button>
-              <span className="text-xs text-foreground/80">
-                {filter.options[0]?.label || t("filter.yes")}
-              </span>
-            </label>
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                        selected.length > 0 ? "translate-x-4" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                  <span className="ml-3 flex-1 text-xs text-foreground/80">
+                    {filter.options[0]?.label || t("filter.yes")}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

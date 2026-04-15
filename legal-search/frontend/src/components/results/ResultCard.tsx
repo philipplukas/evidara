@@ -35,18 +35,25 @@ export function ResultCard({
   return (
     <article
       aria-current={isSelected ? "true" : undefined}
+      aria-label={`Open ${result.title}`}
       onClick={() => onFocus(result.id)}
-      className={`group px-4 py-4 border-b border-border/60 cursor-pointer transition-all rounded-sm
-        sm:px-5
+      className={`group cursor-pointer border-b border-border/60 px-4 py-3.5 transition-[background-color,border-color,box-shadow,transform]
+        duration-150 focus-within:ring-1 focus-within:ring-brand/20 sm:px-5
         ${
           isSelected
-            ? "bg-brand/[0.06] border-l-2 border-l-brand shadow-[inset_0_0_0_1px_rgba(15,76,129,0.22)]"
-            : "hover:bg-muted/30 border-l-2 border-l-transparent hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]"
+            ? "border-l-2 border-l-brand bg-brand/[0.06] shadow-[inset_0_0_0_1px_rgba(15,76,129,0.18)]"
+            : "border-l-2 border-l-transparent hover:-translate-y-px hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
         }`}
     >
+      {result.structuralContext && (
+        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+          {result.structuralContext}
+        </div>
+      )}
+
       {/* Title row */}
-      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-2">
-        <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <h3 className="min-w-0 flex-1 text-[15px] font-semibold leading-5 text-foreground">
           {result.title}
         </h3>
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
@@ -68,37 +75,34 @@ export function ResultCard({
       </div>
 
       {/* Subtitle */}
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>{result.subtitle}</span>
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <span className="min-w-0">{result.subtitle}</span>
         {result.contentLanguage?.isTranslation && (
-          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-tiny font-medium">
-            <Globe className="w-2.5 h-2.5" />
+          <span className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-tiny font-medium text-amber-700">
+            <Globe className="h-2.5 w-2.5" />
             {result.contentLanguage.label}
           </span>
         )}
       </div>
 
-      {/* Structural context */}
-      {result.structuralContext && (
-        <div className="text-micro text-muted-foreground/70 mb-2 font-medium">
-          {result.structuralContext}
-        </div>
-      )}
-
       {/* Snippet */}
-      <p className="text-sm text-foreground/80 leading-relaxed mb-3 line-clamp-3 font-document">
+      <p className="mb-3 line-clamp-3 text-[13px] leading-6 text-foreground/80 font-document">
         {result.snippet}
       </p>
 
       {/* Metadata rows */}
       {result.metadataRows.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3">
+        <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1">
           {result.metadataRows.map((row, i) => {
             const icon = getIcon(row.iconKey);
             return (
-              <span key={i} className="text-micro text-muted-foreground">
-                <span className="font-medium text-foreground/60">{row.label}:</span>{" "}
-                {icon && <span className="text-xs">{icon}</span>} {row.value}
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+              >
+                {icon && <span className="text-xs text-muted-foreground/80">{icon}</span>}
+                <span className="font-medium text-foreground/60">{row.label}:</span>
+                <span className="text-foreground/80">{row.value}</span>
               </span>
             );
           })}
@@ -106,25 +110,27 @@ export function ResultCard({
       )}
 
       {/* Bottom row: related counts (pivots) + actions */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
           {result.relatedCounts.map((rc, i) => (
             <button
               type="button"
               key={i}
+              aria-label={`See ${rc.count} related ${rc.label}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onPivot?.(rc.label, result.id);
               }}
-              className="inline-flex items-center gap-1 text-micro text-muted-foreground
-                hover:text-brand transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/70
+                bg-muted/20 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors
+                hover:border-brand/30 hover:bg-brand/5 hover:text-brand"
             >
               <span className="font-semibold text-foreground/60">{rc.count}</span>
               {rc.label}
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-1 opacity-70 transition-opacity group-hover:opacity-100">
+        <div className="flex flex-wrap items-center gap-1">
           {onPin && (
             <AccentButton
               onClick={(e) => {
@@ -132,6 +138,8 @@ export function ResultCard({
                 onPin(result.id, result.title, result.type);
               }}
               active={isPinned}
+              title={isPinned ? "Unpin result" : "Pin result"}
+              className="border border-border/70 bg-background shadow-sm"
             >
               <MapPin className="w-3 h-3" />
               {isPinned ? "Pinned" : "Pin"}
@@ -140,7 +148,12 @@ export function ResultCard({
           {result.actions.map((action, i) => {
             const IconComp = iconComponents[action.icon] || ArrowRight;
             return (
-              <AccentButton key={i} onClick={(e) => e.stopPropagation()}>
+              <AccentButton
+                key={i}
+                onClick={(e) => e.stopPropagation()}
+                title={action.label}
+                className="border border-border/70 bg-background shadow-sm"
+              >
                 <IconComp className="w-3 h-3" />
                 {action.label}
               </AccentButton>

@@ -6,6 +6,7 @@ const HANDOFF_QUERY_PARAM = "ls_query";
 const HANDOFF_SCOPE_PARAM = "ls_scope";
 const HANDOFF_ITEM_PARAM = "ls_item";
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
 export type LegalSearchHandoff = {
   hasOrigin: boolean;
@@ -29,6 +30,35 @@ function resolveConfiguredOrigin(fallbackUrl: string): string | null {
   }
 }
 
+function normalizePort(url: URL): string {
+  if (url.port) {
+    return url.port;
+  }
+  return url.protocol === "https:" ? "443" : "80";
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(hostname);
+}
+
+function isAllowedReturnTarget(candidate: URL, configuredOrigin: string): boolean {
+  if (candidate.origin === configuredOrigin) {
+    return true;
+  }
+
+  try {
+    const configured = new URL(configuredOrigin);
+    return (
+      candidate.protocol === configured.protocol &&
+      normalizePort(candidate) === normalizePort(configured) &&
+      isLoopbackHost(candidate.hostname) &&
+      isLoopbackHost(configured.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function resolveLegalSearchHandoff(
   searchParams: Pick<URLSearchParams, "get"> | null,
   fallbackUrl: string,
@@ -42,7 +72,10 @@ export function resolveLegalSearchHandoff(
   if (rawReturnTo) {
     try {
       const parsed = new URL(rawReturnTo, configuredOrigin);
-      if (ALLOWED_PROTOCOLS.has(parsed.protocol) && parsed.origin === configuredOrigin) {
+      if (
+        ALLOWED_PROTOCOLS.has(parsed.protocol) &&
+        isAllowedReturnTarget(parsed, configuredOrigin)
+      ) {
         returnToUrl = parsed.toString();
       }
     } catch {
@@ -60,14 +93,20 @@ export function resolveLegalSearchHandoff(
 }
 
 export function describeLegalSearchHandoff(handoff: LegalSearchHandoff): string {
-  if (handoff.scopeLabel && handoff.query) {
-    return `${handoff.scopeLabel} · Search "${handoff.query}"`;
-  }
+  const parts: string[] = [];
+
   if (handoff.scopeLabel) {
-    return handoff.scopeLabel;
+    parts.push(handoff.scopeLabel);
   }
   if (handoff.query) {
-    return `Search "${handoff.query}"`;
+    parts.push(`Search "${handoff.query}"`);
+  }
+  if (handoff.selectedId) {
+    parts.push(`Selected item: ${handoff.selectedId}`);
+  }
+
+  if (parts.length > 0) {
+    return parts.join(" · ");
   }
   return "Continue from legal search";
 }

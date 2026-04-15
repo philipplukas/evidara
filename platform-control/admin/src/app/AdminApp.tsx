@@ -45,12 +45,12 @@ const adminTheme = createTheme({
       contrastText: "#fffdf8",
     },
     secondary: {
-      main: "#9a7a4a",
-      light: "#f1e6d6",
+      main: "#5c6b7e",
+      light: "#e5ebf2",
       contrastText: "#1d293d",
     },
     background: {
-      default: "#f4efe7",
+      default: "#eef2f6",
       paper: "#fffdf8",
     },
     text: {
@@ -78,17 +78,18 @@ const adminTheme = createTheme({
     MuiAppBar: {
       styleOverrides: {
         colorPrimary: {
-          background: "linear-gradient(120deg, rgba(15, 76, 129, 0.98), rgba(11, 61, 104, 0.94))",
+          background: "linear-gradient(120deg, rgba(13, 58, 98, 0.98), rgba(9, 48, 83, 0.95))",
           color: "#fffdf8",
           borderBottom: "1px solid rgba(255, 253, 248, 0.12)",
-          boxShadow: "0 18px 40px rgba(15, 76, 129, 0.14)",
+          boxShadow: "0 18px 40px rgba(15, 76, 129, 0.12)",
+          backdropFilter: "blur(16px)",
         },
       },
     },
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 999,
+          borderRadius: 12,
           textTransform: "none",
           fontWeight: 600,
         },
@@ -97,7 +98,26 @@ const adminTheme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 999,
+          borderRadius: 10,
+          fontWeight: 600,
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 20,
+          background: "rgba(255, 253, 248, 0.9)",
+          border: "1px solid rgba(29, 41, 61, 0.08)",
+          boxShadow: "0 18px 44px rgba(29, 41, 61, 0.08)",
+          backdropFilter: "blur(14px)",
+        },
+      },
+    },
+    MuiDivider: {
+      styleOverrides: {
+        root: {
+          borderColor: "rgba(29, 41, 61, 0.12)",
         },
       },
     },
@@ -107,14 +127,16 @@ const adminTheme = createTheme({
           backdropFilter: "blur(14px)",
           border: "1px solid rgba(29, 41, 61, 0.08)",
           boxShadow: "0 22px 50px rgba(29, 41, 61, 0.08)",
+          backgroundImage: "none",
         },
       },
     },
     MuiDrawer: {
       styleOverrides: {
         paper: {
+          width: 288,
           background:
-            "linear-gradient(180deg, rgba(255, 253, 248, 0.98), rgba(248, 243, 235, 0.94))",
+            "linear-gradient(180deg, rgba(255, 253, 248, 0.98), rgba(248, 243, 235, 0.92))",
           borderRight: "1px solid rgba(29, 41, 61, 0.08)",
           backdropFilter: "blur(14px)",
         },
@@ -123,15 +145,23 @@ const adminTheme = createTheme({
     MuiListItemButton: {
       styleOverrides: {
         root: {
-          margin: "4px 8px",
+          margin: "4px 10px",
           borderRadius: 14,
+          minHeight: 44,
+          paddingTop: 10,
+          paddingBottom: 10,
+          paddingLeft: 14,
+          paddingRight: 14,
           transition: "background-color 160ms ease, transform 160ms ease",
+          "&:hover": {
+            backgroundColor: alpha("#0f4c81", 0.05),
+          },
           "&.Mui-selected": {
-            backgroundColor: alpha("#0f4c81", 0.08),
-            boxShadow: `inset 0 0 0 1px ${alpha("#0f4c81", 0.14)}`,
+            backgroundColor: alpha("#0f4c81", 0.1),
+            boxShadow: `inset 0 0 0 1px ${alpha("#0f4c81", 0.16)}`,
           },
           "&.Mui-selected:hover": {
-            backgroundColor: alpha("#0f4c81", 0.12),
+            backgroundColor: alpha("#0f4c81", 0.14),
           },
         },
       },
@@ -144,10 +174,39 @@ const adminTheme = createTheme({
         },
       },
     },
+    MuiListItemText: {
+      styleOverrides: {
+        primary: {
+          fontWeight: 600,
+          lineHeight: 1.2,
+        },
+        secondary: {
+          color: "rgba(29, 41, 61, 0.62)",
+          fontSize: 12,
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          borderBottom: "1px solid rgba(29, 41, 61, 0.08)",
+          paddingTop: 14,
+          paddingBottom: 14,
+        },
+        head: {
+          background: "rgba(244, 239, 231, 0.72)",
+          color: "rgba(29, 41, 61, 0.7)",
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        },
+      },
+    },
     MuiToolbar: {
       styleOverrides: {
         root: {
-          minHeight: 76,
+          minHeight: 72,
           alignItems: "stretch",
         },
       },
@@ -158,6 +217,7 @@ const adminTheme = createTheme({
 function EvidaraAdminAppBar(props: AppBarProps) {
   const [handoff, setHandoff] = useState(() => resolveLegalSearchHandoff(null, LEGAL_SEARCH_URL));
   const handoffLabel = describeLegalSearchHandoff(handoff);
+  const selectedItemLabel = handoff.selectedId ? `Selected item: ${handoff.selectedId}` : null;
 
   useEffect(() => {
     setHandoff(
@@ -188,11 +248,10 @@ function EvidaraAdminAppBar(props: AppBarProps) {
               borderRadius: 3,
               display: "grid",
               placeItems: "center",
-              background:
-                "linear-gradient(135deg, rgba(255, 253, 248, 0.98), rgba(255, 253, 248, 0.72))",
-              color: "#0f4c81",
-              border: "1px solid rgba(255, 253, 248, 0.2)",
-              boxShadow: "0 12px 24px rgba(7, 23, 40, 0.12)",
+              background: "linear-gradient(135deg, #0f4c81, #0b3d68)",
+              color: "#fffdf8",
+              border: "1px solid rgba(255, 253, 248, 0.16)",
+              boxShadow: "0 12px 24px rgba(7, 23, 40, 0.16)",
               fontFamily: "var(--font-admin-serif), Georgia, serif",
               fontSize: 18,
               fontWeight: 700,
@@ -220,7 +279,7 @@ function EvidaraAdminAppBar(props: AppBarProps) {
                 lineHeight: 1.3,
               }}
             >
-              Platform control
+              Control plane
             </Typography>
           </Stack>
         </Stack>
@@ -310,6 +369,18 @@ function EvidaraAdminAppBar(props: AppBarProps) {
                   }}
                 />
               ) : null}
+              {handoff.selectedId ? (
+                <Chip
+                  label={selectedItemLabel}
+                  size="small"
+                  sx={{
+                    height: 24,
+                    backgroundColor: alpha("#fffdf8", 0.16),
+                    color: "#fffdf8",
+                    border: "1px solid rgba(255, 253, 248, 0.2)",
+                  }}
+                />
+              ) : null}
               {handoff.scopeLabel ? (
                 <Chip
                   label={handoff.scopeLabel}
@@ -373,10 +444,19 @@ function EvidaraAdminLayout(props: LayoutProps) {
             zIndex: -1,
           },
         },
+        "& .RaLayout-contentWithSidebar": {
+          background: "transparent",
+        },
+        "& .RaLayout-sidebar": {
+          background: "transparent",
+        },
         "& .RaLayout-content": {
           backgroundColor: "transparent",
-          paddingTop: { xs: 2, sm: 3 },
+          paddingTop: { xs: 1.75, sm: 2.5 },
           paddingBottom: { xs: 3, sm: 4 },
+          width: "100%",
+          maxWidth: "1600px",
+          marginInline: "auto",
         },
       }}
     />
@@ -408,6 +488,12 @@ export default function AdminApp() {
           "*:focus-visible": {
             outline: "2px solid rgba(15, 76, 129, 0.42)",
             outlineOffset: 2,
+          },
+          ".RaSidebar-drawerPaper, .RaSidebar-fixed, .RaLayout-sidebar": {
+            background: "transparent",
+          },
+          ".RaMenuItemLink-root": {
+            borderRadius: 14,
           },
         }}
       />

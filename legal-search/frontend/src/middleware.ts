@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 const DEV_API_URL = "https://legal-search-api-dev-kxc5agexna-oa.a.run.app";
 const STAGING_API_URL = "https://legal-search-api-staging-kxc5agexna-oa.a.run.app";
-const LOCAL_API_URL = "http://localhost:3002";
+const LOCAL_API_URL = "http://localhost:3102";
 
 function resolveApiBase(hostname: string): string {
   if (hostname.includes("legal-search-frontend-staging")) {

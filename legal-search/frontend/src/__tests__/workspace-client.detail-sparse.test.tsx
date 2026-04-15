@@ -78,8 +78,6 @@ describe("WorkspaceClient sparse detail integration", () => {
     expect(screen.getByText("Untitled document")).toBeInTheDocument();
     expect(screen.getByText("No summary available")).toBeInTheDocument();
     expect(screen.getByText("Translated content")).toBeInTheDocument();
-    expect(
-      screen.getByText("No document details are available for this result yet."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Keine Dokumentdetails")).toBeInTheDocument();
   });
 });

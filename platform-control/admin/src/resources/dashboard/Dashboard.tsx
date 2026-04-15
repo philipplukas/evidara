@@ -45,6 +45,19 @@ type RecentRunHealth = {
   error: string | null;
 };
 
+type RecentHealthSummary = {
+  ok: number;
+  blocked: number;
+  failed: number;
+  in_progress: number;
+  unavailable: number;
+};
+
+type AttentionRun = {
+  run_id: string;
+  reason: string;
+};
+
 const STATUS_COLORS: Record<string, "success" | "error" | "warning" | "info" | "default"> = {
   completed: "success",
   failed: "error",
@@ -62,6 +75,14 @@ const HEALTH_COLORS: Record<string, "success" | "error" | "warning" | "info" | "
 
 const MAX_HEALTH_PROBES = 5;
 
+const TONE_ACCENTS: Record<"success" | "error" | "warning" | "info" | "default", string> = {
+  success: "#2e7d32",
+  error: "#c62828",
+  warning: "#ed6c02",
+  info: "#0288d1",
+  default: "rgba(29, 41, 61, 0.22)",
+};
+
 const formatDuration = (start: string | null, end: string | null): string => {
   if (!start || !end) return "-";
   const ms = new Date(end).getTime() - new Date(start).getTime();
@@ -78,6 +99,58 @@ const formatTime = (value: string | null): string => {
   }).format(new Date(value));
 };
 
+export const summarizeRecentHealth = (recentHealth: RecentRunHealth[]): RecentHealthSummary =>
+  recentHealth.reduce(
+    (summary, entry) => {
+      if (!entry.health) {
+        summary.unavailable += 1;
+        return summary;
+      }
+
+      summary[entry.health.overall_status] += 1;
+      return summary;
+    },
+    { ok: 0, blocked: 0, failed: 0, in_progress: 0, unavailable: 0 },
+  );
+
+export const selectAttentionRun = (
+  recentHealth: RecentRunHealth[],
+  recentRuns: DashboardStats["recent_runs"],
+): AttentionRun | null => {
+  const blockedRun = recentHealth.find((entry) => entry.health?.overall_status === "blocked");
+  if (blockedRun) {
+    return {
+      run_id: blockedRun.run_id,
+      reason: "blocked pipeline health",
+    };
+  }
+
+  const failedRun = recentHealth.find((entry) => entry.health?.overall_status === "failed");
+  if (failedRun) {
+    return {
+      run_id: failedRun.run_id,
+      reason: "failed pipeline health",
+    };
+  }
+
+  const blockedStatusRun = recentRuns.find((run) =>
+    ["failed", "pending", "running"].includes(run.status),
+  );
+  if (blockedStatusRun) {
+    return {
+      run_id: blockedStatusRun.run_id,
+      reason:
+        blockedStatusRun.status === "failed"
+          ? "failed run status"
+          : blockedStatusRun.status === "pending"
+            ? "pending run status"
+            : "active run status",
+    };
+  }
+
+  return null;
+};
+
 function StatCard({
   label,
   value,
@@ -92,18 +165,30 @@ function StatCard({
       sx={{
         flex: 1,
         minWidth: 160,
-        borderColor:
-          tone === "default"
-            ? "rgba(29, 41, 61, 0.08)"
-            : `rgba(${tone === "success" ? "25, 118, 210" : tone === "error" ? "211, 47, 47" : tone === "warning" ? "237, 108, 2" : "2, 136, 209"}, 0.16)`,
+        borderTop: "4px solid",
+        borderTopColor: TONE_ACCENTS[tone],
       }}
     >
-      <CardContent sx={{ textAlign: "center", py: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+      <CardContent
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: 0.75,
+          py: 2.5,
+        }}
+      >
+        <Typography
+          variant="overline"
+          sx={{ letterSpacing: "0.14em", color: "text.secondary", lineHeight: 1.1 }}
+        >
+          {label}
+        </Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1 }}>
           {value}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {label}
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.45 }}>
+          At a glance
         </Typography>
       </CardContent>
     </Card>
@@ -129,19 +214,10 @@ function ActionCard({
         flex: 1,
         minWidth: 240,
         borderTop: "4px solid",
-        borderTopColor:
-          tone === "success"
-            ? "success.main"
-            : tone === "error"
-              ? "error.main"
-              : tone === "warning"
-                ? "warning.main"
-                : tone === "info"
-                  ? "info.main"
-                  : "divider",
+        borderTopColor: TONE_ACCENTS[tone],
       }}
     >
-      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1.25, minHeight: 184 }}>
+      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1.1, minHeight: 176 }}>
         <Typography
           variant="overline"
           sx={{
@@ -249,56 +325,12 @@ export function Dashboard() {
   const failed = stats.run_by_status.failed ?? 0;
   const successRate =
     completed + failed > 0 ? `${Math.round((completed / (completed + failed)) * 100)}%` : "-";
-  const recentHealthSummary = recentHealth.reduce(
-    (summary, entry) => {
-      if (!entry.health) {
-        summary.unavailable += 1;
-        return summary;
-      }
-
-      summary[entry.health.overall_status] += 1;
-      return summary;
-    },
-    { ok: 0, blocked: 0, failed: 0, in_progress: 0, unavailable: 0 },
-  );
-  const attentionRun = (() => {
-    const blockedRun = recentHealth.find((entry) => entry.health?.overall_status === "blocked");
-    if (blockedRun) {
-      return {
-        run_id: blockedRun.run_id,
-        reason: "blocked pipeline health",
-      };
-    }
-
-    const failedRun = recentHealth.find((entry) => entry.health?.overall_status === "failed");
-    if (failedRun) {
-      return {
-        run_id: failedRun.run_id,
-        reason: "failed pipeline health",
-      };
-    }
-
-    const blockedStatusRun = stats.recent_runs.find((run) =>
-      ["failed", "pending", "running"].includes(run.status),
-    );
-    if (blockedStatusRun) {
-      return {
-        run_id: blockedStatusRun.run_id,
-        reason:
-          blockedStatusRun.status === "failed"
-            ? "failed run status"
-            : blockedStatusRun.status === "pending"
-              ? "pending run status"
-              : "active run status",
-      };
-    }
-
-    return null;
-  })();
+  const recentHealthSummary = summarizeRecentHealth(recentHealth);
+  const attentionRun = selectAttentionRun(recentHealth, stats.recent_runs);
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack spacing={3}>
+      <Stack spacing={2.5}>
         <Paper
           sx={{
             p: { xs: 2.25, md: 3 },
@@ -395,73 +427,89 @@ export function Dashboard() {
 
         <Stack direction={{ xs: "column", xl: "row" }} spacing={2}>
           <Paper sx={{ flex: 1, p: 2.5 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Runs by Status
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
-              {Object.entries(stats.run_by_status).map(([status, count]) => (
-                <Chip
-                  key={status}
-                  label={`${status}: ${count}`}
-                  color={STATUS_COLORS[status] ?? "default"}
-                  variant="outlined"
-                  size="small"
-                />
-              ))}
-              {Object.keys(stats.run_by_status).length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                  No runs yet.
+            <Stack spacing={1.5}>
+              <Box>
+                <Typography variant="h6" sx={{ mb: 0.5 }}>
+                  Runs by Status
                 </Typography>
-              )}
+                <Typography variant="body2" color="text.secondary">
+                  Quick filter cues for the operational queue.
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {Object.entries(stats.run_by_status).map(([status, count]) => (
+                  <Chip
+                    key={status}
+                    label={`${status}: ${count}`}
+                    color={STATUS_COLORS[status] ?? "default"}
+                    variant="outlined"
+                    size="small"
+                  />
+                ))}
+                {Object.keys(stats.run_by_status).length === 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    No runs yet.
+                  </Typography>
+                )}
+              </Stack>
             </Stack>
           </Paper>
 
           <Paper sx={{ flex: 1, p: 2.5 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Recent health snapshot
-            </Typography>
-            {healthLoading ? (
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <CircularProgress size={18} />
-                <Typography variant="body2" color="text.secondary">
-                  Loading pipeline health...
+            <Stack spacing={1.5}>
+              <Box>
+                <Typography variant="h6" sx={{ mb: 0.5 }}>
+                  Recent health snapshot
                 </Typography>
-              </Stack>
-            ) : healthError ? (
-              <Alert severity="warning">{healthError}</Alert>
-            ) : (
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Chip
-                  label={`ok: ${recentHealthSummary.ok}`}
-                  color="success"
-                  variant="outlined"
-                  size="small"
-                />
-                <Chip
-                  label={`blocked: ${recentHealthSummary.blocked}`}
-                  color="warning"
-                  variant="outlined"
-                  size="small"
-                />
-                <Chip
-                  label={`failed: ${recentHealthSummary.failed}`}
-                  color="error"
-                  variant="outlined"
-                  size="small"
-                />
-                <Chip
-                  label={`in progress: ${recentHealthSummary.in_progress}`}
-                  color="info"
-                  variant="outlined"
-                  size="small"
-                />
-                <Chip
-                  label={`unavailable: ${recentHealthSummary.unavailable}`}
-                  variant="outlined"
-                  size="small"
-                />
-              </Stack>
-            )}
+                <Typography variant="body2" color="text.secondary">
+                  Pipeline health probes from the newest runs.
+                </Typography>
+              </Box>
+              {healthLoading ? (
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <CircularProgress size={18} />
+                  <Typography variant="body2" color="text.secondary">
+                    Loading pipeline health...
+                  </Typography>
+                </Stack>
+              ) : healthError ? (
+                <Alert severity="warning" variant="outlined">
+                  {healthError}
+                </Alert>
+              ) : (
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Chip
+                    label={`ok: ${recentHealthSummary.ok}`}
+                    color="success"
+                    variant="outlined"
+                    size="small"
+                  />
+                  <Chip
+                    label={`blocked: ${recentHealthSummary.blocked}`}
+                    color="warning"
+                    variant="outlined"
+                    size="small"
+                  />
+                  <Chip
+                    label={`failed: ${recentHealthSummary.failed}`}
+                    color="error"
+                    variant="outlined"
+                    size="small"
+                  />
+                  <Chip
+                    label={`in progress: ${recentHealthSummary.in_progress}`}
+                    color="info"
+                    variant="outlined"
+                    size="small"
+                  />
+                  <Chip
+                    label={`unavailable: ${recentHealthSummary.unavailable}`}
+                    variant="outlined"
+                    size="small"
+                  />
+                </Stack>
+              )}
+            </Stack>
           </Paper>
         </Stack>
 
@@ -478,7 +526,19 @@ export function Dashboard() {
             </Box>
 
             {stats.recent_runs.length > 0 ? (
-              <Table size="small">
+              <Table
+                size="small"
+                stickyHeader
+                sx={{
+                  "& .MuiTableCell-head": {
+                    backgroundColor: "rgba(244, 239, 231, 0.92)",
+                    backdropFilter: "blur(10px)",
+                  },
+                  "& .MuiTableRow-root:hover": {
+                    backgroundColor: "rgba(15, 76, 129, 0.03)",
+                  },
+                }}
+              >
                 <TableHead>
                   <TableRow>
                     <TableCell>Run</TableCell>

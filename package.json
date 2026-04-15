@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check:mermaid": "node scripts/check_mermaid_diagrams.mjs"
+    "check:mermaid": "node scripts/check_mermaid_diagrams.mjs",
+    "dev:cross-surface:live": "bash scripts/dev-cross-surface-live.sh",
+    "preflight:cross-surface:live": "bash scripts/preflight-cross-surface-live.sh"
   },
   "devDependencies": {
     "jsdom": "26.1.0",

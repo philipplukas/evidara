@@ -1,16 +1,74 @@
 "use client";
 
+import { Chip, Stack, Typography } from "@mui/material";
 import { Datagrid, DateField, FunctionField, List, ReferenceField, TextField } from "react-admin";
-import type { AuthorityRecord, JurisdictionRecord } from "../../lib/admin/dataProvider";
+import type {
+  AuthorityRecord,
+  JurisdictionRecord,
+  SourceRecord,
+} from "../../lib/admin/dataProvider";
 import { formatReferenceLabel } from "../shared/referenceUtils";
+
+const SOURCE_STATUS_META = {
+  active: {
+    label: "Active",
+    color: "success" as const,
+    detail: "Eligible for new versions and runs.",
+  },
+  inactive: {
+    label: "Inactive",
+    color: "warning" as const,
+    detail: "Paused until an operator reactivates it.",
+  },
+  archived: {
+    label: "Archived",
+    color: "default" as const,
+    detail: "Read-only history.",
+  },
+} as const;
 
 export function SourceList() {
   return (
-    <List resource="sources" title="Sources" perPage={50}>
+    <List
+      resource="sources"
+      title="Sources"
+      perPage={50}
+      sort={{ field: "updated_at", order: "DESC" }}
+    >
       <Datagrid rowClick="show" bulkActionButtons={false}>
-        <TextField source="source_id" label="Source" />
-        <TextField source="name" label="Name" />
-        <TextField source="status" label="Status" />
+        <FunctionField<SourceRecord>
+          label="Source"
+          render={(record) => (
+            <Stack spacing={0.35}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {record?.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {record?.source_id}
+              </Typography>
+            </Stack>
+          )}
+        />
+        <FunctionField<SourceRecord>
+          label="Lifecycle"
+          render={(record) => {
+            if (!record) {
+              return null;
+            }
+            const statusMeta = SOURCE_STATUS_META[record.status];
+            return (
+              <Stack spacing={0.5}>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  <Chip size="small" color={statusMeta.color} label={statusMeta.label} />
+                  <Chip size="small" variant="outlined" label={record.source_type} />
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  {statusMeta.detail}
+                </Typography>
+              </Stack>
+            );
+          }}
+        />
         <ReferenceField
           source="jurisdiction_id"
           reference="jurisdictions"
@@ -28,7 +86,6 @@ export function SourceList() {
           <FunctionField<AuthorityRecord> render={(record) => formatReferenceLabel(record)} />
         </ReferenceField>
         <TextField source="document_family" label="Family" emptyText="-" />
-        <TextField source="source_type" label="Type" />
         <DateField source="updated_at" label="Updated" showTime />
       </Datagrid>
     </List>

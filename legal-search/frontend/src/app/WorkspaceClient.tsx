@@ -227,7 +227,7 @@ export default function WorkspaceClient({
 
   // Desktop
   return (
-    <div className="flex flex-col h-screen bg-surface-page">
+    <div className="flex h-screen flex-col bg-surface-page">
       <AppHeader
         onSearch={handleSearch}
         showControlPlaneEntry={showControlPlaneEntry}
@@ -235,7 +235,7 @@ export default function WorkspaceClient({
       />
       <ContextBar context={searchContext} />
 
-      <div className="flex-1 min-h-0">
+      <div className="min-h-0 flex-1 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
         <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left: Filters */}
           <ResizablePanel
@@ -246,7 +246,7 @@ export default function WorkspaceClient({
             collapsible
             collapsedSize={4}
           >
-            <div className="h-full overflow-y-auto bg-surface-panel border-r border-border">
+            <div className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel shadow-[0_16px_36px_rgb(15_23_42_/_0.06)]">
               <FilterPanel filters={activeFilters} />
             </div>
           </ResizablePanel>
@@ -255,7 +255,7 @@ export default function WorkspaceClient({
 
           {/* Center: Results */}
           <ResizablePanel defaultSize={isDetailOpen ? 46 : 78} minSize={30}>
-            <div className="h-full overflow-y-auto bg-surface-panel">
+            <div className="h-full overflow-y-auto rounded-[1.6rem] border border-border/70 bg-surface-panel shadow-[0_20px_48px_rgb(15_23_42_/_0.08)]">
               <ResultSetScopeBar />
               <ResultContextHeader
                 exactMatches={searchContext.exactMatches}
@@ -284,7 +284,7 @@ export default function WorkspaceClient({
             collapsible
             collapsedSize={0}
           >
-            <div className="h-full overflow-y-auto bg-surface-panel border-l border-border">
+            <div className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel shadow-[0_16px_36px_rgb(15_23_42_/_0.06)]">
               {detailContent}
             </div>
           </ResizablePanel>
