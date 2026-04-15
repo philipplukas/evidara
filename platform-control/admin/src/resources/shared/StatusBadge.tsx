@@ -49,6 +49,11 @@ const LEVEL_META: Record<
   },
 };
 
+/** Border color aligned with `StatusBadge` (for cards, rails, and other non-chip accents). */
+export function adminLevelBorder(level: AdminStatusLevel): string {
+  return LEVEL_META[level].border;
+}
+
 export function runRecordStatusToLevel(status: string): AdminStatusLevel {
   switch (status) {
     case "completed":

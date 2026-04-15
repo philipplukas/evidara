@@ -29,21 +29,18 @@ import { SourceVersionsSection } from "./SourceVersionsSection";
 const SOURCE_STATUS_META = {
   active: {
     label: "Active",
-    color: "success" as const,
     severity: "success" as const,
     title: "Active source",
     detail: "This source can receive new versions and launch new runs.",
   },
   inactive: {
     label: "Inactive",
-    color: "warning" as const,
     severity: "warning" as const,
     title: "Inactive source",
     detail: "This source is paused. Reactivate it before launching new work.",
   },
   archived: {
     label: "Archived",
-    color: "default" as const,
     severity: "info" as const,
     title: "Archived source",
     detail: "This source is retained for history and should be treated as read-only.",

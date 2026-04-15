@@ -32,6 +32,13 @@ All colors are defined as CSS custom properties in [`globals.css`](../src/app/gl
 | `--interactive-accent-muted` | brand @ 10% | `bg-interactive-accent-muted` | Active pin button, nav badge pill |
 | `--focus-ring` | brand @ 20% | `focus:ring-focus-ring` | Input focus rings |
 
+### Tab tokens (Radix `line` variant)
+
+| Token | Light | Dark | Usage |
+|-------|-------|------|--------|
+| `--tab-indicator-color` | `var(--brand)` | `var(--foreground)` | Active tab underline / vertical rail (`tabs.tsx` `after:`) |
+| `--tab-active-font-weight` | `700` | (inherits) | Detail tabs active weight (`DetailTabs` + `font-[var(--tab-active-font-weight)]`) |
+
 ### shadcn Semantic Tokens
 
 Inherited from the shadcn theme and used as-is:
@@ -250,7 +257,7 @@ Structural depth uses **named CSS variables** in [`globals.css`](../src/app/glob
 | Element | Selected | Unselected |
 |---------|----------|------------|
 | Result card | `bg-brand/[0.03] border-l-2 border-l-brand` | `hover:bg-muted/30 border-l-2 border-l-transparent` |
-| Detail tab (Radix `line`) | `font-bold text-foreground` + bottom `after:` indicator | `font-medium text-muted-foreground/70` + indicator hidden |
+| Detail tab (Radix `line`) | `font-[var(--tab-active-font-weight)] text-foreground` + bottom `after:` bar `bg-[var(--tab-indicator-color)]` | `font-medium text-muted-foreground/70` + indicator hidden (`opacity-0`) |
 | Structure item | `bg-interactive-accent-subtle text-brand border-l-2 border-l-brand` | `text-foreground/70 hover:bg-muted/50` |
 | Chip (ContextBar) | `bg-brand-strong text-white shadow-sm` | `bg-muted text-muted-foreground` |
 | Tab (ContextBar) | `text-brand bg-interactive-accent-subtle` | `text-muted-foreground hover:bg-muted` |
@@ -301,6 +308,6 @@ Production milestone: replace with SVG flag components or `circle-flags` library
 
 ## Remaining (tracked in Linear)
 
-Epic **[TAR-243](https://linear.app/tart-baozi/issue/TAR-243)** / project **[Evidara — Design system & UX (ADR-0016)](https://linear.app/tart-baozi/project/evidara-design-system-and-ux-adr-0016-8d1ece16235c)**. Open items include admin `StatusBadge` migration, `PageContextBar`, dashboard thresholds, Linux VRT, optional BFF metadata `visibility`, and tab active-state token pass (`TAR-254`). Cross-surface status vocabulary: [admin status-level table](../../../platform-control/admin/docs/status-level-vocabulary.md) (`TAR-251`).
+Epic **[TAR-243](https://linear.app/tart-baozi/issue/TAR-243)** / project **[Evidara — Design system & UX (ADR-0016)](https://linear.app/tart-baozi/project/evidara-design-system-and-ux-adr-0016-8d1ece16235c)**. Open items include admin `StatusBadge` migration, `PageContextBar`, dashboard thresholds, Linux VRT, and optional BFF metadata `visibility`. Detail tab line variant uses `--tab-indicator-color` and `--tab-active-font-weight` (`TAR-254` done). Cross-surface status vocabulary: [admin status-level table](../../../platform-control/admin/docs/status-level-vocabulary.md) (`TAR-251`).
 
 **ADR:** [ADR-0016](../../../docs/adr/adr-0016-design-system-component-contracts.md) (**accepted** — component contracts are team guidance).

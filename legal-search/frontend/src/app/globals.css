@@ -158,6 +158,10 @@
   --status-info: #1e40af;
   --status-info-subtle: #eff6ff;
 
+  /* ─── Tabs (Radix line: indicator + active weight) ─── */
+  --tab-indicator-color: var(--brand);
+  --tab-active-font-weight: 700;
+
   --shadow-shell: 0 18px 56px rgb(15 23 42 / 8%);
   --shadow-control-plane: 0 18px 40px rgb(15 76 129 / 18%);
 }
@@ -194,6 +198,8 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --tab-indicator-color: var(--foreground);
 }
 
 @layer base {

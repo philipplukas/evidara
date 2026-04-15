@@ -13,17 +13,14 @@ import { StatusBadge, sourceStatusToLevel } from "../shared/StatusBadge";
 const SOURCE_STATUS_META = {
   active: {
     label: "Active",
-    color: "success" as const,
     detail: "Eligible for new versions and runs.",
   },
   inactive: {
     label: "Inactive",
-    color: "warning" as const,
     detail: "Paused until an operator reactivates it.",
   },
   archived: {
     label: "Archived",
-    color: "default" as const,
     detail: "Read-only history.",
   },
 } as const;

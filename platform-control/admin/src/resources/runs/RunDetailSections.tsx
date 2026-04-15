@@ -32,6 +32,12 @@ import type {
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
 import {
+  type AdminStatusLevel,
+  adminLevelBorder,
+  pipelineHealthToLevel,
+  StatusBadge,
+} from "../shared/StatusBadge";
+import {
   type ChecklistItem,
   type ChecklistState,
   deriveOperatorChecklist,
@@ -91,15 +97,19 @@ export const overallSummaryByStatus = (status: RunPipelineHealth["overall_status
   return "At least one stage is still moving through the pipeline.";
 };
 
-const stageBorderColorByStatus = (
-  status: RunPipelineHealth["stages"][number]["status"],
-): string => {
-  if (status === "failed") return "error.main";
-  if (status === "blocked") return "warning.main";
-  if (status === "in_progress") return "info.main";
-  if (status === "ok") return "success.main";
-  return "divider";
-};
+const stageBorderColorByStatus = (status: RunPipelineHealth["stages"][number]["status"]): string =>
+  adminLevelBorder(pipelineHealthToLevel(status));
+
+function checklistStateToLevel(state: ChecklistState): AdminStatusLevel {
+  if (state === "ok") return "healthy";
+  if (state === "blocked") return "degraded";
+  if (state === "in_progress") return "info";
+  return "neutral";
+}
+
+function rowStatusLevel(isFailed: boolean): AdminStatusLevel {
+  return isFailed ? "critical" : "neutral";
+}
 
 const renderCodeBlock = (value: unknown): ReactNode => {
   const json = formatJson(value);
@@ -445,14 +455,6 @@ function RunSectionNav() {
   );
 }
 
-function pipelineChipColor(status: string): "default" | "info" | "warning" | "error" | "success" {
-  if (status === "ok") return "success";
-  if (status === "failed") return "error";
-  if (status === "blocked") return "warning";
-  if (status === "in_progress") return "info";
-  return "default";
-}
-
 export function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
   if (stage.status === "ok") return "No action required.";
   if (stage.stage === "acquisition") {
@@ -484,13 +486,6 @@ export function stageActionTarget(
     return { label: "Open legal-search verification", href: options.legalSearchUrl };
   }
   return { label: "Open evidence runbook", href: options.evidenceRunbookPath };
-}
-
-function checklistChipColor(state: ChecklistState): "default" | "info" | "warning" | "success" {
-  if (state === "ok") return "success";
-  if (state === "blocked") return "warning";
-  if (state === "in_progress") return "info";
-  return "default";
 }
 
 function PipelineHealthSection({ run }: { run: RunRecord }) {
@@ -645,11 +640,9 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                   {overallSummaryByStatus(health.overall_status)}
                 </Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  <Chip
-                    size="small"
+                  <StatusBadge
+                    level={pipelineHealthToLevel(health.overall_status)}
                     label={`Overall ${health.overall_status}`}
-                    color={pipelineChipColor(health.overall_status)}
-                    variant="outlined"
                   />
                   <Chip size="small" label={`Run ${health.run_status}`} variant="outlined" />
                   <Chip
@@ -704,21 +697,19 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                 <Stack spacing={1}>
                   <Typography variant="subtitle2">Stage summary</Typography>
                   <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                    <Chip size="small" label={`Healthy ${stageSummary.ok ?? 0}`} color="success" />
-                    <Chip
-                      size="small"
+                    <StatusBadge level="healthy" label={`Healthy ${stageSummary.ok ?? 0}`} />
+                    <StatusBadge
+                      level="degraded"
                       label={`Needs action ${(stageSummary.blocked ?? 0) + (stageSummary.failed ?? 0)}`}
-                      color="warning"
                     />
-                    <Chip
-                      size="small"
+                    <StatusBadge
+                      level="info"
                       label={`In progress ${stageSummary.in_progress ?? 0}`}
-                      color="info"
                     />
-                    <Chip
-                      size="small"
+                    <StatusBadge
+                      level="neutral"
                       label={`Pending ${stageSummary.pending ?? 0}`}
-                      variant="outlined"
+                      emphasis="subtle"
                     />
                   </Stack>
                 </Stack>
@@ -735,7 +726,10 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                     spacing={1}
                     alignItems="start"
                   >
-                    <Chip size="small" label={item.state} color={checklistChipColor(item.state)} />
+                    <StatusBadge
+                      level={checklistStateToLevel(item.state)}
+                      label={item.state.replaceAll("_", " ")}
+                    />
                     <Box>
                       <Typography variant="body2">{item.label}</Typography>
                       <Typography variant="caption" color="text.secondary">
@@ -813,17 +807,13 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                           </Typography>
                         </Box>
                         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                          <Chip
-                            size="small"
-                            label={stage.status}
-                            color={pipelineChipColor(stage.status)}
-                            variant="outlined"
+                          <StatusBadge
+                            level={pipelineHealthToLevel(stage.status)}
+                            label={stage.status.replaceAll("_", " ")}
                           />
-                          <Chip
-                            size="small"
+                          <StatusBadge
+                            level={isHealthy ? "healthy" : "degraded"}
                             label={isHealthy ? "No action required" : "Action required"}
-                            color={isHealthy ? "success" : "warning"}
-                            variant={isHealthy ? "outlined" : "filled"}
                           />
                         </Stack>
                       </Stack>
@@ -1076,11 +1066,7 @@ export function RunDetailSections() {
           {
             header: "Status",
             render: (job) => (
-              <Chip
-                size="small"
-                label={job.status}
-                color={job.status === "failed" ? "error" : "default"}
-              />
+              <StatusBadge level={rowStatusLevel(job.status === "failed")} label={job.status} />
             ),
           },
           { header: "Last event", render: (job) => renderInlineValue(job.last_event_type) },
@@ -1163,10 +1149,9 @@ export function RunDetailSections() {
           {
             header: "Status",
             render: (update) => (
-              <Chip
-                size="small"
+              <StatusBadge
+                level={rowStatusLevel(update.status === "failed")}
                 label={update.status}
-                color={update.status === "failed" ? "error" : "default"}
               />
             ),
           },

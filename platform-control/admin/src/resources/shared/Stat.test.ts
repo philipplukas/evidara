@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { successRateTone } from "./Stat";
+import { statToneBorder, successRateTone } from "./Stat";
+import { adminLevelBorder } from "./StatusBadge";
+
+describe("statToneBorder", () => {
+  it("matches StatusBadge border tokens for stat tones", () => {
+    expect(statToneBorder("success")).toBe(adminLevelBorder("healthy"));
+    expect(statToneBorder("error")).toBe(adminLevelBorder("critical"));
+    expect(statToneBorder("warning")).toBe(adminLevelBorder("degraded"));
+    expect(statToneBorder("info")).toBe(adminLevelBorder("info"));
+    expect(statToneBorder("default")).toBe(adminLevelBorder("neutral"));
+  });
+});
 
 describe("successRateTone", () => {
   it("treats dash as unknown", () => {

@@ -23,7 +23,7 @@ import { useRedirect } from "react-admin";
 import type { RunPipelineHealth } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { RunLaunchButton } from "../runs/RunLaunchDialog";
-import { StatCard, type StatTone, successRateTone, TONE_ACCENTS } from "../shared/Stat";
+import { StatCard, type StatTone, statToneBorder, successRateTone } from "../shared/Stat";
 import { pipelineHealthToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
 
 type DashboardStats = {
@@ -153,7 +153,7 @@ function ActionCard({
         flex: 1,
         minWidth: 240,
         borderTop: "4px solid",
-        borderTopColor: TONE_ACCENTS[tone],
+        borderTopColor: statToneBorder(tone),
       }}
     >
       <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1.1, minHeight: 176 }}>

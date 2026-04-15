@@ -1,16 +1,29 @@
 "use client";
 
 import { Card, CardContent, Typography } from "@mui/material";
+import { type AdminStatusLevel, adminLevelBorder } from "./StatusBadge";
 
 export type StatTone = "success" | "error" | "warning" | "info" | "default";
 
-export const TONE_ACCENTS: Record<StatTone, string> = {
-  success: "#2e7d32",
-  error: "#c62828",
-  warning: "#ed6c02",
-  info: "#0288d1",
-  default: "rgba(29, 41, 61, 0.22)",
-};
+function statToneToAdminLevel(tone: StatTone): AdminStatusLevel {
+  switch (tone) {
+    case "success":
+      return "healthy";
+    case "error":
+      return "critical";
+    case "warning":
+      return "degraded";
+    case "info":
+      return "info";
+    default:
+      return "neutral";
+  }
+}
+
+/** Top-border accent for dashboard stats/cards — same borders as `StatusBadge` levels. */
+export function statToneBorder(tone: StatTone): string {
+  return adminLevelBorder(statToneToAdminLevel(tone));
+}
 
 /**
  * Derives dashboard card accent for a success-rate string like "85%" or "-".
@@ -40,7 +53,7 @@ export function StatCard({
         flex: 1,
         minWidth: 160,
         borderTop: "4px solid",
-        borderTopColor: TONE_ACCENTS[tone],
+        borderTopColor: statToneBorder(tone),
       }}
     >
       <CardContent

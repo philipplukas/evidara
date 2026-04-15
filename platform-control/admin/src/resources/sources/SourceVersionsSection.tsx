@@ -128,31 +128,26 @@ const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: st
 const VERSION_STATUS_META = {
   draft: {
     label: "Draft",
-    color: "warning" as const,
     detail: "Needs review before approval.",
     attention: true,
   },
   pending_approval: {
     label: "Pending approval",
-    color: "info" as const,
     detail: "Waiting on operator review.",
     attention: true,
   },
   approved: {
     label: "Approved",
-    color: "success" as const,
     detail: "Ready for preview or production runs.",
     attention: false,
   },
   rejected: {
     label: "Rejected",
-    color: "error" as const,
     detail: "Needs revision or replacement.",
     attention: true,
   },
   superseded: {
     label: "Superseded",
-    color: "default" as const,
     detail: "Read-only history.",
     attention: false,
   },
