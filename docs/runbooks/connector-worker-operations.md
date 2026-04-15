@@ -54,11 +54,15 @@ but uses a different entrypoint.
 ### Cloud Run Service Config
 
 - **Image**: `platform-control-worker:latest`
-- **Min instances**: 1 (keep warm for polling)
+- **Min instances**: 1 (keep warm for polling; `0` lets the poll loop scale away)
 - **Max instances**: 1 (single writer to avoid duplicate dispatch)
 - **CPU**: 1 vCPU
 - **Memory**: 512 Mi
 - **Timeout**: 300s
+
+`minScale=0` is not safe for the current Cloud Run Service design. The worker only polls while an
+instance is already running, so a scale-to-zero worker may only come up during deploy rollouts or
+manual traffic and will not reliably pick up newly created `pending` runs.
 
 ### Required Secrets
 
@@ -140,9 +144,13 @@ ORDER BY created_at ASC;
 If pending runs are aging, check:
 
 1. Is the worker process running? (Cloud Run console)
-2. Are there errors in worker logs?
-3. Is the Firecrawl API key valid?
-4. Is Postgres reachable from the worker?
+2. Does the worker service have `autoscaling.knative.dev/minScale=1` and `maxScale=1`?
+3. Does `platform-control-api` also have `PLATFORM_CONTROL_RUN_DISPATCH_BACKEND=worker`?
+4. Does the worker share the API's GCS artifact store, Pub/Sub topics, Cloud SQL binding, and database secret?
+5. Run `python3 scripts/check_connector_worker_runtime.py --project-id PROJECT_ID --region REGION --env ENV`
+6. Are there errors in worker logs?
+7. Is the Firecrawl API key valid?
+8. Is Postgres reachable from the worker?
 
 ### Force-Dispatch a Single Run
 

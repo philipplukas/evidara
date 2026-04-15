@@ -108,6 +108,7 @@ The runtime stack defaults already include Pub/Sub subscription wiring for DI in
 ### Acquisition dispatch and control-panel deep link
 
 - When `platform-control-worker` is in use, set `PLATFORM_CONTROL_RUN_DISPATCH_BACKEND=worker` on **`platform-control-api`** so new runs stay `PENDING` until the worker calls providers (see `runtime.gcp.tfvars.example` for dev/staging).
+- Keep **`platform-control-worker`** on `min_instance_count=1` and `max_instance_count=1`. A poll-loop worker with `min_instance_count=0` can scale to zero and never wake up for new pending runs.
 - Set `NEXT_PUBLIC_CONTROL_PANEL_URL` on **`legal-search-frontend`** to the public URL of `platform-control-admin` so the search header can show the control-panel entrypoint (see the same tfvars examples).
 
 ### GKE OpenSearch secret sync
