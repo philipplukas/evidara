@@ -91,6 +91,8 @@ Both `text-micro` and `text-tiny` are registered as custom Tailwind font-size to
 
 Reusable design components in [`src/components/primitives/`](../src/components/primitives/). All primitives use design tokens — no hardcoded hex.
 
+**Barrel exports:** see [`primitives/README.md`](../src/components/primitives/README.md) for the authoritative export list (`TAR-267`).
+
 ### SectionLabel
 
 Consistent section header. Replaces the repeated `text-xs font-semibold uppercase tracking-wider text-muted-foreground` pattern.
@@ -208,6 +210,30 @@ These use Tailwind's built-in color palette (not tokens) for domain-specific bad
 
 ---
 
+## Elevation & shadows
+
+Structural depth uses **named CSS variables** in [`globals.css`](../src/app/globals.css) (not ad-hoc `shadow-lg` on chrome):
+
+| Token | Typical use |
+|-------|----------------|
+| `--shadow-shell` | Sticky app header (`box-shadow: var(--shadow-shell)`) |
+| `--shadow-control-plane` | Floating control surfaces (e.g. elevated panels tied to brand tint) |
+
+**Rule:** new floating surfaces pick a **named** token or add one with design review; avoid one-off `box-shadow` unless documented here (`TAR-246`, `TAR-261`).
+
+---
+
+## Border hierarchy
+
+| Kind | Classes / token | When |
+|------|-----------------|------|
+| Structural dividers | `border-border` or `border-border/60`–`/70` | Panel edges, header/footer separators — softer opacity = lower emphasis |
+| Input / control outline | `border-border/70` + `focus:border-brand` | Search field, form controls |
+| Selection emphasis | `border-l-2 border-l-brand` (transparent when idle) | Result list selection, structure nav current item |
+| Dashed empty | `border-dashed border-border/70` | Empty metadata placeholder |
+
+---
+
 ## Interactive Patterns
 
 ### Transitions
@@ -224,7 +250,7 @@ These use Tailwind's built-in color palette (not tokens) for domain-specific bad
 | Element | Selected | Unselected |
 |---------|----------|------------|
 | Result card | `bg-brand/[0.03] border-l-2 border-l-brand` | `hover:bg-muted/30 border-l-2 border-l-transparent` |
-| Detail tab | `border-b-2 border-brand text-brand` | `border-transparent text-muted-foreground` |
+| Detail tab (Radix `line`) | `font-bold text-foreground` + bottom `after:` indicator | `font-medium text-muted-foreground/70` + indicator hidden |
 | Structure item | `bg-interactive-accent-subtle text-brand border-l-2 border-l-brand` | `text-foreground/70 hover:bg-muted/50` |
 | Chip (ContextBar) | `bg-brand-strong text-white shadow-sm` | `bg-muted text-muted-foreground` |
 | Tab (ContextBar) | `text-brand bg-interactive-accent-subtle` | `text-muted-foreground hover:bg-muted` |
@@ -268,6 +294,13 @@ Production milestone: replace with SVG flag components or `circle-flags` library
 
 ## Future Work
 
-- **Dark Mode:** Brand/surface/interactive tokens need `.dark {}` overrides in globals.css
+- **Dark Mode:** Brand/surface/interactive tokens need `.dark {}` overrides in globals.css (`TAR-252`, `TAR-264` focus parity)
 - **Docling Renderer Migration:** Replace HTML-string rendering in `DetailsTab.tsx` with structured Docling components when the BFF returns canonical document blocks
-- **Component Contracts:** See [ADR-0016](../../../docs/adr/adr-0016-design-system-component-contracts.md) for 8 design-system component contracts (`StatusBadge`, `FilterBar`, `MetadataList`, `PageContextBar`, `Tabs` enhancement, `Stat` threshold, `ResultsControlRegion`, `Button` consequence tier) identified in the April 2026 UX review
+- **Motion tokens:** Centralize duration/easing for sheets and hovers (`TAR-263`)
+- **Token audit:** Replace remaining Tailwind palette exceptions in the table above with semantic tokens (`TAR-260`)
+
+## Remaining (tracked in Linear)
+
+Epic **[TAR-243](https://linear.app/tart-baozi/issue/TAR-243)** / project **[Evidara — Design system & UX (ADR-0016)](https://linear.app/tart-baozi/project/evidara-design-system-and-ux-adr-0016-8d1ece16235c)**. Open items include admin `StatusBadge` migration, `PageContextBar`, dashboard thresholds, Linux VRT, optional BFF metadata `visibility`, and tab active-state token pass (`TAR-254`). Cross-surface status vocabulary: [admin status-level table](../../../platform-control/admin/docs/status-level-vocabulary.md) (`TAR-251`).
+
+**ADR:** [ADR-0016](../../../docs/adr/adr-0016-design-system-component-contracts.md) (**accepted** — component contracts are team guidance).

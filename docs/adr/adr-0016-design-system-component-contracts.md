@@ -1,6 +1,6 @@
 # ADR-0016: Design-System Component Contracts
 
-**Status:** proposed  
+**Status:** accepted  
 **Date:** 2026-04-15  
 **Deciders:** Product / engineering  
 **Context:** UX review (2026-04-15) identified 8 pattern violations that share a root cause: the codebase treats visual polish as CSS fixes rather than component contracts. This ADR defines the contracts needed so the wrong thing becomes hard to build.
@@ -19,11 +19,11 @@
 |---|---|---|---|
 | `ui/badge.tsx` | legal-search | `variant` (default, secondary, destructive, outline) | No `status` prop; no icon slot |
 | `primitives/Badge.tsx` | legal-search | `colorKey`, `size` | Hex from `badge-tokens.ts`; no semantic status |
-| `ui/tabs.tsx` | legal-search | `variant` (default, line) | No `aria-selected`; active state is CSS-only |
-| `DetailTabs.tsx` | legal-search | None (URL-driven) | Uses `aria-current="page"` not `aria-selected`; single-dimension active state |
-| `MetadataList.tsx` | legal-search | `fields`, `initialDensity?`, `showHeading?` | Density + progressive disclosure shipped; row shaping still comes from `enrichMetadataRows` / `metadata-visibility` (not BFF-emitted `visibility` on each row) |
-| `FilterPanel.tsx` | legal-search | `filters` | No active-count, no per-chip dismiss, no clear-all contract |
-| `ContextBar.tsx` | legal-search | `context` | Contains filters + toggle but no unified "result control region" concept |
+| `ui/tabs.tsx` | legal-search | `variant` (default, line) | Radix triggers expose `aria-selected`; polish two-dimensional active styling via tokens (`TAR-254`) |
+| `DetailTabs.tsx` | legal-search | `tabs` + nuqs `tab` | Composes Radix `Tabs`; URL sync covered by tests — strengthen token-driven active contrast (`TAR-254`) |
+| `MetadataList.tsx` | legal-search | `fields`, `initialDensity?`, `showHeading?` | Density + progressive disclosure shipped; row shaping still comes from `enrichMetadataRows` / `metadata-visibility` (not BFF-emitted `visibility` on each row) (`TAR-258`) |
+| `FilterPanel.tsx` | legal-search | `filters` | Delegates refinement chips to `FilterBar`; panel layout / filter groups still evolve with `TAR-255` |
+| `ContextBar.tsx` | legal-search | `context` | Jurisdiction / language / source chips; refinements live in `FilterPanel` / `FiltersSheet` + `FilterBar` — document vs `ResultsControlRegion` (`TAR-256`) |
 | MUI `Chip` | admin | `color`, `variant`, `size` | Status color maps are local to each file (`STATUS_COLORS`, `HEALTH_COLORS`, `TONE_ACCENTS`) |
 | `SourceVersionsSection.tsx` | admin | None | Version badges use color-only differentiation |
 
