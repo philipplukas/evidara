@@ -19,7 +19,7 @@ import type {
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
-  resolveLegalSearchHandoff,
+  readLegalSearchHandoff,
 } from "../../lib/admin/navigationContext";
 import { formatReferenceLabel } from "../shared/referenceUtils";
 import { SourceVersionsSection } from "./SourceVersionsSection";
@@ -52,17 +52,6 @@ export type SourceHandoffGuidance = {
   whyYouAreHere: string;
   whatToCheckNext: string;
 };
-
-function readLegalSearchHandoff(): LegalSearchHandoff | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return resolveLegalSearchHandoff(
-    new URLSearchParams(window.location.search),
-    window.location.href,
-  );
-}
 
 export function buildSourceHandoffGuidance(
   source: SourceRecord,

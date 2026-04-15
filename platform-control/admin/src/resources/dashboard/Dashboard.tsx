@@ -107,13 +107,18 @@ export const summarizeRecentHealth = (recentHealth: RecentRunHealth[]): RecentHe
         return summary;
       }
 
-      summary[entry.health.overall_status] += 1;
+      const key = entry.health.overall_status;
+      if (key in summary) {
+        summary[key] += 1;
+      } else {
+        summary.unavailable += 1;
+      }
       return summary;
     },
     { ok: 0, blocked: 0, failed: 0, in_progress: 0, unavailable: 0 },
   );
 
-export const selectAttentionRun = (
+export const selectDashboardAttentionRun = (
   recentHealth: RecentRunHealth[],
   recentRuns: DashboardStats["recent_runs"],
 ): AttentionRun | null => {
@@ -326,7 +331,7 @@ export function Dashboard() {
   const successRate =
     completed + failed > 0 ? `${Math.round((completed / (completed + failed)) * 100)}%` : "-";
   const recentHealthSummary = summarizeRecentHealth(recentHealth);
-  const attentionRun = selectAttentionRun(recentHealth, stats.recent_runs);
+  const attentionRun = selectDashboardAttentionRun(recentHealth, stats.recent_runs);
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>

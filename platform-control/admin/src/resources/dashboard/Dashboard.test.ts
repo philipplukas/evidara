@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectAttentionRun, summarizeRecentHealth } from "./Dashboard";
+import { selectDashboardAttentionRun, summarizeRecentHealth } from "./Dashboard";
 
 describe("Dashboard helpers", () => {
   it("summarizes recent health probes including unavailable entries", () => {
@@ -32,7 +32,7 @@ describe("Dashboard helpers", () => {
 
   it("prioritizes blocked health over other attention signals", () => {
     expect(
-      selectAttentionRun(
+      selectDashboardAttentionRun(
         [
           {
             run_id: "run-1",
@@ -54,7 +54,7 @@ describe("Dashboard helpers", () => {
   });
 
   it("falls back to recent run status when health is unavailable", () => {
-    expect(selectAttentionRun([], [{ run_id: "run-3", status: "pending" }] as never)).toEqual({
+    expect(selectDashboardAttentionRun([], [{ run_id: "run-3", status: "pending" }] as never)).toEqual({
       run_id: "run-3",
       reason: "pending run status",
     });

@@ -130,7 +130,7 @@ export type PipelineDecisionSupport = {
 };
 
 const stageLabel = (stage: RunPipelineHealth["stages"][number]): string =>
-  stage.stage.replace("_", " ");
+  stage.stage.replaceAll("_", " ");
 
 const mostRecentStage = (
   stages: RunPipelineHealth["stages"],
@@ -182,7 +182,7 @@ export function buildPipelineDecisionSupport(options: {
         : "No stage is blocked, but the pipeline is still moving and may need operator attention soon.";
 
   const whatChangedRecently = latestStage
-    ? `Most recent stage update: ${stageLabel(latestStage)} is ${latestStage.status.replace("_", " ")}.`
+    ? `Most recent stage update: ${stageLabel(latestStage)} is ${latestStage.status.replaceAll("_", " ")}.`
     : `Health snapshot recorded ${health.processing_status_event_count} processing events and ${health.document_lifecycle_event_count} lifecycle events.`;
 
   const whatHappensIfIgnored =
@@ -806,7 +806,7 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                       >
                         <Box sx={{ minWidth: 0 }}>
                           <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
-                            {stage.stage.replace("_", " ")}
+                            {stage.stage.replaceAll("_", " ")}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             {formatDateTime(stage.updated_at)}

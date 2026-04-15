@@ -15,7 +15,7 @@ import type { RunRecord } from "../../lib/admin/dataProvider";
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
-  resolveLegalSearchHandoff,
+  readLegalSearchHandoff,
 } from "../../lib/admin/navigationContext";
 import { RunActionStack } from "./RunActions";
 import { RunDetailSections } from "./RunDetailSections";
@@ -108,17 +108,6 @@ export function buildRunDecisionSupport(run: RunRecord): RunDecisionSupport {
     whatChangedRecently,
     whatHappensIfIgnored,
   };
-}
-
-function readLegalSearchHandoff(): LegalSearchHandoff | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return resolveLegalSearchHandoff(
-    new URLSearchParams(window.location.search),
-    window.location.href,
-  );
 }
 
 export function buildRunHandoffGuidance(

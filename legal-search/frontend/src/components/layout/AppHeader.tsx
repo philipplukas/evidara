@@ -240,7 +240,7 @@ export function AppHeader({
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder={t("header.searchPlaceholder")}
-                aria-describedby="app-header-search-recent"
+                aria-describedby={recentQueries.length > 0 ? "app-header-search-recent" : undefined}
                 aria-keyshortcuts="/"
                 className="h-10 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-0"
               />

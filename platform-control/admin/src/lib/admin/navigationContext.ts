@@ -92,6 +92,15 @@ export function resolveLegalSearchHandoff(
   };
 }
 
+const LEGAL_SEARCH_FALLBACK_URL =
+  process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
+
+export function readLegalSearchHandoff(): LegalSearchHandoff {
+  const params =
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  return resolveLegalSearchHandoff(params, LEGAL_SEARCH_FALLBACK_URL);
+}
+
 export function describeLegalSearchHandoff(handoff: LegalSearchHandoff): string {
   const parts: string[] = [];
 
