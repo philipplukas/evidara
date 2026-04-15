@@ -57,6 +57,7 @@ Good update wording:
 Question:
 
 - does the experience feel understandable, trustworthy, and demo-safe?
+- does the interface feel visually polished enough to support trust?
 
 Look for:
 
@@ -64,17 +65,23 @@ Look for:
 - search results that feel plausible on first glance
 - pages that do not require apology or explanation
 - states that communicate clearly when data is incomplete
+- visual hierarchy that feels intentional rather than accidental
+- typography, spacing, and density that support comprehension
+- screens that do not feel cluttered, generic, or placeholder-like
+- an overall aesthetic tone that feels calm, serious, and appropriate for legal research
 
 Use UI / UX as its own planning dimension when:
 
 - the backend technically works but the experience still looks broken
 - placeholder labels, weak hierarchy, or confusing copy reduce trust
+- the product is functionally correct but still looks immature or low-care
 - the team is debating whether an issue is "just polish" even though it affects confidence
 
 Good update wording:
 
 - "The path works, but the current AT detail view still looks placeholder-like."
 - "The product is operationally healthier, but first-use search trust is still weak."
+- "The experience is more functional than before, but still not visually credible enough for a strong review."
 
 ### 3. Product trust and credibility
 
@@ -166,6 +173,7 @@ Questions:
 - what does a user, operator, or reviewer actually see?
 - what feels trustworthy?
 - what still feels confusing, generic, or unfinished?
+- what visually reduces confidence even when the behavior is technically correct?
 
 Sources:
 
@@ -174,6 +182,7 @@ Sources:
 - proof-doc inspection
 - operator feedback
 - UI / UX review observations
+- visual design and aesthetic review observations
 
 ### B. Delivery feedback
 
@@ -237,6 +246,7 @@ Success means:
 - representative proof docs show real, human-credible titles and types
 - reviewers do not encounter obvious placeholder labels on the proof set
 - detail pages feel safe to show in a demo or release review without explanation
+- the overall presentation feels polished and intentional enough to support trust
 
 ### Milestone B — search confidence baseline
 
@@ -245,6 +255,60 @@ Success means:
 - a small agreed seed-query set returns clearly plausible top results
 - reviewers can explain why the top hits make sense without tribal context
 - the search experience no longer feels broken or random on first use
+- the results view looks visually credible rather than generic or placeholder-heavy
+
+## Current planning application (2026-04-15)
+
+Use the rubric above to frame the current milestone sequence like this:
+
+### Milestone 1 — trustworthy proof experience
+
+Planning read:
+
+- customer value: improving
+- UI / UX quality: improving, but still weakened by placeholder presentation
+- product trust: improving, but still blocked by the AT proof-doc title
+- execution reliability: improving after the worker/runtime fix
+- engineering confidence: improving because the title issue is narrower than before
+- docs / operator readiness: improving because repo docs and Linear are now aligned
+
+What this means:
+
+- the system is healthy enough to evaluate
+- the product is not yet healthy enough to impress
+- the next visible win is to make the proof-doc experience credible
+
+### Milestone 2 — search confidence baseline
+
+Planning read:
+
+- customer value: important and highly visible
+- UI / UX quality: still weak if seed queries look generic
+- product trust: still weak until first-use search feels plausible
+- execution reliability: no longer the main blocker
+- engineering confidence: moderate, because search quality still spans metadata and ranking
+- docs / operator readiness: good enough to support another evaluation pass
+
+What this means:
+
+- the main product risk is now "does search feel believable?"
+- this should be framed as a confidence milestone, not just a ranking milestone
+
+### Milestone 3 — GA narrative and evidence assembly
+
+Planning read:
+
+- customer value: indirect but necessary for release confidence
+- UI / UX quality: should be summarized explicitly, not assumed
+- product trust: depends on milestones 1 and 2 being credible
+- execution reliability: should be stated as recovered, not still ambiguous
+- engineering confidence: should include code quality, tests, and branch hygiene
+- docs / operator readiness: should be strong enough for handoff without tribal knowledge
+
+What this means:
+
+- the final recommendation should evaluate both experience quality and delivery confidence
+- do not publish a strong go / no-go story that only talks about infrastructure health
 
 ## Recommended status language
 

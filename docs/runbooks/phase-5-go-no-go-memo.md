@@ -14,6 +14,34 @@ Canonical template history: this file is the **working draft**; publish final re
 - **Date:** 2026-04-09 (draft); **local re-verify ([TAR-214](https://linear.app/tart-baozi/issue/TAR-214)):** 2026-04-12 — see §1.1
 - **Environment(s) covered:** **dev** (primary remote integration + TAR-85 target for dev-first posture); staging only if your org provisions it — **re-verify** MVP acceptance tables after each promotion batch on `main`
 
+### 1.0 Planning posture (2026-04-15)
+
+The current planning lens should treat Evidara as being in a product-trust phase rather than a
+pure platform-recovery phase.
+
+What that means:
+
+- replay/runtime health has improved enough that it is no longer the main story
+- the main remaining risk is user-visible trust: proof-doc credibility, seed-query quality, and
+  whether the interface feels polished enough for demo/release review
+- milestone updates should evaluate both experience quality and delivery confidence
+
+Use [Milestone planning rubric](milestone-planning-rubric.md) when writing `TAR-69`,
+`TAR-160`, or leadership updates so planning reflects:
+
+- customer value
+- UI / UX quality, including aesthetics and visual polish
+- product trust and credibility
+- execution reliability
+- engineering confidence (code quality, tests, reviewability)
+- documentation and operator readiness
+
+Recommended next milestone sequence:
+
+1. trustworthy proof experience
+2. search confidence baseline
+3. GA evidence assembly and final recommendation
+
 ### 1.1 TAR-214 — automated verification (2026-04-12)
 
 Executed on **`main`** (TAR-214 automation commit in git history) in an agent environment **without** Cloud Run / GitHub admin access. This **does not** replace TAR-64 / TAR-77 / TAR-85 operator evidence; it refreshes **local + repo contract** preflight for handoff.
@@ -67,6 +95,7 @@ These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, an
 |-------|--------|--------|
 | Projection fields (title, type, dates, structural path) | **Shipped** | `ProjectionsService` maps canonical DI lean rows; see `search-relevance-baseline.md` |
 | Relevance eval pack | **PARTIAL PASS** | The 2026-04-14 dev pack still stands as the latest full relevance snapshot, and the 2026-04-15 AT rerun confirms the runtime path is fixed while the proof doc title is still `RIS Dokument`; see [2026-04-14-dev-relevance-pack.md](evidence/2026-04-14-dev-relevance-pack.md) and [2026-04-15-at-ris-fast-loop-rerun.md](evidence/2026-04-15-at-ris-fast-loop-rerun.md). Treat broad-query ranking as `TAR-241` and residual title cleanup as `TAR-242` |
+| UI / UX and aesthetic trust | **PARTIAL PASS** | The product is operationally more credible than before, but visible trust is still limited by placeholder-style presentation and generic-looking search outcomes. Treat visual polish and first-use trust as part of release readiness, not as optional cleanup |
 | Platform trust proof | **PARTIAL GO** | Hetzner + Tailscale + Argo path is proven via the `rocky-agents` staging smoke and live image verification; explicit Temporal execution ID still missing in the evidence packet |
 | Open issues | | TAR-64, TAR-77, TAR-85 until evidence attached |
 
