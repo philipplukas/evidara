@@ -26,22 +26,15 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
   if (!detail) {
     return (
       <div
-        className="flex h-full min-h-0 items-center justify-center px-4 py-8 text-center sm:px-6"
+        className="flex flex-col items-center justify-center py-20 text-center"
         role="status"
         aria-live="polite"
       >
-        <div className="w-full max-w-[24rem] rounded-3xl border border-border/70 bg-surface-shell/45 px-6 py-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-interactive-accent-subtle text-brand">
-            <FileText className="h-5 w-5" />
-          </div>
-          <p className="mt-4 text-tiny uppercase tracking-[0.18em] text-muted-foreground/70">
-            Document detail
-          </p>
-          <h3 className="mt-2 text-base font-semibold text-foreground">No result selected</h3>
-          <p className="mx-auto mt-2 max-w-[20rem] text-sm leading-6 text-muted-foreground">
-            Choose a result to open the document detail, related materials, and references.
-          </p>
+        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+          <FileText className="w-5 h-5 text-muted-foreground/40" />
         </div>
+        <h3 className="mb-1 text-sm font-medium text-muted-foreground">{t("empty.noSelection")}</h3>
+        <p className="max-w-xs text-xs text-muted-foreground">{t("empty.description")}</p>
       </div>
     );
   }

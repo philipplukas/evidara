@@ -78,8 +78,12 @@ describe("DetailPanel", () => {
   it("shows empty state when detail is null", () => {
     renderWithProviders(<DetailPanel detail={null} />);
 
-    expect(screen.getByText("No result selected")).toBeInTheDocument();
-    expect(screen.getByText(/Choose a result to open the document detail/)).toBeInTheDocument();
+    expect(screen.getByText("Kein Ergebnis ausgewählt")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Wählen Sie ein Ergebnis, um Dokumentdetails, verknüpfte Materialien und Verweise zu öffnen\./,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders title and subtitle when detail is provided", () => {

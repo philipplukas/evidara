@@ -20,14 +20,14 @@ export function FilterPanel({ filters }: FilterPanelProps) {
   if (filters.length === 0) {
     return (
       <div className="px-4 py-4">
-        <div className="rounded-2xl border border-dashed border-border/70 bg-surface-shell/45 px-4 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+        <div className="rounded-2xl border border-dashed border-border/70 bg-surface-shell/45 px-4 py-5 text-center shadow-[--shadow-inset-surface]">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-interactive-accent-subtle text-brand">
             <SlidersHorizontal className="h-4 w-4" />
           </div>
           <SectionLabel className="mb-1">{t("filter.filtersTitle")}</SectionLabel>
-          <p className="text-sm font-medium text-foreground">No filters available</p>
+          <p className="text-sm font-medium text-foreground">{t("filter.empty.title")}</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            The current result set does not expose any refinements yet.
+            {t("filter.empty.description")}
           </p>
         </div>
       </div>
@@ -38,7 +38,7 @@ export function FilterPanel({ filters }: FilterPanelProps) {
     <div className="space-y-2 py-3">
       <FilterBar filters={filters} />
       <div className="px-4 pb-2">
-        <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
+        <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[--shadow-inset-surface]">
           <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
           <div className="flex items-center gap-2 text-xs">
             <button
@@ -110,7 +110,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
   );
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/70 bg-surface-shell/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+    <div className="overflow-hidden rounded-2xl border border-border/70 bg-surface-shell/35 shadow-[--shadow-inset-surface]">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -148,8 +148,10 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
 
           {filteredOptions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/25 px-3 py-4 text-center">
-              <p className="text-xs font-medium text-foreground/75">No matching options</p>
-              <p className="mt-1 text-tiny text-muted-foreground">Try a different search term.</p>
+              <p className="text-xs font-medium text-foreground/75">{t("filter.empty.noMatch")}</p>
+              <p className="mt-1 text-tiny text-muted-foreground">
+                {t("filter.empty.noMatchHint")}
+              </p>
             </div>
           ) : (
             <>

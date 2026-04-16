@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, AlertTitle, Box, Chip, Paper, Stack, Typography } from "@mui/material";
+import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import {
   DateField,
@@ -29,20 +29,14 @@ import { SourceVersionsSection } from "./SourceVersionsSection";
 const SOURCE_STATUS_META = {
   active: {
     label: "Active",
-    severity: "success" as const,
-    title: "Active source",
     detail: "This source can receive new versions and launch new runs.",
   },
   inactive: {
     label: "Inactive",
-    severity: "warning" as const,
-    title: "Inactive source",
     detail: "This source is paused. Reactivate it before launching new work.",
   },
   archived: {
     label: "Archived",
-    severity: "info" as const,
-    title: "Archived source",
     detail: "This source is retained for history and should be treated as read-only.",
   },
 } as const;
@@ -94,10 +88,12 @@ function SourceLifecyclePanel() {
           </Typography>
         </Box>
 
-        <Alert severity={statusMeta.severity} icon={false}>
-          <AlertTitle>{statusMeta.title}</AlertTitle>
-          {statusMeta.detail}
-        </Alert>
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <StatusBadge level={sourceStatusToLevel(source.status)} label={statusMeta.label} />
+          <Typography variant="body2" color="text.secondary">
+            {statusMeta.detail}
+          </Typography>
+        </Stack>
       </Stack>
     </Paper>
   );
@@ -120,7 +116,7 @@ function SourcePageContextBar() {
           {source.source_id}
         </Typography>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          <StatusBadge level={sourceStatusToLevel(source.status)} label={source.status} />
+          <StatusBadge level={sourceStatusToLevel(source.status)} label={SOURCE_STATUS_META[source.status].label} />
           <Chip size="small" variant="outlined" label={`Type: ${source.source_type}`} />
           <Chip
             size="small"
@@ -200,7 +196,6 @@ export function SourceShow() {
         <TextField source="source_id" label="Source ID" />
         <TextField source="name" label="Name" />
         <TextField source="description" label="Description" emptyText="-" />
-        <TextField source="status" label="Status" />
         <ReferenceField
           source="jurisdiction_id"
           reference="jurisdictions"

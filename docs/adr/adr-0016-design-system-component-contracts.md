@@ -21,7 +21,7 @@
 | `primitives/Badge.tsx` | legal-search | `colorKey`, `size` | Hex from `badge-tokens.ts`; no semantic status |
 | `ui/tabs.tsx` | legal-search | `variant` (default, line) | Radix triggers expose `aria-selected`; polish two-dimensional active styling via tokens (`TAR-254`) |
 | `DetailTabs.tsx` | legal-search | `tabs` + nuqs `tab` | Composes Radix `Tabs`; URL sync covered by tests — strengthen token-driven active contrast (`TAR-254`) |
-| `MetadataList.tsx` | legal-search | `fields`, `initialDensity?`, `showHeading?` | Density + progressive disclosure shipped; row shaping still comes from `enrichMetadataRows` / `metadata-visibility` (not BFF-emitted `visibility` on each row) (`TAR-258`) |
+| `MetadataList.tsx` | legal-search | `fields`, `initialDensity?`, `showHeading?` | Density + progressive disclosure shipped; OpenAPI `MetadataRow.visibility` is optional — client prefers BFF value when present, else `metadata-visibility` heuristics (`TAR-258`) |
 | `FilterPanel.tsx` | legal-search | `filters` | Delegates refinement chips to `FilterBar`; panel layout / filter groups still evolve with `TAR-255` |
 | `ContextBar.tsx` | legal-search | `context` | Jurisdiction / language / source chips; refinements live in `FilterPanel` / `FiltersSheet` + `FilterBar` — document vs `ResultsControlRegion` (`TAR-256`) |
 | MUI `Chip` | admin | `color`, `variant`, `size` | Status color maps are local to each file (`STATUS_COLORS`, `HEALTH_COLORS`, `TONE_ACCENTS`) |
@@ -270,5 +270,5 @@ The contracts have dependencies. Recommended sequence:
 
 **Risks:**
 - Two-renderer approach for `StatusBadge` (MUI + Tailwind) adds complexity.
-- `MetadataList` density depends on a content-modelling decision (which fields are "always" vs "on demand") that the BFF API doesn't currently express.
+- `MetadataList` density depends on a content-modelling decision (which fields are "always" vs "on demand"). **Decision (TAR-258):** BFF-owned `visibility` is the target state; the OpenAPI contract already supports an optional `MetadataRow.visibility` enum (`always | default | expanded`). The frontend fallback in `metadata-visibility.ts` remains as a graceful degradation path until the BFF populates `visibility` for all document types. No contract or codegen changes needed — the current optional-field design supports progressive adoption.
 - `Button` consequence tier is the largest blast radius change — every action in the system needs tier classification.

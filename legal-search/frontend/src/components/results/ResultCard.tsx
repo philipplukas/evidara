@@ -37,8 +37,8 @@ export function ResultCard({
       aria-current={isSelected ? "true" : undefined}
       aria-label={`Open ${result.title}`}
       onClick={() => onFocus(result.id)}
-      className={`group cursor-pointer border-b border-border/60 px-4 py-3.5 transition-[background-color,border-color,box-shadow,transform]
-        duration-150 focus-within:ring-1 focus-within:ring-brand/20 sm:px-5
+      className={`group cursor-pointer border-b border-border/60 px-4 py-3.5 transition-all
+        transition-motion-medium focus-within:ring-2 focus-within:ring-focus-ring sm:px-5
         ${
           isSelected
             ? "border-l-2 border-l-brand bg-brand/[0.06] shadow-[inset_0_0_0_1px_rgba(15,76,129,0.18)]"

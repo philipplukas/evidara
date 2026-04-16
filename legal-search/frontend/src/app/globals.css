@@ -162,8 +162,18 @@
   --tab-indicator-color: var(--brand);
   --tab-active-font-weight: 700;
 
+  /* ─── Elevation ─── */
   --shadow-shell: 0 18px 56px rgb(15 23 42 / 8%);
   --shadow-control-plane: 0 18px 40px rgb(15 76 129 / 18%);
+  --shadow-panel: 0 20px 48px rgb(15 23 42 / 8%);
+  --shadow-raised: 0 16px 36px rgb(15 23 42 / 6%);
+  --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 55%);
+  --shadow-sheet-top: 0 -12px 40px rgb(15 23 42 / 6%);
+
+  /* ─── Motion ─── */
+  --motion-duration-short: 150ms;
+  --motion-duration-medium: 200ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {
@@ -199,7 +209,58 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  --tab-indicator-color: var(--foreground);
+  /* ─── Brand ─── */
+  --brand: #4a9eda;
+  --brand-hover: #5ab0ef;
+  --brand-strong: #c7dff0;
+
+  /* ─── Surfaces ─── */
+  --surface-page: #0f1419;
+  --surface-panel: #1a2028;
+  --surface-input: #151b22;
+  --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
+  --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
+
+  /* ─── Interactive ─── */
+  --interactive-accent-subtle: rgb(74 158 218 / 10%);
+  --interactive-accent-muted: rgb(74 158 218 / 18%);
+
+  /* ─── Focus ─── */
+  --focus-ring: rgb(74 158 218 / 30%);
+
+  /* ─── Attention ─── */
+  --attention: #fbbf24;
+  --attention-subtle: rgba(251, 191, 36, 0.1);
+  --attention-border: rgba(251, 191, 36, 0.25);
+
+  /* ─── Status ─── */
+  --status-healthy: #4ade80;
+  --status-healthy-subtle: rgba(74, 222, 128, 0.1);
+  --status-degraded: #fbbf24;
+  --status-degraded-subtle: rgba(251, 191, 36, 0.1);
+  --status-critical: #f87171;
+  --status-critical-subtle: rgba(248, 113, 113, 0.1);
+  --status-neutral: #a3a3a3;
+  --status-neutral-subtle: rgba(163, 163, 163, 0.1);
+  --status-info: #60a5fa;
+  --status-info-subtle: rgba(96, 165, 250, 0.1);
+
+  /* ─── Tabs ─── */
+  --tab-indicator-color: var(--brand);
+  --tab-active-font-weight: 700;
+
+  /* ─── Elevation ─── */
+  --shadow-shell: 0 18px 56px rgb(0 0 0 / 30%);
+  --shadow-control-plane: 0 18px 40px rgb(74 158 218 / 12%);
+  --shadow-panel: 0 20px 48px rgb(0 0 0 / 24%);
+  --shadow-raised: 0 16px 36px rgb(0 0 0 / 18%);
+  --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 6%);
+  --shadow-sheet-top: 0 -12px 40px rgb(0 0 0 / 20%);
+
+  /* ─── Motion ─── */
+  --motion-duration-short: 150ms;
+  --motion-duration-medium: 200ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @layer base {
@@ -229,9 +290,30 @@
   html {
     @apply font-sans;
   }
+
+  .dark body {
+    background: var(--surface-page);
+  }
+  .dark body::before {
+    opacity: 0;
+  }
 }
 
 @layer components {
+  /* ─── Transition helpers ─── */
+  .transition-expand {
+    transition: max-height var(--motion-duration-medium) var(--motion-easing-standard),
+      opacity var(--motion-duration-medium) var(--motion-easing-standard);
+    overflow: hidden;
+  }
+  .transition-expand[data-state="closed"] {
+    max-height: 0;
+    opacity: 0;
+  }
+  .transition-expand[data-state="open"] {
+    max-height: 999px;
+    opacity: 1;
+  }
   .app-header {
     @apply sticky top-0 z-40 border-b border-border/70 bg-surface-page/78 backdrop-blur-xl supports-[backdrop-filter]:bg-surface-page/72;
     box-shadow: var(--shadow-shell);
@@ -391,7 +473,8 @@
   }
 
   .mobile-workspace__sheet {
-    @apply min-h-full overflow-hidden rounded-t-[1.75rem] border border-border/60 border-b-0 bg-surface-panel/95 shadow-[0_-12px_40px_rgb(15_23_42/6%)];
+    @apply min-h-full overflow-hidden rounded-t-[1.75rem] border border-border/60 border-b-0 bg-surface-panel/95;
+    box-shadow: var(--shadow-sheet-top);
   }
 }
 
@@ -404,6 +487,16 @@
   .text-tiny {
     font-size: var(--text-tiny);
     line-height: 1;
+  }
+
+  .transition-motion-short {
+    transition-duration: var(--motion-duration-short);
+    transition-timing-function: var(--motion-easing-standard);
+  }
+
+  .transition-motion-medium {
+    transition-duration: var(--motion-duration-medium);
+    transition-timing-function: var(--motion-easing-standard);
   }
 }
 

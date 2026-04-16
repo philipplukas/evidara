@@ -31,9 +31,7 @@ export function FiltersSheet({ open, onOpenChange, filters }: FiltersSheetProps)
       >
         <SheetHeader className="border-b border-border px-4 pb-2 pt-4">
           <SheetTitle className="text-sm font-semibold">{t("filtersTitle")}</SheetTitle>
-          <SheetDescription className="sr-only">
-            Narrow search results by jurisdiction, language, court level, and more.
-          </SheetDescription>
+          <SheetDescription className="sr-only">{t("sheetDescription")}</SheetDescription>
         </SheetHeader>
         <FilterBar filters={filters} />
         <div className="min-h-0 flex-1 overflow-y-auto">

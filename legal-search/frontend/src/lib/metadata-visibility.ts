@@ -43,7 +43,7 @@ function resolveVisibility(label: string, documentType: string): MetadataVisibil
 export function enrichMetadataRows(rows: MetadataRow[], documentType: string): MetadataField[] {
   return rows.map((row) => ({
     ...row,
-    visibility: resolveVisibility(row.label, documentType),
+    visibility: row.visibility ?? resolveVisibility(row.label, documentType),
   }));
 }
 

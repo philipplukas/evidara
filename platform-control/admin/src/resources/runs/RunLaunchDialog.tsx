@@ -27,6 +27,7 @@ import type {
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
 import { describeReadinessDetail } from "../../lib/admin/readiness-messages";
+import { ConfirmButton } from "../shared/ConfirmButton";
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 250 },
@@ -463,9 +464,25 @@ export function RunLaunchButton({
           <Button onClick={closeDialog} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button variant="contained" onClick={submit} disabled={!isReadyToCreate}>
-            {isSubmitting ? "Creating..." : "Create Run"}
-          </Button>
+          {formState.mode === "production" ? (
+            <ConfirmButton
+              tier="notable"
+              variant="contained"
+              color="success"
+              disabled={!isReadyToCreate || isSubmitting}
+              confirmTitle="Create production run?"
+              confirmDescription="Production runs schedule real pipeline work against the selected approved version. Confirm only when you intend to verify capture end-to-end."
+              confirmLabel="Create run"
+              cancelLabel="Go back"
+              onConfirm={submit}
+            >
+              {isSubmitting ? "Creating..." : "Create Run"}
+            </ConfirmButton>
+          ) : (
+            <Button variant="contained" onClick={submit} disabled={!isReadyToCreate}>
+              {isSubmitting ? "Creating..." : "Create Run"}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </>

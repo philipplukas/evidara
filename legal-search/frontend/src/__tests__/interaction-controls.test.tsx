@@ -111,22 +111,16 @@ describe("High-impact interaction controls", () => {
 
     const backButton = screen.getByRole("button", { name: /Zum vorherigen Bereich/ });
     expect(backButton).toBeInTheDocument();
-    expect(screen.getByText("Aktueller Bereich")).toBeInTheDocument();
     expect(screen.getByText("Eingegrenzter Bereich")).toBeInTheDocument();
     expect(screen.getByText("Commentary for Art. 754 OR")).toBeInTheDocument();
     expect(screen.getByText(/Search for "Art 754 OR" · Commentary/)).toBeInTheDocument();
-    expect(screen.getByText("Vorheriger Bereich")).toBeInTheDocument();
-    expect(screen.getByText(/Results for "Art 754 OR" erneut öffnen/)).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /Der Bereich wurde gegenüber der vorherigen Ergebnismenge eingegrenzt, damit die aktuellen Belege fokussierter bleiben\./,
-      ),
-    ).toBeInTheDocument();
 
     act(() => {
       fireEvent.click(backButton);
     });
 
-    expect(screen.queryByRole("button", { name: /Back/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Zum vorherigen Bereich/ }),
+    ).not.toBeInTheDocument();
   });
 });

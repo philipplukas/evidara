@@ -1161,14 +1161,18 @@ export function SourceVersionsSection() {
                           >
                             Production Run
                           </ConfirmButton>
-                          <Button
+                          <ConfirmButton
+                            tier="notable"
                             size="small"
                             variant="outlined"
-                            onClick={() => runVersionAction("approve", version)}
+                            confirmTitle="Approve this version?"
+                            confirmDescription={`Approving ${version.version_label} makes it eligible for production runs. Ensure the version has been reviewed.`}
+                            confirmLabel="Approve"
+                            onConfirm={() => runVersionAction("approve", version)}
                             disabled={!canReview || isActing}
                           >
                             Approve
-                          </Button>
+                          </ConfirmButton>
                           <ConfirmButton
                             tier="destructive"
                             size="small"

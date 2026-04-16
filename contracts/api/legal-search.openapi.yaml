@@ -295,6 +295,12 @@ components:
           type: string
         iconKey:
           type: string
+        visibility:
+          type: string
+          description: |
+            Optional UI density hint for the detail MetadataList. When omitted, the client derives
+            visibility from document type and label heuristics (`metadata-visibility.ts`).
+          enum: [always, default, expanded]
 
     RelatedCount:
       type: object

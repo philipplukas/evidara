@@ -12,19 +12,21 @@ Maps admin actions to consequence tiers for the ConfirmButton system (ADR-0016, 
 
 ## Admin actions
 
-| Action | Location | Current tier | Target tier | Rationale |
-|---|---|---|---|---|
-| Preview Run (launch) | RunLaunchDialog, SourceVersionsSection | safe | safe | Reversible; low consequence |
-| Production Run (launch) | RunLaunchDialog, SourceVersionsSection | safe | notable | Irreversible; creates real pipeline work |
-| Cancel Run | RunActions | safe | destructive | Stops in-progress work; data loss possible |
-| Approve Version | SourceVersionsSection | safe | notable | Changes version lifecycle state |
-| Reject Version | SourceVersionsSection | safe | destructive | Permanently blocks version from production |
-| Edit Source | SourceShow | safe | safe | Reversible metadata change |
-| Create Source | SourceCreate | safe | safe | Additive; no side effects |
-| Create Version | SourceVersionsSection | safe | safe | Additive; starts in draft |
+| Action | Location | Tier | Rationale |
+|---|---|---|---|
+| Preview Run (launch dialog) | RunLaunchDialog | safe | Reversible; low consequence |
+| Preview Run (version table) | SourceVersionsSection | safe | Reversible; low consequence |
+| Production Run (launch dialog) | RunLaunchDialog | notable | Irreversible; creates real pipeline work |
+| Production Run (version table) | SourceVersionsSection | notable | Irreversible; creates real pipeline work |
+| Cancel Run | RunActions | destructive | Stops in-progress work; data loss possible |
+| Approve Version | SourceVersionsSection | notable | Changes version lifecycle state; enables production |
+| Reject Version | SourceVersionsSection | destructive | Permanently blocks version from production |
+| Edit Version | SourceVersionsSection | safe | Reversible metadata change; only draft/rejected |
+| Create Version | SourceVersionsSection | safe | Additive; starts in draft |
+| Edit Source | SourceShow | safe | Reversible metadata change |
+| Create Source | SourceCreate | safe | Additive; no side effects |
+| Reference edits | AuthorityEdit, JurisdictionEdit | safe | Reversible metadata changes via SimpleForm |
 
-## Migration plan
+## Implementation
 
-1. Import `ConfirmButton` from `@evidara/legal-search-frontend` or copy to admin
-2. Replace each action button with `ConfirmButton` using the target tier
-3. Add contextual confirm messages per action
+All tiers above are implemented via `ConfirmButton` (`platform-control/admin/src/resources/shared/ConfirmButton.tsx`), which mirrors the legal-search `Button` tier contract (ADR-0016 Contract 8) using MUI primitives.

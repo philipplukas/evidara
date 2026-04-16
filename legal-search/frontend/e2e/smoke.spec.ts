@@ -15,7 +15,8 @@ const LEGAL_SEARCH_BASE_URL =
 const USE_REAL_BACKEND = process.env.PLAYWRIGHT_USE_REAL_BACKEND === "true";
 const REAL_BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:3102";
 const UI_PROFILE_COOKIE = "evidara-ui-profile";
-const EMPTY_DETAIL_LABEL = /no result selected|select a result/i;
+const EMPTY_DETAIL_LABEL =
+  /no result selected|select a result|kein ergebnis ausgewählt|aucun résultat sélectionné/i;
 
 test.describe("Frontend smoke journeys", () => {
   test.beforeEach(async ({ page, context }) => {

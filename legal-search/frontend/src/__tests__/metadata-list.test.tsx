@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { MetadataList } from "@/components/detail/MetadataList";
+import { MESSAGES } from "@/i18n/messages";
 import type { MetadataField } from "@/lib/types";
 
 function fieldsFixture(): MetadataField[] {
@@ -11,38 +14,85 @@ function fieldsFixture(): MetadataField[] {
   ];
 }
 
+function renderMetadataList(ui: ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="de" messages={MESSAGES.de}>
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
+
 describe("MetadataList", () => {
   it("shows empty state when there are no fields", () => {
-    render(<MetadataList fields={[]} />);
-    expect(screen.getByText("No metadata available")).toBeInTheDocument();
+    renderMetadataList(<MetadataList fields={[]} />);
+    expect(screen.getByText("Keine Metadaten verfügbar")).toBeInTheDocument();
   });
 
   it("compact density shows only always-visible rows", () => {
-    render(<MetadataList fields={fieldsFixture()} initialDensity="compact" />);
+    renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="compact" />);
     expect(screen.getByText("Court")).toBeInTheDocument();
     expect(screen.queryByText("Docket")).not.toBeInTheDocument();
     expect(screen.queryByText("Internal")).not.toBeInTheDocument();
   });
 
   it("default density shows always and default rows", () => {
-    render(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
+    renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
     expect(screen.getByText("Court")).toBeInTheDocument();
     expect(screen.getByText("Docket")).toBeInTheDocument();
     expect(screen.queryByText("Internal")).not.toBeInTheDocument();
   });
 
   it("expanded density shows all rows", () => {
-    render(<MetadataList fields={fieldsFixture()} initialDensity="expanded" />);
+    renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="expanded" />);
     expect(screen.getByText("Court")).toBeInTheDocument();
     expect(screen.getByText("Docket")).toBeInTheDocument();
     expect(screen.getByText("Internal")).toBeInTheDocument();
   });
 
   it("expands from default to show hidden fields", () => {
-    render(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
+    renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
     expect(screen.queryByText("Internal")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /show 1 more field/i }));
+    fireEvent.click(screen.getByRole("button", { name: /1 weitere Felder anzeigen/ }));
     expect(screen.getByText("Internal")).toBeInTheDocument();
+  });
+
+  it("expands from compact to show all fields (header context)", () => {
+    renderMetadataList(
+      <MetadataList fields={fieldsFixture()} initialDensity="compact" showHeading={false} />,
+    );
+    expect(screen.getByText("Court")).toBeInTheDocument();
+    expect(screen.queryByText("Docket")).not.toBeInTheDocument();
+    expect(screen.queryByText("Internal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Metadaten")).not.toBeInTheDocument();
+
+    const toggle = screen.getByRole("button", { name: /weitere Felder anzeigen/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+
+    expect(screen.getByText("Docket")).toBeInTheDocument();
+    expect(screen.getByText("Internal")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("collapses back to initial density after expanding", () => {
+    renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /1 weitere Felder anzeigen/ }));
+    expect(screen.getByText("Internal")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /weniger/i }));
+    expect(screen.queryByText("Internal")).not.toBeInTheDocument();
+    expect(screen.getByText("Docket")).toBeInTheDocument();
+  });
+
+  it("toggle button has aria-expanded reflecting current state", () => {
+    renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
+    const toggle = screen.getByRole("button", { name: /weitere Felder anzeigen/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    const collapseBtn = screen.getByRole("button", { name: /weniger/i });
+    expect(collapseBtn).toHaveAttribute("aria-expanded", "true");
   });
 });

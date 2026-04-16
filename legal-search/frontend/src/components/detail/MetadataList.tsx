@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { getIcon } from "@/lib/icons";
 import { filterByDensity } from "@/lib/metadata-visibility";
@@ -20,6 +21,7 @@ export function MetadataList({
   showHeading = true,
 }: MetadataListProps) {
   const [density, setDensity] = useState<MetadataDensity>(initialDensity);
+  const t = useTranslations("detail");
   const visibleFields = filterByDensity(fields, density);
   const hiddenCount = fields.length - visibleFields.length;
   const canExpand = density !== "expanded" && hiddenCount > 0;
@@ -28,17 +30,15 @@ export function MetadataList({
   if (fields.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border/70 bg-muted/25 px-4 py-5 text-center">
-        <p className="text-xs font-medium text-foreground/75">No metadata available</p>
-        <p className="mt-1 text-tiny text-muted-foreground">
-          Metadata will appear here once the document has been processed.
-        </p>
+        <p className="text-xs font-medium text-foreground/75">{t("empty.noMetadataTitle")}</p>
+        <p className="mt-1 text-tiny text-muted-foreground">{t("empty.noMetadataDescription")}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      {showHeading ? <SectionLabel>Metadata</SectionLabel> : null}
+      {showHeading ? <SectionLabel>{t("metadataHeading")}</SectionLabel> : null}
       <div className={density === "compact" ? "space-y-0.5" : "space-y-1.5"}>
         {visibleFields.map((field, i) => (
           <MetadataRow key={i} field={field} compact={density === "compact"} />
@@ -47,18 +47,19 @@ export function MetadataList({
       {(canExpand || canCollapse) && (
         <button
           type="button"
+          aria-expanded={!canExpand}
           onClick={() => setDensity(canExpand ? "expanded" : initialDensity)}
           className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-tiny font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           {canExpand ? (
             <>
               <ChevronDown className="h-3 w-3" />
-              Show {hiddenCount} more {hiddenCount === 1 ? "field" : "fields"}
+              {t("showMore", { count: hiddenCount })}
             </>
           ) : (
             <>
               <ChevronUp className="h-3 w-3" />
-              Show less
+              {t("showLess")}
             </>
           )}
         </button>
@@ -70,6 +71,7 @@ export function MetadataList({
 function MetadataRow({ field, compact }: { field: MetadataField; compact: boolean }) {
   const icon = getIcon(field.iconKey);
   const hasValue = field.value.trim().length > 0;
+  const t = useTranslations("detail");
 
   return (
     <div className={`flex items-baseline gap-2 ${compact ? "text-[10px]" : "text-xs"}`}>
@@ -82,7 +84,7 @@ function MetadataRow({ field, compact }: { field: MetadataField; compact: boolea
         }
       >
         {icon && <span className="text-sm">{icon}</span>}
-        {hasValue ? field.value : "Not available"}
+        {hasValue ? field.value : t("notAvailable")}
       </span>
     </div>
   );

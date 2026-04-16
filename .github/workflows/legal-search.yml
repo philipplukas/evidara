@@ -216,10 +216,10 @@ jobs:
             docs/runbooks/interaction-flow-validation.md
           if-no-files-found: warn
 
-  # ─── Playwright pixel baselines (optional gate) ───
-  # After generating Linux snapshots (see scripts/playwright-visual-update-docker.sh), set `if: true`.
+  # ─── Playwright pixel baselines ───
+  # Linux baselines generated via scripts/playwright-visual-update-docker.sh and committed.
   frontend-visual-regression:
-    if: false
+    if: true
     runs-on: ubuntu-latest
     defaults:
       run:

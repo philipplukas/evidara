@@ -33,7 +33,7 @@ export function AnnotationTab({ annotations }: AnnotationTabProps) {
       {annotations.map((ann, i) => (
         <div
           key={i}
-          className="rounded-2xl border border-brand/10 bg-brand/[0.025] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]"
+          className="rounded-2xl border border-brand/10 bg-brand/[0.025] px-4 py-4 shadow-[--shadow-inset-surface]"
         >
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
@@ -48,7 +48,7 @@ export function AnnotationTab({ annotations }: AnnotationTabProps) {
                   </span>
                 )}
                 {ann.confidence && (
-                  <span className="rounded-full bg-green-50 px-2 py-0.5 text-tiny font-semibold text-green-700">
+                  <span className="rounded-full bg-status-healthy-subtle px-2 py-0.5 text-tiny font-semibold text-status-healthy">
                     {ann.confidence} {t("confidenceSuffix")}
                   </span>
                 )}

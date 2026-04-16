@@ -22,7 +22,7 @@ export function DetailTabs({ tabs }: DetailTabsProps) {
             <TabsTrigger
               key={tab.key}
               value={tab.key}
-              className="group gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-[color,font-weight,opacity] data-[state=inactive]:text-muted-foreground/70 data-[state=inactive]:opacity-85 data-[state=active]:font-[var(--tab-active-font-weight)] data-[state=active]:text-foreground data-[state=active]:opacity-100"
+              className="group gap-1.5 rounded-none border-b-2 px-3 py-2 text-xs font-medium transition-[color,font-weight,border-color] data-[state=inactive]:border-transparent data-[state=inactive]:text-muted-foreground/70 data-[state=active]:border-[var(--tab-indicator-color)] data-[state=active]:font-bold data-[state=active]:text-foreground"
             >
               <span>{tab.label}</span>
               {tab.count != null && (

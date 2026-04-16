@@ -24,13 +24,20 @@ export default function Loading() {
         </div>
       </header>
 
-      {/* Body — single column on small viewports to match mobile workspace; filters appear in sheet when loaded */}
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <div className="hidden min-h-0 w-[18%] min-w-[180px] border-r border-border bg-surface-panel overflow-hidden lg:block">
+      {/* Body — matches workspace shell layout with rounded panels and correct spacing */}
+      <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2 lg:flex-row lg:gap-2">
+        {/* Filter panel skeleton — rounded to match workspace */}
+        <div className="hidden min-h-0 w-[18%] min-w-[180px] overflow-hidden rounded-[1.35rem] border border-border/60 bg-surface-panel lg:block">
           <FilterPanelSkeleton />
         </div>
 
-        <div className="min-h-0 flex-1 bg-surface-panel overflow-hidden">
+        {/* Resize handle stub */}
+        <div className="hidden w-2 shrink-0 items-center justify-center lg:flex">
+          <div className="h-8 w-0.5 rounded-full bg-border/40" />
+        </div>
+
+        {/* Result list skeleton — rounded to match workspace */}
+        <div className="min-h-0 flex-1 overflow-hidden rounded-[1.35rem] border border-border/60 bg-surface-panel">
           <ResultListSkeleton count={6} />
         </div>
       </div>

@@ -61,7 +61,7 @@ export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: H
   if (!bootState) {
     return (
       <div className="flex h-screen items-start justify-center bg-surface-page px-4 py-4 sm:px-6">
-        <div className="w-full max-w-[1600px] rounded-[2rem] border border-border/60 bg-surface-panel/90 p-4 shadow-[0_18px_56px_rgb(15_23_42/8%)] backdrop-blur-sm sm:p-6">
+        <div className="w-full max-w-[1600px] rounded-[2rem] border border-border/60 bg-surface-panel/90 p-4 backdrop-blur-sm sm:p-6" style={{ boxShadow: "var(--shadow-shell)" }}>
           <div className="flex flex-col gap-4">
             <div className="h-5 w-32 rounded-full bg-muted/80" />
             <div className="rounded-3xl border border-border/60 bg-surface-input/80 p-3">

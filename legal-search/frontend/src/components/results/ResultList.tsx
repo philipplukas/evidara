@@ -17,24 +17,28 @@ function describeScopeTrail(source: ResultSetSource): string {
   return `${describeScopeTrail(source.parentSource)} · ${source.label}`;
 }
 
-function getEmptyStateCopy(source: ResultSetSource, query?: string) {
+function getEmptyStateCopy(
+  source: ResultSetSource,
+  t: (key: string, values?: Record<string, string>) => string,
+  query?: string,
+) {
   if (source.type === "pivot") {
     return {
-      title: "No results in this pivot",
-      body: "Return to the previous scope or try a different related count to keep moving.",
+      title: t("pivotNoResults"),
+      body: t("pivotHint"),
     };
   }
 
   if (query) {
     return {
-      title: `No results for "${query}"`,
-      body: "Try broadening the query or adjusting filters to widen the result set.",
+      title: t("noResults", { query }),
+      body: t("noResultsHint"),
     };
   }
 
   return {
-    title: "Start searching",
-    body: "Enter a query above to explore legal documents, court decisions, and commentary.",
+    title: t("startTitle"),
+    body: t("startHint"),
   };
 }
 
@@ -64,6 +68,7 @@ export function ResultList({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { state } = useWorkspace();
   const tList = useTranslations("results.list");
+  const tEmpty = useTranslations("results.empty");
   const resultSignature = results.map((result) => result.id).join("|");
   const previousResultSignatureRef = useRef(resultSignature);
 
@@ -101,7 +106,7 @@ export function ResultList({
   }
 
   if (results.length === 0) {
-    const emptyState = getEmptyStateCopy(currentSource, query);
+    const emptyState = getEmptyStateCopy(currentSource, tEmpty, query);
 
     return (
       <div

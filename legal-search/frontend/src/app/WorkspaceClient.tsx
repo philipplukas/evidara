@@ -247,7 +247,7 @@ export default function WorkspaceClient({
             collapsible
             collapsedSize={4}
           >
-            <div className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel shadow-[0_16px_36px_rgb(15_23_42_/_0.06)]">
+            <div className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel" style={{ boxShadow: "var(--shadow-raised)" }}>
               <FilterPanel filters={activeFilters} />
             </div>
           </ResizablePanel>
@@ -256,7 +256,7 @@ export default function WorkspaceClient({
 
           {/* Center: Results */}
           <ResizablePanel defaultSize={isDetailOpen ? 46 : 78} minSize={30}>
-            <div className="h-full overflow-y-auto rounded-[1.6rem] border border-border/70 bg-surface-panel shadow-[0_20px_48px_rgb(15_23_42_/_0.08)]">
+            <div className="h-full overflow-y-auto rounded-[1.6rem] border border-border/70 bg-surface-panel" style={{ boxShadow: "var(--shadow-panel)" }}>
               <ResultsControlRegion>
                 <ResultSetScopeBar />
                 <ResultContextHeader
@@ -287,7 +287,7 @@ export default function WorkspaceClient({
             collapsible
             collapsedSize={0}
           >
-            <div className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel shadow-[0_16px_36px_rgb(15_23_42_/_0.06)]">
+            <div className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel" style={{ boxShadow: "var(--shadow-raised)" }}>
               {detailContent}
             </div>
           </ResizablePanel>

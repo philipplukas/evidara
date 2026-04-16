@@ -15,14 +15,18 @@ Document body reads use the Document Service (`contracts/api/document-intelligen
 
  * OpenAPI spec version: 0.3.1
  */
-import type { MetadataRowVisibility } from './metadataRowVisibility';
 
-export interface MetadataRow {
-  label: string;
-  value: string;
-  iconKey?: string;
-  /** Optional UI density hint for the detail MetadataList. When omitted, the client derives
+/**
+ * Optional UI density hint for the detail MetadataList. When omitted, the client derives
 visibility from document type and label heuristics (`metadata-visibility.ts`).
+
  */
-  visibility?: MetadataRowVisibility;
-}
+export type MetadataRowVisibility = typeof MetadataRowVisibility[keyof typeof MetadataRowVisibility];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const MetadataRowVisibility = {
+  always: 'always',
+  default: 'default',
+  expanded: 'expanded',
+} as const;

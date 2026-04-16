@@ -30,7 +30,7 @@ export interface DetailView {
   title: string;
   subtitle: string;
   breadcrumbs?: string[];
-  metadata: { label: string; value: string; iconKey?: string }[];
+  metadata: { label: string; value: string; iconKey?: string; visibility?: 'always' | 'default' | 'expanded' }[];
   content?: unknown;
   contentLanguage?: {
     display: string;

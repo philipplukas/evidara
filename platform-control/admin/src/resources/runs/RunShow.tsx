@@ -181,8 +181,8 @@ function RunPageContextBar() {
             {run.source_id} · {run.source_version_id}
           </Typography>
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <StatusBadge level={runRecordStatusToLevel(run.status)} label={run.status} />
-            <StatusBadge level={runModeToLevel(run.mode)} label={run.mode} />
+            <StatusBadge level={runRecordStatusToLevel(run.status)} label={run.status.charAt(0).toUpperCase() + run.status.slice(1)} />
+            <StatusBadge level={runModeToLevel(run.mode)} label={run.mode.charAt(0).toUpperCase() + run.mode.slice(1)} />
             <Chip
               size="small"
               variant="outlined"

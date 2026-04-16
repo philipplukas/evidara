@@ -5,11 +5,16 @@ function buildSearchResult(query: string) {
     id: "decision-1",
     type: "decision",
     title: `Result for ${query}`,
-    subtitle: "Federal Supreme Court · Switzerland",
-    snippet: "Deterministic test result returned by Playwright route mocks.",
-    structuralContext: "Mocked Context",
+    subtitle: "Bundesgericht · Schweiz",
+    snippet:
+      "Das Bundesgericht bestätigt die Verantwortlichkeit der Verwaltungsratsmitglieder gemäss Art. 754 OR. Die Beweislastverteilung richtet sich nach den allgemeinen Grundsätzen.",
+    structuralContext: "Obligationenrecht · Gesellschaftsrecht",
     badges: [{ label: "Court decision", colorKey: "pink", iconKey: "ch" }],
-    metadataRows: [{ label: "Date", value: "2026-04-03" }],
+    metadataRows: [
+      { label: "Date", value: "2026-04-03" },
+      { label: "Docket", value: "4A_123/2026" },
+      { label: "Court", value: "Bundesgericht, I. zivilrechtliche Abteilung" },
+    ],
     relatedCounts: [{ label: "Commentary", count: 3 }],
     actions: [{ label: "Open decision", icon: "scale", href: "/documents/decision-1" }],
   };
@@ -71,11 +76,15 @@ function buildDetail(documentId: string) {
   return {
     id: documentId,
     type: "decision",
-    title: "Mocked detail title",
-    subtitle: "Mocked detail subtitle",
-    breadcrumbs: ["Switzerland", "Federal Supreme Court", documentId],
-    metadata: [{ label: "Court", value: "Federal Supreme Court", iconKey: "ch" }],
-    content: "Mocked detail content.",
+    title: "BGer 4A_123/2026 — Verantwortlichkeit des Verwaltungsrats",
+    subtitle: "Bundesgericht, I. zivilrechtliche Abteilung · Schweiz",
+    breadcrumbs: ["Schweiz", "Bundesgericht", documentId],
+    metadata: [
+      { label: "Court", value: "Bundesgericht", iconKey: "ch" },
+      { label: "Date", value: "03.04.2026" },
+      { label: "Docket", value: "4A_123/2026" },
+    ],
+    content: "Das Bundesgericht bestätigt die Verantwortlichkeit der Verwaltungsratsmitglieder gemäss Art. 754 OR.",
     tabs: [
       { key: "details", label: "Details" },
       { key: "related", label: "Related", count: 1 },

@@ -25,4 +25,24 @@ test.describe("Visual regressions", () => {
       fullPage: true,
     });
   });
+
+  test("app header matches baseline", async ({ page }) => {
+    await mockSearchApi(page);
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto("/");
+    const header = page.getByRole("banner");
+    await expect(header).toBeVisible();
+
+    await expect(header).toHaveScreenshot("app-header.png");
+  });
+
+  test("results control region matches baseline", async ({ page }) => {
+    await mockSearchApi(page, { richFacets: true });
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto("/");
+    const region = page.getByRole("region", { name: /Suchergebnisse/ });
+    await expect(region).toBeVisible();
+
+    await expect(region).toHaveScreenshot("results-control-region.png");
+  });
 });

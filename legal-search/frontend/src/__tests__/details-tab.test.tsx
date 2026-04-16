@@ -56,7 +56,7 @@ describe("DetailsTab", () => {
     renderWithProviders(<DetailsTab detail={detail} />);
 
     expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
-    expect(screen.getByText("Not available")).toBeInTheDocument();
+    expect(screen.getByText("Nicht verfügbar")).toBeInTheDocument();
   });
 
   it("renders metadata icons when icon keys are present", () => {
@@ -79,6 +79,6 @@ describe("DetailsTab", () => {
 
     expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
     expect(screen.queryByText("Custom field")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Show 1 more field/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1 weitere Felder anzeigen/ })).toBeInTheDocument();
   });
 });

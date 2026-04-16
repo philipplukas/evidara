@@ -22,12 +22,24 @@
     "searchPlaceholder": "Suchen...",
     "yes": "Ja",
     "clearAll": "Verfeinerungen löschen",
-    "resetAll": "Alles zurücksetzen"
+    "resetAll": "Alles zurücksetzen",
+    "sheetDescription": "Suchergebnisse nach Gerichtsbarkeit, Sprache, Instanz und weiteren Kriterien einschränken.",
+    "empty": {
+      "title": "Keine Filter verfügbar",
+      "description": "Die aktuelle Ergebnismenge bietet noch keine Verfeinerungsmöglichkeiten.",
+      "noMatch": "Keine passenden Optionen",
+      "noMatchHint": "Versuchen Sie einen anderen Suchbegriff."
+    }
   },
   "context": {
     "officialSourcesOnly": "Nur offizielle Quellen"
   },
   "detail": {
+    "metadataHeading": "Metadaten",
+    "showMore": "{count} weitere Felder anzeigen",
+    "showLess": "Weniger anzeigen",
+    "notAvailable": "Nicht verfügbar",
+    "sheetDescription": "Detailansicht des ausgewählten Suchergebnisses.",
     "tabs": {
       "documentDetails": "Dokumentdetails",
       "content": "Inhalt",
@@ -46,6 +58,11 @@
       "structure": "Sprünge durch die Gliederung halten den Lesekontext im aktuellen Dokument verankert."
     },
     "empty": {
+      "noSelection": "Kein Ergebnis ausgewählt",
+      "label": "Dokumentdetail",
+      "description": "Wählen Sie ein Ergebnis, um Dokumentdetails, verknüpfte Materialien und Verweise zu öffnen.",
+      "noMetadataTitle": "Keine Metadaten verfügbar",
+      "noMetadataDescription": "Metadaten erscheinen hier, sobald das Dokument verarbeitet wurde.",
       "noDocumentDetailsTitle": "Keine Dokumentdetails",
       "noDocumentDetailsDescription": "Für dieses Ergebnis sind derzeit weder Metadaten noch Textinhalt verfügbar.",
       "noReferencesTitle": "Keine Verweise",
@@ -85,9 +102,24 @@
       "rechtssatz": "Rechtssätze",
       "commentary": "Kommentare"
     },
+    "card": {
+      "selected": "Ausgewählt",
+      "pin": "Anheften",
+      "pinned": "Angeheftet",
+      "loadMore": "Weitere Ergebnisse laden",
+      "remaining": "{count} verbleibend"
+    },
     "list": {
       "sortedByRelevance": "Nach Relevanz sortiert",
       "sortedByRelevanceHelp": "Treffer sind nach algorithmischer Relevanz geordnet (keine manuelle Prüfung jedes Ergebnisses)."
+    },
+    "empty": {
+      "pivotNoResults": "Keine Ergebnisse in diesem Pivot",
+      "pivotHint": "Kehren Sie zum vorherigen Bereich zurück oder probieren Sie eine andere Verknüpfung.",
+      "noResults": "Keine Ergebnisse für \"{query}\"",
+      "noResultsHint": "Versuchen Sie, die Anfrage zu erweitern oder Filter anzupassen.",
+      "startTitle": "Suche starten",
+      "startHint": "Geben Sie eine Anfrage ein, um Gesetze, Urteile und Kommentare zu durchsuchen."
     }
   },
   "workspace": {

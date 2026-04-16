@@ -14,14 +14,16 @@ export interface BadgeViewModel {
   iconKey?: string;
 }
 
+export type MetadataVisibility = "always" | "default" | "expanded";
+export type MetadataDensity = "compact" | "default" | "expanded";
+
 export interface MetadataRow {
   label: string;
   value: string;
   iconKey?: string;
+  /** When set by the BFF, overrides client-side `metadata-visibility` heuristics. */
+  visibility?: MetadataVisibility;
 }
-
-export type MetadataVisibility = "always" | "default" | "expanded";
-export type MetadataDensity = "compact" | "default" | "expanded";
 
 export interface MetadataField extends MetadataRow {
   visibility: MetadataVisibility;

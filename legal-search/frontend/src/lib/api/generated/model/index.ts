@@ -32,6 +32,7 @@ export * from './filterOption';
 export * from './getDocumentSections200';
 export * from './localStructureItem';
 export * from './metadataRow';
+export * from './metadataRowVisibility';
 export * from './referenceGroup';
 export * from './referenceItem';
 export * from './relatedCount';
