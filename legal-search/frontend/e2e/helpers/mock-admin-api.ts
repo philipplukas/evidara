@@ -124,9 +124,14 @@ export async function mockAdminRunFlowApi(page: Page) {
       return;
     }
 
-    if (apiPath === "/v1/runs/run_01/pipeline-health") {
+    if (
+      apiPath === "/v1/runs/run_01/pipeline-health" ||
+      apiPath === "/v1/runs/run_02/pipeline-health" ||
+      apiPath === "/v1/runs/run_03/pipeline-health"
+    ) {
+      const runId = apiPath.split("/")[3];
       await fulfillJson(route, {
-        run_id: "run_01",
+        run_id: runId,
         source_id: "src_01",
         source_version_id: "sv_01",
         mode: "production",
@@ -164,13 +169,10 @@ export async function mockAdminRunFlowApi(page: Page) {
       return;
     }
 
-    if (
-      apiPath === "/v1/runs/run_01/provider-jobs" ||
-      apiPath === "/v1/runs/run_01/captured-resources" ||
-      apiPath === "/v1/runs/run_01/raw-artifacts" ||
-      apiPath === "/v1/runs/run_01/processing-status" ||
-      apiPath === "/v1/runs/run_01/document-lifecycle"
-    ) {
+    const runSubResourceMatch = apiPath.match(
+      /^\/v1\/runs\/run_\d+\/(provider-jobs|captured-resources|raw-artifacts|processing-status|document-lifecycle)$/,
+    );
+    if (runSubResourceMatch) {
       await fulfillJson(route, {
         data: [],
         total: 0,

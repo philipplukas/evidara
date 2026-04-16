@@ -138,6 +138,7 @@ interface MetadataListProps {
 **Owns:** Rendering a status indicator with color + icon + label together. There is no way to use the component with color only.
 
 **Props:**
+
 ```ts
 type StatusLevel = "healthy" | "degraded" | "critical" | "neutral" | "info";
 
@@ -161,6 +162,7 @@ interface StatusBadgeProps {
 **Invariant:** The `status` prop drives color, icon, and label together. Consumers cannot override color independently.
 
 **Replaces:**
+
 - Admin: `STATUS_COLORS`, `HEALTH_COLORS`, `TONE_ACCENTS` local maps in `Dashboard.tsx`, `RunList.tsx`, `RunShow.tsx`, `SourceList.tsx`
 - Admin: `SOURCE_STATUS_META` in `SourceShow.tsx`
 - Legal-search: Version badge chips in any future admin-adjacent views
@@ -176,6 +178,7 @@ interface StatusBadgeProps {
 **Owns:** A sticky header that shows the canonical identity of what the user is looking at, persisting on scroll.
 
 **Props:**
+
 ```ts
 interface PageContextBarProps {
   title: string;
@@ -199,6 +202,7 @@ interface PageContextBarProps {
 **Extends:** The existing `StatCard` in `Dashboard.tsx`.
 
 **Props:**
+
 ```ts
 interface StatProps {
   label: string;
@@ -221,6 +225,7 @@ interface StatProps {
 **Extends:** Existing `ui/button.tsx`.
 
 **Props (addition):**
+
 ```ts
 type ConsequenceTier = "safe" | "notable" | "destructive";
 
@@ -232,6 +237,7 @@ interface ButtonProps {
 ```
 
 **Behavior by tier:**
+
 - `safe`: No confirmation. Default.
 - `notable`: Inline popover confirmation before action fires.
 - `destructive`: Modal confirmation with explicit action label.
@@ -260,15 +266,18 @@ The contracts have dependencies. Recommended sequence:
 ## Consequences
 
 **What changes:**
+
 - New components get an API contract before visual implementation.
 - Status representation is centralized in tokens, not per-file color maps.
 - The 8 pattern violations become structurally impossible to reintroduce.
 
 **What doesn't change:**
+
 - Existing ad-hoc fixes remain in place until migration replaces them.
 - The BFF API contract is unchanged (component-side mapping).
 
 **Risks:**
+
 - Two-renderer approach for `StatusBadge` (MUI + Tailwind) adds complexity.
 - `MetadataList` density depends on a content-modelling decision (which fields are "always" vs "on demand"). **Decision (TAR-258):** BFF-owned `visibility` is the target state; the OpenAPI contract already supports an optional `MetadataRow.visibility` enum (`always | default | expanded`). The frontend fallback in `metadata-visibility.ts` remains as a graceful degradation path until the BFF populates `visibility` for all document types. No contract or codegen changes needed — the current optional-field design supports progressive adoption.
 - `Button` consequence tier is the largest blast radius change — every action in the system needs tier classification.

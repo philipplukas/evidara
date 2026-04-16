@@ -56,7 +56,10 @@ def test_build_bundle_extraction_hints_prefers_short_title_and_skips_placeholder
             "provider_metadata": {
                 "provider": "fedlex_sparql",
                 "title": "RIS Dokument",
-                "short_title": "Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999",
+                "short_title": (
+                    "Bundesverfassung der Schweizerischen"
+                    " Eidgenossenschaft vom 18. April 1999"
+                ),
             }
         }
     )
