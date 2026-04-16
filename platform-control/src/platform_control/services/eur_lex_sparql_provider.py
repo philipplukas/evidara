@@ -44,6 +44,7 @@ class EurLexSparqlProvider:
     """
 
     provider_name = AcquisitionProvider.EUR_LEX_SPARQL.value
+    live_ready = False
 
     _WORK_QUERY = """
 PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>

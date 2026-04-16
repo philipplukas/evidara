@@ -28,6 +28,11 @@ class ProviderStartResult:
 
 class AcquisitionProvider(Protocol):
     provider_name: str
+    # live_ready = True means start_run() makes real network calls end-to-end.
+    # live_ready = False means start_run() raises NotImplementedError; the
+    # provider is registered only so blueprint templates referencing it parse,
+    # and is rejected by the loader's two-key lock before any run is launched.
+    live_ready: bool
 
     async def start_run(
         self,
@@ -35,6 +40,16 @@ class AcquisitionProvider(Protocol):
         source_version: Any,
         run: Any,
     ) -> ProviderStartResult: ...
+
+
+class ProviderNotLiveReady(RuntimeError):
+    """Raised when a blueprint template references a provider that is a scaffold.
+
+    The two-key lock requires `template.enabled: true` AND
+    `provider.live_ready: true`; this exception fires when the second key
+    fails. Message points at the relevant scaffold runbook so an operator
+    knows which follow-up ticket owns live-enablement.
+    """
 
 
 class ProviderRegistry:
@@ -50,6 +65,34 @@ class ProviderRegistry:
             raise KeyError(provider_name)
         return provider
 
+    def live_ready_names(self) -> set[str]:
+        """Return provider names whose start_run() performs real work."""
+        return {
+            name for name, provider in self._providers.items() if getattr(provider, "live_ready", False)
+        }
+
     def resolve_for_spec(self, acquisition_spec: dict[str, Any] | None) -> AcquisitionProvider:
         provider_name = str((acquisition_spec or {}).get("provider") or "firecrawl")
         return self.get(provider_name)
+
+    def require_live_ready(
+        self,
+        acquisition_spec: dict[str, Any] | None,
+        *,
+        template_id: str | None = None,
+    ) -> AcquisitionProvider:
+        """Two-key lock for blueprint resolution.
+
+        Raises ProviderNotLiveReady when the requested provider is a
+        scaffold. Callers that merely want to resolve-and-introspect can
+        keep using resolve_for_spec(); the loader path for launching a run
+        should use this method so scaffolds cannot fire at runtime.
+        """
+        provider = self.resolve_for_spec(acquisition_spec)
+        if not getattr(provider, "live_ready", False):
+            raise ProviderNotLiveReady(
+                f"Provider {provider.provider_name!r} is a scaffold and cannot run "
+                f"(template_id={template_id!r}). See the provider's runbook for "
+                "live-enablement criteria."
+            )
+        return provider

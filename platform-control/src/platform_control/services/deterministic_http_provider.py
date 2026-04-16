@@ -21,6 +21,7 @@ IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
 class DeterministicHttpProvider:
     provider_name = "deterministic_http"
+    live_ready = True
     _MAX_REDIRECTS = 5
     _DENYLIST_HOSTNAMES = {
         "localhost",

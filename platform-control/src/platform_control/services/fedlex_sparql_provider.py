@@ -22,6 +22,7 @@ _FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
 
 class FedlexSparqlProvider:
     provider_name = AcquisitionProvider.FEDLEX_SPARQL.value
+    live_ready = True
     _EXPRESSION_QUERY = """
 PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
 SELECT ?expr

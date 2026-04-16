@@ -37,6 +37,7 @@ class RegioneHttpProvider:
     """Multi-tenant HTTP provider for IT regioni."""
 
     provider_name = AcquisitionProvider.REGIONE_HTTP.value
+    live_ready = False
 
     async def start_run(
         self,

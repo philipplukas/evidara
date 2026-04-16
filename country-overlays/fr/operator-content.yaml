@@ -1,0 +1,28 @@
+version: 1
+country_code: FR
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code FR.
+  - Confirm source family mapping for lois, codes, décrets, and arrêts.
+  - Confirm authority records include Légifrance and Cour de cassation.
+  - Confirm canonical-concept labels survive French UI translation.
+
+approval_hotspots:
+  - authority taxonomy correctness
+  - legal family naming drift across translated UI
+  - federal vs régional hierarchy-path boundary
+
+triage_overlays:
+  mapping_drift:
+    first_action: Compare incoming authority/jurisdiction labels against canonical FR mapping.
+    escalation_owner: platform-control
+  search_projection_mismatch:
+    first_action: Verify processed-event projection parity for FR-tagged documents.
+    escalation_owner: legal-search
+
+status: scaffold-only
+status_note: |
+  FR overlay is scaffold-only. deterministic_http_legifrance_codes
+  template exists in source_blueprints.yaml; regional providers have no
+  dedicated adapter yet. Live acceptance run evidence lands in a
+  follow-up ticket.

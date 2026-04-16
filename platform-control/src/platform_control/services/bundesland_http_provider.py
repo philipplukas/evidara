@@ -38,6 +38,7 @@ class BundeslandHttpProvider:
     """Multi-tenant HTTP provider for DE Bundesländer."""
 
     provider_name = AcquisitionProvider.BUNDESLAND_HTTP.value
+    live_ready = False
 
     async def start_run(
         self,

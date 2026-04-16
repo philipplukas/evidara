@@ -1,0 +1,17 @@
+version: 1
+country_code: DE
+
+jurisdictions:
+  - jurisdiction_id: jur_de
+    slug: de
+    name: Germany
+
+authorities:
+  - authority_id: auth_de_bundesrecht
+    jurisdiction_id: jur_de
+    slug: de-bundesrecht
+    name: Bundesrecht (gesetze-im-internet.de)
+  - authority_id: auth_de_bverfg
+    jurisdiction_id: jur_de
+    slug: de-bverfg
+    name: Bundesverfassungsgericht

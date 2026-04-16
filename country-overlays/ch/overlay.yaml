@@ -42,5 +42,4 @@ court_level_overlay:
   expected_levels:
     - supreme
     - administrative
-    - appellate
     - cantonal

@@ -1,0 +1,17 @@
+version: 1
+country_code: FR
+
+jurisdictions:
+  - jurisdiction_id: jur_fr
+    slug: fr
+    name: France
+
+authorities:
+  - authority_id: auth_fr_legifrance
+    jurisdiction_id: jur_fr
+    slug: fr-legifrance
+    name: Légifrance
+  - authority_id: auth_fr_ccass
+    jurisdiction_id: jur_fr
+    slug: fr-ccass
+    name: Cour de cassation

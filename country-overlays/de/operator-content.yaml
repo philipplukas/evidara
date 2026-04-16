@@ -1,0 +1,28 @@
+version: 1
+country_code: DE
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code DE.
+  - Confirm source family mapping for Gesetze, Verordnungen, and Urteile.
+  - Confirm authority records include Bundesrecht portal and Bundesverfassungsgericht.
+  - Confirm Länder-level label consistency (known historical drift).
+
+approval_hotspots:
+  - authority taxonomy correctness
+  - state-level labels diverging from canonical keys
+  - federal vs Länder hierarchy-path boundary
+
+triage_overlays:
+  mapping_drift:
+    first_action: Compare incoming authority/jurisdiction labels against canonical DE mapping.
+    escalation_owner: platform-control
+  search_projection_mismatch:
+    first_action: Verify processed-event projection parity for DE-tagged documents.
+    escalation_owner: legal-search
+
+status: scaffold-only
+status_note: |
+  DE overlay is scaffold-only. deterministic_http_bundesrecht template
+  exists in source_blueprints.yaml; Länder providers (bundesland_http)
+  are registered as scaffolds. Live acceptance run evidence lands in a
+  follow-up ticket.

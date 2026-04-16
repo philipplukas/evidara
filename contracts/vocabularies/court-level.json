@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/vocabularies/court-level",
+  "title": "Court Level Vocabulary",
+  "description": "Canonical per-country court-level tokens, aligned with the ECLI court codes published by each national ministry of justice (https://e-justice.europa.eu/ecli). Each token carries an `ecliCourtCodes[]` list that lets canonical emission round-trip an ECLI back to a level. `hierarchyRank` is an integer where lower values mean higher instances (1 = supreme).",
+  "vocabulary": "court_level",
+  "values": {
+    "CH": {
+      "supreme": {
+        "prefLabel": { "de": "Bundesgericht", "fr": "Tribunal fédéral", "it": "Tribunale federale", "en": "Federal Supreme Court" },
+        "ecliCourtCodes": ["BGER"],
+        "hierarchyRank": 1
+      },
+      "administrative": {
+        "prefLabel": { "de": "Bundesverwaltungsgericht", "fr": "Tribunal administratif fédéral", "en": "Federal Administrative Court" },
+        "ecliCourtCodes": ["BVGER"],
+        "hierarchyRank": 2
+      },
+      "criminal": {
+        "prefLabel": { "de": "Bundesstrafgericht", "fr": "Tribunal pénal fédéral", "en": "Federal Criminal Court" },
+        "ecliCourtCodes": ["BSTGER"],
+        "hierarchyRank": 2
+      },
+      "patent": {
+        "prefLabel": { "de": "Bundespatentgericht", "fr": "Tribunal fédéral des brevets", "en": "Federal Patent Court" },
+        "ecliCourtCodes": ["BPATGE"],
+        "hierarchyRank": 2
+      },
+      "cantonal": {
+        "prefLabel": { "de": "Kantonales Gericht", "fr": "Tribunal cantonal", "en": "Cantonal court" },
+        "ecliCourtCodes": [],
+        "hierarchyRank": 3,
+        "note": "Aggregate token; individual cantonal ECLI codes published per canton."
+      }
+    },
+    "AT": {
+      "supreme": {
+        "prefLabel": { "de": "Oberster Gerichtshof", "en": "Supreme Court" },
+        "ecliCourtCodes": ["OGH"],
+        "hierarchyRank": 1
+      },
+      "constitutional": {
+        "prefLabel": { "de": "Verfassungsgerichtshof", "en": "Constitutional Court" },
+        "ecliCourtCodes": ["VFGH"],
+        "hierarchyRank": 1
+      },
+      "administrative": {
+        "prefLabel": { "de": "Verwaltungsgerichtshof", "en": "Administrative Court" },
+        "ecliCourtCodes": ["VWGH"],
+        "hierarchyRank": 1
+      },
+      "appellate": {
+        "prefLabel": { "de": "Oberlandesgericht", "en": "Higher Regional Court" },
+        "ecliCourtCodes": ["OLG"],
+        "hierarchyRank": 2
+      },
+      "regional": {
+        "prefLabel": { "de": "Landesgericht", "en": "Regional Court" },
+        "ecliCourtCodes": ["LG"],
+        "hierarchyRank": 3
+      }
+    },
+    "DE": {
+      "constitutional": {
+        "prefLabel": { "de": "Bundesverfassungsgericht", "en": "Federal Constitutional Court" },
+        "ecliCourtCodes": ["BVERFG"],
+        "hierarchyRank": 1
+      },
+      "supreme": {
+        "prefLabel": { "de": "Bundesgerichtshof", "en": "Federal Court of Justice" },
+        "ecliCourtCodes": ["BGH"],
+        "hierarchyRank": 1
+      },
+      "administrative_supreme": {
+        "prefLabel": { "de": "Bundesverwaltungsgericht", "en": "Federal Administrative Court" },
+        "ecliCourtCodes": ["BVERWG"],
+        "hierarchyRank": 1
+      },
+      "appellate": {
+        "prefLabel": { "de": "Oberlandesgericht", "en": "Higher Regional Court" },
+        "ecliCourtCodes": ["OLG"],
+        "hierarchyRank": 2
+      },
+      "regional": {
+        "prefLabel": { "de": "Landgericht", "en": "Regional Court" },
+        "ecliCourtCodes": ["LG"],
+        "hierarchyRank": 3
+      }
+    },
+    "FR": {
+      "cassation": {
+        "prefLabel": { "fr": "Cour de cassation", "en": "Court of Cassation" },
+        "ecliCourtCodes": ["CCASS"],
+        "hierarchyRank": 1
+      },
+      "conseil-etat": {
+        "prefLabel": { "fr": "Conseil d'État", "en": "Council of State" },
+        "ecliCourtCodes": ["CETAT"],
+        "hierarchyRank": 1
+      },
+      "conseil-constitutionnel": {
+        "prefLabel": { "fr": "Conseil constitutionnel", "en": "Constitutional Council" },
+        "ecliCourtCodes": ["CC"],
+        "hierarchyRank": 1
+      },
+      "appellate": {
+        "prefLabel": { "fr": "Cour d'appel", "en": "Court of Appeal" },
+        "ecliCourtCodes": ["CA"],
+        "hierarchyRank": 2
+      },
+      "tribunal": {
+        "prefLabel": { "fr": "Tribunal judiciaire", "en": "Judicial Court" },
+        "ecliCourtCodes": ["TJ"],
+        "hierarchyRank": 3
+      }
+    },
+    "IT": {
+      "cassation": {
+        "prefLabel": { "it": "Corte suprema di cassazione", "en": "Supreme Court of Cassation" },
+        "ecliCourtCodes": ["CASS"],
+        "hierarchyRank": 1
+      },
+      "constitutional": {
+        "prefLabel": { "it": "Corte costituzionale", "en": "Constitutional Court" },
+        "ecliCourtCodes": ["COST"],
+        "hierarchyRank": 1
+      },
+      "conseil-etat": {
+        "prefLabel": { "it": "Consiglio di Stato", "en": "Council of State" },
+        "ecliCourtCodes": ["CDS"],
+        "hierarchyRank": 1
+      },
+      "appellate": {
+        "prefLabel": { "it": "Corte d'appello", "en": "Court of Appeal" },
+        "ecliCourtCodes": ["APP"],
+        "hierarchyRank": 2
+      },
+      "tribunal": {
+        "prefLabel": { "it": "Tribunale", "en": "Tribunal" },
+        "ecliCourtCodes": ["TRIB"],
+        "hierarchyRank": 3
+      }
+    },
+    "EU": {
+      "court-of-justice": {
+        "prefLabel": { "de": "Europäischer Gerichtshof", "fr": "Cour de justice", "it": "Corte di giustizia", "en": "Court of Justice" },
+        "ecliCourtCodes": ["C"],
+        "hierarchyRank": 1,
+        "note": "ECLI:EU:C — CJEU (the top EU court)."
+      },
+      "general-court": {
+        "prefLabel": { "de": "Gericht der Europäischen Union", "fr": "Tribunal", "it": "Tribunale UE", "en": "General Court" },
+        "ecliCourtCodes": ["T"],
+        "hierarchyRank": 2,
+        "note": "ECLI:EU:T — first-instance EU court."
+      },
+      "civil-service-tribunal": {
+        "prefLabel": { "en": "Civil Service Tribunal" },
+        "ecliCourtCodes": ["F"],
+        "hierarchyRank": 3,
+        "note": "ECLI:EU:F — retired 2016; historical citations still occur."
+      }
+    }
+  }
+}

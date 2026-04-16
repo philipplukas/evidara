@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/vocabularies/language",
+  "title": "Language Vocabulary",
+  "description": "ISO 639-1 two-letter language codes recognized across Evidara country overlays. Overlays' `language_defaults.supported` MUST draw from this set; the schema validator enforces it. Keep minimal: add a code only when an overlay actually surfaces content in that language.",
+  "vocabulary": "language",
+  "values": {
+    "de": {
+      "prefLabel": { "de": "Deutsch", "fr": "Allemand", "it": "Tedesco", "en": "German" },
+      "iso639_1": "de",
+      "iso639_2_b": "ger",
+      "iso639_2_t": "deu"
+    },
+    "fr": {
+      "prefLabel": { "de": "Französisch", "fr": "Français", "it": "Francese", "en": "French" },
+      "iso639_1": "fr",
+      "iso639_2_b": "fre",
+      "iso639_2_t": "fra"
+    },
+    "it": {
+      "prefLabel": { "de": "Italienisch", "fr": "Italien", "it": "Italiano", "en": "Italian" },
+      "iso639_1": "it",
+      "iso639_2_b": "ita",
+      "iso639_2_t": "ita"
+    },
+    "en": {
+      "prefLabel": { "de": "Englisch", "fr": "Anglais", "it": "Inglese", "en": "English" },
+      "iso639_1": "en",
+      "iso639_2_b": "eng",
+      "iso639_2_t": "eng"
+    },
+    "rm": {
+      "prefLabel": { "de": "Rätoromanisch", "fr": "Romanche", "it": "Romancio", "en": "Romansh" },
+      "iso639_1": "rm",
+      "iso639_2_b": "roh",
+      "iso639_2_t": "roh",
+      "note": "Official CH national language; Fedlex publishes selected content in Romansh."
+    }
+  }
+}

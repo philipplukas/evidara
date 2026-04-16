@@ -15,6 +15,7 @@ from platform_control.services.acquisition_provider import ProviderStartResult
 
 class FirecrawlProvider:
     provider_name = "firecrawl"
+    live_ready = True
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/vocabularies/source-family",
+  "title": "Source Family Vocabulary",
+  "description": "Canonical source-family tokens for Evidara. Aligned with the EU ELI `legal_type` vocabulary (http://publications.europa.eu/ontology/eli) and Akoma Ntoso document-class hierarchy. The UI-facing canonical set is {law, decision, commentary, rechtssatz}; the ELI-aligned richer set sits as siblings, each with `broader` pointing back to the short canonical set so projections can collapse or expand as needed.",
+  "vocabulary": "source_family",
+  "values": {
+    "law": {
+      "prefLabel": { "de": "Gesetz", "fr": "Loi", "it": "Legge", "en": "Law" },
+      "eliLegalType": "law",
+      "broader": null,
+      "aliases": ["statute", "act", "gesetz", "loi", "legge", "bundesgesetz", "legislation"],
+      "sortOrder": 10,
+      "note": "Canonical UI-facing token. ELI legal_type=law is the broadest statutory umbrella."
+    },
+    "constitution": {
+      "prefLabel": { "de": "Verfassung", "fr": "Constitution", "it": "Costituzione", "en": "Constitution" },
+      "eliLegalType": "constitution",
+      "broader": "law",
+      "aliases": ["bundesverfassung", "grundgesetz", "costituzione"],
+      "sortOrder": 11
+    },
+    "regulation": {
+      "prefLabel": { "de": "Verordnung", "fr": "Règlement", "it": "Regolamento", "en": "Regulation" },
+      "eliLegalType": "regulation",
+      "broader": "law",
+      "aliases": ["règlement", "regolamento", "verordnung", "regulation"],
+      "sortOrder": 12,
+      "note": "EU regulation (directly applicable) and national statutory instruments share this token."
+    },
+    "directive": {
+      "prefLabel": { "de": "Richtlinie", "fr": "Directive", "it": "Direttiva", "en": "Directive" },
+      "eliLegalType": "directive",
+      "broader": "law",
+      "aliases": ["richtlinie", "directive", "direttiva"],
+      "sortOrder": 13
+    },
+    "ordinance": {
+      "prefLabel": { "de": "Verordnung", "fr": "Ordonnance", "it": "Ordinanza", "en": "Ordinance" },
+      "eliLegalType": "ordinance",
+      "broader": "law",
+      "aliases": ["ordonnance", "ordinanza"],
+      "sortOrder": 14
+    },
+    "decree": {
+      "prefLabel": { "de": "Dekret", "fr": "Décret", "it": "Decreto", "en": "Decree" },
+      "eliLegalType": "decree",
+      "broader": "law",
+      "aliases": ["décret", "decreto", "decreto-legge", "decreto_legislativo"],
+      "sortOrder": 15
+    },
+    "decision": {
+      "prefLabel": { "de": "Gerichtsentscheid", "fr": "Décision judiciaire", "it": "Decisione", "en": "Decision" },
+      "eliLegalType": "decision",
+      "broader": null,
+      "aliases": ["judgment", "ruling", "urteil", "arrêt", "sentenza", "entscheid", "beschluss", "bge", "bger"],
+      "sortOrder": 20,
+      "note": "Covers court judgments AND EU-institution decisions. Akoma Ntoso document class: judgment."
+    },
+    "recommendation": {
+      "prefLabel": { "de": "Empfehlung", "fr": "Recommandation", "it": "Raccomandazione", "en": "Recommendation" },
+      "eliLegalType": "recommendation",
+      "broader": "decision",
+      "aliases": ["empfehlung", "recommandation", "raccomandazione"],
+      "sortOrder": 21
+    },
+    "opinion": {
+      "prefLabel": { "de": "Stellungnahme", "fr": "Avis", "it": "Parere", "en": "Opinion" },
+      "eliLegalType": "opinion",
+      "broader": "decision",
+      "aliases": ["stellungnahme", "avis", "parere"],
+      "sortOrder": 22
+    },
+    "commentary": {
+      "prefLabel": { "de": "Kommentar", "fr": "Commentaire", "it": "Commento", "en": "Commentary" },
+      "eliLegalType": null,
+      "broader": null,
+      "aliases": ["kommentar", "commentaire", "commento"],
+      "sortOrder": 30,
+      "note": "Secondary material (doctrine / annotations). Not an ELI legal_type; Akoma Ntoso class: doc."
+    },
+    "administrative_guidance": {
+      "prefLabel": { "de": "Verwaltungsanweisung", "fr": "Directive administrative", "it": "Circolare", "en": "Administrative guidance" },
+      "eliLegalType": null,
+      "broader": "commentary",
+      "aliases": ["circulaire", "circolare", "verwaltungsanweisung", "kreisschreiben"],
+      "sortOrder": 31
+    },
+    "rechtssatz": {
+      "prefLabel": { "de": "Rechtssatz", "fr": "Principe juridique", "it": "Massima", "en": "Legal principle" },
+      "eliLegalType": null,
+      "broader": "decision",
+      "aliases": ["headnote", "legal principle", "leitsatz", "massima"],
+      "sortOrder": 40,
+      "note": "Austrian legal-principle record (RIS Rechtssatz). Semantically a decision-family extraction."
+    }
+  },
+  "canonicalUiSet": ["law", "decision", "commentary", "rechtssatz"]
+}

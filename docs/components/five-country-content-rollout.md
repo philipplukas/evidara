@@ -162,6 +162,20 @@ Overlay configuration is policy, not runtime state. Treat country overlay YAML f
 | Jurisdiction/source-family keys | contracts | legal-search, platform-control | new country/source family added |
 | Operator onboarding/triage wording | platform-control | docs | new provider or run failure mode |
 | Translation and language indicators | legal-search | document-intelligence | new language or translation policy |
+| Shared vocabularies (subdivisions, source-family, court-level, language) | contracts | platform-control, legal-search | new country, new provider token, new court level |
+| Country-overlay schema + validator | contracts | platform-control | schema tightening / new required field |
+
+## Vocabulary standards
+
+Evidara anchors on ISO 3166-1/3166-2, ELI, ECLI, FRBR, Akoma Ntoso
+document classes, EuroVoc (deferred), and SKOS serialization field
+names. Full rationale and single-source-of-truth rules are in
+[`docs/architecture/vocabulary-standards.md`](../architecture/vocabulary-standards.md).
+
+Overlay drift is caught by
+[`scripts/check_country_overlay_files.py --country <ISO>`](../../scripts/check_country_overlay_files.py),
+which cross-checks every overlay against the shared vocabularies and
+platform-control seeds.
 
 ## Rollout sequencing and quality gates
 
