@@ -94,7 +94,7 @@ export function ContextBar({ context }: ContextBarProps) {
           }
           className={`context-bar__official-toggle ${
             constraints.context.officialOnly
-              ? "context-bar__official-toggle--active border-brand/20 bg-interactive-accent-subtle text-brand"
+              ? "context-bar__official-toggle--active border-accent-core/30 bg-accent-core-subtle text-accent-core"
               : "context-bar__official-toggle--idle border border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
           }`}
         >
@@ -208,7 +208,7 @@ function TabGroup({
           onClick={() => onSelect(item.key)}
           className={`context-bar__tab ${
             item.active
-              ? "context-bar__tab--active bg-interactive-accent-subtle text-brand ring-1 ring-brand/10"
+              ? "context-bar__tab--active bg-accent-core-subtle text-accent-core ring-1 ring-accent-core/15"
               : "context-bar__tab--idle text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >

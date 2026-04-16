@@ -1,14 +1,7 @@
 "use client";
 
-import {
-  Datagrid,
-  DateField,
-  List,
-  NumberField,
-  SelectInput,
-  TextField,
-  TopToolbar,
-} from "react-admin";
+import { Datagrid, List, NumberField, SelectInput, TextField, TopToolbar } from "react-admin";
+import { SwissDateField } from "../../components/SwissDateField";
 import { CancelRunButton } from "./RunActions";
 import { RunLaunchButton } from "./RunLaunchDialog";
 
@@ -59,8 +52,8 @@ export function PreviewReviewList() {
         <TextField source="status" label="Status" />
         <NumberField source="captured_resources_count" label="Captured" />
         <NumberField source="artifacts_count" label="Artifacts" />
-        <DateField source="created_at" label="Created" showTime />
-        <DateField source="updated_at" label="Updated" showTime />
+        <SwissDateField source="created_at" label="Created" showTime />
+        <SwissDateField source="updated_at" label="Updated" showTime />
         <CancelRunButton />
       </Datagrid>
     </List>

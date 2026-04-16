@@ -20,13 +20,15 @@ describe("High-impact interaction controls", () => {
 
     const decisionsTab = screen.getByRole("button", { name: /Court decisions|Urteile/ });
     fireEvent.click(decisionsTab);
-    expect(decisionsTab.className).toContain("text-brand");
+    // Active state on scope/filter tabs now signals via the Evidara accent
+    // (violet) instead of brand-navy, per the Sprint-1 accent contract.
+    expect(decisionsTab.className).toContain("text-accent-core");
 
     const officialToggle = screen.getByRole("button", {
       name: /Official sources only|Nur offizielle Quellen/,
     });
     fireEvent.click(officialToggle);
-    expect(officialToggle.className).toContain("text-brand");
+    expect(officialToggle.className).toContain("text-accent-core");
   });
 
   it("writes selected detail tab to URL state", async () => {
@@ -36,6 +38,12 @@ describe("High-impact interaction controls", () => {
 
     const relatedTab = screen.getByRole("tab", { name: /Related/ });
     expect(relatedTab).toHaveAttribute("aria-selected", "true");
+    // Sprint 1 accent-core contract is applied via data-[state=active]:*
+    // variants on TabsTrigger; presence of those class tokens is a
+    // structural guarantee that the active-state styling flipped from
+    // brand (navy) to accent-core (violet).
+    expect(relatedTab.className).toContain("data-[state=active]:border-accent-core");
+    expect(relatedTab.className).toContain("data-[state=active]:text-accent-core");
 
     // Radix TabsTrigger commits selection on mouseDown (not click).
     fireEvent.mouseDown(screen.getByRole("tab", { name: /^Details$/ }), { button: 0 });

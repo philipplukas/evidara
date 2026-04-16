@@ -1,6 +1,7 @@
 "use client";
 
-import { Datagrid, DateField, EditButton, List, TextField } from "react-admin";
+import { Datagrid, EditButton, List, TextField } from "react-admin";
+import { SwissDateField } from "../../components/SwissDateField";
 
 export function AuthorityList() {
   return (
@@ -10,7 +11,7 @@ export function AuthorityList() {
         <TextField source="name" label="Name" />
         <TextField source="slug" label="Slug" />
         <TextField source="jurisdiction_id" label="Jurisdiction" emptyText="Global" />
-        <DateField source="updated_at" label="Updated" showTime />
+        <SwissDateField source="updated_at" label="Updated" showTime />
         <EditButton />
       </Datagrid>
     </List>

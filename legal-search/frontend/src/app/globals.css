@@ -52,6 +52,12 @@
   --color-brand-hover: var(--brand-hover);
   --color-brand-strong: var(--brand-strong);
 
+  /* ─── Accent (Evidara violet — applied to active states, never to primary CTAs) ─── */
+  --color-accent-core: var(--accent-core);
+  --color-accent-core-foreground: var(--accent-core-foreground);
+  --color-accent-core-subtle: var(--accent-core-subtle);
+  --color-accent-core-muted: var(--accent-core-muted);
+
   /* ─── Surfaces ─── */
   --color-surface-page: var(--surface-page);
   --color-surface-panel: var(--surface-panel);
@@ -127,12 +133,26 @@
   --brand-hover: #0b3d68;
   --brand-strong: #1d293d;
 
-  /* ─── Surfaces ─── */
-  --surface-page: #eef2f6;
+  /* ─── Surfaces ───
+   * `--surface-page` was `#eef2f6` (≈1.04:1 against the `#fffdf8` panel) —
+   * too close for cards to lift. Cooled/darkened to `#e4e9ef` (≈1.07:1,
+   * stays within Swiss-paper warmth) so `--shadow-card` reads visually. */
+  --surface-page: #e4e9ef;
   --surface-panel: #fffdf8;
   --surface-input: #f5f8fb;
   --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
   --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
+
+  /* ─── Accent (Evidara violet) ─────────────────────────────────────────
+   * Used for **state signalling on non-destructive UI** — active tab
+   * indicators, active filter pills, count bubbles on tabs. NEVER used
+   * for the primary CTA (that stays `--brand`) and NEVER for destructive
+   * states (that stays `--destructive`). See design-system.md
+   * §"Accent-core token family". */
+  --accent-core: oklch(0.55 0.24 285);
+  --accent-core-foreground: oklch(0.985 0 0);
+  --accent-core-subtle: color-mix(in oklab, var(--accent-core) 14%, transparent);
+  --accent-core-muted: color-mix(in oklab, var(--accent-core) 22%, transparent);
 
   /* ─── Interactive ─── */
   --interactive-accent-subtle: rgb(15 76 129 / 8%);
@@ -173,6 +193,13 @@
   --shadow-raised: 0 16px 36px rgb(15 23 42 / 6%);
   --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 55%);
   --shadow-sheet-top: 0 -12px 40px rgb(15 23 42 / 6%);
+
+  /* Sprint 1 card elevation — sits one step below `--shadow-panel` so a
+   * result card or exact-match strip reads as lifted off the page without
+   * competing with the admin run-detail panels. Hover state is used by
+   * `.elevated-card`. */
+  --shadow-card: 0 1px 3px rgb(15 76 129 / 8%), 0 1px 2px rgb(15 76 129 / 4%);
+  --shadow-card-hover: 0 6px 18px rgb(15 76 129 / 10%), 0 2px 6px rgb(15 76 129 / 6%);
 
   /* ─── Motion ─── */
   --motion-duration-short: 150ms;
@@ -318,6 +345,28 @@
     max-height: 999px;
     opacity: 1;
   }
+
+  /* Elevation contract — opt cards and panels into the surface-lift
+   * shadow + hover transition. Pair with `bg-surface-panel` or MUI
+   * Paper. Hover darkens the shadow; focus-within keeps the brand
+   * focus ring dominant. See design-system.md §"Surface elevation". */
+  .elevated-card {
+    box-shadow: var(--shadow-card);
+    transition:
+      box-shadow var(--motion-duration-medium) var(--motion-easing-standard),
+      transform var(--motion-duration-short) var(--motion-easing-standard);
+  }
+
+  .elevated-card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .elevated-card {
+      transition: none;
+    }
+  }
+
   .app-header {
     @apply sticky top-0 z-40 border-b border-border/70 bg-surface-page/78 backdrop-blur-xl supports-[backdrop-filter]:bg-surface-page/72;
     box-shadow: var(--shadow-shell);

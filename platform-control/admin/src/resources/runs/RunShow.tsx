@@ -3,7 +3,6 @@
 import { Alert, Box, Chip, Grid, Paper, Stack, Typography } from "@mui/material";
 import { type ReactNode, useEffect, useState } from "react";
 import {
-  DateField,
   FunctionField,
   NumberField,
   Show,
@@ -11,6 +10,7 @@ import {
   TextField,
   useRecordContext,
 } from "react-admin";
+import { SwissDateField } from "../../components/SwissDateField";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import {
   describeLegalSearchHandoff,
@@ -401,12 +401,12 @@ export function RunShow() {
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <RunFieldCell label="Started">
-              <DateField source="started_at" showTime emptyText="-" />
+              <SwissDateField source="started_at" showTime emptyText="-" />
             </RunFieldCell>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <RunFieldCell label="Completed">
-              <DateField source="completed_at" showTime emptyText="-" />
+              <SwissDateField source="completed_at" showTime emptyText="-" />
             </RunFieldCell>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
@@ -416,12 +416,12 @@ export function RunShow() {
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <RunFieldCell label="Created">
-              <DateField source="created_at" showTime />
+              <SwissDateField source="created_at" showTime />
             </RunFieldCell>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <RunFieldCell label="Updated">
-              <DateField source="updated_at" showTime />
+              <SwissDateField source="updated_at" showTime />
             </RunFieldCell>
           </Grid>
         </Grid>

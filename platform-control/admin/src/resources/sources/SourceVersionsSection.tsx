@@ -43,6 +43,7 @@ import type {
   SourceVersionRecord,
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { formatSwissDateTime } from "../../lib/format/date";
 import { ConfirmButton } from "../shared/ConfirmButton";
 import { StatusBadge, sourceVersionStatusToLevel } from "../shared/StatusBadge";
 
@@ -161,11 +162,7 @@ const textToList = (value: string): string[] =>
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 
-const formatDateTime = (value: string): string =>
-  new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+const formatDateTime = (value: string): string => formatSwissDateTime(value);
 
 export const describeSourceVersionStatus = (status: SourceVersionRecord["status"]) =>
   VERSION_STATUS_META[status];

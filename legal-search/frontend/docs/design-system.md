@@ -43,9 +43,41 @@ All colors are defined as CSS custom properties in `[globals.css](../src/app/glo
 
 | Token                      | Light          | Dark                | Usage                                                                             |
 | -------------------------- | -------------- | ------------------- | --------------------------------------------------------------------------------- |
-| `--tab-indicator-color`    | `var(--brand)` | `var(--foreground)` | Active tab underline / vertical rail (`tabs.tsx` `after:`)                        |
+| `--tab-indicator-color`    | `var(--brand)` | `var(--foreground)` | Active tab underline / vertical rail (`tabs.tsx` `after:`) — kept at `--brand` for non-detail tabs; detail tabs override inline to `--accent-core` per Sprint 1 |
 | `--tab-active-font-weight` | `700`          | (inherits)          | Detail tabs active weight (`DetailTabs` + `font-[var(--tab-active-font-weight)]`) |
 
+
+### Accent-core token family (Sprint 1 — TAR-244)
+
+The Evidara violet accent — used wherever the UI needs to **signal a transient state** on non-destructive elements (active tab, active filter, count badge). Never used for primary CTAs (those stay `--brand`) and never for destructive state (that's `--destructive`).
+
+| Token | Value | Tailwind Class | Usage |
+|-------|-------|----------------|-------|
+| `--accent-core` | `oklch(0.55 0.24 285)` ≈ `#7c3aed` | `text-accent-core`, `bg-accent-core`, `border-accent-core` | Active detail-tab indicator, active tab count badge foreground, active ContextBar scope tab, active StructureTab item, active admin nav item (`Mui-selected`) |
+| `--accent-core-foreground` | `oklch(0.985 0 0)` | `text-accent-core-foreground` | Text on top of filled accent surfaces |
+| `--accent-core-subtle` | accent-core @ 14 % | `bg-accent-core-subtle` | Tinted active backgrounds (count badges, active pill fill) |
+| `--accent-core-muted` | accent-core @ 22 % | `bg-accent-core-muted` | Active-hover, selected-hover |
+
+**Cross-surface parity:** the admin MUI theme mirrors these via `ACCENT_CORE`, `ACCENT_CORE_SUBTLE`, `ACCENT_CORE_MUTED` in `platform-control/admin/src/lib/admin/designTokens.ts`. Both surfaces apply accent-core to the same semantic states (active nav item, active tab, filter activation), so moving between legal-search and the control plane never re-teaches the user what "active" looks like.
+
+### Shadow + elevation tokens (Sprint 1 — TAR-244)
+
+Paired with a cooled `--surface-page` (`#e4e9ef` instead of `#eef2f6`) so cards actually lift off the page background.
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--shadow-card` | `0 1px 3px rgba(15,76,129,0.08), 0 1px 2px rgba(15,76,129,0.04)` | Resting state on elevated surfaces |
+| `--shadow-card-hover` | `0 6px 18px rgba(15,76,129,0.10), 0 2px 6px rgba(15,76,129,0.06)` | Hover state — paired with a 180 ms transition |
+| `--shadow-shell` | `0 18px 56px rgba(15,23,42,0.08)` | App header / shell |
+| `--shadow-control-plane` | `0 18px 40px rgba(15,76,129,0.18)` | Control-plane CTA, admin AppBar |
+
+A `.elevated-card` utility class (see `globals.css`) bundles `--shadow-card` + hover transition + `prefers-reduced-motion` fallback. Apply it to any standalone panel or tile that sits on `--surface-page`.
+
+### Motion tokens (Sprint 1 — TAR-244)
+
+Sprint 1's `.elevated-card` uses these existing design-system motion tokens so card hover stays in the same visual language as sheets and panels. See the "Motion" section below for the canonical table; Sprint 1 adds no new motion tokens, it only introduces the `.elevated-card` utility that consumes them.
+
+Components MUST honour `prefers-reduced-motion: reduce` (the `.elevated-card` utility does this automatically).
 
 ### shadcn Semantic Tokens
 
@@ -301,14 +333,19 @@ Structural depth uses **named CSS variables** in `[globals.css](../src/app/globa
 ### Selection States
 
 
-| Element                   | Selected                                                                                                       | Unselected                                                              |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Result card               | `bg-brand/[0.03] border-l-2 border-l-brand`                                                                    | `hover:bg-muted/30 border-l-2 border-l-transparent`                     |
-| Detail tab (Radix `line`) | `font-[var(--tab-active-font-weight)] text-foreground` + bottom `after:` bar `bg-[var(--tab-indicator-color)]` | `font-medium text-muted-foreground/70` + indicator hidden (`opacity-0`) |
-| Structure item            | `bg-interactive-accent-subtle text-brand border-l-2 border-l-brand`                                            | `text-foreground/70 hover:bg-muted/50`                                  |
-| Chip (ContextBar)         | `bg-brand-strong text-white shadow-sm`                                                                         | `bg-muted text-muted-foreground`                                        |
-| Tab (ContextBar)          | `text-brand bg-interactive-accent-subtle`                                                                      | `text-muted-foreground hover:bg-muted`                                  |
-| Pin button                | `text-brand bg-interactive-accent-muted` (via AccentButton)                                                    | `text-muted-foreground` (via AccentButton)                              |
+| Element                         | Selected                                                                                              | Unselected                                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Result card                     | `bg-brand/[0.03] border-l-2 border-l-brand` (navy — the list's "focused row")                         | `hover:bg-muted/30 border-l-2 border-l-transparent` |
+| Detail tab (Radix `line`)       | `data-[state=active]:border-accent-core data-[state=active]:text-accent-core` (accent — "active state") | `font-medium text-muted-foreground/70`              |
+| Detail tab count badge          | `group-data-[state=active]:bg-accent-core-subtle group-data-[state=active]:text-accent-core`          | `bg-muted text-muted-foreground/70`                 |
+| Structure item                  | `bg-accent-core-subtle text-accent-core border-l-2 border-l-accent-core`                              | `text-foreground/70 hover:bg-muted/50`              |
+| Chip (ContextBar)               | `bg-brand-strong text-white shadow-sm` (navy — categorical, not transient state)                      | `bg-muted text-muted-foreground`                    |
+| Tab (ContextBar)                | `text-accent-core bg-accent-core-subtle ring-1 ring-accent-core/15`                                   | `text-muted-foreground hover:bg-muted`              |
+| Official-sources toggle         | `text-accent-core bg-accent-core-subtle border-accent-core/30`                                        | `text-muted-foreground`                             |
+| Pin button                      | `text-brand bg-interactive-accent-muted` (via AccentButton — brand semantics, not state)              | `text-muted-foreground` (via AccentButton)          |
+| Admin nav item (`Mui-selected`) | `backgroundColor: ACCENT_CORE_SUBTLE; color: ACCENT_CORE`                                             | `backgroundColor: transparent`                      |
+
+**Colour semantics.** `--brand` marks *identity* (where you are, whose data you're looking at, which record is focused in a list). `--accent-core` marks *transient state* (is this tab active right now, is this filter switched on right now). Never collapse the two.
 
 
 ### Focus States
@@ -432,10 +469,37 @@ Rules:
 
 ---
 
+## Date formatting contract (Sprint 1 — TAR-244)
+
+A single Swiss-locale formatter, used on every surface, to eliminate the "`3/12/2025, 8:00:00 AM` in a Swiss legal product" trust-signal failure the design critique called out. Both surfaces pin the formatter to `Europe/Zurich` so SSR, a UTC dev container, and a Swiss operator's laptop all render the same wall-clock time.
+
+| Output    | Example               | Formatter                    |
+| --------- | --------------------- | ---------------------------- |
+| Date only | `03.04.2026`          | `formatSwissDate(value)`     |
+| Timestamp | `03.04.2026, 14:30`   | `formatSwissDateTime(value)` |
+
+- **Locale:** `de-CH` (24-hour clock, leading zeros, dot separators). **Time zone:** `Europe/Zurich`.
+- **Source modules:**
+  - `legal-search/frontend/src/lib/format/date.ts`
+  - `platform-control/admin/src/lib/format/date.ts`
+- **Primitives / wrappers:**
+  - `<DateText>` (legal-search) — wraps `<time>` with `tabular-nums` so digits align in columns.
+  - `<SwissDateField>` (admin) — drop-in replacement for react-admin's `<DateField>` that pins `locales="de-CH"` and the contract's Intl options.
+- **Guardrail tests:**
+  - `legal-search/frontend/src/__tests__/date-format.cross-surface.test.ts`
+  - `platform-control/admin/src/lib/__tests__/date.swiss.test.ts`
+
+Both tests exercise the same fixtures; if both pass, the two surfaces render a given ISO string identically. Never introduce a new `toLocaleDateString` / `Intl.DateTimeFormat` call in product code — route through the formatter.
+
+
+---
+
 ## Future Work
 
 - **Dark Mode:** Brand/surface/interactive tokens have `.dark {}` overrides; keep auditing contrast and focus parity (`TAR-252`)
 - **Docling Renderer Migration:** Replace HTML-string rendering in `DetailsTab.tsx` with structured Docling components when the BFF returns canonical document blocks
+- **Additional Primitives:** `Chip` component for ContextBar/FilterPanel chip patterns
+- **Sprint 2 (TAR-??? — follow-on):** Source Serif 4 on detail headings, tab indicator `transform`-based motion, mobile detail-sheet IA rework, admin/public masthead unification.
 
 ## Metadata visibility contract (TAR-258 decision)
 
@@ -453,6 +517,6 @@ Rules:
 
 ## Remaining (tracked in Linear)
 
-Epic **[TAR-243](https://linear.app/tart-baozi/issue/TAR-243)** / project **[Evidara — Design system & UX (ADR-0016)](https://linear.app/tart-baozi/project/evidara-design-system-and-ux-adr-0016-8d1ece16235c)**. Detail tab line variant uses `--tab-indicator-color` and `--tab-active-font-weight` (`TAR-254` done). Cross-surface status vocabulary: [admin status-level table](../../../platform-control/admin/docs/status-level-vocabulary.md) (`TAR-251`).
+Epic **[TAR-243](https://linear.app/tart-baozi/issue/TAR-243)** / project **[Evidara — Design system & UX (ADR-0016)](https://linear.app/tart-baozi/project/evidara-design-system-and-ux-adr-0016-8d1ece16235c)**. Detail tab line variant uses `--tab-indicator-color` and `--tab-active-font-weight` (`TAR-254` done). Cross-surface status vocabulary: [admin status-level table](../../../platform-control/admin/docs/status-level-vocabulary.md) (`TAR-251`). Sprint 1 aesthetic pass: [**TAR-244**](https://linear.app/tart-baozi/issue/TAR-244) (accent-core token family, card elevation, Swiss date contract).
 
 **ADR:** [ADR-0016](../../../docs/adr/adr-0016-design-system-component-contracts.md) (**accepted** — component contracts are team guidance).

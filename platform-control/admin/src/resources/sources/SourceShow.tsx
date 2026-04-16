@@ -3,7 +3,6 @@
 import { Box, Chip, Grid, Paper, Stack, Typography } from "@mui/material";
 import { type ReactNode, useEffect, useState } from "react";
 import {
-  DateField,
   FunctionField,
   ReferenceField,
   Show,
@@ -11,6 +10,7 @@ import {
   TextField,
   useRecordContext,
 } from "react-admin";
+import { SwissDateField } from "../../components/SwissDateField";
 import type {
   AuthorityRecord,
   JurisdictionRecord,
@@ -251,12 +251,12 @@ export function SourceShow() {
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <SourceFieldCell label="Created">
-              <DateField source="created_at" showTime />
+              <SwissDateField source="created_at" showTime />
             </SourceFieldCell>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <SourceFieldCell label="Updated">
-              <DateField source="updated_at" showTime />
+              <SwissDateField source="updated_at" showTime />
             </SourceFieldCell>
           </Grid>
         </Grid>

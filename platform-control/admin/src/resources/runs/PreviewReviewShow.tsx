@@ -1,7 +1,8 @@
 "use client";
 
 import { Box } from "@mui/material";
-import { DateField, NumberField, Show, SimpleShowLayout, TextField } from "react-admin";
+import { NumberField, Show, SimpleShowLayout, TextField } from "react-admin";
+import { SwissDateField } from "../../components/SwissDateField";
 import { RunActionStack } from "./RunActions";
 import { RunDetailSections } from "./RunDetailSections";
 
@@ -23,10 +24,10 @@ export function PreviewReviewShow() {
         <NumberField source="captured_resources_count" label="Captured resources" />
         <NumberField source="artifacts_count" label="Artifacts" />
         <TextField source="failure_reason" label="Failure reason" emptyText="-" />
-        <DateField source="started_at" label="Started" showTime emptyText="-" />
-        <DateField source="completed_at" label="Completed" showTime emptyText="-" />
-        <DateField source="created_at" label="Created" showTime />
-        <DateField source="updated_at" label="Updated" showTime />
+        <SwissDateField source="started_at" label="Started" showTime emptyText="-" />
+        <SwissDateField source="completed_at" label="Completed" showTime emptyText="-" />
+        <SwissDateField source="created_at" label="Created" showTime />
+        <SwissDateField source="updated_at" label="Updated" showTime />
         <RunDetailSections />
       </SimpleShowLayout>
     </Show>

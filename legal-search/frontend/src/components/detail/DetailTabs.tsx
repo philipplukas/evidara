@@ -22,11 +22,15 @@ export function DetailTabs({ tabs }: DetailTabsProps) {
             <TabsTrigger
               key={tab.key}
               value={tab.key}
-              className="group gap-1.5 rounded-none border-b-2 px-3 py-2 text-xs font-medium transition-[color,font-weight,border-color] data-[state=inactive]:border-transparent data-[state=inactive]:text-muted-foreground/70 data-[state=active]:border-[var(--tab-indicator-color)] data-[state=active]:font-bold data-[state=active]:text-foreground"
+              // Sprint 1: detail-panel tabs surface transient "which subview"
+              // state — use accent-core (violet) so they're distinct from
+              // the navy brand that marks identity (logo, primary CTAs, result
+              // list selection). See design-system.md → Accent-core family.
+              className="group gap-1.5 rounded-none border-b-2 px-3 py-2 text-xs font-medium transition-[color,font-weight,border-color] data-[state=inactive]:border-transparent data-[state=inactive]:text-muted-foreground/70 data-[state=active]:border-accent-core data-[state=active]:font-bold data-[state=active]:text-accent-core"
             >
               <span>{tab.label}</span>
               {tab.count != null && (
-                <span className="rounded-full px-1.5 py-0.5 text-tiny font-semibold group-data-[state=active]:bg-brand/10 group-data-[state=active]:text-brand bg-muted text-muted-foreground/70">
+                <span className="rounded-full px-1.5 py-0.5 text-tiny font-semibold group-data-[state=active]:bg-accent-core-subtle group-data-[state=active]:text-accent-core bg-muted text-muted-foreground/70">
                   {tab.count}
                 </span>
               )}

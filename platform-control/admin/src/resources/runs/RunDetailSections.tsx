@@ -35,6 +35,7 @@ import type {
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
+import { formatSwissDateTime } from "../../lib/format/date";
 import {
   type AdminStatusLevel,
   adminLevelBorder,
@@ -74,12 +75,7 @@ type RunTableSectionProps<TRecord extends { id: Identifier }> = {
 };
 
 const formatDateTime = (value: string | null | undefined): string =>
-  value
-    ? new Intl.DateTimeFormat("en", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(new Date(value))
-    : "—";
+  formatSwissDateTime(value) || "—";
 
 const formatJson = (value: unknown): string => JSON.stringify(value, null, 2);
 
