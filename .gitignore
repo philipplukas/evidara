@@ -102,3 +102,6 @@ site/
 
 # --- Operator-local scripts (host-specific paths / IPs; not part of default clone) ---
 scripts/deploy-hetzner-runner.sh
+
+# Pnpm store artifacts from local Docker runs
+.pnpm-store/
