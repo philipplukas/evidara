@@ -1,0 +1,47 @@
+version: 1
+country_code: DE
+country_name: Germany
+
+jurisdiction_overlay:
+  canonical_codes:
+    - DE
+  hierarchy_paths:
+    - de
+    - de/federal
+    - de/land
+  # Sub-federal hierarchy paths for Länder follow the pattern
+  # `de/land/<iso-3166-2-subdivision-lowercased>` (e.g. `de/land/by` for
+  # Bayern). Each Bundesland has its own portal; see
+  # `bundesland_http` provider for per-state templates.
+
+language_defaults:
+  primary: de
+  supported:
+    - de
+    - en
+
+source_family_overlay:
+  canonical:
+    - law
+    - decision
+    - commentary
+  local_mappings:
+    - local_type: gesetz
+      canonical_type: law
+      note: German statutory law maps to canonical law.
+    - local_type: verordnung
+      canonical_type: law
+      note: German ordinance (Verordnung) maps to canonical law.
+    - local_type: urteil
+      canonical_type: decision
+      note: German court judgment maps to decision-family discovery.
+    - local_type: beschluss
+      canonical_type: decision
+      note: German court resolution maps to decision-family discovery.
+
+court_level_overlay:
+  expected_levels:
+    - constitutional
+    - supreme
+    - appellate
+    - regional

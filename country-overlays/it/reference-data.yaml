@@ -1,0 +1,25 @@
+version: 1
+country_code: IT
+
+jurisdictions:
+  - jurisdiction_id: jur_it
+    slug: it
+    name: Italy
+
+authorities:
+  - authority_id: auth_it_gazzetta
+    jurisdiction_id: jur_it
+    slug: it-gazzetta
+    name: Gazzetta Ufficiale
+  - authority_id: auth_it_normattiva
+    jurisdiction_id: jur_it
+    slug: it-normattiva
+    name: Normattiva
+  - authority_id: auth_it_cassazione
+    jurisdiction_id: jur_it
+    slug: it-cassazione
+    name: Corte Suprema di Cassazione
+  - authority_id: auth_it_consiglio_di_stato
+    jurisdiction_id: jur_it
+    slug: it-cds
+    name: Consiglio di Stato

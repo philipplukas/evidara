@@ -1,0 +1,46 @@
+version: 1
+country_code: CH
+country_name: Switzerland
+
+jurisdiction_overlay:
+  canonical_codes:
+    - CH
+  hierarchy_paths:
+    - ch
+    - ch/federal
+    - ch/canton
+  # Sub-federal hierarchy paths for cantons follow the pattern
+  # `ch/canton/<iso-3166-2-subdivision-lowercased>` (e.g. `ch/canton/zh`).
+  # Additive per the five-country rollout design rule.
+
+language_defaults:
+  primary: de
+  supported:
+    - de
+    - fr
+    - it
+    - rm
+    - en
+
+source_family_overlay:
+  canonical:
+    - law
+    - decision
+    - commentary
+  local_mappings:
+    - local_type: bundesgesetz
+      canonical_type: law
+      note: Federal law (Bundesgesetz) maps to canonical law.
+    - local_type: bge
+      canonical_type: decision
+      note: Bundesgerichtsentscheid maps to decision-family discovery.
+    - local_type: bundesverfassung
+      canonical_type: law
+      note: Federal constitutional text maps to law-family discovery.
+
+court_level_overlay:
+  expected_levels:
+    - supreme
+    - administrative
+    - appellate
+    - cantonal

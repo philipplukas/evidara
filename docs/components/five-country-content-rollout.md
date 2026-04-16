@@ -105,6 +105,32 @@ Without a shared model, each country rollout risks introducing inconsistent term
 | FR | centralized codes + administrative tracks | cassation + administrative courts | fr | legal family naming drift in translated UI |
 | IT | national codes with region-sensitive practice | cassation + appellate + tribunal | it | inconsistent metadata quality across decisions |
 
+## Sub-federal hierarchy paths
+
+Country overlays MUST encode sub-federal jurisdiction in `hierarchy_paths`
+using ISO 3166-2 subdivision codes lowercased. The canonical path shape is:
+
+`<iso-3166-1-alpha-2-lowercased>/<subdivision-tier>/<iso-3166-2-subdivision-lowercased>`
+
+| Country | Sub-federal tier | Path pattern | Example |
+|---|---|---|---|
+| CH | canton | `ch/canton/<code>` | `ch/canton/zh` (Zürich) |
+| AT | state (Bundesland) | `at/state/<code>` | `at/state/w` (Wien) |
+| DE | Land | `de/land/<code>` | `de/land/by` (Bayern) |
+| FR | région | `fr/region/<code>` | `fr/region/idf` (Île-de-France) |
+| IT | regione | `it/region/<code>` | `it/region/25` (Lombardia) |
+
+For EU the analogous nesting is member-state, not a subdivision of a single
+country: `eu/member-state/<iso-3166-1-alpha-2-lowercased>` (e.g.
+`eu/member-state/de`). National sub-federal paths stay under their own
+country overlay regardless of EU membership.
+
+Additive rule: a country overlay's `hierarchy_paths` MUST include
+`<country>`, SHOULD include `<country>/federal`, and MAY include the
+`<country>/<sub-federal-tier>` umbrella. Concrete sub-federal subdivision
+paths live on the individual provider templates and are emitted at
+discovery time, not pinned at overlay level.
+
 ## End-user content principles
 
 1. Show canonical concepts first, local naming second.

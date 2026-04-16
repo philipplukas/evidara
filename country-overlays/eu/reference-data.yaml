@@ -1,0 +1,33 @@
+version: 1
+country_code: EU
+
+jurisdictions:
+  - jurisdiction_id: jur_eu
+    slug: eu
+    name: European Union
+
+authorities:
+  - authority_id: auth_eu_eurlex
+    jurisdiction_id: jur_eu
+    slug: eu-eurlex
+    name: EUR-Lex
+  - authority_id: auth_eu_parliament
+    jurisdiction_id: jur_eu
+    slug: eu-parliament
+    name: European Parliament
+  - authority_id: auth_eu_council
+    jurisdiction_id: jur_eu
+    slug: eu-council
+    name: Council of the European Union
+  - authority_id: auth_eu_commission
+    jurisdiction_id: jur_eu
+    slug: eu-commission
+    name: European Commission
+  - authority_id: auth_eu_cjeu
+    jurisdiction_id: jur_eu
+    slug: eu-cjeu
+    name: Court of Justice of the European Union
+  - authority_id: auth_eu_general_court
+    jurisdiction_id: jur_eu
+    slug: eu-general-court
+    name: General Court of the European Union

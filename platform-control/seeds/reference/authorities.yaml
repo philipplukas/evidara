@@ -1,13 +1,24 @@
 version: 1
 items:
+  # ─── Switzerland ────────────────────────────────────────────
   - authority_id: auth_ch_fedlex
     jurisdiction_id: jur_ch
     slug: ch-fedlex
     name: Fedlex
+  - authority_id: auth_ch_bundesgericht
+    jurisdiction_id: jur_ch
+    slug: ch-bger
+    name: Bundesgericht
+  - authority_id: auth_ch_bundesverwaltungsgericht
+    jurisdiction_id: jur_ch
+    slug: ch-bvger
+    name: Bundesverwaltungsgericht
   - authority_id: auth_zh_admin
     jurisdiction_id: jur_ch
     slug: zh-admin-court
     name: Zurich Administrative Court
+
+  # ─── Austria ────────────────────────────────────────────────
   - authority_id: auth_at_ris
     jurisdiction_id: jur_at
     slug: at-ris
@@ -24,3 +35,67 @@ items:
     jurisdiction_id: jur_at
     slug: at-vwgh
     name: Verwaltungsgerichtshof
+
+  # ─── Germany ────────────────────────────────────────────────
+  - authority_id: auth_de_bundesrecht
+    jurisdiction_id: jur_de
+    slug: de-bundesrecht
+    name: Bundesrecht (gesetze-im-internet.de)
+  - authority_id: auth_de_bverfg
+    jurisdiction_id: jur_de
+    slug: de-bverfg
+    name: Bundesverfassungsgericht
+
+  # ─── France ─────────────────────────────────────────────────
+  - authority_id: auth_fr_legifrance
+    jurisdiction_id: jur_fr
+    slug: fr-legifrance
+    name: Légifrance
+  - authority_id: auth_fr_ccass
+    jurisdiction_id: jur_fr
+    slug: fr-ccass
+    name: Cour de cassation
+
+  # ─── Italy ──────────────────────────────────────────────────
+  - authority_id: auth_it_gazzetta
+    jurisdiction_id: jur_it
+    slug: it-gazzetta
+    name: Gazzetta Ufficiale
+  - authority_id: auth_it_normattiva
+    jurisdiction_id: jur_it
+    slug: it-normattiva
+    name: Normattiva
+  - authority_id: auth_it_cassazione
+    jurisdiction_id: jur_it
+    slug: it-cassazione
+    name: Corte Suprema di Cassazione
+  - authority_id: auth_it_consiglio_di_stato
+    jurisdiction_id: jur_it
+    slug: it-cds
+    name: Consiglio di Stato
+
+  # ─── European Union ─────────────────────────────────────────
+  - authority_id: auth_eu_eurlex
+    jurisdiction_id: jur_eu
+    slug: eu-eurlex
+    name: EUR-Lex
+  - authority_id: auth_eu_parliament
+    jurisdiction_id: jur_eu
+    slug: eu-parliament
+    name: European Parliament
+  - authority_id: auth_eu_council
+    jurisdiction_id: jur_eu
+    slug: eu-council
+    name: Council of the European Union
+  - authority_id: auth_eu_commission
+    jurisdiction_id: jur_eu
+    slug: eu-commission
+    name: European Commission
+  - authority_id: auth_eu_cjeu
+    jurisdiction_id: jur_eu
+    slug: eu-cjeu
+    name: Court of Justice of the European Union
+  - authority_id: auth_eu_general_court
+    jurisdiction_id: jur_eu
+    slug: eu-general-court
+    name: General Court of the European Union

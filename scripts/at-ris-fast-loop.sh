@@ -43,6 +43,9 @@ Options:
   --jurisdiction-id <id>         Jurisdiction ID override (default: jur_at_federal)
   --authority-id <id>            Authority ID override (default: auto-detect live RIS authority, preferring auth_ris)
   --max-resources <n>            Preview scope max_resources (default: 5)
+  --widen-discovery              Shortcut: --template firecrawl_justice_portal --max-resources 25
+                                 Executes the AT discovery-widening slice from
+                                 docs/runbooks/ch-at-thin-slice-execution.md.
   --max-polls <n>                Maximum run polls (default: 60)
   --poll-interval <seconds>      Run poll interval (default: 5)
   --out-dir <path>               Exact directory for persisted evidence bundle
@@ -92,6 +95,11 @@ while [[ $# -gt 0 ]]; do
     --max-resources)
       MAX_RESOURCES="${2:?missing value for --max-resources}"
       shift 2
+      ;;
+    --widen-discovery)
+      TEMPLATE_ID="firecrawl_justice_portal"
+      MAX_RESOURCES=25
+      shift
       ;;
     --max-polls)
       MAX_POLLS="${2:?missing value for --max-polls}"

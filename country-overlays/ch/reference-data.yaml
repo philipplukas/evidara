@@ -1,0 +1,25 @@
+version: 1
+country_code: CH
+
+jurisdictions:
+  - jurisdiction_id: jur_ch
+    slug: ch
+    name: Switzerland
+
+authorities:
+  - authority_id: auth_ch_fedlex
+    jurisdiction_id: jur_ch
+    slug: ch-fedlex
+    name: Fedlex
+  - authority_id: auth_ch_bundesgericht
+    jurisdiction_id: jur_ch
+    slug: ch-bger
+    name: Bundesgericht
+  - authority_id: auth_ch_bundesverwaltungsgericht
+    jurisdiction_id: jur_ch
+    slug: ch-bvger
+    name: Bundesverwaltungsgericht
+  - authority_id: auth_zh_admin
+    jurisdiction_id: jur_ch
+    slug: zh-admin-court
+    name: Zurich Administrative Court

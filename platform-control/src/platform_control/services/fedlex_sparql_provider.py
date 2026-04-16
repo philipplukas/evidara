@@ -207,6 +207,26 @@ LIMIT 1
             ]
         return [language for language in languages if language]
 
+    def _canton_filter(self, acquisition_spec: dict[str, object]) -> str | None:
+        """Return the ISO 3166-2:CH code when the spec asks for a cantonal slice.
+
+        Reads `acquisition_spec.canton` (e.g. "CH-ZH" or "ZH") and normalizes to
+        the ISO form. Currently only extracted; applying it to the SPARQL query
+        (via `jolux:CantonOfOrigin`) lands alongside the first live cantonal
+        acceptance run — see docs/runbooks/ch-fedlex-fast-loop-backlog.md.
+        """
+        raw = acquisition_spec.get("canton")
+        if not isinstance(raw, str):
+            return None
+        code = raw.strip().upper()
+        if not code:
+            return None
+        if code.startswith("CH-"):
+            return code
+        if len(code) == 2:
+            return f"CH-{code}"
+        return code
+
     async def _resolve_concrete_work_uri(
         self,
         *,

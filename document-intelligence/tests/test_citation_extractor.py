@@ -58,6 +58,56 @@ class TestEUCitations:
         assert len(eu) == 1
 
 
+class TestCelexCitations:
+    def test_celex_regulation(self):
+        citations = extract_citations("GDPR (CELEX 32016R0679) applies.")
+        celex = [c for c in citations if c.citation_type == "eu_celex"]
+        assert len(celex) == 1
+        assert celex[0].metadata["celex"] == "32016R0679"
+        assert celex[0].metadata["sector"] == "3"
+        assert celex[0].metadata["year"] == "2016"
+        assert celex[0].metadata["descriptor"] == "R"
+
+    def test_celex_directive(self):
+        citations = extract_citations("See 32019L0790 on copyright in the DSM.")
+        celex = [c for c in citations if c.citation_type == "eu_celex"]
+        assert len(celex) == 1
+        assert celex[0].metadata["descriptor"] == "L"
+        assert celex[0].metadata["year"] == "2019"
+
+    def test_celex_non_legislation_sector(self):
+        # Sector 6 = case law from earlier CELEX generations.
+        citations = extract_citations("The decision 62019CJ0311 is relevant.")
+        celex = [c for c in citations if c.citation_type == "eu_celex"]
+        assert len(celex) == 1
+        assert celex[0].metadata["sector"] == "6"
+
+
+class TestEcliEuCitations:
+    def test_ecli_court_of_justice(self):
+        citations = extract_citations("Schrems II (ECLI:EU:C:2020:559) invalidated Privacy Shield.")
+        ecli = [c for c in citations if c.citation_type == "eu_ecli"]
+        assert len(ecli) == 1
+        assert ecli[0].metadata["ecli"] == "ECLI:EU:C:2020:559"
+        assert ecli[0].metadata["court"] == "court-of-justice"
+        assert ecli[0].metadata["year"] == "2020"
+        assert ecli[0].metadata["ordinal"] == "559"
+
+    def test_ecli_general_court(self):
+        citations = extract_citations("ECLI:EU:T:2020:338 settled the issue.")
+        ecli = [c for c in citations if c.citation_type == "eu_ecli"]
+        assert len(ecli) == 1
+        assert ecli[0].metadata["court"] == "general-court"
+        assert ecli[0].metadata["court_code"] == "T"
+
+    def test_ecli_civil_service_tribunal(self):
+        # Retired 2016 but historical citations still occur.
+        citations = extract_citations("See ECLI:EU:F:2014:18 for background.")
+        ecli = [c for c in citations if c.citation_type == "eu_ecli"]
+        assert len(ecli) == 1
+        assert ecli[0].metadata["court"] == "civil-service-tribunal"
+
+
 class TestArticleCitations:
     def test_article_reference(self):
         citations = extract_citations("Art. 8 EMRK schützt das Privatleben.")

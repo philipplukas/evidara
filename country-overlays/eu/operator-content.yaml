@@ -1,0 +1,28 @@
+version: 1
+country_code: EU
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code EU.
+  - Confirm source family mapping for regulation, directive, decision, opinion, judgment.
+  - Confirm authority records include EUR-Lex, Parliament, Council, Commission, CJEU, General Court.
+  - Confirm CELEX IDs and ECLI identifiers are recognized by the citation extractor.
+
+approval_hotspots:
+  - authority taxonomy correctness (institutions vs courts)
+  - language-version selection (EUR-Lex exposes all 24 official languages)
+  - CELEX vs ECLI identifier disambiguation
+
+triage_overlays:
+  mapping_drift:
+    first_action: Compare incoming authority/jurisdiction labels against canonical EU mapping.
+    escalation_owner: platform-control
+  search_projection_mismatch:
+    first_action: Verify processed-event projection parity for EU-tagged documents.
+    escalation_owner: legal-search
+
+status: scaffold-only
+status_note: |
+  EU overlay is scaffold-only. The EUR-Lex SPARQL acquisition provider is
+  registered as a stub in platform_control/services/provider_registry_factory.py
+  but raises NotImplementedError on discover/fetch. Live fetch and evidence
+  capture land in a follow-up ticket.

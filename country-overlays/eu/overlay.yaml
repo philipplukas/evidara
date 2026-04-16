@@ -1,0 +1,51 @@
+version: 1
+country_code: EU
+country_name: European Union
+
+jurisdiction_overlay:
+  canonical_codes:
+    - EU
+  hierarchy_paths:
+    - eu
+    - eu/union
+    - eu/member-state
+  # EU is a supranational jurisdiction. "Sub-federal" for EU means nested
+  # member states rather than subdivisions of a single country; the pattern
+  # is `eu/member-state/<iso-3166-1-alpha-2-lowercased>` (e.g.
+  # `eu/member-state/de`). National sub-federal paths stay under their own
+  # country overlay.
+
+language_defaults:
+  primary: en
+  supported:
+    - de
+    - en
+    - fr
+    - it
+
+source_family_overlay:
+  canonical:
+    - law
+    - decision
+    - commentary
+  local_mappings:
+    - local_type: regulation
+      canonical_type: law
+      note: EU regulation maps to canonical law (directly applicable).
+    - local_type: directive
+      canonical_type: law
+      note: EU directive maps to canonical law (transposition-required).
+    - local_type: decision
+      canonical_type: decision
+      note: EU institutional decision maps to canonical decision.
+    - local_type: opinion
+      canonical_type: commentary
+      note: EU advisory opinion maps to commentary discovery.
+    - local_type: judgment
+      canonical_type: decision
+      note: CJEU / General Court judgment maps to decision-family discovery.
+
+court_level_overlay:
+  expected_levels:
+    - court-of-justice
+    - general-court

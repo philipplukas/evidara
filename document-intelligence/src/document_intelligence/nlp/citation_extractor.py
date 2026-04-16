@@ -4,6 +4,8 @@ Extracts references to:
 - Swiss federal law (SR numbers): e.g., "SR 210", "SR 311.0"
 - Swiss BGE decisions: e.g., "BGE 147 III 49", "BGE 148 IV 234"
 - EU regulations/directives: e.g., "Regulation (EU) 2016/679", "Directive 2013/36/EU"
+- EU CELEX IDs: e.g., "32016R0679" (GDPR), "32019L0790" (Copyright Directive)
+- EU ECLI identifiers: e.g., "ECLI:EU:C:2019:218", "ECLI:EU:T:2020:338"
 - Article references: e.g., "Art. 8 EMRK", "Art. 261bis StGB"
 - Named statute abbreviations: e.g., "OR", "ZGB", "StGB", "SchKG"
 """
@@ -55,6 +57,28 @@ _EU_REGULATION_PATTERN = re.compile(
 _EU_DIRECTIVE_PATTERN = re.compile(
     r"\b(?:Directive|Richtlinie|Directive)\s*\d{4}/\d{1,4}/(?:EU|EG|EC|CE)\b",
     re.IGNORECASE,
+)
+
+# CELEX identifiers: 1-digit sector + 4-digit year + 1-or-2-letter descriptor +
+# 4-digit doc number. Sector 3 (legislation) uses single letters (R regulation,
+# L directive, D decision, E CFSP, H recommendation, C other). Sector 6 (case
+# law) uses two-letter codes (CJ Court of Justice, TJ General Court, FJ Civil
+# Service Tribunal). Example: "32016R0679" = GDPR; "62019CJ0311" = CJEU case.
+_CELEX_PATTERN = re.compile(
+    r"\b(?P<sector>[1-9])"
+    r"(?P<year>\d{4})"
+    r"(?P<descriptor>[A-Z]{1,2})"
+    r"(?P<doc>\d{4})"
+    r"(?:\([A-Z0-9]+\))?\b",
+)
+
+# ECLI identifiers for EU courts:
+#   ECLI:EU:C:YYYY:NNN  → Court of Justice
+#   ECLI:EU:T:YYYY:NNN  → General Court
+#   ECLI:EU:F:YYYY:NNN  → Civil Service Tribunal (retired 2016)
+# Year has 4 digits; ordinal is 1–5 digits (2024 growth-proof).
+_ECLI_EU_PATTERN = re.compile(
+    r"\bECLI:EU:(?P<court>[CTF]):(?P<year>\d{4}):(?P<ordinal>\d{1,5})\b",
 )
 
 # Article references: "Art. 8 EMRK", "Art. 261bis StGB", "Art. 1 Abs. 2 OR"
@@ -145,6 +169,41 @@ def extract_citations(text: str) -> list[Citation]:
                 citation_type="eu_directive",
                 start=m.start(),
                 end=m.end(),
+            )
+        )
+
+    for m in _CELEX_PATTERN.finditer(text):
+        citations.append(
+            Citation(
+                text=m.group(0),
+                citation_type="eu_celex",
+                start=m.start(),
+                end=m.end(),
+                metadata={
+                    "celex": m.group(0),
+                    "sector": m.group("sector"),
+                    "year": m.group("year"),
+                    "descriptor": m.group("descriptor"),
+                    "doc_number": m.group("doc"),
+                },
+            )
+        )
+
+    for m in _ECLI_EU_PATTERN.finditer(text):
+        court_by_code = {"C": "court-of-justice", "T": "general-court", "F": "civil-service-tribunal"}
+        citations.append(
+            Citation(
+                text=m.group(0),
+                citation_type="eu_ecli",
+                start=m.start(),
+                end=m.end(),
+                metadata={
+                    "ecli": m.group(0),
+                    "court_code": m.group("court"),
+                    "court": court_by_code[m.group("court")],
+                    "year": m.group("year"),
+                    "ordinal": m.group("ordinal"),
+                },
             )
         )
 
