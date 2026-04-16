@@ -7,19 +7,28 @@
  *
  * Palette keys are visual, not semantic:
  *   "blue", "pink", "indigo", "green" — not "law", "decision", etc.
+ *
+ * Values resolve to CSS custom properties defined in
+ * `contracts/design-tokens/evidara-tokens.css` so swatches stay in
+ * sync across apps and pick up dark-mode overrides automatically.
  */
 
-const palette: Record<string, { bg: string; text: string }> = {
-  blue: { bg: "#dbeafe", text: "#1e40af" },
-  pink: { bg: "#fce7f3", text: "#9d174d" },
-  indigo: { bg: "#e0e7ff", text: "#3730a3" },
-  green: { bg: "#d1fae5", text: "#065f46" },
-  amber: { bg: "#fef3c7", text: "#92400e" },
-  slate: { bg: "#f1f5f9", text: "#334155" },
+type BadgeColor = { bg: string; text: string };
+
+const palette: Record<string, BadgeColor> = {
+  blue: { bg: "var(--badge-blue-bg)", text: "var(--badge-blue-text)" },
+  pink: { bg: "var(--badge-pink-bg)", text: "var(--badge-pink-text)" },
+  indigo: { bg: "var(--badge-indigo-bg)", text: "var(--badge-indigo-text)" },
+  green: { bg: "var(--badge-green-bg)", text: "var(--badge-green-text)" },
+  amber: { bg: "var(--badge-amber-bg)", text: "var(--badge-amber-text)" },
+  slate: { bg: "var(--badge-slate-bg)", text: "var(--badge-slate-text)" },
 };
 
-const fallback = { bg: "#f3f4f6", text: "#374151" };
+const fallback: BadgeColor = {
+  bg: "var(--badge-fallback-bg)",
+  text: "var(--badge-fallback-text)",
+};
 
-export function getBadgeColor(colorKey?: string): { bg: string; text: string } {
+export function getBadgeColor(colorKey?: string): BadgeColor {
   return palette[colorKey || ""] || fallback;
 }
