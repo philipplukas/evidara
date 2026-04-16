@@ -56,12 +56,12 @@ describe("High-impact interaction controls", () => {
       <DetailPanelHeader detail={articleDetail} onPin={onPin} isPinned={false} />,
     );
 
-    const pinButton = document.querySelector('button[title="Pin"]');
+    const pinButton = document.querySelector('button[title="Anheften"]');
     expect(pinButton).toBeTruthy();
     fireEvent.click(pinButton!);
     expect(onPin).toHaveBeenCalledWith(articleDetail.id, articleDetail.title, articleDetail.type);
 
-    const copyButton = document.querySelector('button[title="Copy citation"]');
+    const copyButton = document.querySelector('button[title="Zitat kopieren"]');
     expect(copyButton).toBeTruthy();
     fireEvent.click(copyButton!);
     expect(writeText).toHaveBeenCalledWith(articleDetail.title);
@@ -113,7 +113,7 @@ describe("High-impact interaction controls", () => {
     expect(backButton).toBeInTheDocument();
     expect(screen.getByText("Eingegrenzter Bereich")).toBeInTheDocument();
     expect(screen.getByText("Commentary for Art. 754 OR")).toBeInTheDocument();
-    expect(screen.getByText(/Search for "Art 754 OR" · Commentary/)).toBeInTheDocument();
+    expect(screen.getByText(/Suche nach .*Art 754 OR.* · Commentary/)).toBeInTheDocument();
 
     act(() => {
       fireEvent.click(backButton);

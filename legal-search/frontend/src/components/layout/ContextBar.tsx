@@ -2,7 +2,7 @@
 
 import { Shield } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getIcon } from "@/lib/icons";
+import { getIcon, getFlagSrc, getFlagAlt, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
 
@@ -115,7 +115,6 @@ function ChipGroup({
   return (
     <div className="context-bar__chip-group">
       {items.map((item) => {
-        const icon = getIcon(item.iconKey);
         return (
           <button
             type="button"
@@ -127,7 +126,11 @@ function ChipGroup({
                 : "context-bar__chip--idle bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
             }`}
           >
-            {icon && <span className="text-sm leading-none">{icon}</span>}
+            {item.iconKey && isFlagIcon(item.iconKey) ? (
+              <img src={getFlagSrc(item.iconKey)!} alt="" width={14} height={14} className="inline-block" />
+            ) : (
+              (() => { const icon = getIcon(item.iconKey); return icon ? <span className="text-sm leading-none">{icon}</span> : null; })()
+            )}
             {item.label}
           </button>
         );

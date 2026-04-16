@@ -5,12 +5,12 @@ import { useTranslations } from "next-intl";
 import type { ResultSetSource } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 
-function describeScopeTrail(source: ResultSetSource): string {
+function describeScopeTrail(source: ResultSetSource, searchForFn: (query: string) => string): string {
   if (source.type === "search") {
-    return `Search for "${source.query}"`;
+    return searchForFn(source.query);
   }
 
-  return `${describeScopeTrail(source.parentSource)} · ${source.label}`;
+  return `${describeScopeTrail(source.parentSource, searchForFn)} · ${source.label}`;
 }
 
 export function ResultSetScopeBar() {
@@ -42,7 +42,7 @@ export function ResultSetScopeBar() {
       </div>
       {currentSource.type === "pivot" && (
         <span className="hidden text-[11px] text-muted-foreground/80 sm:block">
-          {describeScopeTrail(currentSource)}
+          {describeScopeTrail(currentSource, (q) => t("searchFor", { query: q }))}
         </span>
       )}
     </div>

@@ -100,7 +100,7 @@ describe("ResultCard", () => {
     const article = container.querySelector("article");
     expect(article?.className).toContain("border-l-brand");
     expect(article?.getAttribute("aria-current")).toBe("true");
-    expect(screen.getByText("Selected")).toBeInTheDocument();
+    expect(screen.getByText("Ausgewählt")).toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {

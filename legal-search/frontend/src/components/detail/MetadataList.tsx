@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { getIcon } from "@/lib/icons";
+import { getIcon, getFlagSrc, getFlagAlt, isFlagIcon } from "@/lib/icons";
 import { filterByDensity } from "@/lib/metadata-visibility";
 import type { MetadataDensity, MetadataField } from "@/lib/types";
 import { SectionLabel } from "../primitives";
@@ -69,7 +69,6 @@ export function MetadataList({
 }
 
 function MetadataRow({ field, compact }: { field: MetadataField; compact: boolean }) {
-  const icon = getIcon(field.iconKey);
   const hasValue = field.value.trim().length > 0;
   const t = useTranslations("detail");
 
@@ -83,7 +82,11 @@ function MetadataRow({ field, compact }: { field: MetadataField; compact: boolea
             : "text-muted-foreground/70 italic flex items-center gap-1"
         }
       >
-        {icon && <span className="text-sm">{icon}</span>}
+        {field.iconKey && isFlagIcon(field.iconKey) ? (
+          <img src={getFlagSrc(field.iconKey)!} alt="" width={14} height={14} className="inline-block" />
+        ) : (
+          (() => { const icon = getIcon(field.iconKey); return icon ? <span className="text-sm">{icon}</span> : null; })()
+        )}
         {hasValue ? field.value : t("notAvailable")}
       </span>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Copy, MapPin } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { MetadataList } from "@/components/detail/MetadataList";
 import { enrichMetadataRows } from "@/lib/metadata-visibility";
 import type { DetailViewModel } from "@/lib/types";
@@ -14,12 +15,13 @@ interface DetailPanelHeaderProps {
 }
 
 export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeaderProps) {
-  const safeTitle = detail.title.trim().length > 0 ? detail.title : "Untitled document";
-  const safeSubtitle = detail.subtitle.trim().length > 0 ? detail.subtitle : "No summary available";
+  const t = useTranslations("detail");
+  const safeTitle = detail.title.trim().length > 0 ? detail.title : t("fallbackTitle");
+  const safeSubtitle = detail.subtitle.trim().length > 0 ? detail.subtitle : t("fallbackSubtitle");
   const translationLabel =
     detail.contentLanguage?.label && detail.contentLanguage.label.trim().length > 0
       ? detail.contentLanguage.label
-      : "Translated content";
+      : t("translatedContent");
 
   return (
     <div className="border-b border-border/60 px-5 py-3.5">
@@ -52,14 +54,14 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
             <AccentButton
               onClick={() => onPin(detail.id, safeTitle, detail.type)}
               active={isPinned}
-              title={isPinned ? "Unpin" : "Pin"}
+              title={isPinned ? t("unpin") : t("pin")}
             >
               <MapPin className="h-3 w-3" />
             </AccentButton>
           )}
           <AccentButton
             onClick={() => navigator.clipboard.writeText(safeTitle)}
-            title="Copy citation"
+            title={t("copyCitation")}
           >
             <Copy className="h-3 w-3" />
           </AccentButton>

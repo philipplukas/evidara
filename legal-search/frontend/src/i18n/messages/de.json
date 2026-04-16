@@ -75,7 +75,13 @@
       "noStructureDescription": "Dieses Dokument stellt derzeit keine navigierbare Gliederung bereit."
     },
     "confidenceSuffix": "Vertrauen",
-    "sourcesSuffix": "Quellen"
+    "sourcesSuffix": "Quellen",
+    "fallbackTitle": "Dokument ohne Titel",
+    "fallbackSubtitle": "Keine Zusammenfassung verfügbar",
+    "translatedContent": "Übersetzter Inhalt",
+    "pin": "Anheften",
+    "unpin": "Lösen",
+    "copyCitation": "Zitat kopieren"
   },
   "results": {
     "exactMatches": {
@@ -92,6 +98,7 @@
       "rootSearch": "Ausgangssuche",
       "refinedScope": "Eingegrenzter Bereich",
       "back": "Zum vorherigen Bereich",
+      "searchFor": "Suche nach \u201E{query}\u201C",
       "reopen": "{scope} erneut öffnen",
       "pivotDescription": "Der Bereich wurde gegenüber der vorherigen Ergebnismenge eingegrenzt, damit die aktuellen Belege fokussierter bleiben."
     },
@@ -107,7 +114,11 @@
       "pin": "Anheften",
       "pinned": "Angeheftet",
       "loadMore": "Weitere Ergebnisse laden",
-      "remaining": "{count} verbleibend"
+      "remaining": "{count} verbleibend",
+      "openResult": "{title} öffnen",
+      "seeRelated": "{count} verwandte {label} anzeigen",
+      "pinResult": "Ergebnis anheften",
+      "unpinResult": "Ergebnis lösen"
     },
     "list": {
       "sortedByRelevance": "Nach Relevanz sortiert",

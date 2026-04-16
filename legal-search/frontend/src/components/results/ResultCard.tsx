@@ -1,7 +1,8 @@
 "use client";
 
 import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
-import { getIcon } from "@/lib/icons";
+import { useTranslations } from "next-intl";
+import { getIcon, getFlagSrc, getFlagAlt, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
 
@@ -14,6 +15,24 @@ const iconComponents: Record<string, React.ComponentType<{ className?: string }>
   link: Link,
   globe: Globe,
 };
+
+function IconCell({ iconKey, className }: { iconKey?: string; className?: string }) {
+  if (!iconKey) return null;
+  if (isFlagIcon(iconKey)) {
+    return (
+      <img
+        src={getFlagSrc(iconKey)!}
+        alt=""
+        width={14}
+        height={14}
+        className={className}
+      />
+    );
+  }
+  const text = getIcon(iconKey);
+  if (!text) return null;
+  return <span className={className}>{text}</span>;
+}
 
 interface ResultCardProps {
   result: SearchResultViewModel;
@@ -32,10 +51,11 @@ export function ResultCard({
   onPin,
   isPinned,
 }: ResultCardProps) {
+  const t = useTranslations("results.card");
   return (
     <article
       aria-current={isSelected ? "true" : undefined}
-      aria-label={`Open ${result.title}`}
+      aria-label={t("openResult", { title: result.title })}
       onClick={() => onFocus(result.id)}
       className={`group cursor-pointer border-b border-border/60 px-4 py-3.5 transition-all
         transition-motion-medium focus-within:ring-2 focus-within:ring-focus-ring sm:px-5
@@ -59,18 +79,15 @@ export function ResultCard({
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
           {isSelected && (
             <span className="inline-flex items-center rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand">
-              Selected
+              {t("selected")}
             </span>
           )}
-          {result.badges.map((badge, i) => {
-            const icon = getIcon(badge.iconKey);
-            return (
-              <span key={i} className="inline-flex items-center gap-1">
-                {icon && <span className="text-xs leading-none">{icon}</span>}
-                <Badge label={badge.label} colorKey={badge.colorKey} />
-              </span>
-            );
-          })}
+          {result.badges.map((badge, i) => (
+            <span key={i} className="inline-flex items-center gap-1">
+              <IconCell iconKey={badge.iconKey} className="text-xs leading-none" />
+              <Badge label={badge.label} colorKey={badge.colorKey} />
+            </span>
+          ))}
         </div>
       </div>
 
@@ -93,19 +110,16 @@ export function ResultCard({
       {/* Metadata rows */}
       {result.metadataRows.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1">
-          {result.metadataRows.map((row, i) => {
-            const icon = getIcon(row.iconKey);
-            return (
-              <span
-                key={i}
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
-              >
-                {icon && <span className="text-xs text-muted-foreground/80">{icon}</span>}
-                <span className="font-medium text-foreground/60">{row.label}:</span>
-                <span className="text-foreground/80">{row.value}</span>
-              </span>
-            );
-          })}
+          {result.metadataRows.map((row, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+            >
+              <IconCell iconKey={row.iconKey} className="text-xs text-muted-foreground/80" />
+              <span className="font-medium text-foreground/60">{row.label}:</span>
+              <span className="text-foreground/80">{row.value}</span>
+            </span>
+          ))}
         </div>
       )}
 
@@ -116,7 +130,7 @@ export function ResultCard({
             <button
               type="button"
               key={i}
-              aria-label={`See ${rc.count} related ${rc.label}`}
+              aria-label={t("seeRelated", { count: rc.count, label: rc.label })}
               onClick={(e) => {
                 e.stopPropagation();
                 onPivot?.(rc.label, result.id);
@@ -138,11 +152,11 @@ export function ResultCard({
                 onPin(result.id, result.title, result.type);
               }}
               active={isPinned}
-              title={isPinned ? "Unpin result" : "Pin result"}
+              title={isPinned ? t("unpinResult") : t("pinResult")}
               className="border border-border/70 bg-background shadow-sm"
             >
               <MapPin className="w-3 h-3" />
-              {isPinned ? "Pinned" : "Pin"}
+              {isPinned ? t("pinned") : t("pin")}
             </AccentButton>
           )}
           {result.actions.map((action, i) => {

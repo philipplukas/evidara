@@ -98,20 +98,29 @@ function composeSubtitle(doc: DocumentEntity, locale: SupportedLocale, warn?: Wa
   return parts.join(' · ') || t('labels.document', locale);
 }
 
+type MetadataRowView = {
+  label: string;
+  value: string;
+  iconKey?: string;
+  visibility?: 'always' | 'default' | 'expanded';
+};
+
 function composeMetadata(
   doc: DocumentEntity,
   locale: SupportedLocale,
-): { label: string; value: string; iconKey?: string }[] {
-  const rows: { label: string; value: string; iconKey?: string }[] = [];
+): MetadataRowView[] {
+  const rows: MetadataRowView[] = [];
   const documentTypeLabel = doc.document_type
     ? getDocumentTypeLabel(doc.document_type, locale)
     : undefined;
+  const isDecision = doc.document_type === 'decision';
 
   if (doc.lifecycle_status && doc.lifecycle_status !== 'active') {
     rows.push({
       label: t('metadata.status', locale),
       value: formatLifecycleStatus(doc.lifecycle_status, locale),
       iconKey: METADATA_ROW_ICONS.status,
+      visibility: 'always',
     });
   }
   if (doc.document_type && documentTypeLabel && documentTypeLabel !== doc.document_type) {
@@ -119,15 +128,16 @@ function composeMetadata(
       label: t('facets.documentType', locale),
       value: documentTypeLabel,
       iconKey: iconKeyForDocumentType(doc.document_type),
+      visibility: 'default',
     });
   }
   if (doc.effective_date) {
-    const label =
-      doc.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
+    const label = isDecision ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({
       label,
       value: doc.effective_date,
       iconKey: METADATA_ROW_ICONS.calendar,
+      visibility: 'always',
     });
   }
   if (doc.authority_name) {
@@ -135,6 +145,7 @@ function composeMetadata(
       label: t('metadata.authority', locale),
       value: doc.authority_name,
       iconKey: METADATA_ROW_ICONS.authority,
+      visibility: isDecision ? 'always' : 'default',
     });
   }
   if (doc.official_citation) {
@@ -142,6 +153,7 @@ function composeMetadata(
       label: t('metadata.citation', locale),
       value: doc.official_citation,
       iconKey: METADATA_ROW_ICONS.citation,
+      visibility: 'always',
     });
   }
   if (doc.is_official) {
@@ -149,6 +161,7 @@ function composeMetadata(
       label: t('metadata.source', locale),
       value: t('metadata.officialSource', locale),
       iconKey: METADATA_ROW_ICONS.official,
+      visibility: 'expanded',
     });
   }
   if (doc.jurisdiction) {
@@ -157,6 +170,7 @@ function composeMetadata(
       label: t('metadata.jurisdiction', locale),
       value: meta?.label ?? doc.jurisdiction,
       ...(meta?.iconKey && { iconKey: meta.iconKey }),
+      visibility: 'always',
     });
   }
   if (doc.language) {
@@ -164,6 +178,7 @@ function composeMetadata(
       label: t('metadata.language', locale),
       value: formatLanguageDisplay(doc.language),
       iconKey: METADATA_ROW_ICONS.language,
+      visibility: 'default',
     });
   }
 

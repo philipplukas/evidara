@@ -74,6 +74,12 @@
       "noStructureTitle": "Aucune structure locale",
       "noStructureDescription": "Ce document ne propose pas encore de plan navigable."
     },
+    "fallbackTitle": "Document sans titre",
+    "fallbackSubtitle": "Aucun résumé disponible",
+    "translatedContent": "Contenu traduit",
+    "pin": "Épingler",
+    "unpin": "Détacher",
+    "copyCitation": "Copier la citation",
     "confidenceSuffix": "confiance",
     "sourcesSuffix": "sources"
   },
@@ -92,6 +98,7 @@
       "rootSearch": "Recherche initiale",
       "refinedScope": "Périmètre affiné",
       "back": "Retour au périmètre précédent",
+      "searchFor": "Recherche de « {query} »",
       "reopen": "Rouvrir {scope}",
       "pivotDescription": "Le périmètre a été resserré par rapport au jeu de résultats précédent pour garder les éléments actuels plus ciblés."
     },
@@ -107,7 +114,11 @@
       "pin": "Épingler",
       "pinned": "Épinglé",
       "loadMore": "Charger plus de résultats",
-      "remaining": "{count} restants"
+      "remaining": "{count} restants",
+      "openResult": "Ouvrir {title}",
+      "seeRelated": "Voir {count} {label} associés",
+      "pinResult": "Épingler le résultat",
+      "unpinResult": "Détacher le résultat"
     },
     "list": {
       "sortedByRelevance": "Tri par pertinence",

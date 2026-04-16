@@ -44,11 +44,11 @@ describe("DetailPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Untitled document")).toBeInTheDocument();
-    expect(screen.getByText("No summary available")).toBeInTheDocument();
+    expect(screen.getByText("Dokument ohne Titel")).toBeInTheDocument();
+    expect(screen.getByText("Keine Zusammenfassung verfügbar")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTitle("Copy citation"));
-    expect(writeText).toHaveBeenCalledWith("Untitled document");
+    fireEvent.click(screen.getByTitle("Zitat kopieren"));
+    expect(writeText).toHaveBeenCalledWith("Dokument ohne Titel");
   });
 
   it("shows a fallback translation badge label when translation label is missing", () => {
@@ -72,7 +72,7 @@ describe("DetailPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Translated content")).toBeInTheDocument();
+    expect(screen.getByText("Übersetzter Inhalt")).toBeInTheDocument();
   });
 
   it("shows empty state when detail is null", () => {

@@ -2,7 +2,7 @@
 
 import { Globe, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getIcon } from "@/lib/icons";
+import { getIcon, getFlagSrc, getFlagAlt, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { Badge } from "../primitives";
 
@@ -37,7 +37,6 @@ export function ExactMatchStrip({ matches, onSelect }: ExactMatchStripProps) {
       <div className="grid gap-2 sm:grid-cols-2">
         {matches.map((match) => {
           const badge = match.badges[0];
-          const icon = badge?.iconKey ? getIcon(badge.iconKey) : null;
           return (
             <button
               type="button"
@@ -48,7 +47,11 @@ export function ExactMatchStrip({ matches, onSelect }: ExactMatchStripProps) {
                 text-left transition-all hover:-translate-y-px hover:border-brand/30 hover:shadow-sm"
             >
               <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
-                {icon ? <span className="text-sm">{icon}</span> : <Zap className="h-3.5 w-3.5" />}
+                {badge?.iconKey && isFlagIcon(badge.iconKey) ? (
+                  <img src={getFlagSrc(badge.iconKey)!} alt="" width={16} height={16} />
+                ) : (
+                  (() => { const icon = badge?.iconKey ? getIcon(badge.iconKey) : null; return icon ? <span className="text-sm">{icon}</span> : <Zap className="h-3.5 w-3.5" />; })()
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
