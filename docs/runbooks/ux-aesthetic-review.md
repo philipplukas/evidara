@@ -25,11 +25,13 @@ and a concrete list of issues found so far.
 
 - Local stack healthy: `legal-search` on port **3101**, `admin` on port **3100**.
   The admin dev server requires:
+
   ```bash
   NEXT_PUBLIC_USER_ROLE=admin \
   NEXT_PUBLIC_ADMIN_ALLOWED_ROLES=admin \
   pnpm --filter admin dev
   ```
+
 - Playwright dependencies installed (`pnpm --filter frontend exec playwright install`).
 - Linear access via the `plugin-linear-linear` MCP (or CLI equivalent) for
   sync. Note the workspace has been hitting free-tier `save_issue` limits —

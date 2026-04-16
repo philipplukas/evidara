@@ -40,6 +40,7 @@ Each contract below specifies: what the component owns, what props it exposes, a
 **Owns:** Chip rendering, active-count badge, per-chip dismiss, clear-all affordance.
 
 **Props:**
+
 ```ts
 interface FilterBarProps {
   filters: FilterViewModel[];
@@ -64,6 +65,7 @@ interface FilterBarProps {
 **Owns:** The single bounded region where all result-narrowing, sorting, and toggling controls live. Nothing outside this region may mutate the result list.
 
 **Props:**
+
 ```ts
 interface ResultsControlRegionProps {
   children: ReactNode; // FilterBar, sort controls, official-only toggle
@@ -83,11 +85,13 @@ interface ResultsControlRegionProps {
 **Extends:** Existing `ui/tabs.tsx` (Radix).
 
 **Required changes:**
+
 - Active state uses TWO dimensions: color + weight, or color + indicator bar.
 - `aria-selected="true"` is wired on the active tab (not `aria-current`).
 - Selected state is token-driven: `--tab-indicator-color`, `--tab-active-weight`.
 
 **Props (additions to existing):**
+
 ```ts
 // The Radix TabsTrigger already manages aria-selected.
 // DetailTabs.tsx should migrate to use Radix Tabs instead of custom buttons.
@@ -106,6 +110,7 @@ interface ResultsControlRegionProps {
 **Owns:** Rendering a list of key-value metadata pairs at a specified density level.
 
 **Props:**
+
 ```ts
 type MetadataDensity = "compact" | "default" | "expanded";
 
