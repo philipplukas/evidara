@@ -5,7 +5,10 @@ import { useTranslations } from "next-intl";
 import type { ResultSetSource } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 
-function describeScopeTrail(source: ResultSetSource, searchForFn: (query: string) => string): string {
+function describeScopeTrail(
+  source: ResultSetSource,
+  searchForFn: (query: string) => string,
+): string {
   if (source.type === "search") {
     return searchForFn(source.query);
   }

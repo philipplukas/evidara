@@ -30,7 +30,12 @@ export interface DetailView {
   title: string;
   subtitle: string;
   breadcrumbs?: string[];
-  metadata: { label: string; value: string; iconKey?: string; visibility?: 'always' | 'default' | 'expanded' }[];
+  metadata: {
+    label: string;
+    value: string;
+    iconKey?: string;
+    visibility?: 'always' | 'default' | 'expanded';
+  }[];
   content?: unknown;
   contentLanguage?: {
     display: string;
@@ -105,10 +110,7 @@ type MetadataRowView = {
   visibility?: 'always' | 'default' | 'expanded';
 };
 
-function composeMetadata(
-  doc: DocumentEntity,
-  locale: SupportedLocale,
-): MetadataRowView[] {
+function composeMetadata(doc: DocumentEntity, locale: SupportedLocale): MetadataRowView[] {
   const rows: MetadataRowView[] = [];
   const documentTypeLabel = doc.document_type
     ? getDocumentTypeLabel(doc.document_type, locale)

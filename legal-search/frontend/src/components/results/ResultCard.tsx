@@ -2,7 +2,7 @@
 
 import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getIcon, getFlagSrc, getFlagAlt, isFlagIcon } from "@/lib/icons";
+import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
 
@@ -19,15 +19,7 @@ const iconComponents: Record<string, React.ComponentType<{ className?: string }>
 function IconCell({ iconKey, className }: { iconKey?: string; className?: string }) {
   if (!iconKey) return null;
   if (isFlagIcon(iconKey)) {
-    return (
-      <img
-        src={getFlagSrc(iconKey)!}
-        alt=""
-        width={14}
-        height={14}
-        className={className}
-      />
-    );
+    return <img src={getFlagSrc(iconKey)!} alt="" width={14} height={14} className={className} />;
   }
   const text = getIcon(iconKey);
   if (!text) return null;

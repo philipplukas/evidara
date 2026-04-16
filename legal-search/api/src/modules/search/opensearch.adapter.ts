@@ -237,7 +237,10 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     return 'free_text';
   }
 
-  private buildPrimaryQuery(query: string, shape: Exclude<QueryShape, 'wildcard'>): Record<string, unknown> {
+  private buildPrimaryQuery(
+    query: string,
+    shape: Exclude<QueryShape, 'wildcard'>,
+  ): Record<string, unknown> {
     if (shape === 'short_legal') {
       return {
         multi_match: {

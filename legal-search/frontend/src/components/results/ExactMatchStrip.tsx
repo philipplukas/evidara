@@ -2,7 +2,7 @@
 
 import { Globe, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getIcon, getFlagSrc, getFlagAlt, isFlagIcon } from "@/lib/icons";
+import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { Badge } from "../primitives";
 
@@ -50,7 +50,14 @@ export function ExactMatchStrip({ matches, onSelect }: ExactMatchStripProps) {
                 {badge?.iconKey && isFlagIcon(badge.iconKey) ? (
                   <img src={getFlagSrc(badge.iconKey)!} alt="" width={16} height={16} />
                 ) : (
-                  (() => { const icon = badge?.iconKey ? getIcon(badge.iconKey) : null; return icon ? <span className="text-sm">{icon}</span> : <Zap className="h-3.5 w-3.5" />; })()
+                  (() => {
+                    const icon = badge?.iconKey ? getIcon(badge.iconKey) : null;
+                    return icon ? (
+                      <span className="text-sm">{icon}</span>
+                    ) : (
+                      <Zap className="h-3.5 w-3.5" />
+                    );
+                  })()
                 )}
               </div>
               <div className="min-w-0 flex-1">

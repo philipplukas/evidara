@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { getIcon, getFlagSrc, getFlagAlt, isFlagIcon } from "@/lib/icons";
+import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel } from "@/lib/types";
 import { SectionLabel } from "../primitives";
@@ -172,9 +172,18 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                         }`}
                       >
                         {opt.iconKey && isFlagIcon(opt.iconKey) ? (
-                          <img src={getFlagSrc(opt.iconKey)!} alt="" width={14} height={14} className="inline-block" />
+                          <img
+                            src={getFlagSrc(opt.iconKey)!}
+                            alt=""
+                            width={14}
+                            height={14}
+                            className="inline-block"
+                          />
                         ) : (
-                          (() => { const icon = getIcon(opt.iconKey); return icon ? <span className="text-xs">{icon}</span> : null; })()
+                          (() => {
+                            const icon = getIcon(opt.iconKey);
+                            return icon ? <span className="text-xs">{icon}</span> : null;
+                          })()
                         )}
                         <span>{opt.label}</span>
                         {opt.count != null && (

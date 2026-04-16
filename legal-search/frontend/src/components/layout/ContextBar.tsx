@@ -2,7 +2,7 @@
 
 import { Shield } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getIcon, getFlagSrc, getFlagAlt, isFlagIcon } from "@/lib/icons";
+import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
 
@@ -127,9 +127,18 @@ function ChipGroup({
             }`}
           >
             {item.iconKey && isFlagIcon(item.iconKey) ? (
-              <img src={getFlagSrc(item.iconKey)!} alt="" width={14} height={14} className="inline-block" />
+              <img
+                src={getFlagSrc(item.iconKey)!}
+                alt=""
+                width={14}
+                height={14}
+                className="inline-block"
+              />
             ) : (
-              (() => { const icon = getIcon(item.iconKey); return icon ? <span className="text-sm leading-none">{icon}</span> : null; })()
+              (() => {
+                const icon = getIcon(item.iconKey);
+                return icon ? <span className="text-sm leading-none">{icon}</span> : null;
+              })()
             )}
             {item.label}
           </button>
