@@ -13,7 +13,7 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.3.1
+ * OpenAPI spec version: 0.3.2
  */
 import {
   useQuery
@@ -41,8 +41,6 @@ import type {
 import { customFetch } from '../custom-fetch';
 
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
-
 
 
 /**
@@ -53,7 +51,7 @@ Facet counts are live (computed from the same query via OpenSearch aggs).
  */
 export const searchDocuments = (
     params: SearchDocumentsParams,
- options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+ signal?: AbortSignal
 ) => {
       
       
@@ -61,7 +59,7 @@ export const searchDocuments = (
       {url: `/v1/search`, method: 'GET',
         params, signal
     },
-      options);
+      );
     }
   
 
@@ -74,16 +72,16 @@ export const getSearchDocumentsQueryKey = (params?: SearchDocumentsParams,) => {
     }
 
     
-export const getSearchDocumentsQueryOptions = <TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getSearchDocumentsQueryOptions = <TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getSearchDocumentsQueryKey(params);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchDocuments>>> = ({ signal }) => searchDocuments(params, requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchDocuments>>> = ({ signal }) => searchDocuments(params, signal);
 
       
 
@@ -103,7 +101,7 @@ export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocum
           TError,
           Awaited<ReturnType<typeof searchDocuments>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
+      >, }
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(
@@ -113,11 +111,11 @@ export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocum
           TError,
           Awaited<ReturnType<typeof searchDocuments>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
+      >, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(
- params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -125,7 +123,7 @@ export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocum
  */
 
 export function useSearchDocuments<TData = Awaited<ReturnType<typeof searchDocuments>>, TError = void>(
- params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ params: SearchDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchDocuments>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
@@ -150,14 +148,14 @@ Query-independent and cacheable. Changes rarely.
  */
 export const getSearchContext = (
     
- options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+ signal?: AbortSignal
 ) => {
       
       
       return customFetch<SearchContextView>(
       {url: `/v1/search/context`, method: 'GET', signal
     },
-      options);
+      );
     }
   
 
@@ -170,16 +168,16 @@ export const getGetSearchContextQueryKey = () => {
     }
 
     
-export const getGetSearchContextQueryOptions = <TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getGetSearchContextQueryOptions = <TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetSearchContextQueryKey();
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSearchContext>>> = ({ signal }) => getSearchContext(requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSearchContext>>> = ({ signal }) => getSearchContext(signal);
 
       
 
@@ -199,7 +197,7 @@ export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchC
           TError,
           Awaited<ReturnType<typeof getSearchContext>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
+      >, }
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>(
@@ -209,11 +207,11 @@ export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchC
           TError,
           Awaited<ReturnType<typeof getSearchContext>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
+      >, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -221,7 +219,7 @@ export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchC
  */
 
 export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchContext>>, TError = void>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSearchContext>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
@@ -243,14 +241,14 @@ export function useGetSearchContext<TData = Awaited<ReturnType<typeof getSearchC
  */
 export const getDocument = (
     documentId: string,
- options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+ signal?: AbortSignal
 ) => {
       
       
       return customFetch<DetailView>(
       {url: `/v1/documents/${documentId}`, method: 'GET', signal
     },
-      options);
+      );
     }
   
 
@@ -263,16 +261,16 @@ export const getGetDocumentQueryKey = (documentId?: string,) => {
     }
 
     
-export const getGetDocumentQueryOptions = <TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getGetDocumentQueryOptions = <TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetDocumentQueryKey(documentId);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocument>>> = ({ signal }) => getDocument(documentId, requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocument>>> = ({ signal }) => getDocument(documentId, signal);
 
       
 
@@ -292,7 +290,7 @@ export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, 
           TError,
           Awaited<ReturnType<typeof getDocument>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
+      >, }
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(
@@ -302,11 +300,11 @@ export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, 
           TError,
           Awaited<ReturnType<typeof getDocument>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
+      >, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(
- documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -314,7 +312,7 @@ export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, 
  */
 
 export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, TError = void>(
- documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocument>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
@@ -336,14 +334,14 @@ export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, 
  */
 export const getDocumentSections = (
     documentId: string,
- options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+ signal?: AbortSignal
 ) => {
       
       
       return customFetch<GetDocumentSections200>(
       {url: `/v1/documents/${documentId}/sections`, method: 'GET', signal
     },
-      options);
+      );
     }
   
 
@@ -356,16 +354,16 @@ export const getGetDocumentSectionsQueryKey = (documentId?: string,) => {
     }
 
     
-export const getGetDocumentSectionsQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getGetDocumentSectionsQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetDocumentSectionsQueryKey(documentId);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentSections>>> = ({ signal }) => getDocumentSections(documentId, requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentSections>>> = ({ signal }) => getDocumentSections(documentId, signal);
 
       
 
@@ -385,7 +383,7 @@ export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocu
           TError,
           Awaited<ReturnType<typeof getDocumentSections>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
+      >, }
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(
@@ -395,11 +393,11 @@ export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocu
           TError,
           Awaited<ReturnType<typeof getDocumentSections>>
         > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
+      >, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(
- documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -407,7 +405,7 @@ export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocu
  */
 
 export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocumentSections>>, TError = void>(
- documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentSections>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 

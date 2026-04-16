@@ -1,5 +1,10 @@
 # UX / Aesthetic review runbook
 
+Owner: Design / frontend
+Last reviewed: 2026-04-16
+Last verified: 2026-04-16 (Pass 3, commit 78ee96b)
+Applies to: legal-search/frontend, platform-control/admin
+
 A reusable checklist for periodically auditing the visual and interaction
 quality of Evidara's two user-facing surfaces:
 
