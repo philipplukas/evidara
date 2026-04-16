@@ -167,7 +167,11 @@ test.describe("Canonical screenshot evidence pack", () => {
     await searchInput.press("Enter");
     await expect(page.locator("article").first()).toBeVisible();
 
-    await saveScreenshot(page, "cross-surface-header-navigation.png");
+    // Crop the header to its own artefact so the navigation/cross-surface
+    // shot isn't byte-identical to the full results page (the user flagged
+    // this in the Sprint 1 pack). `legal-search-result-list.png` remains the
+    // full-page capture of the populated result list.
+    await saveScreenshot(page, "cross-surface-header-navigation.png", page.getByRole("banner"));
     await saveScreenshot(page, "legal-search-result-list.png");
 
     await page.locator("article").first().click();
