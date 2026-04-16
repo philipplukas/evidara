@@ -33,6 +33,7 @@ describe('SearchOpenSearchAdapter', () => {
           bool: {
             filter: unknown[];
             must?: [{ multi_match: { fields: string[] } }];
+            should?: unknown[];
           };
         };
       };

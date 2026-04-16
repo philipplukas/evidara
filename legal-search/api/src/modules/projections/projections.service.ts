@@ -424,6 +424,16 @@ export class ProjectionsService {
     return undefined;
   }
 
+  private extractStructuredBodyTitle(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    try {
+      const parsed = JSON.parse(value.trim()) as unknown;
+      return this.findFirstStringByKey(parsed, 'title');
+    } catch {
+      return undefined;
+    }
+  }
+
   private findFirstStringByKey(value: unknown, key: string): string | undefined {
     if (!value || typeof value !== 'object') return undefined;
     if (Array.isArray(value)) {
