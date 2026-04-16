@@ -199,6 +199,22 @@ Defined in `[src/lib/badge-tokens.ts](../src/lib/badge-tokens.ts)`. The keys are
 | fallback | `#f3f4f6`  | `#374151` |
 
 
+## Pill / Badge contract (cross-surface, TAR-243 / ADR-0016)
+
+Three pill families exist across the two surfaces. They must not be mixed; pick the family that matches the *meaning* of the pill, not the visual preference.
+
+| Family | When to use | legal-search | admin | Shared tokens |
+| ------ | ----------- | ------------ | ----- | ------------- |
+| **Domain colour badge** | Document type (Law, Decision, Commentary) — categorical, brand-assigned colour | `<Badge label="…" colorKey="pink" />` (`[primitives/Badge.tsx](../src/components/primitives/Badge.tsx)`) | Not used (admin does not surface document type) | Palette from `[badge-tokens.ts](../src/lib/badge-tokens.ts)` (visual, not semantic) |
+| **Semantic status badge** | Lifecycle state (Active, Blocked, Pending, Failed) | `<StatusBadge level="healthy" label="Active" />` (`[primitives/StatusBadge.tsx](../src/components/primitives/StatusBadge.tsx)`) | `<StatusBadge level="healthy" label="Active" />` (MUI `Chip`, admin `resources/shared/StatusBadge.tsx`) | Shared `StatusLevel` vocabulary — see [admin status-level table](../../../platform-control/admin/docs/status-level-vocabulary.md) |
+| **Neutral metadata chip** | Filter chip, jurisdiction label, version stamp | `.context-bar__chip` / `.context-bar__chip--active` / `.context-bar__chip--idle` | MUI `<Chip variant="outlined" size="small" />` | Rounded-full pill, 11px text, neutral palette |
+
+**Usage rules**
+
+- **Never** use the domain colour badge to encode status. Status is `StatusLevel` + icon + label (WCAG 1.4.1).
+- Prefer the shared primitive over a one-off span. Introducing a fourth family requires an ADR.
+- Visual contract for the neutral metadata chip (family 3): `borderRadius: 999` (full pill), 11px text, weight 600, 24px height at `size="small"`. The admin MUI `MuiChip` theme mirrors the Tailwind `.context-bar__chip` values so the two surfaces read as one family.
+
 ### Special Context Colors
 
 These use Tailwind's built-in color palette (not tokens) for domain-specific badges:
@@ -411,6 +427,8 @@ Rules:
 - Always use `ring-2` width for consistency.
 - Always use `ring-focus-ring` (not `ring-ring`, `ring-brand`, or arbitrary ring colors).
 - For container focus (e.g. `ResultCard`), use `focus-within:ring-2 focus-within:ring-focus-ring`.
+
+**Cross-surface parity:** the admin MUI surface uses `outline: 2px solid rgba(15, 76, 129, 0.24)` with `outlineOffset: 2` in `GlobalStyles` plus matching `MuiButton` / `MuiListItemButton` theme overrides (`[AdminApp.tsx](../../../platform-control/admin/src/app/AdminApp.tsx)`) to render the same visual as Tailwind `ring-2 ring-focus-ring`. If you introduce a new interactive element on either surface, reuse these exact values — do not substitute another opacity or width.
 
 ---
 

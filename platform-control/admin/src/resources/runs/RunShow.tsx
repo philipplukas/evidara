@@ -1,7 +1,7 @@
 "use client";
 
-import { Alert, Box, Chip, Paper, Stack, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { Alert, Box, Chip, Grid, Paper, Stack, Typography } from "@mui/material";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   DateField,
   FunctionField,
@@ -181,8 +181,14 @@ function RunPageContextBar() {
             {run.source_id} · {run.source_version_id}
           </Typography>
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <StatusBadge level={runRecordStatusToLevel(run.status)} label={run.status.charAt(0).toUpperCase() + run.status.slice(1)} />
-            <StatusBadge level={runModeToLevel(run.mode)} label={run.mode.charAt(0).toUpperCase() + run.mode.slice(1)} />
+            <StatusBadge
+              level={runRecordStatusToLevel(run.status)}
+              label={run.status.charAt(0).toUpperCase() + run.status.slice(1)}
+            />
+            <StatusBadge
+              level={runModeToLevel(run.mode)}
+              label={run.mode.charAt(0).toUpperCase() + run.mode.slice(1)}
+            />
             <Chip
               size="small"
               variant="outlined"
@@ -334,6 +340,17 @@ function RunHandoffCard() {
   );
 }
 
+function RunFieldCell({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Stack spacing={0.5}>
+      <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+        {label}
+      </Typography>
+      <Box>{children}</Box>
+    </Stack>
+  );
+}
+
 export function RunShow() {
   return (
     <Show resource="runs" title="Run Detail">
@@ -341,19 +358,73 @@ export function RunShow() {
         <RunHandoffCard />
         <RunPageContextBar />
         <RunOverviewCard />
-        <TextField source="run_id" label="Run" />
-        <TextField source="source_id" label="Source ID" />
-        <TextField source="source_version_id" label="Source version ID" />
-        <TextField source="mode" label="Mode" />
-        <TextField source="status" label="Status" />
-        <NumberField source="captured_resources_count" label="Captured resources" />
-        <NumberField source="artifacts_count" label="Artifacts" />
-        <TextField source="failure_reason" label="Failure reason" emptyText="-" />
-        <DateField source="started_at" label="Started" showTime emptyText="-" />
-        <DateField source="completed_at" label="Completed" showTime emptyText="-" />
-        <FunctionField label="Duration" render={() => <RunDurationField />} />
-        <DateField source="created_at" label="Created" showTime />
-        <DateField source="updated_at" label="Updated" showTime />
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Run">
+              <TextField source="run_id" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Source ID">
+              <TextField source="source_id" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Source version ID">
+              <TextField source="source_version_id" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Mode">
+              <TextField source="mode" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Status">
+              <TextField source="status" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Captured resources">
+              <NumberField source="captured_resources_count" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Artifacts">
+              <NumberField source="artifacts_count" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Failure reason">
+              <TextField source="failure_reason" emptyText="-" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Started">
+              <DateField source="started_at" showTime emptyText="-" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Completed">
+              <DateField source="completed_at" showTime emptyText="-" />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Duration">
+              <FunctionField render={() => <RunDurationField />} />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Created">
+              <DateField source="created_at" showTime />
+            </RunFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <RunFieldCell label="Updated">
+              <DateField source="updated_at" showTime />
+            </RunFieldCell>
+          </Grid>
+        </Grid>
         <RunDetailSections />
       </SimpleShowLayout>
     </Show>

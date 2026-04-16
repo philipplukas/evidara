@@ -139,6 +139,10 @@
   --interactive-accent-muted: rgb(15 76 129 / 14%);
 
   /* ─── Focus ─── */
+  /* Cross-surface parity: admin MUI mirrors this via
+     outline: 2px solid rgba(15, 76, 129, 0.24) + outlineOffset: 2
+     in AdminApp.tsx GlobalStyles + MuiButton/MuiListItemButton overrides.
+     See legal-search design-system.md → Focus rings. */
   --focus-ring: rgb(15 76 129 / 24%);
 
   /* ─── Attention (warm highlight, distinct from brand) ─── */
@@ -356,9 +360,15 @@
   }
 
   .app-header__nav {
-    @apply flex min-w-0 w-full flex-wrap items-center gap-1 rounded-2xl border border-border/60 p-1 transition-shadow lg:w-auto lg:justify-self-end;
+    @apply flex min-w-0 w-full items-center gap-1 overflow-x-auto rounded-2xl border border-border/60 p-1 transition-shadow sm:flex-wrap sm:overflow-x-visible lg:w-auto lg:justify-self-end;
     grid-area: nav;
     background-color: var(--surface-shell);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .app-header__nav::-webkit-scrollbar {
+    display: none;
   }
 
   .app-header__nav-button {
@@ -385,6 +395,12 @@
 
   .app-header__control-plane-copy {
     @apply flex min-w-0 items-center gap-1.5 leading-none;
+  }
+
+  @media (max-width: 479px) {
+    .app-header__control-plane-copy {
+      display: none;
+    }
   }
 
   .app-header__control-plane-kicker {

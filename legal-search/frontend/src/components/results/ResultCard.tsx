@@ -127,8 +127,8 @@ export function ResultCard({
                 e.stopPropagation();
                 onPivot?.(rc.label, result.id);
               }}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border/70
-                bg-muted/20 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors
+              className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 rounded-full border border-border/70
+                bg-muted/20 px-2.5 py-2 sm:py-1 text-[11px] font-medium text-muted-foreground transition-colors
                 hover:border-brand/30 hover:bg-brand/5 hover:text-brand"
             >
               <span className="font-semibold text-foreground/60">{rc.count}</span>

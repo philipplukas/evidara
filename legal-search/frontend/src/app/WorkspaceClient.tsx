@@ -10,7 +10,6 @@ import { ContextBar } from "@/components/layout/ContextBar";
 import { MobileWorkspace } from "@/components/layout/MobileWorkspace";
 import { ResultContextHeader } from "@/components/results/ResultContextHeader";
 import { ResultList } from "@/components/results/ResultList";
-import { ResultSetScopeBar } from "@/components/results/ResultSetScopeBar";
 import { ResultsControlRegion } from "@/components/results/ResultsControlRegion";
 import { DetailPanelSkeleton } from "@/components/skeletons";
 import {
@@ -166,11 +165,14 @@ export default function WorkspaceClient({
     void executeSearch(urlQuery);
   }, [constraints, createSearchSignature, executeSearch, urlQuery]);
 
-  // Desktop panel sync
+  // Desktop panel sync — use imperative `resize(32)` instead of `expand()` because
+  // `expand()` restores to the last-known size, which with `defaultSize={0}` ends up
+  // being ~0 (see UX-9). `resize` always sets an explicit width that lands inside
+  // the [minSize, maxSize] bounds configured on the panel.
   useEffect(() => {
     if (!isDesktop) return;
     if (isDetailOpen) {
-      rightRef.current?.expand();
+      rightRef.current?.resize(32);
     } else {
       rightRef.current?.collapse();
     }
@@ -258,13 +260,12 @@ export default function WorkspaceClient({
           <ResizableHandle withHandle />
 
           {/* Center: Results */}
-          <ResizablePanel defaultSize={isDetailOpen ? 46 : 78} minSize={30}>
+          <ResizablePanel defaultSize={isDetailOpen ? 50 : 78} minSize={30}>
             <div
               className="h-full overflow-y-auto rounded-[1.6rem] border border-border/70 bg-surface-panel"
               style={{ boxShadow: "var(--shadow-panel)" }}
             >
               <ResultsControlRegion>
-                <ResultSetScopeBar />
                 <ResultContextHeader
                   exactMatches={searchContext.exactMatches}
                   onSelect={handleSelect}
@@ -284,16 +285,19 @@ export default function WorkspaceClient({
 
           <ResizableHandle withHandle />
 
-          {/* Right: Detail — collapsed by default */}
+          {/* Right: Detail — starts at its desired width when already open via URL,
+              otherwise collapsed; toggled imperatively via `resize(32)` / `collapse()`
+              in the desktop panel sync effect above. */}
           <ResizablePanel
             panelRef={rightRef}
-            defaultSize={0}
+            defaultSize={isDetailOpen ? 32 : 0}
             minSize={25}
             maxSize={45}
             collapsible
             collapsedSize={0}
           >
             <div
+              data-testid="detail-panel"
               className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel"
               style={{ boxShadow: "var(--shadow-raised)" }}
             >

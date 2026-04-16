@@ -1,6 +1,10 @@
 "use client";
 
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -66,6 +70,7 @@ type RunTableSectionProps<TRecord extends { id: Identifier }> = {
   error: unknown;
   emptyMessage: string;
   columns: SectionColumn<TRecord>[];
+  defaultExpanded?: boolean;
 };
 
 const formatDateTime = (value: string | null | undefined): string =>
@@ -639,20 +644,17 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {overallSummaryByStatus(health.overall_status)}
                 </Typography>
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
                   <StatusBadge
                     level={pipelineHealthToLevel(health.overall_status)}
                     label={`Overall ${health.overall_status}`}
                   />
                   <Chip size="small" label={`Run ${health.run_status}`} variant="outlined" />
-                  <Chip
-                    size="small"
-                    label={`Processing events ${health.processing_status_event_count}`}
-                  />
-                  <Chip
-                    size="small"
-                    label={`Lifecycle events ${health.document_lifecycle_event_count}`}
-                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {health.processing_status_event_count} processing
+                    {" / "}
+                    {health.document_lifecycle_event_count} lifecycle events
+                  </Typography>
                 </Stack>
               </Stack>
             </Alert>
@@ -939,62 +941,78 @@ function RunTableSection<TRecord extends { id: Identifier }>({
   error,
   emptyMessage,
   columns,
+  defaultExpanded = false,
 }: RunTableSectionProps<TRecord>) {
+  const rowCount = rows?.length ?? 0;
+  const summaryChip = !isPending && !error && (
+    <Chip label={`${rowCount} ${rowCount === 1 ? "row" : "rows"}`} size="small" sx={{ ml: 1 }} />
+  );
+
   return (
-    <Paper id={sectionId} sx={{ p: 3 }}>
-      <Stack spacing={2}>
-        <Box>
+    <Accordion
+      id={sectionId}
+      defaultExpanded={defaultExpanded}
+      disableGutters
+      sx={{ "&::before": { display: "none" } }}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
           <Typography variant="h6">{title}</Typography>
+          {summaryChip}
+        </Box>
+      </AccordionSummary>
+      <AccordionDetails>
+        <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
             {description}
           </Typography>
-        </Box>
 
-        {isPending ? (
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <CircularProgress size={18} />
+          {isPending ? (
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <CircularProgress size={18} />
+              <Typography variant="body2" color="text.secondary">
+                Loading {title.toLowerCase()} rows...
+              </Typography>
+            </Stack>
+          ) : null}
+
+          {!isPending && error ? (
+            <Alert severity="error">
+              {error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.`}
+            </Alert>
+          ) : null}
+
+          {!isPending && !error && rows?.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              Loading {title.toLowerCase()} rows...
+              {emptyMessage}
             </Typography>
-          </Stack>
-        ) : null}
+          ) : null}
 
-        {!isPending && error ? (
-          <Alert severity="error">
-            {error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.`}
-          </Alert>
-        ) : null}
-
-        {!isPending && !error && rows?.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            {emptyMessage}
-          </Typography>
-        ) : null}
-
-        {!isPending && !error && rows && rows.length > 0 ? (
-          <Box sx={{ overflowX: "auto" }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  {columns.map((column) => (
-                    <TableCell key={column.header}>{column.header}</TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
+          {!isPending && !error && rows && rows.length > 0 ? (
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
                     {columns.map((column) => (
-                      <TableCell key={column.header}>{column.render(row)}</TableCell>
+                      <TableCell key={column.header}>{column.header}</TableCell>
                     ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
-        ) : null}
-      </Stack>
-    </Paper>
+                </TableHead>
+                <TableBody>
+                  {rows.map((row) => (
+                    <TableRow key={row.id}>
+                      {columns.map((column) => (
+                        <TableCell key={column.header}>{column.render(row)}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          ) : null}
+        </Stack>
+      </AccordionDetails>
+    </Accordion>
   );
 }
 

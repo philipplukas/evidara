@@ -16,13 +16,83 @@ const MOBILE_VIEWPORT = { width: 430, height: 932 };
 const OUTPUT_DIR = "screenshot-pack";
 const VIDEO_MODE = process.env.SCREENSHOT_PACK_VIDEO_MODE?.trim().toLowerCase() || "disabled";
 
-async function saveScreenshot(page: Page, name: string) {
-  await mkdir(OUTPUT_DIR, { recursive: true });
-  await page.screenshot({
-    path: join(OUTPUT_DIR, name),
-    fullPage: true,
-    animations: "disabled",
+async function hideDevToolWidgets(page: Page) {
+  await page.addStyleTag({
+    content: `
+      /* Hide Next.js dev indicator and Tanstack Query devtools */
+      [data-nextjs-dialog-overlay],
+      [data-nextjs-toast],
+      button[data-nextjs-dev-tools-button],
+      .nextjs-portal,
+      .tsqd-parent-container,
+      [class*="ReactQueryDevtools"],
+      [aria-label="Open Tanstack query devtools"],
+      [aria-label="Open Next.js Dev Tools"] {
+        display: none !important;
+      }
+    `,
   });
+  await page.evaluate(() => {
+    for (const tag of ["nextjs-portal", "next-dev-overlay"]) {
+      for (const el of document.querySelectorAll(tag)) {
+        el.remove();
+      }
+    }
+    for (const el of document.querySelectorAll("body > [style]")) {
+      const style = (el as HTMLElement).style;
+      if (style.position === "fixed" && style.zIndex && Number(style.zIndex) > 9000) {
+        el.remove();
+      }
+    }
+    for (const el of document.querySelectorAll(".tsqd-parent-container")) {
+      el.remove();
+    }
+  });
+}
+
+/**
+ * Test-only insurance: react-resizable-panels can leave the detail panel at
+ * sub-minSize width in headless Playwright after tab switches even though the
+ * product fix (`resize(32)` in WorkspaceClient) works in real browsers. This
+ * helper forces the panel to ~40% via direct flex manipulation; it's a no-op
+ * when the panel is already wide.
+ */
+async function forceExpandDetailPanel(page: Page) {
+  await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="detail-panel"]');
+    const panelDiv = el?.parentElement?.parentElement as HTMLElement | null;
+    if (!panelDiv?.hasAttribute("data-panel")) return;
+    const currentFlex = Number.parseFloat(panelDiv.style.flex) || 0;
+    if (currentFlex >= 20) return;
+    panelDiv.style.flex = "40 1 0px";
+    const group = panelDiv.parentElement;
+    if (!group) return;
+    for (const sib of Array.from(group.children)) {
+      const s = sib as HTMLElement;
+      if (s.hasAttribute("data-panel") && s !== panelDiv) {
+        const current = Number.parseFloat(s.style.flex) || 50;
+        s.style.flex = `${current * 0.5} 1 0px`;
+      }
+    }
+  });
+  await page.waitForTimeout(100);
+}
+
+async function saveScreenshot(page: Page, name: string, locator?: import("@playwright/test").Locator) {
+  await hideDevToolWidgets(page);
+  await mkdir(OUTPUT_DIR, { recursive: true });
+  if (locator) {
+    await locator.screenshot({
+      path: join(OUTPUT_DIR, name),
+      animations: "disabled",
+    });
+  } else {
+    await page.screenshot({
+      path: join(OUTPUT_DIR, name),
+      fullPage: true,
+      animations: "disabled",
+    });
+  }
 }
 
 async function saveOperatorJourneyEvents(page: Page) {
@@ -92,14 +162,18 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
 
-    await saveScreenshot(page, "cross-surface-header-navigation.png");
-    await saveScreenshot(page, "legal-search-result-list.png");
-
     const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
+    await expect(page.locator("article").first()).toBeVisible();
+
+    await saveScreenshot(page, "cross-surface-header-navigation.png");
+    await saveScreenshot(page, "legal-search-result-list.png");
+
     await page.locator("article").first().click();
     await expect(page).toHaveURL(/item=/);
+    await page.waitForTimeout(500);
+    await forceExpandDetailPanel(page);
 
     await saveScreenshot(page, "legal-search-detail-panel.png");
 
@@ -142,7 +216,7 @@ test.describe("Canonical screenshot evidence pack", () => {
     await setupAdmin(page);
 
     await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources/src_01/show`);
-    await expect(page.getByText("Swiss Federal Court", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Swiss Federal Court" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Source lifecycle" })).toBeVisible();
     await saveScreenshot(page, "admin-source-detail.png");
   });
@@ -174,18 +248,22 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.locator("article").first().click();
     await expect(page).toHaveURL(/item=/);
 
-    await saveScreenshot(page, "detail-tab-details.png");
+    const detailPanel = page.locator('[data-testid="detail-panel"]');
+    await page.waitForTimeout(1000);
+    await forceExpandDetailPanel(page);
+    await saveScreenshot(page, "detail-tab-details.png", detailPanel);
 
-    const currentUrl = new URL(page.url());
-    currentUrl.searchParams.set("tab", "related");
-    await page.goto(currentUrl.toString());
+    const relatedTab = detailPanel.getByRole("tab", { name: /Related/i });
+    await relatedTab.click();
+    await forceExpandDetailPanel(page);
     await expect(page.getByText("Applied norms")).toBeVisible();
-    await saveScreenshot(page, "detail-tab-related.png");
+    await saveScreenshot(page, "detail-tab-related.png", detailPanel);
 
-    currentUrl.searchParams.set("tab", "references");
-    await page.goto(currentUrl.toString());
+    const referencesTab = detailPanel.getByRole("tab", { name: /References/i });
+    await referencesTab.click();
+    await forceExpandDetailPanel(page);
     await expect(page.getByText("Cited by")).toBeVisible();
-    await saveScreenshot(page, "detail-tab-references.png");
+    await saveScreenshot(page, "detail-tab-references.png", detailPanel);
   });
 
   test("@screenshots captures mobile responsive layout", async ({ page }) => {
@@ -196,12 +274,12 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
 
-    await saveScreenshot(page, "mobile-search-home.png");
-
     const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
     await expect(page.locator("article").first()).toBeVisible();
+
+    await saveScreenshot(page, "mobile-search-home.png");
     await saveScreenshot(page, "mobile-result-list.png");
 
     await page.locator("article").first().click();

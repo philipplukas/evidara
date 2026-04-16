@@ -1108,13 +1108,25 @@ export function SourceVersionsSection() {
                       </TableCell>
                       <TableCell>{version.extractor_profile_id ?? "—"}</TableCell>
                       <TableCell>
-                        <Stack spacing={0.5}>
-                          {summarizeAcquisitionSpec(version.acquisition_spec).map((line) => (
-                            <Typography key={line} variant="caption" color="text.secondary">
-                              {line}
-                            </Typography>
-                          ))}
-                        </Stack>
+                        <Box
+                          component="pre"
+                          sx={{
+                            m: 0,
+                            p: 1,
+                            borderRadius: 1,
+                            bgcolor: "grey.50",
+                            border: "1px solid",
+                            borderColor: "grey.200",
+                            fontSize: "0.7rem",
+                            lineHeight: 1.6,
+                            fontFamily: "monospace",
+                            whiteSpace: "pre-wrap",
+                            maxWidth: 260,
+                            overflow: "hidden",
+                          }}
+                        >
+                          {summarizeAcquisitionSpec(version.acquisition_spec).join("\n")}
+                        </Box>
                       </TableCell>
                       <TableCell>{formatDateTime(version.updated_at)}</TableCell>
                       <TableCell>

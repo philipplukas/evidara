@@ -1,6 +1,19 @@
 "use client";
 
-import { alpha, Box, Button, Chip, GlobalStyles, Stack, Typography } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import {
+  alpha,
+  Box,
+  Button,
+  Chip,
+  Divider,
+  GlobalStyles,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { createTheme } from "@mui/material/styles";
 import { useEffect, useState } from "react";
 import {
@@ -9,6 +22,7 @@ import {
   type AppBarProps,
   Layout,
   type LayoutProps,
+  Menu,
   Resource,
   TitlePortal,
 } from "react-admin";
@@ -92,14 +106,23 @@ const adminTheme = createTheme({
           borderRadius: 12,
           textTransform: "none",
           fontWeight: 600,
+          "&:focus-visible": {
+            outline: "2px solid rgba(15, 76, 129, 0.24)",
+            outlineOffset: 2,
+          },
         },
       },
     },
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
+          borderRadius: 999,
+          fontSize: 11,
           fontWeight: 600,
+          letterSpacing: 0,
+        },
+        sizeSmall: {
+          height: 24,
         },
       },
     },
@@ -154,7 +177,7 @@ const adminTheme = createTheme({
           paddingRight: 14,
           transition: "background-color 160ms ease, transform 160ms ease",
           "&:hover": {
-            backgroundColor: alpha("#0f4c81", 0.05),
+            backgroundColor: alpha("#0f4c81", 0.08),
           },
           "&.Mui-selected": {
             backgroundColor: alpha("#0f4c81", 0.1),
@@ -162,6 +185,10 @@ const adminTheme = createTheme({
           },
           "&.Mui-selected:hover": {
             backgroundColor: alpha("#0f4c81", 0.14),
+          },
+          "&:focus-visible": {
+            outline: "2px solid rgba(15, 76, 129, 0.24)",
+            outlineOffset: 2,
           },
         },
       },
@@ -293,42 +320,19 @@ function EvidaraAdminAppBar(props: AppBarProps) {
             textAlign: { xs: "left", md: "center" },
           }}
         >
-          <Stack
-            direction="row"
-            spacing={0.75}
-            useFlexGap
-            flexWrap="wrap"
-            sx={{ justifyContent: { xs: "flex-start", md: "center" } }}
-          >
-            <Chip
-              label="Control plane"
-              size="small"
-              sx={{
-                height: 24,
-                backgroundColor: "rgba(255, 253, 248, 0.08)",
-                color: "rgba(255, 253, 248, 0.9)",
-                border: "1px solid rgba(255, 253, 248, 0.14)",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-              }}
-            />
-            <Chip
-              label="Operator only"
-              size="small"
-              sx={{
-                height: 24,
-                backgroundColor: alpha("#fffdf8", 0.14),
-                color: "#fffdf8",
-                border: "1px solid rgba(255, 253, 248, 0.16)",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            />
-          </Stack>
+          <Chip
+            label="Operator · Control plane"
+            size="small"
+            sx={{
+              height: 22,
+              backgroundColor: "rgba(255, 253, 248, 0.08)",
+              color: "rgba(255, 253, 248, 0.7)",
+              border: "1px solid rgba(255, 253, 248, 0.10)",
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+            }}
+          />
           <TitlePortal
             variant="h6"
             sx={{
@@ -423,11 +427,70 @@ function EvidaraAdminAppBar(props: AppBarProps) {
   );
 }
 
+function EvidaraAdminMenu() {
+  const [handoff, setHandoff] = useState(() => resolveLegalSearchHandoff(null, LEGAL_SEARCH_URL));
+
+  useEffect(() => {
+    setHandoff(
+      resolveLegalSearchHandoff(new URLSearchParams(window.location.search), LEGAL_SEARCH_URL),
+    );
+  }, []);
+
+  const footerLabel =
+    handoff.hasOrigin && handoff.query ? "Return to active search" : "Back to legal search";
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "calc(100vh - 96px)",
+      }}
+    >
+      <Box sx={{ flexShrink: 0 }}>
+        <Menu />
+      </Box>
+      <Box
+        sx={{
+          mt: "auto",
+          pt: 1,
+          pb: 1.25,
+          background:
+            "linear-gradient(180deg, rgba(248, 243, 235, 0), rgba(248, 243, 235, 0.92) 40%, rgba(248, 243, 235, 0.98))",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <Divider sx={{ mx: 2, mb: 1 }} />
+        <ListItemButton
+          component="a"
+          href={handoff.returnToUrl}
+          sx={{
+            mx: 1.25,
+            my: 0,
+            borderRadius: 14,
+            color: "#0f4c81",
+          }}
+        >
+          <ListItemIcon>
+            <ArrowBackIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary={footerLabel}
+            secondary="Open operator search"
+            primaryTypographyProps={{ fontWeight: 600 }}
+          />
+        </ListItemButton>
+      </Box>
+    </Box>
+  );
+}
+
 function EvidaraAdminLayout(props: LayoutProps) {
   return (
     <Layout
       {...props}
       appBar={EvidaraAdminAppBar}
+      menu={EvidaraAdminMenu}
       sx={{
         "& .RaLayout-appFrame": {
           minHeight: "100vh",
@@ -447,8 +510,15 @@ function EvidaraAdminLayout(props: LayoutProps) {
         "& .RaLayout-contentWithSidebar": {
           background: "transparent",
         },
-        "& .RaLayout-sidebar": {
+        "& .RaSidebar-paper, & .RaLayout-sidebar .MuiDrawer-paper": {
           background: "transparent",
+          paddingTop: { xs: "72px", sm: "80px" },
+          boxSizing: "border-box",
+          minHeight: "100vh",
+        },
+        "& .RaSidebar-fixed": {
+          height: "100%",
+          minHeight: 0,
         },
         "& .RaLayout-content": {
           backgroundColor: "transparent",
@@ -486,7 +556,7 @@ export default function AdminApp() {
             color: "#1d293d",
           },
           "*:focus-visible": {
-            outline: "2px solid rgba(15, 76, 129, 0.42)",
+            outline: "2px solid rgba(15, 76, 129, 0.24)",
             outlineOffset: 2,
           },
           ".RaSidebar-drawerPaper, .RaSidebar-fixed, .RaLayout-sidebar": {

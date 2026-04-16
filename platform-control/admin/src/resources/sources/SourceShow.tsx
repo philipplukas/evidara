@@ -1,7 +1,7 @@
 "use client";
 
-import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { Box, Chip, Grid, Paper, Stack, Typography } from "@mui/material";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   DateField,
   FunctionField,
@@ -116,7 +116,10 @@ function SourcePageContextBar() {
           {source.source_id}
         </Typography>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          <StatusBadge level={sourceStatusToLevel(source.status)} label={SOURCE_STATUS_META[source.status].label} />
+          <StatusBadge
+            level={sourceStatusToLevel(source.status)}
+            label={SOURCE_STATUS_META[source.status].label}
+          />
           <Chip size="small" variant="outlined" label={`Type: ${source.source_type}`} />
           <Chip
             size="small"
@@ -186,6 +189,17 @@ function SourceHandoffPanel() {
   );
 }
 
+function SourceFieldCell({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Stack spacing={0.5}>
+      <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+        {label}
+      </Typography>
+      <Box>{children}</Box>
+    </Stack>
+  );
+}
+
 export function SourceShow() {
   return (
     <Show resource="sources" title="Source">
@@ -193,29 +207,59 @@ export function SourceShow() {
         <SourceHandoffPanel />
         <SourcePageContextBar />
         <SourceLifecyclePanel />
-        <TextField source="source_id" label="Source ID" />
-        <TextField source="name" label="Name" />
-        <TextField source="description" label="Description" emptyText="-" />
-        <ReferenceField
-          source="jurisdiction_id"
-          reference="jurisdictions"
-          label="Jurisdiction"
-          link={false}
-        >
-          <FunctionField<JurisdictionRecord> render={(record) => formatReferenceLabel(record)} />
-        </ReferenceField>
-        <ReferenceField
-          source="authority_id"
-          reference="authorities"
-          label="Authority"
-          link={false}
-        >
-          <FunctionField<AuthorityRecord> render={(record) => formatReferenceLabel(record)} />
-        </ReferenceField>
-        <TextField source="document_family" label="Document family" emptyText="-" />
-        <TextField source="source_type" label="Source type" />
-        <DateField source="created_at" label="Created" showTime />
-        <DateField source="updated_at" label="Updated" showTime />
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SourceFieldCell label="Source ID">
+              <TextField source="source_id" />
+            </SourceFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SourceFieldCell label="Name">
+              <TextField source="name" />
+            </SourceFieldCell>
+          </Grid>
+          <Grid size={12}>
+            <SourceFieldCell label="Description">
+              <TextField source="description" emptyText="-" />
+            </SourceFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SourceFieldCell label="Jurisdiction">
+              <ReferenceField source="jurisdiction_id" reference="jurisdictions" link={false}>
+                <FunctionField<JurisdictionRecord>
+                  render={(record) => formatReferenceLabel(record)}
+                />
+              </ReferenceField>
+            </SourceFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SourceFieldCell label="Authority">
+              <ReferenceField source="authority_id" reference="authorities" link={false}>
+                <FunctionField<AuthorityRecord> render={(record) => formatReferenceLabel(record)} />
+              </ReferenceField>
+            </SourceFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SourceFieldCell label="Document family">
+              <TextField source="document_family" emptyText="-" />
+            </SourceFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SourceFieldCell label="Source type">
+              <TextField source="source_type" />
+            </SourceFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SourceFieldCell label="Created">
+              <DateField source="created_at" showTime />
+            </SourceFieldCell>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <SourceFieldCell label="Updated">
+              <DateField source="updated_at" showTime />
+            </SourceFieldCell>
+          </Grid>
+        </Grid>
         <SourceVersionsSection />
       </SimpleShowLayout>
     </Show>

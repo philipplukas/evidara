@@ -15,6 +15,7 @@ Maps **pipeline and UI domain states** to the shared `StatusLevel` type used by 
 1. **Never encode meaning by color alone** — always pair `StatusBadge` with icon + label (WCAG 1.4.1).
 2. **Map domain enums in one place** per surface (admin resource vs legal-search) and keep this table aligned when adding states.
 3. **MUI admin** may wrap the same levels with different presentation; the **semantic level** should still match this table.
+4. **Pill visual contract** — outlined neutral MUI chips use `borderRadius: 999`, 11px text, weight 600, 24px height at `size="small"`, matching the legal-search `.context-bar__chip` family (see [legal-search design-system.md → Pill / Badge contract](../../../legal-search/frontend/docs/design-system.md#pill--badge-contract-cross-surface-tar-243--adr-0016)).
 
 ## Related
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { Shield } from "lucide-react";
+import { ChevronDown, Shield } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useState } from "react";
 import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
@@ -12,14 +13,29 @@ interface ContextBarProps {
 
 const SOURCE_TYPE_I18N_KEYS = new Set(["all", "law", "decision", "rechtssatz", "commentary"]);
 
+function useActiveFilterCount(constraints: {
+  jurisdictions: string[];
+  languages: string[];
+  sourceType: string | null;
+  officialOnly: boolean;
+}) {
+  let count = constraints.jurisdictions.length + constraints.languages.length;
+  if (constraints.sourceType) count += 1;
+  if (constraints.officialOnly) count += 1;
+  return count;
+}
+
 /**
  * Top-level, high-signal search constraints.
  * Reads/writes through SearchConstraintsProvider dispatch actions.
+ * On mobile (<md) the filter chips are collapsed behind a summary toggle.
  */
 export function ContextBar({ context }: ContextBarProps) {
   const { state: constraints, dispatch } = useSearchConstraints();
   const t = useTranslations();
   const tSourceTypes = useTranslations("results.sourceTypes");
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const activeCount = useActiveFilterCount(constraints.context);
 
   const translatedSourceTypes = context.sourceTypes.map((item) => ({
     ...item,
@@ -28,70 +44,98 @@ export function ContextBar({ context }: ContextBarProps) {
       : item.label,
   }));
 
+  const chipContent = (
+    <div className="context-bar__clusters min-w-0 flex-1">
+      <div className="context-bar__cluster">
+        <ChipGroup
+          items={context.jurisdictions.map((j) => ({
+            ...j,
+            active: constraints.context.jurisdictions.includes(j.key),
+          }))}
+          onToggle={(key) => dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: key })}
+        />
+      </div>
+
+      <div className="context-bar__cluster">
+        <ChipGroup
+          items={context.languages.map((l) => ({
+            ...l,
+            active: constraints.context.languages.includes(l.key),
+          }))}
+          onToggle={(key) => dispatch({ type: "TOGGLE_LANGUAGE", language: key })}
+        />
+      </div>
+
+      <div className="context-bar__cluster">
+        <TabGroup
+          items={translatedSourceTypes.map((st) => ({
+            ...st,
+            active:
+              constraints.context.sourceType === st.key ||
+              (constraints.context.sourceType === null && st.key === "all"),
+          }))}
+          onSelect={(key) =>
+            dispatch({
+              type: "SET_SOURCE_TYPE",
+              sourceType: key === "all" ? null : key,
+            })
+          }
+        />
+      </div>
+
+      <div className="context-bar__cluster">
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: "SET_OFFICIAL_ONLY",
+              value: !constraints.context.officialOnly,
+            })
+          }
+          className={`context-bar__official-toggle ${
+            constraints.context.officialOnly
+              ? "context-bar__official-toggle--active border-brand/20 bg-interactive-accent-subtle text-brand"
+              : "context-bar__official-toggle--idle border border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
+          }`}
+        >
+          <Shield className="h-3.5 w-3.5" />
+          {t("context.officialSourcesOnly")}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="context-bar">
       <div className="context-bar__layout">
-        <span className="text-micro shrink-0 font-medium text-muted-foreground">
+        {/* Desktop: always-visible label */}
+        <span className="hidden text-micro shrink-0 font-medium text-muted-foreground md:block">
           {t("filter.filtersTitle")}
         </span>
-        <div className="context-bar__clusters min-w-0 flex-1">
-          <div className="context-bar__cluster">
-            <ChipGroup
-              items={context.jurisdictions.map((j) => ({
-                ...j,
-                active: constraints.context.jurisdictions.includes(j.key),
-              }))}
-              onToggle={(key) => dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: key })}
-            />
-          </div>
 
-          <div className="context-bar__cluster">
-            <ChipGroup
-              items={context.languages.map((l) => ({
-                ...l,
-                active: constraints.context.languages.includes(l.key),
-              }))}
-              onToggle={(key) => dispatch({ type: "TOGGLE_LANGUAGE", language: key })}
-            />
-          </div>
+        {/* Mobile: collapsible toggle */}
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-micro font-medium text-muted-foreground md:hidden"
+          onClick={() => setMobileExpanded((v) => !v)}
+          aria-expanded={mobileExpanded}
+        >
+          {t("filter.filtersTitle")}
+          {activeCount > 0 && (
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-white">
+              {activeCount}
+            </span>
+          )}
+          <ChevronDown
+            className={`h-3.5 w-3.5 transition-transform duration-200 ${mobileExpanded ? "rotate-180" : ""}`}
+          />
+        </button>
 
-          <div className="context-bar__cluster">
-            <TabGroup
-              items={translatedSourceTypes.map((st) => ({
-                ...st,
-                active:
-                  constraints.context.sourceType === st.key ||
-                  (constraints.context.sourceType === null && st.key === "all"),
-              }))}
-              onSelect={(key) =>
-                dispatch({
-                  type: "SET_SOURCE_TYPE",
-                  sourceType: key === "all" ? null : key,
-                })
-              }
-            />
-          </div>
+        {/* Desktop: always show chips */}
+        <div className="hidden md:contents">{chipContent}</div>
 
-          <div className="context-bar__cluster">
-            <button
-              type="button"
-              onClick={() =>
-                dispatch({
-                  type: "SET_OFFICIAL_ONLY",
-                  value: !constraints.context.officialOnly,
-                })
-              }
-              className={`context-bar__official-toggle ${
-                constraints.context.officialOnly
-                  ? "context-bar__official-toggle--active border-brand/20 bg-interactive-accent-subtle text-brand"
-                  : "context-bar__official-toggle--idle border border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <Shield className="h-3.5 w-3.5" />
-              {t("context.officialSourcesOnly")}
-            </button>
-          </div>
-        </div>
+        {/* Mobile: collapsible chips */}
+        {mobileExpanded && <div className="md:hidden">{chipContent}</div>}
 
         <button
           type="button"

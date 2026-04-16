@@ -58,11 +58,7 @@
     }
   },
   "files": {
-    "includes": [
-      "src/**/*.ts",
-      "src/**/*.tsx",
-      "!src/lib/api/generated/**"
-    ]
+    "includes": ["src/**/*.ts", "src/**/*.tsx", "!src/lib/api/generated"]
   },
   "overrides": [
     {
