@@ -3,7 +3,7 @@
 # Bump the image tag when bumping @playwright/test in legal-search/frontend/package.json.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="${PLAYWRIGHT_DOCKER_IMAGE:-mcr.microsoft.com/playwright:v1.49.1-jammy}"
+IMAGE="${PLAYWRIGHT_DOCKER_IMAGE:-mcr.microsoft.com/playwright:v1.59.1-jammy}"
 
 docker run --rm \
   -v "${ROOT}:/work" \
