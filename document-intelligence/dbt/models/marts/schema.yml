@@ -2,6 +2,7 @@ version: 2
 
 models:
   - name: fct_document_processing
+    description: Document-level processing fact. Rewritten at processing_manifest grain in step 3.
     columns:
       - name: document_id
         tests:
@@ -10,27 +11,82 @@ models:
       - name: latest_processed_at
         tests:
           - not_null
+
   - name: document_knowledge_base
+    description: Unified per-document-version knowledge base with docling metadata and entity aggregates.
     columns:
       - name: document_version_id
         tests:
           - not_null
           - unique
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_version_id
+
   - name: embeddings_ready
+    description: Chunk-level serving model ready for vector embedding ingest.
     columns:
       - name: chunk_id
         tests:
           - not_null
           - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
+      - name: section_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_document_sections')
+              field: section_id
+      - name: document_version_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_version_id
+      - name: chunk_idx
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+      - name: chunk_length_chars
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 51
+              strictly: false
+
   - name: srv_search_documents
+    description: Denormalised document-level serving model with identity, metadata and aggregates.
     columns:
       - name: document_version_id
         tests:
           - not_null
           - unique
+      - name: document_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_id
+      - name: is_current_version
+        tests:
+          - not_null
+
   - name: srv_search_chunks
+    description: Chunk-level serving model joining embeddings_ready with document metadata.
     columns:
       - name: chunk_id
         tests:
           - not_null
           - unique
+          - relationships:
+              to: ref('embeddings_ready')
+              field: chunk_id
+      - name: document_id
+        tests:
+          - not_null
+      - name: document_version_id
+        tests:
+          - not_null

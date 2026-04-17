@@ -10,6 +10,7 @@ resources:
             project_directory: ./dbt
             commands:
               - dbt deps
+              - dbt source freshness --target ${bundle.target}
               - dbt run --target ${bundle.target}
               - dbt test --target ${bundle.target}
           new_cluster:
