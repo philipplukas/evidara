@@ -8,6 +8,7 @@ from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from platform_control.temporal.activities import (
+        RetentionActivities,
         ReviewDrainActivities,
         ScopeShardActivities,
         WizardStateActivities,
@@ -171,3 +172,30 @@ class WizardRunWorkflow:
     def reject(self, reason: str | None = None) -> None:
         del reason
         self._rejected = True
+
+
+@workflow.defn
+class RetentionSweepWorkflow:
+    """Thin wrapper that delegates to ``RetentionActivities.run_retention_sweep``.
+
+    Scheduled via a Temporal Schedule (see platform-control-schedule-retention)
+    so the sweep fires on a cron without anyone remembering to run
+    ``pc retention sweep`` manually. Hard-delete retention is a legal
+    requirement for some jurisdictions; cron enforcement matches the
+    obligation's timing rather than relying on operator discipline.
+    """
+
+    @workflow.run
+    async def run(self, dry_run: bool = False) -> dict:
+        retry = RetryPolicy(
+            maximum_attempts=3,
+            backoff_coefficient=2.0,
+            initial_interval=timedelta(seconds=30),
+            maximum_interval=timedelta(minutes=5),
+        )
+        return await workflow.execute_activity_method(
+            RetentionActivities.run_retention_sweep,
+            dry_run,
+            start_to_close_timeout=timedelta(minutes=30),
+            retry_policy=retry,
+        )
