@@ -15,7 +15,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from platform_control.errors import NotFoundError
+from platform_control.errors import InvalidStateTransitionError, NotFoundError
 from platform_control.models.authority import Jurisdiction
 from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.source import Source
@@ -23,12 +23,20 @@ from platform_control.schemas.compliance_policy import (
     CreateCompliancePolicyRequest,
     UpdateCompliancePolicyRequest,
 )
+from platform_control.seed_schemas import _validate_rate_corridor
 from platform_control.services.politeness import HostRateLimiter
 from platform_control.services.robots import RobotsChecker, RobotsContext
 
 
 class RateLimiterRegistry:
-    """Process-wide cache of limiters keyed by ``compliance_policy_id``."""
+    """Process-wide cache of limiters keyed by ``compliance_policy_id``.
+
+    When a policy declares ``min_requests_per_minute_per_host`` and
+    ``start_requests_per_minute_per_host`` the limiter is constructed with an
+    AIMD corridor; otherwise it operates as a static cap. The cache holds the
+    same instance across runs so observed state (current rate, retry-after
+    deadlines) is preserved.
+    """
 
     def __init__(self) -> None:
         self._limiters: dict[str, HostRateLimiter] = {}
@@ -39,10 +47,16 @@ class RateLimiterRegistry:
             return existing
         limiter = HostRateLimiter(
             max_requests_per_minute=policy.max_requests_per_minute_per_host,
+            min_requests_per_minute=policy.min_requests_per_minute_per_host,
+            start_requests_per_minute=policy.start_requests_per_minute_per_host,
             max_concurrent=policy.max_concurrent_per_host,
         )
         self._limiters[policy.compliance_policy_id] = limiter
         return limiter
+
+    def invalidate(self, compliance_policy_id: str) -> None:
+        """Drop a cached limiter so the next run rebuilds with updated policy."""
+        self._limiters.pop(compliance_policy_id, None)
 
 
 class CompliancePolicyService:
@@ -73,6 +87,8 @@ class CompliancePolicyService:
             description=request.description,
             robots_mode=request.robots_mode,
             max_requests_per_minute_per_host=request.max_requests_per_minute_per_host,
+            min_requests_per_minute_per_host=request.min_requests_per_minute_per_host,
+            start_requests_per_minute_per_host=request.start_requests_per_minute_per_host,
             max_concurrent_per_host=request.max_concurrent_per_host,
             retention_days=request.retention_days,
             attribution_required=request.attribution_required,
@@ -93,6 +109,28 @@ class CompliancePolicyService:
         payload = request.model_dump(exclude_unset=True)
         if "contact_url" in payload and payload["contact_url"] is not None:
             payload["contact_url"] = str(payload["contact_url"])
+
+        # Compose the effective corridor after the patch and validate it before
+        # persisting. Partial patches (e.g. only bumping `max`) still need to
+        # leave the persisted row in a self-consistent state.
+        effective_max = payload.get(
+            "max_requests_per_minute_per_host", policy.max_requests_per_minute_per_host
+        )
+        effective_min = payload.get(
+            "min_requests_per_minute_per_host", policy.min_requests_per_minute_per_host
+        )
+        effective_start = payload.get(
+            "start_requests_per_minute_per_host", policy.start_requests_per_minute_per_host
+        )
+        try:
+            _validate_rate_corridor(
+                min_rpm=effective_min,
+                start_rpm=effective_start,
+                max_rpm=effective_max,
+            )
+        except ValueError as exc:
+            raise InvalidStateTransitionError(str(exc)) from exc
+
         for key, value in payload.items():
             setattr(policy, key, value)
         await self.session.commit()

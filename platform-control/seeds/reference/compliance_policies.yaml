@@ -22,9 +22,13 @@ items:
       Swiss Fedlex open-data policy. Fedlex publishes federal legislation
       through an explicit open-data programme with SPARQL + filestore endpoints
       designed for automated access. Scrapers ignore robots.txt per the
-      programme terms and include attribution on every bundle.
+      programme terms and include attribution on every bundle. Adaptive
+      corridor: start at 60 rpm/host, probe up to 600 rpm on clean traffic,
+      floor at 30 on pressure.
     robots_mode: ignore
-    max_requests_per_minute_per_host: 60
+    min_requests_per_minute_per_host: 30
+    start_requests_per_minute_per_host: 60
+    max_requests_per_minute_per_host: 600
     max_concurrent_per_host: 4
     retention_days: null
     attribution_required: true
@@ -39,9 +43,12 @@ items:
       Austrian RIS OGD policy. The Bundeskanzleramt publishes federal law and
       court decisions through an explicit Open Government Data REST API at
       data.bka.gv.at. Scrapers use open-data tier rate limits and include
-      programme attribution on every bundle.
+      programme attribution on every bundle. Adaptive corridor: start at 60
+      rpm/host, probe up to 600 rpm on clean traffic, floor at 30 on pressure.
     robots_mode: ignore
-    max_requests_per_minute_per_host: 60
+    min_requests_per_minute_per_host: 30
+    start_requests_per_minute_per_host: 60
+    max_requests_per_minute_per_host: 600
     max_concurrent_per_host: 4
     retention_days: null
     attribution_required: true

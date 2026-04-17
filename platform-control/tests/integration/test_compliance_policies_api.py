@@ -125,3 +125,122 @@ async def test_update_policy_requires_at_least_one_field(session_maker) -> None:
 
         response = await client.patch(f"/v1/compliance-policies/{policy_id}", json={})
         assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_policy_with_adaptive_corridor(session_maker) -> None:
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/v1/compliance-policies",
+            json={
+                "name": "corridor-test",
+                "max_requests_per_minute_per_host": 600,
+                "min_requests_per_minute_per_host": 30,
+                "start_requests_per_minute_per_host": 60,
+            },
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["min_requests_per_minute_per_host"] == 30
+        assert body["start_requests_per_minute_per_host"] == 60
+        assert body["max_requests_per_minute_per_host"] == 600
+
+
+@pytest.mark.asyncio
+async def test_create_policy_rejects_inverted_corridor(session_maker) -> None:
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/v1/compliance-policies",
+            json={
+                "name": "bad-corridor",
+                "max_requests_per_minute_per_host": 60,
+                "min_requests_per_minute_per_host": 100,
+                "start_requests_per_minute_per_host": 80,
+            },
+        )
+        assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_policy_rejects_half_corridor(session_maker) -> None:
+    """Setting min without start (or vice versa) must be rejected — ambiguous."""
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/v1/compliance-policies",
+            json={
+                "name": "half-corridor",
+                "max_requests_per_minute_per_host": 600,
+                "min_requests_per_minute_per_host": 30,
+                # start missing
+            },
+        )
+        assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_corridor_composes_with_persisted_fields(session_maker) -> None:
+    """Patching `max` alone must keep the corridor self-consistent."""
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        created = await client.post(
+            "/v1/compliance-policies",
+            json={
+                "name": "patch-corridor",
+                "max_requests_per_minute_per_host": 600,
+                "min_requests_per_minute_per_host": 30,
+                "start_requests_per_minute_per_host": 120,
+            },
+        )
+        policy_id = created.json()["compliance_policy_id"]
+
+        # Legal: raise the ceiling.
+        ok = await client.patch(
+            f"/v1/compliance-policies/{policy_id}",
+            json={"max_requests_per_minute_per_host": 900},
+        )
+        assert ok.status_code == 200
+
+        # Illegal: drop max below persisted start.
+        bad = await client.patch(
+            f"/v1/compliance-policies/{policy_id}",
+            json={"max_requests_per_minute_per_host": 60},
+        )
+        # start=120 now > max=60 — rejected by the service-layer check.
+        # Our service raises InvalidStateTransitionError which the app returns
+        # as 400; accept that rather than 422 so the guard is what matters.
+        assert bad.status_code in (400, 409, 422)
