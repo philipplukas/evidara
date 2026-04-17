@@ -10,14 +10,21 @@ items:
     jurisdiction_id: jur_ch_federal
     slug: ch-fedlex
     name: Fedlex
+    # Renamed from auth_ch_fedlex in migration 20260417_0012 — see #264.
+    deprecated_aliases:
+      - auth_ch_fedlex
   - authority_id: auth_bger
     jurisdiction_id: jur_ch_federal
     slug: ch-bger
     name: Bundesgericht
+    deprecated_aliases:
+      - auth_ch_bundesgericht
   - authority_id: auth_bvger
     jurisdiction_id: jur_ch_federal
     slug: ch-bvger
     name: Bundesverwaltungsgericht
+    deprecated_aliases:
+      - auth_ch_bundesverwaltungsgericht
   - authority_id: auth_zh_admin
     jurisdiction_id: jur_ch
     slug: zh-admin-court

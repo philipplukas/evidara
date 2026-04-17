@@ -84,6 +84,12 @@ class JurisdictionSeed(BaseModel):
     slug: str
     name: str
     compliance_policy_id: str | None = None
+    # Previously-used jurisdiction_ids for this same logical entity. When
+    # the seeder encounters an existing row under one of these aliases,
+    # it raises a clear error pointing at the required data migration;
+    # silent upserts against a renamed PK would violate the UNIQUE
+    # constraints on `slug` / `name`. See issue #264 for policy.
+    deprecated_aliases: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -93,6 +99,9 @@ class AuthoritySeed(BaseModel):
     jurisdiction_id: str
     slug: str
     name: str
+    # Previously-used authority_ids for this same logical entity. See
+    # JurisdictionSeed.deprecated_aliases for the contract.
+    deprecated_aliases: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
 

@@ -19,7 +19,6 @@ is the gate.
 
 from __future__ import annotations
 
-import json
 import re
 import unittest
 from pathlib import Path
@@ -57,35 +56,39 @@ _JUR_ID_RE = re.compile(r'jurisdiction_id["\']?\s*[:=]\s*["\']([a-z0-9_]+)["\']'
 #
 # Per policy in issue #264: ID renames go through a dedicated
 # `ids-migration`-labeled PR, not buried in a feature PR.
-_KNOWN_MISSING_AUTHORITY_IDS: frozenset[str] = frozenset({
-    # AT drift: seed has auth_at_ris / auth_at_ogh / auth_at_vfgh /
-    # auth_at_vwgh (prefixed), downstream consumers use the flat form.
-    # See #264 + follow-up AT reconciliation (to be filed).
-    "auth_ris",
-    "auth_vfgh",
-    "auth_vwgh",
-    # Generic placeholder authority IDs used only in scraping-baseline
-    # test fixtures. These don't represent real publishers — the
-    # fixtures test pipeline plumbing, not ID resolution. Fixture
-    # rewrites are tracked as a separate cleanup and can remove these.
-    "auth_parliament",
-    "auth_commentary_publisher",
-    "auth_federal_admin",
-    "auth_federal_assembly",
-    "auth_federal_chancellery",
-    "auth_federal_court",
-    "auth_federal_procurement",
-    "auth_gesetze_im_internet",
-})
-_KNOWN_MISSING_JURISDICTION_IDS: frozenset[str] = frozenset({
-    # AT/DE federal scope: same drift class as CH's (fixed in this PR).
-    # Follow-up AT + DE reconciliation tracked separately.
-    "jur_at_federal",
-    "jur_de_federal",
-    # LI (Liechtenstein) referenced by the DI canonical resolver but not
-    # yet part of the five-country rollout scope.
-    "jur_li",
-})
+_KNOWN_MISSING_AUTHORITY_IDS: frozenset[str] = frozenset(
+    {
+        # AT drift: seed has auth_at_ris / auth_at_ogh / auth_at_vfgh /
+        # auth_at_vwgh (prefixed), downstream consumers use the flat form.
+        # See #264 + follow-up AT reconciliation (to be filed).
+        "auth_ris",
+        "auth_vfgh",
+        "auth_vwgh",
+        # Generic placeholder authority IDs used only in scraping-baseline
+        # test fixtures. These don't represent real publishers — the
+        # fixtures test pipeline plumbing, not ID resolution. Fixture
+        # rewrites are tracked as a separate cleanup and can remove these.
+        "auth_parliament",
+        "auth_commentary_publisher",
+        "auth_federal_admin",
+        "auth_federal_assembly",
+        "auth_federal_chancellery",
+        "auth_federal_court",
+        "auth_federal_procurement",
+        "auth_gesetze_im_internet",
+    }
+)
+_KNOWN_MISSING_JURISDICTION_IDS: frozenset[str] = frozenset(
+    {
+        # AT/DE federal scope: same drift class as CH's (fixed in this PR).
+        # Follow-up AT + DE reconciliation tracked separately.
+        "jur_at_federal",
+        "jur_de_federal",
+        # LI (Liechtenstein) referenced by the DI canonical resolver but not
+        # yet part of the five-country rollout scope.
+        "jur_li",
+    }
+)
 
 
 def _load_seed_ids() -> tuple[set[str], set[str]]:
@@ -130,7 +133,14 @@ def _collect_consumer_ids() -> tuple[dict[str, set[Path]], dict[str, set[Path]]]
 
     # DI jurisdiction resolver carries an explicit canonical map. Pick up
     # every jur_* literal in that file too.
-    resolver = REPO_ROOT / "document-intelligence" / "src" / "document_intelligence" / "canonical" / "jurisdiction.py"
+    resolver = (
+        REPO_ROOT
+        / "document-intelligence"
+        / "src"
+        / "document_intelligence"
+        / "canonical"
+        / "jurisdiction.py"
+    )
     if resolver.exists():
         text = resolver.read_text(encoding="utf-8")
         for jid in re.findall(r'["\'](jur_[a-z0-9_]+)["\']', text):
@@ -161,7 +171,8 @@ class TestSeedIdConsistency(unittest.TestCase):
             ]
             for aid in sorted(missing):
                 files = sorted(str(p.relative_to(REPO_ROOT)) for p in missing[aid])
-                lines.append(f"  {aid}  (referenced by: {', '.join(files[:5])}{'…' if len(files) > 5 else ''})")
+                suffix = "…" if len(files) > 5 else ""
+                lines.append(f"  {aid}  (referenced by: {', '.join(files[:5])}{suffix})")
             self.fail("\n".join(lines))
 
         # Ratchet: fail if a known-drift entry is no longer actually missing
@@ -189,7 +200,8 @@ class TestSeedIdConsistency(unittest.TestCase):
             ]
             for jid in sorted(missing):
                 files = sorted(str(p.relative_to(REPO_ROOT)) for p in missing[jid])
-                lines.append(f"  {jid}  (referenced by: {', '.join(files[:5])}{'…' if len(files) > 5 else ''})")
+                suffix = "…" if len(files) > 5 else ""
+                lines.append(f"  {jid}  (referenced by: {', '.join(files[:5])}{suffix})")
             self.fail("\n".join(lines))
 
         stale = {jid for jid in _KNOWN_MISSING_JURISDICTION_IDS if jid in seed_jur_ids}
@@ -207,12 +219,14 @@ class TestSeedIdConsistency(unittest.TestCase):
         orphans = [
             item["authority_id"]
             for item in authorities.get("items", [])
-            if isinstance(item, dict)
-            and item.get("jurisdiction_id") not in seed_jur_ids
+            if isinstance(item, dict) and item.get("jurisdiction_id") not in seed_jur_ids
         ]
         self.assertFalse(
             orphans,
-            msg=f"Authority rows reference jurisdiction_ids missing from jurisdictions.yaml: {orphans}",
+            msg=(
+                f"Authority rows reference jurisdiction_ids missing from "
+                f"jurisdictions.yaml: {orphans}"
+            ),
         )
 
 
