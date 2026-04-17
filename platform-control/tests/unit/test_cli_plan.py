@@ -123,3 +123,109 @@ async def test_format_plan_surfaces_execution_mode_and_seed_urls(session) -> Non
     assert "execution_mode       shadow" in rendered
     assert "provider             deterministic_http" in rendered
     assert "https://example.com/a" in rendered
+
+
+@pytest.fixture
+def _fake_checker_factory():
+    from platform_control.services.robots import RobotsChecker
+
+    class _FakeChecker(RobotsChecker):
+        def __init__(self, verdicts: dict[str, bool]) -> None:
+            super().__init__()
+            self._verdicts = verdicts
+            self.calls: list[tuple[str, str]] = []
+
+        async def is_allowed(self, url: str, user_agent: str) -> bool:
+            self.calls.append((url, user_agent))
+            return self._verdicts.get(url, True)
+
+    return _FakeChecker
+
+
+@pytest.mark.asyncio
+async def test_check_seed_robots_returns_verdicts_for_each_seed(
+    session, _fake_checker_factory
+) -> None:
+    from platform_control.cli.plan import check_seed_robots
+
+    source_version_id = await _seed(
+        session,
+        spec={
+            "provider": "deterministic_http",
+            "seed_urls": ["https://example.com/a", "https://example.com/b"],
+        },
+    )
+    source, _, plan = await resolve_plan(session, _build_registry(), source_version_id)
+    checker = _fake_checker_factory({"https://example.com/a": True, "https://example.com/b": False})
+
+    verdicts = await check_seed_robots(session, source, plan, checker=checker)
+
+    assert {v.url for v in verdicts} == {
+        "https://example.com/a",
+        "https://example.com/b",
+    }
+    assert next(v for v in verdicts if v.url.endswith("/a")).allowed is True
+    assert next(v for v in verdicts if v.url.endswith("/b")).allowed is False
+
+
+@pytest.mark.asyncio
+async def test_check_seed_robots_uses_policy_user_agent_when_attached(
+    session, _fake_checker_factory
+) -> None:
+    from platform_control.cli.plan import check_seed_robots
+    from platform_control.domain import RobotsMode
+    from platform_control.models.compliance_policy import CompliancePolicy
+
+    # Attach a policy with a known contact_url -> UA should include it.
+    policy = CompliancePolicy(
+        name="ua-test",
+        robots_mode=RobotsMode.STRICT,
+        contact_url="https://evidara.ai/contact",
+    )
+    session.add(policy)
+    await session.flush()
+    source_version_id = await _seed(
+        session,
+        spec={
+            "provider": "deterministic_http",
+            "seed_urls": ["https://example.com/a"],
+        },
+    )
+    # Attach policy after _seed by updating jurisdiction.
+    from platform_control.models.authority import Jurisdiction as _Jur
+
+    jur = await session.get(_Jur, "jur_ch")
+    jur.compliance_policy_id = policy.compliance_policy_id
+    await session.commit()
+
+    source, _, plan = await resolve_plan(session, _build_registry(), source_version_id)
+    checker = _fake_checker_factory({"https://example.com/a": True})
+
+    verdicts = await check_seed_robots(session, source, plan, checker=checker)
+
+    assert len(verdicts) == 1
+    assert "https://evidara.ai/contact" in verdicts[0].user_agent
+
+
+@pytest.mark.asyncio
+async def test_format_robots_verdicts_surfaces_disallow() -> None:
+    from platform_control.cli.plan import RobotsVerdict, format_robots_verdicts
+
+    rendered = format_robots_verdicts(
+        [
+            RobotsVerdict(url="https://example.com/a", allowed=True, user_agent="ua"),
+            RobotsVerdict(url="https://example.com/b", allowed=False, user_agent="ua"),
+        ]
+    )
+    assert "robots_check:" in rendered
+    assert "DISALLOWED" in rendered
+    assert "allowed" in rendered
+    assert "https://example.com/b" in rendered
+
+
+@pytest.mark.asyncio
+async def test_format_robots_verdicts_empty() -> None:
+    from platform_control.cli.plan import format_robots_verdicts
+
+    rendered = format_robots_verdicts([])
+    assert "no seed URLs" in rendered

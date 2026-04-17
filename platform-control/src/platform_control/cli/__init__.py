@@ -35,6 +35,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "source_version_id",
         help="SourceVersion identifier (e.g. sv_ab12cd34).",
     )
+    plan_parser.add_argument(
+        "--check-robots",
+        action="store_true",
+        help=(
+            "Fetch robots.txt for each seed host and report allowed/disallowed "
+            "verdicts under the policy's user-agent. Network-touching; off by default."
+        ),
+    )
     plan_parser.set_defaults(runner=plan_cmd.run_from_args)
 
     ingest_parser = subparsers.add_parser(
