@@ -26,7 +26,7 @@ exploded as (
     where sections is not null
 )
 select
-    sha2(concat_ws('||', document_version_id, cast(section_idx as string)), 256) as section_id,
+    {{ generate_hash_id(["document_version_id", "section_idx"]) }} as section_id,
     document_version_id,
     file_id,
     section_idx,

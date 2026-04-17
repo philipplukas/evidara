@@ -62,6 +62,17 @@ variables:
       Override with --var when needed (for example if the policy is not provisioned yet).
     lookup:
       cluster_policy: "Evidara compute guardrails"
+  alert_email:
+    description: |
+      Email address to notify on job failures. Set per-target via bundle
+      variables; empty string disables notifications cleanly.
+    default: ""
+  vector_endpoint_name:
+    description: Mosaic AI Vector Search endpoint name.
+    default: document-intelligence
+  vector_index_name:
+    description: Fully-qualified Vector Search index name.
+    default: ""
 
 targets:
   dev:

@@ -1,0 +1,59 @@
+resources:
+  jobs:
+    document_intelligence_pipeline:
+      name: document-intelligence-pipeline
+      description: >
+        End-to-end bronze -> marts DAG: Auto Loader ingest, followed by dbt
+        source freshness, snapshots, run, and test. Scheduled as a single
+        job so failures in bronze short-circuit dbt.
+      queue:
+        enabled: true
+      max_concurrent_runs: 1
+      email_notifications:
+        on_failure:
+          - ${var.alert_email}
+        no_alert_for_skipped_runs: true
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: gcs_processed_bucket
+          default: ${var.gcs_processed_bucket}
+      tasks:
+        - task_key: autoloader_bronze
+          notebook_task:
+            notebook_path: ./databricks/notebooks/00_autoloader_bronze.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              gcs_processed_bucket: "{{job.parameters.gcs_processed_bucket}}"
+          max_retries: 2
+          min_retry_interval_millis: 60000
+          retry_on_timeout: true
+          timeout_seconds: 7200
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: ${var.num_workers}
+            policy_id: ${var.compute_guardrails_policy_id}
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+
+        - task_key: dbt_pipeline
+          depends_on:
+            - task_key: autoloader_bronze
+          dbt_task:
+            project_directory: ./dbt
+            commands:
+              - dbt deps
+              - dbt source freshness --target ${bundle.target}
+              - dbt snapshot --target ${bundle.target}
+              - dbt run --target ${bundle.target}
+              - dbt test --target ${bundle.target}
+              - dbt run-operation elementary.upload_dbt_monitor --target ${bundle.target}
+          max_retries: 1
+          min_retry_interval_millis: 300000
+          timeout_seconds: 10800
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: ${var.num_workers}
+            policy_id: ${var.compute_guardrails_policy_id}

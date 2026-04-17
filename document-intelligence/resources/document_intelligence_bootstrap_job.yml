@@ -1,0 +1,33 @@
+resources:
+  jobs:
+    document_intelligence_bootstrap_ddl:
+      name: document-intelligence-bootstrap-ddl
+      queue:
+        enabled: true
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: surfaces_root_uri
+          default: ${var.surfaces_root_uri}
+        - name: bronze_schema
+          default: bronze
+        - name: published_schema
+          default: published
+      tasks:
+        - task_key: bootstrap_ddl
+          notebook_task:
+            notebook_path: ./databricks/notebooks/01_bootstrap_ddl.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              surfaces_root_uri: "{{job.parameters.surfaces_root_uri}}"
+              bronze_schema: "{{job.parameters.bronze_schema}}"
+              published_schema: "{{job.parameters.published_schema}}"
+          libraries:
+            - whl: ./dist/*.whl
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: ${var.num_workers}
+            policy_id: ${var.compute_guardrails_policy_id}
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"

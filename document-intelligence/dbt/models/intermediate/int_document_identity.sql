@@ -26,10 +26,10 @@ identity_derived as (
         language,
         case
             when source_document_id is not null
-                then sha2(concat_ws('||', source_system, source_document_id, coalesce(language, '')), 256)
-            else sha2(concat_ws('||', source_system, source_uri), 256)
+                then {{ generate_hash_id(["source_system", "source_document_id", "coalesce(language, '')"]) }}
+            else {{ generate_hash_id(["source_system", "source_uri"]) }}
         end as document_id,
-        sha2(concat_ws('||', source_system, source_uri, checksum), 256) as document_version_id,
+        {{ generate_hash_id(["source_system", "source_uri", "checksum"]) }} as document_version_id,
         retrieved_at
     from envelopes
 ),

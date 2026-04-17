@@ -1,0 +1,6 @@
+jurisdiction_code,country,display_name,region
+AT,AT,Austria,EU
+CH,CH,Switzerland,EFTA
+DE,DE,Germany,EU
+EU,EU,European Union,EU
+UNKNOWN,ZZ,Unknown,other

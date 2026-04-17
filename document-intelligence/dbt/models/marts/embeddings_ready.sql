@@ -1,7 +1,8 @@
 {{
     config(
         materialized='table',
-        comment='Text chunks ready for vector embedding.'
+        comment='Text chunks ready for vector embedding.',
+        post_hook=["{{ zorder_by(['document_version_id', 'section_id']) }}"]
     )
 }}
 
@@ -23,10 +24,7 @@ joined as (
 ),
 chunked as (
     select
-        sha2(
-            concat_ws('||', document_version_id, cast(section_idx as string), cast(chunk_idx as string)),
-            256
-        ) as chunk_id,
+        {{ generate_hash_id(["document_version_id", "section_idx", "chunk_idx"]) }} as chunk_id,
         document_version_id,
         file_id,
         section_id,
@@ -41,10 +39,10 @@ chunked as (
             section_content,
             greatest(
                 1,
-                chunk_idx * {{ var('chunk_size_tokens') }} * 4
-                - chunk_idx * {{ var('chunk_overlap_tokens') }} * 4
+                chunk_idx * {{ approx_token_chars(var('chunk_size_tokens')) }}
+                - chunk_idx * {{ approx_token_chars(var('chunk_overlap_tokens')) }}
             ),
-            {{ var('chunk_size_tokens') }} * 4
+            {{ approx_token_chars(var('chunk_size_tokens')) }}
         ) as chunk_text,
         meta,
         transformed_at
@@ -54,7 +52,7 @@ chunked as (
             0,
             greatest(
                 0,
-                cast(ceil(content_length_chars / ({{ var('chunk_size_tokens') }} * 4.0)) as int) - 1
+                cast(ceil(content_length_chars / ({{ approx_token_chars(var('chunk_size_tokens')) }} * 1.0)) as int) - 1
             )
         )
     ) t as chunk_idx

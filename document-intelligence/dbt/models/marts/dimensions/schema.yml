@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: dim_document
+    description: >
+      SCD2 document dimension. One row per (document_id, validity window).
+      document_sk is the slowly-changing surrogate; document_nk_sk is the
+      stable natural-key hash. is_current flags the latest window per document.
+    columns:
+      - name: document_sk
+        description: SCD2 surrogate key (SHA2 of document_id + valid_from).
+        tests:
+          - not_null
+          - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
+      - name: document_nk_sk
+        description: Stable natural-key hash (same across all SCD2 versions).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
+      - name: document_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_id
+      - name: valid_from
+        tests:
+          - not_null
+      - name: is_current
+        tests:
+          - not_null
