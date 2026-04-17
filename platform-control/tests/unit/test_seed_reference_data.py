@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.extractor_profile import ExtractorProfile
 from platform_control.seed_reference_data import ReferenceDataSeeder
 
@@ -15,6 +16,10 @@ from platform_control.seed_reference_data import ReferenceDataSeeder
 def _write_seed_file(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _write_compliance_policies(path: Path, items: list[dict] | None = None) -> None:
+    _write_seed_file(path, {"version": 1, "items": items or []})
 
 
 async def _count_rows(session_maker: async_sessionmaker[AsyncSession], model) -> int:
@@ -28,6 +33,7 @@ async def test_seed_reference_data_dry_run_does_not_persist(
     session_maker: async_sessionmaker[AsyncSession],
     tmp_path: Path,
 ) -> None:
+    _write_compliance_policies(tmp_path / "reference" / "compliance_policies.yaml")
     _write_seed_file(
         tmp_path / "reference" / "jurisdictions.yaml",
         {
@@ -81,10 +87,12 @@ async def test_seed_reference_data_is_idempotent_and_updates_existing_rows(
     session_maker: async_sessionmaker[AsyncSession],
     tmp_path: Path,
 ) -> None:
+    compliance_policies = tmp_path / "reference" / "compliance_policies.yaml"
     jurisdictions = tmp_path / "reference" / "jurisdictions.yaml"
     authorities = tmp_path / "reference" / "authorities.yaml"
     extractor_profiles = tmp_path / "reference" / "extractor_profiles.yaml"
 
+    _write_compliance_policies(compliance_policies)
     _write_seed_file(
         jurisdictions,
         {
@@ -150,3 +158,113 @@ async def test_seed_reference_data_is_idempotent_and_updates_existing_rows(
         authority = await session.get(Authority, "auth_ch_fedlex")
         assert authority is not None
         assert authority.name == "Fedlex Updated"
+
+
+@pytest.mark.asyncio
+async def test_seed_attaches_compliance_policy_to_jurisdiction(
+    session_maker: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    _write_compliance_policies(
+        tmp_path / "reference" / "compliance_policies.yaml",
+        items=[
+            {
+                "compliance_policy_id": "cp_ch_fedlex_open_data",
+                "name": "ch-fedlex-open-data",
+                "robots_mode": "ignore",
+                "max_requests_per_minute_per_host": 60,
+                "max_concurrent_per_host": 4,
+                "attribution_required": True,
+                "attribution_text": "Source: Fedlex.",
+                "contact_url": "https://evidara.ai/contact",
+            }
+        ],
+    )
+    _write_seed_file(
+        tmp_path / "reference" / "jurisdictions.yaml",
+        {
+            "version": 1,
+            "items": [
+                {
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "ch",
+                    "name": "Switzerland",
+                    "compliance_policy_id": "cp_ch_fedlex_open_data",
+                },
+                # Unattached jurisdiction stays unconstrained by design.
+                {"jurisdiction_id": "jur_de", "slug": "de", "name": "Germany"},
+            ],
+        },
+    )
+    _write_seed_file(tmp_path / "reference" / "authorities.yaml", {"version": 1, "items": []})
+    _write_seed_file(
+        tmp_path / "reference" / "extractor_profiles.yaml", {"version": 1, "items": []}
+    )
+
+    summary = await ReferenceDataSeeder(session_maker).seed(tmp_path, dry_run=False)
+
+    assert summary.created["compliance_policies"] == 1
+    assert summary.created["jurisdictions"] == 2
+
+    async with session_maker() as session:
+        policy = await session.get(CompliancePolicy, "cp_ch_fedlex_open_data")
+        assert policy is not None
+        assert policy.max_requests_per_minute_per_host == 60
+        assert policy.attribution_required is True
+
+        ch = await session.get(Jurisdiction, "jur_ch")
+        de = await session.get(Jurisdiction, "jur_de")
+        assert ch is not None
+        assert ch.compliance_policy_id == "cp_ch_fedlex_open_data"
+        assert de is not None
+        assert de.compliance_policy_id is None
+
+
+@pytest.mark.asyncio
+async def test_seed_rejects_jurisdiction_with_missing_policy_reference(
+    session_maker: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    _write_compliance_policies(tmp_path / "reference" / "compliance_policies.yaml")
+    _write_seed_file(
+        tmp_path / "reference" / "jurisdictions.yaml",
+        {
+            "version": 1,
+            "items": [
+                {
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "ch",
+                    "name": "Switzerland",
+                    "compliance_policy_id": "cp_does_not_exist",
+                }
+            ],
+        },
+    )
+    _write_seed_file(tmp_path / "reference" / "authorities.yaml", {"version": 1, "items": []})
+    _write_seed_file(
+        tmp_path / "reference" / "extractor_profiles.yaml", {"version": 1, "items": []}
+    )
+
+    with pytest.raises(ValueError, match="missing compliance policy"):
+        await ReferenceDataSeeder(session_maker).seed(tmp_path, dry_run=False)
+
+
+@pytest.mark.asyncio
+async def test_repo_jurisdictions_and_compliance_policies_are_consistent() -> None:
+    """File-level consistency check on the repo's own seed YAMLs.
+
+    Pure YAML load + FK check — avoids the DB path so pre-existing authority
+    name collisions (DE vs CH Bundesverwaltungsgericht) don't mask this.
+    """
+    repo_seed_dir = Path(__file__).resolve().parents[2] / "seeds" / "reference"
+    policies = yaml.safe_load((repo_seed_dir / "compliance_policies.yaml").read_text())
+    jurisdictions = yaml.safe_load((repo_seed_dir / "jurisdictions.yaml").read_text())
+
+    policy_ids = {item["compliance_policy_id"] for item in policies["items"]}
+    assert policy_ids, "expected at least one seeded compliance policy"
+    for item in jurisdictions["items"]:
+        pid = item.get("compliance_policy_id")
+        if pid is not None:
+            assert pid in policy_ids, (
+                f"jurisdiction {item['jurisdiction_id']} references unknown policy {pid}"
+            )

@@ -3,9 +3,15 @@ items:
   - jurisdiction_id: jur_ch
     slug: ch
     name: Switzerland
+    compliance_policy_id: cp_ch_fedlex_open_data
   - jurisdiction_id: jur_at
     slug: at
     name: Austria
+    compliance_policy_id: cp_at_ris_ogd
+  # DE/FR/IT/EU stay without a policy until their source terms are reviewed.
+  # Absence = unconstrained (no rate limiter, no robots check, no retention),
+  # which is the explicit operator signal that policy work is still pending.
+  # See #252 for adaptive-limiter defaults, #257 for robots prefetch.
   - jurisdiction_id: jur_de
     slug: de
     name: Germany

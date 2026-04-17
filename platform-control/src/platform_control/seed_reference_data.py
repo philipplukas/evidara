@@ -12,9 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from platform_control.database import get_session_maker
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.extractor_profile import ExtractorProfile
 from platform_control.seed_schemas import (
     AuthoritySeed,
+    CompliancePolicySeed,
     ExtractorProfileSeed,
     JurisdictionSeed,
     SeedBundle,
@@ -30,15 +32,27 @@ class ReferenceDataSeeder:
 
     async def seed(self, seed_dir: Path, *, dry_run: bool) -> SeedSummary:
         bundles = self._load_seed_bundles(seed_dir)
+        counter_keys = (
+            "compliance_policies",
+            "jurisdictions",
+            "authorities",
+            "extractor_profiles",
+        )
         summary = SeedSummary(
             dry_run=dry_run,
             seed_dir=seed_dir,
-            created={"jurisdictions": 0, "authorities": 0, "extractor_profiles": 0},
-            updated={"jurisdictions": 0, "authorities": 0, "extractor_profiles": 0},
-            unchanged={"jurisdictions": 0, "authorities": 0, "extractor_profiles": 0},
+            created=dict.fromkeys(counter_keys, 0),
+            updated=dict.fromkeys(counter_keys, 0),
+            unchanged=dict.fromkeys(counter_keys, 0),
         )
 
         async with self.session_maker() as session:
+            # Policies land before jurisdictions so jurisdictions.compliance_policy_id
+            # resolves its FK on the first run. Jurisdictions without a policy
+            # stay unconstrained (absence is the explicit operator signal).
+            await self._upsert_compliance_policies(
+                session, bundles["compliance_policies"].items, summary
+            )
             await self._upsert_jurisdictions(session, bundles["jurisdictions"].items, summary)
             await self._upsert_authorities(session, bundles["authorities"].items, summary)
             await self._upsert_extractor_profiles(
@@ -66,6 +80,10 @@ class ReferenceDataSeeder:
         seed_dir: Path,
     ) -> dict[str, Any]:
         bundle_map: dict[str, tuple[Path, TypeAdapter[Any]]] = {
+            "compliance_policies": (
+                seed_dir / "reference" / "compliance_policies.yaml",
+                TypeAdapter(SeedBundle[CompliancePolicySeed]),
+            ),
             "jurisdictions": (
                 seed_dir / "reference" / "jurisdictions.yaml",
                 TypeAdapter(SeedBundle[JurisdictionSeed]),
@@ -87,6 +105,24 @@ class ReferenceDataSeeder:
             loaded[name] = adapter.validate_python(self._load_yaml(path))
         return loaded
 
+    async def _upsert_compliance_policies(
+        self,
+        session: AsyncSession,
+        items: list[CompliancePolicySeed],
+        summary: SeedSummary,
+    ) -> None:
+        for item in items:
+            item_payload = item.model_dump()
+            existing = await session.get(CompliancePolicy, item.compliance_policy_id)
+            await self._upsert_entity(
+                existing=existing,
+                create=lambda item_payload=item_payload: CompliancePolicy(**item_payload),
+                updates=item.model_dump(exclude={"compliance_policy_id"}),
+                session=session,
+                summary=summary,
+                summary_key="compliance_policies",
+            )
+
     async def _upsert_jurisdictions(
         self,
         session: AsyncSession,
@@ -94,6 +130,13 @@ class ReferenceDataSeeder:
         summary: SeedSummary,
     ) -> None:
         for item in items:
+            if item.compliance_policy_id is not None:
+                policy = await session.get(CompliancePolicy, item.compliance_policy_id)
+                if policy is None:
+                    raise ValueError(
+                        "Jurisdiction seed references missing compliance policy: "
+                        f"{item.jurisdiction_id} -> {item.compliance_policy_id}"
+                    )
             item_payload = item.model_dump()
             existing = await session.get(Jurisdiction, item.jurisdiction_id)
             await self._upsert_entity(
@@ -202,7 +245,7 @@ def main() -> None:
     summary = asyncio.run(_run(seed_dir=args.seed_dir, dry_run=args.dry_run))
     print(f"Seed directory: {summary.seed_dir}")
     print(f"Dry run: {summary.dry_run}")
-    for key in ("jurisdictions", "authorities", "extractor_profiles"):
+    for key in ("compliance_policies", "jurisdictions", "authorities", "extractor_profiles"):
         print(
             f"{key}: created={summary.created[key]} "
             f"updated={summary.updated[key]} unchanged={summary.unchanged[key]}"
