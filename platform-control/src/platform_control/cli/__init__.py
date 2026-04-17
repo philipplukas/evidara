@@ -17,6 +17,7 @@ from collections.abc import Callable, Sequence
 from platform_control.cli import fetch as fetch_cmd
 from platform_control.cli import ingest as ingest_cmd
 from platform_control.cli import plan as plan_cmd
+from platform_control.cli import retention as retention_cmd
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -62,6 +63,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Cassette directory (defaults to Settings.cassette_dir).",
     )
     fetch_parser.set_defaults(runner=fetch_cmd.run_from_args)
+
+    retention_parser = subparsers.add_parser(
+        "retention",
+        help="Retention-related operator commands.",
+    )
+    retention_subparsers = retention_parser.add_subparsers(dest="retention_command", required=True)
+    sweep_parser = retention_subparsers.add_parser(
+        "sweep",
+        help="Purge artifacts older than their jurisdiction's retention_days.",
+    )
+    sweep_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report what would be purged without touching the database.",
+    )
+    sweep_parser.set_defaults(runner=retention_cmd.run_from_args)
 
     return parser
 

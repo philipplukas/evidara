@@ -27,6 +27,15 @@ class ArtifactStore(Protocol):
         payload: dict[str, Any],
     ) -> dict[str, Any]: ...
 
+    async def delete_blob(self, storage_path: str) -> None:
+        """Best-effort delete of a blob referenced by a persisted storage_path.
+
+        Used by retention sweeps. Implementations that can't locate the blob
+        (e.g. a file URI pointing outside the managed tree) MUST NOT raise —
+        the DB row purge still proceeds so partial-state cleanup converges.
+        """
+        ...
+
 
 class LocalArtifactStore:
     def __init__(self, base_dir: Path | None = None) -> None:
@@ -43,6 +52,16 @@ class LocalArtifactStore:
         artifact_path = artifact_dir / f"{artifact_id}.json"
         artifact_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         return f"file://{artifact_path.resolve()}"
+
+    async def delete_blob(self, storage_path: str) -> None:
+        if not storage_path.startswith("file://"):
+            return
+        path = Path(storage_path.removeprefix("file://"))
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            # Surface nothing — retention sweep continues regardless.
+            return
 
     async def store_bundle_manifest(
         self,
@@ -76,6 +95,22 @@ class GcsArtifactStore:
         self.bucket_name = bucket_name
         self.object_prefix = object_prefix.strip("/")
         self.storage_client = storage_client or storage.Client(project=project_id)
+
+    async def delete_blob(self, storage_path: str) -> None:
+        prefix = f"gs://{self.bucket_name}/"
+        if not storage_path.startswith(prefix):
+            return
+        object_name = storage_path.removeprefix(prefix)
+
+        def _delete() -> None:
+            bucket = self.storage_client.bucket(self.bucket_name)
+            blob = bucket.blob(object_name)
+            try:
+                blob.delete()
+            except Exception:  # pragma: no cover - GCS call is exercised in integration
+                return
+
+        await asyncio.to_thread(_delete)
 
     async def store_page_payload(
         self,
