@@ -1,6 +1,12 @@
 // Icon Registry
 // Maps iconKey strings from the BFF to emoji/text representations.
-// In production, these would be SVG components or an icon library like circle-flags.
+//
+// Sub-federal subdivision entries (ch-zh, at-w, de-by, fr-idf, it-25, …) are
+// generated from contracts/vocabularies/subdivisions.json — do not edit
+// SUBDIVISION_ICONS by hand. Regenerate with `npm run generate:icons`.
+// Country entries and document-meta icons below are hand-maintained.
+
+import { SUBDIVISION_ICONS } from "./subdivisions.generated";
 
 const iconMap: Record<string, string> = {
   // ─── Countries ──────────────────────────────────────────────
@@ -12,104 +18,8 @@ const iconMap: Record<string, string> = {
   li: "🇱🇮",
   eu: "🇪🇺",
 
-  // ─── CH cantons (ISO 3166-2:CH) ─────────────────────────────
-  "ch-ag": "AG",
-  "ch-ai": "AI",
-  "ch-ar": "AR",
-  "ch-be": "BE",
-  "ch-bl": "BL",
-  "ch-bs": "BS",
-  "ch-fr": "FR",
-  "ch-ge": "GE",
-  "ch-gl": "GL",
-  "ch-gr": "GR",
-  "ch-ju": "JU",
-  "ch-lu": "LU",
-  "ch-ne": "NE",
-  "ch-nw": "NW",
-  "ch-ow": "OW",
-  "ch-sg": "SG",
-  "ch-sh": "SH",
-  "ch-so": "SO",
-  "ch-sz": "SZ",
-  "ch-tg": "TG",
-  "ch-ti": "TI",
-  "ch-ur": "UR",
-  "ch-vd": "VD",
-  "ch-vs": "VS",
-  "ch-zg": "ZG",
-  "ch-zh": "ZH",
-
-  // ─── AT Bundesländer (ISO 3166-2:AT) ────────────────────────
-  "at-bgl": "B",
-  "at-ktn": "K",
-  "at-noe": "NÖ",
-  "at-ooe": "OÖ",
-  "at-sbg": "S",
-  "at-stm": "ST",
-  "at-tir": "T",
-  "at-vbg": "V",
-  "at-w": "W",
-
-  // ─── DE Länder (ISO 3166-2:DE) ──────────────────────────────
-  "de-bw": "BW",
-  "de-by": "BY",
-  "de-be": "BE",
-  "de-bb": "BB",
-  "de-hb": "HB",
-  "de-hh": "HH",
-  "de-he": "HE",
-  "de-mv": "MV",
-  "de-ni": "NI",
-  "de-nw": "NW",
-  "de-rp": "RP",
-  "de-sl": "SL",
-  "de-sn": "SN",
-  "de-st": "ST",
-  "de-sh": "SH",
-  "de-th": "TH",
-
-  // ─── FR régions (ISO 3166-2:FR) ─────────────────────────────
-  "fr-ara": "ARA",
-  "fr-bfc": "BFC",
-  "fr-bre": "BRE",
-  "fr-cvl": "CVL",
-  "fr-cor": "COR",
-  "fr-ges": "GES",
-  "fr-hdf": "HDF",
-  "fr-idf": "IDF",
-  "fr-nor": "NOR",
-  "fr-naq": "NAQ",
-  "fr-occ": "OCC",
-  "fr-pdl": "PDL",
-  "fr-pac": "PAC",
-  "fr-gp": "GP",
-  "fr-gf": "GF",
-  "fr-mq": "MQ",
-  "fr-re": "RE",
-  "fr-yt": "YT",
-
-  // ─── IT regioni (ISO 3166-2:IT) ─────────────────────────────
-  "it-65": "ABR",
-  "it-77": "BAS",
-  "it-78": "CAL",
-  "it-72": "CAM",
-  "it-45": "EMR",
-  "it-36": "FVG",
-  "it-62": "LAZ",
-  "it-42": "LIG",
-  "it-25": "LOM",
-  "it-57": "MAR",
-  "it-67": "MOL",
-  "it-21": "PIE",
-  "it-75": "PUG",
-  "it-88": "SAR",
-  "it-82": "SIC",
-  "it-52": "TOS",
-  "it-32": "TAA",
-  "it-55": "UMB",
-  "it-23": "VDA",
-  "it-34": "VEN",
+  // ─── Sub-federal subdivisions (generated from subdivisions.json) ──
+  ...SUBDIVISION_ICONS,
 
   // ─── Document meta icons ────────────────────────────────────
   "dtype-law": "§",

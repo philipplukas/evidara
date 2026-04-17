@@ -30,7 +30,7 @@ const REPO_ROOT = resolve(__dirname, "../../../..");
 const SUBDIVISIONS_PATH = resolve(REPO_ROOT, "contracts/vocabularies/subdivisions.json");
 
 type SubdivisionsFile = {
-  values: Record<string, { iconKey: string; country: string }>;
+  values: Record<string, { iconKey: string; country: string; iconText?: string }>;
 };
 
 function loadSubdivisions(): SubdivisionsFile {
@@ -75,5 +75,30 @@ describe("icons.ts ↔ subdivisions.json parity", () => {
       }
     }
     expect(violations).toEqual([]);
+  });
+
+  /**
+   * WHY: `iconText` is the canonical text abbreviation for each subdivision
+   * (e.g. "ZH" for CH-ZH, "NÖ" for AT-3). The generator turns it into the
+   * SUBDIVISION_ICONS map; this test asserts getIcon() returns the same
+   * value. If this fails, either the generator hasn't been re-run or
+   * subdivisions.json and the committed generated file have drifted.
+   */
+  it("every subdivision iconText round-trips through getIcon()", () => {
+    const { values } = loadSubdivisions();
+    const mismatches: string[] = [];
+    for (const [isoCode, entry] of Object.entries(values)) {
+      if (!entry.iconText) {
+        mismatches.push(`${isoCode}: subdivisions.json entry missing iconText`);
+        continue;
+      }
+      const rendered = getIcon(entry.iconKey);
+      if (rendered !== entry.iconText) {
+        mismatches.push(
+          `${isoCode}: subdivisions iconText=${JSON.stringify(entry.iconText)} but getIcon=${JSON.stringify(rendered)}`,
+        );
+      }
+    }
+    expect(mismatches).toEqual([]);
   });
 });

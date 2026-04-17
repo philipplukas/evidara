@@ -121,6 +121,21 @@
           "type": "string",
           "enum": ["original", "machine_translated", "translation_unavailable"],
           "description": "Translation state of the published content."
+        },
+        "eli_uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "European Legislation Identifier URI for this document revision when available. Carries the FRBR identity (Work/Expression/Manifestation) round-trippable with Fedlex, Légifrance, EUR-Lex, and other ELI-publishing systems. See docs/architecture/vocabulary-standards.md."
+        },
+        "celex": {
+          "type": "string",
+          "pattern": "^[1-9]\\d{4}[A-Z]{1,2}\\d{4}(?:\\([A-Z0-9]+\\))?$",
+          "description": "EU CELEX identifier when this document is an EU legal act. Carried alongside eli_uri for EU documents; the citation extractor already recognises this shape."
+        },
+        "subdivision": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}-[A-Z0-9]{1,3}$",
+          "description": "ISO 3166-2 subdivision code when the document's jurisdiction is sub-federal (cantonal, Land, régional, regione). See contracts/vocabularies/subdivisions.json for the registry."
         }
       },
       "additionalProperties": true

@@ -157,6 +157,11 @@ LIMIT {limit}
                                 "title_short": title_short,
                                 "describe_turtle": describe_turtle,
                                 "fetched_at": datetime.now(UTC).isoformat(),
+                                # ELI round-trip: Fedlex work URIs ARE ELI URIs.
+                                # Emitting eli_uri here lets canonical document
+                                # metadata carry the identifier forward per
+                                # docs/architecture/vocabulary-standards.md.
+                                "eli_uri": self._eli_uri_for_work(work_uri, concrete_work_uri),
                             },
                         )
                     )
@@ -243,6 +248,21 @@ LIMIT {limit}
         if len(code) == 2:
             return f"CH-{code}"
         return code
+
+    def _eli_uri_for_work(self, seed_work_uri: str, concrete_work_uri: str) -> str | None:
+        """Return the ELI URI for a Fedlex work, preferring the abstract form.
+
+        Fedlex work URIs are already ELI URIs (e.g.
+        `https://fedlex.data.admin.ch/eli/cc/1999/404`). The `concrete_work_uri`
+        carries a dated temporal selector (e.g. `.../404/20240303`) — we prefer
+        the abstract `seed_work_uri` so the emitted identifier matches the
+        canonical ELI shape used by external ELI consumers. Returns None if
+        neither URI looks like a Fedlex ELI URI.
+        """
+        for candidate in (seed_work_uri, concrete_work_uri):
+            if isinstance(candidate, str) and f"{_FEDLEX_HOST}/eli/" in candidate:
+                return candidate
+        return None
 
     def _canton_iri(self, iso_3166_2_code: str) -> str:
         """Return the Fedlex vocabulary IRI for an ISO 3166-2:CH code.

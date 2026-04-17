@@ -272,22 +272,53 @@ Ticket: `docs/runbooks/eu-eur-lex-fast-loop-backlog.md`.
 
 Larger feature work that unlocks new surfaces once Tier 1–4 are stable.
 
-### 5.1 ELI URI emission on canonical documents
+### 5.1 ELI URI emission on canonical documents ✅ LANDED
 
-`contracts/schemas/document.schema.json` gains optional
-`metadata.eli_uri` (string, URI format). Providers that navigate ELI
-(`fedlex_sparql`, `eur_lex_sparql`, future Légifrance) populate it.
-Downstream projection carries it so external systems can round-trip
-against canonical Evidara output.
+**Outcome:** `contracts/schemas/document.schema.json` gains three
+optional metadata fields: `eli_uri` (URI format), `celex` (EU CELEX
+regex), and `subdivision` (ISO 3166-2 regex). Fedlex SPARQL provider
+emits `eli_uri` on every captured resource via a new
+`_eli_uri_for_work()` helper that prefers the abstract seed URI
+(`https://fedlex.data.admin.ch/eli/cc/1999/404`) over the dated
+concrete form — matching what external ELI consumers expect. 4 new
+Fedlex tests assert the round-trip. Projection-layer wiring
+(persisting `metadata.eli_uri` on canonical output) lands in a
+follow-up alongside the live EUR-Lex adapter.
 
-### 5.2 Sub-federal UI filters
+**Landed in:** commit following `bfe163e`, same branch.
 
-`legal-search/frontend` gains a `Jurisdiction` filter that accepts
-both country codes (`CH`) and subdivision codes (`CH-ZH`). The admin
-source-setup UI gains a subdivision picker when the selected overlay
-has a non-empty `subdivisions` ancestor in `hierarchy_paths`.
+### 5.2 Sub-federal UI filters 🟡 CONTRACT + PARSER LANDED; UI WIRING PENDING
 
-Depends on Tier 2.3 (sub-federal query model).
+**Landed (contract + parsers):**
+- `contracts/api/legal-search.openapi.yaml` `jurisdiction` param now
+  documents both country (`CH`) and subdivision (`CH-ZH`) shapes with
+  regex validation and helper text.
+- `legal-search/api/src/modules/search/dto/jurisdiction-token.ts`
+  ships `parseJurisdictionToken` + `parseJurisdictionList`, returning
+  `{country, subdivision?}`. Covered by 11 unit tests.
+- `SearchQueryDto.getParsedJurisdictions()` returns parsed tokens for
+  downstream consumers.
+- `legal-search/frontend/src/lib/jurisdiction-filter.ts` mirrors the
+  parser and exposes `subdivisionsForCountry(country, lang)` and
+  `labelForSubdivisionToken(token, lang)` by reading the generated
+  `SUBDIVISION_REGISTRY`. 9 frontend tests cover parsing, localized
+  labels, and empty-list for subdivisionless countries.
+
+**Still needed (UI surface):**
+- Wire `subdivisionsForCountry()` into the filter panel component so
+  users can toggle between country-wide and subdivision-scoped filters.
+- Wire `getParsedJurisdictions()` into the OpenSearch adapter so
+  subdivision-scoped queries hit the `subdivision` field (requires an
+  index mapping change).
+- Admin source-setup UI: add a subdivision picker when the selected
+  overlay has a sub-federal hierarchy tier.
+
+Design decision (T2.3 close-out): `jurisdiction` accepts mixed
+granularity in a single param; the BFF normalizer splits country vs.
+subdivision. No separate `subdivision` param. Rationale:
+- Fewer params = smaller API surface.
+- Matches ISO 3166 intent (subdivision codes encode the country).
+- User input ("CH-ZH" or "CH") never has to think about routing.
 
 ### 5.3 Citation extractor coverage for DE / FR / IT ✅ LANDED
 
@@ -322,9 +353,27 @@ SKOS thesaurus with 7k+ concepts. Integration shape:
 Non-trivial: classification model + evaluation. Scope as a full
 workstream.
 
-### 5.5 `icons.ts` generation
+### 5.5 `icons.ts` generation ✅ LANDED
 
-Tier 1.3's follow-up: move from parity test to code-generation.
+**Outcome:**
+- `legal-search/frontend/scripts/generate-subdivision-icons.mjs`
+  emits `src/lib/subdivisions.generated.ts` from
+  `contracts/vocabularies/subdivisions.json`.
+- The generated file exports `SUBDIVISION_REGISTRY`,
+  `SUBDIVISIONS_BY_COUNTRY`, and `SUBDIVISION_ICONS` — one source of
+  truth for every sub-federal data view the frontend needs.
+- `icons.ts` now imports `SUBDIVISION_ICONS` and spreads it alongside
+  the hand-maintained country + meta icons.
+- All 89 subdivisions gained an `iconText` field in
+  `subdivisions.json` as the canonical text-label source.
+- `npm run generate:icons` regenerates on demand;
+  `predev`/`prebuild`/`pretest`/`check` run it automatically. The
+  generated file is gitignored (per the repo's `*.generated.*`
+  pattern) and regenerated on every run — no committed copy to drift.
+- Parity test asserts `iconText` from `subdivisions.json` round-trips
+  through `getIcon()`.
+
+**Landed in:** commit following `bfe163e`, same branch.
 
 ## Tier 6 — Platform chokepoints (serialized, on GA operator board)
 

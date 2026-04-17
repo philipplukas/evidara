@@ -22,11 +22,23 @@ export type SearchDocumentsParams = {
  */
 q: string;
 /**
- * Filter by jurisdiction (ISO 3166-1 alpha-2)
+ * Filter by jurisdiction. Accepts either:
+- ISO 3166-1 alpha-2 country code (e.g. `CH`, `DE`, `EU`)
+- ISO 3166-2 subdivision code (e.g. `CH-ZH`, `DE-BY`, `IT-25`)
+
+The BFF normalizes both forms and filters against country +
+subdivision columns. See
+`contracts/vocabularies/subdivisions.json` for the full
+subdivision registry.
+
+ * @pattern ^[A-Z]{2}(-[A-Z0-9]{1,3})?$
  */
 jurisdiction?: string;
 /**
- * Comma-separated list of jurisdiction filters
+ * Comma-separated list of jurisdiction filters. Each element
+follows the same shape as `jurisdiction` — country code,
+subdivision code, or a mix.
+
  */
 jurisdictions?: string;
 /**
