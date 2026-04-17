@@ -61,6 +61,43 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: decision
+      # Sub-federal: Bundesländer LGBl templates. Reuse the existing RIS OGD
+      # provider with per-LGBl applikation codes. Live RIS exposes LGBl per
+      # Bundesland via the same API shape as Bundesrecht. enabled:false until
+      # the first per-state acceptance run lands (see drift-prevention
+      # backlog §3.4 and §4).
+      ris_ogd_lgbl_wien:
+        provider: ris_ogd
+        base_url: https://data.bka.gv.at/ris/api/v2.6/LgblAuth
+        applikation: LgblAuthW
+        preferred_formats: [Html, Xml]
+        request_timeout_seconds: 15.0
+        page_size: 5
+        max_pages: 1
+        tenant_id: tenant_public
+        corpus_id: corpus_public_at_w_lgbl
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      ris_ogd_lgbl_noe:
+        provider: ris_ogd
+        base_url: https://data.bka.gv.at/ris/api/v2.6/LgblAuth
+        applikation: LgblAuthNO
+        preferred_formats: [Html, Xml]
+        request_timeout_seconds: 15.0
+        page_size: 5
+        max_pages: 1
+        tenant_id: tenant_public
+        corpus_id: corpus_public_at_noe_lgbl
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
   de:
     provider_templates:
       deterministic_http_bundesrecht:
@@ -183,43 +220,6 @@ overlays:
         source_origin_kind: official_primary
         trust_tier: authoritative
         language_codes: [it]
-        document_type_hint: legislation
-        enabled: false
-  at_subfederal:
-    # Sub-federal AT Bundesländer templates reuse the existing RIS OGD
-    # provider with per-LGBl applikation codes. Live RIS exposes LGBl per
-    # Bundesland via the same API shape as Bundesrecht.
-    provider_templates:
-      ris_ogd_lgbl_wien:
-        provider: ris_ogd
-        base_url: https://data.bka.gv.at/ris/api/v2.6/LgblAuth
-        applikation: LgblAuthW
-        preferred_formats: [Html, Xml]
-        request_timeout_seconds: 15.0
-        page_size: 5
-        max_pages: 1
-        tenant_id: tenant_public
-        corpus_id: corpus_public_at_w_lgbl
-        scope_type: global_public
-        source_origin_kind: official_primary
-        trust_tier: authoritative
-        language_codes: [de]
-        document_type_hint: legislation
-        enabled: false
-      ris_ogd_lgbl_noe:
-        provider: ris_ogd
-        base_url: https://data.bka.gv.at/ris/api/v2.6/LgblAuth
-        applikation: LgblAuthNO
-        preferred_formats: [Html, Xml]
-        request_timeout_seconds: 15.0
-        page_size: 5
-        max_pages: 1
-        tenant_id: tenant_public
-        corpus_id: corpus_public_at_noe_lgbl
-        scope_type: global_public
-        source_origin_kind: official_primary
-        trust_tier: authoritative
-        language_codes: [de]
         document_type_hint: legislation
         enabled: false
   eu:
