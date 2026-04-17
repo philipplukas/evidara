@@ -97,7 +97,7 @@ class RunService:
     ) -> AcquisitionProvider | None:
         provider = self.provider
         if provider is None and self.provider_registry is not None:
-            provider = self.provider_registry.resolve_for_spec(source_version.acquisition_spec)
+            provider = self.provider_registry.resolve_for_version(source_version)
         return provider
 
     def _should_dispatch_via_worker(self, source_version: SourceVersion) -> bool:
@@ -804,7 +804,7 @@ class RunService:
     ) -> PendingDispatchPublications:
         provider = self.provider
         if provider is None and self.provider_registry is not None:
-            provider = self.provider_registry.resolve_for_spec(source_version.acquisition_spec)
+            provider = self.provider_registry.resolve_for_version(source_version)
         if provider is None:
             raise ProviderConfigurationError(
                 "An acquisition provider or provider registry is required before creating runs."

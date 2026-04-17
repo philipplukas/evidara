@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     raw_artifact_bucket: str = "evidara-raw-artifacts-dev"
     raw_artifact_prefix: str = "runs"
     raw_artifact_local_dir: Path = Field(default=Path(".data/raw-artifacts"))
+    cassette_dir: Path = Field(
+        default=Path(".data/cassettes"),
+        description=(
+            "Directory holding cassettes used by CassetteProvider "
+            "(shadow-mode + fixture-driven runs)."
+        ),
+    )
     event_publisher_backend: Literal["noop", "pubsub"] = "noop"
     raw_artifact_pubsub_topic: str = "raw-artifact-available"
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
