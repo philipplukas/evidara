@@ -8,6 +8,7 @@ Current overlays:
 
 - `at/` — Austria
 - `ch/` — Switzerland
+- `de/` — Germany
 
 Each country overlay contains:
 
@@ -23,3 +24,7 @@ scoped to a single overlay and documented inline. Current examples:
 - `ch/municipalities.yaml` — Swiss municipality registry keyed by BFS number,
   with an optional `law_collection` block per municipality. Pilot subset only;
   full load from the BFS Gemeindeverzeichnis is out of scope for this file.
+- `de/municipalities.yaml` — German municipality registry keyed by AGS
+  (Amtlicher Gemeindeschlüssel), with the same `law_collection` shape. Pilot
+  subset only; city-states (Berlin, Hamburg, Bremen) are intentionally
+  covered at Land level and not duplicated here.

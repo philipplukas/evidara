@@ -1,0 +1,57 @@
+version: 1
+country_code: DE
+country_name: Germany
+
+jurisdiction_overlay:
+  canonical_codes:
+    - DE
+  hierarchy_paths:
+    - de
+    - de/federal
+    - de/land
+    - de/land/{land_code}
+    - de/kommunal
+    - de/kommunal/{ags}
+
+language_defaults:
+  primary: de
+  supported:
+    - de
+    - en
+
+source_family_overlay:
+  canonical:
+    - law
+    - decision
+    - commentary
+    - administrative_guidance
+  local_mappings:
+    - local_type: bundesgesetz
+      canonical_type: law
+      note: Federal statutes (Bundesrecht) published via gesetze-im-internet.de.
+    - local_type: rechtsverordnung
+      canonical_type: law
+      note: Ordinances at federal or Land level; level disambiguated by hierarchy_path.
+    - local_type: landesgesetz
+      canonical_type: law
+      note: Land statutes; publisher and collection vary by Land (e.g. RIS-BY in Bavaria, gesetze.berlin.de).
+    - local_type: satzung
+      canonical_type: law
+      note: Municipal statute (Ortsrecht/Satzung); level is de/kommunal/{ags}.
+    - local_type: verwaltungsvorschrift
+      canonical_type: administrative_guidance
+      note: Administrative instructions issued by federal ministries or Land authorities.
+    - local_type: bverfg_entscheidung
+      canonical_type: decision
+      note: Federal Constitutional Court decisions.
+    - local_type: bgh_entscheidung
+      canonical_type: decision
+      note: Federal Court of Justice decisions (civil and criminal).
+
+court_level_overlay:
+  expected_levels:
+    - constitutional
+    - supreme
+    - appellate
+    - land
+    - administrative

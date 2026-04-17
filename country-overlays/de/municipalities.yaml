@@ -1,0 +1,141 @@
+version: 1
+country_code: DE
+
+# German municipality registry (Gemeinden / Städte).
+#
+# Scope:
+#   Out-of-band registry, same pattern as country-overlays/ch/municipalities.yaml.
+#   Germany has ~11,000 Gemeinden; seeding all of them as first-class
+#   authorities would flood the taxonomy with entities that do not publish
+#   structured legal corpora. This file holds a pilot subset of cities known
+#   to publish their Ortsrecht as a structured collection. The three
+#   city-states (Berlin, Hamburg, Bremen) are simultaneously Länder and
+#   municipalities; their legal corpus is covered at Land level and is
+#   intentionally not duplicated here.
+#
+# Identifier:
+#   Each entry is keyed by AGS (Amtlicher Gemeindeschlüssel), the stable
+#   8-digit municipality identifier maintained by Destatis.
+#
+# Seed scope:
+#   Pilot set only. Full ~11,000-entry load should come from the Destatis
+#   Gemeindeverzeichnis via a separate ingestion job. URLs are left for
+#   operator onboarding rather than guessed here.
+
+schema:
+  required:
+    - ags
+    - land_jurisdiction_id
+    - name
+    - primary_language
+  optional:
+    - names
+    - law_collection
+  law_collection_shape:
+    required:
+      - publisher
+      - format
+    optional:
+      - url
+      - language
+      - note
+
+municipalities:
+  - ags: "05315000"
+    land_jurisdiction_id: jur_de_nw
+    name: Köln
+    names:
+      de: Köln
+      en: Cologne
+    primary_language: de
+    law_collection:
+      publisher: Stadt Köln
+      format: html
+      note: Ortsrecht collection; URL to be confirmed by operator.
+
+  - ags: "05911000"
+    land_jurisdiction_id: jur_de_nw
+    name: Dortmund
+    primary_language: de
+    law_collection:
+      publisher: Stadt Dortmund
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.
+
+  - ags: "05513000"
+    land_jurisdiction_id: jur_de_nw
+    name: Düsseldorf
+    primary_language: de
+    law_collection:
+      publisher: Landeshauptstadt Düsseldorf
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.
+
+  - ags: "09162000"
+    land_jurisdiction_id: jur_de_by
+    name: München
+    names:
+      de: München
+      en: Munich
+    primary_language: de
+    law_collection:
+      publisher: Landeshauptstadt München
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.
+
+  - ags: "09564000"
+    land_jurisdiction_id: jur_de_by
+    name: Nürnberg
+    names:
+      de: Nürnberg
+      en: Nuremberg
+    primary_language: de
+    law_collection:
+      publisher: Stadt Nürnberg
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.
+
+  - ags: "08111000"
+    land_jurisdiction_id: jur_de_bw
+    name: Stuttgart
+    primary_language: de
+    law_collection:
+      publisher: Landeshauptstadt Stuttgart
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.
+
+  - ags: "06412000"
+    land_jurisdiction_id: jur_de_he
+    name: Frankfurt am Main
+    primary_language: de
+    law_collection:
+      publisher: Stadt Frankfurt am Main
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.
+
+  - ags: "14612000"
+    land_jurisdiction_id: jur_de_sn
+    name: Dresden
+    primary_language: de
+    law_collection:
+      publisher: Landeshauptstadt Dresden
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.
+
+  - ags: "14713000"
+    land_jurisdiction_id: jur_de_sn
+    name: Leipzig
+    primary_language: de
+    law_collection:
+      publisher: Stadt Leipzig
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.
+
+  - ags: "03241001"
+    land_jurisdiction_id: jur_de_ni
+    name: Hannover
+    primary_language: de
+    law_collection:
+      publisher: Landeshauptstadt Hannover
+      format: html
+      note: Ortsrecht collection; URL to be confirmed.

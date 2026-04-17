@@ -1,0 +1,134 @@
+version: 1
+country_code: DE
+
+# Jurisdictions:
+#   - jur_de            : country-level Germany
+#   - jur_de_federal    : federal scope (Bund); federal authorities bind here
+#   - jur_de_<code>     : one per Land, using ISO 3166-2:DE lowercase codes
+#                         (bw, by, be, bb, hb, hh, he, mv, ni, nw, rp, sl,
+#                         sn, st, sh, th).
+# Municipalities (~11,000 Gemeinden) are NOT modeled as jurisdictions here;
+# they should live in a separate municipalities.yaml keyed by AGS
+# (Amtlicher Gemeindeschlüssel). This overlay only seeds the pilot subset
+# of city-states and major cities that publish structured legal corpora.
+
+jurisdictions:
+  - jurisdiction_id: jur_de
+    slug: de
+    name: Germany
+  - jurisdiction_id: jur_de_federal
+    slug: de-federal
+    name: Federal Republic of Germany (Bund)
+  - jurisdiction_id: jur_de_bw
+    slug: de-bw
+    name: Baden-Württemberg
+    iso_3166_2: DE-BW
+  - jurisdiction_id: jur_de_by
+    slug: de-by
+    name: Bayern
+    iso_3166_2: DE-BY
+  - jurisdiction_id: jur_de_be
+    slug: de-be
+    name: Berlin
+    iso_3166_2: DE-BE
+  - jurisdiction_id: jur_de_bb
+    slug: de-bb
+    name: Brandenburg
+    iso_3166_2: DE-BB
+  - jurisdiction_id: jur_de_hb
+    slug: de-hb
+    name: Bremen
+    iso_3166_2: DE-HB
+  - jurisdiction_id: jur_de_hh
+    slug: de-hh
+    name: Hamburg
+    iso_3166_2: DE-HH
+  - jurisdiction_id: jur_de_he
+    slug: de-he
+    name: Hessen
+    iso_3166_2: DE-HE
+  - jurisdiction_id: jur_de_mv
+    slug: de-mv
+    name: Mecklenburg-Vorpommern
+    iso_3166_2: DE-MV
+  - jurisdiction_id: jur_de_ni
+    slug: de-ni
+    name: Niedersachsen
+    iso_3166_2: DE-NI
+  - jurisdiction_id: jur_de_nw
+    slug: de-nw
+    name: Nordrhein-Westfalen
+    iso_3166_2: DE-NW
+  - jurisdiction_id: jur_de_rp
+    slug: de-rp
+    name: Rheinland-Pfalz
+    iso_3166_2: DE-RP
+  - jurisdiction_id: jur_de_sl
+    slug: de-sl
+    name: Saarland
+    iso_3166_2: DE-SL
+  - jurisdiction_id: jur_de_sn
+    slug: de-sn
+    name: Sachsen
+    iso_3166_2: DE-SN
+  - jurisdiction_id: jur_de_st
+    slug: de-st
+    name: Sachsen-Anhalt
+    iso_3166_2: DE-ST
+  - jurisdiction_id: jur_de_sh
+    slug: de-sh
+    name: Schleswig-Holstein
+    iso_3166_2: DE-SH
+  - jurisdiction_id: jur_de_th
+    slug: de-th
+    name: Thüringen
+    iso_3166_2: DE-TH
+
+# Federal publishers and high courts, plus one cantonal-equivalent publisher
+# per Land (Staatskanzlei / Senatskanzlei). IDs follow the flat convention
+# used by the canonical seed (no country prefix; Land code carries scope).
+authorities:
+  - authority_id: auth_bmj_gii
+    jurisdiction_id: jur_de_federal
+    slug: bmj-gii
+    name: Bundesministerium der Justiz - gesetze-im-internet.de
+  - authority_id: auth_bverfg
+    jurisdiction_id: jur_de_federal
+    slug: bverfg
+    name: Bundesverfassungsgericht
+  - authority_id: auth_bgh
+    jurisdiction_id: jur_de_federal
+    slug: bgh
+    name: Bundesgerichtshof
+  - authority_id: auth_bverwg
+    jurisdiction_id: jur_de_federal
+    slug: bverwg
+    name: Bundesverwaltungsgericht
+  - authority_id: auth_bfh
+    jurisdiction_id: jur_de_federal
+    slug: bfh
+    name: Bundesfinanzhof
+  - authority_id: auth_bag
+    jurisdiction_id: jur_de_federal
+    slug: bag
+    name: Bundesarbeitsgericht
+  - authority_id: auth_bsg
+    jurisdiction_id: jur_de_federal
+    slug: bsg
+    name: Bundessozialgericht
+  - authority_id: auth_by_skbayern
+    jurisdiction_id: jur_de_by
+    slug: by-staatskanzlei
+    name: Bayerische Staatskanzlei
+  - authority_id: auth_be_senatskanzlei
+    jurisdiction_id: jur_de_be
+    slug: be-senatskanzlei
+    name: Senatskanzlei Berlin
+  - authority_id: auth_hh_senatskanzlei
+    jurisdiction_id: jur_de_hh
+    slug: hh-senatskanzlei
+    name: Senatskanzlei Hamburg
+  - authority_id: auth_nw_staatskanzlei
+    jurisdiction_id: jur_de_nw
+    slug: nw-staatskanzlei
+    name: Staatskanzlei Nordrhein-Westfalen

@@ -1,0 +1,28 @@
+version: 1
+country_code: DE
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code DE and hierarchy paths de/federal, de/land/{land_code}, de/kommunal/{ags}.
+  - Confirm source family mapping for Bundesgesetz, Rechtsverordnung, Landesgesetz, Satzung, Verwaltungsvorschrift, decisions, and commentary.
+  - Confirm federal authority records include gesetze-im-internet.de, BVerfG, BGH, BVerwG, BFH, BAG, BSG.
+  - Confirm Land jurisdictions cover all 16 Länder and are keyed by ISO 3166-2:DE codes.
+  - Confirm municipality registry (municipalities.yaml) covers the pilot subset and references Land jurisdiction_ids via AGS.
+  - Note that Berlin, Hamburg, and Bremen are city-states; their legal corpus is covered at Land level, not duplicated in the municipality registry.
+
+approval_hotspots:
+  - authority taxonomy correctness across three levels (federal, Land, municipal)
+  - Land <-> municipality parent linkage via jurisdiction_id and AGS
+  - source family boundary between federal Rechtsverordnung, Land Rechtsverordnung, and municipal Satzung
+  - court level mapping between constitutional, federal supreme, Land, and administrative courts
+  - city-state handling (Berlin, Hamburg, Bremen) to avoid double-counting
+
+triage_overlays:
+  mapping_drift:
+    first_action: Compare incoming authority/jurisdiction labels against canonical DE mapping; check Land code against ISO 3166-2:DE.
+    escalation_owner: platform-control
+  municipality_unknown:
+    first_action: Look up AGS in country-overlays/de/municipalities.yaml; if absent, treat as unregistered and do not auto-create.
+    escalation_owner: platform-control
+  search_projection_mismatch:
+    first_action: Verify processed-event projection parity for DE-tagged documents; confirm Land and municipality facets project correctly.
+    escalation_owner: legal-search
