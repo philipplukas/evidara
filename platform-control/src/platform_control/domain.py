@@ -62,6 +62,18 @@ class AcquisitionProvider(StrEnum):
     RIS_OGD = "ris_ogd"
 
 
+class RobotsMode(StrEnum):
+    """How aggressively a jurisdiction's scrapers honour robots.txt.
+
+    ``STRICT`` (default) means the crawler must refuse any URL robots.txt
+    disallows. ``IGNORE`` is reserved for sources where we have an explicit
+    open-data licence that supersedes robots (e.g. Fedlex, RIS OGD).
+    """
+
+    STRICT = "strict"
+    IGNORE = "ignore"
+
+
 class ExecutionMode(StrEnum):
     """Run-time execution posture for a source version.
 

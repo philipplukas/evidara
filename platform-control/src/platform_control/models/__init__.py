@@ -1,5 +1,6 @@
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
+from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.corpus import Corpus
 from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
 from platform_control.models.extractor_profile import ExtractorProfile
@@ -20,6 +21,7 @@ from platform_control.models.wizard_run_ledger import WizardRunLedger
 __all__ = [
     "Authority",
     "CapturedResource",
+    "CompliancePolicy",
     "Corpus",
     "DocumentLifecycleEvent",
     "ExtractorProfile",

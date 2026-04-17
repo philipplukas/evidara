@@ -16,6 +16,7 @@ from platform_control.services.acquisition_provider import (
     ProviderResource,
     ProviderStartResult,
 )
+from platform_control.services.politeness import HostRateLimiter
 
 IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
@@ -23,6 +24,10 @@ IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 class DeterministicHttpProvider:
     provider_name = "deterministic_http"
     _MAX_REDIRECTS = 5
+
+    def __init__(self, rate_limiter: HostRateLimiter | None = None) -> None:
+        self.rate_limiter = rate_limiter
+
     _DENYLIST_HOSTNAMES = {
         "localhost",
         "metadata",
@@ -207,7 +212,9 @@ class DeterministicHttpProvider:
     ) -> tuple[str, httpx.Response]:
         current_url = self._validate_target_url(url)
         for _ in range(self._MAX_REDIRECTS + 1):
-            response = await client.get(current_url, headers=headers)
+            response = await self._get_with_rate_limit(
+                client=client, url=current_url, headers=headers
+            )
             if not response.is_redirect:
                 return current_url, response
             location = response.headers.get("location")
@@ -218,6 +225,19 @@ class DeterministicHttpProvider:
         raise ProviderConfigurationError(
             f"deterministic_http provider exceeded max redirects ({self._MAX_REDIRECTS}) for {url}."
         )
+
+    async def _get_with_rate_limit(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        url: str,
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        if self.rate_limiter is None:
+            return await client.get(url, headers=headers)
+        host = (urlparse(url).hostname or "").lower()
+        async with await self.rate_limiter.acquire(host):
+            return await client.get(url, headers=headers)
 
     async def _read_body_limited(
         self,
