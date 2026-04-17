@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
+import { type ParsedJurisdictionToken, parseJurisdictionList } from './jurisdiction-token';
+
 const REFINEMENT_TYPES = ['terms', 'date_range', 'range', 'toggle', 'text'] as const;
 
 type SearchRefinementDto = {
@@ -103,6 +105,23 @@ export class SearchQueryDto {
 
   getNormalizedJurisdictions(): string[] | undefined {
     return normalizeCsv(this.jurisdictions) ?? normalizeCsv(this.jurisdiction);
+  }
+
+  /**
+   * Return the jurisdiction filter parsed into {country, subdivision?}
+   * pairs. Used by projection code that needs to route sub-federal
+   * scope (e.g. `CH-ZH`) to a different OpenSearch field than the
+   * top-level country. Returns [] when no jurisdiction param is set;
+   * silently drops malformed tokens.
+   */
+  getParsedJurisdictions(): ParsedJurisdictionToken[] {
+    if (typeof this.jurisdictions === 'string' && this.jurisdictions.trim() !== '') {
+      return parseJurisdictionList(this.jurisdictions);
+    }
+    if (typeof this.jurisdiction === 'string' && this.jurisdiction.trim() !== '') {
+      return parseJurisdictionList(this.jurisdiction);
+    }
+    return [];
   }
 
   getNormalizedLanguages(): string[] | undefined {

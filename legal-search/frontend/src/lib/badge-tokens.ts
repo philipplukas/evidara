@@ -8,24 +8,34 @@
  * Palette keys are visual aliases, not semantic:
  *   "blue", "pink", "indigo", "green" — not "law", "decision", etc.
  *
- * Note: the `pink` key was retuned to a neutral sky-blue (UX-7) because
- * the former pink/fuchsia hue combined with the red Swiss-cross flag icon
- * on result cards read as an error/destructive state. The key name is kept
- * for backwards compatibility with existing BFF payloads and mock data —
- * the BFF still owns the semantic mapping from document type to colorKey.
+ * Values resolve to CSS custom properties defined in
+ * `contracts/design-tokens/evidara-tokens.css` so swatches stay in sync
+ * across apps and pick up dark-mode overrides automatically.
+ *
+ * Note: the `pink` key is tuned to a neutral sky-blue hue (UX-7) in the
+ * shared tokens file because the former pink/fuchsia hue combined with
+ * the red Swiss-cross flag icon on result cards read as an error /
+ * destructive state. The key name is kept for backwards compatibility
+ * with existing BFF payloads and mock data — the BFF still owns the
+ * semantic mapping from document type to colorKey.
  */
 
-const palette: Record<string, { bg: string; text: string }> = {
-  blue: { bg: "#dbeafe", text: "#1e40af" },
-  pink: { bg: "#e0f2fe", text: "#075985" },
-  indigo: { bg: "#e0e7ff", text: "#3730a3" },
-  green: { bg: "#d1fae5", text: "#065f46" },
-  amber: { bg: "#fef3c7", text: "#92400e" },
-  slate: { bg: "#f1f5f9", text: "#334155" },
+type BadgeColor = { bg: string; text: string };
+
+const palette: Record<string, BadgeColor> = {
+  blue: { bg: "var(--badge-blue-bg)", text: "var(--badge-blue-text)" },
+  pink: { bg: "var(--badge-pink-bg)", text: "var(--badge-pink-text)" },
+  indigo: { bg: "var(--badge-indigo-bg)", text: "var(--badge-indigo-text)" },
+  green: { bg: "var(--badge-green-bg)", text: "var(--badge-green-text)" },
+  amber: { bg: "var(--badge-amber-bg)", text: "var(--badge-amber-text)" },
+  slate: { bg: "var(--badge-slate-bg)", text: "var(--badge-slate-text)" },
 };
 
-const fallback = { bg: "#f3f4f6", text: "#374151" };
+const fallback: BadgeColor = {
+  bg: "var(--badge-fallback-bg)",
+  text: "var(--badge-fallback-text)",
+};
 
-export function getBadgeColor(colorKey?: string): { bg: string; text: string } {
+export function getBadgeColor(colorKey?: string): BadgeColor {
   return palette[colorKey || ""] || fallback;
 }

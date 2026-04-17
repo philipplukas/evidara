@@ -159,3 +159,70 @@ async def test_minimal_work_to_expression_flow_extracts_expression_uris(
     ]
     assert payload.metadata["title"] == "Bundesverfassung"
     assert payload.metadata["title_short"] == "BV"
+    # ELI URI emission (T5.1): prefer the abstract seed work URI, not the
+    # dated concrete form, so canonical output matches the ELI shape that
+    # external ELI consumers expect.
+    assert payload.metadata["eli_uri"] == "https://fedlex.data.admin.ch/eli/cc/1999/404"
+
+
+def test_eli_uri_for_work_prefers_abstract_seed():
+    provider = FedlexSparqlProvider()
+    uri = provider._eli_uri_for_work(
+        "https://fedlex.data.admin.ch/eli/cc/1999/404",
+        "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303",
+    )
+    assert uri == "https://fedlex.data.admin.ch/eli/cc/1999/404"
+
+
+def test_eli_uri_for_work_falls_back_to_concrete():
+    provider = FedlexSparqlProvider()
+    uri = provider._eli_uri_for_work(
+        "https://example.test/not-eli",
+        "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303",
+    )
+    assert uri == "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303"
+
+
+def test_eli_uri_for_work_returns_none_without_fedlex_eli():
+    provider = FedlexSparqlProvider()
+    assert provider._eli_uri_for_work("https://other.example/foo", "https://other/bar") is None
+
+
+# ─── Cantonal discovery helpers (T4.4) ─────────────────────────────────────
+# These helpers are not yet wired into start_run(); exercised here so the
+# query shape and IRI mapping are tested ahead of the live acceptance run.
+
+
+def test_canton_iri_from_iso_3166_2_code():
+    provider = FedlexSparqlProvider()
+    assert provider._canton_iri("CH-ZH") == "https://fedlex.data.admin.ch/vocabulary/canton/ZH"
+
+
+def test_canton_iri_accepts_bare_two_letter_code():
+    provider = FedlexSparqlProvider()
+    assert provider._canton_iri("VS") == "https://fedlex.data.admin.ch/vocabulary/canton/VS"
+
+
+def test_canton_iri_rejects_garbage():
+    provider = FedlexSparqlProvider()
+    import pytest
+
+    with pytest.raises(ValueError, match="Invalid ISO 3166-2:CH"):
+        provider._canton_iri("CH-XYZ")
+    with pytest.raises(ValueError, match="Invalid ISO 3166-2:CH"):
+        provider._canton_iri("")
+
+
+def test_build_canton_discovery_query_shape():
+    provider = FedlexSparqlProvider()
+    query = provider._build_canton_discovery_query("CH-ZH", limit=25)
+    assert "jolux:CantonOfOrigin" in query
+    assert "<https://fedlex.data.admin.ch/vocabulary/canton/ZH>" in query
+    assert "LIMIT 25" in query
+    assert "SELECT ?work" in query
+
+
+def test_build_canton_discovery_query_default_limit():
+    provider = FedlexSparqlProvider()
+    query = provider._build_canton_discovery_query("CH-VS")
+    assert "LIMIT 50" in query

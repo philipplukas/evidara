@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://evidara.dev/vocabularies/jurisdiction",
   "title": "Jurisdiction Vocabulary",
-  "description": "Controlled vocabulary for jurisdiction codes. MUST use ISO 3166-1 alpha-2. Canonical output MUST emit normalized values only.",
+  "description": "Controlled vocabulary for jurisdiction codes. Country codes MUST use ISO 3166-1 alpha-2. Subdivision codes MUST use ISO 3166-2. Canonical output MUST emit normalized values only.",
   "type": "object",
   "properties": {
     "vocabulary": { "const": "jurisdiction" },
@@ -17,11 +17,61 @@
               "type": "object",
               "properties": {
                 "de": { "const": "Schweiz" },
-                "fr": { "const": "Suisse" }
+                "fr": { "const": "Suisse" },
+                "it": { "const": "Svizzera" },
+                "en": { "const": "Switzerland" }
               }
             },
             "iconKey": { "const": "ch" },
-            "standard": { "const": "ISO 3166-1 alpha-2" }
+            "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "description": "Canonical slug (matches subdivisions.json hierarchyTier) plus per-language labels. Code paths use the slug; UI surfaces the label.",
+              "properties": {
+                "slug": { "const": "canton" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Kanton" },
+                    "fr": { "const": "canton" },
+                    "it": { "const": "cantone" },
+                    "en": { "const": "canton" }
+                  }
+                }
+              }
+            },
+            "subdivisions": {
+              "type": "object",
+              "description": "ISO 3166-2:CH cantons.",
+              "properties": {
+                "CH-AG": { "type": "object", "properties": { "label": { "const": "Aargau" },           "iconKey": { "const": "ch-ag" } } },
+                "CH-AI": { "type": "object", "properties": { "label": { "const": "Appenzell Innerrhoden" }, "iconKey": { "const": "ch-ai" } } },
+                "CH-AR": { "type": "object", "properties": { "label": { "const": "Appenzell Ausserrhoden" }, "iconKey": { "const": "ch-ar" } } },
+                "CH-BE": { "type": "object", "properties": { "label": { "const": "Bern" },             "iconKey": { "const": "ch-be" } } },
+                "CH-BL": { "type": "object", "properties": { "label": { "const": "Basel-Landschaft" }, "iconKey": { "const": "ch-bl" } } },
+                "CH-BS": { "type": "object", "properties": { "label": { "const": "Basel-Stadt" },      "iconKey": { "const": "ch-bs" } } },
+                "CH-FR": { "type": "object", "properties": { "label": { "const": "Freiburg" },         "iconKey": { "const": "ch-fr" } } },
+                "CH-GE": { "type": "object", "properties": { "label": { "const": "Genf" },             "iconKey": { "const": "ch-ge" } } },
+                "CH-GL": { "type": "object", "properties": { "label": { "const": "Glarus" },           "iconKey": { "const": "ch-gl" } } },
+                "CH-GR": { "type": "object", "properties": { "label": { "const": "Graubünden" },       "iconKey": { "const": "ch-gr" } } },
+                "CH-JU": { "type": "object", "properties": { "label": { "const": "Jura" },             "iconKey": { "const": "ch-ju" } } },
+                "CH-LU": { "type": "object", "properties": { "label": { "const": "Luzern" },           "iconKey": { "const": "ch-lu" } } },
+                "CH-NE": { "type": "object", "properties": { "label": { "const": "Neuenburg" },        "iconKey": { "const": "ch-ne" } } },
+                "CH-NW": { "type": "object", "properties": { "label": { "const": "Nidwalden" },        "iconKey": { "const": "ch-nw" } } },
+                "CH-OW": { "type": "object", "properties": { "label": { "const": "Obwalden" },         "iconKey": { "const": "ch-ow" } } },
+                "CH-SG": { "type": "object", "properties": { "label": { "const": "St. Gallen" },       "iconKey": { "const": "ch-sg" } } },
+                "CH-SH": { "type": "object", "properties": { "label": { "const": "Schaffhausen" },     "iconKey": { "const": "ch-sh" } } },
+                "CH-SO": { "type": "object", "properties": { "label": { "const": "Solothurn" },        "iconKey": { "const": "ch-so" } } },
+                "CH-SZ": { "type": "object", "properties": { "label": { "const": "Schwyz" },           "iconKey": { "const": "ch-sz" } } },
+                "CH-TG": { "type": "object", "properties": { "label": { "const": "Thurgau" },          "iconKey": { "const": "ch-tg" } } },
+                "CH-TI": { "type": "object", "properties": { "label": { "const": "Tessin" },           "iconKey": { "const": "ch-ti" } } },
+                "CH-UR": { "type": "object", "properties": { "label": { "const": "Uri" },              "iconKey": { "const": "ch-ur" } } },
+                "CH-VD": { "type": "object", "properties": { "label": { "const": "Waadt" },            "iconKey": { "const": "ch-vd" } } },
+                "CH-VS": { "type": "object", "properties": { "label": { "const": "Wallis" },           "iconKey": { "const": "ch-vs" } } },
+                "CH-ZG": { "type": "object", "properties": { "label": { "const": "Zug" },              "iconKey": { "const": "ch-zg" } } },
+                "CH-ZH": { "type": "object", "properties": { "label": { "const": "Zürich" },           "iconKey": { "const": "ch-zh" } } }
+              }
+            }
           }
         },
         "AT": {
@@ -32,11 +82,43 @@
               "type": "object",
               "properties": {
                 "de": { "const": "Österreich" },
-                "fr": { "const": "Autriche" }
+                "fr": { "const": "Autriche" },
+                "it": { "const": "Austria" },
+                "en": { "const": "Austria" }
               }
             },
             "iconKey": { "const": "at" },
-            "standard": { "const": "ISO 3166-1 alpha-2" }
+            "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "properties": {
+                "slug": { "const": "state" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Bundesland" },
+                    "fr": { "const": "land" },
+                    "it": { "const": "Land" },
+                    "en": { "const": "Bundesland" }
+                  }
+                }
+              }
+            },
+            "subdivisions": {
+              "type": "object",
+              "description": "ISO 3166-2:AT Bundesländer.",
+              "properties": {
+                "AT-1": { "type": "object", "properties": { "label": { "const": "Burgenland" },        "iconKey": { "const": "at-bgl" } } },
+                "AT-2": { "type": "object", "properties": { "label": { "const": "Kärnten" },           "iconKey": { "const": "at-ktn" } } },
+                "AT-3": { "type": "object", "properties": { "label": { "const": "Niederösterreich" },  "iconKey": { "const": "at-noe" } } },
+                "AT-4": { "type": "object", "properties": { "label": { "const": "Oberösterreich" },    "iconKey": { "const": "at-ooe" } } },
+                "AT-5": { "type": "object", "properties": { "label": { "const": "Salzburg" },          "iconKey": { "const": "at-sbg" } } },
+                "AT-6": { "type": "object", "properties": { "label": { "const": "Steiermark" },        "iconKey": { "const": "at-stm" } } },
+                "AT-7": { "type": "object", "properties": { "label": { "const": "Tirol" },             "iconKey": { "const": "at-tir" } } },
+                "AT-8": { "type": "object", "properties": { "label": { "const": "Vorarlberg" },        "iconKey": { "const": "at-vbg" } } },
+                "AT-9": { "type": "object", "properties": { "label": { "const": "Wien" },              "iconKey": { "const": "at-w" } } }
+              }
+            }
           }
         },
         "DE": {
@@ -47,11 +129,164 @@
               "type": "object",
               "properties": {
                 "de": { "const": "Deutschland" },
-                "fr": { "const": "Allemagne" }
+                "fr": { "const": "Allemagne" },
+                "it": { "const": "Germania" },
+                "en": { "const": "Germany" }
               }
             },
             "iconKey": { "const": "de" },
-            "standard": { "const": "ISO 3166-1 alpha-2" }
+            "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "properties": {
+                "slug": { "const": "land" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Land" },
+                    "fr": { "const": "land" },
+                    "it": { "const": "Land" },
+                    "en": { "const": "state" }
+                  }
+                }
+              }
+            },
+            "subdivisions": {
+              "type": "object",
+              "description": "ISO 3166-2:DE Länder.",
+              "properties": {
+                "DE-BW": { "type": "object", "properties": { "label": { "const": "Baden-Württemberg" },    "iconKey": { "const": "de-bw" } } },
+                "DE-BY": { "type": "object", "properties": { "label": { "const": "Bayern" },              "iconKey": { "const": "de-by" } } },
+                "DE-BE": { "type": "object", "properties": { "label": { "const": "Berlin" },              "iconKey": { "const": "de-be" } } },
+                "DE-BB": { "type": "object", "properties": { "label": { "const": "Brandenburg" },         "iconKey": { "const": "de-bb" } } },
+                "DE-HB": { "type": "object", "properties": { "label": { "const": "Bremen" },              "iconKey": { "const": "de-hb" } } },
+                "DE-HH": { "type": "object", "properties": { "label": { "const": "Hamburg" },             "iconKey": { "const": "de-hh" } } },
+                "DE-HE": { "type": "object", "properties": { "label": { "const": "Hessen" },              "iconKey": { "const": "de-he" } } },
+                "DE-MV": { "type": "object", "properties": { "label": { "const": "Mecklenburg-Vorpommern" }, "iconKey": { "const": "de-mv" } } },
+                "DE-NI": { "type": "object", "properties": { "label": { "const": "Niedersachsen" },       "iconKey": { "const": "de-ni" } } },
+                "DE-NW": { "type": "object", "properties": { "label": { "const": "Nordrhein-Westfalen" }, "iconKey": { "const": "de-nw" } } },
+                "DE-RP": { "type": "object", "properties": { "label": { "const": "Rheinland-Pfalz" },     "iconKey": { "const": "de-rp" } } },
+                "DE-SL": { "type": "object", "properties": { "label": { "const": "Saarland" },            "iconKey": { "const": "de-sl" } } },
+                "DE-SN": { "type": "object", "properties": { "label": { "const": "Sachsen" },             "iconKey": { "const": "de-sn" } } },
+                "DE-ST": { "type": "object", "properties": { "label": { "const": "Sachsen-Anhalt" },      "iconKey": { "const": "de-st" } } },
+                "DE-SH": { "type": "object", "properties": { "label": { "const": "Schleswig-Holstein" },  "iconKey": { "const": "de-sh" } } },
+                "DE-TH": { "type": "object", "properties": { "label": { "const": "Thüringen" },           "iconKey": { "const": "de-th" } } }
+              }
+            }
+          }
+        },
+        "FR": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "France" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Frankreich" },
+                "fr": { "const": "France" },
+                "it": { "const": "Francia" },
+                "en": { "const": "France" }
+              }
+            },
+            "iconKey": { "const": "fr" },
+            "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "properties": {
+                "slug": { "const": "region" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Region" },
+                    "fr": { "const": "région" },
+                    "it": { "const": "regione" },
+                    "en": { "const": "region" }
+                  }
+                }
+              }
+            },
+            "subdivisions": {
+              "type": "object",
+              "description": "ISO 3166-2:FR régions (métropolitaines + outre-mer).",
+              "properties": {
+                "FR-ARA": { "type": "object", "properties": { "label": { "const": "Auvergne-Rhône-Alpes" }, "iconKey": { "const": "fr-ara" } } },
+                "FR-BFC": { "type": "object", "properties": { "label": { "const": "Bourgogne-Franche-Comté" }, "iconKey": { "const": "fr-bfc" } } },
+                "FR-BRE": { "type": "object", "properties": { "label": { "const": "Bretagne" },            "iconKey": { "const": "fr-bre" } } },
+                "FR-CVL": { "type": "object", "properties": { "label": { "const": "Centre-Val de Loire" }, "iconKey": { "const": "fr-cvl" } } },
+                "FR-COR": { "type": "object", "properties": { "label": { "const": "Corse" },               "iconKey": { "const": "fr-cor" } } },
+                "FR-GES": { "type": "object", "properties": { "label": { "const": "Grand Est" },           "iconKey": { "const": "fr-ges" } } },
+                "FR-HDF": { "type": "object", "properties": { "label": { "const": "Hauts-de-France" },     "iconKey": { "const": "fr-hdf" } } },
+                "FR-IDF": { "type": "object", "properties": { "label": { "const": "Île-de-France" },       "iconKey": { "const": "fr-idf" } } },
+                "FR-NOR": { "type": "object", "properties": { "label": { "const": "Normandie" },           "iconKey": { "const": "fr-nor" } } },
+                "FR-NAQ": { "type": "object", "properties": { "label": { "const": "Nouvelle-Aquitaine" },  "iconKey": { "const": "fr-naq" } } },
+                "FR-OCC": { "type": "object", "properties": { "label": { "const": "Occitanie" },           "iconKey": { "const": "fr-occ" } } },
+                "FR-PDL": { "type": "object", "properties": { "label": { "const": "Pays de la Loire" },    "iconKey": { "const": "fr-pdl" } } },
+                "FR-PAC": { "type": "object", "properties": { "label": { "const": "Provence-Alpes-Côte d'Azur" }, "iconKey": { "const": "fr-pac" } } },
+                "FR-GP":  { "type": "object", "properties": { "label": { "const": "Guadeloupe" },          "iconKey": { "const": "fr-gp" } } },
+                "FR-GF":  { "type": "object", "properties": { "label": { "const": "Guyane" },              "iconKey": { "const": "fr-gf" } } },
+                "FR-MQ":  { "type": "object", "properties": { "label": { "const": "Martinique" },          "iconKey": { "const": "fr-mq" } } },
+                "FR-RE":  { "type": "object", "properties": { "label": { "const": "La Réunion" },          "iconKey": { "const": "fr-re" } } },
+                "FR-YT":  { "type": "object", "properties": { "label": { "const": "Mayotte" },             "iconKey": { "const": "fr-yt" } } }
+              }
+            }
+          }
+        },
+        "IT": {
+          "type": "object",
+          "properties": {
+            "label": { "const": "Italia" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Italien" },
+                "fr": { "const": "Italie" },
+                "it": { "const": "Italia" },
+                "en": { "const": "Italy" }
+              }
+            },
+            "iconKey": { "const": "it" },
+            "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "properties": {
+                "slug": { "const": "region" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Region" },
+                    "fr": { "const": "région" },
+                    "it": { "const": "regione" },
+                    "en": { "const": "region" }
+                  }
+                }
+              }
+            },
+            "subdivisions": {
+              "type": "object",
+              "description": "ISO 3166-2:IT regioni.",
+              "properties": {
+                "IT-65": { "type": "object", "properties": { "label": { "const": "Abruzzo" },           "iconKey": { "const": "it-65" } } },
+                "IT-77": { "type": "object", "properties": { "label": { "const": "Basilicata" },        "iconKey": { "const": "it-77" } } },
+                "IT-78": { "type": "object", "properties": { "label": { "const": "Calabria" },          "iconKey": { "const": "it-78" } } },
+                "IT-72": { "type": "object", "properties": { "label": { "const": "Campania" },          "iconKey": { "const": "it-72" } } },
+                "IT-45": { "type": "object", "properties": { "label": { "const": "Emilia-Romagna" },    "iconKey": { "const": "it-45" } } },
+                "IT-36": { "type": "object", "properties": { "label": { "const": "Friuli-Venezia Giulia" }, "iconKey": { "const": "it-36" } } },
+                "IT-62": { "type": "object", "properties": { "label": { "const": "Lazio" },             "iconKey": { "const": "it-62" } } },
+                "IT-42": { "type": "object", "properties": { "label": { "const": "Liguria" },           "iconKey": { "const": "it-42" } } },
+                "IT-25": { "type": "object", "properties": { "label": { "const": "Lombardia" },         "iconKey": { "const": "it-25" } } },
+                "IT-57": { "type": "object", "properties": { "label": { "const": "Marche" },            "iconKey": { "const": "it-57" } } },
+                "IT-67": { "type": "object", "properties": { "label": { "const": "Molise" },            "iconKey": { "const": "it-67" } } },
+                "IT-21": { "type": "object", "properties": { "label": { "const": "Piemonte" },          "iconKey": { "const": "it-21" } } },
+                "IT-75": { "type": "object", "properties": { "label": { "const": "Puglia" },            "iconKey": { "const": "it-75" } } },
+                "IT-88": { "type": "object", "properties": { "label": { "const": "Sardegna" },          "iconKey": { "const": "it-88" } } },
+                "IT-82": { "type": "object", "properties": { "label": { "const": "Sicilia" },           "iconKey": { "const": "it-82" } } },
+                "IT-52": { "type": "object", "properties": { "label": { "const": "Toscana" },           "iconKey": { "const": "it-52" } } },
+                "IT-32": { "type": "object", "properties": { "label": { "const": "Trentino-Alto Adige" }, "iconKey": { "const": "it-32" } } },
+                "IT-55": { "type": "object", "properties": { "label": { "const": "Umbria" },            "iconKey": { "const": "it-55" } } },
+                "IT-23": { "type": "object", "properties": { "label": { "const": "Valle d'Aosta" },     "iconKey": { "const": "it-23" } } },
+                "IT-34": { "type": "object", "properties": { "label": { "const": "Veneto" },            "iconKey": { "const": "it-34" } } }
+              }
+            }
           }
         },
         "LI": {
@@ -67,6 +302,24 @@
             },
             "iconKey": { "const": "li" },
             "standard": { "const": "ISO 3166-1 alpha-2" }
+          }
+        },
+        "EU": {
+          "type": "object",
+          "description": "European Union as a supranational jurisdiction. 'EU' is reserved in ISO 3166-1 alpha-2 exceptionally.",
+          "properties": {
+            "label": { "const": "Europäische Union" },
+            "labels": {
+              "type": "object",
+              "properties": {
+                "de": { "const": "Europäische Union" },
+                "fr": { "const": "Union européenne" },
+                "it": { "const": "Unione europea" },
+                "en": { "const": "European Union" }
+              }
+            },
+            "iconKey": { "const": "eu" },
+            "standard": { "const": "ISO 3166-1 alpha-2 (exceptionally reserved)" }
           }
         }
       },

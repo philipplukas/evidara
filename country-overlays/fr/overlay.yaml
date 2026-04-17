@@ -1,0 +1,47 @@
+version: 1
+country_code: FR
+country_name: France
+
+jurisdiction_overlay:
+  canonical_codes:
+    - FR
+  hierarchy_paths:
+    - fr
+    - fr/federal
+    - fr/region
+  # Sub-federal hierarchy paths for régions follow the pattern
+  # `fr/region/<iso-3166-2-subdivision-lowercased>` (e.g. `fr/region/idf`
+  # for Île-de-France). Légifrance currently covers federal + codes;
+  # per-region portals are out of scope until a dedicated provider lands.
+
+language_defaults:
+  primary: fr
+  supported:
+    - fr
+    - en
+
+source_family_overlay:
+  canonical:
+    - law
+    - decision
+    - commentary
+  local_mappings:
+    - local_type: loi
+      canonical_type: law
+      note: French statutory law maps to canonical law.
+    - local_type: code
+      canonical_type: law
+      note: Codified law (code) maps to canonical law.
+    - local_type: decret
+      canonical_type: law
+      note: French decree maps to canonical law.
+    - local_type: arret
+      canonical_type: decision
+      note: French court judgment (arrêt) maps to decision-family discovery.
+
+court_level_overlay:
+  expected_levels:
+    - cassation
+    - conseil-etat
+    - appellate
+    - tribunal

@@ -1,0 +1,29 @@
+version: 1
+country_code: DE
+
+# result_subtitle_pattern is inherited from _shared/.
+
+filters:
+  jurisdiction:
+    label: Jurisdiction
+    helper_text: Germany scope covers federal and Länder overlays.
+  source_type:
+    label: Source type
+    helper_text: Includes laws, decisions, and commentary.
+  court_level:
+    label: Court level
+    helper_text: Distinguishes constitutional, federal, regional, and Länder courts.
+  official_only:
+    label: Official sources only
+    helper_text: Restricts to authoritative German public sources.
+
+detail_copy:
+  translation_indicator:
+    original: Originalsprache
+    translated: Maschinell übersetzt aus {language}
+    unavailable: Übersetzung nicht verfügbar
+
+empty_states:
+  no_results:
+    message: Keine deutschen Ergebnisse für diese Suche und Filter.
+    recovery: Filter entfernen oder Quellentyp erweitern.

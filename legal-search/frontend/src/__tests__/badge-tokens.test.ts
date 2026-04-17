@@ -10,7 +10,10 @@
  * badges render as invisible or misleading — a quiet UX regression
  * that's easy to ship and hard to catch visually.
  *
- * This test is near-zero maintenance because the palette rarely changes.
+ * Values resolve via CSS custom properties defined in
+ * `contracts/design-tokens/evidara-tokens.css` so we assert the
+ * token reference rather than a concrete hex. This keeps dark-mode
+ * overrides and cross-app consistency free.
  *
  * WHAT WE DON'T TEST:
  * - Which document types map to which colors (that's BFF logic)
@@ -22,17 +25,31 @@ import { getBadgeColor } from "@/lib/badge-tokens";
 
 describe("getBadgeColor", () => {
   /**
-   * WHY: Ensures each palette key returns distinct, correct values.
+   * WHY: Ensures each palette key returns distinct, correct tokens.
    * Catches accidental key renames or color swaps.
    */
-  it("returns correct colors for each palette key", () => {
-    expect(getBadgeColor("blue")).toEqual({ bg: "#dbeafe", text: "#1e40af" });
-    // UX-7: `pink` was retuned from fuchsia (#fce7f3/#9d174d) to sky-blue so
-    // court-decision badges no longer read as an error state next to the red
-    // Swiss cross icon. Palette key kept for BFF backwards compatibility.
-    expect(getBadgeColor("pink")).toEqual({ bg: "#e0f2fe", text: "#075985" });
-    expect(getBadgeColor("indigo")).toEqual({ bg: "#e0e7ff", text: "#3730a3" });
-    expect(getBadgeColor("green")).toEqual({ bg: "#d1fae5", text: "#065f46" });
+  it("returns correct token references for each palette key", () => {
+    // Palette resolves to CSS custom properties defined in
+    // contracts/design-tokens/evidara-tokens.css. The `pink` slot was
+    // retuned from fuchsia to sky-blue (UX-7) so court-decision badges
+    // no longer read as an error state next to the red Swiss cross icon.
+    // The key name stays `pink` for BFF payload backwards compatibility.
+    expect(getBadgeColor("blue")).toEqual({
+      bg: "var(--badge-blue-bg)",
+      text: "var(--badge-blue-text)",
+    });
+    expect(getBadgeColor("pink")).toEqual({
+      bg: "var(--badge-pink-bg)",
+      text: "var(--badge-pink-text)",
+    });
+    expect(getBadgeColor("indigo")).toEqual({
+      bg: "var(--badge-indigo-bg)",
+      text: "var(--badge-indigo-text)",
+    });
+    expect(getBadgeColor("green")).toEqual({
+      bg: "var(--badge-green-bg)",
+      text: "var(--badge-green-text)",
+    });
   });
 
   /**

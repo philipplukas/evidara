@@ -1,0 +1,23 @@
+version: 1
+country_code: EU
+
+# triage_overlays defaults and the "authority taxonomy correctness"
+# approval hotspot are inherited from _shared/.
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code EU.
+  - Confirm source family mapping for regulation, directive, decision, opinion, judgment.
+  - Confirm authority records include EUR-Lex, Parliament, Council, Commission, CJEU, General Court.
+  - Confirm CELEX IDs and ECLI identifiers are recognized by the citation extractor.
+
+approval_hotspots:
+  - authority taxonomy correctness (institutions vs courts)
+  - language-version selection (EUR-Lex exposes all 24 official languages)
+  - CELEX vs ECLI identifier disambiguation
+
+status: scaffold-only
+status_note: |
+  EU overlay is scaffold-only. The EUR-Lex SPARQL acquisition provider is
+  registered as a stub in platform_control/services/provider_registry_factory.py
+  but raises NotImplementedError on discover/fetch. Live fetch and evidence
+  capture land in a follow-up ticket.

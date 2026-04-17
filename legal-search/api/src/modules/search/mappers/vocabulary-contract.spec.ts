@@ -52,10 +52,17 @@ describe('jurisdiction vocabulary contract', () => {
   });
 
   it('should contain all expected ISO 3166-1 codes', () => {
+    // CH/AT/DE/LI were the original set; FR/IT/EU joined in the
+    // five-country rollout. See
+    // contracts/vocabularies/jurisdiction.json — adding an entry here
+    // keeps the BFF mapper in parity with the vocabulary file.
     expect(JURISDICTION_VALUES).toContain('CH');
     expect(JURISDICTION_VALUES).toContain('AT');
     expect(JURISDICTION_VALUES).toContain('DE');
+    expect(JURISDICTION_VALUES).toContain('FR');
+    expect(JURISDICTION_VALUES).toContain('IT');
     expect(JURISDICTION_VALUES).toContain('LI');
+    expect(JURISDICTION_VALUES).toContain('EU');
   });
 
   it('should have label and iconKey for every jurisdiction', () => {
@@ -68,7 +75,7 @@ describe('jurisdiction vocabulary contract', () => {
   });
 
   it('should not have unexpected values in the vocabulary', () => {
-    expect(JURISDICTION_VALUES).toHaveLength(4);
+    expect(JURISDICTION_VALUES).toHaveLength(7);
   });
 });
 

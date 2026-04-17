@@ -1,0 +1,23 @@
+version: 1
+country_code: DE
+
+# triage_overlays defaults and the "authority taxonomy correctness"
+# approval hotspot are inherited from _shared/.
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code DE.
+  - Confirm source family mapping for Gesetze, Verordnungen, and Urteile.
+  - Confirm authority records include Bundesrecht portal and Bundesverfassungsgericht.
+  - Confirm Länder-level label consistency (known historical drift).
+
+approval_hotspots:
+  - authority taxonomy correctness
+  - state-level labels diverging from canonical keys
+  - federal vs Länder hierarchy-path boundary
+
+status: scaffold-only
+status_note: |
+  DE overlay is scaffold-only. deterministic_http_bundesrecht template
+  exists in source_blueprints.yaml; Länder providers (bundesland_http)
+  are registered as scaffolds. Live acceptance run evidence lands in a
+  follow-up ticket.

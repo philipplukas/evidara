@@ -60,6 +60,9 @@ class AcquisitionProvider(StrEnum):
     DETERMINISTIC_HTTP = "deterministic_http"
     FEDLEX_SPARQL = "fedlex_sparql"
     RIS_OGD = "ris_ogd"
+    EUR_LEX_SPARQL = "eur_lex_sparql"
+    BUNDESLAND_HTTP = "bundesland_http"
+    REGIONE_HTTP = "regione_http"
 
 
 class RobotsMode(StrEnum):

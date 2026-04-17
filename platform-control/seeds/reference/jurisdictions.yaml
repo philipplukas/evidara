@@ -6,3 +6,15 @@ items:
   - jurisdiction_id: jur_at
     slug: at
     name: Austria
+  - jurisdiction_id: jur_de
+    slug: de
+    name: Germany
+  - jurisdiction_id: jur_fr
+    slug: fr
+    name: France
+  - jurisdiction_id: jur_it
+    slug: it
+    name: Italy
+  - jurisdiction_id: jur_eu
+    slug: eu
+    name: European Union

@@ -1,0 +1,42 @@
+version: 1
+country_code: IT
+country_name: Italy
+
+jurisdiction_overlay:
+  canonical_codes:
+    - IT
+  hierarchy_paths:
+    - it
+    - it/federal
+    - it/region
+  # Sub-federal hierarchy paths for regioni follow the pattern
+  # `it/region/<iso-3166-2-subdivision-lowercased>` (e.g. `it/region/25`
+  # for Lombardia). Additive per the five-country rollout design rule.
+
+language_defaults:
+  primary: it
+  supported:
+    - it
+    - en
+
+source_family_overlay:
+  canonical:
+    - law
+    - decision
+    - commentary
+  local_mappings:
+    - local_type: legge
+      canonical_type: law
+      note: Italian statutory law maps to canonical law.
+    - local_type: decreto_legislativo
+      canonical_type: law
+      note: Legislative decrees map to canonical law.
+    - local_type: sentenza
+      canonical_type: decision
+      note: Italian court judgments map to decision-family discovery.
+
+court_level_overlay:
+  expected_levels:
+    - cassation
+    - appellate
+    - tribunal

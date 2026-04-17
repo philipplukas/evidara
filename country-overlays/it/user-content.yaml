@@ -1,0 +1,29 @@
+version: 1
+country_code: IT
+
+# result_subtitle_pattern is inherited from _shared/.
+
+filters:
+  jurisdiction:
+    label: Giurisdizione
+    helper_text: Italia scope copre overlay nazionali e regionali.
+  source_type:
+    label: Tipo di fonte
+    helper_text: Include leggi, sentenze e commentari.
+  court_level:
+    label: Livello di corte
+    helper_text: Distingue cassazione, appello e tribunale di primo grado.
+  official_only:
+    label: Solo fonti ufficiali
+    helper_text: Restringe alle fonti pubbliche autorevoli italiane.
+
+detail_copy:
+  translation_indicator:
+    original: Lingua originale
+    translated: Tradotto automaticamente da {language}
+    unavailable: Traduzione non disponibile
+
+empty_states:
+  no_results:
+    message: Nessun risultato italiano per questa query e questi filtri.
+    recovery: Rimuovi un filtro o amplia il tipo di fonte.

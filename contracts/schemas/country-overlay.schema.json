@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/country-overlay",
+  "title": "Country Overlay",
+  "description": "Meta-schema for the four YAML files that make up a country overlay under country-overlays/<iso-lowercased>/: overlay.yaml, reference-data.yaml, user-content.yaml, operator-content.yaml. Each file carries a country_code (ISO 3166-1 alpha-2) and, for overlay.yaml, structured sub-federal hierarchy paths. Vocabulary cross-references (source-family, court-level, language) MUST resolve against the shared vocabulary files.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/overlayFile" },
+    { "$ref": "#/$defs/referenceDataFile" },
+    { "$ref": "#/$defs/userContentFile" },
+    { "$ref": "#/$defs/operatorContentFile" }
+  ],
+  "$defs": {
+    "countryCode": {
+      "description": "ISO 3166-1 alpha-2 country code (uppercase). 'EU' is reserved exceptionally for the European Union.",
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "hierarchyPath": {
+      "description": "Sub-federal path. Pattern: <iso2>(/<tier>(/<subdivision>)?)?. Lowercase throughout. Subdivision segment may be a literal ISO 3166-2 code tail (e.g. 'zh') or a parametric placeholder ('{canton_code}', '{bfs_id}') for templated overlays. Examples: 'ch', 'ch/federal', 'ch/canton/zh', 'ch/cantonal/{canton_code}'.",
+      "type": "string",
+      "pattern": "^[a-z]{2}(/[a-z-]+(/([a-z0-9-]+|\\{[a-z_]+\\}))?)?$"
+    },
+    "iso639LanguageCode": {
+      "description": "ISO 639-1 two-letter language code (lowercase).",
+      "type": "string",
+      "pattern": "^[a-z]{2}$"
+    },
+    "overlayFile": {
+      "description": "overlay.yaml — structural overlay: jurisdiction codes, hierarchy paths, language defaults, source family mappings, court level expectations.",
+      "type": "object",
+      "required": ["version", "country_code", "jurisdiction_overlay"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "country_code": { "$ref": "#/$defs/countryCode" },
+        "country_name": { "type": "string" },
+        "jurisdiction_overlay": {
+          "type": "object",
+          "required": ["canonical_codes", "hierarchy_paths"],
+          "properties": {
+            "canonical_codes": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/countryCode" }
+            },
+            "hierarchy_paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/hierarchyPath" }
+            }
+          }
+        },
+        "language_defaults": {
+          "type": "object",
+          "required": ["primary", "supported"],
+          "properties": {
+            "primary": { "$ref": "#/$defs/iso639LanguageCode" },
+            "supported": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/iso639LanguageCode" }
+            }
+          }
+        },
+        "source_family_overlay": {
+          "type": "object",
+          "required": ["canonical"],
+          "properties": {
+            "canonical": {
+              "description": "Canonical source-family tokens (see contracts/vocabularies/source-family.json).",
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string" }
+            },
+            "local_mappings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["local_type", "canonical_type"],
+                "properties": {
+                  "local_type": { "type": "string" },
+                  "canonical_type": { "type": "string" },
+                  "note": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "court_level_overlay": {
+          "type": "object",
+          "properties": {
+            "expected_levels": {
+              "description": "Court-level tokens from contracts/vocabularies/court-level.json, scoped to this country.",
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "referenceDataFile": {
+      "description": "reference-data.yaml — jurisdiction and authority records for the overlay. Two valid shapes: (a) ID-citation — `jurisdiction_id` + `authority_ids[]` pointing at platform-control/seeds/reference/*.yaml (preferred when the overlay scope is a single jurisdiction + a small authority set); (b) embedded — full `jurisdictions[]` + `authorities[]` arrays (required when the overlay models multiple jurisdictions per country, e.g. CH federal + 26 cantons).",
+      "type": "object",
+      "required": ["version", "country_code"],
+      "oneOf": [
+        {
+          "description": "ID-citation shape.",
+          "required": ["jurisdiction_id", "authority_ids"],
+          "properties": {
+            "version": { "type": "integer", "minimum": 1 },
+            "country_code": { "$ref": "#/$defs/countryCode" },
+            "jurisdiction_id": {
+              "type": "string",
+              "pattern": "^jur_[a-z0-9_]+$"
+            },
+            "authority_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^auth_[a-z0-9_]+$" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Embedded shape (multi-jurisdiction countries).",
+          "required": ["jurisdictions", "authorities"],
+          "properties": {
+            "version": { "type": "integer", "minimum": 1 },
+            "country_code": { "$ref": "#/$defs/countryCode" },
+            "jurisdictions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["jurisdiction_id", "slug", "name"],
+                "properties": {
+                  "jurisdiction_id": { "type": "string", "pattern": "^jur_[a-z0-9_]+$" },
+                  "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+                  "name": { "type": "string" }
+                }
+              }
+            },
+            "authorities": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["authority_id", "jurisdiction_id", "slug", "name"],
+                "properties": {
+                  "authority_id": { "type": "string", "pattern": "^auth_[a-z0-9_]+$" },
+                  "jurisdiction_id": { "type": "string", "pattern": "^jur_[a-z0-9_]+$" },
+                  "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "userContentFile": {
+      "description": "user-content.yaml — end-user-facing filter labels, subtitle pattern, translation indicators, empty-state copy. Per-country files MAY omit fields that the shared default under country-overlays/_shared/user-content.yaml already provides; the merged view (see platform_control.overlays.loader.load_user_content) must contain `filters` and `result_subtitle_pattern` together.",
+      "type": "object",
+      "required": ["version", "country_code"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "country_code": { "$ref": "#/$defs/countryCode" },
+        "filters": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "required": ["label"],
+            "properties": {
+              "label": { "type": "string" },
+              "helper_text": { "type": "string" }
+            }
+          }
+        },
+        "result_subtitle_pattern": {
+          "type": "object",
+          "required": ["template"],
+          "properties": {
+            "template": { "type": "string" }
+          }
+        },
+        "detail_copy": { "type": "object" },
+        "empty_states": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "operatorContentFile": {
+      "description": "operator-content.yaml — operator-facing onboarding checklists, approval hotspots, triage overlays.",
+      "type": "object",
+      "required": ["version", "country_code"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "country_code": { "$ref": "#/$defs/countryCode" },
+        "onboarding_checklist": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "approval_hotspots": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "triage_overlays": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "first_action": { "type": "string" },
+              "escalation_owner": { "type": "string" }
+            }
+          }
+        },
+        "status": { "type": "string" },
+        "status_note": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

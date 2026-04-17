@@ -1,25 +1,15 @@
 version: 1
 country_code: AT
 
-jurisdictions:
-  - jurisdiction_id: jur_at
-    slug: at
-    name: Austria
+# Canonical reference data lives in platform-control/seeds/reference/
+# {jurisdictions,authorities}.yaml. This file cites IDs only so the
+# overlay stays in sync without duplication; the validator cross-checks
+# every ID against the seed index.
 
-authorities:
-  - authority_id: auth_at_ris
-    jurisdiction_id: jur_at
-    slug: at-ris
-    name: Rechtsinformationssystem des Bundes
-  - authority_id: auth_at_ogh
-    jurisdiction_id: jur_at
-    slug: at-ogh
-    name: Oberster Gerichtshof
-  - authority_id: auth_at_vfgh
-    jurisdiction_id: jur_at
-    slug: at-vfgh
-    name: Verfassungsgerichtshof
-  - authority_id: auth_at_vwgh
-    jurisdiction_id: jur_at
-    slug: at-vwgh
-    name: Verwaltungsgerichtshof
+jurisdiction_id: jur_at
+
+authority_ids:
+  - auth_at_ris
+  - auth_at_ogh
+  - auth_at_vfgh
+  - auth_at_vwgh

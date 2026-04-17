@@ -1,0 +1,29 @@
+version: 1
+country_code: FR
+
+# result_subtitle_pattern is inherited from _shared/.
+
+filters:
+  jurisdiction:
+    label: Juridiction
+    helper_text: La France couvre le droit fédéral et, à terme, les surcouches régionales.
+  source_type:
+    label: Type de source
+    helper_text: Inclut lois, codes, décisions et commentaires.
+  court_level:
+    label: Niveau de juridiction
+    helper_text: Distingue cassation, Conseil d'État, appel et tribunaux.
+  official_only:
+    label: Sources officielles uniquement
+    helper_text: Restreint aux sources publiques autoritaires françaises.
+
+detail_copy:
+  translation_indicator:
+    original: Langue originale
+    translated: Traduit automatiquement depuis {language}
+    unavailable: Traduction non disponible
+
+empty_states:
+  no_results:
+    message: Aucun résultat français pour cette requête et ces filtres.
+    recovery: Supprimez un filtre ou élargissez le type de source.

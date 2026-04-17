@@ -1,0 +1,17 @@
+version: 1
+country_code: EU
+
+# Canonical reference data lives in platform-control/seeds/reference/
+# {jurisdictions,authorities}.yaml. This file cites IDs only so the
+# overlay stays in sync without duplication; the validator cross-checks
+# every ID against the seed index.
+
+jurisdiction_id: jur_eu
+
+authority_ids:
+  - auth_eu_eurlex
+  - auth_eu_parliament
+  - auth_eu_council
+  - auth_eu_commission
+  - auth_eu_cjeu
+  - auth_eu_general_court

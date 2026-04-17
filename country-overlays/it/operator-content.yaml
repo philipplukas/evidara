@@ -1,0 +1,16 @@
+version: 1
+country_code: IT
+
+# triage_overlays defaults and the "authority taxonomy correctness"
+# approval hotspot are inherited from _shared/.
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code IT.
+  - Confirm source family mapping for leggi, decreti legislativi, and sentenze.
+  - Confirm authority records include Gazzetta Ufficiale, Normattiva, and Cassazione.
+  - Confirm region-sensitive metadata is handled consistently across filters.
+
+approval_hotspots:
+  - authority taxonomy correctness
+  - inconsistent metadata quality across decisions (known historical drift)
+  - federal vs regional hierarchy-path boundary

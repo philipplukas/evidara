@@ -1,0 +1,29 @@
+version: 1
+country_code: EU
+
+# result_subtitle_pattern is inherited from _shared/.
+
+filters:
+  jurisdiction:
+    label: Jurisdiction
+    helper_text: EU scope covers union-level and nested member-state overlays.
+  source_type:
+    label: Source type
+    helper_text: Includes regulations, directives, decisions, opinions, and judgments.
+  court_level:
+    label: Court level
+    helper_text: Distinguishes Court of Justice and General Court.
+  official_only:
+    label: Official sources only
+    helper_text: Restricts to EUR-Lex and authoritative EU institution sources.
+
+detail_copy:
+  translation_indicator:
+    original: Original language
+    translated: Machine translated from {language}
+    unavailable: Translation unavailable
+
+empty_states:
+  no_results:
+    message: No EU results for this query and filter set.
+    recovery: Clear one filter or broaden source type.

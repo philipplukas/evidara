@@ -56,6 +56,7 @@ jobs:
           python -m unittest discover -s scripts/tests -p "test_check_platform_contract_vendor.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay_at.py"
+          python -m unittest discover -s scripts/tests -p "test_check_country_overlay_files.py"
           python -m unittest discover -s scripts/tests -p "test_analyze_github_actions_queue.py"
 
       - name: Enforce contract manifest version bump
@@ -76,13 +77,23 @@ jobs:
       - name: Validate k8s GitOps kustomizations
         run: bash scripts/validate_k8s_gitops_kustomize.sh
 
-      - name: Validate country overlays
+      - name: Validate country overlay blueprint templates
         run: |
           python scripts/check_country_overlay.py --country AT
           python scripts/check_country_overlay.py --country DE
           python scripts/check_country_overlay.py --country CH
           python scripts/check_country_overlay.py --country FR
           python scripts/check_country_overlay.py --country IT
+          python scripts/check_country_overlay.py --country EU
+
+      - name: Validate country overlay files (schema + vocab cross-refs)
+        run: |
+          python scripts/check_country_overlay_files.py --country AT
+          python scripts/check_country_overlay_files.py --country CH
+          python scripts/check_country_overlay_files.py --country DE
+          python scripts/check_country_overlay_files.py --country FR
+          python scripts/check_country_overlay_files.py --country IT
+          python scripts/check_country_overlay_files.py --country EU
 
       - name: Install markdownlint
         run: |

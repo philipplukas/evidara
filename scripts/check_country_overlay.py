@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 _BLUEPRINTS_PATH = (
     ROOT / "platform-control" / "src" / "platform_control" / "hierarchies" / "source_blueprints.yaml"
 )
-_SUPPORTED = {"AT", "DE", "FR", "IT", "CH"}
+_SUPPORTED = {"AT", "DE", "FR", "IT", "CH", "EU"}
 _TEMPLATE_ID_RE = re.compile(r"^[a-z0-9]+_[a-z0-9_]+$")
 
 
@@ -52,13 +52,27 @@ def evaluate(country: str) -> list[str]:
     return errors
 
 
+# Providers whose templates are validated here. Keep in sync with
+# `AcquisitionProvider` in platform-control/src/platform_control/domain.py;
+# `test_blueprint_provider_parity.py` covers the enum-vs-blueprint side.
+_SUPPORTED_PROVIDERS = {
+    "firecrawl",
+    "deterministic_http",
+    "fedlex_sparql",
+    "ris_ogd",
+    "eur_lex_sparql",
+    "bundesland_http",
+    "regione_http",
+}
+
+
 def _validate_template(
     overlay_id: str,
     template_id: str,
     payload: dict,
 ) -> list[str]:
     provider = payload.get("provider")
-    if provider not in {"firecrawl", "deterministic_http", "fedlex_sparql", "ris_ogd"}:
+    if provider not in _SUPPORTED_PROVIDERS:
         return [
             f"Overlay '{overlay_id}' template '{template_id}' has unsupported provider '{provider}'."
         ]
@@ -87,26 +101,47 @@ def _validate_template(
             ]
         return []
 
-    if provider == "deterministic_http":
+    if provider in {"deterministic_http", "fedlex_sparql", "eur_lex_sparql"}:
         if not (
             _has_nonempty_str(payload.get("seed_url"))
             or _has_nonempty_str_list(payload.get("seed_urls"))
         ):
             return [
-                f"Overlay '{overlay_id}' template '{template_id}' deterministic_http requires seed_url or seed_urls."
+                f"Overlay '{overlay_id}' template '{template_id}' {provider} requires seed_url or seed_urls."
             ]
         return []
 
-    if provider == "fedlex_sparql":
+    if provider == "bundesland_http":
+        errors: list[str] = []
+        if not _has_nonempty_str(payload.get("bundesland")):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' bundesland_http requires bundesland (ISO 3166-2:DE)."
+            )
         if not (
             _has_nonempty_str(payload.get("seed_url"))
             or _has_nonempty_str_list(payload.get("seed_urls"))
         ):
-            return [
-                f"Overlay '{overlay_id}' template '{template_id}' fedlex_sparql requires seed_url or seed_urls."
-            ]
-        return []
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' bundesland_http requires seed_url or seed_urls."
+            )
+        return errors
 
+    if provider == "regione_http":
+        errors = []
+        if not _has_nonempty_str(payload.get("regione")):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' regione_http requires regione (ISO 3166-2:IT)."
+            )
+        if not (
+            _has_nonempty_str(payload.get("seed_url"))
+            or _has_nonempty_str_list(payload.get("seed_urls"))
+        ):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' regione_http requires seed_url or seed_urls."
+            )
+        return errors
+
+    # ris_ogd
     if not _has_nonempty_str(payload.get("base_url")):
         return [
             f"Overlay '{overlay_id}' template '{template_id}' ris_ogd requires base_url."
@@ -124,7 +159,7 @@ def _has_nonempty_str_list(value: object) -> bool:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate country overlay provider templates.")
-    parser.add_argument("--country", required=True, help="Country code (AT|DE|FR|IT|CH)")
+    parser.add_argument("--country", required=True, help="Country code (AT|DE|FR|IT|CH|EU)")
     return parser.parse_args()
 
 

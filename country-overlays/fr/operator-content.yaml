@@ -1,0 +1,23 @@
+version: 1
+country_code: FR
+
+# triage_overlays defaults and the "authority taxonomy correctness"
+# approval hotspot are inherited from _shared/.
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code FR.
+  - Confirm source family mapping for lois, codes, décrets, and arrêts.
+  - Confirm authority records include Légifrance and Cour de cassation.
+  - Confirm canonical-concept labels survive French UI translation.
+
+approval_hotspots:
+  - authority taxonomy correctness
+  - legal family naming drift across translated UI
+  - federal vs régional hierarchy-path boundary
+
+status: scaffold-only
+status_note: |
+  FR overlay is scaffold-only. deterministic_http_legifrance_codes
+  template exists in source_blueprints.yaml; regional providers have no
+  dedicated adapter yet. Live acceptance run evidence lands in a
+  follow-up ticket.

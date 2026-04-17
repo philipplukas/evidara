@@ -66,6 +66,7 @@ class RisOgdProvider:
     """Acquisition provider that pages through the OGD-RIS REST API."""
 
     provider_name = "ris_ogd"
+    live_ready = True
 
     async def start_run(
         self,

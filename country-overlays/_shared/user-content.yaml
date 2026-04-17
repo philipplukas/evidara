@@ -1,0 +1,12 @@
+version: 1
+
+# Shared user-facing defaults for every country overlay.
+#
+# Per-country files (country-overlays/<iso>/user-content.yaml) override
+# on top of this via platform_control.overlays.loader.load_user_content;
+# later keys win, and the placeholder {country_code} is substituted with
+# the overlay's ISO 3166-1 alpha-2 code after merge. Per-country files
+# SHOULD omit any field whose value is identical to the shared default.
+
+result_subtitle_pattern:
+  template: "{jurisdiction} • {source_type} • {court_or_authority} • {effective_date}"
