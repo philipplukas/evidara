@@ -24,6 +24,22 @@
             },
             "iconKey": { "const": "ch" },
             "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "description": "Canonical slug (matches subdivisions.json hierarchyTier) plus per-language labels. Code paths use the slug; UI surfaces the label.",
+              "properties": {
+                "slug": { "const": "canton" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Kanton" },
+                    "fr": { "const": "canton" },
+                    "it": { "const": "cantone" },
+                    "en": { "const": "canton" }
+                  }
+                }
+              }
+            },
             "subdivisions": {
               "type": "object",
               "description": "ISO 3166-2:CH cantons.",
@@ -73,6 +89,21 @@
             },
             "iconKey": { "const": "at" },
             "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "properties": {
+                "slug": { "const": "state" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Bundesland" },
+                    "fr": { "const": "land" },
+                    "it": { "const": "Land" },
+                    "en": { "const": "Bundesland" }
+                  }
+                }
+              }
+            },
             "subdivisions": {
               "type": "object",
               "description": "ISO 3166-2:AT Bundesländer.",
@@ -105,6 +136,21 @@
             },
             "iconKey": { "const": "de" },
             "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "properties": {
+                "slug": { "const": "land" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Land" },
+                    "fr": { "const": "land" },
+                    "it": { "const": "Land" },
+                    "en": { "const": "state" }
+                  }
+                }
+              }
+            },
             "subdivisions": {
               "type": "object",
               "description": "ISO 3166-2:DE Länder.",
@@ -144,6 +190,21 @@
             },
             "iconKey": { "const": "fr" },
             "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "properties": {
+                "slug": { "const": "region" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Region" },
+                    "fr": { "const": "région" },
+                    "it": { "const": "regione" },
+                    "en": { "const": "region" }
+                  }
+                }
+              }
+            },
             "subdivisions": {
               "type": "object",
               "description": "ISO 3166-2:FR régions (métropolitaines + outre-mer).",
@@ -185,6 +246,21 @@
             },
             "iconKey": { "const": "it" },
             "standard": { "const": "ISO 3166-1 alpha-2" },
+            "subdivisionTier": {
+              "type": "object",
+              "properties": {
+                "slug": { "const": "region" },
+                "prefLabel": {
+                  "type": "object",
+                  "properties": {
+                    "de": { "const": "Region" },
+                    "fr": { "const": "région" },
+                    "it": { "const": "regione" },
+                    "en": { "const": "region" }
+                  }
+                }
+              }
+            },
             "subdivisions": {
               "type": "object",
               "description": "ISO 3166-2:IT regioni.",

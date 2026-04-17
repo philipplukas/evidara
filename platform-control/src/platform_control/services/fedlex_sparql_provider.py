@@ -51,6 +51,22 @@ WHERE {{
 LIMIT 1
 """.strip()
 
+    # Discover cantonal-concordat works filtered by canton of origin. Not
+    # wired into start_run() yet; awaits the cantonal acceptance run per
+    # docs/runbooks/country-rollout-drift-prevention-backlog.md §4.4.
+    # `canton_iri` is a full IRI (e.g. https://fedlex.data.admin.ch/vocabulary/canton/ZH).
+    _CANTON_WORK_DISCOVERY_QUERY = """
+PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
+SELECT ?work
+WHERE {{
+  ?work jolux:CantonOfOrigin <{canton_iri}> .
+}}
+ORDER BY ?work
+LIMIT {limit}
+""".strip()
+
+    _CANTON_IRI_BASE = "https://fedlex.data.admin.ch/vocabulary/canton/"
+
     async def start_run(
         self,
         source: Source,
@@ -212,9 +228,9 @@ LIMIT 1
         """Return the ISO 3166-2:CH code when the spec asks for a cantonal slice.
 
         Reads `acquisition_spec.canton` (e.g. "CH-ZH" or "ZH") and normalizes to
-        the ISO form. Currently only extracted; applying it to the SPARQL query
-        (via `jolux:CantonOfOrigin`) lands alongside the first live cantonal
-        acceptance run — see docs/runbooks/ch-fedlex-fast-loop-backlog.md.
+        the ISO form. Not yet wired into start_run(); discovery mode lands
+        alongside the first cantonal acceptance run — see
+        docs/runbooks/country-rollout-drift-prevention-backlog.md §4.4.
         """
         raw = acquisition_spec.get("canton")
         if not isinstance(raw, str):
@@ -227,6 +243,65 @@ LIMIT 1
         if len(code) == 2:
             return f"CH-{code}"
         return code
+
+    def _canton_iri(self, iso_3166_2_code: str) -> str:
+        """Return the Fedlex vocabulary IRI for an ISO 3166-2:CH code.
+
+        E.g. `CH-ZH` -> `https://fedlex.data.admin.ch/vocabulary/canton/ZH`.
+        The Fedlex canton vocabulary uses the trailing two-letter cantonal
+        code (uppercase) as the fragment.
+        """
+        code = iso_3166_2_code.strip().upper()
+        if code.startswith("CH-"):
+            code = code[3:]
+        if len(code) != 2 or not code.isalpha():
+            raise ValueError(f"Invalid ISO 3166-2:CH subdivision code: {iso_3166_2_code!r}")
+        return f"{self._CANTON_IRI_BASE}{code}"
+
+    def _build_canton_discovery_query(self, iso_3166_2_code: str, limit: int = 50) -> str:
+        """Render the cantonal work-discovery SPARQL query.
+
+        Isolated so it can be unit-tested without a live endpoint. The
+        runtime discovery path will call this and issue the query via
+        the same httpx client used by start_run().
+        """
+        canton_iri = self._canton_iri(iso_3166_2_code)
+        return self._CANTON_WORK_DISCOVERY_QUERY.format(
+            canton_iri=canton_iri,
+            limit=int(limit),
+        )
+
+    async def _discover_works_by_canton(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        sparql_endpoint: str,
+        iso_3166_2_code: str,
+        limit: int = 50,
+    ) -> list[str]:
+        """Execute the cantonal work-discovery query and return work URIs.
+
+        Kept as a stand-alone helper (not yet called from start_run()) so
+        that unit tests and a future cantonal-slice discovery mode can
+        share the same path. The caller is responsible for wiring the
+        returned URIs into `acquisition_spec.seed_work_uris` for the main
+        work→expression→manifestation flow.
+        """
+        query = self._build_canton_discovery_query(iso_3166_2_code, limit=limit)
+        response = await client.get(
+            sparql_endpoint,
+            params={"query": query, "format": "application/sparql-results+json"},
+            headers={"Accept": "application/sparql-results+json"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        bindings = payload.get("results", {}).get("bindings", [])
+        work_uris: list[str] = []
+        for binding in bindings:
+            work = binding.get("work", {}).get("value")
+            if isinstance(work, str) and work.startswith(f"https://{_FEDLEX_HOST}/"):
+                work_uris.append(work)
+        return work_uris
 
     async def _resolve_concrete_work_uri(
         self,

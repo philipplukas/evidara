@@ -98,28 +98,17 @@ if any currently iterates by overlay name.
 
 **Estimated size:** ~50 LOC moved.
 
-### 1.5 Tier-name canonicalization decision
+### 1.5 Tier-name canonicalization decision ✅ LANDED
 
-**Problem:** `hierarchyTier` in `subdivisions.json` currently uses local
-words: `canton` / `state` / `land` / `region` / `region`. Any UI,
-filter, or analytics surface that shows the tier word has to decide
-per-country.
+**Outcome:** Pragmatic hybrid of options A and B. Each country in
+`contracts/vocabularies/jurisdiction.json` gains a `subdivisionTier`
+block with a canonical `slug` (matches `subdivisions.json` `hierarchyTier`)
+and a `prefLabel` with per-language display labels. Code paths use the
+slug (`canton` / `state` / `land` / `region`); UI surfaces the
+localized label (`Kanton`, `Bundesland`, `Land`, `région`, `regione`).
+The `hierarchyPath` wire format stays the same so no URLs break.
 
-**Target options (pick one):**
-- **(A) One canonical word.** Rename all tiers to `subdivision`; keep
-  the label in `prefLabel` per language (e.g.
-  `prefLabel.de: "Kanton"`, `prefLabel.de: "Bundesland"`).
-- **(B) Embrace local words.** Keep today's values but publish a
-  display-label map: `subdivisions.json` entry gains
-  `tierLabel: { de: "Kanton", en: "canton", … }`.
-
-**Recommendation:** (A) with `prefLabel` carrying the local label. One
-canonical tier word in code paths, localized labels in UI.
-
-**Files (if (A)):** `contracts/vocabularies/subdivisions.json`
-(global rename), downstream references.
-
-**Estimated size:** ~200 LOC token churn, no behavior change.
+**Landed in:** commit following `6b726a9`, same branch.
 
 ### 1.6 Per-country authority-seed expansion ✅ LANDED
 
@@ -258,13 +247,26 @@ Ticket: `docs/runbooks/eu-eur-lex-fast-loop-backlog.md`.
 - Enable `regione_http_lombardia` template
 - Runbook: create `docs/runbooks/it-lombardia-regione-fast-loop.md`
 
-### 4.4 Fedlex cantonal SPARQL filter — activate the hook
+### 4.4 Fedlex cantonal SPARQL filter — partially landed
 
-`FedlexSparqlProvider._canton_filter()` extracts the code today but
-does not apply it to the SPARQL query. To enable: add a
-`jolux:CantonOfOrigin` filter on `_EXPRESSION_QUERY` and
-`_MEMBER_QUERY`, parameterized on the normalized code. Ship with an
-acceptance run against a known cantonal concordat to verify.
+**Landed (scaffolding):**
+- `_canton_filter(acquisition_spec)` normalizes ISO 3166-2:CH codes.
+- `_canton_iri(code)` maps to the Fedlex canton vocabulary IRI
+  (`https://fedlex.data.admin.ch/vocabulary/canton/ZH`).
+- `_build_canton_discovery_query(code, limit)` renders the
+  `jolux:CantonOfOrigin` discovery SPARQL.
+- `_discover_works_by_canton(...)` async method executes the query and
+  returns work URIs; not yet wired into `start_run()`.
+- 5 unit tests cover the mapping, query shape, default limit, and
+  rejection of garbage codes.
+
+**Still needed:**
+- Wire `_discover_works_by_canton` into a new
+  `acquisition_spec.scope_kind = "canton"` mode in `start_run()`.
+- Run a live acceptance test against a known cantonal concordat
+  (proposal: a Valais inter-cantonal concordat as first target).
+- Flip the scope mode live-ready + land evidence under
+  `docs/runbooks/evidence/<date>-ch-fedlex-cantonal-*.md`.
 
 ## Tier 5 — Feature additions
 
@@ -287,17 +289,24 @@ has a non-empty `subdivisions` ancestor in `hierarchy_paths`.
 
 Depends on Tier 2.3 (sub-federal query model).
 
-### 5.3 Citation extractor coverage for DE / FR / IT
+### 5.3 Citation extractor coverage for DE / FR / IT ✅ LANDED
 
-Today the extractor is heavy on CH (SR, BGE, article patterns) and EU
-(CELEX, ECLI:EU, regulation/directive). Add:
-- DE: BVerfGE, BGHSt, BGHZ, §-patterns, BGB / StGB abbreviations
-- FR: Code civil / Code pénal articles, jurisprudence numbering
-  (pourvoi references, Dalloz notation)
-- IT: Codice civile articoli, sentenze Cassazione numbering
+**Outcome:** `document-intelligence/src/document_intelligence/nlp/citation_extractor.py`
+grew from CH + EU coverage to include:
+- **DE:** BVerfGE volume+page citations, BVerfG docket numbers
+  (1 BvR 1234/56 style), BGHZ/BGHSt, ECLI:DE:*, § paragraph references
+  with a curated list of ~30 common German statute abbreviations
+  (BGB, StGB, ZPO, GG, …).
+- **FR:** Code articles (civil, pénal, commerce, procédure civile/pénale,
+  travail, environnement, consommation, santé publique, assurances) with
+  L./R./D. prefixes; pourvoi numbers; Cassation chamber prefixes;
+  Conseil d'État dockets; ECLI:FR:*.
+- **IT:** Codice civile / penale / procedura civile + penale articles;
+  Cassazione judgments (civil + penal with sezione); Consiglio di
+  Stato; ECLI:IT:*.
+- 22 new test cases added (43 total citation tests pass).
 
-Each country adds ~50 LOC of regex + aliases and a new test class,
-following the existing shape.
+**Landed in:** commit following `6b726a9`, same branch.
 
 ### 5.4 EuroVoc topic classification
 
