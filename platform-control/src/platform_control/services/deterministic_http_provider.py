@@ -16,7 +16,7 @@ from platform_control.services.acquisition_provider import (
     ProviderResource,
     ProviderStartResult,
 )
-from platform_control.services.politeness import HostRateLimiter
+from platform_control.services.politeness import HostRateLimiter, limited_get
 
 IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
@@ -233,11 +233,7 @@ class DeterministicHttpProvider:
         url: str,
         headers: dict[str, str],
     ) -> httpx.Response:
-        if self.rate_limiter is None:
-            return await client.get(url, headers=headers)
-        host = (urlparse(url).hostname or "").lower()
-        async with await self.rate_limiter.acquire(host):
-            return await client.get(url, headers=headers)
+        return await limited_get(client, url, limiter=self.rate_limiter, headers=headers)
 
     async def _read_body_limited(
         self,

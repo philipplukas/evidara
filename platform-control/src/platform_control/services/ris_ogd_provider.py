@@ -21,6 +21,7 @@ from platform_control.services.acquisition_provider import (
     ProviderResource,
     ProviderStartResult,
 )
+from platform_control.services.politeness import limited_get
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,7 @@ class RisOgdProvider:
                     params["ImRisSeitDatumBis"] = _format_date(until_date)
 
                 try:
-                    listing = await client.get(base_url, params=params)
+                    listing = await limited_get(client, base_url, params=params)
                     listing.raise_for_status()
                     listing_json = listing.json()
                 except httpx.TimeoutException:
@@ -331,7 +332,7 @@ async def _fetch_single_document(
     content_type = _FORMAT_CONTENT_TYPE.get(data_type, "application/octet-stream")
 
     try:
-        response = await client.get(url)
+        response = await limited_get(client, url)
         response.raise_for_status()
     except httpx.TimeoutException:
         return {"url": url, "error": f"timed out after {request_timeout_seconds:.1f}s"}

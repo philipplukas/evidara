@@ -54,6 +54,11 @@ from platform_control.schemas.run import (
 )
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
+from platform_control.services.compliance_policy_service import (
+    RateLimiterRegistry,
+    resolve_rate_limiter_for_source,
+)
+from platform_control.services.politeness import current_rate_limiter
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.replay_checkpoint import checkpoint_dict_from_parent
 
@@ -84,6 +89,7 @@ class RunService:
         publisher: RawArtifactPublisher | None = None,
         *,
         run_dispatch_backend: str = "inline",
+        rate_limiter_registry: RateLimiterRegistry | None = None,
     ) -> None:
         self.session = session
         self.provider = provider
@@ -91,6 +97,7 @@ class RunService:
         self.artifact_store = artifact_store or get_artifact_store()
         self.publisher = publisher or get_raw_artifact_publisher()
         self.run_dispatch_backend = run_dispatch_backend
+        self.rate_limiter_registry = rate_limiter_registry or RateLimiterRegistry()
 
     def _resolve_provider_for_source_version(
         self, source_version: SourceVersion
@@ -810,7 +817,17 @@ class RunService:
                 "An acquisition provider or provider registry is required before creating runs."
             )
 
-        provider_result = await provider.start_run(source, source_version, run)
+        # Bind the jurisdiction's rate limiter into the async context so every
+        # outbound GET performed by the provider honours it. set/reset keeps
+        # concurrent runs on different policies isolated.
+        limiter = await resolve_rate_limiter_for_source(
+            self.session, source, self.rate_limiter_registry
+        )
+        token = current_rate_limiter.set(limiter)
+        try:
+            provider_result = await provider.start_run(source, source_version, run)
+        finally:
+            current_rate_limiter.reset(token)
         provider_job = ProviderJob(
             run_id=run.run_id,
             provider=provider_result.provider,

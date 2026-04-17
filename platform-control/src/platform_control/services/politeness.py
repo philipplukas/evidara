@@ -15,7 +15,12 @@ import asyncio
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
+from typing import Any
+from urllib.parse import urlparse
+
+import httpx
 
 
 @dataclass(slots=True)
@@ -112,3 +117,33 @@ class _HostPermit:
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         self.release()
+
+
+current_rate_limiter: ContextVar[HostRateLimiter | None] = ContextVar(
+    "current_rate_limiter", default=None
+)
+"""Run-scoped limiter set by ``run_service`` before dispatch and read by each
+provider's outbound GET. Propagates across ``await`` points automatically."""
+
+
+async def limited_get(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    limiter: HostRateLimiter | None = None,
+    **kwargs: Any,
+) -> httpx.Response:
+    """GET ``url`` through the effective rate limiter for the current run.
+
+    Resolution order: explicit ``limiter`` → ``current_rate_limiter`` contextvar
+    → no limiter (bypass). Providers that own their HTTP boundary (deterministic,
+    fedlex, ris) call this in place of ``client.get`` so the per-jurisdiction
+    :class:`CompliancePolicy` is honoured without each provider needing its own
+    integration code.
+    """
+    effective = limiter if limiter is not None else current_rate_limiter.get()
+    if effective is None:
+        return await client.get(url, **kwargs)
+    host = (urlparse(url).hostname or "").lower()
+    async with await effective.acquire(host):
+        return await client.get(url, **kwargs)
