@@ -64,3 +64,29 @@ models:
       - name: processed_at
         tests:
           - not_null
+
+  - name: stg_processing_manifests
+    description: Projection of the processing_manifests published surface with failure flattening.
+    columns:
+      - name: processing_manifest_id
+        tests:
+          - not_null
+          - unique
+      - name: document_id
+        tests:
+          - not_null
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["canonical_ready", "failed", "superseded"]
+      - name: document_count
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+      - name: section_count
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false

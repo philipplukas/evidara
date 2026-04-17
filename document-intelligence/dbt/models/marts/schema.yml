@@ -2,15 +2,63 @@ version: 2
 
 models:
   - name: fct_document_processing
-    description: Document-level processing fact. Rewritten at processing_manifest grain in step 3.
+    description: >
+      Fact at processing-manifest grain: one row per processing attempt,
+      including failed and superseded results. Inline dim attributes
+      (source_system, country, jurisdiction, authority_name, language,
+      document_type, document_class, processing_version) are swapped for
+      surrogate keys when dim tables land.
     columns:
-      - name: document_id
+      - name: processing_manifest_id
         tests:
           - not_null
           - unique
-      - name: latest_processed_at
+      - name: document_id
         tests:
           - not_null
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_id
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["canonical_ready", "failed", "superseded"]
+      - name: is_success
+        tests:
+          - not_null
+      - name: is_superseded
+        tests:
+          - not_null
+      - name: has_failure
+        tests:
+          - not_null
+      - name: document_count
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+      - name: section_count
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+      - name: entities_count
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+      - name: chunk_count
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+      - name: total_latency_s
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+              row_condition: "total_latency_s is not null"
 
   - name: document_knowledge_base
     description: Unified per-document-version knowledge base with docling metadata and entity aggregates.
