@@ -52,7 +52,7 @@
   --color-brand-hover: var(--brand-hover);
   --color-brand-strong: var(--brand-strong);
 
-  /* ─── Accent (Evidara violet — applied to active states, never to primary CTAs) ─── */
+  /* ─── Accent (Evidara violet — the ONE action color: CTAs, active states, links) ─── */
   --color-accent-core: var(--accent-core);
   --color-accent-core-foreground: var(--accent-core-foreground);
   --color-accent-core-subtle: var(--accent-core-subtle);
@@ -95,75 +95,73 @@
 }
 
 :root {
-  --background: oklch(0.985 0.01 250);
-  --foreground: oklch(0.31 0.04 250);
+  /* ─── shadcn semantic tokens (navy-tinted neutrals, hue ≈ 215) ─── */
+  --background: oklch(0.985 0.008 215);
+  --foreground: oklch(0.25 0.04 215);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.31 0.04 250);
+  --card-foreground: oklch(0.25 0.04 215);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.31 0.04 250);
-  --primary: oklch(0.43 0.09 245);
+  --popover-foreground: oklch(0.25 0.04 215);
+  --primary: oklch(0.44 0.24 284);          /* ← #6246D9 violet — THE action color */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0.015 90);
-  --secondary-foreground: oklch(0.31 0.04 250);
-  --muted: oklch(0.965 0.012 90);
-  --muted-foreground: oklch(0.52 0.03 250);
-  --accent: oklch(0.95 0.02 245);
-  --accent-foreground: oklch(0.31 0.04 250);
+  --secondary: oklch(0.94 0.01 215);
+  --secondary-foreground: oklch(0.25 0.04 215);
+  --muted: oklch(0.94 0.008 215);
+  --muted-foreground: oklch(0.55 0.025 215); /* mid-tone L≈55, navy-tinted */
+  --accent: oklch(0.93 0.015 215);
+  --accent-foreground: oklch(0.25 0.04 215);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.89 0.01 250);
-  --input: oklch(0.89 0.01 250);
-  --ring: oklch(0.55 0.07 245);
+  --border: oklch(0.87 0.012 215);           /* mid-tone L≈87, navy-tinted */
+  --input: oklch(0.87 0.012 215);
+  --ring: oklch(0.44 0.18 284);              /* violet ring to match primary */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.01 90);
-  --sidebar-foreground: oklch(0.31 0.04 250);
-  --sidebar-primary: oklch(0.43 0.09 245);
+  --sidebar: oklch(0.96 0.008 215);
+  --sidebar-foreground: oklch(0.25 0.04 215);
+  --sidebar-primary: oklch(0.44 0.24 284);   /* violet */
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.96 0.015 90);
-  --sidebar-accent-foreground: oklch(0.31 0.04 250);
-  --sidebar-border: oklch(0.89 0.01 250);
-  --sidebar-ring: oklch(0.55 0.07 245);
+  --sidebar-accent: oklch(0.94 0.01 215);
+  --sidebar-accent-foreground: oklch(0.25 0.04 215);
+  --sidebar-border: oklch(0.87 0.012 215);
+  --sidebar-ring: oklch(0.44 0.18 284);      /* violet */
 
-  /* ─── Brand ─── */
+  /* ─── Brand (navy — environment only: logo, header, wordmark) ─── */
   --brand: #0f4c81;
   --brand-hover: #0b3d68;
   --brand-strong: #1d293d;
 
   /* ─── Surfaces ───
-   * `--surface-page` was `#eef2f6` (≈1.04:1 against the `#fffdf8` panel) —
-   * too close for cards to lift. Cooled/darkened to `#e4e9ef` (≈1.07:1,
-   * stays within Swiss-paper warmth) so `--shadow-card` reads visually. */
+   * Navy-tinted neutral foundation. `--surface-page` uses a cooled navy-tint
+   * gray so cards (white `--surface-panel`) lift clearly. The slight warmth
+   * of the panel creates a paper-like content feel within the cool system. */
   --surface-page: #e4e9ef;
-  --surface-panel: #fffdf8;
-  --surface-input: #f5f8fb;
+  --surface-panel: #f8fafc;
+  --surface-input: #f1f5f9;
   --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
   --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
 
-  /* ─── Accent (Evidara violet) ─────────────────────────────────────────
-   * Used for **state signalling on non-destructive UI** — active tab
-   * indicators, active filter pills, count bubbles on tabs. NEVER used
-   * for the primary CTA (that stays `--brand`) and NEVER for destructive
-   * states (that stays `--destructive`). See design-system.md
-   * §"Accent-core token family". */
-  --accent-core: oklch(0.55 0.24 285);
+  /* ─── Accent (Evidara violet #6246D9) ─────────────────────────────────
+   * The ONE action color. Used for CTAs ("Suchen" button), active tabs,
+   * active filter pills, links, count bubbles. Navy (`--brand`) stays as
+   * environment/identity. Destructive states stay `--destructive`.
+   * See design-system.md §"Accent-core token family". */
+  --accent-core: #6246D9;
   --accent-core-foreground: oklch(0.985 0 0);
   --accent-core-subtle: color-mix(in oklab, var(--accent-core) 14%, transparent);
   --accent-core-muted: color-mix(in oklab, var(--accent-core) 22%, transparent);
 
-  /* ─── Interactive ─── */
-  --interactive-accent-subtle: rgb(15 76 129 / 8%);
-  --interactive-accent-muted: rgb(15 76 129 / 14%);
+  /* ─── Interactive (violet-tinted, not navy-tinted) ─── */
+  --interactive-accent-subtle: rgb(98 70 217 / 8%);
+  --interactive-accent-muted: rgb(98 70 217 / 14%);
 
   /* ─── Focus ─── */
-  /* Cross-surface parity: admin MUI mirrors this via
-     outline: 2px solid rgba(15, 76, 129, 0.24) + outlineOffset: 2
-     in AdminApp.tsx GlobalStyles + MuiButton/MuiListItemButton overrides.
-     See legal-search design-system.md → Focus rings. */
-  --focus-ring: rgb(15 76 129 / 24%);
+  /* Violet focus ring matches the action color for visual consistency.
+     Admin MUI should mirror: outline: 2px solid rgba(98, 70, 217, 0.24). */
+  --focus-ring: rgb(98 70 217 / 24%);
 
   /* ─── Attention (warm highlight, distinct from brand) ─── */
   --attention: #92400e;
@@ -183,7 +181,7 @@
   --status-info-subtle: #eff6ff;
 
   /* ─── Tabs (Radix line: indicator + active weight) ─── */
-  --tab-indicator-color: var(--brand);
+  --tab-indicator-color: var(--accent-core);
   --tab-active-font-weight: 700;
 
   /* ─── Elevation ─── */
@@ -214,8 +212,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.65 0.22 284);           /* lighter violet for dark mode */
+  --primary-foreground: oklch(0.15 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -225,7 +223,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.65 0.18 284);              /* violet ring */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -233,14 +231,14 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.65 0.22 284);   /* violet */
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.65 0.18 284);      /* violet */
 
-  /* ─── Brand ─── */
+  /* ─── Brand (navy — environment only in dark mode too) ─── */
   --brand: #4a9eda;
   --brand-hover: #5ab0ef;
   --brand-strong: #c7dff0;
@@ -252,12 +250,12 @@
   --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
   --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
 
-  /* ─── Interactive ─── */
-  --interactive-accent-subtle: rgb(74 158 218 / 10%);
-  --interactive-accent-muted: rgb(74 158 218 / 18%);
+  /* ─── Interactive (violet-tinted in dark mode) ─── */
+  --interactive-accent-subtle: rgb(138 118 240 / 10%);
+  --interactive-accent-muted: rgb(138 118 240 / 18%);
 
   /* ─── Focus ─── */
-  --focus-ring: rgb(74 158 218 / 30%);
+  --focus-ring: rgb(138 118 240 / 30%);
 
   /* ─── Attention ─── */
   --attention: #fbbf24;
@@ -276,13 +274,19 @@
   --status-info: #60a5fa;
   --status-info-subtle: rgba(96, 165, 250, 0.1);
 
+  /* ─── Accent (dark mode violet — lighter for contrast) ─── */
+  --accent-core: #8a76f0;
+  --accent-core-foreground: oklch(0.15 0 0);
+  --accent-core-subtle: color-mix(in oklab, var(--accent-core) 14%, transparent);
+  --accent-core-muted: color-mix(in oklab, var(--accent-core) 22%, transparent);
+
   /* ─── Tabs ─── */
-  --tab-indicator-color: var(--brand);
+  --tab-indicator-color: var(--accent-core);
   --tab-active-font-weight: 700;
 
   /* ─── Elevation ─── */
   --shadow-shell: 0 18px 56px rgb(0 0 0 / 30%);
-  --shadow-control-plane: 0 18px 40px rgb(74 158 218 / 12%);
+  --shadow-control-plane: 0 18px 40px rgb(138 118 240 / 12%);
   --shadow-panel: 0 20px 48px rgb(0 0 0 / 24%);
   --shadow-raised: 0 16px 36px rgb(0 0 0 / 18%);
   --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 6%);
@@ -429,13 +433,13 @@
   }
 
   .app-header__nav-button--active {
-    @apply bg-interactive-accent-subtle text-brand;
+    @apply bg-interactive-accent-subtle text-accent-core;
   }
 
   .app-header__control-plane {
     @apply inline-flex min-w-0 max-w-full items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
     @apply border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground;
-    @apply lg:border-brand/15 lg:bg-interactive-accent-subtle lg:text-brand lg:hover:border-brand/25 lg:hover:bg-interactive-accent-muted;
+    @apply lg:border-accent-core/15 lg:bg-interactive-accent-subtle lg:text-accent-core lg:hover:border-accent-core/25 lg:hover:bg-interactive-accent-muted;
   }
 
   .app-header__control-plane-icon {
@@ -494,7 +498,7 @@
   }
 
   .context-bar__official-toggle--active {
-    @apply border-brand/20 bg-interactive-accent-subtle text-brand;
+    @apply border-accent-core/20 bg-interactive-accent-subtle text-accent-core;
   }
 
   .context-bar__official-toggle--idle {
@@ -510,7 +514,7 @@
   }
 
   .context-bar__chip--active {
-    @apply bg-brand-strong text-white shadow-sm ring-1 ring-brand/10;
+    @apply bg-accent-core text-white shadow-sm ring-1 ring-accent-core/10;
   }
 
   .context-bar__chip--idle {
@@ -526,7 +530,7 @@
   }
 
   .context-bar__tab--active {
-    @apply bg-interactive-accent-subtle text-brand ring-1 ring-brand/10;
+    @apply bg-interactive-accent-subtle text-accent-core ring-1 ring-accent-core/10;
   }
 
   .context-bar__tab--idle {

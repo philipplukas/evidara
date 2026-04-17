@@ -258,7 +258,7 @@ export function AppHeader({
                 type="submit"
                 disabled={!hasSearchText || isSearching}
                 aria-busy={isSearching}
-                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-primary px-3.5 text-sm font-semibold text-white transition-colors hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
               >
                 {isSearching ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -283,7 +283,7 @@ export function AppHeader({
                     type="button"
                     key={query}
                     onClick={() => void handleRecentSearch(query)}
-                    className="inline-flex items-center rounded-full border border-border/60 bg-surface-panel px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-brand/30 hover:bg-interactive-accent-subtle hover:text-brand"
+                    className="inline-flex items-center rounded-full border border-border/60 bg-surface-panel px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle hover:text-accent-core"
                   >
                     {query}
                   </button>
@@ -371,7 +371,7 @@ export function AppHeader({
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wider transition-colors
                   ${
                     locale === loc
-                      ? "bg-brand text-white"
+                      ? "bg-accent-core text-white"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
               >
@@ -385,9 +385,9 @@ export function AppHeader({
             <button
               type="button"
               aria-label={t("header.openUserMenu")}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-interactive-accent-muted transition-colors hover:bg-brand/20"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-interactive-accent-muted transition-colors hover:bg-accent-core/20"
             >
-              <User className="h-4 w-4 text-brand" />
+              <User className="h-4 w-4 text-accent-core" />
             </button>
           </div>
         </div>

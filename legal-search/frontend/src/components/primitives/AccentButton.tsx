@@ -31,8 +31,8 @@ export function AccentButton({
       className={`flex items-center gap-1 min-h-11 sm:min-h-0 px-3 py-2 sm:px-2 sm:py-1 rounded text-micro font-medium transition-all
         ${
           active
-            ? "text-brand bg-interactive-accent-muted"
-            : "text-muted-foreground hover:text-brand hover:bg-interactive-accent-subtle"
+            ? "text-accent-core bg-interactive-accent-muted"
+            : "text-muted-foreground hover:text-accent-core hover:bg-interactive-accent-subtle"
         } ${className}`}
     >
       {children}

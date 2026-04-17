@@ -29,7 +29,7 @@ export function ResultSetScopeBar() {
         <button
           type="button"
           onClick={() => dispatch({ type: "BACK" })}
-          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border/70 bg-surface-panel px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-brand/30 hover:text-foreground"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border/70 bg-surface-panel px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-accent-core/30 hover:text-foreground"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           {t("back")}

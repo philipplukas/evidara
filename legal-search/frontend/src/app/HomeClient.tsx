@@ -71,7 +71,7 @@ export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: H
               <div className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-full bg-muted/90" />
                 <div className="h-4 flex-1 rounded-full bg-muted/70" />
-                <div className="h-9 w-20 rounded-xl bg-brand/90" />
+                <div className="h-9 w-20 rounded-xl bg-primary/90" />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <div className="h-8 w-24 rounded-full bg-muted/80" />

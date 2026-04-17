@@ -16,7 +16,7 @@ describe("High-impact interaction controls", () => {
     const austriaChip = screen.getByRole("button", { name: /Austria/ });
     expect(austriaChip.className).toContain("bg-muted");
     fireEvent.click(austriaChip);
-    expect(austriaChip.className).toContain("bg-brand-strong");
+    expect(austriaChip.className).toContain("bg-accent-core");
 
     const decisionsTab = screen.getByRole("button", { name: /Court decisions|Urteile/ });
     fireEvent.click(decisionsTab);

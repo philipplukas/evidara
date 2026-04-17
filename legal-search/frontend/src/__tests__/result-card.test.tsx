@@ -98,7 +98,7 @@ describe("ResultCard", () => {
     );
 
     const article = container.querySelector("article");
-    expect(article?.className).toContain("border-l-brand");
+    expect(article?.className).toContain("border-l-accent-core");
     expect(article?.getAttribute("aria-current")).toBe("true");
     expect(screen.getByText("Ausgewählt")).toBeInTheDocument();
   });

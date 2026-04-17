@@ -98,7 +98,7 @@ export function ResultList({
         role="status"
         aria-live="polite"
       >
-        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mb-4" />
+        <div className="w-8 h-8 border-2 border-accent-core border-t-transparent rounded-full animate-spin mb-4" />
         <p className="text-sm font-medium text-foreground">Searching current scope…</p>
         <p className="mt-1 max-w-sm text-xs text-muted-foreground">{scopeTrail}</p>
       </div>
@@ -160,7 +160,7 @@ export function ResultList({
             onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border
               bg-background px-4 py-3 text-sm font-medium text-muted-foreground transition-colors
-              hover:border-brand/20 hover:bg-muted/40 hover:text-foreground"
+              hover:border-accent-core/20 hover:bg-muted/40 hover:text-foreground"
           >
             <span>Load more results</span>
             <ArrowRight className="h-3.5 w-3.5" />
