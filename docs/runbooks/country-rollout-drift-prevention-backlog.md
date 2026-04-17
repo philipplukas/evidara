@@ -28,37 +28,19 @@ Work that reduces duplication, hardens invariants, and finishes the
 rollout-platform seam. All additive, none blocks on live acquisition
 runs or operator work.
 
-### 1.1 Authorities deduplication
+### 1.1 Authorities deduplication ✅ LANDED
 
-**Problem:** Authority rows live in two places today —
-`platform-control/seeds/reference/authorities.yaml` (19 rows across
-all countries) and each `country-overlays/<iso>/reference-data.yaml`
-(same rows duplicated per country). Drift is guaranteed.
+**Problem:** Authority rows lived in two places — `platform-control/seeds/reference/authorities.yaml` and each `country-overlays/<iso>/reference-data.yaml`. Drift was guaranteed.
 
-**Target:** Seeds become the single source of truth. Overlay
-`reference-data.yaml` references authority IDs instead of re-embedding
-rows.
+**Outcome:** Seeds are now the single source of truth. Each overlay
+`reference-data.yaml` carries only `jurisdiction_id` (single string)
+and `authority_ids` (string list). The validator cross-checks every ID
+against the seed index and fails on unknown authority IDs or
+jurisdiction mismatches. Schema enforces the new shape; embedded
+`authorities[]` arrays in overlays are no longer valid. 2 new negative
+tests cover unknown-authority and jurisdiction-mismatch drift classes.
 
-**Steps:**
-1. Update `contracts/schemas/country-overlay.schema.json`:
-   `reference-data.yaml` gains an optional `authority_ids` list (string
-   array matching `^auth_[a-z0-9_]+$`). Existing `authorities[]` remains
-   valid until all overlays migrate.
-2. `scripts/check_country_overlay_files.py` cross-check: if
-   `authority_ids` present, each ID MUST exist in
-   `seeds/reference/authorities.yaml` with matching `jurisdiction_id`.
-3. Migrate CH/AT/DE/FR/IT/EU `reference-data.yaml` to use
-   `authority_ids` shape; delete the embedded `authorities[]` rows.
-4. Add per-country `required_authority_ids` to `check_country_overlay_files.py`
-   (already exists); verify it still passes post-migration.
-5. Remove now-dead code paths in anything that reads authority rows from
-   overlay files.
-
-**Files:** `contracts/schemas/country-overlay.schema.json`,
-`scripts/check_country_overlay_files.py`, all six
-`country-overlays/*/reference-data.yaml`.
-
-**Estimated size:** ~200 LOC net (mostly removal).
+**Landed in:** commit following `1220c66`, same branch.
 
 ### 1.2 Shared operator copy
 
@@ -154,17 +136,16 @@ canonical tier word in code paths, localized labels in UI.
 
 **Estimated size:** ~200 LOC token churn, no behavior change.
 
-### 1.6 Per-country authority-seed expansion
+### 1.6 Per-country authority-seed expansion ✅ LANDED
 
-**Problem:** Today's seeds have thin DE (2 rows) and FR (2 rows)
-coverage. Overlays reference only what exists.
+**Outcome:** `platform-control/seeds/reference/authorities.yaml` grew
+from 19 to 30 rows. DE: 2 → 7 (added BGH, BVerwG, BFH, BAG, BSG). FR: 2
+→ 4 (added Conseil d'État, Conseil constitutionnel). IT: 4 → 5 (added
+Corte Costituzionale). Per-country `REQUIRED_AUTHORITIES` minimums in
+the validator tightened accordingly. DE/FR/IT overlays now cite these
+richer sets.
 
-**Target:** Flesh out DE/FR/IT authorities to match CH/AT thoroughness
-— at least constitutional, supreme, appellate, and one administrative
-authority per country, plus the federal publication authority.
-
-**Files:** `platform-control/seeds/reference/authorities.yaml`.
-**Estimated size:** ~40 rows added.
+**Landed in:** commit following `1220c66`, same branch.
 
 ## Tier 2 — Design decisions pending
 

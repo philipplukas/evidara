@@ -1,17 +1,15 @@
 version: 1
 country_code: FR
 
-jurisdictions:
-  - jurisdiction_id: jur_fr
-    slug: fr
-    name: France
+# Canonical reference data lives in platform-control/seeds/reference/
+# {jurisdictions,authorities}.yaml. This file cites IDs only so the
+# overlay stays in sync without duplication; the validator cross-checks
+# every ID against the seed index.
 
-authorities:
-  - authority_id: auth_fr_legifrance
-    jurisdiction_id: jur_fr
-    slug: fr-legifrance
-    name: Légifrance
-  - authority_id: auth_fr_ccass
-    jurisdiction_id: jur_fr
-    slug: fr-ccass
-    name: Cour de cassation
+jurisdiction_id: jur_fr
+
+authority_ids:
+  - auth_fr_legifrance
+  - auth_fr_ccass
+  - auth_fr_ce
+  - auth_fr_cc

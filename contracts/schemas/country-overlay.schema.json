@@ -100,38 +100,23 @@
       "additionalProperties": false
     },
     "referenceDataFile": {
-      "description": "reference-data.yaml — jurisdiction and authority records referenced by the overlay. Mirrors platform-control/seeds/reference/*.yaml shape.",
+      "description": "reference-data.yaml — jurisdiction and authority references used by the overlay. The canonical rows live in platform-control/seeds/reference/*.yaml; overlays cite IDs only so there is one source of truth.",
       "type": "object",
-      "required": ["version", "country_code", "jurisdictions", "authorities"],
+      "required": ["version", "country_code", "jurisdiction_id", "authority_ids"],
       "properties": {
         "version": { "type": "integer", "minimum": 1 },
         "country_code": { "$ref": "#/$defs/countryCode" },
-        "jurisdictions": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "required": ["jurisdiction_id", "slug", "name"],
-            "properties": {
-              "jurisdiction_id": { "type": "string", "pattern": "^jur_[a-z0-9_]+$" },
-              "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-              "name": { "type": "string" }
-            }
-          }
+        "jurisdiction_id": {
+          "description": "Canonical jurisdiction reference. Must match a jurisdiction_id in platform-control/seeds/reference/jurisdictions.yaml.",
+          "type": "string",
+          "pattern": "^jur_[a-z0-9_]+$"
         },
-        "authorities": {
+        "authority_ids": {
+          "description": "Canonical authority references. Each ID must exist in platform-control/seeds/reference/authorities.yaml with matching jurisdiction_id.",
           "type": "array",
           "minItems": 1,
-          "items": {
-            "type": "object",
-            "required": ["authority_id", "jurisdiction_id", "slug", "name"],
-            "properties": {
-              "authority_id": { "type": "string", "pattern": "^auth_[a-z0-9_]+$" },
-              "jurisdiction_id": { "type": "string", "pattern": "^jur_[a-z0-9_]+$" },
-              "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-              "name": { "type": "string" }
-            }
-          }
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^auth_[a-z0-9_]+$" }
         }
       },
       "additionalProperties": false

@@ -49,10 +49,10 @@ OVERLAY_FILES = ("overlay.yaml", "reference-data.yaml", "user-content.yaml", "op
 REQUIRED_AUTHORITIES: dict[str, set[str]] = {
     "AT": {"auth_at_ris", "auth_at_ogh", "auth_at_vfgh", "auth_at_vwgh"},
     "CH": {"auth_ch_fedlex", "auth_ch_bundesgericht"},
-    "IT": {"auth_it_gazzetta", "auth_it_normattiva", "auth_it_cassazione"},
+    "DE": {"auth_de_bundesrecht", "auth_de_bverfg", "auth_de_bgh"},
+    "FR": {"auth_fr_legifrance", "auth_fr_ccass", "auth_fr_ce"},
+    "IT": {"auth_it_gazzetta", "auth_it_normattiva", "auth_it_cassazione", "auth_it_cost"},
     "EU": {"auth_eu_eurlex", "auth_eu_cjeu"},
-    "DE": set(),
-    "FR": set(),
 }
 
 _HIERARCHY_PATH_RE = re.compile(r"^[a-z]{2}(/[a-z-]+(/[a-z0-9-]+)?)?$")
@@ -194,16 +194,51 @@ def evaluate(country: str, root: Path) -> tuple[int, list[str]]:
         errors.append(f"platform-control jurisdiction seeds must include {jur_id}")
 
     seed_authorities = _load_yaml(seeds_dir / "authorities.yaml").get("items") or []
-    existing_authority_ids = {
-        item.get("authority_id")
+    seed_authority_index = {
+        item.get("authority_id"): item.get("jurisdiction_id")
         for item in seed_authorities
-        if isinstance(item, dict) and item.get("jurisdiction_id") == jur_id
+        if isinstance(item, dict)
     }
+    existing_authority_ids = {
+        aid for aid, jid in seed_authority_index.items() if jid == jur_id
+    }
+
     required_auth = REQUIRED_AUTHORITIES.get(country, set())
-    missing = sorted(required_auth - existing_authority_ids)
-    if missing:
+    missing_in_seeds = sorted(required_auth - existing_authority_ids)
+    if missing_in_seeds:
         errors.append(
-            f"platform-control authority seeds missing {country} IDs: {', '.join(missing)}"
+            f"platform-control authority seeds missing {country} IDs: "
+            f"{', '.join(missing_in_seeds)}"
+        )
+
+    # ─── reference-data.yaml must reference canonical seed IDs ───
+    overlay_jurisdiction_id = reference_data.get("jurisdiction_id")
+    if overlay_jurisdiction_id != jur_id:
+        errors.append(
+            f"reference-data.yaml jurisdiction_id must be {jur_id!r}, got "
+            f"{overlay_jurisdiction_id!r}"
+        )
+
+    overlay_authority_ids = reference_data.get("authority_ids") or []
+    if not overlay_authority_ids:
+        errors.append("reference-data.yaml authority_ids must be a non-empty list")
+    for aid in overlay_authority_ids:
+        if aid not in seed_authority_index:
+            errors.append(
+                f"reference-data.yaml references unknown authority_id {aid!r}; "
+                f"not present in platform-control/seeds/reference/authorities.yaml"
+            )
+        elif seed_authority_index[aid] != jur_id:
+            errors.append(
+                f"reference-data.yaml references authority_id {aid!r} whose "
+                f"jurisdiction_id in seeds is {seed_authority_index[aid]!r}, "
+                f"expected {jur_id!r}"
+            )
+
+    missing_in_overlay = sorted(required_auth - set(overlay_authority_ids))
+    if missing_in_overlay:
+        errors.append(
+            f"reference-data.yaml must cite at minimum: {', '.join(missing_in_overlay)}"
         )
 
     # ─── Optional JSON-Schema layer ──────────────────────────

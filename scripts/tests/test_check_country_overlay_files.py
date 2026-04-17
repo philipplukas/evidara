@@ -85,8 +85,8 @@ class NegativeCaseTests(unittest.TestCase):
         self._write_yaml(overlay_root / "reference-data.yaml", {
             "version": 1,
             "country_code": country,
-            "jurisdictions": [{"jurisdiction_id": f"jur_{iso_lower}", "slug": iso_lower, "name": country}],
-            "authorities": [{"authority_id": f"auth_{iso_lower}_test", "jurisdiction_id": f"jur_{iso_lower}", "slug": f"{iso_lower}-test", "name": "Test"}],
+            "jurisdiction_id": f"jur_{iso_lower}",
+            "authority_ids": [f"auth_{iso_lower}_test"],
         })
 
         vocab_dir = root / "contracts" / "vocabularies"
@@ -112,9 +112,22 @@ class NegativeCaseTests(unittest.TestCase):
             seeds_dir / "jurisdictions.yaml",
             {"version": 1, "items": [{"jurisdiction_id": f"jur_{iso_lower}", "slug": iso_lower}]},
         )
+        # Seeds include the scaffold's cited authority so the
+        # overlay-reference check passes; negative tests override this as
+        # needed to trigger specific drift classes.
         self._write_yaml(
             seeds_dir / "authorities.yaml",
-            {"version": 1, "items": []},
+            {
+                "version": 1,
+                "items": [
+                    {
+                        "authority_id": f"auth_{iso_lower}_test",
+                        "jurisdiction_id": f"jur_{iso_lower}",
+                        "slug": f"{iso_lower}-test",
+                        "name": "Test",
+                    }
+                ],
+            },
         )
 
     def test_missing_required_authorities_fails(self) -> None:
@@ -146,6 +159,79 @@ class NegativeCaseTests(unittest.TestCase):
             exit_code, errors = MODULE.evaluate(country="CH", root=root)
             self.assertEqual(exit_code, 1)
             self.assertTrue(any("invalid hierarchy_path" in e for e in errors), errors)
+
+    def test_authority_id_not_in_seeds_fails(self) -> None:
+        """Overlay may not reference an authority that doesn't exist in seeds."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._scaffold_minimal_root(root, "CH")
+            # Overlay cites an authority not in seeds.
+            self._write_yaml(
+                root / "country-overlays" / "ch" / "reference-data.yaml",
+                {
+                    "version": 1,
+                    "country_code": "CH",
+                    "jurisdiction_id": "jur_ch",
+                    "authority_ids": ["auth_ch_test", "auth_ch_ghost"],
+                },
+            )
+            # Seeds only have auth_ch_test.
+            self._write_yaml(
+                root / "platform-control" / "seeds" / "reference" / "authorities.yaml",
+                {
+                    "version": 1,
+                    "items": [
+                        {
+                            "authority_id": "auth_ch_test",
+                            "jurisdiction_id": "jur_ch",
+                            "slug": "ch-test",
+                            "name": "Test",
+                        }
+                    ],
+                },
+            )
+            exit_code, errors = MODULE.evaluate(country="CH", root=root)
+            self.assertEqual(exit_code, 1)
+            self.assertTrue(
+                any("auth_ch_ghost" in e and "unknown" in e for e in errors),
+                errors,
+            )
+
+    def test_authority_jurisdiction_mismatch_fails(self) -> None:
+        """Overlay may not reference an authority whose seed jurisdiction disagrees."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._scaffold_minimal_root(root, "CH")
+            self._write_yaml(
+                root / "country-overlays" / "ch" / "reference-data.yaml",
+                {
+                    "version": 1,
+                    "country_code": "CH",
+                    "jurisdiction_id": "jur_ch",
+                    "authority_ids": ["auth_foreign"],
+                },
+            )
+            # auth_foreign is defined but under a different jurisdiction.
+            self._write_yaml(
+                root / "platform-control" / "seeds" / "reference" / "authorities.yaml",
+                {
+                    "version": 1,
+                    "items": [
+                        {
+                            "authority_id": "auth_foreign",
+                            "jurisdiction_id": "jur_at",
+                            "slug": "foreign",
+                            "name": "Foreign",
+                        }
+                    ],
+                },
+            )
+            exit_code, errors = MODULE.evaluate(country="CH", root=root)
+            self.assertEqual(exit_code, 1)
+            self.assertTrue(
+                any("jur_at" in e and "auth_foreign" in e for e in errors),
+                errors,
+            )
 
     def test_unknown_language_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

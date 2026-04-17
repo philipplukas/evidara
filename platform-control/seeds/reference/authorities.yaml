@@ -45,6 +45,26 @@ items:
     jurisdiction_id: jur_de
     slug: de-bverfg
     name: Bundesverfassungsgericht
+  - authority_id: auth_de_bgh
+    jurisdiction_id: jur_de
+    slug: de-bgh
+    name: Bundesgerichtshof
+  - authority_id: auth_de_bverwg
+    jurisdiction_id: jur_de
+    slug: de-bverwg
+    name: Bundesverwaltungsgericht
+  - authority_id: auth_de_bfh
+    jurisdiction_id: jur_de
+    slug: de-bfh
+    name: Bundesfinanzhof
+  - authority_id: auth_de_bag
+    jurisdiction_id: jur_de
+    slug: de-bag
+    name: Bundesarbeitsgericht
+  - authority_id: auth_de_bsg
+    jurisdiction_id: jur_de
+    slug: de-bsg
+    name: Bundessozialgericht
 
   # ─── France ─────────────────────────────────────────────────
   - authority_id: auth_fr_legifrance
@@ -55,6 +75,14 @@ items:
     jurisdiction_id: jur_fr
     slug: fr-ccass
     name: Cour de cassation
+  - authority_id: auth_fr_ce
+    jurisdiction_id: jur_fr
+    slug: fr-ce
+    name: Conseil d'État
+  - authority_id: auth_fr_cc
+    jurisdiction_id: jur_fr
+    slug: fr-cc
+    name: Conseil constitutionnel
 
   # ─── Italy ──────────────────────────────────────────────────
   - authority_id: auth_it_gazzetta
@@ -73,6 +101,10 @@ items:
     jurisdiction_id: jur_it
     slug: it-cds
     name: Consiglio di Stato
+  - authority_id: auth_it_cost
+    jurisdiction_id: jur_it
+    slug: it-cost
+    name: Corte Costituzionale
 
   # ─── European Union ─────────────────────────────────────────
   - authority_id: auth_eu_eurlex

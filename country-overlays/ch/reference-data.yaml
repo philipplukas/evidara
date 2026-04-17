@@ -1,25 +1,15 @@
 version: 1
 country_code: CH
 
-jurisdictions:
-  - jurisdiction_id: jur_ch
-    slug: ch
-    name: Switzerland
+# Canonical reference data lives in platform-control/seeds/reference/
+# {jurisdictions,authorities}.yaml. This file cites IDs only so the
+# overlay stays in sync without duplication; the validator cross-checks
+# every ID against the seed index.
 
-authorities:
-  - authority_id: auth_ch_fedlex
-    jurisdiction_id: jur_ch
-    slug: ch-fedlex
-    name: Fedlex
-  - authority_id: auth_ch_bundesgericht
-    jurisdiction_id: jur_ch
-    slug: ch-bger
-    name: Bundesgericht
-  - authority_id: auth_ch_bundesverwaltungsgericht
-    jurisdiction_id: jur_ch
-    slug: ch-bvger
-    name: Bundesverwaltungsgericht
-  - authority_id: auth_zh_admin
-    jurisdiction_id: jur_ch
-    slug: zh-admin-court
-    name: Zurich Administrative Court
+jurisdiction_id: jur_ch
+
+authority_ids:
+  - auth_ch_fedlex
+  - auth_ch_bundesgericht
+  - auth_ch_bundesverwaltungsgericht
+  - auth_zh_admin

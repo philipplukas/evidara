@@ -1,17 +1,18 @@
 version: 1
 country_code: DE
 
-jurisdictions:
-  - jurisdiction_id: jur_de
-    slug: de
-    name: Germany
+# Canonical reference data lives in platform-control/seeds/reference/
+# {jurisdictions,authorities}.yaml. This file cites IDs only so the
+# overlay stays in sync without duplication; the validator cross-checks
+# every ID against the seed index.
 
-authorities:
-  - authority_id: auth_de_bundesrecht
-    jurisdiction_id: jur_de
-    slug: de-bundesrecht
-    name: Bundesrecht (gesetze-im-internet.de)
-  - authority_id: auth_de_bverfg
-    jurisdiction_id: jur_de
-    slug: de-bverfg
-    name: Bundesverfassungsgericht
+jurisdiction_id: jur_de
+
+authority_ids:
+  - auth_de_bundesrecht
+  - auth_de_bverfg
+  - auth_de_bgh
+  - auth_de_bverwg
+  - auth_de_bfh
+  - auth_de_bag
+  - auth_de_bsg
