@@ -17,7 +17,15 @@ const nextConfig: NextConfig = {
   turbopack: {
     // Widen the Turbopack root to the monorepo so globals.css can
     // @import the shared design tokens at styles/tokens/tokens.css.
-    // Matches platform-control/admin/next.config.ts.
+    //
+    // Without this, `next dev` panics at compile time with
+    // `FileSystemPath("").join("../../styles/tokens/tokens.css") leaves
+    // the filesystem root` and returns HTTP 500. `next build` succeeds
+    // (prod CSS bundling takes a different path), so the bug hides
+    // from local production checks and only surfaces when Playwright's
+    // webServer: `npm run dev` crashes — frontend-visual-regression
+    // and interaction-flow-evidence then screenshot the 500 page.
+    // Must match the Docker build context root (see Dockerfile).
     root: path.resolve(__dirname, "../.."),
   },
 };
