@@ -4,7 +4,8 @@
         unique_key='processing_manifest_id',
         incremental_strategy='merge',
         on_schema_change='merge',
-        comment='Fact at processing-manifest grain: one row per processing attempt.'
+        comment='Fact at processing-manifest grain: one row per processing attempt.',
+        post_hook=["{{ zorder_by(['document_id', 'document_version_id', 'canonical_ready_at']) }}"]
     )
 }}
 

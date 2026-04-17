@@ -1,7 +1,8 @@
 {{
     config(
         materialized='table',
-        comment='Text chunks ready for vector embedding.'
+        comment='Text chunks ready for vector embedding.',
+        post_hook=["{{ zorder_by(['document_version_id', 'section_id']) }}"]
     )
 }}
 

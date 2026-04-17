@@ -1,7 +1,8 @@
 {{
     config(
         materialized='table',
-        comment='Chunk-level serving model for search and vector ingestion.'
+        comment='Chunk-level serving model for search and vector ingestion.',
+        post_hook=["{{ zorder_by(['document_id', 'document_version_id']) }}"]
     )
 }}
 
