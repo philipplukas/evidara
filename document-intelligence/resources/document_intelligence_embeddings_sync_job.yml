@@ -1,0 +1,40 @@
+resources:
+  jobs:
+    document_intelligence_embeddings_sync:
+      name: document-intelligence-embeddings-sync
+      description: >
+        Create (first run) or trigger sync of the Mosaic AI Vector Search
+        index that backs srv_search_chunks. Embedding is delegated to a
+        Databricks foundation-model endpoint. Idempotent.
+      queue:
+        enabled: true
+      email_notifications:
+        on_failure:
+          - ${var.alert_email}
+        no_alert_for_skipped_runs: true
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: vector_endpoint_name
+          default: ${var.vector_endpoint_name}
+        - name: vector_index_name
+          default: ${var.vector_index_name}
+        - name: embedding_model_endpoint
+          default: databricks-bge-large-en
+      tasks:
+        - task_key: vector_index_sync
+          notebook_task:
+            notebook_path: ./databricks/notebooks/03_vector_index_sync.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              vector_endpoint_name: "{{job.parameters.vector_endpoint_name}}"
+              vector_index_name: "{{job.parameters.vector_index_name}}"
+              embedding_model_endpoint: "{{job.parameters.embedding_model_endpoint}}"
+          max_retries: 2
+          min_retry_interval_millis: 120000
+          timeout_seconds: 5400
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: ${var.num_workers}
+            policy_id: ${var.compute_guardrails_policy_id}

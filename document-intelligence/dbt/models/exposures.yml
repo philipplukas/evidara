@@ -21,14 +21,16 @@ exposures:
     type: ml
     label: Vector search index
     description: >
-      Mosaic AI Vector Search index (or external vector DB) built from
-      embeddings_ready chunks. Sync job lives in the bundle as
+      Mosaic AI Vector Search index backing srv_search_chunks. Embedding is
+      delegated to a Databricks foundation-model endpoint (default:
+      databricks-bge-large-en). Sync job lives in the bundle as
       document_intelligence_embeddings_sync.
-    maturity: low
+    maturity: medium
     owner:
       name: Evidara Platform
       email: platform@evidara.example
     depends_on:
+      - ref('srv_search_chunks')
       - ref('embeddings_ready')
 
   - name: processing_analytics
