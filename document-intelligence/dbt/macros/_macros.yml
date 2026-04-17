@@ -1,0 +1,29 @@
+version: 2
+
+macros:
+  - name: generate_hash_id
+    description: >
+      Return SHA2-256 over concat_ws('||', ...) of the provided columns.
+      Non-string inputs are cast to string. Used to derive surrogate keys
+      (document_id, document_version_id, section_id, chunk_id, entity_id,
+      relation_id) deterministically from natural keys.
+    arguments:
+      - name: columns
+        type: list[str]
+        description: Column expressions to concatenate before hashing.
+
+  - name: approx_token_chars
+    description: >
+      Heuristic conversion from token count to character count (4 chars per
+      token). Swap the body when a real tokenizer UDF is available without
+      touching every call site.
+    arguments:
+      - name: tokens
+        type: int | str
+        description: Token count (literal or column expression).
+
+  - name: generate_schema_name
+    description: >
+      Custom schema resolver for Unity Catalog. Uses the custom schema
+      verbatim instead of prepending the target schema, because environment
+      isolation lives at the catalog level.

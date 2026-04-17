@@ -35,7 +35,7 @@ exploded_relations as (
     where relations_json is not null
 )
 select
-    sha2(concat_ws('||', document_version_id, section_idx, cast(rel_pos as string)), 256) as relation_id,
+    {{ generate_hash_id(["document_version_id", "section_idx", "rel_pos"]) }} as relation_id,
     document_version_id,
     section_idx,
     rel.head_text,
