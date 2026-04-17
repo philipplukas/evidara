@@ -122,9 +122,9 @@
       "additionalProperties": false
     },
     "userContentFile": {
-      "description": "user-content.yaml — end-user-facing filter labels, subtitle pattern, translation indicators, empty-state copy.",
+      "description": "user-content.yaml — end-user-facing filter labels, subtitle pattern, translation indicators, empty-state copy. Per-country files MAY omit fields that the shared default under country-overlays/_shared/user-content.yaml already provides; the merged view (see platform_control.overlays.loader.load_user_content) must contain `filters` and `result_subtitle_pattern` together.",
       "type": "object",
-      "required": ["version", "country_code", "filters"],
+      "required": ["version", "country_code"],
       "properties": {
         "version": { "type": "integer", "minimum": 1 },
         "country_code": { "$ref": "#/$defs/countryCode" },

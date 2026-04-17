@@ -1,6 +1,10 @@
 version: 1
 country_code: AT
 
+# result_subtitle_pattern, detail_copy.translation_indicator defaults:
+# inherited from country-overlays/_shared/user-content.yaml. Override
+# here only when AT diverges.
+
 filters:
   jurisdiction:
     label: Jurisdiction
@@ -14,9 +18,6 @@ filters:
   official_only:
     label: Official sources only
     helper_text: Restricts to authoritative Austrian public sources.
-
-result_subtitle_pattern:
-  template: "{jurisdiction} • {source_type} • {court_or_authority} • {effective_date}"
 
 detail_copy:
   translation_indicator:

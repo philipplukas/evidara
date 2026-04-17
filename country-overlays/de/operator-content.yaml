@@ -1,6 +1,9 @@
 version: 1
 country_code: DE
 
+# triage_overlays defaults and the "authority taxonomy correctness"
+# approval hotspot are inherited from _shared/.
+
 onboarding_checklist:
   - Confirm scope maps to jurisdiction code DE.
   - Confirm source family mapping for Gesetze, Verordnungen, and Urteile.
@@ -11,14 +14,6 @@ approval_hotspots:
   - authority taxonomy correctness
   - state-level labels diverging from canonical keys
   - federal vs Länder hierarchy-path boundary
-
-triage_overlays:
-  mapping_drift:
-    first_action: Compare incoming authority/jurisdiction labels against canonical DE mapping.
-    escalation_owner: platform-control
-  search_projection_mismatch:
-    first_action: Verify processed-event projection parity for DE-tagged documents.
-    escalation_owner: legal-search
 
 status: scaffold-only
 status_note: |

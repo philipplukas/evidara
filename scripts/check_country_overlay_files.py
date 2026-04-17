@@ -65,8 +65,25 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _load_yaml_if_exists(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return _load_yaml(path)
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Mirror platform_control.overlays.loader._deep_merge for validator use."""
+    result: dict[str, Any] = dict(base)
+    for key, value in override.items():
+        if isinstance(result.get(key), dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
 
 
 def evaluate(country: str, root: Path) -> tuple[int, list[str]]:
@@ -103,6 +120,16 @@ def evaluate(country: str, root: Path) -> tuple[int, list[str]]:
     user_content = _load_yaml(overlay_root / "user-content.yaml")
     operator_content = _load_yaml(overlay_root / "operator-content.yaml")
 
+    # Merged views mirror what platform_control.overlays.loader produces
+    # at runtime. Certain downstream invariants only hold on the merged
+    # view (e.g. "every overlay has a result_subtitle_pattern") because
+    # _shared/ supplies the default.
+    shared_dir = root / "country-overlays" / "_shared"
+    shared_user_content = _load_yaml_if_exists(shared_dir / "user-content.yaml")
+    shared_operator_content = _load_yaml_if_exists(shared_dir / "operator-content.yaml")
+    merged_user_content = _deep_merge(shared_user_content, user_content)
+    merged_operator_content = _deep_merge(shared_operator_content, operator_content)
+
     for name, payload in [
         ("overlay.yaml", overlay),
         ("reference-data.yaml", reference_data),
@@ -111,6 +138,18 @@ def evaluate(country: str, root: Path) -> tuple[int, list[str]]:
     ]:
         if payload.get("country_code") != country:
             errors.append(f"{name} must declare country_code: {country}")
+
+    # Invariants on the merged view.
+    if "result_subtitle_pattern" not in merged_user_content:
+        errors.append(
+            "merged user-content must contain result_subtitle_pattern "
+            "(either per-country or from _shared/user-content.yaml)"
+        )
+    if "triage_overlays" not in merged_operator_content:
+        errors.append(
+            "merged operator-content must contain triage_overlays "
+            "(either per-country or from _shared/operator-content.yaml)"
+        )
 
     jurisdiction_overlay = overlay.get("jurisdiction_overlay")
     if not isinstance(jurisdiction_overlay, dict):

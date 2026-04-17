@@ -1,6 +1,9 @@
 version: 1
 country_code: IT
 
+# triage_overlays defaults and the "authority taxonomy correctness"
+# approval hotspot are inherited from _shared/.
+
 onboarding_checklist:
   - Confirm scope maps to jurisdiction code IT.
   - Confirm source family mapping for leggi, decreti legislativi, and sentenze.
@@ -11,11 +14,3 @@ approval_hotspots:
   - authority taxonomy correctness
   - inconsistent metadata quality across decisions (known historical drift)
   - federal vs regional hierarchy-path boundary
-
-triage_overlays:
-  mapping_drift:
-    first_action: Compare incoming authority/jurisdiction labels against canonical IT mapping.
-    escalation_owner: platform-control
-  search_projection_mismatch:
-    first_action: Verify processed-event projection parity for IT-tagged documents.
-    escalation_owner: legal-search

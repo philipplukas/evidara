@@ -1,6 +1,9 @@
 version: 1
 country_code: CH
 
+# triage_overlays defaults and the "authority taxonomy correctness"
+# approval hotspot are inherited from _shared/.
+
 onboarding_checklist:
   - Confirm scope maps to jurisdiction code CH.
   - Confirm source family mapping for laws, decisions, and commentary.
@@ -11,11 +14,3 @@ approval_hotspots:
   - authority taxonomy correctness
   - canton naming consistency in filters
   - federal vs cantonal hierarchy-path boundary
-
-triage_overlays:
-  mapping_drift:
-    first_action: Compare incoming authority/jurisdiction labels against canonical CH mapping.
-    escalation_owner: platform-control
-  search_projection_mismatch:
-    first_action: Verify processed-event projection parity for CH-tagged documents.
-    escalation_owner: legal-search

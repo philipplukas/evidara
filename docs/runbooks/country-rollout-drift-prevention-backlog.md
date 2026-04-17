@@ -42,36 +42,21 @@ tests cover unknown-authority and jurisdiction-mismatch drift classes.
 
 **Landed in:** commit following `1220c66`, same branch.
 
-### 1.2 Shared operator copy
+### 1.2 Shared operator copy ✅ LANDED
 
-**Problem:** `triage_overlays` and `detail_copy.translation_indicator`
-wording is copy-pasted across six `operator-content.yaml` and six
-`user-content.yaml` files. Any tweak requires touching six files.
+**Outcome:** `country-overlays/_shared/` now owns the default
+`result_subtitle_pattern`, the `triage_overlays` block, and the
+"authority taxonomy correctness" approval hotspot.
+`platform_control.overlays.loader` deep-merges per-country overrides
+on top and substitutes `{country_code}`. 17 unit tests cover merge and
+substitution behavior. The file-level schema relaxes to reflect that
+the shared default supplies certain fields; a new merged-view invariant
+check in `scripts/check_country_overlay_files.py` enforces that both
+`result_subtitle_pattern` and `triage_overlays` still appear in the
+merged payload even if the per-country file omits them. All 6 country
+overlays pass post-migration.
 
-**Target:** `country-overlays/_shared/operator-content.yaml` and
-`_shared/user-content.yaml` own the default strings; per-country files
-override only the values that truly differ (language choice, country
-name in helper text).
-
-**Steps:**
-1. Ship `country-overlays/_shared/` directory with default
-   `operator-content.yaml` and `user-content.yaml`.
-2. Add a deep-merge loader in `platform-control/src/platform_control/overlays/`
-   (new subpackage) that loads shared + per-country and returns the
-   merged payload. Country values win.
-3. Thin the six per-country files to country-specific overrides only.
-4. Update `check_country_overlay_files.py` to validate the merged
-   payload, not the raw file.
-5. Document the merge order in
-   `docs/architecture/vocabulary-standards.md` §"Single-source-of-truth
-   rule".
-
-**Files:** `country-overlays/_shared/*`,
-`platform-control/src/platform_control/overlays/loader.py` (new),
-six per-country `operator-content.yaml` + `user-content.yaml`,
-`scripts/check_country_overlay_files.py`.
-
-**Estimated size:** ~400 LOC (loader + migration).
+**Landed in:** commit following `9549fba`, same branch.
 
 ### 1.3 `icons.ts` ↔ `subdivisions.json` parity test
 

@@ -1,6 +1,8 @@
 version: 1
 country_code: CH
 
+# result_subtitle_pattern is inherited from _shared/.
+
 filters:
   jurisdiction:
     label: Jurisdiction
@@ -14,9 +16,6 @@ filters:
   official_only:
     label: Official sources only
     helper_text: Restricts to authoritative Swiss public sources.
-
-result_subtitle_pattern:
-  template: "{jurisdiction} • {source_type} • {court_or_authority} • {effective_date}"
 
 detail_copy:
   translation_indicator:

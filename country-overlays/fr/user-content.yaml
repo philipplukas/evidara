@@ -1,6 +1,8 @@
 version: 1
 country_code: FR
 
+# result_subtitle_pattern is inherited from _shared/.
+
 filters:
   jurisdiction:
     label: Juridiction
@@ -14,9 +16,6 @@ filters:
   official_only:
     label: Sources officielles uniquement
     helper_text: Restreint aux sources publiques autoritaires françaises.
-
-result_subtitle_pattern:
-  template: "{jurisdiction} • {source_type} • {court_or_authority} • {effective_date}"
 
 detail_copy:
   translation_indicator:

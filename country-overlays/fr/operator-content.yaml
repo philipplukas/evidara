@@ -1,6 +1,9 @@
 version: 1
 country_code: FR
 
+# triage_overlays defaults and the "authority taxonomy correctness"
+# approval hotspot are inherited from _shared/.
+
 onboarding_checklist:
   - Confirm scope maps to jurisdiction code FR.
   - Confirm source family mapping for lois, codes, décrets, and arrêts.
@@ -11,14 +14,6 @@ approval_hotspots:
   - authority taxonomy correctness
   - legal family naming drift across translated UI
   - federal vs régional hierarchy-path boundary
-
-triage_overlays:
-  mapping_drift:
-    first_action: Compare incoming authority/jurisdiction labels against canonical FR mapping.
-    escalation_owner: platform-control
-  search_projection_mismatch:
-    first_action: Verify processed-event projection parity for FR-tagged documents.
-    escalation_owner: legal-search
 
 status: scaffold-only
 status_note: |

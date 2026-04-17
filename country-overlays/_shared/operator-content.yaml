@@ -1,0 +1,21 @@
+version: 1
+
+# Shared operator-facing defaults for every country overlay.
+#
+# Per-country files (country-overlays/<iso>/operator-content.yaml)
+# override on top of this via
+# platform_control.overlays.loader.load_operator_content; later keys
+# win, and the placeholder {country_code} is substituted with the
+# overlay's ISO 3166-1 alpha-2 code after merge. Per-country files
+# SHOULD omit any field whose value is identical to the shared default.
+
+approval_hotspots:
+  - authority taxonomy correctness
+
+triage_overlays:
+  mapping_drift:
+    first_action: "Compare incoming authority/jurisdiction labels against canonical {country_code} mapping."
+    escalation_owner: platform-control
+  search_projection_mismatch:
+    first_action: "Verify processed-event projection parity for {country_code}-tagged documents."
+    escalation_owner: legal-search

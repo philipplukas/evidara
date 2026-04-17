@@ -85,6 +85,26 @@ Concretely, for sub-federal identity:
 - `legal-search/frontend/src/lib/icons.ts`, provider adapters, and any
   future admin filter MUST derive their value from this registry.
 
+For reference data (jurisdictions + authorities):
+
+- `platform-control/seeds/reference/{jurisdictions,authorities}.yaml`
+  own the canonical rows.
+- Each `country-overlays/<iso>/reference-data.yaml` cites IDs only —
+  `jurisdiction_id` + `authority_ids[]` — never re-embeds rows.
+- The validator enforces that every cited authority ID exists in seeds
+  with the matching jurisdiction.
+
+For operator and user overlay copy:
+
+- `country-overlays/_shared/{operator-content,user-content}.yaml` own
+  the defaults shared by every country (subtitle template, triage
+  playbook, approval hotspots that don't vary).
+- Per-country files override only the values that genuinely differ.
+- `platform_control.overlays.loader` produces the merged payload: deep
+  merge country over shared, then substitute the literal
+  `{country_code}` placeholder with the overlay's ISO 3166-1 alpha-2
+  code. No other templating is supported.
+
 The two-key live-ready lock (blueprint `enabled: true` AND
 `provider.live_ready: true`) enforces the same principle on the runtime
 side: a scaffold provider cannot fire by accident.
@@ -94,10 +114,15 @@ side: a scaffold provider cannot fire by accident.
 - [`scripts/check_country_overlay_files.py`](../../scripts/check_country_overlay_files.py)
   cross-checks each country overlay against `language.json`,
   `source-family.json`, `court-level.json`, the jurisdiction vocab and
-  the platform-control seeds. Run with `--country <ISO>`.
+  the platform-control seeds, then exercises the merged view so
+  `result_subtitle_pattern` and `triage_overlays` are guaranteed to
+  exist even if a per-country file omits them. Run with `--country <ISO>`.
 - [`scripts/tests/test_check_country_overlay_files.py`](../../scripts/tests/test_check_country_overlay_files.py)
   asserts all 6 shipped overlays pass the validator and that the
   validator catches the drift classes it claims to catch.
+- [`platform-control/tests/unit/test_overlay_loader.py`](../../platform-control/tests/unit/test_overlay_loader.py)
+  covers the deep-merge and `{country_code}` substitution behaviour
+  that the loader ships.
 - [`platform-control/tests/unit/test_blueprint_provider_parity.py`](../../platform-control/tests/unit/test_blueprint_provider_parity.py)
   asserts every `provider:` string in `source_blueprints.yaml` is an
   `AcquisitionProvider` enum member, and the four core live providers
