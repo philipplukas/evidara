@@ -996,6 +996,7 @@ class RunService:
         source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
         trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
         authority_name = await self._resolve_authority_name(source.authority_id)
+        attribution = await self._resolve_attribution(source.jurisdiction_id)
 
         manifest = build_artifact_bundle_manifest(
             bundle_manifest_id=bundle_manifest_id,
@@ -1022,6 +1023,7 @@ class RunService:
                     authority_display_hint=authority_name,
                 ),
             },
+            attribution=attribution,
             snapshot_captured_at=run.completed_at or datetime.now(UTC),
         )
         reference_snapshot_set = self._build_reference_snapshot_set(
@@ -1096,6 +1098,7 @@ class RunService:
         source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
         trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
         authority_name = await self._resolve_authority_name(source.authority_id)
+        attribution = await self._resolve_attribution(source.jurisdiction_id)
 
         events: list[dict[str, Any]] = []
         for artifact in doc_artifacts:
@@ -1133,6 +1136,7 @@ class RunService:
                         authority_display_hint=authority_name,
                     ),
                 },
+                attribution=attribution,
                 snapshot_captured_at=run.completed_at or datetime.now(UTC),
             )
             manifest_storage_ref = await self.artifact_store.store_bundle_manifest(
@@ -1164,6 +1168,31 @@ class RunService:
             return None
         authority = await self.session.get(Authority, authority_id)
         return authority.name if authority is not None else None
+
+    async def _resolve_attribution(
+        self, jurisdiction_id: str | None
+    ) -> dict[str, Any] | None:
+        """Return the attribution block for the manifest when required.
+
+        Falls back to ``None`` when the jurisdiction has no policy or attribution
+        isn't required — callers simply omit the attribution key.
+        """
+        from platform_control.models.authority import Jurisdiction
+        from platform_control.models.compliance_policy import CompliancePolicy
+
+        if not jurisdiction_id:
+            return None
+        jurisdiction = await self.session.get(Jurisdiction, jurisdiction_id)
+        if jurisdiction is None or jurisdiction.compliance_policy_id is None:
+            return None
+        policy = await self.session.get(CompliancePolicy, jurisdiction.compliance_policy_id)
+        if policy is None or not policy.attribution_required:
+            return None
+        return {
+            "required": True,
+            "text": policy.attribution_text,
+            "contact_url": policy.contact_url,
+        }
 
     async def _publish_pending_dispatch_events(
         self, pending_publications: list[PendingDispatchPublications]

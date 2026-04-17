@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     firecrawl_base_url: str = "https://api.firecrawl.dev/v2"
     firecrawl_webhook_secret: str | None = None
     firecrawl_webhook_url: str | None = None
+    firecrawl_webhook_record_dir: Path | None = Field(
+        default=None,
+        description=(
+            "Optional directory where each processed Firecrawl webhook payload is "
+            "mirrored to disk (one JSON file per payload). When set, enables offline "
+            "replay of a real crawl via 'pc ingest --from-fixture'."
+        ),
+    )
 
     gcp_project_id: str | None = None
     artifact_store_backend: Literal["local", "gcs"] = "local"

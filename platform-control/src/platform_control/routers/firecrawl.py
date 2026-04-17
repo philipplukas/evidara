@@ -35,6 +35,7 @@ async def receive_firecrawl_webhook(
         artifact_store=artifact_store,
         publisher=publisher,
         webhook_secret=settings.firecrawl_webhook_secret,
+        webhook_record_dir=settings.firecrawl_webhook_record_dir,
     )
     await service.process(payload=payload, raw_body=raw_body, signature=signature)
     return WebhookAcceptedResponse(status="accepted")
