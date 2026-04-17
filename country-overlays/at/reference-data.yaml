@@ -74,3 +74,47 @@ authorities:
     jurisdiction_id: jur_at
     slug: at-vwgh
     name: Verwaltungsgerichtshof
+
+  # Per-Bundesland RIS Landesrecht publishers. Each is scoped to its own
+  # jurisdiction so platform-control source validation
+  # (_validate_source_reference_data in source_service.py, which requires
+  # authority.jurisdiction_id == requested jurisdiction) can accept
+  # Bundesland sources. RIS itself is a single operational surface; the
+  # per-Land records model the fact that each Bundesland publishes its
+  # Landesrecht under a distinct editorial scope within RIS.
+  - authority_id: auth_at_bgld_ris
+    jurisdiction_id: jur_at_bgld
+    slug: at-bgld-ris
+    name: RIS Landesrecht Burgenland
+  - authority_id: auth_at_ktn_ris
+    jurisdiction_id: jur_at_ktn
+    slug: at-ktn-ris
+    name: RIS Landesrecht Kärnten
+  - authority_id: auth_at_noe_ris
+    jurisdiction_id: jur_at_noe
+    slug: at-noe-ris
+    name: RIS Landesrecht Niederösterreich
+  - authority_id: auth_at_ooe_ris
+    jurisdiction_id: jur_at_ooe
+    slug: at-ooe-ris
+    name: RIS Landesrecht Oberösterreich
+  - authority_id: auth_at_sbg_ris
+    jurisdiction_id: jur_at_sbg
+    slug: at-sbg-ris
+    name: RIS Landesrecht Salzburg
+  - authority_id: auth_at_stmk_ris
+    jurisdiction_id: jur_at_stmk
+    slug: at-stmk-ris
+    name: RIS Landesrecht Steiermark
+  - authority_id: auth_at_tir_ris
+    jurisdiction_id: jur_at_tir
+    slug: at-tir-ris
+    name: RIS Landesrecht Tirol
+  - authority_id: auth_at_vbg_ris
+    jurisdiction_id: jur_at_vbg
+    slug: at-vbg-ris
+    name: RIS Landesrecht Vorarlberg
+  - authority_id: auth_at_wien_ris
+    jurisdiction_id: jur_at_wien
+    slug: at-wien-ris
+    name: RIS Landesrecht Wien
