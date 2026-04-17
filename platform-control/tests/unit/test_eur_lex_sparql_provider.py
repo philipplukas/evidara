@@ -25,7 +25,7 @@ class FakeAsyncClient:
     def __init__(self, *args, **kwargs) -> None:
         del args, kwargs
 
-    async def __aenter__(self) -> "FakeAsyncClient":
+    async def __aenter__(self) -> FakeAsyncClient:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
@@ -38,14 +38,17 @@ class FakeAsyncClient:
         request = httpx.Request("GET", url, params=params)
 
         # Cellar manifestation fetch
-        if url.startswith(
-            "http://publications.europa.eu/resource/cellar/"
-        ) and url.endswith(".html"):
+        if url.startswith("http://publications.europa.eu/resource/cellar/") and url.endswith(
+            ".html"
+        ):
             return httpx.Response(
                 200,
                 text=(
-                    "<html><body><h1>REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL</h1>"
-                    "<p>on the protection of natural persons with regard to the processing of personal data...</p>"
+                    "<html><body>"
+                    "<h1>REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT"
+                    " AND OF THE COUNCIL</h1>"
+                    "<p>on the protection of natural persons with regard to"
+                    " the processing of personal data...</p>"
                     "</body></html>"
                 ),
                 headers={"content-type": "text/html; charset=utf-8"},
@@ -131,7 +134,10 @@ class FakeAsyncClient:
                             {
                                 "title": {
                                     "type": "literal",
-                                    "value": "Regulation (EU) 2016/679 (General Data Protection Regulation)",
+                                    "value": (
+                                        "Regulation (EU) 2016/679"
+                                        " (General Data Protection Regulation)"
+                                    ),
                                 }
                             }
                         ]
@@ -162,9 +168,7 @@ async def test_gdpr_end_to_end_flow_emits_eli_uri_and_celex(
     )
 
     assert result.provider == "eur_lex_sparql"
-    assert result.request_payload["work_uris"] == [
-        "http://data.europa.eu/eli/reg/2016/679/oj"
-    ]
+    assert result.request_payload["work_uris"] == ["http://data.europa.eu/eli/reg/2016/679/oj"]
     assert result.request_payload["preferred_languages"] == ["en"]
     assert result.response_payload["captured"] == 1
     assert result.response_payload["failed"] == 0
@@ -172,18 +176,13 @@ async def test_gdpr_end_to_end_flow_emits_eli_uri_and_celex(
     assert len(result.inline_resources) == 1
     payload = result.inline_resources[0]
     assert payload.source_url == "http://data.europa.eu/eli/reg/2016/679/oj"
-    assert payload.final_url == (
-        "http://publications.europa.eu/resource/cellar/gdpr-eng.html"
-    )
+    assert payload.final_url == ("http://publications.europa.eu/resource/cellar/gdpr-eng.html")
     assert payload.content_type == "text/html"
     assert "REGULATION (EU) 2016/679" in payload.body
     assert payload.metadata["eli_uri"] == "http://data.europa.eu/eli/reg/2016/679/oj"
     assert payload.metadata["celex"] == "32016R0679"
     assert payload.metadata["language"] == "en"
-    assert (
-        payload.metadata["expression_uri"]
-        == "http://data.europa.eu/eli/reg/2016/679/oj/eng"
-    )
+    assert payload.metadata["expression_uri"] == "http://data.europa.eu/eli/reg/2016/679/oj/eng"
 
 
 @pytest.mark.asyncio
@@ -206,10 +205,7 @@ async def test_language_preference_ranking_picks_german_when_listed_first(
     )
     assert len(result.inline_resources) == 1
     payload = result.inline_resources[0]
-    assert (
-        payload.metadata["expression_uri"]
-        == "http://data.europa.eu/eli/reg/2016/679/oj/deu"
-    )
+    assert payload.metadata["expression_uri"] == "http://data.europa.eu/eli/reg/2016/679/oj/deu"
     assert payload.metadata["language"] == "de"
 
 
@@ -259,9 +255,7 @@ def test_validate_eurlex_eli_rejects_wrong_host():
 def test_validate_eurlex_url_accepts_sparql_endpoint():
     provider = EurLexSparqlProvider()
     assert (
-        provider._validate_eurlex_url(
-            "http://publications.europa.eu/webapi/rdf/sparql"
-        )
+        provider._validate_eurlex_url("http://publications.europa.eu/webapi/rdf/sparql")
         == "http://publications.europa.eu/webapi/rdf/sparql"
     )
 
@@ -286,9 +280,7 @@ def test_seed_work_uris_accepts_seed_urls_list():
 
 
 def test_looks_like_eli():
-    assert EurLexSparqlProvider._looks_like_eli(
-        "http://data.europa.eu/eli/reg/2016/679/oj"
-    )
+    assert EurLexSparqlProvider._looks_like_eli("http://data.europa.eu/eli/reg/2016/679/oj")
     assert not EurLexSparqlProvider._looks_like_eli(
         "http://publications.europa.eu/resource/cellar/foo.html"
     )
@@ -303,6 +295,8 @@ def test_preferred_languages_defaults_to_english():
 
 def test_preferred_languages_normalizes_case_and_whitespace():
     provider = EurLexSparqlProvider()
-    assert provider._preferred_languages(
-        {"preferred_languages": ["EN", " de ", "FR"]}
-    ) == ["en", "de", "fr"]
+    assert provider._preferred_languages({"preferred_languages": ["EN", " de ", "FR"]}) == [
+        "en",
+        "de",
+        "fr",
+    ]

@@ -23,9 +23,15 @@ import yaml
 
 from platform_control.domain import AcquisitionProvider
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
-BLUEPRINTS = REPO_ROOT / "platform-control" / "src" / "platform_control" / "hierarchies" / "source_blueprints.yaml"
+BLUEPRINTS = (
+    REPO_ROOT
+    / "platform-control"
+    / "src"
+    / "platform_control"
+    / "hierarchies"
+    / "source_blueprints.yaml"
+)
 
 
 def _referenced_provider_names() -> set[str]:
@@ -59,5 +65,6 @@ def test_blueprint_references_at_least_the_core_providers() -> None:
     core = {"firecrawl", "deterministic_http", "fedlex_sparql", "ris_ogd"}
     missing = core - referenced
     assert not missing, (
-        f"source_blueprints.yaml no longer has templates for core live providers: {sorted(missing)}."
+        "source_blueprints.yaml no longer has templates for core live providers: "
+        f"{sorted(missing)}."
     )

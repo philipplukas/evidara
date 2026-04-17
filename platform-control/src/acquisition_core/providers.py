@@ -51,7 +51,7 @@ class AcquisitionProvider(Protocol):
     ) -> ProviderStartResult: ...
 
 
-class ProviderNotLiveReady(RuntimeError):
+class ProviderNotLiveReadyError(RuntimeError):
     """Raised when a blueprint template references a provider that is a scaffold.
 
     The two-key lock requires `template.enabled: true` AND
@@ -77,7 +77,9 @@ class ProviderRegistry:
     def live_ready_names(self) -> set[str]:
         """Return provider names whose start_run() performs real work."""
         return {
-            name for name, provider in self._providers.items() if getattr(provider, "live_ready", False)
+            name
+            for name, provider in self._providers.items()
+            if getattr(provider, "live_ready", False)
         }
 
     def resolve_for_spec(self, acquisition_spec: dict[str, Any] | None) -> AcquisitionProvider:
@@ -92,14 +94,14 @@ class ProviderRegistry:
     ) -> AcquisitionProvider:
         """Two-key lock for blueprint resolution.
 
-        Raises ProviderNotLiveReady when the requested provider is a
+        Raises ProviderNotLiveReadyError when the requested provider is a
         scaffold. Callers that merely want to resolve-and-introspect can
         keep using resolve_for_spec(); the loader path for launching a run
         should use this method so scaffolds cannot fire at runtime.
         """
         provider = self.resolve_for_spec(acquisition_spec)
         if not getattr(provider, "live_ready", False):
-            raise ProviderNotLiveReady(
+            raise ProviderNotLiveReadyError(
                 f"Provider {provider.provider_name!r} is a scaffold and cannot run "
                 f"(template_id={template_id!r}). See the provider's runbook for "
                 "live-enablement criteria."

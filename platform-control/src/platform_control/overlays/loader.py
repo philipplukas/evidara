@@ -96,8 +96,7 @@ def _load_merged(
     country_dir = overlays_root / iso_lower
     if not country_dir.is_dir():
         raise OverlayLoadError(
-            f"Country overlay directory missing: {country_dir} "
-            f"(country_code={country_code!r})"
+            f"Country overlay directory missing: {country_dir} (country_code={country_code!r})"
         )
 
     shared = _load_yaml_if_exists(overlays_root / "_shared" / filename)
@@ -114,7 +113,9 @@ def load_user_content(country_code: str, overlays_root: Path) -> dict[str, Any]:
 
 def load_operator_content(country_code: str, overlays_root: Path) -> dict[str, Any]:
     """Return the merged operator-facing content payload for a country."""
-    return _load_merged(kind="operator_content", country_code=country_code, overlays_root=overlays_root)
+    return _load_merged(
+        kind="operator_content", country_code=country_code, overlays_root=overlays_root
+    )
 
 
 def load_overlay(country_code: str, overlays_root: Path) -> dict[str, Any]:
@@ -124,4 +125,6 @@ def load_overlay(country_code: str, overlays_root: Path) -> dict[str, Any]:
 
 def load_reference_data(country_code: str, overlays_root: Path) -> dict[str, Any]:
     """Return the reference-data citation payload for a country (no shared base today)."""
-    return _load_merged(kind="reference_data", country_code=country_code, overlays_root=overlays_root)
+    return _load_merged(
+        kind="reference_data", country_code=country_code, overlays_root=overlays_root
+    )

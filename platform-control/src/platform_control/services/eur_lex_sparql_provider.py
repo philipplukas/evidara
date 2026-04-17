@@ -46,11 +46,30 @@ _EUR_LEX_FILE_TYPE_AUTHORITY = "http://publications.europa.eu/resource/authority
 # ISO 639-1 → EUR-Lex 3-letter authority language code.
 # Evidara-relevant subset; extend as needed.
 _ISO_639_1_TO_AUTHORITY: dict[str, str] = {
-    "bg": "BUL", "cs": "CES", "da": "DAN", "de": "DEU", "el": "ELL",
-    "en": "ENG", "es": "SPA", "et": "EST", "fi": "FIN", "fr": "FRA",
-    "ga": "GLE", "hr": "HRV", "hu": "HUN", "it": "ITA", "lt": "LIT",
-    "lv": "LAV", "mt": "MLT", "nl": "NLD", "pl": "POL", "pt": "POR",
-    "ro": "RON", "sk": "SLK", "sl": "SLV", "sv": "SWE",
+    "bg": "BUL",
+    "cs": "CES",
+    "da": "DAN",
+    "de": "DEU",
+    "el": "ELL",
+    "en": "ENG",
+    "es": "SPA",
+    "et": "EST",
+    "fi": "FIN",
+    "fr": "FRA",
+    "ga": "GLE",
+    "hr": "HRV",
+    "hu": "HUN",
+    "it": "ITA",
+    "lt": "LIT",
+    "lv": "LAV",
+    "mt": "MLT",
+    "nl": "NLD",
+    "pl": "POL",
+    "pt": "POR",
+    "ro": "RON",
+    "sk": "SLK",
+    "sl": "SLV",
+    "sv": "SWE",
 }
 
 
@@ -150,7 +169,9 @@ LIMIT 1
                     for pick in selected:
                         expression_uri = pick["expression"]
                         language_iri = pick.get("language")
-                        iso_language = self._language_iri_to_iso(language_iri) if language_iri else None
+                        iso_language = (
+                            self._language_iri_to_iso(language_iri) if language_iri else None
+                        )
                         manifestation_url = await self._pick_html_manifestation(
                             client=client,
                             sparql_endpoint=sparql_endpoint,
@@ -257,7 +278,9 @@ LIMIT 1
         if not acquisition_spec:
             return ["en"]
         raw = acquisition_spec.get("preferred_languages") or ["en"]
-        return [str(code).strip().lower() for code in raw if isinstance(code, str) and str(code).strip()]
+        return [
+            str(code).strip().lower() for code in raw if isinstance(code, str) and str(code).strip()
+        ]
 
     def _language_iri_for_iso(self, iso_code: str) -> str | None:
         authority = _ISO_639_1_TO_AUTHORITY.get(iso_code.lower())
@@ -268,7 +291,7 @@ LIMIT 1
     def _language_iri_to_iso(self, iri: str) -> str | None:
         if not isinstance(iri, str) or not iri.startswith(_EUR_LEX_LANGUAGE_AUTHORITY):
             return None
-        authority = iri[len(_EUR_LEX_LANGUAGE_AUTHORITY):].upper()
+        authority = iri[len(_EUR_LEX_LANGUAGE_AUTHORITY) :].upper()
         for iso, code in _ISO_639_1_TO_AUTHORITY.items():
             if code == authority:
                 return iso

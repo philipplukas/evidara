@@ -44,9 +44,7 @@ class TestDeepMerge:
     def test_nested_dict_recurses(self) -> None:
         base = {"triage": {"mapping": {"owner": "platform", "hint": "X"}}}
         override = {"triage": {"mapping": {"owner": "ops"}}}
-        assert _deep_merge(base, override) == {
-            "triage": {"mapping": {"owner": "ops", "hint": "X"}}
-        }
+        assert _deep_merge(base, override) == {"triage": {"mapping": {"owner": "ops", "hint": "X"}}}
 
     def test_list_replaces_wholesale(self) -> None:
         # Lists do NOT merge element-wise; a country must declare the full list.
@@ -98,7 +96,11 @@ class TestLoadUserContent:
         )
         _write_yaml(
             tmp_path / "ch" / "user-content.yaml",
-            {"version": 1, "country_code": "CH", "result_subtitle_pattern": {"template": "ch-custom"}},
+            {
+                "version": 1,
+                "country_code": "CH",
+                "result_subtitle_pattern": {"template": "ch-custom"},
+            },
         )
         merged = load_user_content("CH", tmp_path)
         assert merged["result_subtitle_pattern"]["template"] == "ch-custom"

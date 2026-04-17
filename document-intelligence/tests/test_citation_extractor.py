@@ -154,9 +154,7 @@ class TestGermanCitations:
         assert de[0].metadata["statute"] == "StGB"
 
     def test_de_ecli(self):
-        citations = extract_citations(
-            "Siehe ECLI:DE:BVERFG:2020:rs20200120.1bvr164519 zur Frage."
-        )
+        citations = extract_citations("Siehe ECLI:DE:BVERFG:2020:rs20200120.1bvr164519 zur Frage.")
         de = [c for c in citations if c.citation_type == "de_ecli"]
         assert len(de) == 1
         assert de[0].metadata["court"] == "BVERFG"

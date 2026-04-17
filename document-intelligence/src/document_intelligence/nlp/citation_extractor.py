@@ -320,9 +320,7 @@ def extract_citations(text: str) -> list[Citation]:
 
     # ─── Germany ──
     for m in _DE_BVERFGE_PATTERN.finditer(text):
-        citations.append(
-            Citation(text=m.group(0), citation_type="de_bverfge", start=m.start(), end=m.end())
-        )
+        citations.append(Citation(text=m.group(0), citation_type="de_bverfge", start=m.start(), end=m.end()))
     for m in _DE_BVERFG_DOCKET_PATTERN.finditer(text):
         citations.append(
             Citation(
@@ -376,9 +374,7 @@ def extract_citations(text: str) -> list[Citation]:
 
     # ─── France ──
     for m in _FR_CODE_ARTICLE_PATTERN.finditer(text):
-        citations.append(
-            Citation(text=m.group(0), citation_type="fr_code_article", start=m.start(), end=m.end())
-        )
+        citations.append(Citation(text=m.group(0), citation_type="fr_code_article", start=m.start(), end=m.end()))
     for m in _FR_POURVOI_PATTERN.finditer(text):
         citations.append(
             Citation(
@@ -390,9 +386,7 @@ def extract_citations(text: str) -> list[Citation]:
             )
         )
     for m in _FR_CASS_PATTERN.finditer(text):
-        citations.append(
-            Citation(text=m.group(0), citation_type="fr_cassation", start=m.start(), end=m.end())
-        )
+        citations.append(Citation(text=m.group(0), citation_type="fr_cassation", start=m.start(), end=m.end()))
     for m in _FR_CONSEIL_ETAT_PATTERN.finditer(text):
         citations.append(
             Citation(

@@ -160,10 +160,7 @@ async def test_minimal_work_to_expression_flow_extracts_expression_uris(
     # ELI URI emission (T5.1): prefer the abstract seed work URI, not the
     # dated concrete form, so canonical output matches the ELI shape that
     # external ELI consumers expect.
-    assert (
-        payload.metadata["eli_uri"]
-        == "https://fedlex.data.admin.ch/eli/cc/1999/404"
-    )
+    assert payload.metadata["eli_uri"] == "https://fedlex.data.admin.ch/eli/cc/1999/404"
 
 
 def test_eli_uri_for_work_prefers_abstract_seed():
@@ -196,18 +193,12 @@ def test_eli_uri_for_work_returns_none_without_fedlex_eli():
 
 def test_canton_iri_from_iso_3166_2_code():
     provider = FedlexSparqlProvider()
-    assert (
-        provider._canton_iri("CH-ZH")
-        == "https://fedlex.data.admin.ch/vocabulary/canton/ZH"
-    )
+    assert provider._canton_iri("CH-ZH") == "https://fedlex.data.admin.ch/vocabulary/canton/ZH"
 
 
 def test_canton_iri_accepts_bare_two_letter_code():
     provider = FedlexSparqlProvider()
-    assert (
-        provider._canton_iri("VS")
-        == "https://fedlex.data.admin.ch/vocabulary/canton/VS"
-    )
+    assert provider._canton_iri("VS") == "https://fedlex.data.admin.ch/vocabulary/canton/VS"
 
 
 def test_canton_iri_rejects_garbage():
