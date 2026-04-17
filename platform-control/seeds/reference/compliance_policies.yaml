@@ -1,0 +1,49 @@
+# Compliance policies declare per-jurisdiction politeness + retention.
+#
+# Three tiers inform the seed values below:
+#   - open-data (Fedlex, RIS OGD): 60 rpm / 4 concurrent / robots=ignore / no retention
+#   - public-official (court/gazette without explicit terms): 20 rpm / 2 / strict / 365d
+#   - restrictive (anti-bot / unclear licence): 6 rpm / 1 / strict / 180d
+#
+# These are steady-state ceilings. An adaptive controller (#252) will probe
+# higher within a [min, max] corridor once merged; today's static limiter uses
+# these as the hard cap.
+#
+# Attribution text reflects the programme's terms verbatim. Contact URL
+# identifies evidara.ai in the user-agent for both rate logs and robots.txt
+# User-agent matching.
+version: 1
+items:
+  # CH / Fedlex is an explicit open-data programme operated by the Swiss
+  # Federal Chancellery. Scraping is authorised; attribution is required.
+  - compliance_policy_id: cp_ch_fedlex_open_data
+    name: ch-fedlex-open-data
+    description: >-
+      Swiss Fedlex open-data policy. Fedlex publishes federal legislation
+      through an explicit open-data programme with SPARQL + filestore endpoints
+      designed for automated access. Scrapers ignore robots.txt per the
+      programme terms and include attribution on every bundle.
+    robots_mode: ignore
+    max_requests_per_minute_per_host: 60
+    max_concurrent_per_host: 4
+    retention_days: null
+    attribution_required: true
+    attribution_text: "Source: Fedlex — Swiss Federal Chancellery (open-data programme)."
+    contact_url: "https://evidara.ai/contact"
+
+  # AT / RIS OGD is the Austrian Federal Chancellery's Open Government Data
+  # REST API for federal legislation and court decisions. Open-data tier.
+  - compliance_policy_id: cp_at_ris_ogd
+    name: at-ris-ogd
+    description: >-
+      Austrian RIS OGD policy. The Bundeskanzleramt publishes federal law and
+      court decisions through an explicit Open Government Data REST API at
+      data.bka.gv.at. Scrapers use open-data tier rate limits and include
+      programme attribution on every bundle.
+    robots_mode: ignore
+    max_requests_per_minute_per_host: 60
+    max_concurrent_per_host: 4
+    retention_days: null
+    attribution_required: true
+    attribution_text: "Source: Rechtsinformationssystem des Bundes (RIS), Bundeskanzleramt Österreich — Open Government Data."
+    contact_url: "https://evidara.ai/contact"
