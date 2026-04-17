@@ -1,16 +1,21 @@
 version: 1
 items:
   # ─── Switzerland ────────────────────────────────────────────
-  - authority_id: auth_ch_fedlex
-    jurisdiction_id: jur_ch
+  # IDs use the flat scheme (no country prefix) because Fedlex, BGer, and
+  # BVGer are globally-unique proper nouns — see issue #264 for policy.
+  # ~20 downstream consumers (scripts/ch-fedlex-fast-loop.sh, DI pipeline
+  # tests, contracts/examples, scraping_baseline fixtures) rely on these
+  # IDs and must continue to resolve after this file changes.
+  - authority_id: auth_fedlex
+    jurisdiction_id: jur_ch_federal
     slug: ch-fedlex
     name: Fedlex
-  - authority_id: auth_ch_bundesgericht
-    jurisdiction_id: jur_ch
+  - authority_id: auth_bger
+    jurisdiction_id: jur_ch_federal
     slug: ch-bger
     name: Bundesgericht
-  - authority_id: auth_ch_bundesverwaltungsgericht
-    jurisdiction_id: jur_ch
+  - authority_id: auth_bvger
+    jurisdiction_id: jur_ch_federal
     slug: ch-bvger
     name: Bundesverwaltungsgericht
   - authority_id: auth_zh_admin
