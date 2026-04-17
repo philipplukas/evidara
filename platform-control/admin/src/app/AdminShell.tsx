@@ -26,9 +26,12 @@ const AdminApp = dynamic(() => import("./AdminApp"), {
         </header>
         <div className="evidara-shell__body">
           <div className="evidara-shell__spinner" />
-          <p style={{ margin: "16px 0 0", fontSize: 14, color: "var(--foreground-muted)" }}>
-            Loading control plane...
-          </p>
+          <div className="evidara-shell__meta">
+            <p className="evidara-shell__copy">Loading control plane...</p>
+            <p className="evidara-shell__fineprint">
+              Preparing operator navigation, status surfaces, and active records.
+            </p>
+          </div>
         </div>
       </section>
     </main>
@@ -82,14 +85,7 @@ export default function AdminShell() {
             >
               Access denied
             </h1>
-            <p
-              style={{
-                margin: "12px 0 0",
-                fontSize: 14,
-                lineHeight: 1.7,
-                color: "var(--foreground-muted)",
-              }}
-            >
+            <p className="evidara-shell__copy">
               This control-plane surface is restricted to authorized operators. If you believe you
               should have access, contact your administrator.
             </p>

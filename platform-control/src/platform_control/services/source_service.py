@@ -105,6 +105,7 @@ class SourceService:
             source_id=source.source_id,
             extractor_profile_id=request.source_version.extractor_profile_id,
             version_label=request.source_version.version_label,
+            execution_mode=request.source_version.execution_mode,
             acquisition_spec=acquisition_spec.model_dump(mode="json"),
         )
         self.session.add(source_version)
@@ -158,6 +159,7 @@ class SourceService:
             source_id=source_id,
             extractor_profile_id=request.extractor_profile_id,
             version_label=request.version_label,
+            execution_mode=request.execution_mode,
             acquisition_spec=acquisition_spec.model_dump(mode="json"),
         )
         self.session.add(version)
@@ -202,6 +204,8 @@ class SourceService:
             version.acquisition_spec = acquisition_spec.model_dump(mode="json")
         if "extractor_profile_id" in payload:
             version.extractor_profile_id = payload["extractor_profile_id"]
+        if request.execution_mode is not None:
+            version.execution_mode = request.execution_mode
 
         await self.session.commit()
         await self.session.refresh(version)

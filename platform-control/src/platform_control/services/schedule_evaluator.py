@@ -9,8 +9,10 @@ from croniter import croniter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from platform_control.domain import ExecutionMode
 from platform_control.models.run import Run
 from platform_control.models.schedule import Schedule
+from platform_control.models.source_version import SourceVersion
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +20,18 @@ logger = logging.getLogger(__name__)
 async def evaluate_due_schedules(session: AsyncSession) -> int:
     """Find schedules that are due and create runs for them.
 
+    Schedules whose ``SourceVersion.execution_mode`` is ``OFF`` are skipped even
+    when the cron expression is due; this is the operator-facing kill switch
+    without having to disable the schedule row itself.
+
     Returns the number of runs created.
     """
-    stmt = select(Schedule).where(Schedule.enabled.is_(True))
+    stmt = (
+        select(Schedule)
+        .join(SourceVersion, Schedule.source_version_id == SourceVersion.source_version_id)
+        .where(Schedule.enabled.is_(True))
+        .where(SourceVersion.execution_mode != ExecutionMode.OFF)
+    )
     result = await session.execute(stmt)
     schedules = list(result.scalars().all())
 

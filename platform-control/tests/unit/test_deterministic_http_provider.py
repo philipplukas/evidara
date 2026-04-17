@@ -7,6 +7,7 @@ import pytest
 
 from platform_control.errors import ProviderConfigurationError
 from platform_control.services.deterministic_http_provider import DeterministicHttpProvider
+from platform_control.services.politeness import HostRateLimiter
 
 
 def _source_version_with_spec(spec: dict) -> SimpleNamespace:
@@ -130,3 +131,56 @@ def test_validate_target_url_allows_public_resolution(monkeypatch: pytest.Monkey
     monkeypatch.setattr("socket.getaddrinfo", fake_getaddrinfo)
 
     assert provider._validate_target_url("https://example.com/path") == "https://example.com/path"
+
+
+class _SpyLimiter(HostRateLimiter):
+    def __init__(self) -> None:
+        super().__init__(max_requests_per_minute=60, max_concurrent=2)
+        self.acquired_hosts: list[str] = []
+
+    async def acquire(self, host: str):
+        self.acquired_hosts.append(host)
+        return await super().acquire(host)
+
+
+class _StubAsyncClient:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def get(self, url: str, headers: dict[str, str]) -> httpx.Response:
+        del headers
+        self.calls.append(url)
+        return httpx.Response(
+            200,
+            request=httpx.Request("GET", url),
+            content=b"ok",
+            headers={"content-type": "text/plain"},
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_with_rate_limit_consults_limiter_per_host() -> None:
+    limiter = _SpyLimiter()
+    provider = DeterministicHttpProvider(rate_limiter=limiter)
+    client = _StubAsyncClient()
+
+    response = await provider._get_with_rate_limit(
+        client=client, url="https://example.com/a", headers={}
+    )
+
+    assert response.status_code == 200
+    assert client.calls == ["https://example.com/a"]
+    assert limiter.acquired_hosts == ["example.com"]
+
+
+@pytest.mark.asyncio
+async def test_get_with_rate_limit_noop_when_no_limiter() -> None:
+    provider = DeterministicHttpProvider()
+    client = _StubAsyncClient()
+
+    response = await provider._get_with_rate_limit(
+        client=client, url="https://example.com/b", headers={}
+    )
+
+    assert response.status_code == 200
+    assert client.calls == ["https://example.com/b"]

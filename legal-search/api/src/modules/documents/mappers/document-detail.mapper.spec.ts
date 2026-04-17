@@ -72,39 +72,52 @@ describe('mapDocumentToDetailView', () => {
     expect(view.contentLanguage?.label).toBe('Originalsprache');
   });
 
-  it('should compose metadata rows', () => {
+  it('should compose metadata rows with visibility', () => {
     const view = mapDocumentToDetailView(lawDoc, sections, citations);
     expect(view.metadata.length).toBeGreaterThan(0);
     expect(view.metadata).toContainEqual({
       label: 'Dokumenttyp',
       value: 'Gesetz',
       iconKey: 'dtype-law',
+      visibility: 'default',
     });
     expect(view.metadata).toContainEqual({
       label: 'In Kraft',
       value: '2024-01-01',
       iconKey: 'meta-calendar',
+      visibility: 'always',
     });
     expect(view.metadata).toContainEqual({
       label: 'Sprache',
       value: 'DE',
       iconKey: 'meta-language',
+      visibility: 'default',
     });
     expect(view.metadata).toContainEqual({
       label: 'Behörde',
       value: 'Fedlex',
       iconKey: 'meta-authority',
+      visibility: 'default',
     });
     expect(view.metadata).toContainEqual({
       label: 'Fundstelle',
       value: 'SR 101',
       iconKey: 'meta-citation',
+      visibility: 'always',
     });
     expect(view.metadata).toContainEqual({
       label: 'Quelle',
       value: 'Offizielle Quelle',
       iconKey: 'meta-official',
+      visibility: 'expanded',
     });
+  });
+
+  it('should set authority visibility to always for decisions', () => {
+    const decisionDoc = { ...lawDoc, document_type: 'decision' };
+    const view = mapDocumentToDetailView(decisionDoc, sections, citations);
+    const authorityRow = view.metadata.find((r) => r.iconKey === 'meta-authority');
+    expect(authorityRow?.visibility).toBe('always');
   });
 
   it('should include a non-active lifecycle status row when present', () => {
@@ -117,6 +130,7 @@ describe('mapDocumentToDetailView', () => {
       label: 'Status',
       value: 'Ersetzt',
       iconKey: 'meta-status',
+      visibility: 'always',
     });
   });
 

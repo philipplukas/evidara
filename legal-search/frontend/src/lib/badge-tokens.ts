@@ -5,12 +5,19 @@
  * The UI has no knowledge of what document types map to which colors —
  * that mapping lives in the BFF.
  *
- * Palette keys are visual, not semantic:
+ * Palette keys are visual aliases, not semantic:
  *   "blue", "pink", "indigo", "green" — not "law", "decision", etc.
  *
  * Values resolve to CSS custom properties defined in
- * `contracts/design-tokens/evidara-tokens.css` so swatches stay in
- * sync across apps and pick up dark-mode overrides automatically.
+ * `contracts/design-tokens/evidara-tokens.css` so swatches stay in sync
+ * across apps and pick up dark-mode overrides automatically.
+ *
+ * Note: the `pink` key is tuned to a neutral sky-blue hue (UX-7) in the
+ * shared tokens file because the former pink/fuchsia hue combined with
+ * the red Swiss-cross flag icon on result cards read as an error /
+ * destructive state. The key name is kept for backwards compatibility
+ * with existing BFF payloads and mock data — the BFF still owns the
+ * semantic mapping from document type to colorKey.
  */
 
 type BadgeColor = { bg: string; text: string };

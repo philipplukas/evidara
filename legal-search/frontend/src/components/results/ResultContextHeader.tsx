@@ -21,9 +21,9 @@ export function ResultContextHeader({ exactMatches, onSelect }: ResultContextHea
   const hasExactMatches = exactMatches && exactMatches.length > 0;
 
   return (
-    <div>
+    <div className="border-b border-border/60 bg-linear-to-b from-surface-page/70 via-surface-page/35 to-transparent">
       {hasExactMatches && (
-        <div className="px-5 pt-4">
+        <div className="px-4 pt-4 sm:px-5">
           <ExactMatchStrip matches={exactMatches} onSelect={onSelect} />
         </div>
       )}

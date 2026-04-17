@@ -31,6 +31,8 @@ models:
     marts:
       +materialized: table
       +schema: di_marts
+  elementary:
+    +schema: di_elementary
 
 vars:
   entity_labels:

@@ -48,7 +48,7 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText(/No results for/)).toBeInTheDocument();
+    expect(screen.getByText(/Keine Ergebnisse für/)).toBeInTheDocument();
   });
 
   it("shows start-searching state when no query", () => {
@@ -63,7 +63,7 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("Start searching")).toBeInTheDocument();
+    expect(screen.getByText("Suche starten")).toBeInTheDocument();
   });
 
   it("shows loading spinner when isLoading", () => {
@@ -178,7 +178,7 @@ describe("ResultList", () => {
     fireEvent.click(screen.getByRole("button", { name: "pivot-empty" }));
 
     await waitFor(() => {
-      expect(screen.getByText("No results in this pivot")).toBeInTheDocument();
+      expect(screen.getByText("Keine Ergebnisse in diesem Pivot")).toBeInTheDocument();
     });
   });
 });

@@ -7,10 +7,10 @@ test.describe("Visual regressions", () => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
+    await expect(page.locator("article").first()).toBeVisible();
 
     await expect(page).toHaveScreenshot("workspace-desktop.png", {
       fullPage: true,
-      animations: "disabled",
     });
   });
 
@@ -19,10 +19,30 @@ test.describe("Visual regressions", () => {
     await page.setViewportSize({ width: 430, height: 932 });
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
+    await expect(page.locator("article").first()).toBeVisible();
 
     await expect(page).toHaveScreenshot("workspace-mobile.png", {
       fullPage: true,
-      animations: "disabled",
     });
+  });
+
+  test("app header matches baseline", async ({ page }) => {
+    await mockSearchApi(page);
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto("/");
+    const header = page.getByRole("banner");
+    await expect(header).toBeVisible();
+
+    await expect(header).toHaveScreenshot("app-header.png");
+  });
+
+  test("results control region matches baseline", async ({ page }) => {
+    await mockSearchApi(page, { richFacets: true });
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto("/");
+    const region = page.getByRole("region", { name: /Suchergebnisse/ });
+    await expect(region).toBeVisible();
+
+    await expect(region).toHaveScreenshot("results-control-region.png");
   });
 });

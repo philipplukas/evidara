@@ -1,22 +1,19 @@
-@import "../../../../contracts/design-tokens/evidara-tokens.css";
-
 :root {
-  --background: var(--surface-page);
-  --background-panel: color-mix(in oklab, var(--surface-panel) 92%, transparent);
+  --background: #eef2f6;
+  --background-panel: rgba(255, 253, 248, 0.92);
+  --surface: rgba(255, 253, 248, 0.88);
+  --surface-strong: rgba(255, 253, 248, 0.98);
   --foreground: #1d293d;
-  --foreground-muted: rgb(29 41 61 / 72%);
-  --accent: var(--brand);
-  --accent-hover: var(--brand-hover);
-  --accent-strong: var(--brand-strong);
-  --accent-soft: var(--interactive-accent-muted);
-  --border: rgb(29 41 61 / 12%);
-}
-
-.dark {
-  --foreground: oklch(0.94 0.01 90);
-  --foreground-muted: oklch(0.78 0.02 90 / 82%);
-  --background-panel: color-mix(in oklab, var(--surface-panel) 94%, transparent);
-  --border: oklch(1 0 0 / 12%);
+  --foreground-muted: rgba(29, 41, 61, 0.72);
+  --accent: #0f4c81;
+  --accent-hover: #0b3d68;
+  --accent-strong: #1d293d;
+  --accent-soft: rgba(15, 76, 129, 0.1);
+  --highlight: #5c6b7e;
+  --highlight-soft: rgba(92, 107, 126, 0.14);
+  --border: rgba(29, 41, 61, 0.12);
+  --shadow-soft: 0 18px 44px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 28px 64px rgba(15, 23, 42, 0.12);
 }
 
 html,
@@ -32,9 +29,9 @@ body {
   margin: 0;
   color: var(--foreground);
   background:
-    radial-gradient(circle at top left, rgb(15 76 129 / 16%), transparent 36%),
-    radial-gradient(circle at top right, var(--highlight-soft), transparent 30%),
-    linear-gradient(180deg, color-mix(in oklab, var(--surface-panel) 82%, var(--surface-page)) 0%, var(--surface-page) 100%);
+    radial-gradient(circle at top left, rgba(15, 76, 129, 0.1), transparent 30%),
+    radial-gradient(circle at top right, rgba(92, 107, 126, 0.08), transparent 26%),
+    linear-gradient(180deg, #fbfcfe 0%, var(--background) 44%, #e8eef4 100%);
   font-family: var(--font-admin-sans), system-ui, sans-serif;
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
@@ -51,18 +48,18 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(135deg, color-mix(in oklab, var(--surface-panel) 80%, transparent) 0%, transparent 35%),
-    radial-gradient(circle at 50% -10%, rgb(255 255 255 / 54%), transparent 28%);
+    linear-gradient(135deg, rgba(15, 76, 129, 0.1), transparent 35%),
+    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.45), transparent 28%);
   opacity: 0.75;
 }
 
 :focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid rgba(15, 76, 129, 0.42);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: var(--interactive-accent-muted);
+  background: rgba(15, 76, 129, 0.18);
   color: var(--foreground);
 }
 
@@ -76,9 +73,9 @@ a {
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at top left, rgb(15 76 129 / 16%), transparent 36%),
-    radial-gradient(circle at top right, var(--highlight-soft), transparent 30%),
-    linear-gradient(180deg, color-mix(in oklab, var(--surface-panel) 82%, var(--surface-page)) 0%, var(--surface-page) 100%);
+    radial-gradient(circle at top left, rgba(15, 76, 129, 0.1), transparent 30%),
+    radial-gradient(circle at top right, rgba(92, 107, 126, 0.08), transparent 26%),
+    linear-gradient(180deg, #fbfcfe 0%, var(--background) 44%, #e8eef4 100%);
 }
 
 .evidara-shell__panel {
@@ -87,7 +84,7 @@ a {
   border: 1px solid var(--border);
   border-radius: 32px;
   background: var(--background-panel);
-  box-shadow: var(--shadow-shell);
+  box-shadow: var(--shadow-strong);
   backdrop-filter: blur(18px);
 }
 
@@ -97,8 +94,8 @@ a {
   align-items: flex-start;
   gap: 16px;
   padding: 24px 28px;
-  background: linear-gradient(120deg, var(--brand), var(--brand-hover));
-  color: var(--surface-panel);
+  background: linear-gradient(120deg, rgba(15, 76, 129, 0.98), rgba(11, 61, 104, 0.94));
+  color: #fffdf8;
 }
 
 .evidara-shell__brand {
@@ -114,17 +111,17 @@ a {
   display: grid;
   place-items: center;
   border-radius: 14px;
-  border: 1px solid rgb(255 253 248 / 20%);
-  background: linear-gradient(135deg, rgb(255 253 248 / 98%), rgb(255 253 248 / 72%));
-  color: var(--accent);
-  box-shadow: 0 12px 24px rgb(7 23 40 / 12%);
+  border: 1px solid rgba(255, 253, 248, 0.18);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fffdf8;
+  box-shadow: 0 12px 24px rgba(7, 23, 40, 0.16);
   font-family: var(--font-admin-serif), Georgia, serif;
   font-size: 18px;
   font-weight: 700;
 }
 
 .evidara-shell__eyebrow {
-  color: rgb(255 253 248 / 78%);
+  color: rgba(255, 253, 248, 0.78);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -134,22 +131,19 @@ a {
 
 .evidara-shell__title {
   margin: 2px 0 0;
-  color: var(--surface-panel);
+  color: #fffdf8;
   font-family: var(--font-admin-serif), Georgia, serif;
   font-size: 22px;
   font-weight: 600;
   line-height: 1.1;
 }
 
-.evidara-shell__copy {
-  margin: 4px 0 0;
-  color: rgb(255 253 248 / 74%);
-  font-size: 14px;
-  line-height: 1.45;
-}
-
 .evidara-shell__body {
   padding: 28px;
+}
+
+.evidara-shell__meta {
+  margin-top: 16px;
 }
 
 .evidara-shell__badge {
@@ -158,10 +152,24 @@ a {
   gap: 8px;
   padding: 7px 12px;
   border-radius: 999px;
-  background: var(--interactive-accent-subtle);
+  background: rgba(15, 76, 129, 0.08);
   color: var(--accent);
   font-size: 12px;
   font-weight: 600;
+}
+
+.evidara-shell__copy {
+  margin: 0;
+  color: var(--foreground-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.evidara-shell__fineprint {
+  margin: 8px 0 0;
+  color: rgba(29, 41, 61, 0.56);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .evidara-shell__button {
@@ -171,13 +179,13 @@ a {
   gap: 8px;
   padding: 11px 16px;
   border-radius: 999px;
-  border: 1px solid rgb(255 253 248 / 14%);
+  border: 1px solid rgba(255, 253, 248, 0.14);
   background: linear-gradient(120deg, var(--accent), var(--accent-hover));
-  color: var(--surface-panel);
+  color: #fffdf8;
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: var(--shadow-control-plane);
+  box-shadow: 0 16px 30px rgba(15, 76, 129, 0.22);
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -186,9 +194,9 @@ a {
 }
 
 .evidara-shell__button:hover {
-  border-color: rgb(255 253 248 / 20%);
-  background: linear-gradient(120deg, var(--accent-hover), color-mix(in oklab, var(--accent-hover) 70%, var(--brand-strong)));
-  box-shadow: 0 18px 34px rgb(15 76 129 / 28%);
+  border-color: rgba(255, 253, 248, 0.2);
+  background: linear-gradient(120deg, var(--accent-hover), #092f52);
+  box-shadow: 0 18px 34px rgba(15, 76, 129, 0.28);
   transform: translateY(-1px);
 }
 
@@ -196,7 +204,7 @@ a {
   width: 44px;
   height: 44px;
   border-radius: 999px;
-  border: 3px solid rgb(29 41 61 / 12%);
+  border: 3px solid rgba(29, 41, 61, 0.12);
   border-top-color: var(--accent);
   animation: evidara-spin 0.8s linear infinite;
 }

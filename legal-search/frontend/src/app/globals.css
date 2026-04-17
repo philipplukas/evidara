@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "../../../../contracts/design-tokens/evidara-tokens.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -19,12 +18,11 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --color-chart-6: var(--chart-6);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -54,9 +52,11 @@
   --color-brand-hover: var(--brand-hover);
   --color-brand-strong: var(--brand-strong);
 
-  /* ─── Highlight (secondary accent) ─── */
-  --color-highlight: var(--highlight);
-  --color-highlight-hover: var(--highlight-hover);
+  /* ─── Accent (Evidara violet — the ONE action color: CTAs, active states, links) ─── */
+  --color-accent-core: var(--accent-core);
+  --color-accent-core-foreground: var(--accent-core-foreground);
+  --color-accent-core-subtle: var(--accent-core-subtle);
+  --color-accent-core-muted: var(--accent-core-muted);
 
   /* ─── Surfaces ─── */
   --color-surface-page: var(--surface-page);
@@ -68,10 +68,26 @@
   /* ─── Interactive ─── */
   --color-interactive-accent-subtle: var(--interactive-accent-subtle);
   --color-interactive-accent-muted: var(--interactive-accent-muted);
-  --color-interactive-highlight-subtle: var(--interactive-highlight-subtle);
 
   /* ─── Focus ─── */
   --color-focus-ring: var(--focus-ring);
+
+  /* ─── Attention ─── */
+  --color-attention: var(--attention);
+  --color-attention-subtle: var(--attention-subtle);
+  --color-attention-border: var(--attention-border);
+
+  /* ─── Status ─── */
+  --color-status-healthy: var(--status-healthy);
+  --color-status-healthy-subtle: var(--status-healthy-subtle);
+  --color-status-degraded: var(--status-degraded);
+  --color-status-degraded-subtle: var(--status-degraded-subtle);
+  --color-status-critical: var(--status-critical);
+  --color-status-critical-subtle: var(--status-critical-subtle);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-neutral-subtle: var(--status-neutral-subtle);
+  --color-status-info: var(--status-info);
+  --color-status-info-subtle: var(--status-info-subtle);
 
   /* ─── Typography ─── */
   --text-micro: 0.6875rem;  /* 11px */
@@ -79,62 +95,207 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.31 0.04 250);
+  /* ─── shadcn semantic tokens (navy-tinted neutrals, hue ≈ 215) ─── */
+  --background: oklch(0.985 0.008 215);
+  --foreground: oklch(0.25 0.04 215);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.31 0.04 250);
+  --card-foreground: oklch(0.25 0.04 215);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.31 0.04 250);
-  --primary: oklch(0.43 0.09 245);
+  --popover-foreground: oklch(0.25 0.04 215);
+  --primary: oklch(0.44 0.24 284);          /* ← #6246D9 violet — THE action color */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0.015 90);
-  --secondary-foreground: oklch(0.31 0.04 250);
-  --muted: oklch(0.965 0.012 90);
-  --muted-foreground: oklch(0.52 0.03 250);
-  --accent: oklch(0.95 0.02 245);
-  --accent-foreground: oklch(0.31 0.04 250);
+  --secondary: oklch(0.94 0.01 215);
+  --secondary-foreground: oklch(0.25 0.04 215);
+  --muted: oklch(0.94 0.008 215);
+  --muted-foreground: oklch(0.55 0.025 215); /* mid-tone L≈55, navy-tinted */
+  --accent: oklch(0.93 0.015 215);
+  --accent-foreground: oklch(0.25 0.04 215);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.89 0.01 250);
-  --input: oklch(0.89 0.01 250);
-  --ring: oklch(0.55 0.07 245);
+  --border: oklch(0.87 0.012 215);           /* mid-tone L≈87, navy-tinted */
+  --input: oklch(0.87 0.012 215);
+  --ring: oklch(0.44 0.18 284);              /* violet ring to match primary */
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.01 90);
-  --sidebar-foreground: oklch(0.31 0.04 250);
-  --sidebar-primary: oklch(0.43 0.09 245);
+  --sidebar: oklch(0.96 0.008 215);
+  --sidebar-foreground: oklch(0.25 0.04 215);
+  --sidebar-primary: oklch(0.44 0.24 284);   /* violet */
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.96 0.015 90);
-  --sidebar-accent-foreground: oklch(0.31 0.04 250);
-  --sidebar-border: oklch(0.89 0.01 250);
-  --sidebar-ring: oklch(0.55 0.07 245);
+  --sidebar-accent: oklch(0.94 0.01 215);
+  --sidebar-accent-foreground: oklch(0.25 0.04 215);
+  --sidebar-border: oklch(0.87 0.012 215);
+  --sidebar-ring: oklch(0.44 0.18 284);      /* violet */
+
+  /* ─── Brand (navy — environment only: logo, header, wordmark) ─── */
+  --brand: #0f4c81;
+  --brand-hover: #0b3d68;
+  --brand-strong: #1d293d;
+
+  /* ─── Surfaces ───
+   * Navy-tinted neutral foundation. `--surface-page` uses a cooled navy-tint
+   * gray so cards (white `--surface-panel`) lift clearly. The slight warmth
+   * of the panel creates a paper-like content feel within the cool system. */
+  --surface-page: #e4e9ef;
+  --surface-panel: #f8fafc;
+  --surface-input: #f1f5f9;
+  --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
+  --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
+
+  /* ─── Accent (Evidara violet #6246D9) ─────────────────────────────────
+   * The ONE action color. Used for CTAs ("Suchen" button), active tabs,
+   * active filter pills, links, count bubbles. Navy (`--brand`) stays as
+   * environment/identity. Destructive states stay `--destructive`.
+   * See design-system.md §"Accent-core token family". */
+  --accent-core: #6246D9;
+  --accent-core-foreground: oklch(0.985 0 0);
+  --accent-core-subtle: color-mix(in oklab, var(--accent-core) 14%, transparent);
+  --accent-core-muted: color-mix(in oklab, var(--accent-core) 22%, transparent);
+
+  /* ─── Interactive (violet-tinted, not navy-tinted) ─── */
+  --interactive-accent-subtle: rgb(98 70 217 / 8%);
+  --interactive-accent-muted: rgb(98 70 217 / 14%);
+
+  /* ─── Focus ─── */
+  /* Violet focus ring matches the action color for visual consistency.
+     Admin MUI should mirror: outline: 2px solid rgba(98, 70, 217, 0.24). */
+  --focus-ring: rgb(98 70 217 / 24%);
+
+  /* ─── Attention (warm highlight, distinct from brand) ─── */
+  --attention: #92400e;
+  --attention-subtle: #fef3c7;
+  --attention-border: #fde68a;
+
+  /* ─── Status ─── */
+  --status-healthy: #166534;
+  --status-healthy-subtle: #f0fdf4;
+  --status-degraded: #92400e;
+  --status-degraded-subtle: #fffbeb;
+  --status-critical: #991b1b;
+  --status-critical-subtle: #fef2f2;
+  --status-neutral: #525252;
+  --status-neutral-subtle: #f5f5f5;
+  --status-info: #1e40af;
+  --status-info-subtle: #eff6ff;
+
+  /* ─── Tabs (Radix line: indicator + active weight) ─── */
+  --tab-indicator-color: var(--accent-core);
+  --tab-active-font-weight: 700;
+
+  /* ─── Elevation ─── */
+  --shadow-shell: 0 18px 56px rgb(15 23 42 / 8%);
+  --shadow-control-plane: 0 18px 40px rgb(15 76 129 / 18%);
+  --shadow-panel: 0 20px 48px rgb(15 23 42 / 8%);
+  --shadow-raised: 0 16px 36px rgb(15 23 42 / 6%);
+  --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 55%);
+  --shadow-sheet-top: 0 -12px 40px rgb(15 23 42 / 6%);
+
+  /* Sprint 1 card elevation — sits one step below `--shadow-panel` so a
+   * result card or exact-match strip reads as lifted off the page without
+   * competing with the admin run-detail panels. Hover state is used by
+   * `.elevated-card`. */
+  --shadow-card: 0 1px 3px rgb(15 76 129 / 8%), 0 1px 2px rgb(15 76 129 / 4%);
+  --shadow-card-hover: 0 6px 18px rgb(15 76 129 / 10%), 0 2px 6px rgb(15 76 129 / 6%);
+
+  /* ─── Motion ─── */
+  --motion-duration-short: 150ms;
+  --motion-duration-medium: 200ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {
-  --background: oklch(0.18 0.01 250);
-  --foreground: oklch(0.94 0.01 90);
-  --card: oklch(0.22 0.01 250);
-  --card-foreground: oklch(0.94 0.01 90);
-  --popover: oklch(0.22 0.01 250);
-  --popover-foreground: oklch(0.94 0.01 90);
-  --primary: oklch(0.72 0.1 245);
-  --primary-foreground: oklch(0.18 0.01 250);
-  --secondary: oklch(0.28 0.02 250);
-  --secondary-foreground: oklch(0.94 0.01 90);
-  --muted: oklch(0.26 0.015 250);
-  --muted-foreground: oklch(0.7 0.02 250);
-  --accent: oklch(0.3 0.04 245);
-  --accent-foreground: oklch(0.94 0.01 90);
-  --destructive: oklch(0.7 0.19 22);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.72 0.1 245);
-  --sidebar: oklch(0.22 0.01 250);
-  --sidebar-foreground: oklch(0.94 0.01 90);
-  --sidebar-primary: oklch(0.72 0.1 245);
-  --sidebar-primary-foreground: oklch(0.18 0.01 250);
-  --sidebar-accent: oklch(0.3 0.04 245);
-  --sidebar-accent-foreground: oklch(0.94 0.01 90);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.72 0.1 245);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.65 0.22 284);           /* lighter violet for dark mode */
+  --primary-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.65 0.18 284);              /* violet ring */
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.65 0.22 284);   /* violet */
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.65 0.18 284);      /* violet */
+
+  /* ─── Brand (navy — environment only in dark mode too) ─── */
+  --brand: #4a9eda;
+  --brand-hover: #5ab0ef;
+  --brand-strong: #c7dff0;
+
+  /* ─── Surfaces ─── */
+  --surface-page: #0f1419;
+  --surface-panel: #1a2028;
+  --surface-input: #151b22;
+  --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
+  --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
+
+  /* ─── Interactive (violet-tinted in dark mode) ─── */
+  --interactive-accent-subtle: rgb(138 118 240 / 10%);
+  --interactive-accent-muted: rgb(138 118 240 / 18%);
+
+  /* ─── Focus ─── */
+  --focus-ring: rgb(138 118 240 / 30%);
+
+  /* ─── Attention ─── */
+  --attention: #fbbf24;
+  --attention-subtle: rgba(251, 191, 36, 0.1);
+  --attention-border: rgba(251, 191, 36, 0.25);
+
+  /* ─── Status ─── */
+  --status-healthy: #4ade80;
+  --status-healthy-subtle: rgba(74, 222, 128, 0.1);
+  --status-degraded: #fbbf24;
+  --status-degraded-subtle: rgba(251, 191, 36, 0.1);
+  --status-critical: #f87171;
+  --status-critical-subtle: rgba(248, 113, 113, 0.1);
+  --status-neutral: #a3a3a3;
+  --status-neutral-subtle: rgba(163, 163, 163, 0.1);
+  --status-info: #60a5fa;
+  --status-info-subtle: rgba(96, 165, 250, 0.1);
+
+  /* ─── Accent (dark mode violet — lighter for contrast) ─── */
+  --accent-core: #8a76f0;
+  --accent-core-foreground: oklch(0.15 0 0);
+  --accent-core-subtle: color-mix(in oklab, var(--accent-core) 14%, transparent);
+  --accent-core-muted: color-mix(in oklab, var(--accent-core) 22%, transparent);
+
+  /* ─── Tabs ─── */
+  --tab-indicator-color: var(--accent-core);
+  --tab-active-font-weight: 700;
+
+  /* ─── Elevation ─── */
+  --shadow-shell: 0 18px 56px rgb(0 0 0 / 30%);
+  --shadow-control-plane: 0 18px 40px rgb(138 118 240 / 12%);
+  --shadow-panel: 0 20px 48px rgb(0 0 0 / 24%);
+  --shadow-raised: 0 16px 36px rgb(0 0 0 / 18%);
+  --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 6%);
+  --shadow-sheet-top: 0 -12px 40px rgb(0 0 0 / 20%);
+
+  /* ─── Motion ─── */
+  --motion-duration-short: 150ms;
+  --motion-duration-medium: 200ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @layer base {
@@ -145,33 +306,87 @@
     @apply text-foreground;
     background:
       radial-gradient(circle at top left, rgb(15 76 129 / 10%), transparent 30%),
-      radial-gradient(circle at top right, rgb(154 122 74 / 10%), transparent 28%),
-      linear-gradient(180deg, color-mix(in oklab, var(--surface-panel) 70%, var(--surface-page)) 0%, var(--surface-page) 100%);
+      radial-gradient(circle at top right, rgb(92 107 126 / 8%), transparent 26%),
+      linear-gradient(180deg, #fbfcfe 0%, var(--surface-page) 44%, #e8eef4 100%);
     background-attachment: fixed;
   }
-  .dark body {
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
     background:
-      radial-gradient(circle at top left, rgb(110 168 218 / 10%), transparent 32%),
-      radial-gradient(circle at top right, rgb(201 168 119 / 8%), transparent 28%),
-      linear-gradient(180deg, var(--surface-panel) 0%, var(--surface-page) 100%);
+      linear-gradient(135deg, rgb(15 76 129 / 8%), transparent 35%),
+      radial-gradient(circle at 50% -10%, rgb(255 255 255 / 45%), transparent 28%);
+    opacity: 0.7;
   }
+
   html {
     @apply font-sans;
+  }
+
+  .dark body {
+    background: var(--surface-page);
+  }
+  .dark body::before {
+    opacity: 0;
   }
 }
 
 @layer components {
+  /* ─── Transition helpers ─── */
+  .transition-expand {
+    transition: max-height var(--motion-duration-medium) var(--motion-easing-standard),
+      opacity var(--motion-duration-medium) var(--motion-easing-standard);
+    overflow: hidden;
+  }
+  .transition-expand[data-state="closed"] {
+    max-height: 0;
+    opacity: 0;
+  }
+  .transition-expand[data-state="open"] {
+    max-height: 999px;
+    opacity: 1;
+  }
+
+  /* Elevation contract — opt cards and panels into the surface-lift
+   * shadow + hover transition. Pair with `bg-surface-panel` or MUI
+   * Paper. Hover darkens the shadow; focus-within keeps the brand
+   * focus ring dominant. See design-system.md §"Surface elevation". */
+  .elevated-card {
+    box-shadow: var(--shadow-card);
+    transition:
+      box-shadow var(--motion-duration-medium) var(--motion-easing-standard),
+      transform var(--motion-duration-short) var(--motion-easing-standard);
+  }
+
+  .elevated-card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .elevated-card {
+      transition: none;
+    }
+  }
+
   .app-header {
     @apply sticky top-0 z-40 border-b border-border/70 bg-surface-page/78 backdrop-blur-xl supports-[backdrop-filter]:bg-surface-page/72;
     box-shadow: var(--shadow-shell);
   }
 
   .app-header__inner {
-    @apply mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-3 lg:flex-nowrap lg:px-6;
+    @apply mx-auto grid max-w-[1600px] items-center gap-3 px-4 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:gap-4 lg:px-6;
+    grid-template-areas:
+      "brand utility"
+      "search search"
+      "nav nav";
   }
 
   .app-header__brand {
     @apply flex shrink-0 items-center gap-2.5 rounded-2xl border border-border/60 px-3 py-2 transition-transform duration-200 hover:-translate-y-px;
+    grid-area: brand;
     background-color: var(--surface-shell);
   }
 
@@ -184,7 +399,8 @@
   }
 
   .app-header__search {
-    @apply order-3 min-w-0 flex-1 basis-[22rem] lg:order-none lg:min-w-[28rem] lg:flex-[1.7] lg:max-w-[56rem];
+    @apply min-w-0 lg:min-w-[28rem];
+    grid-area: search;
   }
 
   .app-header__search-shell {
@@ -193,16 +409,23 @@
   }
 
   .app-header__search-input {
-    @apply h-11 w-full rounded-2xl border border-border/70 bg-surface-input/95 pl-10 pr-4 text-sm shadow-inner transition placeholder:text-muted-foreground/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-focus-ring;
+    @apply h-12 w-full rounded-2xl border border-border/70 bg-surface-input/95 pl-10 pr-4 text-sm shadow-inner transition placeholder:text-muted-foreground/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-focus-ring;
   }
 
   .app-header__nav {
-    @apply flex shrink-0 items-center gap-1 rounded-2xl border border-border/60 p-1 transition-shadow;
+    @apply flex min-w-0 w-full items-center gap-1 overflow-x-auto rounded-2xl border border-border/60 p-1 transition-shadow sm:flex-wrap sm:overflow-x-visible lg:w-auto lg:justify-self-end;
+    grid-area: nav;
     background-color: var(--surface-shell);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .app-header__nav::-webkit-scrollbar {
+    display: none;
   }
 
   .app-header__nav-button {
-    @apply inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+    @apply inline-flex min-h-10 whitespace-nowrap items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
   }
 
   .app-header__nav-button--idle {
@@ -210,28 +433,35 @@
   }
 
   .app-header__nav-button--active {
-    @apply bg-interactive-accent-subtle text-brand;
+    @apply bg-interactive-accent-subtle text-accent-core;
   }
 
   .app-header__control-plane {
-    @apply inline-flex min-w-[13.5rem] items-center gap-3 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand to-brand-hover px-4 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-px hover:border-brand/30 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
-    box-shadow: var(--shadow-control-plane);
+    @apply inline-flex min-w-0 max-w-full items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+    @apply border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground;
+    @apply lg:border-accent-core/15 lg:bg-interactive-accent-subtle lg:text-accent-core lg:hover:border-accent-core/25 lg:hover:bg-interactive-accent-muted;
   }
 
   .app-header__control-plane-icon {
-    @apply flex h-9 w-9 items-center justify-center rounded-xl bg-white/12 ring-1 ring-white/15;
+    @apply flex h-5 w-5 items-center justify-center;
   }
 
   .app-header__control-plane-copy {
-    @apply flex min-w-0 flex-1 flex-col items-start leading-none;
+    @apply flex min-w-0 items-center gap-1.5 leading-none;
+  }
+
+  @media (max-width: 479px) {
+    .app-header__control-plane-copy {
+      display: none;
+    }
   }
 
   .app-header__control-plane-kicker {
-    @apply text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-white/72;
+    @apply hidden;
   }
 
   .app-header__control-plane-text {
-    @apply mt-1 flex min-w-0 items-center gap-1.5 truncate;
+    @apply flex min-w-0 items-center gap-1 truncate;
   }
 
   .app-header__status {
@@ -242,8 +472,78 @@
   }
 
   .app-header__utility-strip {
-    @apply flex shrink-0 items-center gap-2 rounded-2xl border border-border/60 px-1.5 py-1.5;
+    @apply flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2 rounded-2xl border border-border/60 px-2 py-2 lg:justify-self-end;
+    grid-area: utility;
     background-color: var(--surface-shell);
+  }
+
+  .context-bar {
+    @apply border-b border-border bg-surface-panel/95 px-4 py-3 backdrop-blur-sm sm:px-5;
+  }
+
+  .context-bar__layout {
+    @apply mx-auto flex max-w-[1600px] flex-col gap-3 lg:flex-row lg:items-center;
+  }
+
+  .context-bar__clusters {
+    @apply flex min-w-0 flex-col gap-2 md:flex-row md:flex-wrap md:items-center;
+  }
+
+  .context-bar__cluster {
+    @apply flex min-w-0 flex-wrap items-center gap-1.5;
+  }
+
+  .context-bar__official-toggle {
+    @apply inline-flex min-h-9 whitespace-nowrap items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+  }
+
+  .context-bar__official-toggle--active {
+    @apply border-accent-core/20 bg-interactive-accent-subtle text-accent-core;
+  }
+
+  .context-bar__official-toggle--idle {
+    @apply text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground;
+  }
+
+  .context-bar__chip-group {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+
+  .context-bar__chip {
+    @apply inline-flex min-h-9 whitespace-nowrap items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all;
+  }
+
+  .context-bar__chip--active {
+    @apply bg-accent-core text-white shadow-sm ring-1 ring-accent-core/10;
+  }
+
+  .context-bar__chip--idle {
+    @apply bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground;
+  }
+
+  .context-bar__tab-group {
+    @apply flex flex-wrap items-center gap-1;
+  }
+
+  .context-bar__tab {
+    @apply inline-flex min-h-9 whitespace-nowrap items-center rounded-full px-3 py-1.5 text-xs font-medium transition-all;
+  }
+
+  .context-bar__tab--active {
+    @apply bg-interactive-accent-subtle text-accent-core ring-1 ring-accent-core/10;
+  }
+
+  .context-bar__tab--idle {
+    @apply text-muted-foreground hover:bg-muted hover:text-foreground;
+  }
+
+  .mobile-workspace__shell {
+    @apply flex h-[100dvh] flex-col overflow-hidden bg-surface-page;
+  }
+
+  .mobile-workspace__sheet {
+    @apply min-h-full overflow-hidden rounded-t-[1.75rem] border border-border/60 border-b-0 bg-surface-panel/95;
+    box-shadow: var(--shadow-sheet-top);
   }
 }
 
@@ -256,6 +556,16 @@
   .text-tiny {
     font-size: var(--text-tiny);
     line-height: 1;
+  }
+
+  .transition-motion-short {
+    transition-duration: var(--motion-duration-short);
+    transition-timing-function: var(--motion-easing-standard);
+  }
+
+  .transition-motion-medium {
+    transition-duration: var(--motion-duration-medium);
+    transition-timing-function: var(--motion-easing-standard);
   }
 }
 

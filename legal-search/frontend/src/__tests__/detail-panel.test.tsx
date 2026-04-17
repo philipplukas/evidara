@@ -44,11 +44,11 @@ describe("DetailPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Untitled document")).toBeInTheDocument();
-    expect(screen.getByText("No summary available")).toBeInTheDocument();
+    expect(screen.getByText("Dokument ohne Titel")).toBeInTheDocument();
+    expect(screen.getByText("Keine Zusammenfassung verfügbar")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTitle("Copy citation"));
-    expect(writeText).toHaveBeenCalledWith("Untitled document");
+    fireEvent.click(screen.getByTitle("Zitat kopieren"));
+    expect(writeText).toHaveBeenCalledWith("Dokument ohne Titel");
   });
 
   it("shows a fallback translation badge label when translation label is missing", () => {
@@ -72,14 +72,18 @@ describe("DetailPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Translated content")).toBeInTheDocument();
+    expect(screen.getByText("Übersetzter Inhalt")).toBeInTheDocument();
   });
 
   it("shows empty state when detail is null", () => {
     renderWithProviders(<DetailPanel detail={null} />);
 
-    expect(screen.getByText("No result selected")).toBeInTheDocument();
-    expect(screen.getByText(/Choose a result to open the document detail/)).toBeInTheDocument();
+    expect(screen.getByText("Kein Ergebnis ausgewählt")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Wählen Sie ein Ergebnis, um Dokumentdetails, verknüpfte Materialien und Verweise zu öffnen\./,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders title and subtitle when detail is provided", () => {
@@ -128,7 +132,7 @@ describe("DetailPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Switzerland")).toBeInTheDocument();
+    expect(screen.getAllByText("Switzerland").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Obligationenrecht (OR)")).toBeInTheDocument();
   });
 

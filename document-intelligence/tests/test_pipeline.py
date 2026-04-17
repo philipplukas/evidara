@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from document_intelligence.extractors.metadata import (
     MetadataExtractionCandidate,
 )
+from document_intelligence.ingest.docling_adapter import _is_placeholder_title as is_docling_placeholder_title
 from document_intelligence.persist.sinks import InMemoryCanonicalSink
 from document_intelligence.pipeline import ProcessingPipeline, _resolve_official_citation
 from document_intelligence.validate.schema_validation import (
@@ -77,6 +78,11 @@ class StubMetadataExtractor:
 
 
 class ProcessingPipelineTests(unittest.TestCase):
+    def test_docling_placeholder_title_guard_rejects_ris_placeholder(self) -> None:
+        self.assertTrue(is_docling_placeholder_title("RIS Dokument"))
+        self.assertTrue(is_docling_placeholder_title("RIS - Bundesrecht konsolidiert"))
+        self.assertFalse(is_docling_placeholder_title("Bundesgesetz über digitale Register"))
+
     def test_official_citation_uses_publication_organ_from_ris_metadata(self) -> None:
         citation = _resolve_official_citation(
             {},

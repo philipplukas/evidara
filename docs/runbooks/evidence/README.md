@@ -12,6 +12,8 @@ Refresh when staging URLs or corpus change. URLs are taken from [`infra/env/stag
 | `2026-04-09-staging-relevance-pack.md` | Staging search top-3 IDs per suggested query |
 | `2026-04-09-staging-relevance-pack-rerun.md` | Same, regenerated via `scripts/capture-staging-relevance-pack.sh` |
 | `2026-04-13-dev-mvp-acceptance-run1.json` | Fresh dev `evidara workflow mvp-acceptance` capture after the CI/auth fix landed |
-| `2026-04-13-dev-relevance-pack.md` | Dev relevance pack with `q=*` control row; points to alias/index/corpus drift |
+| `2026-04-13-dev-relevance-pack.md` | Historical dev relevance pack before the 2026-04-14 refresh; `q=*` was empty |
+| `2026-04-14-dev-relevance-pack.md` | Latest full dev relevance snapshot: `q=*` is non-empty, CH recovered, AT still `RIS Dokument`, broader ranking remains open |
+| `2026-04-15-at-ris-fast-loop-rerun.md` | Latest AT/runtime rerun on dev: worker-backed replay path passes again after the runtime fix; proof-doc title still unresolved |
 | `2026-04-09-e2e-github-dispatch-tar64.md` | Two `gh workflow run` E2E Smoke Dev attempts + outcomes |
 | `2026-04-09-e2e-step7-investigation.md` | Dev: Pub/Sub wiring OK; `di-consumer-dev` HTTP 500 on bundle ingress; DLQ note; next actions |

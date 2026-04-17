@@ -23,12 +23,12 @@ interface BadgeProps {
 export function Badge({ label, colorKey, size = "sm", className = "" }: BadgeProps) {
   const colors = getBadgeColor(colorKey);
 
-  const sizeClasses = size === "xs" ? "px-1 py-0.5 text-tiny" : "px-1.5 py-0.5 text-tiny";
+  const sizeClasses = size === "xs" ? "px-1 py-0.5 text-[10px]" : "px-1.5 py-0.5 text-tiny";
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded font-semibold uppercase tracking-wide shrink-0 ${sizeClasses} ${className}`}
-      style={{ backgroundColor: colors.bg, color: colors.text }}
+      className={`inline-flex items-center gap-1 rounded border font-semibold uppercase tracking-wide leading-none shrink-0 ${sizeClasses} ${className}`}
+      style={{ backgroundColor: colors.bg, borderColor: colors.text, color: colors.text }}
     >
       {label}
     </span>

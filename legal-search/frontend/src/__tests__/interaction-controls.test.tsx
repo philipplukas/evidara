@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DetailPanelHeader } from "@/components/detail/DetailPanelHeader";
 import { DetailTabs } from "@/components/detail/DetailTabs";
@@ -16,29 +16,43 @@ describe("High-impact interaction controls", () => {
     const austriaChip = screen.getByRole("button", { name: /Austria/ });
     expect(austriaChip.className).toContain("bg-muted");
     fireEvent.click(austriaChip);
-    expect(austriaChip.className).toContain("bg-brand-strong");
+    expect(austriaChip.className).toContain("bg-accent-core");
 
-    const decisionsTab = screen.getByRole("button", { name: "Court decisions" });
+    const decisionsTab = screen.getByRole("button", { name: /Court decisions|Urteile/ });
     fireEvent.click(decisionsTab);
-    expect(decisionsTab.className).toContain("text-brand");
+    // Active state on scope/filter tabs now signals via the Evidara accent
+    // (violet) instead of brand-navy, per the Sprint-1 accent contract.
+    expect(decisionsTab.className).toContain("text-accent-core");
 
     const officialToggle = screen.getByRole("button", {
       name: /Official sources only|Nur offizielle Quellen/,
     });
     fireEvent.click(officialToggle);
-    expect(officialToggle.className).toContain("text-brand");
+    expect(officialToggle.className).toContain("text-accent-core");
   });
 
-  it("writes selected detail tab to URL state", () => {
+  it("writes selected detail tab to URL state", async () => {
     renderWithProviders(<DetailTabs tabs={articleDetail.tabs} />, {
       searchParams: { tab: "related" },
     });
 
-    const relatedTab = screen.getByRole("button", { name: /Related/ });
-    expect(relatedTab.className).toContain("text-brand");
+    const relatedTab = screen.getByRole("tab", { name: /Related/ });
+    expect(relatedTab).toHaveAttribute("aria-selected", "true");
+    // Sprint 1 accent-core contract is applied via data-[state=active]:*
+    // variants on TabsTrigger; presence of those class tokens is a
+    // structural guarantee that the active-state styling flipped from
+    // brand (navy) to accent-core (violet).
+    expect(relatedTab.className).toContain("data-[state=active]:border-accent-core");
+    expect(relatedTab.className).toContain("data-[state=active]:text-accent-core");
 
-    fireEvent.click(screen.getByRole("button", { name: /^Details$/ }));
-    expect(screen.getByRole("button", { name: /^Details$/ }).className).toContain("text-brand");
+    // Radix TabsTrigger commits selection on mouseDown (not click).
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Details$/ }), { button: 0 });
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /^Details$/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    });
   });
 
   it("fires pin and copy actions in detail header", async () => {
@@ -50,12 +64,12 @@ describe("High-impact interaction controls", () => {
       <DetailPanelHeader detail={articleDetail} onPin={onPin} isPinned={false} />,
     );
 
-    const pinButton = document.querySelector('button[title="Pin"]');
+    const pinButton = document.querySelector('button[title="Anheften"]');
     expect(pinButton).toBeTruthy();
     fireEvent.click(pinButton!);
     expect(onPin).toHaveBeenCalledWith(articleDetail.id, articleDetail.title, articleDetail.type);
 
-    const copyButton = document.querySelector('button[title="Copy citation"]');
+    const copyButton = document.querySelector('button[title="Zitat kopieren"]');
     expect(copyButton).toBeTruthy();
     fireEvent.click(copyButton!);
     expect(writeText).toHaveBeenCalledWith(articleDetail.title);
@@ -65,7 +79,11 @@ describe("High-impact interaction controls", () => {
     const onSelect = vi.fn();
     renderWithProviders(<ExactMatchStrip matches={[searchResults[0]]} onSelect={onSelect} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Art\. 754 OR/ }));
+    expect(screen.getByText("Exakte Treffer")).toBeInTheDocument();
+    expect(screen.getByText("Hohe Übereinstimmung")).toBeInTheDocument();
+    expect(screen.getByText("1 gefunden")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Exakten Treffer Art\. 754 OR öffnen/ }));
     expect(onSelect).toHaveBeenCalledWith(searchResults[0].id);
   });
 
@@ -99,17 +117,18 @@ describe("High-impact interaction controls", () => {
     renderWithProviders(<ScopeHarness />);
     fireEvent.click(screen.getByRole("button", { name: "pivot-now" }));
 
-    const backButton = screen.getByRole("button", { name: /Back/ });
+    const backButton = screen.getByRole("button", { name: /Zum vorherigen Bereich/ });
     expect(backButton).toBeInTheDocument();
-    expect(screen.getByText("Current scope")).toBeInTheDocument();
+    expect(screen.getByText("Eingegrenzter Bereich")).toBeInTheDocument();
     expect(screen.getByText("Commentary for Art. 754 OR")).toBeInTheDocument();
-    expect(screen.getByText(/Search for "Art 754 OR" · Commentary/)).toBeInTheDocument();
-    expect(screen.getByText(/Previous scope: Results for "Art 754 OR"/)).toBeInTheDocument();
+    expect(screen.getByText(/Suche nach .*Art 754 OR.* · Commentary/)).toBeInTheDocument();
 
     act(() => {
       fireEvent.click(backButton);
     });
 
-    expect(screen.queryByRole("button", { name: /Back/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Zum vorherigen Bereich/ }),
+    ).not.toBeInTheDocument();
   });
 });

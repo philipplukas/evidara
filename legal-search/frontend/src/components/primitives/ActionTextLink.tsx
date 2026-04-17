@@ -25,7 +25,7 @@ export function ActionTextLink({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-0.5 text-micro font-medium text-brand hover:text-brand-hover transition-colors ${className}`}
+      className={`flex items-center gap-0.5 text-micro font-medium text-accent-core hover:text-accent-core/80 transition-colors ${className}`}
     >
       {children}
       {showArrow && <ArrowRight className="w-3 h-3" />}

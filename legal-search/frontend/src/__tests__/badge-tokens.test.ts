@@ -29,6 +29,11 @@ describe("getBadgeColor", () => {
    * Catches accidental key renames or color swaps.
    */
   it("returns correct token references for each palette key", () => {
+    // Palette resolves to CSS custom properties defined in
+    // contracts/design-tokens/evidara-tokens.css. The `pink` slot was
+    // retuned from fuchsia to sky-blue (UX-7) so court-decision badges
+    // no longer read as an error state next to the red Swiss cross icon.
+    // The key name stays `pink` for BFF payload backwards compatibility.
     expect(getBadgeColor("blue")).toEqual({
       bg: "var(--badge-blue-bg)",
       text: "var(--badge-blue-text)",

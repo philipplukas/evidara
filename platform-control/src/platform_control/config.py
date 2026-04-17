@@ -25,12 +25,27 @@ class Settings(BaseSettings):
     firecrawl_base_url: str = "https://api.firecrawl.dev/v2"
     firecrawl_webhook_secret: str | None = None
     firecrawl_webhook_url: str | None = None
+    firecrawl_webhook_record_dir: Path | None = Field(
+        default=None,
+        description=(
+            "Optional directory where each processed Firecrawl webhook payload is "
+            "mirrored to disk (one JSON file per payload). When set, enables offline "
+            "replay of a real crawl via 'pc ingest --from-fixture'."
+        ),
+    )
 
     gcp_project_id: str | None = None
     artifact_store_backend: Literal["local", "gcs"] = "local"
     raw_artifact_bucket: str = "evidara-raw-artifacts-dev"
     raw_artifact_prefix: str = "runs"
     raw_artifact_local_dir: Path = Field(default=Path(".data/raw-artifacts"))
+    cassette_dir: Path = Field(
+        default=Path(".data/cassettes"),
+        description=(
+            "Directory holding cassettes used by CassetteProvider "
+            "(shadow-mode + fixture-driven runs)."
+        ),
+    )
     event_publisher_backend: Literal["noop", "pubsub"] = "noop"
     raw_artifact_pubsub_topic: str = "raw-artifact-available"
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"

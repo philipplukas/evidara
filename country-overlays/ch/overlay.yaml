@@ -8,10 +8,10 @@ jurisdiction_overlay:
   hierarchy_paths:
     - ch
     - ch/federal
-    - ch/canton
-  # Sub-federal hierarchy paths for cantons follow the pattern
-  # `ch/canton/<iso-3166-2-subdivision-lowercased>` (e.g. `ch/canton/zh`).
-  # Additive per the five-country rollout design rule.
+    - ch/cantonal
+    - ch/cantonal/{canton_code}
+    - ch/municipal
+    - ch/municipal/{bfs_id}
 
 language_defaults:
   primary: de
@@ -30,16 +30,26 @@ source_family_overlay:
   local_mappings:
     - local_type: bundesgesetz
       canonical_type: law
-      note: Federal law (Bundesgesetz) maps to canonical law.
-    - local_type: bge
-      canonical_type: decision
-      note: Bundesgerichtsentscheid maps to decision-family discovery.
-    - local_type: bundesverfassung
+      note: Federal statutes published via Fedlex (Systematische Rechtssammlung).
+    - local_type: verordnung
       canonical_type: law
-      note: Federal constitutional text maps to law-family discovery.
+      note: Ordinances at federal, cantonal, or municipal level; level disambiguated by hierarchy_path.
+    - local_type: kantonale_rechtssammlung
+      canonical_type: law
+      note: Cantonal systematic collections; per-canton publisher and language vary.
+    - local_type: gemeindeordnung
+      canonical_type: law
+      note: Municipal charter; top of a municipality's own legal hierarchy.
+    - local_type: reglement
+      canonical_type: law
+      note: Municipal regulation; cantonal equivalents also exist.
+    - local_type: bundesgerichtsentscheid
+      canonical_type: decision
+      note: Federal Supreme Court decisions (BGE and unpublished rulings).
 
 court_level_overlay:
   expected_levels:
     - supreme
-    - administrative
+    - appellate
     - cantonal
+    - administrative

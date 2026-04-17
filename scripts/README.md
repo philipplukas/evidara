@@ -16,5 +16,7 @@ Operator-focused entry points (from repo root unless noted).
 | [`analyze_github_actions_queue.py`](analyze_github_actions_queue.py) | Summarize GitHub Actions **queue vs run** time via `gh` (`--csv`, `--per-job`, `--aggregate-jobs`). See [CI Actions duration metrics](../docs/runbooks/ci-actions-duration-metrics.md). |
 | [`validate_k8s_gitops_kustomize.sh`](validate_k8s_gitops_kustomize.sh) | Renders `k8s/gitops/{dev,staging,prod}` with `kubectl kustomize` (skips if `kubectl` missing locally; required in CI). |
 | [`run-staging-relevance-query-pack.sh`](run-staging-relevance-query-pack.sh) | Staging `GET /v1/search` top-3 table for **TAR-82** / **TAR-68** (needs `EVIDARA_LEGAL_SEARCH_URL` + token). |
+| [`preflight-cross-surface-live.sh`](preflight-cross-surface-live.sh) | Local readiness check for the legal-search frontend, control-panel admin, legal-search API, and supporting search stack. |
+| [`dev-cross-surface-live.sh`](dev-cross-surface-live.sh) | One-command live local workflow: lean backend stack + legal-search frontend + control-panel admin, with preflight wait. |
 
 Auth details: [docs/setup/gcp-local-cloud-run-auth.md](../docs/setup/gcp-local-cloud-run-auth.md) and [docs/runbooks/mvp-acceptance-scenario-pack.md](../docs/runbooks/mvp-acceptance-scenario-pack.md).

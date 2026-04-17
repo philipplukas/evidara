@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from platform_control.config import Settings
 from platform_control.services.bundesland_http_provider import BundeslandHttpProvider
+from platform_control.services.cassette_provider import CassetteProvider
 from platform_control.services.deterministic_http_provider import DeterministicHttpProvider
 from platform_control.services.eur_lex_sparql_provider import EurLexSparqlProvider
 from platform_control.services.fedlex_sparql_provider import FedlexSparqlProvider
@@ -17,10 +18,12 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     registry.register(DeterministicHttpProvider())
     registry.register(FedlexSparqlProvider())
     registry.register(RisOgdProvider())
-    # Sub-federal and supranational scaffolds: registered so templates can
-    # reference the provider names, but each raises NotImplementedError on
-    # start_run until its live adapter lands.
+    # Sub-federal and supranational providers: live_ready but blueprint
+    # templates referencing them stay `enabled: false` until an operator
+    # captures acceptance-run evidence for each jurisdiction.
     registry.register(EurLexSparqlProvider())
     registry.register(BundeslandHttpProvider())
     registry.register(RegioneHttpProvider())
+    # Fixture-backed replay for SHADOW execution mode.
+    registry.register(CassetteProvider(cassette_dir=settings.cassette_dir))
     return registry

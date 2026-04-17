@@ -157,6 +157,8 @@ async def test_minimal_work_to_expression_flow_extracts_expression_uris(
     assert payload.metadata["expression_uris"] == [
         "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/de"
     ]
+    assert payload.metadata["title"] == "Bundesverfassung"
+    assert payload.metadata["title_short"] == "BV"
     # ELI URI emission (T5.1): prefer the abstract seed work URI, not the
     # dated concrete form, so canonical output matches the ELI shape that
     # external ELI consumers expect.

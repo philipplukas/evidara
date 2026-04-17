@@ -47,7 +47,7 @@ describe("FilterPanel interaction matrix", () => {
 
     const austriaChip = screen.getByRole("button", { name: /Austria/ });
     fireEvent.click(austriaChip);
-    expect(austriaChip.className).toContain("bg-brand-strong");
+    expect(austriaChip.className).toContain("bg-accent-core");
 
     const civilCheckbox = screen.getByRole("checkbox", { name: /Civil law/ });
     fireEvent.click(civilCheckbox);
@@ -60,30 +60,33 @@ describe("FilterPanel interaction matrix", () => {
     const toggleTrack = screen.getByRole("button", { name: "Has commentary toggle" });
     expect(toggleTrack).toBeTruthy();
     fireEvent.click(toggleTrack);
-    expect(toggleTrack.className).toContain("bg-brand");
+    expect(toggleTrack.className).toContain("bg-accent-core");
   });
 
   it("supports clear refinements and reset all controls", () => {
     renderWithProviders(<FilterPanel filters={filters} />);
 
-    const clearButton = screen.getByRole("button", { name: /verfeinerungen löschen/i });
+    expect(
+      screen.queryByRole("button", { name: /verfeinerungen löschen/i }),
+    ).not.toBeInTheDocument();
+
     const resetButton = screen.getByRole("button", { name: /alles zurücksetzen/i });
     const austriaChip = screen.getByRole("button", { name: /Austria/ });
     const civilCheckbox = screen.getByRole("checkbox", { name: /Civil law/ });
 
-    expect(clearButton).toBeDisabled();
-
     fireEvent.click(austriaChip);
     fireEvent.click(civilCheckbox);
     expect(civilCheckbox.getAttribute("aria-checked")).toBe("true");
-    expect(clearButton).not.toBeDisabled();
 
+    const clearButton = screen.getByRole("button", { name: /verfeinerungen löschen/i });
     fireEvent.click(clearButton);
     expect(civilCheckbox.getAttribute("aria-checked")).toBe("false");
-    expect(clearButton).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /verfeinerungen löschen/i }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(resetButton);
-    expect(austriaChip.className).not.toContain("bg-brand-strong");
+    expect(austriaChip.className).not.toContain("bg-accent-core");
     expect(civilCheckbox.getAttribute("aria-checked")).toBe("false");
   });
 });

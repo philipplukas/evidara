@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DetailsTab } from "@/components/detail/tabs/DetailsTab";
 import type { DetailViewModel } from "@/lib/types";
+import { renderWithProviders } from "./helpers/render-with-providers";
 
 function buildDetail(
   contentHtml: string,
@@ -31,7 +32,7 @@ describe("DetailsTab", () => {
     `;
     const detail = buildDetail(maliciousHtml);
 
-    const { container } = render(<DetailsTab detail={detail} />);
+    const { container } = renderWithProviders(<DetailsTab detail={detail} />);
 
     expect(screen.getByText("Allowed paragraph")).toBeInTheDocument();
     expect(container.querySelector("script")).toBeNull();
@@ -40,29 +41,44 @@ describe("DetailsTab", () => {
 
   it("shows a graceful empty state when no metadata and no content exist", () => {
     const detail = buildDetail("");
-    render(<DetailsTab detail={detail} />);
+    renderWithProviders(<DetailsTab detail={detail} />);
 
+    expect(screen.getByText("Keine Dokumentdetails")).toBeInTheDocument();
     expect(
-      screen.getByText("No document details are available for this result yet."),
+      screen.getByText(
+        "Für dieses Ergebnis sind derzeit weder Metadaten noch Textinhalt verfügbar.",
+      ),
     ).toBeInTheDocument();
   });
 
   it("renders a fallback label when metadata value is empty", () => {
     const detail = buildDetail("", [{ label: "Jurisdiction", value: "" }]);
-    render(<DetailsTab detail={detail} />);
+    renderWithProviders(<DetailsTab detail={detail} />);
 
     expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
-    expect(screen.getByText("Not available")).toBeInTheDocument();
+    expect(screen.getByText("Nicht verfügbar")).toBeInTheDocument();
   });
 
   it("renders metadata icons when icon keys are present", () => {
     const detail = buildDetail("", [
       { label: "Document type", value: "Law", iconKey: "dtype-law" },
     ]);
-    render(<DetailsTab detail={detail} />);
+    renderWithProviders(<DetailsTab detail={detail} />);
 
     expect(screen.getByText("Document type")).toBeInTheDocument();
     expect(screen.getByText("§")).toBeInTheDocument();
     expect(screen.getByText("Law")).toBeInTheDocument();
+  });
+
+  it("hides expanded-only metadata until the expand control is used", () => {
+    const detail = buildDetail("", [
+      { label: "Jurisdiction", value: "CH" },
+      { label: "Custom field", value: "Extra" },
+    ]);
+    renderWithProviders(<DetailsTab detail={detail} />);
+
+    expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
+    expect(screen.queryByText("Custom field")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1 weitere Felder anzeigen/ })).toBeInTheDocument();
   });
 });

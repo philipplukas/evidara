@@ -1,15 +1,151 @@
 version: 1
 country_code: CH
 
-# Canonical reference data lives in platform-control/seeds/reference/
-# {jurisdictions,authorities}.yaml. This file cites IDs only so the
-# overlay stays in sync without duplication; the validator cross-checks
-# every ID against the seed index.
+# Jurisdictions are modeled hierarchically:
+#   - jur_ch               : country-level Switzerland
+#   - jur_ch_federal       : Swiss Confederation (federal scope); federal
+#                            authorities (Fedlex, Bundesgericht, etc.) bind here
+#   - jur_ch_<canton_code> : one per canton, using ISO 3166-2:CH lowercase code
+# Municipalities are NOT modeled as jurisdictions here; they live in
+# municipalities.yaml and reference their canton's jurisdiction_id.
+#
+# Authority and jurisdiction IDs mirror the canonical shape in
+# platform-control/src/platform_control/hierarchies/ (e.g. auth_fedlex,
+# auth_bger, jur_ch_federal) so existing scripts such as
+# scripts/ch-fedlex-fast-loop.sh can resolve them without a translation layer.
 
-jurisdiction_id: jur_ch
+jurisdictions:
+  - jurisdiction_id: jur_ch
+    slug: ch
+    name: Switzerland
+  - jurisdiction_id: jur_ch_federal
+    slug: ch-federal
+    name: Swiss Confederation
+  - jurisdiction_id: jur_ch_zh
+    slug: ch-zh
+    name: Kanton Zürich
+  - jurisdiction_id: jur_ch_be
+    slug: ch-be
+    name: Kanton Bern / Canton de Berne
+  - jurisdiction_id: jur_ch_lu
+    slug: ch-lu
+    name: Kanton Luzern
+  - jurisdiction_id: jur_ch_ur
+    slug: ch-ur
+    name: Kanton Uri
+  - jurisdiction_id: jur_ch_sz
+    slug: ch-sz
+    name: Kanton Schwyz
+  - jurisdiction_id: jur_ch_ow
+    slug: ch-ow
+    name: Kanton Obwalden
+  - jurisdiction_id: jur_ch_nw
+    slug: ch-nw
+    name: Kanton Nidwalden
+  - jurisdiction_id: jur_ch_gl
+    slug: ch-gl
+    name: Kanton Glarus
+  - jurisdiction_id: jur_ch_zg
+    slug: ch-zg
+    name: Kanton Zug
+  - jurisdiction_id: jur_ch_fr
+    slug: ch-fr
+    name: Canton de Fribourg / Kanton Freiburg
+  - jurisdiction_id: jur_ch_so
+    slug: ch-so
+    name: Kanton Solothurn
+  - jurisdiction_id: jur_ch_bs
+    slug: ch-bs
+    name: Kanton Basel-Stadt
+  - jurisdiction_id: jur_ch_bl
+    slug: ch-bl
+    name: Kanton Basel-Landschaft
+  - jurisdiction_id: jur_ch_sh
+    slug: ch-sh
+    name: Kanton Schaffhausen
+  - jurisdiction_id: jur_ch_ar
+    slug: ch-ar
+    name: Kanton Appenzell Ausserrhoden
+  - jurisdiction_id: jur_ch_ai
+    slug: ch-ai
+    name: Kanton Appenzell Innerrhoden
+  - jurisdiction_id: jur_ch_sg
+    slug: ch-sg
+    name: Kanton St. Gallen
+  - jurisdiction_id: jur_ch_gr
+    slug: ch-gr
+    name: Kanton Graubünden / Chantun Grischun / Cantone dei Grigioni
+  - jurisdiction_id: jur_ch_ag
+    slug: ch-ag
+    name: Kanton Aargau
+  - jurisdiction_id: jur_ch_tg
+    slug: ch-tg
+    name: Kanton Thurgau
+  - jurisdiction_id: jur_ch_ti
+    slug: ch-ti
+    name: Cantone Ticino
+  - jurisdiction_id: jur_ch_vd
+    slug: ch-vd
+    name: Canton de Vaud
+  - jurisdiction_id: jur_ch_vs
+    slug: ch-vs
+    name: Canton du Valais / Kanton Wallis
+  - jurisdiction_id: jur_ch_ne
+    slug: ch-ne
+    name: Canton de Neuchâtel
+  - jurisdiction_id: jur_ch_ge
+    slug: ch-ge
+    name: Canton de Genève
+  - jurisdiction_id: jur_ch_ju
+    slug: ch-ju
+    name: Canton du Jura
 
-authority_ids:
-  - auth_ch_fedlex
-  - auth_ch_bundesgericht
-  - auth_ch_bundesverwaltungsgericht
-  - auth_zh_admin
+# Federal authority IDs match the canonical seed shape used by
+# platform-control/src/platform_control/hierarchies/authorities.yaml and by
+# scripts/ch-fedlex-fast-loop.sh. Cantonal authorities follow the same flat
+# convention (no country prefix; canton code carries the scope).
+authorities:
+  - authority_id: auth_fedlex
+    jurisdiction_id: jur_ch_federal
+    slug: fedlex
+    name: Fedlex - Swiss Federal Publication Platform
+  - authority_id: auth_bger
+    jurisdiction_id: jur_ch_federal
+    slug: bger
+    name: Schweizerisches Bundesgericht / Tribunal fédéral suisse
+  - authority_id: auth_bvger
+    jurisdiction_id: jur_ch_federal
+    slug: bvger
+    name: Bundesverwaltungsgericht / Tribunal administratif fédéral
+  - authority_id: auth_bstger
+    jurisdiction_id: jur_ch_federal
+    slug: bstger
+    name: Bundesstrafgericht / Tribunal pénal fédéral
+  - authority_id: auth_bpger
+    jurisdiction_id: jur_ch_federal
+    slug: bpger
+    name: Bundespatentgericht / Tribunal fédéral des brevets
+  - authority_id: auth_zh_sk
+    jurisdiction_id: jur_ch_zh
+    slug: zh-staatskanzlei
+    name: Staatskanzlei Kanton Zürich
+  - authority_id: auth_be_sk
+    jurisdiction_id: jur_ch_be
+    slug: be-staatskanzlei
+    name: Staatskanzlei Kanton Bern / Chancellerie d'État du canton de Berne
+  - authority_id: auth_bs_sk
+    jurisdiction_id: jur_ch_bs
+    slug: bs-staatskanzlei
+    name: Staatskanzlei Basel-Stadt
+  - authority_id: auth_ge_ce
+    jurisdiction_id: jur_ch_ge
+    slug: ge-chancellerie
+    name: Chancellerie d'État du canton de Genève
+  - authority_id: auth_vd_ce
+    jurisdiction_id: jur_ch_vd
+    slug: vd-chancellerie
+    name: Chancellerie d'État du canton de Vaud
+  - authority_id: auth_ti_cs
+    jurisdiction_id: jur_ch_ti
+    slug: ti-cancelleria
+    name: Cancelleria dello Stato del Cantone Ticino

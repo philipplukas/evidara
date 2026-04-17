@@ -2,6 +2,7 @@
 
 import {
   Alert,
+  AlertTitle,
   Button,
   Chip,
   Dialog,
@@ -25,6 +26,8 @@ import type {
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
+import { describeReadinessDetail } from "../../lib/admin/readiness-messages";
+import { ConfirmButton } from "../shared/ConfirmButton";
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 250 },
@@ -71,20 +74,6 @@ const versionAllowedForMode = (
   }
   return status !== "rejected" && status !== "superseded";
 };
-
-const readinessActionByCode: Record<string, string> = {
-  source_exists: "Select an existing source from the catalog.",
-  source_version_exists: "Select an existing source version for the selected source.",
-  source_version_belongs_to_source: "Use a source/version pair from the same source.",
-  mode_compatible_with_version_status:
-    "For production runs, approve the selected version before launch.",
-  acquisition_seed_present:
-    "Update acquisition spec with at least one seed_url or seed_urls entry.",
-};
-
-export function describeReadinessAction(code: string): string {
-  return readinessActionByCode[code] ?? "Review the selected source/version pair and retry.";
-}
 
 const RUN_READINESS_CONFIRMED_KEY_PREFIX = "evidara_run_readiness_confirmed:";
 const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_codes:";
@@ -266,6 +255,15 @@ export function RunLaunchButton({
     () => readiness?.checks.filter((check) => !check.ok) ?? [],
     [readiness],
   );
+  const readinessStatusLabel = isCheckingReadiness
+    ? "Preflight checking"
+    : readinessError
+      ? "Preflight error"
+      : readiness?.ready
+        ? "Preflight ready"
+        : readiness
+          ? "Preflight blocked"
+          : "Preflight pending";
   const isReadyToCreate =
     !!formState.source_id &&
     !!formState.source_version_id &&
@@ -318,6 +316,7 @@ export function RunLaunchButton({
                         : "Version not selected"
                     }
                   />
+                  <Chip size="small" label={readinessStatusLabel} variant="outlined" />
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
                   {formState.mode === "production"
@@ -407,47 +406,38 @@ export function RunLaunchButton({
             </Paper>
 
             {isCheckingReadiness ? (
-              <Alert
-                severity="info"
-                icon={false}
-                action={<Chip size="small" color="info" variant="outlined" label="running" />}
-              >
-                Checking preflight readiness...
+              <Alert severity="info" icon={false}>
+                <AlertTitle>Checking preflight readiness</AlertTitle>
+                The launch dialog is validating the selected source/version pair.
               </Alert>
             ) : null}
             {readinessError ? <Alert severity="error">{readinessError}</Alert> : null}
             {readiness && !readiness.ready ? (
-              <Alert
-                severity="warning"
-                icon={false}
-                action={<Chip size="small" color="warning" variant="outlined" label="blocked" />}
-              >
+              <Alert severity="warning" icon={false}>
                 <Stack spacing={1.25}>
+                  <AlertTitle>Preflight blocks launch</AlertTitle>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     Preflight is blocking launch. Resolve the items below to enable Create Run.
                   </Typography>
                   <Stack spacing={1}>
-                    {failingChecks.map((check) => (
-                      <Paper key={check.code} variant="outlined" sx={{ p: 1.25 }}>
-                        <Stack spacing={0.75}>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                            useFlexGap
-                            flexWrap="wrap"
-                          >
-                            <Chip size="small" label={check.code} variant="outlined" />
+                    {failingChecks.map((check) => {
+                      const info = describeReadinessDetail(check.code);
+                      return (
+                        <Paper key={check.code} variant="outlined" sx={{ p: 1.25 }}>
+                          <Stack spacing={0.75}>
                             <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {info.title}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
                               {check.detail}
                             </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Next action: {info.action}
+                            </Typography>
                           </Stack>
-                          <Typography variant="caption" color="text.secondary">
-                            Next action: {describeReadinessAction(check.code)}
-                          </Typography>
-                        </Stack>
-                      </Paper>
-                    ))}
+                        </Paper>
+                      );
+                    })}
                   </Stack>
                   <Typography variant="caption" color="text.secondary">
                     {failingChecks.length} blocked check
@@ -463,12 +453,9 @@ export function RunLaunchButton({
               </Alert>
             ) : null}
             {readiness?.ready ? (
-              <Alert
-                severity="success"
-                icon={false}
-                action={<Chip size="small" color="success" variant="outlined" label="ready" />}
-              >
-                Preflight checks passed. The current source/version pair is ready to launch.
+              <Alert severity="success" icon={false}>
+                <AlertTitle>Preflight ready</AlertTitle>
+                The current source/version pair is ready to launch.
               </Alert>
             ) : null}
           </Stack>
@@ -477,9 +464,25 @@ export function RunLaunchButton({
           <Button onClick={closeDialog} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button variant="contained" onClick={submit} disabled={!isReadyToCreate}>
-            {isSubmitting ? "Creating..." : "Create Run"}
-          </Button>
+          {formState.mode === "production" ? (
+            <ConfirmButton
+              tier="notable"
+              variant="contained"
+              color="success"
+              disabled={!isReadyToCreate || isSubmitting}
+              confirmTitle="Create production run?"
+              confirmDescription="Production runs schedule real pipeline work against the selected approved version. Confirm only when you intend to verify capture end-to-end."
+              confirmLabel="Create run"
+              cancelLabel="Go back"
+              onConfirm={submit}
+            >
+              {isSubmitting ? "Creating..." : "Create Run"}
+            </ConfirmButton>
+          ) : (
+            <Button variant="contained" onClick={submit} disabled={!isReadyToCreate}>
+              {isSubmitting ? "Creating..." : "Create Run"}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </>

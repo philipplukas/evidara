@@ -17,9 +17,9 @@
       "pattern": "^[A-Z]{2}$"
     },
     "hierarchyPath": {
-      "description": "Sub-federal path. Pattern: <iso2>(/<tier>(/<subdivision>)?)?. Lowercase throughout. Examples: 'ch', 'ch/federal', 'ch/canton/zh'.",
+      "description": "Sub-federal path. Pattern: <iso2>(/<tier>(/<subdivision>)?)?. Lowercase throughout. Subdivision segment may be a literal ISO 3166-2 code tail (e.g. 'zh') or a parametric placeholder ('{canton_code}', '{bfs_id}') for templated overlays. Examples: 'ch', 'ch/federal', 'ch/canton/zh', 'ch/cantonal/{canton_code}'.",
       "type": "string",
-      "pattern": "^[a-z]{2}(/[a-z-]+(/[a-z0-9-]+)?)?$"
+      "pattern": "^[a-z]{2}(/[a-z-]+(/([a-z0-9-]+|\\{[a-z_]+\\}))?)?$"
     },
     "iso639LanguageCode": {
       "description": "ISO 639-1 two-letter language code (lowercase).",
@@ -100,26 +100,66 @@
       "additionalProperties": false
     },
     "referenceDataFile": {
-      "description": "reference-data.yaml — jurisdiction and authority references used by the overlay. The canonical rows live in platform-control/seeds/reference/*.yaml; overlays cite IDs only so there is one source of truth.",
+      "description": "reference-data.yaml — jurisdiction and authority records for the overlay. Two valid shapes: (a) ID-citation — `jurisdiction_id` + `authority_ids[]` pointing at platform-control/seeds/reference/*.yaml (preferred when the overlay scope is a single jurisdiction + a small authority set); (b) embedded — full `jurisdictions[]` + `authorities[]` arrays (required when the overlay models multiple jurisdictions per country, e.g. CH federal + 26 cantons).",
       "type": "object",
-      "required": ["version", "country_code", "jurisdiction_id", "authority_ids"],
-      "properties": {
-        "version": { "type": "integer", "minimum": 1 },
-        "country_code": { "$ref": "#/$defs/countryCode" },
-        "jurisdiction_id": {
-          "description": "Canonical jurisdiction reference. Must match a jurisdiction_id in platform-control/seeds/reference/jurisdictions.yaml.",
-          "type": "string",
-          "pattern": "^jur_[a-z0-9_]+$"
+      "required": ["version", "country_code"],
+      "oneOf": [
+        {
+          "description": "ID-citation shape.",
+          "required": ["jurisdiction_id", "authority_ids"],
+          "properties": {
+            "version": { "type": "integer", "minimum": 1 },
+            "country_code": { "$ref": "#/$defs/countryCode" },
+            "jurisdiction_id": {
+              "type": "string",
+              "pattern": "^jur_[a-z0-9_]+$"
+            },
+            "authority_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^auth_[a-z0-9_]+$" }
+            }
+          },
+          "additionalProperties": false
         },
-        "authority_ids": {
-          "description": "Canonical authority references. Each ID must exist in platform-control/seeds/reference/authorities.yaml with matching jurisdiction_id.",
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^auth_[a-z0-9_]+$" }
+        {
+          "description": "Embedded shape (multi-jurisdiction countries).",
+          "required": ["jurisdictions", "authorities"],
+          "properties": {
+            "version": { "type": "integer", "minimum": 1 },
+            "country_code": { "$ref": "#/$defs/countryCode" },
+            "jurisdictions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["jurisdiction_id", "slug", "name"],
+                "properties": {
+                  "jurisdiction_id": { "type": "string", "pattern": "^jur_[a-z0-9_]+$" },
+                  "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+                  "name": { "type": "string" }
+                }
+              }
+            },
+            "authorities": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["authority_id", "jurisdiction_id", "slug", "name"],
+                "properties": {
+                  "authority_id": { "type": "string", "pattern": "^auth_[a-z0-9_]+$" },
+                  "jurisdiction_id": { "type": "string", "pattern": "^jur_[a-z0-9_]+$" },
+                  "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
-      },
-      "additionalProperties": false
+      ]
     },
     "userContentFile": {
       "description": "user-content.yaml — end-user-facing filter labels, subtitle pattern, translation indicators, empty-state copy. Per-country files MAY omit fields that the shared default under country-overlays/_shared/user-content.yaml already provides; the merged view (see platform_control.overlays.loader.load_user_content) must contain `filters` and `result_subtitle_pattern` together.",

@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { DetailViewModel } from "@/lib/types";
 import { DetailPanelHeader } from "./DetailPanelHeader";
 import { DetailTabs, useActiveTab } from "./DetailTabs";
@@ -19,37 +20,30 @@ interface DetailPanelProps {
 }
 
 export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: DetailPanelProps) {
+  const t = useTranslations("detail");
   const activeTab = useActiveTab();
 
   if (!detail) {
     return (
       <div
-        className="flex h-full flex-col items-center justify-center px-4 text-center sm:px-6"
+        className="flex flex-col items-center justify-center py-20 text-center"
         role="status"
         aria-live="polite"
       >
-        <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-          <FileText className="w-6 h-6 text-muted-foreground/40" />
+        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+          <FileText className="w-5 h-5 text-muted-foreground/40" />
         </div>
-        <h3 className="text-sm font-medium text-foreground mb-1">No result selected</h3>
-        <p className="max-w-[220px] text-xs text-muted-foreground/70">
-          Choose a result to open the document detail, related materials, and references. The URL
-          will stay in sync with your selection.
-        </p>
+        <h3 className="mb-1 text-sm font-medium text-muted-foreground">{t("empty.noSelection")}</h3>
+        <p className="max-w-xs text-xs text-muted-foreground">{t("empty.description")}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Stable header — stays constant across tab switches */}
+    <div className="flex h-full min-h-0 flex-col">
       <DetailPanelHeader detail={detail} onPin={onPin} isPinned={isPinned} />
-
-      {/* URL-driven tab bar */}
       <DetailTabs tabs={detail.tabs} />
-
-      {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {activeTab === "details" && <DetailsTab detail={detail} />}
         {activeTab === "related" && (
           <RelatedTab
@@ -69,9 +63,28 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
           />
         )}
         {activeTab === "annotation" && <AnnotationTab annotations={detail.annotations} />}
-        {activeTab === "structure" && detail.localStructure && (
-          <StructureTab items={detail.localStructure.items} onFocus={onFocus} />
-        )}
+        {activeTab === "structure" &&
+          (detail.localStructure?.items?.length ? (
+            <StructureTab items={detail.localStructure.items} onFocus={onFocus} />
+          ) : (
+            <DetailEmptyState
+              title={t("empty.noStructureTitle")}
+              description={t("empty.noStructureDescription")}
+            />
+          ))}
+      </div>
+    </div>
+  );
+}
+
+function DetailEmptyState({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="p-5">
+      <div className="rounded-2xl border border-dashed border-border/70 bg-muted/25 px-4 py-5 text-center">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="mx-auto mt-1.5 max-w-[20rem] text-xs leading-5 text-muted-foreground">
+          {description}
+        </p>
       </div>
     </div>
   );

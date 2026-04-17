@@ -13,11 +13,16 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.3.1
+ * OpenAPI spec version: 0.3.2
  */
+import type { MetadataRowVisibility } from './metadataRowVisibility';
 
 export interface MetadataRow {
   label: string;
   value: string;
   iconKey?: string;
+  /** Optional UI density hint for the detail MetadataList. When omitted, the client derives
+visibility from document type and label heuristics (`metadata-visibility.ts`).
+ */
+  visibility?: MetadataRowVisibility;
 }

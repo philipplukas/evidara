@@ -42,3 +42,25 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - Optional runtime env var: `NEXT_PUBLIC_DEFAULT_UI_PROFILE` (`admin` | `standard`) — default when no `evidara-ui-profile` cookie is present; unset behaves like `admin` for backward compatibility
 - Session integration: set the `evidara-ui-profile` cookie to `standard` to hide the control panel link for non-operator users even when `NEXT_PUBLIC_CONTROL_PANEL_URL` is configured
 - Cloud Run service key: `legal-search-frontend` (dev/staging tfvars)
+
+## Local live workflow
+
+For local legal-search ↔ control-panel validation from the repo root:
+
+```bash
+npm run dev:cross-surface:live
+```
+
+That launcher starts the lean backend stack, legal-search on `3101`, and the control panel on `3100`, then waits for a preflight to pass.
+
+You can also run the readiness check directly:
+
+```bash
+npm run preflight:cross-surface:live
+```
+
+Expected local prerequisites:
+
+- Docker available on the machine for the lean backend stack
+- Node/npm for frontend and admin dev servers
+- `shellcheck` is already provided by the repo `nix develop` shell

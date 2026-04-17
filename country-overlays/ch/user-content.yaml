@@ -1,21 +1,25 @@
 version: 1
 country_code: CH
 
-# result_subtitle_pattern is inherited from _shared/.
-
 filters:
   jurisdiction:
     label: Jurisdiction
-    helper_text: Switzerland scope covers federal and cantonal overlays.
+    helper_text: Swiss scope spans federal, cantonal, and municipal law.
   source_type:
     label: Source type
-    helper_text: Includes laws, decisions, and commentary.
+    helper_text: Includes federal statutes, cantonal collections, municipal regulations, decisions, and commentary.
   court_level:
     label: Court level
-    helper_text: Distinguishes supreme, administrative, appellate, and cantonal courts.
+    helper_text: Distinguishes federal supreme, cantonal, and administrative courts.
+  language:
+    label: Language
+    helper_text: Swiss sources appear in German, French, Italian, and Romansh; canton determines primary language.
   official_only:
     label: Official sources only
-    helper_text: Restricts to authoritative Swiss public sources.
+    helper_text: Restricts to authoritative Swiss public sources (Fedlex, cantonal and municipal publishers).
+
+result_subtitle_pattern:
+  template: "{jurisdiction} • {source_type} • {court_or_authority} • {effective_date}"
 
 detail_copy:
   translation_indicator:
@@ -26,4 +30,4 @@ detail_copy:
 empty_states:
   no_results:
     message: No Swiss results for this query and filter set.
-    recovery: Clear one filter or broaden source type.
+    recovery: Clear one filter, broaden source type, or widen to federal scope.

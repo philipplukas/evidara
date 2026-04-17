@@ -68,8 +68,8 @@
   */
   --badge-blue-bg: oklch(0.94 0.04 245);
   --badge-blue-text: oklch(0.4 0.12 245);
-  --badge-pink-bg: oklch(0.94 0.04 350);
-  --badge-pink-text: oklch(0.42 0.12 350);
+  --badge-pink-bg: oklch(0.96 0.025 230);
+  --badge-pink-text: oklch(0.45 0.1 230);
   --badge-indigo-bg: oklch(0.94 0.04 275);
   --badge-indigo-text: oklch(0.38 0.12 275);
   --badge-green-bg: oklch(0.94 0.04 155);
@@ -123,8 +123,8 @@
 
   --badge-blue-bg: oklch(0.3 0.06 245);
   --badge-blue-text: oklch(0.85 0.08 245);
-  --badge-pink-bg: oklch(0.3 0.06 350);
-  --badge-pink-text: oklch(0.85 0.08 350);
+  --badge-pink-bg: oklch(0.3 0.06 230);
+  --badge-pink-text: oklch(0.85 0.08 230);
   --badge-indigo-bg: oklch(0.3 0.06 275);
   --badge-indigo-text: oklch(0.85 0.08 275);
   --badge-green-bg: oklch(0.3 0.06 155);

@@ -1,7 +1,8 @@
 {{
     config(
         materialized='table',
-        comment='Document-level serving model for search.'
+        comment='Document-level serving model for search.',
+        post_hook=["{{ zorder_by(['document_id', 'document_version_id']) }}"]
     )
 }}
 

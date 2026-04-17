@@ -2,44 +2,111 @@ version: 2
 
 models:
   - name: int_control_versions
+    description: Per-document-version processing lifecycle state derived from bronze events.
     columns:
       - name: document_version_id
         tests:
           - not_null
           - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
       - name: status
         tests:
           - not_null
+          - accepted_values:
+              values: ["in_progress", "done", "dead_letter", "retryable"]
+
   - name: int_document_identity
+    description: Canonical document_id + document_version_id derived from landing envelopes.
     columns:
       - name: document_id
         tests:
           - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
       - name: document_version_id
         tests:
           - not_null
           - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
+      - name: is_new_version
+        tests:
+          - not_null
+      - name: retrieved_at
+        tests:
+          - not_null
+
   - name: int_document_sections
+    description: Exploded sections with stable section_id per (document_version, section_idx).
     columns:
       - name: section_id
         tests:
           - not_null
           - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
       - name: document_version_id
         tests:
           - not_null
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_version_id
+      - name: section_idx
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              strictly: false
+      - name: content_length_chars
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              strictly: false
+
   - name: int_entities
+    description: Per-section entity mentions filtered to the configured label whitelist.
     columns:
       - name: entity_id
         tests:
           - not_null
           - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
+      - name: document_version_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_version_id
       - name: entity_label
         tests:
           - not_null
+          - dbt_expectations.expect_column_values_to_be_in_set:
+              value_set: "{{ var('entity_labels') }}"
+      - name: confidence
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1
+              strictly: false
+
   - name: int_relations
+    description: Per-section syntactic relations filtered to the whitelisted dep types.
     columns:
       - name: relation_id
         tests:
           - not_null
           - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
+      - name: document_version_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_version_id
+      - name: relation_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: [nsubj, nsubjpass, dobj, pobj, appos, compound, prep, agent, attr, nmod]

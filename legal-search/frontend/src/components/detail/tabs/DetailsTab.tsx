@@ -1,16 +1,20 @@
 "use client";
 
 import DOMPurify from "dompurify";
+import { useTranslations } from "next-intl";
 import { useMemo } from "react";
-import { MetadataSection } from "@/components/detail/MetadataSection";
+import { MetadataList } from "@/components/detail/MetadataList";
+import { enrichMetadataRows } from "@/lib/metadata-visibility";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
+import { TabEmptyState } from "./TabEmptyState";
 
 interface DetailsTabProps {
   detail: DetailViewModel;
 }
 
 export function DetailsTab({ detail }: DetailsTabProps) {
+  const t = useTranslations("detail");
   const sanitizedContentHtml = useMemo(() => {
     if (!detail.contentHtml) {
       return "";
@@ -22,30 +26,43 @@ export function DetailsTab({ detail }: DetailsTabProps) {
   const showEmptyState = !hasMetadata && !hasContent;
 
   return (
-    <div className="p-5 space-y-5">
-      {/* Metadata */}
-      {hasMetadata && <MetadataSection rows={detail.metadata} />}
+    <div className="space-y-5 px-5 py-5">
+      <div className="space-y-1">
+        <SectionLabel>{t("tabs.documentDetails")}</SectionLabel>
+        <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+          {t("descriptions.details")}
+        </p>
+      </div>
 
-      {/* Content */}
+      {hasMetadata && (
+        <MetadataList
+          fields={enrichMetadataRows(detail.metadata, detail.type)}
+          initialDensity="default"
+        />
+      )}
+
       {hasContent && (
-        <div className="space-y-2">
-          <SectionLabel>Content</SectionLabel>
+        <section className="space-y-3">
+          <SectionLabel>{t("tabs.content")}</SectionLabel>
           <div
-            className="text-sm leading-relaxed text-foreground/85 prose-sm font-document
+            className="max-w-[72ch] text-sm leading-7 text-foreground/88 prose-sm font-document
               [&_.article-marginal]:text-micro [&_.article-marginal]:font-semibold [&_.article-marginal]:text-muted-foreground
               [&_.article-marginal]:mt-3 [&_.article-marginal]:mb-1
               [&_strong]:text-foreground [&_strong]:font-semibold
               [&_h4]:text-xs [&_h4]:font-semibold [&_h4]:uppercase [&_h4]:tracking-wider [&_h4]:text-muted-foreground [&_h4]:mt-4 [&_h4]:mb-2
-              [&_p]:mb-2"
+              [&_p]:mb-3 [&_p:last-child]:mb-0
+              [&_ul]:my-3 [&_ol]:my-3
+              [&_li]:mb-1"
             dangerouslySetInnerHTML={{ __html: sanitizedContentHtml }}
           />
-        </div>
+        </section>
       )}
 
       {showEmptyState && (
-        <div className="rounded-md border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground">
-          No document details are available for this result yet.
-        </div>
+        <TabEmptyState
+          title={t("empty.noDocumentDetailsTitle")}
+          description={t("empty.noDocumentDetailsDescription")}
+        />
       )}
     </div>
   );

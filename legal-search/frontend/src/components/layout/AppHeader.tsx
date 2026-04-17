@@ -1,22 +1,50 @@
 "use client";
 
 import {
-  ArrowUpRight,
   Clock,
+  Loader2,
   Lock,
   MapPin,
   Search,
   Settings2,
   SlidersHorizontal,
   User,
+  X,
 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { parseAsString, useQueryState } from "nuqs";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { buildControlPanelHref } from "@/lib/control-plane-entry";
 import { SUPPORTED_LOCALES, useLocale } from "@/lib/locale-context";
 import { useWorkspace } from "@/lib/workspace-store";
+
+const RECENT_QUERIES_STORAGE_KEY = "evidara.recent-queries";
+const RECENT_QUERIES_LIMIT = 4;
+
+const isKeyboardShortcutInputTarget = (target: EventTarget | null): boolean => {
+  if (!target || typeof target !== "object") {
+    return false;
+  }
+
+  const element = target as {
+    tagName?: string;
+    isContentEditable?: boolean;
+    contentEditable?: string;
+    closest?: (selector: string) => unknown;
+  };
+
+  const tagName = element.tagName?.toUpperCase();
+
+  return (
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    tagName === "SELECT" ||
+    element.isContentEditable === true ||
+    element.contentEditable === "true" ||
+    (typeof element.closest === "function" && element.closest("[contenteditable='true']") !== null)
+  );
+};
 
 interface AppHeaderProps {
   onOpenFilters?: () => void;
@@ -44,6 +72,9 @@ export function AppHeader({
 
   // Local input state — syncs with store query but allows free typing
   const [inputValue, setInputValue] = useState(storeQuery);
+  const [recentQueries, setRecentQueries] = useState<string[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const resolvedControlPanelUrl = controlPanelUrl?.trim();
   const hasControlPanelUrl = Boolean(resolvedControlPanelUrl);
   const hasControlPanelAccess = hasControlPanelUrl && showControlPlaneEntry;
@@ -71,6 +102,34 @@ export function AppHeader({
     setInputValue(storeQuery);
   }, [storeQuery]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(RECENT_QUERIES_STORAGE_KEY);
+      if (!stored) {
+        return;
+      }
+
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+
+      setRecentQueries(
+        parsed
+          .filter((entry): entry is string => typeof entry === "string")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .slice(0, RECENT_QUERIES_LIMIT),
+      );
+    } catch {
+      // Ignore malformed storage and keep the search shell functional.
+    }
+  }, []);
+
   // On mount or when the URL ?q= param changes (e.g. browser back/forward),
   // resync the store search state if needed.
   useEffect(() => {
@@ -80,16 +139,83 @@ export function AppHeader({
     }
   }, [urlQuery, storeQuery, onSearch]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.key !== "/" ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isKeyboardShortcutInputTarget(event.target)
+      ) {
+        return;
+      }
+
+      const input = searchInputRef.current;
+      if (!input) {
+        return;
+      }
+
+      event.preventDefault();
+      input.focus();
+      input.select();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const persistRecentQuery = (query: string) => {
+    setRecentQueries((current) => {
+      const next = [query, ...current.filter((entry) => entry !== query)].slice(
+        0,
+        RECENT_QUERIES_LIMIT,
+      );
+
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(RECENT_QUERIES_STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          // Ignore quota or privacy-mode failures.
+        }
+      }
+
+      return next;
+    });
+  };
+
+  const handleRunSearch = async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed || isSearching) {
+      return;
+    }
+
+    setIsSearching(true);
+    setInputValue(trimmed);
+    persistRecentQuery(trimmed);
+
+    try {
+      if (onSearch) {
+        await onSearch(trimmed);
+      }
+      await setUrlQuery(trimmed);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const trimmed = inputValue.trim();
-    if (!trimmed) return;
-
-    if (onSearch) {
-      await onSearch(trimmed);
-    }
-    await setUrlQuery(trimmed);
+    await handleRunSearch(inputValue);
   };
+
+  const handleRecentSearch = async (query: string) => {
+    setInputValue(query);
+    await handleRunSearch(query);
+  };
+
+  const hasSearchText = inputValue.trim().length > 0;
 
   return (
     <header className="app-header">
@@ -104,15 +230,66 @@ export function AppHeader({
 
         {/* Search Bar */}
         <form onSubmit={handleSubmit} className="app-header__search">
-          <div className="app-header__search-shell">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={t("header.searchPlaceholder")}
-              className="app-header__search-input"
-            />
+          <div className="app-header__search-shell flex flex-col gap-2 rounded-3xl border border-border/70 bg-surface-input/95 p-2.5 shadow-inner transition-shadow focus-within:ring-2 focus-within:ring-focus-ring">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={t("header.searchPlaceholder")}
+                aria-describedby={recentQueries.length > 0 ? "app-header-search-recent" : undefined}
+                aria-keyshortcuts="/"
+                className="h-10 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-0"
+              />
+              {hasSearchText && (
+                <button
+                  type="button"
+                  onClick={() => setInputValue("")}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                  aria-label={t("header.clearSearch")}
+                  title={t("header.clearSearch")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={!hasSearchText || isSearching}
+                aria-busy={isSearching}
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-primary px-3.5 text-sm font-semibold text-white transition-colors hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+              >
+                {isSearching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                <span className="sr-only sm:not-sr-only">
+                  {isSearching ? t("header.searchingAction") : t("header.searchAction")}
+                </span>
+              </button>
+            </div>
+
+            {recentQueries.length > 0 && (
+              <fieldset
+                id="app-header-search-recent"
+                className="flex flex-wrap items-center gap-1.5 px-1 text-[11px] text-muted-foreground/80"
+              >
+                <legend className="sr-only">{t("header.recentSearches")}</legend>
+                <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                {recentQueries.map((query) => (
+                  <button
+                    type="button"
+                    key={query}
+                    onClick={() => void handleRecentSearch(query)}
+                    className="inline-flex items-center rounded-full border border-border/60 bg-surface-panel px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle hover:text-accent-core"
+                  >
+                    {query}
+                  </button>
+                ))}
+              </fieldset>
+            )}
           </div>
         </form>
 
@@ -139,22 +316,13 @@ export function AppHeader({
             count={state.pinned.length > 0 ? state.pinned.length : undefined}
           />
           {hasControlPanelAccess ? (
-            <a
-              href={controlPlaneHref}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="app-header__control-plane"
-            >
+            <a href={controlPlaneHref} className="app-header__control-plane">
               <span className="app-header__control-plane-icon">
-                <Settings2 className="h-4 w-4" />
+                <Settings2 className="h-3.5 w-3.5" />
               </span>
               <span className="app-header__control-plane-copy">
-                <span className="app-header__control-plane-kicker">
-                  {t("header.profileOperator")}
-                </span>
                 <span className="app-header__control-plane-text">{t("header.controlPanel")}</span>
               </span>
-              <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
             </a>
           ) : hasControlPanelUrl ? (
             <button
@@ -203,7 +371,7 @@ export function AppHeader({
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wider transition-colors
                   ${
                     locale === loc
-                      ? "bg-brand text-white"
+                      ? "bg-accent-core text-white"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
               >
@@ -217,9 +385,9 @@ export function AppHeader({
             <button
               type="button"
               aria-label={t("header.openUserMenu")}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-interactive-accent-muted transition-colors hover:bg-brand/20"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-interactive-accent-muted transition-colors hover:bg-accent-core/20"
             >
-              <User className="h-4 w-4 text-brand" />
+              <User className="h-4 w-4 text-accent-core" />
             </button>
           </div>
         </div>
@@ -249,7 +417,7 @@ function NavLink({
       {icon}
       {label}
       {count != null && (
-        <span className="ml-0.5 rounded-full bg-interactive-accent-muted px-1.5 py-0.5 text-tiny font-semibold leading-none text-brand">
+        <span className="ml-0.5 rounded-full bg-accent-core-subtle px-1.5 py-0.5 text-tiny font-semibold leading-none text-accent-core">
           {count}
         </span>
       )}

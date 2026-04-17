@@ -26,6 +26,12 @@
         "ecliCourtCodes": ["BPATGE"],
         "hierarchyRank": 2
       },
+      "appellate": {
+        "prefLabel": { "de": "Obergericht / Kantonsgericht", "fr": "Cour d'appel cantonale", "en": "Cantonal court of appeal" },
+        "ecliCourtCodes": [],
+        "hierarchyRank": 3,
+        "note": "Per-canton appellate layer; individual ECLI codes published per canton."
+      },
       "cantonal": {
         "prefLabel": { "de": "Kantonales Gericht", "fr": "Tribunal cantonal", "en": "Cantonal court" },
         "ecliCourtCodes": [],

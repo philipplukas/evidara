@@ -16,8 +16,8 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Omnilex — Legal Research",
-  description: "Legal search and knowledge exploration workspace for Swiss and Austrian law.",
+  title: "Evidara Search",
+  description: "Legal research and knowledge exploration workspace for Swiss and Austrian law.",
 };
 
 export default function RootLayout({

@@ -15,6 +15,7 @@ from pydantic import (
 
 from platform_control.domain import (
     AcquisitionProvider,
+    ExecutionMode,
     FirecrawlMode,
     SourceStatus,
     SourceVersionStatus,
@@ -168,6 +169,7 @@ class CreateSourceVersionRequest(BaseModel):
     overlay_id: str | None = None
     provider_template_id: str | None = None
     extractor_profile_id: str | None = None
+    execution_mode: ExecutionMode = ExecutionMode.LIVE
 
     @field_validator("acquisition_spec", mode="before")
     @classmethod
@@ -200,6 +202,7 @@ class UpdateSourceVersionRequest(BaseModel):
     overlay_id: str | None = None
     provider_template_id: str | None = None
     extractor_profile_id: str | None = None
+    execution_mode: ExecutionMode | None = None
 
     @field_validator("acquisition_spec", mode="before")
     @classmethod
@@ -228,6 +231,7 @@ class UpdateSourceVersionRequest(BaseModel):
             and self.overlay_id is None
             and self.provider_template_id is None
             and self.extractor_profile_id is None
+            and self.execution_mode is None
         ):
             raise ValueError("At least one field must be provided.")
         return self
@@ -239,6 +243,7 @@ class SourceVersionResponse(BaseModel):
     extractor_profile_id: str | None
     version_label: str
     status: SourceVersionStatus
+    execution_mode: ExecutionMode
     acquisition_spec: AcquisitionSpec
     created_at: datetime
     updated_at: datetime

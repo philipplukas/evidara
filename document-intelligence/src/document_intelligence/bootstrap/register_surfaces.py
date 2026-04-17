@@ -5,6 +5,13 @@ import argparse
 from document_intelligence.config.runtime import SurfaceUris
 from document_intelligence.persist.surfaces import iter_surface_definitions
 
+_PUBLISHED_TABLE_PROPERTIES: tuple[tuple[str, str], ...] = (
+    ("delta.columnMapping.mode", "name"),
+    ("delta.minReaderVersion", "2"),
+    ("delta.minWriterVersion", "5"),
+    ("delta.enableChangeDataFeed", "true"),
+)
+
 
 def render_register_surfaces_sql(
     *,
@@ -27,13 +34,19 @@ def render_register_surfaces_sql(
         "",
     ]
 
+    properties_sql = ",\n".join(f"  '{key}' = '{value}'" for key, value in _PUBLISHED_TABLE_PROPERTIES)
+
     for surface in iter_surface_definitions():
+        qualified = f"`{catalog_name}`.`{schema_name}`.`{surface.surface_name}`"
         statements.extend(
             [
                 f"-- {surface.description}",
-                f"CREATE TABLE IF NOT EXISTS `{catalog_name}`.`{schema_name}`.`{surface.surface_name}`",
+                f"CREATE TABLE IF NOT EXISTS {qualified}",
                 "USING DELTA",
                 f"LOCATION '{location_by_surface[surface.surface_name]}';",
+                f"ALTER TABLE {qualified} SET TBLPROPERTIES (",
+                properties_sql,
+                ");",
                 "",
             ]
         )

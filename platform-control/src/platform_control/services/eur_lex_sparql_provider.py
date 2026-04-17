@@ -33,6 +33,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    ProviderPlan,
     ProviderResource,
     ProviderStartResult,
 )
@@ -259,6 +260,28 @@ LIMIT 1
             response_payload=response_payload,
             inline_resources=resources,
             inline_failure_reason=inline_failure_reason,
+        )
+
+    def plan(self, source: Source, source_version: SourceVersion) -> ProviderPlan:
+        """Describe the acquisition without network IO."""
+        del source
+        acquisition_spec: dict[str, Any] = source_version.acquisition_spec or {}
+        try:
+            work_uris = self._seed_work_uris(acquisition_spec)
+        except ProviderConfigurationError:
+            work_uris = []
+        preferred_languages = self._preferred_languages(acquisition_spec)
+        notes: list[str] = []
+        if preferred_languages:
+            notes.append(f"preferred_languages={preferred_languages}")
+        return ProviderPlan(
+            provider=self.provider_name,
+            mode="work_to_expression",
+            seed_urls=work_uris,
+            estimated_request_count=len(work_uris),
+            request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 30.0),
+            notes=notes,
+            raw=dict(acquisition_spec),
         )
 
     # ─── Helpers ──────────────────────────────────────────────

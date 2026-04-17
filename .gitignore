@@ -92,6 +92,16 @@ generated/
 !legal-search/frontend/src/lib/api/generated/
 !legal-search/frontend/src/lib/api/generated/**
 *.generated.*
+# Exception: the DI published-source contract YAML is rendered from Python but
+# checked in. A unit test keeps it in sync with surfaces.py, and dbt needs it
+# on disk to register the source-level column contract tests.
+!document-intelligence/dbt/models/sources_published.generated.yml
+
+# dbt local artifacts
+document-intelligence/dbt/.user.yml
+document-intelligence/dbt/dbt_packages/
+document-intelligence/dbt/target/
+document-intelligence/dbt/logs/
 
 # --- Build outputs ---
 dist/
@@ -102,3 +112,6 @@ site/
 
 # --- Operator-local scripts (host-specific paths / IPs; not part of default clone) ---
 scripts/deploy-hetzner-runner.sh
+
+# Pnpm store artifacts from local Docker runs
+.pnpm-store/

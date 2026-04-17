@@ -36,7 +36,7 @@ exploded as (
     where entities_json is not null
 )
 select
-    sha2(concat_ws('||', document_version_id, section_idx, cast(entity_pos as string), entity.label), 256) as entity_id,
+    {{ generate_hash_id(["document_version_id", "section_idx", "entity_pos", "entity.label"]) }} as entity_id,
     document_version_id,
     file_id,
     section_idx,

@@ -12,6 +12,7 @@ const LEGAL_SEARCH_BASE_URL =
   process.env.PLAYWRIGHT_EXTERNAL_BASE_URL?.trim() || "http://localhost:3101";
 const EXPECTED_CONTROL_PANEL_URL =
   process.env.PLAYWRIGHT_EXPECTED_CONTROL_PANEL_URL?.trim() || "http://localhost:3100";
+const USE_REAL_BACKEND = process.env.PLAYWRIGHT_USE_REAL_BACKEND === "true";
 
 /** Playwright `webServer`: admin dev server with non-admin role (`playwright.config.ts`). */
 const ADMIN_CONTRACT_BASE_URL =
@@ -71,6 +72,81 @@ test.describe("@contract RBAC cross-surface (legal-search header + admin denial)
     if (href && href !== EXPECTED_CONTROL_PANEL_URL) {
       expect(href).toMatch(new RegExp(`^${escapeRegExp(EXPECTED_CONTROL_PANEL_URL)}.*from=legal-search`));
     }
+  });
+
+  test("round-trips query, scope, and selected item through control panel and back", async ({
+    page,
+    context,
+  }) => {
+    await context.addInitScript(([roleKey, roleValue]) => {
+      window.localStorage.setItem(roleKey, roleValue);
+    }, [ADMIN_LOCAL_STORAGE_ROLE_KEY, "admin"]);
+
+    const query = "Art 754 OR";
+    const scopeLabel = `Results for "${query}"`;
+
+    if (!USE_REAL_BACKEND) {
+      await mockSearchApi(page);
+    }
+    await gotoWithRetry(page, `/?q=${encodeURIComponent(query)}`);
+
+    if (USE_REAL_BACKEND) {
+      await expect(page.locator("article").first()).toBeVisible();
+    } else {
+      await expect(page.getByText(`Result for ${query}`)).toBeVisible();
+    }
+
+    await page.locator("article").first().click();
+    await expect(page).toHaveURL(/item=/);
+    const selectedItem = new URL(page.url()).searchParams.get("item");
+    expect(selectedItem).toBeTruthy();
+
+    const controlPanelLink = page.getByRole("link", { name: CONTROL_PANEL_LABEL });
+    const href = await controlPanelLink.getAttribute("href");
+    expect(href).toBeTruthy();
+
+    const handoffUrl = new URL(href!, LEGAL_SEARCH_BASE_URL);
+    expect(handoffUrl.searchParams.get("from")).toBe("legal-search");
+    expect(handoffUrl.searchParams.get("ls_query")).toBe(query);
+    expect(handoffUrl.searchParams.get("ls_item")).toBe(selectedItem);
+    if (!USE_REAL_BACKEND) {
+      expect(handoffUrl.searchParams.get("ls_scope")).toBe(scopeLabel);
+    }
+
+    await Promise.all([
+      page.waitForURL((url) => url.toString().startsWith(EXPECTED_CONTROL_PANEL_URL)),
+      controlPanelLink.click(),
+    ]);
+
+    await expect(page.getByText(/entered from legal search/i)).toBeVisible();
+    await expect(page.getByText(`Search: ${query}`)).toBeVisible();
+    if (!USE_REAL_BACKEND) {
+      await expect(page.getByText(scopeLabel, { exact: true })).toBeVisible();
+    }
+    await expect(page.getByText(`Selected item: ${selectedItem}`, { exact: true })).toBeVisible();
+
+    // Disambiguate: the admin chrome renders two "Return to active search"
+    // links — the header button (exact label) and the sidebar footer
+    // ListItemButton (primary + secondary line, name contains "Open").
+    // We click the header button so the assertion remains scoped to the
+    // original cross-surface return affordance.
+    const returnLink = page.getByRole("link", { name: "Return to active search", exact: true });
+    await Promise.all([
+      page.waitForURL((url) => {
+        const parsed = new URL(url.toString());
+        return (
+          parsed.origin === new URL(LEGAL_SEARCH_BASE_URL).origin &&
+          parsed.searchParams.get("q") === query &&
+          parsed.searchParams.get("item") === selectedItem
+        );
+      }),
+      returnLink.click(),
+    ]);
+
+    const returnedUrl = new URL(page.url());
+    expect(returnedUrl.searchParams.get("q")).toBe(query);
+    expect(returnedUrl.searchParams.get("item")).toBe(selectedItem);
+    await expect(page.getByPlaceholder(SEARCH_PLACEHOLDER)).toHaveValue(query);
   });
 
   test("standard profile does not show control panel entry when URL is configured", async ({

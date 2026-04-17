@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -18,8 +19,9 @@ from platform_control.events.artifact_bundle import (
 )
 from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.ids import generate_prefixed_id
-from platform_control.models.authority import Authority
+from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
+from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
@@ -37,11 +39,14 @@ class FirecrawlWebhookService:
         artifact_store: ArtifactStore,
         publisher: RawArtifactPublisher,
         webhook_secret: str | None,
+        *,
+        webhook_record_dir: Path | None = None,
     ) -> None:
         self.session = session
         self.artifact_store = artifact_store
         self.publisher = publisher
         self.webhook_secret = webhook_secret
+        self.webhook_record_dir = webhook_record_dir
 
     async def process(
         self,
@@ -49,8 +54,33 @@ class FirecrawlWebhookService:
         raw_body: bytes,
         signature: str | None,
     ) -> None:
+        """HTTP entrypoint: verify the Firecrawl signature, then delegate to ``process_payload``."""
         self._verify_signature(raw_body, signature)
         payload_sha256 = hashlib.sha256(raw_body).hexdigest()
+        await self.process_payload(
+            payload,
+            signature=signature,
+            payload_sha256=payload_sha256,
+        )
+
+    async def process_payload(
+        self,
+        payload: dict[str, Any],
+        *,
+        signature: str | None = None,
+        payload_sha256: str | None = None,
+    ) -> None:
+        """Pure ingest entrypoint: apply a Firecrawl webhook payload without HTTP context.
+
+        Callable from fixture-based replay (``pc ingest --from-fixture``) and from the
+        HTTP handler's ``process`` wrapper. ``payload_sha256`` is used for idempotent
+        dedupe against ``webhook_receipts``; when omitted it is derived from a canonical
+        JSON serialization of ``payload``.
+        """
+        if payload_sha256 is None:
+            payload_sha256 = hashlib.sha256(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
 
         # Atomic dedupe: attempt insert and skip if the (provider, payload_sha256)
         # unique constraint already exists. This keeps webhook replay handling safe
@@ -78,6 +108,11 @@ class FirecrawlWebhookService:
         # If no row was inserted the webhook was already processed — skip.
         if result.rowcount == 0:
             return
+
+        # Mirror the payload to disk when a record directory is configured, so
+        # a production crawl is replayable offline via ``pc ingest --from-fixture``.
+        # Best-effort: record failures never break the ingest path.
+        self._record_payload_to_disk(payload)
 
         external_job_id = str(payload.get("id", ""))
         event_type = str(payload.get("type", ""))
@@ -112,6 +147,25 @@ class FirecrawlWebhookService:
         actual = signature.removeprefix("sha256=")
         if not hmac.compare_digest(expected, actual):
             raise SignatureVerificationError("Firecrawl signature verification failed.")
+
+    def _record_payload_to_disk(self, payload: dict[str, Any]) -> None:
+        if self.webhook_record_dir is None:
+            return
+        try:
+            external_job_id = str(payload.get("id") or "unknown")
+            event_type = str(payload.get("type") or "unknown").replace(".", "_")
+            timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
+            target_dir = self.webhook_record_dir / external_job_id
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target = target_dir / f"{timestamp}_{event_type}.json"
+            target.write_text(
+                json.dumps(payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+        except OSError:
+            # Recording is an operator convenience; swallow disk errors so they
+            # never surface as a failed webhook back to Firecrawl.
+            return
 
     def _insert_for_current_dialect(self):
         dialect_name = self.session.get_bind().dialect.name
@@ -274,6 +328,7 @@ class FirecrawlWebhookService:
         source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
         trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
         authority_name = await self._resolve_authority_name(source.authority_id)
+        attribution = await self._resolve_attribution(source.jurisdiction_id)
 
         manifest = build_artifact_bundle_manifest(
             bundle_manifest_id=bundle_manifest_id,
@@ -300,6 +355,7 @@ class FirecrawlWebhookService:
                     authority_display_hint=authority_name,
                 ),
             },
+            attribution=attribution,
             snapshot_captured_at=run.completed_at or datetime.now(UTC),
         )
         reference_snapshot_set = self._build_reference_snapshot_set(
@@ -357,6 +413,24 @@ class FirecrawlWebhookService:
             return None
         authority = await self.session.get(Authority, authority_id)
         return authority.name if authority is not None else None
+
+    async def _resolve_attribution(self, jurisdiction_id: str | None) -> dict[str, Any] | None:
+        """Return the attribution block for the manifest when the jurisdiction
+        requires it. Absent policy or ``attribution_required=False`` -> ``None``.
+        """
+        if not jurisdiction_id:
+            return None
+        jurisdiction = await self.session.get(Jurisdiction, jurisdiction_id)
+        if jurisdiction is None or jurisdiction.compliance_policy_id is None:
+            return None
+        policy = await self.session.get(CompliancePolicy, jurisdiction.compliance_policy_id)
+        if policy is None or not policy.attribution_required:
+            return None
+        return {
+            "required": True,
+            "text": policy.attribution_text,
+            "contact_url": policy.contact_url,
+        }
 
     @staticmethod
     def _build_storage_ref_for_artifact(artifact: RawArtifact) -> dict[str, Any]:

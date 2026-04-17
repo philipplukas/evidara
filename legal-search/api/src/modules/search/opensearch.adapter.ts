@@ -4,6 +4,7 @@
  *
  * Query strategy:
  * - multi_match across title, content, regeste with boosted title
+ * - authority_name and official_citation boosts for legal-series and court-name queries
  * - keyword filters for jurisdiction, document_type
  * - aggregations for facets (jurisdiction, document_type, language)
  * - highlight on content for snippet generation
@@ -29,6 +30,27 @@ type OpenSearchHit = {
   };
 };
 
+const SEARCH_FIELD_WEIGHTS = [
+  'title^4',
+  'authority_name^3',
+  'official_citation^3',
+  'structural_path^2',
+  'regeste^2',
+  'content',
+  'content_preview',
+  'docket_number^2',
+] as const;
+
+const PHRASE_BOOST_FIELDS = [
+  ['title', 8],
+  ['official_citation', 6],
+  ['authority_name', 5],
+  ['structural_path', 4],
+  ['docket_number', 4],
+] as const;
+
+type QueryShape = 'wildcard' | 'short_legal' | 'free_text';
+
 @Injectable()
 export class SearchOpenSearchAdapter implements SearchRepository {
   private readonly logger = new Logger(SearchOpenSearchAdapter.name);
@@ -48,6 +70,7 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     const pageSize = options?.pageSize ?? 20;
     const from = (page - 1) * pageSize;
     const normalizedQuery = query.trim();
+    const queryShape = this.classifyQuery(normalizedQuery);
 
     // Build filter clauses
     const filters: Record<string, unknown>[] = [];
@@ -73,25 +96,20 @@ export class SearchOpenSearchAdapter implements SearchRepository {
       query: {
         bool: {
           must:
-            normalizedQuery === '*' || normalizedQuery.length === 0
+            queryShape === 'wildcard'
               ? [{ match_all: {} }]
-              : [
-                  {
-                    multi_match: {
+              : [this.buildPrimaryQuery(normalizedQuery, queryShape)],
+          should:
+            queryShape === 'wildcard'
+              ? []
+              : PHRASE_BOOST_FIELDS.map(([field, boost]) => ({
+                  match_phrase: {
+                    [field]: {
                       query: normalizedQuery,
-                      fields: [
-                        'title^4',
-                        'structural_path^2',
-                        'regeste^2',
-                        'content',
-                        'content_preview',
-                        'docket_number^2',
-                      ],
-                      type: 'best_fields' as const,
-                      fuzziness: 'AUTO',
+                      boost,
                     },
                   },
-                ],
+                })),
           filter: filters,
         },
       },
@@ -121,34 +139,14 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     this.logger.debug(`Searching "${query}" in ${this.indexDocuments}`);
 
     try {
-      let response = await this.client.search({
+      const response = await this.client.search({
         index: this.indexDocuments,
         body,
       });
 
-      let result = response.body;
-      let total =
+      const result = response.body;
+      const total =
         typeof result.hits.total === 'number' ? result.hits.total : (result.hits.total?.value ?? 0);
-      if (total === 0 && normalizedQuery !== '*' && normalizedQuery.length > 0) {
-        // Fallback keeps search usable when indexed docs have sparse text fields.
-        response = await this.client.search({
-          index: this.indexDocuments,
-          body: {
-            ...body,
-            query: {
-              bool: {
-                must: [{ match_all: {} }],
-                filter: filters,
-              },
-            },
-          },
-        });
-        result = response.body;
-        total =
-          typeof result.hits.total === 'number'
-            ? result.hits.total
-            : (result.hits.total?.value ?? 0);
-      }
 
       const hits: SearchHitEntity[] = (result.hits.hits as OpenSearchHit[])
         .filter((hit) => hit._source != null)
@@ -224,6 +222,45 @@ export class SearchOpenSearchAdapter implements SearchRepository {
   }
 
   // ─── Helpers ───
+
+  private classifyQuery(query: string): QueryShape {
+    if (query === '*' || query.length === 0) return 'wildcard';
+
+    const tokens = query.split(/\s+/).filter(Boolean);
+    const looksCitationLike = /(?:\bart\.?\b|\bbge\b|\bbvge\b|\bemrk\b|\d|\/|§)/i.test(query);
+    const shortLegalQuery = tokens.length <= 3 && query.length <= 32;
+
+    if (looksCitationLike || shortLegalQuery) {
+      return 'short_legal';
+    }
+
+    return 'free_text';
+  }
+
+  private buildPrimaryQuery(
+    query: string,
+    shape: Exclude<QueryShape, 'wildcard'>,
+  ): Record<string, unknown> {
+    if (shape === 'short_legal') {
+      return {
+        multi_match: {
+          query,
+          fields: [...SEARCH_FIELD_WEIGHTS],
+          type: 'best_fields' as const,
+          operator: 'and' as const,
+        },
+      };
+    }
+
+    return {
+      multi_match: {
+        query,
+        fields: [...SEARCH_FIELD_WEIGHTS],
+        type: 'best_fields' as const,
+        fuzziness: 'AUTO',
+      },
+    };
+  }
 
   private mapRefinementsToFilters(refinements: SearchRefinement[]): Record<string, unknown>[] {
     const mapped: Record<string, unknown>[] = [];

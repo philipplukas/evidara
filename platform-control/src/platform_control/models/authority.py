@@ -20,6 +20,9 @@ class Jurisdiction(TimestampMixin, Base):
     depth: Mapped[int] = mapped_column(default=0)
     name: Mapped[str] = mapped_column(unique=True)
     slug: Mapped[str] = mapped_column(unique=True)
+    compliance_policy_id: Mapped[str | None] = mapped_column(
+        ForeignKey("compliance_policies.compliance_policy_id"), nullable=True
+    )
 
 
 class Authority(TimestampMixin, Base):

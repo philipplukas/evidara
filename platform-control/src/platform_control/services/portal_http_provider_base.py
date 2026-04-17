@@ -45,6 +45,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    ProviderPlan,
     ProviderResource,
     ProviderStartResult,
 )
@@ -144,6 +145,29 @@ class PortalHttpProviderBase:
             response_payload=response_payload,
             inline_resources=resources,
             inline_failure_reason=inline_failure_reason,
+        )
+
+    def plan(self, source: Source, source_version: SourceVersion) -> ProviderPlan:
+        """Describe the acquisition without network IO."""
+        del source
+        acquisition_spec: dict[str, Any] = source_version.acquisition_spec or {}
+        notes: list[str] = []
+        seed_urls: list[str] = []
+        try:
+            code = self._require_subdivision_code(acquisition_spec)
+            portal_host = self._portal_host(code)
+            seed_urls = self._seed_urls(acquisition_spec, portal_host=portal_host)
+            notes.append(f"{self.subdivision_spec_key}={code}")
+            notes.append(f"portal_host={portal_host}")
+        except ProviderConfigurationError as exc:
+            notes.append(f"config_error={exc}")
+        return ProviderPlan(
+            provider=self.provider_name,
+            seed_urls=seed_urls,
+            estimated_request_count=len(seed_urls),
+            request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 30.0),
+            notes=notes,
+            raw=dict(acquisition_spec),
         )
 
     # ─── Helpers ──────────────────────────────────────────────

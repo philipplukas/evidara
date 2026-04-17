@@ -54,8 +54,15 @@ from platform_control.schemas.run import (
 )
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
+from platform_control.services.compliance_policy_service import (
+    RateLimiterRegistry,
+    resolve_rate_limiter_for_source,
+    resolve_robots_context_for_source,
+)
+from platform_control.services.politeness import current_rate_limiter
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.replay_checkpoint import checkpoint_dict_from_parent
+from platform_control.services.robots import RobotsChecker, current_robots_context
 
 
 @dataclass(slots=True)
@@ -84,6 +91,8 @@ class RunService:
         publisher: RawArtifactPublisher | None = None,
         *,
         run_dispatch_backend: str = "inline",
+        rate_limiter_registry: RateLimiterRegistry | None = None,
+        robots_checker: RobotsChecker | None = None,
     ) -> None:
         self.session = session
         self.provider = provider
@@ -91,13 +100,15 @@ class RunService:
         self.artifact_store = artifact_store or get_artifact_store()
         self.publisher = publisher or get_raw_artifact_publisher()
         self.run_dispatch_backend = run_dispatch_backend
+        self.rate_limiter_registry = rate_limiter_registry or RateLimiterRegistry()
+        self.robots_checker = robots_checker or RobotsChecker()
 
     def _resolve_provider_for_source_version(
         self, source_version: SourceVersion
     ) -> AcquisitionProvider | None:
         provider = self.provider
         if provider is None and self.provider_registry is not None:
-            provider = self.provider_registry.resolve_for_spec(source_version.acquisition_spec)
+            provider = self.provider_registry.resolve_for_version(source_version)
         return provider
 
     def _should_dispatch_via_worker(self, source_version: SourceVersion) -> bool:
@@ -804,13 +815,28 @@ class RunService:
     ) -> PendingDispatchPublications:
         provider = self.provider
         if provider is None and self.provider_registry is not None:
-            provider = self.provider_registry.resolve_for_spec(source_version.acquisition_spec)
+            provider = self.provider_registry.resolve_for_version(source_version)
         if provider is None:
             raise ProviderConfigurationError(
                 "An acquisition provider or provider registry is required before creating runs."
             )
 
-        provider_result = await provider.start_run(source, source_version, run)
+        # Bind the jurisdiction's rate limiter + robots context into the async
+        # context so every outbound GET performed by the provider honours them.
+        # set/reset keeps concurrent runs on different policies isolated.
+        limiter = await resolve_rate_limiter_for_source(
+            self.session, source, self.rate_limiter_registry
+        )
+        robots_ctx = await resolve_robots_context_for_source(
+            self.session, source, self.robots_checker
+        )
+        limiter_token = current_rate_limiter.set(limiter)
+        robots_token = current_robots_context.set(robots_ctx)
+        try:
+            provider_result = await provider.start_run(source, source_version, run)
+        finally:
+            current_robots_context.reset(robots_token)
+            current_rate_limiter.reset(limiter_token)
         provider_job = ProviderJob(
             run_id=run.run_id,
             provider=provider_result.provider,
@@ -970,6 +996,7 @@ class RunService:
         source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
         trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
         authority_name = await self._resolve_authority_name(source.authority_id)
+        attribution = await self._resolve_attribution(source.jurisdiction_id)
 
         manifest = build_artifact_bundle_manifest(
             bundle_manifest_id=bundle_manifest_id,
@@ -996,6 +1023,7 @@ class RunService:
                     authority_display_hint=authority_name,
                 ),
             },
+            attribution=attribution,
             snapshot_captured_at=run.completed_at or datetime.now(UTC),
         )
         reference_snapshot_set = self._build_reference_snapshot_set(
@@ -1070,6 +1098,7 @@ class RunService:
         source_origin_kind = str(acquisition_spec.get("source_origin_kind") or "official_primary")
         trust_tier = str(acquisition_spec.get("trust_tier") or "authoritative")
         authority_name = await self._resolve_authority_name(source.authority_id)
+        attribution = await self._resolve_attribution(source.jurisdiction_id)
 
         events: list[dict[str, Any]] = []
         for artifact in doc_artifacts:
@@ -1107,6 +1136,7 @@ class RunService:
                         authority_display_hint=authority_name,
                     ),
                 },
+                attribution=attribution,
                 snapshot_captured_at=run.completed_at or datetime.now(UTC),
             )
             manifest_storage_ref = await self.artifact_store.store_bundle_manifest(
@@ -1138,6 +1168,29 @@ class RunService:
             return None
         authority = await self.session.get(Authority, authority_id)
         return authority.name if authority is not None else None
+
+    async def _resolve_attribution(self, jurisdiction_id: str | None) -> dict[str, Any] | None:
+        """Return the attribution block for the manifest when required.
+
+        Falls back to ``None`` when the jurisdiction has no policy or attribution
+        isn't required — callers simply omit the attribution key.
+        """
+        from platform_control.models.authority import Jurisdiction
+        from platform_control.models.compliance_policy import CompliancePolicy
+
+        if not jurisdiction_id:
+            return None
+        jurisdiction = await self.session.get(Jurisdiction, jurisdiction_id)
+        if jurisdiction is None or jurisdiction.compliance_policy_id is None:
+            return None
+        policy = await self.session.get(CompliancePolicy, jurisdiction.compliance_policy_id)
+        if policy is None or not policy.attribution_required:
+            return None
+        return {
+            "required": True,
+            "text": policy.attribution_text,
+            "contact_url": policy.contact_url,
+        }
 
     async def _publish_pending_dispatch_events(
         self, pending_publications: list[PendingDispatchPublications]

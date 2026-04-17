@@ -27,7 +27,7 @@ This file splits TAR-89 into **three implementation tracks** so work can be file
 |----------------|-------|---------------------|
 | **Projections** | Map lean → search document; title/type fallbacks | [`legal-search/api/src/modules/projections/projections.service.ts`](../../legal-search/api/src/modules/projections/projections.service.ts) |
 | **Search rank shape** | Field boosts (separate Linear **TAR-82** when tuning) | [`legal-search/api/src/modules/search/opensearch.adapter.ts`](../../legal-search/api/src/modules/search/opensearch.adapter.ts) |
-| **Detail trust** | `MetadataRow` labels/icons, `MetadataSection` | [`legal-search/frontend/src/components/detail/MetadataSection.tsx`](../../legal-search/frontend/src/components/detail/MetadataSection.tsx), [`metadata-icons.ts`](../../legal-search/api/src/core/presentation/metadata-icons.ts) |
+| **Detail trust** | `MetadataRow` labels/icons, `MetadataList` in detail tab | [`legal-search/frontend/src/components/detail/MetadataList.tsx`](../../legal-search/frontend/src/components/detail/MetadataList.tsx), [`metadata-icons.ts`](../../legal-search/api/src/core/presentation/metadata-icons.ts) |
 
 **Exit (track):** section **3.5** “Search / list” and “Detail” bullets pass for the agreed IDs after fresh index rows exist.
 

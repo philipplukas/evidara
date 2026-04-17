@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { DetailPanel } from "@/components/detail/DetailPanel";
 import {
   Sheet,
@@ -29,12 +30,14 @@ export function DetailSheet({
   onPin,
   isPinned,
 }: DetailSheetProps) {
+  const t = useTranslations("detail");
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[90vw] sm:w-[480px] p-0">
         <SheetHeader className="sr-only">
-          <SheetTitle>{detail?.title ?? "Detail"}</SheetTitle>
-          <SheetDescription>Detailed view of the selected search result.</SheetDescription>
+          <SheetTitle>{detail?.title ?? t("empty.label")}</SheetTitle>
+          <SheetDescription>{t("sheetDescription")}</SheetDescription>
         </SheetHeader>
         <div className="overflow-y-auto h-full">
           <DetailPanel
