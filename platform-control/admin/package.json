@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "tokens:sync": "node ../../scripts/sync-tokens.mjs",
+    "tokens:check": "node ../../scripts/sync-tokens.mjs --check",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run tokens:check"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
