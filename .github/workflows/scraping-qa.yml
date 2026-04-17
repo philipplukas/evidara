@@ -24,6 +24,7 @@ on:
       - "scripts/check-scraping-qa.sh"
       - "scripts/validate_json_schemas.py"
       - ".github/workflows/scraping-qa.yml"
+  workflow_dispatch:
 
 jobs:
   scraping-qa:
