@@ -54,13 +54,35 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     fetch_parser.add_argument(
         "source_version_id",
-        help="SourceVersion to record (must be execution_mode=live).",
+        nargs="?",
+        default=None,
+        help=(
+            "SourceVersion to record (must be execution_mode=live). Omit when "
+            "using --from-webhook-log."
+        ),
     )
     fetch_parser.add_argument(
         "--record",
         dest="cassette_dir",
         default=None,
         help="Cassette directory (defaults to Settings.cassette_dir).",
+    )
+    fetch_parser.add_argument(
+        "--from-webhook-log",
+        dest="from_webhook_log",
+        default=None,
+        help=(
+            "Bundle a directory of recorded Firecrawl webhook payloads into a "
+            "single JSON fixture that 'pc ingest --from-fixture' can replay. "
+            "Points at the directory populated by "
+            "PLATFORM_CONTROL_FIRECRAWL_WEBHOOK_RECORD_DIR."
+        ),
+    )
+    fetch_parser.add_argument(
+        "--out",
+        dest="out",
+        default=None,
+        help=("Output path for --from-webhook-log (defaults to <src_dir>.bundle.json)."),
     )
     fetch_parser.set_defaults(runner=fetch_cmd.run_from_args)
 

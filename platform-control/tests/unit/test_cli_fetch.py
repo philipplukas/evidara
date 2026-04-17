@@ -160,3 +160,75 @@ async def test_cassette_is_loadable_by_ingest_loader_shape(session, tmp_path: Pa
     loaded = load_payloads(cassette_path)
     assert len(loaded) == 1
     assert loaded[0]["provider_name"] == "deterministic_http"
+
+
+def test_bundle_webhook_log_returns_payloads_in_sort_order(tmp_path: Path) -> None:
+    from platform_control.cli.fetch import bundle_webhook_log
+
+    src = tmp_path / "webhook-log" / "crawl_abc123"
+    src.mkdir(parents=True)
+    (src / "20260417T100000000000_crawl_started.json").write_text(
+        json.dumps({"id": "crawl_abc123", "type": "crawl.started"})
+    )
+    (src / "20260417T100001000000_crawl_page.json").write_text(
+        json.dumps({"id": "crawl_abc123", "type": "crawl.page"})
+    )
+    (src / "20260417T100002000000_crawl_completed.json").write_text(
+        json.dumps({"id": "crawl_abc123", "type": "crawl.completed"})
+    )
+
+    bundled = bundle_webhook_log(src)
+
+    types = [p["type"] for p in bundled]
+    assert types == ["crawl.started", "crawl.page", "crawl.completed"]
+
+
+def test_bundle_webhook_log_walks_recursively(tmp_path: Path) -> None:
+    from platform_control.cli.fetch import bundle_webhook_log
+
+    root = tmp_path / "webhook-log"
+    (root / "job_a").mkdir(parents=True)
+    (root / "job_b").mkdir(parents=True)
+    (root / "job_a" / "20260417_a.json").write_text(json.dumps({"id": "a"}))
+    (root / "job_b" / "20260417_b.json").write_text(json.dumps({"id": "b"}))
+
+    bundled = bundle_webhook_log(root)
+
+    assert sorted(p["id"] for p in bundled) == ["a", "b"]
+
+
+def test_bundle_webhook_log_rejects_non_object_entry(tmp_path: Path) -> None:
+    from platform_control.cli.fetch import bundle_webhook_log
+
+    src = tmp_path / "webhook-log"
+    src.mkdir()
+    (src / "broken.json").write_text(json.dumps(["not", "an", "object"]))
+
+    with pytest.raises(ValueError, match="not a JSON object"):
+        bundle_webhook_log(src)
+
+
+def test_bundle_webhook_log_missing_dir_raises(tmp_path: Path) -> None:
+    from platform_control.cli.fetch import bundle_webhook_log
+
+    with pytest.raises(FileNotFoundError):
+        bundle_webhook_log(tmp_path / "does-not-exist")
+
+
+def test_write_bundle_produces_file_that_pc_ingest_loader_accepts(tmp_path: Path) -> None:
+    """Bundled output must round-trip through ingest's load_payloads."""
+    from platform_control.cli.fetch import write_bundle
+    from platform_control.cli.ingest import load_payloads
+
+    out = tmp_path / "bundle.json"
+    payloads = [
+        {"id": "a", "type": "crawl.page"},
+        {"id": "b", "type": "crawl.completed"},
+    ]
+    write_bundle(payloads, out)
+
+    loaded = load_payloads(out)
+    assert len(loaded) == 2
+    assert [p["type"] for p in loaded] == ["crawl.completed", "crawl.page"] or [
+        p["type"] for p in loaded
+    ] == ["crawl.page", "crawl.completed"]
