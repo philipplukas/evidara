@@ -60,7 +60,7 @@ export function RelatedTab({ groups, onFocus, onPivot, sourceId }: RelatedTabPro
               <InteractiveRow
                 key={item.id}
                 onClick={() => onFocus?.(item.id)}
-                className="group rounded-xl border border-border/40 bg-surface-panel/70 px-3 py-2.5 transition-all hover:border-brand/20 hover:bg-surface-panel hover:shadow-sm"
+                className="group rounded-xl border border-border/40 bg-surface-panel/70 px-3 py-2.5 transition-all hover:border-accent-core/20 hover:bg-surface-panel hover:shadow-sm"
               >
                 {item.badge && (
                   <Badge label={item.badge.label} colorKey={item.badge.colorKey} size="xs" />
@@ -75,7 +75,7 @@ export function RelatedTab({ groups, onFocus, onPivot, sourceId }: RelatedTabPro
                     </div>
                   )}
                 </div>
-                <ExternalLink className="w-3 h-3 text-muted-foreground/30 group-hover:text-brand transition-colors shrink-0" />
+                <ExternalLink className="w-3 h-3 text-muted-foreground/30 group-hover:text-accent-core transition-colors shrink-0" />
               </InteractiveRow>
             ))}
           </div>

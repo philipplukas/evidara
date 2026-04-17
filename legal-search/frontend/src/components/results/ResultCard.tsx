@@ -53,7 +53,7 @@ export function ResultCard({
         transition-motion-medium focus-within:ring-2 focus-within:ring-focus-ring sm:px-5
         ${
           isSelected
-            ? "border-l-2 border-l-brand bg-brand/[0.06] shadow-[inset_0_0_0_1px_rgba(15,76,129,0.18)]"
+            ? "border-l-2 border-l-accent-core bg-accent-core/[0.06] shadow-[inset_0_0_0_1px_rgba(98,70,217,0.18)]"
             : "border-l-2 border-l-transparent hover:-translate-y-px hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
         }`}
     >
@@ -70,7 +70,7 @@ export function ResultCard({
         </h3>
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
           {isSelected && (
-            <span className="inline-flex items-center rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand">
+            <span className="inline-flex items-center rounded-full border border-accent-core/20 bg-accent-core/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-core">
               {t("selected")}
             </span>
           )}
@@ -129,7 +129,7 @@ export function ResultCard({
               }}
               className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 rounded-full border border-border/70
                 bg-muted/20 px-2.5 py-2 sm:py-1 text-[11px] font-medium text-muted-foreground transition-colors
-                hover:border-brand/30 hover:bg-brand/5 hover:text-brand"
+                hover:border-accent-core/30 hover:bg-accent-core/5 hover:text-accent-core"
             >
               <span className="font-semibold text-foreground/60">{rc.count}</span>
               {rc.label}

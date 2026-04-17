@@ -1,7 +1,8 @@
 "use client";
 
 import { Chip, Stack, Typography } from "@mui/material";
-import { Datagrid, DateField, FunctionField, List, ReferenceField, TextField } from "react-admin";
+import { Datagrid, FunctionField, List, ReferenceField, TextField } from "react-admin";
+import { SwissDateField } from "../../components/SwissDateField";
 import type {
   AuthorityRecord,
   JurisdictionRecord,
@@ -87,7 +88,7 @@ export function SourceList() {
           <FunctionField<AuthorityRecord> render={(record) => formatReferenceLabel(record)} />
         </ReferenceField>
         <TextField source="document_family" label="Family" emptyText="-" />
-        <DateField source="updated_at" label="Updated" showTime />
+        <SwissDateField source="updated_at" label="Updated" showTime />
       </Datagrid>
     </List>
   );

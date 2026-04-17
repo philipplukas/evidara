@@ -4,7 +4,6 @@ import { Box, Button, Chip, Divider, Paper, Stack, Typography } from "@mui/mater
 import { useEffect, useMemo, useRef } from "react";
 import {
   Datagrid,
-  DateField,
   FunctionField,
   List,
   NumberField,
@@ -13,6 +12,7 @@ import {
   useListContext,
   useRedirect,
 } from "react-admin";
+import { SwissDateField } from "../../components/SwissDateField";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { runModeToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
 import { CancelRunButton } from "./RunActions";
@@ -551,8 +551,8 @@ function RunListGrid() {
       <RunStateField />
       <NumberField source="captured_resources_count" label="Captured" />
       <NumberField source="artifacts_count" label="Artifacts" />
-      <DateField source="created_at" label="Created" showTime />
-      <DateField source="updated_at" label="Updated" showTime />
+      <SwissDateField source="created_at" label="Created" showTime />
+      <SwissDateField source="updated_at" label="Updated" showTime />
       <CancelRunButton />
     </Datagrid>
   );

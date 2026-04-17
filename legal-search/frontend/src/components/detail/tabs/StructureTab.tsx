@@ -51,14 +51,14 @@ export function StructureTab({ items, onFocus }: StructureTabProps) {
             className={`flex w-full items-center gap-3 rounded-xl border-l-2 px-3 py-2.5 text-left text-xs transition-all
               ${
                 item.active
-                  ? "border-l-brand bg-interactive-accent-subtle text-brand font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+                  ? "border-l-accent-core bg-accent-core-subtle text-accent-core font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
                   : "border-l-transparent text-foreground/75 hover:bg-muted/50 hover:text-foreground"
               }`}
           >
             <BookOpen className="h-3 w-3 shrink-0" />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
             {item.active && (
-              <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-tiny font-semibold text-brand">
+              <span className="rounded-full bg-accent-core-subtle px-1.5 py-0.5 text-tiny font-semibold text-accent-core">
                 {t("tabs.current")}
               </span>
             )}

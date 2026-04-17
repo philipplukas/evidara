@@ -167,7 +167,11 @@ test.describe("Canonical screenshot evidence pack", () => {
     await searchInput.press("Enter");
     await expect(page.locator("article").first()).toBeVisible();
 
-    await saveScreenshot(page, "cross-surface-header-navigation.png");
+    // Crop the header to its own artefact so the navigation/cross-surface
+    // shot isn't byte-identical to the full results page (the user flagged
+    // this in the Sprint 1 pack). `legal-search-result-list.png` remains the
+    // full-page capture of the populated result list.
+    await saveScreenshot(page, "cross-surface-header-navigation.png", page.getByRole("banner"));
     await saveScreenshot(page, "legal-search-result-list.png");
 
     await page.locator("article").first().click();
@@ -274,12 +278,16 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
 
+    // Mobile landing (pre-query) — captures the mobile masthead + empty
+    // state before the user types a search term. Distinct from the
+    // populated `mobile-result-list.png` below.
+    await saveScreenshot(page, "mobile-search-home.png");
+
     const searchInput = page.getByPlaceholder(SEARCH_PLACEHOLDER);
     await searchInput.fill("Art. 754");
     await searchInput.press("Enter");
     await expect(page.locator("article").first()).toBeVisible();
 
-    await saveScreenshot(page, "mobile-search-home.png");
     await saveScreenshot(page, "mobile-result-list.png");
 
     await page.locator("article").first().click();

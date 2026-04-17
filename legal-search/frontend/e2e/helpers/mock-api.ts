@@ -11,7 +11,11 @@ function buildSearchResult(query: string) {
     structuralContext: "Obligationenrecht · Gesellschaftsrecht",
     badges: [{ label: "Court decision", colorKey: "pink", iconKey: "ch" }],
     metadataRows: [
-      { label: "Date", value: "2026-04-03" },
+      // Fixture dates render as-is (the BFF owns date formatting for
+      // MetadataRow.value, per OpenAPI contract). Stay in Swiss DD.MM.YYYY
+      // so the result list matches the detail panel and admin date columns
+      // in the Sprint 1 screenshot pack.
+      { label: "Date", value: "03.04.2026" },
       { label: "Docket", value: "4A_123/2026" },
       { label: "Court", value: "Bundesgericht, I. zivilrechtliche Abteilung" },
     ],

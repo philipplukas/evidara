@@ -66,7 +66,7 @@ export function ReferencesTab({
               <InteractiveRow
                 key={item.id}
                 onClick={() => onFocus?.(item.id)}
-                className="rounded-xl border border-border/40 bg-surface-panel/70 px-3 py-2.5 transition-all hover:border-brand/20 hover:bg-surface-panel hover:shadow-sm"
+                className="rounded-xl border border-border/40 bg-surface-panel/70 px-3 py-2.5 transition-all hover:border-accent-core/20 hover:bg-surface-panel hover:shadow-sm"
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-foreground line-clamp-2">

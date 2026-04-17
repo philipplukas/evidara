@@ -38,7 +38,7 @@ export function FilterBar({ filters }: FilterBarProps) {
       {activeRefinements.map((item) => (
         <span
           key={item.field}
-          className="inline-flex items-center gap-1 rounded-full border border-brand/15 bg-interactive-accent-subtle px-2 py-0.5 text-xs font-medium text-brand"
+          className="inline-flex items-center gap-1 rounded-full border border-accent-core/15 bg-interactive-accent-subtle px-2 py-0.5 text-xs font-medium text-accent-core"
         >
           <span className="max-w-[12rem] truncate">
             {item.filterLabel}: {item.valueLabels}
@@ -46,7 +46,7 @@ export function FilterBar({ filters }: FilterBarProps) {
           <button
             type="button"
             onClick={() => dispatch({ type: "CLEAR_REFINEMENT", field: item.field })}
-            className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-brand/10"
+            className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-accent-core/10"
             aria-label={`Remove ${item.filterLabel} filter`}
           >
             <X className="h-3 w-3" />

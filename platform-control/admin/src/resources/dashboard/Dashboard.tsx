@@ -22,6 +22,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useRedirect } from "react-admin";
 import type { RunPipelineHealth } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { formatSwissDateTime } from "../../lib/format/date";
 import { RunLaunchButton } from "../runs/RunLaunchDialog";
 import { StatCard, type StatTone, statToneBorder, successRateTone } from "../shared/Stat";
 import { pipelineHealthToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
@@ -69,13 +70,7 @@ const formatDuration = (start: string | null, end: string | null): string => {
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 };
 
-const formatTime = (value: string | null): string => {
-  if (!value) return "-";
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-};
+const formatTime = (value: string | null): string => formatSwissDateTime(value) || "-";
 
 export const summarizeRecentHealth = (recentHealth: RecentRunHealth[]): RecentHealthSummary =>
   recentHealth.reduce(

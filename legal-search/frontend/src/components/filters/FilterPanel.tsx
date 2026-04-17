@@ -21,7 +21,7 @@ export function FilterPanel({ filters }: FilterPanelProps) {
     return (
       <div className="px-4 py-4">
         <div className="rounded-2xl border border-dashed border-border/70 bg-surface-shell/45 px-4 py-5 text-center shadow-[--shadow-inset-surface]">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-interactive-accent-subtle text-brand">
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-interactive-accent-subtle text-accent-core">
             <SlidersHorizontal className="h-4 w-4" />
           </div>
           <SectionLabel className="mb-1">{t("filter.filtersTitle")}</SectionLabel>
@@ -119,7 +119,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate">{filter.label}</span>
           {selectedCount > 0 && (
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand/10 px-1.5 text-tiny font-semibold text-brand">
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-core/10 px-1.5 text-tiny font-semibold text-accent-core">
               {selectedCount}
             </span>
           )}
@@ -141,7 +141,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                 placeholder={t("filter.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 w-full rounded-xl border border-border bg-surface-input/95 pl-8 pr-3 text-xs shadow-inner transition placeholder:text-muted-foreground/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-focus-ring"
+                className="h-8 w-full rounded-xl border border-border bg-surface-input/95 pl-8 pr-3 text-xs shadow-inner transition placeholder:text-muted-foreground/60 focus:border-accent-core focus:outline-none focus:ring-2 focus:ring-focus-ring"
               />
             </div>
           )}
@@ -167,8 +167,8 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                         aria-pressed={isSelected}
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
                           isSelected
-                            ? "border-brand bg-brand-strong text-white shadow-sm"
-                            : "border-border/70 bg-surface-panel text-muted-foreground hover:border-brand/30 hover:text-foreground"
+                            ? "border-accent-core bg-accent-core text-white shadow-sm"
+                            : "border-border/70 bg-surface-panel text-muted-foreground hover:border-accent-core/30 hover:text-foreground"
                         }`}
                       >
                         {opt.iconKey && isFlagIcon(opt.iconKey) ? (
@@ -220,7 +220,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                         <div
                           className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-all ${
                             isSelected
-                              ? "border-brand bg-brand"
+                              ? "border-accent-core bg-accent-core"
                               : "border-border group-hover:border-muted-foreground"
                           }`}
                         >
@@ -259,7 +259,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                   aria-label={filter.label}
                   value={selected[0] || ""}
                   onChange={(e) => setSelected([e.target.value])}
-                  className="h-9 w-full rounded-xl border border-border bg-surface-input/95 px-3 text-xs shadow-inner transition focus:border-brand focus:outline-none focus:ring-2 focus:ring-focus-ring"
+                  className="h-9 w-full rounded-xl border border-border bg-surface-input/95 px-3 text-xs shadow-inner transition focus:border-accent-core focus:outline-none focus:ring-2 focus:ring-focus-ring"
                 >
                   {filter.options.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -283,7 +283,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                       }
                     }}
                     className={`relative h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
-                      selected.length > 0 ? "bg-brand" : "bg-muted-foreground/20"
+                      selected.length > 0 ? "bg-accent-core" : "bg-muted-foreground/20"
                     }`}
                   >
                     <div

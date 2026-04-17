@@ -28,6 +28,15 @@ import {
 } from "react-admin";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
 import {
+  ACCENT_CORE,
+  ACCENT_CORE_MUTED,
+  ACCENT_CORE_SUBTLE,
+  MOTION_DURATION_MEDIUM,
+  MOTION_EASING_STANDARD,
+  SHADOW_CARD,
+  SHADOW_CARD_HOVER,
+} from "../lib/admin/designTokens";
+import {
   describeLegalSearchHandoff,
   resolveLegalSearchHandoff,
 } from "../lib/admin/navigationContext";
@@ -149,8 +158,22 @@ const adminTheme = createTheme({
         root: {
           backdropFilter: "blur(14px)",
           border: "1px solid rgba(29, 41, 61, 0.08)",
-          boxShadow: "0 22px 50px rgba(29, 41, 61, 0.08)",
           backgroundImage: "none",
+          // Sprint 1 — default Paper surfaces to the shared card elevation
+          // + motion so admin Show/List tiles lift the same way legal-search
+          // cards do. `MuiAppBar` has its own style override below and is
+          // unaffected by this (styleOverrides merge per-component-root, and
+          // AppBar's root wins its own boxShadow).
+          boxShadow: SHADOW_CARD,
+          transition: `box-shadow ${MOTION_DURATION_MEDIUM} ${MOTION_EASING_STANDARD}`,
+          "@media (hover: hover)": {
+            "&:hover": {
+              boxShadow: SHADOW_CARD_HOVER,
+            },
+          },
+          "@media (prefers-reduced-motion: reduce)": {
+            transition: "none",
+          },
         },
       },
     },
@@ -175,16 +198,25 @@ const adminTheme = createTheme({
           paddingBottom: 10,
           paddingLeft: 14,
           paddingRight: 14,
-          transition: "background-color 160ms ease, transform 160ms ease",
+          transition: `background-color ${MOTION_DURATION_MEDIUM} ${MOTION_EASING_STANDARD}, transform ${MOTION_DURATION_MEDIUM} ${MOTION_EASING_STANDARD}`,
           "&:hover": {
             backgroundColor: alpha("#0f4c81", 0.08),
           },
+          // Selected nav item uses the Evidara violet accent — admin analogue
+          // of legal-search's active detail tab indicator (Sprint 1, TAR-244).
+          // Hover-while-selected bumps to ACCENT_CORE_MUTED. The bar chrome
+          // itself stays brand-navy so "where am I" (identity) and "which row
+          // am I on" (state) stay distinct.
           "&.Mui-selected": {
-            backgroundColor: alpha("#0f4c81", 0.1),
-            boxShadow: `inset 0 0 0 1px ${alpha("#0f4c81", 0.16)}`,
+            backgroundColor: ACCENT_CORE_SUBTLE,
+            boxShadow: `inset 0 0 0 1px ${alpha(ACCENT_CORE, 0.22)}`,
+            color: ACCENT_CORE,
+            "& .MuiListItemIcon-root": {
+              color: ACCENT_CORE,
+            },
           },
           "&.Mui-selected:hover": {
-            backgroundColor: alpha("#0f4c81", 0.14),
+            backgroundColor: ACCENT_CORE_MUTED,
           },
           "&:focus-visible": {
             outline: "2px solid rgba(15, 76, 129, 0.24)",

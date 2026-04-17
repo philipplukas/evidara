@@ -44,7 +44,7 @@ export function ExactMatchStrip({ matches, onSelect }: ExactMatchStripProps) {
               onClick={() => onSelect(match.id)}
               aria-label={t("openLabel", { title: match.title })}
               className="flex w-full items-start gap-3 rounded-lg border border-border bg-surface-panel px-3 py-2.5
-                text-left transition-all hover:-translate-y-px hover:border-brand/30 hover:shadow-sm"
+                text-left transition-all hover:-translate-y-px hover:border-accent-core/30 hover:shadow-sm"
             >
               <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
                 {badge?.iconKey && isFlagIcon(badge.iconKey) ? (

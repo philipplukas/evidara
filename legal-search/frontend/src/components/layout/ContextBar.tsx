@@ -94,7 +94,7 @@ export function ContextBar({ context }: ContextBarProps) {
           }
           className={`context-bar__official-toggle ${
             constraints.context.officialOnly
-              ? "context-bar__official-toggle--active border-brand/20 bg-interactive-accent-subtle text-brand"
+              ? "context-bar__official-toggle--active border-accent-core/30 bg-accent-core-subtle text-accent-core"
               : "context-bar__official-toggle--idle border border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
           }`}
         >
@@ -122,7 +122,7 @@ export function ContextBar({ context }: ContextBarProps) {
         >
           {t("filter.filtersTitle")}
           {activeCount > 0 && (
-            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-white">
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-core px-1 text-[10px] font-semibold text-white">
               {activeCount}
             </span>
           )}
@@ -166,7 +166,7 @@ function ChipGroup({
             onClick={() => onToggle(item.key)}
             className={`context-bar__chip ${
               item.active
-                ? "context-bar__chip--active bg-brand-strong text-white shadow-sm ring-1 ring-brand/10"
+                ? "context-bar__chip--active bg-accent-core text-white shadow-sm ring-1 ring-accent-core/10"
                 : "context-bar__chip--idle bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
             }`}
           >
@@ -208,7 +208,7 @@ function TabGroup({
           onClick={() => onSelect(item.key)}
           className={`context-bar__tab ${
             item.active
-              ? "context-bar__tab--active bg-interactive-accent-subtle text-brand ring-1 ring-brand/10"
+              ? "context-bar__tab--active bg-accent-core-subtle text-accent-core ring-1 ring-accent-core/15"
               : "context-bar__tab--idle text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >
