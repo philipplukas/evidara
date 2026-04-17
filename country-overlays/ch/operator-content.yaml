@@ -1,0 +1,28 @@
+version: 1
+country_code: CH
+
+onboarding_checklist:
+  - Confirm scope maps to jurisdiction code CH and hierarchy paths ch/federal, ch/cantonal/{canton_code}, ch/municipal/{bfs_id}.
+  - Confirm source family mapping for federal laws, cantonal collections, municipal regulations, decisions, and commentary.
+  - Confirm Fedlex SPARQL provider is configured for federal acquisition (see docs/architecture/ch-fedlex-sparql-temporal-architecture.md).
+  - Confirm cantonal authority records cover the 26 cantons.
+  - Confirm municipality registry (municipalities.yaml) covers the pilot subset and references canton jurisdiction_ids.
+  - Confirm language coverage for de, fr, it, and rm per source.
+
+approval_hotspots:
+  - authority taxonomy correctness across three levels (federal, cantonal, municipal)
+  - canton <-> municipality parent linkage via jurisdiction_id
+  - source family boundary between federal Verordnung, cantonal Verordnung, and municipal Reglement
+  - language attribution for multilingual cantons (BE, FR, GR, VS)
+  - court level mapping between cantonal and federal instances
+
+triage_overlays:
+  mapping_drift:
+    first_action: Compare incoming authority/jurisdiction labels against canonical CH mapping; check canton code against ISO 3166-2:CH.
+    escalation_owner: platform-control
+  municipality_unknown:
+    first_action: Look up BFS number in country-overlays/ch/municipalities.yaml; if absent, treat as unregistered and do not auto-create.
+    escalation_owner: platform-control
+  search_projection_mismatch:
+    first_action: Verify processed-event projection parity for CH-tagged documents; confirm canton and municipality facets project correctly.
+    escalation_owner: legal-search

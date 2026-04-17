@@ -7,6 +7,7 @@ platform-control).
 Current overlays:
 
 - `at/` — Austria
+- `ch/` — Switzerland
 
 Each country overlay contains:
 
@@ -14,3 +15,11 @@ Each country overlay contains:
 - `user-content.yaml` — end-user label/copy overlays
 - `operator-content.yaml` — operator onboarding/triage overlays
 - `reference-data.yaml` — reference-data records expected in platform-control seeds
+
+Country overlays may additionally contain large or country-specific registries
+that do not fit the curated `reference-data.yaml` pattern. These files are
+scoped to a single overlay and documented inline. Current examples:
+
+- `ch/municipalities.yaml` — Swiss municipality registry keyed by BFS number,
+  with an optional `law_collection` block per municipality. Pilot subset only;
+  full load from the BFS Gemeindeverzeichnis is out of scope for this file.

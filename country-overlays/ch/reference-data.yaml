@@ -1,0 +1,140 @@
+version: 1
+country_code: CH
+
+# Jurisdictions are modeled hierarchically:
+#   - jur_ch               : Confederation (federal scope)
+#   - jur_ch_<canton_code> : one per canton, using ISO 3166-2:CH lowercase code
+# Municipalities are NOT modeled as jurisdictions here; they live in
+# municipalities.yaml and reference their canton's jurisdiction_id.
+
+jurisdictions:
+  - jurisdiction_id: jur_ch
+    slug: ch
+    name: Switzerland (Confederation)
+  - jurisdiction_id: jur_ch_zh
+    slug: ch-zh
+    name: Kanton Zürich
+  - jurisdiction_id: jur_ch_be
+    slug: ch-be
+    name: Kanton Bern / Canton de Berne
+  - jurisdiction_id: jur_ch_lu
+    slug: ch-lu
+    name: Kanton Luzern
+  - jurisdiction_id: jur_ch_ur
+    slug: ch-ur
+    name: Kanton Uri
+  - jurisdiction_id: jur_ch_sz
+    slug: ch-sz
+    name: Kanton Schwyz
+  - jurisdiction_id: jur_ch_ow
+    slug: ch-ow
+    name: Kanton Obwalden
+  - jurisdiction_id: jur_ch_nw
+    slug: ch-nw
+    name: Kanton Nidwalden
+  - jurisdiction_id: jur_ch_gl
+    slug: ch-gl
+    name: Kanton Glarus
+  - jurisdiction_id: jur_ch_zg
+    slug: ch-zg
+    name: Kanton Zug
+  - jurisdiction_id: jur_ch_fr
+    slug: ch-fr
+    name: Canton de Fribourg / Kanton Freiburg
+  - jurisdiction_id: jur_ch_so
+    slug: ch-so
+    name: Kanton Solothurn
+  - jurisdiction_id: jur_ch_bs
+    slug: ch-bs
+    name: Kanton Basel-Stadt
+  - jurisdiction_id: jur_ch_bl
+    slug: ch-bl
+    name: Kanton Basel-Landschaft
+  - jurisdiction_id: jur_ch_sh
+    slug: ch-sh
+    name: Kanton Schaffhausen
+  - jurisdiction_id: jur_ch_ar
+    slug: ch-ar
+    name: Kanton Appenzell Ausserrhoden
+  - jurisdiction_id: jur_ch_ai
+    slug: ch-ai
+    name: Kanton Appenzell Innerrhoden
+  - jurisdiction_id: jur_ch_sg
+    slug: ch-sg
+    name: Kanton St. Gallen
+  - jurisdiction_id: jur_ch_gr
+    slug: ch-gr
+    name: Kanton Graubünden / Chantun Grischun / Cantone dei Grigioni
+  - jurisdiction_id: jur_ch_ag
+    slug: ch-ag
+    name: Kanton Aargau
+  - jurisdiction_id: jur_ch_tg
+    slug: ch-tg
+    name: Kanton Thurgau
+  - jurisdiction_id: jur_ch_ti
+    slug: ch-ti
+    name: Cantone Ticino
+  - jurisdiction_id: jur_ch_vd
+    slug: ch-vd
+    name: Canton de Vaud
+  - jurisdiction_id: jur_ch_vs
+    slug: ch-vs
+    name: Canton du Valais / Kanton Wallis
+  - jurisdiction_id: jur_ch_ne
+    slug: ch-ne
+    name: Canton de Neuchâtel
+  - jurisdiction_id: jur_ch_ge
+    slug: ch-ge
+    name: Canton de Genève
+  - jurisdiction_id: jur_ch_ju
+    slug: ch-ju
+    name: Canton du Jura
+
+# Authorities: federal publishers and courts, plus one canonical publisher
+# per canton. Cantonal court records are intentionally minimal here and
+# should be extended per canton as onboarding proceeds.
+authorities:
+  - authority_id: auth_ch_fedlex
+    jurisdiction_id: jur_ch
+    slug: ch-fedlex
+    name: Fedlex - Swiss Federal Publication Platform
+  - authority_id: auth_ch_bger
+    jurisdiction_id: jur_ch
+    slug: ch-bger
+    name: Schweizerisches Bundesgericht / Tribunal fédéral suisse
+  - authority_id: auth_ch_bvger
+    jurisdiction_id: jur_ch
+    slug: ch-bvger
+    name: Bundesverwaltungsgericht / Tribunal administratif fédéral
+  - authority_id: auth_ch_bstger
+    jurisdiction_id: jur_ch
+    slug: ch-bstger
+    name: Bundesstrafgericht / Tribunal pénal fédéral
+  - authority_id: auth_ch_bpger
+    jurisdiction_id: jur_ch
+    slug: ch-bpger
+    name: Bundespatentgericht / Tribunal fédéral des brevets
+  - authority_id: auth_ch_zh_sk
+    jurisdiction_id: jur_ch_zh
+    slug: ch-zh-staatskanzlei
+    name: Staatskanzlei Kanton Zürich
+  - authority_id: auth_ch_be_sk
+    jurisdiction_id: jur_ch_be
+    slug: ch-be-staatskanzlei
+    name: Staatskanzlei Kanton Bern / Chancellerie d'État du canton de Berne
+  - authority_id: auth_ch_bs_sk
+    jurisdiction_id: jur_ch_bs
+    slug: ch-bs-staatskanzlei
+    name: Staatskanzlei Basel-Stadt
+  - authority_id: auth_ch_ge_ce
+    jurisdiction_id: jur_ch_ge
+    slug: ch-ge-chancellerie
+    name: Chancellerie d'État du canton de Genève
+  - authority_id: auth_ch_vd_ce
+    jurisdiction_id: jur_ch_vd
+    slug: ch-vd-chancellerie
+    name: Chancellerie d'État du canton de Vaud
+  - authority_id: auth_ch_ti_cs
+    jurisdiction_id: jur_ch_ti
+    slug: ch-ti-cancelleria
+    name: Cancelleria dello Stato del Cantone Ticino

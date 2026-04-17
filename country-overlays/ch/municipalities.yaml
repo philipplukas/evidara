@@ -1,0 +1,151 @@
+version: 1
+country_code: CH
+
+# Swiss municipality registry (Gemeinden / communes / comuni / vischnancas).
+#
+# Scope:
+#   This file is an out-of-band registry — it is NOT part of the core
+#   reference-data seeds consumed by platform-control's Jurisdiction /
+#   Authority contract. Municipalities are tracked here because:
+#     - there are ~2,100 of them, which is too large for the curated
+#       reference-data.yaml pattern used by other overlays,
+#     - not every municipality publishes a structured law collection, so
+#       treating each as a first-class Authority would inflate the taxonomy
+#       with non-publishing entities,
+#     - publication practice varies (own Rechtssammlung, cantonal portal,
+#       PDFs only, or print-only), and that variation is modelled below
+#       with an optional law_collection block.
+#
+# Identifier:
+#   Each entry is keyed by the BFS number (Bundesamt für Statistik
+#   Gemeindenummer), the stable Swiss identifier for a municipality.
+#
+# Parent linkage:
+#   canton_jurisdiction_id references an entry in reference-data.yaml.
+#
+# Seed scope:
+#   This pilot set contains the large cities known to publish a structured
+#   legal corpus. The full ~2,100-entry registry should be loaded from the
+#   BFS Gemeindeverzeichnis via a separate ingestion job rather than
+#   hand-maintained here. URLs are intentionally omitted for now and should
+#   be filled in by operators during onboarding to avoid guessed links.
+
+schema:
+  required:
+    - bfs_id
+    - canton_jurisdiction_id
+    - name
+    - primary_language
+  optional:
+    - names  # localized display names keyed by language code
+    - law_collection
+  law_collection_shape:
+    required:
+      - publisher
+      - format
+    optional:
+      - url
+      - language
+      - note
+
+municipalities:
+  - bfs_id: 261
+    canton_jurisdiction_id: jur_ch_zh
+    name: Zürich
+    primary_language: de
+    law_collection:
+      publisher: Stadt Zürich
+      format: html
+      note: Municipal legal database (Legislative Datenbank / LDB). URL to be confirmed by operator.
+
+  - bfs_id: 230
+    canton_jurisdiction_id: jur_ch_zh
+    name: Winterthur
+    primary_language: de
+    law_collection:
+      publisher: Stadt Winterthur
+      format: html
+      note: Systematic municipal collection; URL to be confirmed.
+
+  - bfs_id: 351
+    canton_jurisdiction_id: jur_ch_be
+    name: Bern
+    names:
+      de: Bern
+      fr: Berne
+    primary_language: de
+    law_collection:
+      publisher: Stadt Bern
+      format: html
+      note: Stadtrecht collection; URL to be confirmed.
+
+  - bfs_id: 371
+    canton_jurisdiction_id: jur_ch_be
+    name: Biel/Bienne
+    names:
+      de: Biel
+      fr: Bienne
+    primary_language: de
+    law_collection:
+      publisher: Stadt Biel / Ville de Bienne
+      format: html
+      note: Bilingual systematic collection; URL to be confirmed.
+
+  - bfs_id: 1061
+    canton_jurisdiction_id: jur_ch_lu
+    name: Luzern
+    primary_language: de
+    law_collection:
+      publisher: Stadt Luzern
+      format: html
+      note: Systematic municipal collection; URL to be confirmed.
+
+  - bfs_id: 2701
+    canton_jurisdiction_id: jur_ch_bs
+    name: Basel
+    primary_language: de
+    law_collection:
+      publisher: Staatskanzlei Basel-Stadt
+      format: html
+      note: Basel-Stadt is simultaneously canton and municipality; the cantonal systematic collection is the municipal collection.
+
+  - bfs_id: 3203
+    canton_jurisdiction_id: jur_ch_sg
+    name: St. Gallen
+    primary_language: de
+    law_collection:
+      publisher: Stadt St. Gallen
+      format: html
+      note: Systematic municipal collection; URL to be confirmed.
+
+  - bfs_id: 5586
+    canton_jurisdiction_id: jur_ch_vd
+    name: Lausanne
+    primary_language: fr
+    law_collection:
+      publisher: Ville de Lausanne
+      format: html
+      note: Recueil systématique communal; URL to be confirmed.
+
+  - bfs_id: 6621
+    canton_jurisdiction_id: jur_ch_ge
+    name: Genève
+    names:
+      fr: Genève
+      de: Genf
+      it: Ginevra
+      en: Geneva
+    primary_language: fr
+    law_collection:
+      publisher: Ville de Genève
+      format: html
+      note: Recueil systématique de la Ville de Genève; URL to be confirmed.
+
+  - bfs_id: 5192
+    canton_jurisdiction_id: jur_ch_ti
+    name: Lugano
+    primary_language: it
+    law_collection:
+      publisher: Città di Lugano
+      format: html
+      note: Raccolta sistematica degli atti comunali; URL to be confirmed.
