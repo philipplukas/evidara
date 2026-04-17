@@ -4,9 +4,69 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from document_intelligence.bootstrap.bronze_schemas import (
+    BRONZE_TABLE_DEFINITIONS,
+    render_register_bronze_sql,
+)
 from document_intelligence.bootstrap.register_surfaces import (
     render_register_surfaces_sql,
 )
+
+
+class BronzeBootstrapSqlTests(unittest.TestCase):
+    def test_renders_schema_and_tables(self) -> None:
+        sql = render_register_bronze_sql(catalog_name="document_intelligence")
+
+        self.assertIn(
+            "CREATE SCHEMA IF NOT EXISTS `document_intelligence`.`bronze`;",
+            sql,
+        )
+        for table_name in (
+            "landing_envelopes",
+            "document_processing_events",
+            "raw_docling_output",
+            "raw_nlp_annotations",
+            "raw_metadata",
+            "raw_documents",
+        ):
+            self.assertIn(
+                f"CREATE TABLE IF NOT EXISTS `document_intelligence`.`bronze`.`{table_name}`",
+                sql,
+            )
+        self.assertIn("'delta.enableChangeDataFeed' = 'true'", sql)
+        self.assertIn("'delta.columnMapping.mode' = 'name'", sql)
+
+    def test_honours_custom_schema_name(self) -> None:
+        sql = render_register_bronze_sql(
+            catalog_name="document_intelligence",
+            schema_name="bronze_v2",
+        )
+
+        self.assertIn(
+            "CREATE SCHEMA IF NOT EXISTS `document_intelligence`.`bronze_v2`;",
+            sql,
+        )
+        self.assertIn(
+            "CREATE TABLE IF NOT EXISTS `document_intelligence`.`bronze_v2`.`landing_envelopes`",
+            sql,
+        )
+
+    def test_autoloader_bookkeeping_columns_are_present(self) -> None:
+        for definition in BRONZE_TABLE_DEFINITIONS.values():
+            column_names = {column.name for column in definition.columns}
+            self.assertIn("ingested_at", column_names, definition.table_name)
+            self.assertIn("_source_file", column_names, definition.table_name)
+
+    def test_payload_columns_are_strings(self) -> None:
+        # Staging models cast every payload column; bronze stays typed as STRING
+        # so Auto Loader schema inference cannot conflict with the pre-declared
+        # table shape. Only the bookkeeping `ingested_at` column is a TIMESTAMP.
+        for definition in BRONZE_TABLE_DEFINITIONS.values():
+            for column in definition.columns:
+                if column.name == "ingested_at":
+                    self.assertEqual(column.sql_type, "TIMESTAMP")
+                else:
+                    self.assertEqual(column.sql_type, "STRING", f"{definition.table_name}.{column.name}")
 
 
 class SurfaceBootstrapSqlTests(unittest.TestCase):
