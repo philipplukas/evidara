@@ -41,6 +41,12 @@ cloud_run_services = {
       PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC = "artifact-bundle-available"
       # Keep acquisition dispatch off the API process; `platform-control-worker` polls `dispatch_pending_runs`.
       PLATFORM_CONTROL_RUN_DISPATCH_BACKEND = "worker"
+      # Mirror each Firecrawl webhook payload to /tmp for offline replay via
+      # `pc ingest --from-fixture` during dev-loop work. /tmp is the only
+      # container-writable path on Cloud Run without a mounted volume, so the
+      # log is ephemeral (rotates with each revision). For a durable audit
+      # trail on staging/prod, promote to a GCS mount — see #254.
+      PLATFORM_CONTROL_FIRECRAWL_WEBHOOK_RECORD_DIR = "/tmp/firecrawl-webhook-log"
     }
     secret_env_vars = {
       PLATFORM_CONTROL_DATABASE_URL = {

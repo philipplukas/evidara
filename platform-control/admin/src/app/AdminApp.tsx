@@ -31,10 +31,18 @@ import {
   ACCENT_CORE,
   ACCENT_CORE_MUTED,
   ACCENT_CORE_SUBTLE,
+  BORDER,
+  BRAND,
+  BRAND_HOVER,
+  BRAND_STRONG,
+  FOCUS_RING,
+  FOREGROUND_MUTED,
+  INTERACTIVE_ACCENT_SUBTLE,
   MOTION_DURATION_MEDIUM,
   MOTION_EASING_STANDARD,
   SHADOW_CARD,
   SHADOW_CARD_HOVER,
+  SURFACE_PAGE,
 } from "../lib/admin/designTokens";
 import {
   describeLegalSearchHandoff,
@@ -62,25 +70,25 @@ const adminTheme = createTheme({
   palette: {
     mode: "light",
     primary: {
-      main: "#0f4c81",
-      dark: "#0b3d68",
+      main: BRAND,
+      dark: BRAND_HOVER,
       light: "#dce8f3",
       contrastText: "#fffdf8",
     },
     secondary: {
       main: "#5c6b7e",
       light: "#e5ebf2",
-      contrastText: "#1d293d",
+      contrastText: BRAND_STRONG,
     },
     background: {
-      default: "#eef2f6",
+      default: SURFACE_PAGE,
       paper: "#fffdf8",
     },
     text: {
-      primary: "#1d293d",
-      secondary: "rgba(29, 41, 61, 0.72)",
+      primary: BRAND_STRONG,
+      secondary: FOREGROUND_MUTED,
     },
-    divider: "rgba(29, 41, 61, 0.12)",
+    divider: BORDER,
   },
   shape: {
     borderRadius: 18,
@@ -116,7 +124,7 @@ const adminTheme = createTheme({
           textTransform: "none",
           fontWeight: 600,
           "&:focus-visible": {
-            outline: "2px solid rgba(15, 76, 129, 0.24)",
+            outline: `2px solid ${FOCUS_RING}`,
             outlineOffset: 2,
           },
         },
@@ -149,7 +157,7 @@ const adminTheme = createTheme({
     MuiDivider: {
       styleOverrides: {
         root: {
-          borderColor: "rgba(29, 41, 61, 0.12)",
+          borderColor: BORDER,
         },
       },
     },
@@ -200,7 +208,7 @@ const adminTheme = createTheme({
           paddingRight: 14,
           transition: `background-color ${MOTION_DURATION_MEDIUM} ${MOTION_EASING_STANDARD}, transform ${MOTION_DURATION_MEDIUM} ${MOTION_EASING_STANDARD}`,
           "&:hover": {
-            backgroundColor: alpha("#0f4c81", 0.08),
+            backgroundColor: INTERACTIVE_ACCENT_SUBTLE,
           },
           // Selected nav item uses the Evidara violet accent — admin analogue
           // of legal-search's active detail tab indicator (Sprint 1, TAR-244).
@@ -219,7 +227,7 @@ const adminTheme = createTheme({
             backgroundColor: ACCENT_CORE_MUTED,
           },
           "&:focus-visible": {
-            outline: "2px solid rgba(15, 76, 129, 0.24)",
+            outline: `2px solid ${FOCUS_RING}`,
             outlineOffset: 2,
           },
         },
@@ -229,7 +237,7 @@ const adminTheme = createTheme({
       styleOverrides: {
         root: {
           minWidth: 36,
-          color: "#0f4c81",
+          color: BRAND,
         },
       },
     },
@@ -307,7 +315,7 @@ function EvidaraAdminAppBar(props: AppBarProps) {
               borderRadius: 3,
               display: "grid",
               placeItems: "center",
-              background: "linear-gradient(135deg, #0f4c81, #0b3d68)",
+              background: `linear-gradient(135deg, ${BRAND}, ${BRAND_HOVER})`,
               color: "#fffdf8",
               border: "1px solid rgba(255, 253, 248, 0.16)",
               boxShadow: "0 12px 24px rgba(7, 23, 40, 0.16)",
@@ -500,7 +508,7 @@ function EvidaraAdminMenu() {
             mx: 1.25,
             my: 0,
             borderRadius: 14,
-            color: "#0f4c81",
+            color: BRAND,
           }}
         >
           <ListItemIcon>
@@ -584,11 +592,11 @@ export default function AdminApp() {
             backgroundColor: "#f4efe7",
           },
           "::selection": {
-            backgroundColor: "rgba(15, 76, 129, 0.18)",
-            color: "#1d293d",
+            backgroundColor: ACCENT_CORE_SUBTLE,
+            color: BRAND_STRONG,
           },
           "*:focus-visible": {
-            outline: "2px solid rgba(15, 76, 129, 0.24)",
+            outline: `2px solid ${FOCUS_RING}`,
             outlineOffset: 2,
           },
           ".RaSidebar-drawerPaper, .RaSidebar-fixed, .RaLayout-sidebar": {

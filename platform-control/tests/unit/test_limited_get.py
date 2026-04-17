@@ -153,3 +153,83 @@ async def test_strict_robots_allows_when_checker_approves() -> None:
 
     assert response.status_code == 200
     assert client.calls == ["https://example.com/public"]
+
+
+class _ControlledClient:
+    """Stub client whose responses can be sequenced per call."""
+
+    def __init__(self, responses: list[httpx.Response]) -> None:
+        self._responses = list(responses)
+
+    async def get(self, url: str, **kwargs) -> httpx.Response:
+        del url, kwargs
+        return self._responses.pop(0)
+
+
+@pytest.mark.asyncio
+async def test_limited_get_feeds_2xx_back_to_limiter() -> None:
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=30,
+        start_requests_per_minute=60,
+    )
+    client = _ControlledClient(
+        [
+            httpx.Response(
+                200,
+                request=httpx.Request("GET", "https://example.com/a"),
+                content=b"ok",
+                headers={"content-type": "text/plain"},
+            )
+        ]
+    )
+
+    response = await limited_get(client, "https://example.com/a", limiter=limiter)
+
+    assert response.status_code == 200
+    # Clean traffic: rate stayed at start (no elapsed time yet).
+    assert limiter.current_requests_per_minute == 60.0
+
+
+@pytest.mark.asyncio
+async def test_limited_get_feeds_429_back_to_limiter() -> None:
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=30,
+        start_requests_per_minute=120,
+    )
+    client = _ControlledClient(
+        [
+            httpx.Response(
+                429,
+                request=httpx.Request("GET", "https://example.com/a"),
+                headers={"retry-after": "3", "content-type": "text/plain"},
+                content=b"slow down",
+            )
+        ]
+    )
+
+    response = await limited_get(client, "https://example.com/a", limiter=limiter)
+
+    assert response.status_code == 429
+    # Halved on pressure.
+    assert limiter.current_requests_per_minute == 60.0
+
+
+@pytest.mark.asyncio
+async def test_limited_get_reports_exception_to_limiter() -> None:
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=30,
+        start_requests_per_minute=120,
+    )
+
+    class _FailingClient:
+        async def get(self, url: str, **kwargs):
+            del url, kwargs
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        await limited_get(_FailingClient(), "https://example.com/a", limiter=limiter)
+
+    assert limiter.current_requests_per_minute == 60.0

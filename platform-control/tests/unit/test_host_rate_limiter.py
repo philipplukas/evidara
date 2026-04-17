@@ -118,3 +118,178 @@ async def test_concurrent_acquires_are_bounded_by_semaphore() -> None:
     permit = await third
     permit.release()
     permit_b.release()
+
+
+def test_corridor_validation_rejects_inverted_bounds() -> None:
+    with pytest.raises(ValueError):
+        HostRateLimiter(
+            max_requests_per_minute=60,
+            min_requests_per_minute=120,  # > max
+            start_requests_per_minute=60,
+        )
+    with pytest.raises(ValueError):
+        HostRateLimiter(
+            max_requests_per_minute=60,
+            min_requests_per_minute=30,
+            start_requests_per_minute=20,  # < min
+        )
+
+
+@pytest.mark.asyncio
+async def test_adaptive_start_controls_initial_bucket_size() -> None:
+    clock = _FakeClock()
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=30,
+        start_requests_per_minute=60,
+        monotonic=clock,
+    )
+
+    assert limiter.current_requests_per_minute == 60.0
+    assert limiter.adaptive is True
+
+
+@pytest.mark.asyncio
+async def test_observe_success_climbs_rate_after_interval() -> None:
+    clock = _FakeClock()
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=30,
+        start_requests_per_minute=60,
+        increase_interval_seconds=60.0,
+        monotonic=clock,
+    )
+
+    # Immediate success — below threshold, no climb.
+    limiter.observe(status=200)
+    assert limiter.current_requests_per_minute == 60.0
+
+    # Advance past the interval and observe again.
+    clock.advance(61.0)
+    limiter.observe(status=200)
+    assert limiter.current_requests_per_minute == 61.0
+
+    # Pile up enough clean traffic to climb further.
+    for _ in range(10):
+        clock.advance(61.0)
+        limiter.observe(status=200)
+    assert limiter.current_requests_per_minute == 71.0
+
+
+@pytest.mark.asyncio
+async def test_observe_ceils_at_max() -> None:
+    clock = _FakeClock()
+    limiter = HostRateLimiter(
+        max_requests_per_minute=65,
+        min_requests_per_minute=30,
+        start_requests_per_minute=60,
+        increase_interval_seconds=60.0,
+        monotonic=clock,
+    )
+    for _ in range(20):
+        clock.advance(61.0)
+        limiter.observe(status=200)
+    assert limiter.current_requests_per_minute == 65.0
+
+
+@pytest.mark.asyncio
+async def test_observe_429_halves_rate_floored_at_min() -> None:
+    clock = _FakeClock()
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=40,
+        start_requests_per_minute=200,
+        monotonic=clock,
+    )
+
+    limiter.observe(status=429)
+    assert limiter.current_requests_per_minute == 100.0
+
+    limiter.observe(status=429)
+    assert limiter.current_requests_per_minute == 50.0
+
+    # One more halving would go under 40; should clamp to min.
+    limiter.observe(status=429)
+    assert limiter.current_requests_per_minute == 40.0
+
+
+@pytest.mark.asyncio
+async def test_observe_503_and_exception_also_halve() -> None:
+    clock = _FakeClock()
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=30,
+        start_requests_per_minute=120,
+        monotonic=clock,
+    )
+
+    limiter.observe(status=503)
+    assert limiter.current_requests_per_minute == 60.0
+
+    limiter.observe(exception=RuntimeError("connection reset"))
+    assert limiter.current_requests_per_minute == 30.0
+
+
+@pytest.mark.asyncio
+async def test_retry_after_sets_pause_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = _FakeClock()
+    sleeps: list[float] = []
+
+    async def _record_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        clock.advance(seconds)
+
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=60,
+        start_requests_per_minute=120,
+        monotonic=clock,
+    )
+    limiter.observe(status=429, retry_after_seconds=5.0)
+
+    import platform_control.services.politeness as politeness
+
+    original_sleep = asyncio.sleep
+    politeness.asyncio.sleep = _record_sleep  # type: ignore[assignment]
+    try:
+        permit = await limiter.acquire("example.com")
+    finally:
+        politeness.asyncio.sleep = original_sleep  # type: ignore[assignment]
+    permit.release()
+
+    # First sleep should be the full 5s Retry-After pause.
+    assert sleeps
+    assert sleeps[0] == pytest.approx(5.0, rel=0.05)
+
+
+@pytest.mark.asyncio
+async def test_static_behaviour_preserved_when_corridor_not_set() -> None:
+    clock = _FakeClock()
+    limiter = HostRateLimiter(
+        max_requests_per_minute=60,
+        monotonic=clock,
+    )
+
+    # Without min/start, current == max and adaptive is False.
+    assert limiter.current_requests_per_minute == 60.0
+    assert limiter.adaptive is False
+
+    # Success still a no-op (already at max).
+    clock.advance(120.0)
+    limiter.observe(status=200)
+    assert limiter.current_requests_per_minute == 60.0
+
+
+@pytest.mark.asyncio
+async def test_4xx_other_than_429_does_not_change_rate() -> None:
+    clock = _FakeClock()
+    limiter = HostRateLimiter(
+        max_requests_per_minute=600,
+        min_requests_per_minute=30,
+        start_requests_per_minute=120,
+        monotonic=clock,
+    )
+
+    for status in (400, 401, 403, 404):
+        limiter.observe(status=status)
+        assert limiter.current_requests_per_minute == 120.0

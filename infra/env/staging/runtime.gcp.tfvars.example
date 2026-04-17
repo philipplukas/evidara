@@ -91,6 +91,10 @@ cloud_run_services = {
       PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC     = "raw-artifact-available-staging"
       PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC  = "artifact-bundle-available-staging"
       PLATFORM_CONTROL_RUN_DISPATCH_BACKEND          = "worker"
+      # PLATFORM_CONTROL_FIRECRAWL_WEBHOOK_RECORD_DIR = "/var/firecrawl-webhook-log"
+      # ^ Leave commented until a durable GCS FUSE mount is added under volumes.
+      # /tmp is writable but ephemeral (lost on revision recycle); not suitable
+      # as a staging audit trail. See #254 for the mount decision.
     }
     secret_env_vars = {
       PLATFORM_CONTROL_DATABASE_URL = {
