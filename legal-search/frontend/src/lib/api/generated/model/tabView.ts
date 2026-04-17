@@ -13,7 +13,7 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.3.2
+ * OpenAPI spec version: 0.3.3
  */
 
 export interface TabView {
