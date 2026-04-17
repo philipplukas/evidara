@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   canary:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'dev' }}
     env:
       GCP_PROJECT_ID: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging') && vars.GCP_PROJECT_ID_STAGING || vars.GCP_PROJECT_ID_DEV }}
