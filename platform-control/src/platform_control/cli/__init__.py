@@ -14,6 +14,7 @@ import asyncio
 import sys
 from collections.abc import Callable, Sequence
 
+from platform_control.cli import ingest as ingest_cmd
 from platform_control.cli import plan as plan_cmd
 
 
@@ -33,6 +34,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="SourceVersion identifier (e.g. sv_ab12cd34).",
     )
     plan_parser.set_defaults(runner=plan_cmd.run_from_args)
+
+    ingest_parser = subparsers.add_parser(
+        "ingest",
+        help="Replay a recorded Firecrawl webhook payload into the ingest pipeline.",
+    )
+    ingest_parser.add_argument(
+        "--from-fixture",
+        required=True,
+        help="Path to a JSON file holding one Firecrawl payload or an array of payloads.",
+    )
+    ingest_parser.set_defaults(runner=ingest_cmd.run_from_args)
 
     return parser
 
