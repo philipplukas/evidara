@@ -47,12 +47,23 @@ envelopes as (
     from {{ ref('stg_landing_envelopes') }}
 ),
 
+-- Restrict identity to one row per document_id (latest version) so joining
+-- on document_id alone does not fan out the manifest grain. The resulting
+-- document_version_id on the fact therefore refers to the latest version of
+-- the document, not necessarily the version that produced the manifest --
+-- an approximation we accept until processing_manifests carries
+-- document_version_id directly in the contract.
 identity as (
-    select
-        document_id,
-        document_version_id,
-        ingestion_id
-    from {{ ref('int_document_identity') }}
+    select document_id, document_version_id, ingestion_id
+    from (
+        select
+            document_id,
+            document_version_id,
+            ingestion_id,
+            row_number() over (partition by document_id order by retrieved_at desc) as _rn
+        from {{ ref('int_document_identity') }}
+    )
+    where _rn = 1
 ),
 
 entities_by_version as (

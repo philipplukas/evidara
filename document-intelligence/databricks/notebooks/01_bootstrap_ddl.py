@@ -18,6 +18,7 @@ from pyspark.sql import SparkSession
 
 from document_intelligence.bootstrap.bronze_schemas import render_register_bronze_sql
 from document_intelligence.bootstrap.register_surfaces import render_register_surfaces_sql
+from document_intelligence.bootstrap.sql_exec import execute_sql_script
 
 
 def _widget(name: str, default: str = "") -> str:
@@ -25,14 +26,6 @@ def _widget(name: str, default: str = "") -> str:
         return dbutils.widgets.get(name)  # type: ignore[name-defined]
     except Exception:
         return default
-
-
-def _execute(spark: SparkSession, sql_script: str) -> None:
-    for raw_statement in sql_script.split(";"):
-        statement = raw_statement.strip()
-        if not statement or statement.startswith("--"):
-            continue
-        spark.sql(statement)
 
 
 spark = SparkSession.builder.getOrCreate()
@@ -55,9 +48,9 @@ published_sql = render_register_surfaces_sql(
 )
 
 print({"step": "bronze", "catalog": catalog, "schema": bronze_schema, "status": "starting"})
-_execute(spark, bronze_sql)
+execute_sql_script(spark, bronze_sql)
 print({"step": "bronze", "status": "completed"})
 
 print({"step": "published", "catalog": catalog, "schema": published_schema, "status": "starting"})
-_execute(spark, published_sql)
+execute_sql_script(spark, published_sql)
 print({"step": "published", "status": "completed"})

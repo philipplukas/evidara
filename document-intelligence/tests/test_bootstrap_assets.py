@@ -20,6 +20,10 @@ from document_intelligence.bootstrap.register_surfaces import (
 from document_intelligence.bootstrap.render_source_contracts import (
     render_published_sources_yaml,
 )
+from document_intelligence.bootstrap.sql_exec import (
+    iter_sql_statements,
+    strip_sql_line_comments,
+)
 from document_intelligence.persist.surfaces import iter_surface_definitions
 
 
@@ -206,8 +210,7 @@ class GovernanceSqlTests(unittest.TestCase):
 
         for tag in PII_COLUMN_TAGS:
             self.assertIn(
-                f"ALTER TABLE `document_intelligence`.`{tag.schema}`.`{tag.table}` "
-                f"ALTER COLUMN `{tag.column}`",
+                f"ALTER TABLE `document_intelligence`.`{tag.schema}`.`{tag.table}` ALTER COLUMN `{tag.column}`",
                 sql,
             )
             self.assertIn(f"'{tag.tag_key}' = '{tag.tag_value}'", sql)
@@ -217,6 +220,40 @@ class GovernanceSqlTests(unittest.TestCase):
         self.assertIn(("di_intermediate", "int_entities", "entity_text"), columns)
         self.assertIn(("di_marts", "embeddings_ready", "chunk_text"), columns)
         self.assertIn(("di_marts", "srv_search_chunks", "chunk_text"), columns)
+
+
+class SqlExecTests(unittest.TestCase):
+    def test_strip_sql_line_comments_removes_comment_lines(self) -> None:
+        sql = "-- header\nCREATE SCHEMA foo;\n-- another\nCREATE TABLE t (a INT);"
+        stripped = strip_sql_line_comments(sql)
+        self.assertNotIn("--", stripped)
+        self.assertIn("CREATE SCHEMA foo", stripped)
+        self.assertIn("CREATE TABLE t", stripped)
+
+    def test_strip_sql_line_comments_handles_embedded_semicolons(self) -> None:
+        # Real-world bug: header comment contained "Safe to run; re-runs ...".
+        # Splitting on ';' before stripping comments yields bogus fragments.
+        sql = "-- Safe to run; re-runs are idempotent.\nCREATE SCHEMA foo;"
+        statements = list(iter_sql_statements(sql))
+        self.assertEqual(statements, ["CREATE SCHEMA foo"])
+
+    def test_iter_sql_statements_executes_every_create_statement(self) -> None:
+        from document_intelligence.bootstrap.bronze_schemas import render_register_bronze_sql
+        from document_intelligence.bootstrap.governance import render_grants_sql
+
+        bronze = list(iter_sql_statements(render_register_bronze_sql(catalog_name="c")))
+        grants = list(iter_sql_statements(render_grants_sql(catalog_name="c")))
+
+        # Every bronze table must produce an executable CREATE TABLE statement.
+        creates = [s for s in bronze if s.startswith("CREATE TABLE")]
+        self.assertEqual(len(creates), 6, creates)
+        # Every principal group must produce an executable GRANT on CATALOG.
+        catalog_grants = [s for s in grants if "ON CATALOG" in s]
+        self.assertEqual(len(catalog_grants), 3, catalog_grants)
+
+    def test_iter_sql_statements_skips_blank_and_comment_only_chunks(self) -> None:
+        sql = "\n\n-- just a comment\n\n;CREATE TABLE t (a INT);"
+        self.assertEqual(list(iter_sql_statements(sql)), ["CREATE TABLE t (a INT)"])
 
 
 class TerraformModuleShapeTests(unittest.TestCase):

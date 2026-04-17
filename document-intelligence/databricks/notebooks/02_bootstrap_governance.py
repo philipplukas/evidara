@@ -15,6 +15,7 @@ from document_intelligence.bootstrap.governance import (
     render_column_tags_sql,
     render_grants_sql,
 )
+from document_intelligence.bootstrap.sql_exec import execute_sql_script
 
 
 def _widget(name: str, default: str = "") -> str:
@@ -22,14 +23,6 @@ def _widget(name: str, default: str = "") -> str:
         return dbutils.widgets.get(name)  # type: ignore[name-defined]
     except Exception:
         return default
-
-
-def _execute(spark: SparkSession, sql_script: str) -> None:
-    for raw_statement in sql_script.split(";"):
-        statement = raw_statement.strip()
-        if not statement or statement.startswith("--"):
-            continue
-        spark.sql(statement)
 
 
 spark = SparkSession.builder.getOrCreate()
@@ -42,10 +35,10 @@ if not catalog:
 
 if mode in ("grants", "all"):
     print({"step": "grants", "catalog": catalog, "status": "starting"})
-    _execute(spark, render_grants_sql(catalog_name=catalog))
+    execute_sql_script(spark, render_grants_sql(catalog_name=catalog))
     print({"step": "grants", "status": "completed"})
 
 if mode in ("tags", "all"):
     print({"step": "tags", "catalog": catalog, "status": "starting"})
-    _execute(spark, render_column_tags_sql(catalog_name=catalog))
+    execute_sql_script(spark, render_column_tags_sql(catalog_name=catalog))
     print({"step": "tags", "status": "completed"})

@@ -80,9 +80,7 @@ def render_grants_sql(*, catalog_name: str) -> str:
             statements.append(f"GRANT {joined} ON CATALOG `{catalog_name}` TO `{group.name}`;")
         for grant in group.schema_grants:
             joined = ", ".join(grant.privileges)
-            statements.append(
-                f"GRANT {joined} ON SCHEMA `{catalog_name}`.`{grant.schema}` TO `{group.name}`;"
-            )
+            statements.append(f"GRANT {joined} ON SCHEMA `{catalog_name}`.`{grant.schema}` TO `{group.name}`;")
         statements.append("")
 
     return "\n".join(statements).rstrip() + "\n"
@@ -115,8 +113,7 @@ def render_column_tags_sql(*, catalog_name: str) -> str:
     for tag in PII_COLUMN_TAGS:
         qualified = f"`{catalog_name}`.`{tag.schema}`.`{tag.table}`"
         statements.append(
-            f"ALTER TABLE {qualified} ALTER COLUMN `{tag.column}` "
-            f"SET TAGS ('{tag.tag_key}' = '{tag.tag_value}');"
+            f"ALTER TABLE {qualified} ALTER COLUMN `{tag.column}` SET TAGS ('{tag.tag_key}' = '{tag.tag_value}');"
         )
 
     return "\n".join(statements).rstrip() + "\n"
