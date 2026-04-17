@@ -136,6 +136,7 @@ custom adapter, and the adapters will diverge (different HTML, different
 authentication, different pagination).
 
 **Options:**
+
 - **Multi-tenant (status quo)** — one class per country, state-switched
   at runtime. Pro: one import. Con: class becomes a pile of
   conditionals.
@@ -153,6 +154,7 @@ before the second live state adapter lands.
 ### 2.2 Overlay + seed merge policy
 
 Closely related to Tier 1.1 and 1.2. Spec is:
+
 - **Seeds** — authoritative for reference data (jurisdictions,
   authorities). Overlays reference IDs.
 - **Shared overlays** — authoritative for default operator / user copy.
@@ -168,12 +170,14 @@ and 1.2 land.
 
 When a user searches "Mietrecht, Bayern only", the query path needs to
 know:
+
 - Filter projection by `subdivision = DE-BY`
 - Route discovery to `bundesland_http` with `bundesland=DE-BY`
 - Label the result with `hierarchyPath=de/land/by`
 
 **Decision to make:** where does the `subdivision` filter live in the
 BFF contract (`contracts/api/legal-search.openapi.yaml`)? Options:
+
 - Top-level `jurisdiction` param accepts `DE-BY` as well as `DE` (ISO
   3166 mixed granularity)
 - Separate `subdivision` param
@@ -221,6 +225,7 @@ and can run in parallel.
 ### 4.1 EurLexSparqlProvider live adapter 🟡 CODE LANDED; ACCEPTANCE RUN PENDING
 
 **Code landed:**
+
 - `platform_control/services/eur_lex_sparql_provider.py` implements
   the full CDM work → expression → manifestation flow (mirrors Fedlex
   structure): `_query_expressions`, `_select_expressions` (ranked by
@@ -238,6 +243,7 @@ and can run in parallel.
   mapping, ELI validation, seed input modes.
 
 **Still needed:**
+
 - First acceptance run against `http://publications.europa.eu/webapi/rdf/sparql`
   with CELEX `32016R0679` (GDPR), seed URI
   `http://data.europa.eu/eli/reg/2016/679/oj`. Needs GCP auth + dev.
@@ -265,6 +271,7 @@ and can run in parallel.
 ### 4.4 Fedlex cantonal SPARQL filter — partially landed
 
 **Landed (scaffolding):**
+
 - `_canton_filter(acquisition_spec)` normalizes ISO 3166-2:CH codes.
 - `_canton_iri(code)` maps to the Fedlex canton vocabulary IRI
   (`https://fedlex.data.admin.ch/vocabulary/canton/ZH`).
@@ -276,6 +283,7 @@ and can run in parallel.
   rejection of garbage codes.
 
 **Still needed:**
+
 - Wire `_discover_works_by_canton` into a new
   `acquisition_spec.scope_kind = "canton"` mode in `start_run()`.
 - Run a live acceptance test against a known cantonal concordat
@@ -305,6 +313,7 @@ follow-up alongside the live EUR-Lex adapter.
 ### 5.2 Sub-federal UI filters 🟡 CONTRACT + PARSER LANDED; UI WIRING PENDING
 
 **Landed (contract + parsers):**
+
 - `contracts/api/legal-search.openapi.yaml` `jurisdiction` param now
   documents both country (`CH`) and subdivision (`CH-ZH`) shapes with
   regex validation and helper text.
@@ -320,6 +329,7 @@ follow-up alongside the live EUR-Lex adapter.
   labels, and empty-list for subdivisionless countries.
 
 **Still needed (UI surface):**
+
 - Wire `subdivisionsForCountry()` into the filter panel component so
   users can toggle between country-wide and subdivision-scoped filters.
 - Wire `getParsedJurisdictions()` into the OpenSearch adapter so
@@ -331,6 +341,7 @@ follow-up alongside the live EUR-Lex adapter.
 Design decision (T2.3 close-out): `jurisdiction` accepts mixed
 granularity in a single param; the BFF normalizer splits country vs.
 subdivision. No separate `subdivision` param. Rationale:
+
 - Fewer params = smaller API surface.
 - Matches ISO 3166 intent (subdivision codes encode the country).
 - User input ("CH-ZH" or "CH") never has to think about routing.
@@ -339,6 +350,7 @@ subdivision. No separate `subdivision` param. Rationale:
 
 **Outcome:** `document-intelligence/src/document_intelligence/nlp/citation_extractor.py`
 grew from CH + EU coverage to include:
+
 - **DE:** BVerfGE volume+page citations, BVerfG docket numbers
   (1 BvR 1234/56 style), BGHZ/BGHSt, ECLI:DE:*, § paragraph references
   with a curated list of ~30 common German statute abbreviations
@@ -371,6 +383,7 @@ workstream.
 ### 5.5 `icons.ts` generation ✅ LANDED
 
 **Outcome:**
+
 - `legal-search/frontend/scripts/generate-subdivision-icons.mjs`
   emits `src/lib/subdivisions.generated.ts` from
   `contracts/vocabularies/subdivisions.json`.

@@ -142,7 +142,7 @@ of changes in flight; the refresh cycle should follow.
    - Ran `ruff format` on all touched files (lint-clean per project's
      `line-length = 100`).
 5. `document-intelligence/src/document_intelligence/nlp/citation_extractor.py`
-   + tests: same formatting pass.
+   - tests: same formatting pass.
 
 ## Known remaining (not code-owned)
 

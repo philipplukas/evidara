@@ -90,6 +90,7 @@ abstracted for the easy cases and insufficient for the hard cases.
 ## Consequences
 
 **Positive:**
+
 - New states land as one-line entries in the `supported_portals` dict
   plus a blueprint template. No code growth per state.
 - Base-class tests cover the acquisition flow; per-state tests only
@@ -98,6 +99,7 @@ abstracted for the easy cases and insufficient for the hard cases.
   an attacker-controlled domain even if the template is malicious.
 
 **Negative:**
+
 - Portals with truly custom needs (ReCaptcha, cookie walls,
   JavaScript-rendered content) cannot use this pattern. They must
   ship a dedicated provider class and a new enum entry.
