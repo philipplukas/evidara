@@ -41,6 +41,12 @@ class CompliancePolicy(TimestampMixin, Base):
         server_default=RobotsMode.STRICT.value,
     )
     max_requests_per_minute_per_host: Mapped[int] = mapped_column(default=60, server_default="60")
+    # Optional AIMD corridor. When min/start are set and min < max the adaptive
+    # controller probes upward from `start` toward `max` on clean traffic, and
+    # halves back toward `min` on 429/503/connection-error pressure. When null,
+    # behaviour collapses to the static cap (equivalent to min == start == max).
+    min_requests_per_minute_per_host: Mapped[int | None] = mapped_column(nullable=True)
+    start_requests_per_minute_per_host: Mapped[int | None] = mapped_column(nullable=True)
     max_concurrent_per_host: Mapped[int] = mapped_column(default=2, server_default="2")
     retention_days: Mapped[int | None] = mapped_column(nullable=True)
     attribution_required: Mapped[bool] = mapped_column(default=False, server_default="0")
