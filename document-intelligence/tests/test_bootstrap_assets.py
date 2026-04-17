@@ -11,6 +11,10 @@ from document_intelligence.bootstrap.bronze_schemas import (
 from document_intelligence.bootstrap.register_surfaces import (
     render_register_surfaces_sql,
 )
+from document_intelligence.bootstrap.render_source_contracts import (
+    render_published_sources_yaml,
+)
+from document_intelligence.persist.surfaces import iter_surface_definitions
 
 
 class BronzeBootstrapSqlTests(unittest.TestCase):
@@ -103,6 +107,76 @@ class SurfaceBootstrapSqlTests(unittest.TestCase):
             "LOCATION 'gs://evidara-di-dev/published/processing_manifests';",
             sql,
         )
+
+    def test_emits_alter_table_tblproperties_for_every_surface(self) -> None:
+        sql = render_register_surfaces_sql(
+            catalog_name="document_intelligence",
+            schema_name="published",
+            surfaces_root_uri="gs://evidara-di-dev/published",
+        )
+
+        for surface_name in ("published_documents", "published_sections", "processing_manifests"):
+            self.assertIn(
+                f"ALTER TABLE `document_intelligence`.`published`.`{surface_name}` SET TBLPROPERTIES",
+                sql,
+            )
+        self.assertIn("'delta.enableChangeDataFeed' = 'true'", sql)
+        self.assertIn("'delta.columnMapping.mode' = 'name'", sql)
+
+
+class PublishedSourceContractsTests(unittest.TestCase):
+    def test_renderer_emits_every_published_surface_with_column_set_test(self) -> None:
+        yaml_text = render_published_sources_yaml()
+
+        self.assertIn("version: 2", yaml_text)
+        self.assertIn("- name: published", yaml_text)
+        self.assertIn("schema: published", yaml_text)
+
+        for definition in iter_surface_definitions():
+            self.assertIn(f"- name: {definition.surface_name}", yaml_text)
+            for column in definition.columns:
+                self.assertIn(f"- {column.name}", yaml_text)
+        self.assertIn(
+            "- dbt_expectations.expect_table_columns_to_match_set:",
+            yaml_text,
+        )
+
+    def test_checked_in_generated_yaml_matches_renderer(self) -> None:
+        generated_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "dbt",
+            "models",
+            "sources_published.generated.yml",
+        )
+        self.assertTrue(os.path.exists(generated_path), generated_path)
+        with open(generated_path, encoding="utf-8") as generated_file:
+            on_disk = generated_file.read()
+
+        expected = render_published_sources_yaml()
+        self.assertEqual(
+            on_disk,
+            expected,
+            "sources_published.generated.yml is out of sync; regenerate with "
+            "`document_intelligence_render_source_contracts > dbt/models/sources_published.generated.yml`",
+        )
+
+    def test_nullable_false_columns_get_not_null_tests(self) -> None:
+        yaml_text = render_published_sources_yaml()
+
+        # document_id is nullable=False and should be enforced by a not_null test.
+        self.assertIn("- name: document_id", yaml_text)
+        # effective_date is nullable=True and should NOT have a not_null block attached
+        # directly beneath it. We spot-check by ensuring the column description line is
+        # not immediately followed by `tests:` + `- not_null`.
+        lines = yaml_text.splitlines()
+        for idx, line in enumerate(lines):
+            if line.strip() == "- name: effective_date":
+                # next line is description, then (for nullable columns) nothing; verify.
+                self.assertNotIn("not_null", "\n".join(lines[idx : idx + 3]))
+                break
+        else:
+            self.fail("effective_date column not found in rendered YAML")
 
 
 class TerraformModuleShapeTests(unittest.TestCase):

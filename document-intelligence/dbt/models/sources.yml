@@ -1,14 +1,10 @@
 version: 2
 
-sources:
-  - name: published
-    database: "{{ env_var('DATABRICKS_CATALOG', 'evidara_document_intelligence_dev') }}"
-    schema: published
-    tables:
-      - name: published_documents
-      - name: published_sections
-      - name: processing_manifests
+# The `published` source lives in sources_published.generated.yml and is
+# rendered from document_intelligence.persist.surfaces. Do not add published
+# tables here - edit the Python surface definitions instead.
 
+sources:
   - name: bronze
     database: "{{ env_var('DATABRICKS_CATALOG', 'evidara_document_intelligence_dev') }}"
     schema: bronze

@@ -45,6 +45,17 @@ python3 -m document_intelligence.bootstrap.register_surfaces --catalog-name ... 
 
 Run the `document_intelligence_bootstrap_ddl` bundle job (see `resources/document_intelligence_bootstrap_job.yml`). It executes `databricks/notebooks/01_bootstrap_ddl.py`, which renders both SQL scripts in-process and issues each statement via `spark.sql`. Re-running is safe — every statement uses `CREATE SCHEMA / TABLE IF NOT EXISTS`.
 
+## Runtime contract tests
+
+Every published surface has a source-level `dbt_expectations.expect_table_columns_to_match_set` test attached in `dbt/models/sources_published.generated.yml`. The YAML is rendered from `src/document_intelligence/persist/surfaces.py` via:
+
+```bash
+document_intelligence_render_source_contracts \
+  > dbt/models/sources_published.generated.yml
+```
+
+A unit test (`tests/test_bootstrap_assets.py::PublishedSourceContractsTests`) fails if the checked-in file drifts from the rendered output. The dbt source test fails at `dbt test` time if the runtime writes a column that is not in the contract, or stops writing one that is. `register_surfaces` additionally emits `ALTER TABLE ... SET TBLPROPERTIES` for each published surface to enable Change Data Feed and name-based column mapping (matching the bronze convention).
+
 ## Tables created
 
 Bronze (managed Delta, populated by Auto Loader):
