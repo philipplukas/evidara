@@ -98,7 +98,7 @@ supersession as (
 ),
 
 dim_document as (
-    select document_sk, document_id from {{ ref('dim_document') }}
+    select document_sk, document_id from {{ ref('dim_document') }} where is_current
 ),
 
 dim_source_system as (

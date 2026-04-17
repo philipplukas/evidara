@@ -11,6 +11,7 @@ resources:
             commands:
               - dbt deps
               - dbt source freshness --target ${bundle.target}
+              - dbt snapshot --target ${bundle.target}
               - dbt run --target ${bundle.target}
               - dbt test --target ${bundle.target}
           new_cluster:

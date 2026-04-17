@@ -1,9 +1,12 @@
 {{
     config(
         materialized='table',
-        comment='Document dimension (Type 1; will be upgraded to SCD2 via snapshot in step 5).'
+        comment='SCD2 document dimension with one row per (document_id, validity window).'
     )
 }}
+
+-- Grain: one row per (document_id, dbt_valid_from). The latest row per
+-- document_id has dbt_valid_to IS NULL and is_current = true.
 
 with identity as (
     select * from {{ ref('int_document_identity') }}
@@ -20,46 +23,41 @@ current_versions as (
         document_class,
         language,
         retrieved_at,
-        row_number() over (partition by document_id order by retrieved_at desc) = 1 as is_current
+        row_number() over (partition by document_id order by retrieved_at desc) = 1 as is_latest
     from identity
 ),
 
-published as (
+lifecycle as (
     select
         document_id,
         title,
         document_type,
         lifecycle_status,
-        processed_at
-    from {{ ref('stg_published_documents') }}
-),
-
-latest_published as (
-    select
-        document_id,
-        max_by(title, processed_at) as title,
-        max_by(document_type, processed_at) as document_type,
-        max_by(lifecycle_status, processed_at) as lifecycle_status,
-        max(processed_at) as latest_processed_at
-    from published
-    group by document_id
+        processed_at,
+        dbt_valid_from,
+        dbt_valid_to
+    from {{ ref('snap_document_lifecycle') }}
 )
 
 select
-    {{ generate_hash_id(["c.document_id"]) }} as document_sk,
-    c.document_id,
+    {{ generate_hash_id(["l.document_id", "l.dbt_valid_from"]) }} as document_sk,
+    {{ generate_hash_id(["l.document_id"]) }} as document_nk_sk,
+    l.document_id,
     c.document_version_id as current_version_id,
     c.source_system,
     c.country,
     c.jurisdiction,
     c.document_class,
     c.language,
-    coalesce(p.title, '') as title,
-    p.document_type,
-    p.lifecycle_status,
-    p.latest_processed_at,
+    coalesce(l.title, '') as title,
+    l.document_type,
+    l.lifecycle_status,
+    l.processed_at as latest_processed_at,
     c.retrieved_at as latest_retrieved_at,
+    l.dbt_valid_from as valid_from,
+    l.dbt_valid_to as valid_to,
+    l.dbt_valid_to is null as is_current,
     current_timestamp() as refreshed_at
-from current_versions c
-left join latest_published p using (document_id)
-where c.is_current
+from lifecycle l
+left join current_versions c
+    on l.document_id = c.document_id and c.is_latest
