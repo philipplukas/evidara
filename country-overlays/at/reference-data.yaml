@@ -1,11 +1,62 @@
 version: 1
 country_code: AT
 
+# Jurisdictions:
+#   - jur_at            : country-level Austria
+#   - jur_at_federal    : federal scope (Bund); federal authorities bind here
+#   - jur_at_<code>     : one per Bundesland; codes follow common Austrian
+#                         abbreviations (bgld, ktn, noe, ooe, sbg, stmk, tir,
+#                         vbg, wien). Numeric ISO 3166-2:AT codes (1-9) are
+#                         recorded in iso_3166_2 for traceability.
+
 jurisdictions:
   - jurisdiction_id: jur_at
     slug: at
     name: Austria
+  - jurisdiction_id: jur_at_federal
+    slug: at-federal
+    name: Republic of Austria (Federal)
+  - jurisdiction_id: jur_at_bgld
+    slug: at-bgld
+    name: Burgenland
+    iso_3166_2: AT-1
+  - jurisdiction_id: jur_at_ktn
+    slug: at-ktn
+    name: Kärnten
+    iso_3166_2: AT-2
+  - jurisdiction_id: jur_at_noe
+    slug: at-noe
+    name: Niederösterreich
+    iso_3166_2: AT-3
+  - jurisdiction_id: jur_at_ooe
+    slug: at-ooe
+    name: Oberösterreich
+    iso_3166_2: AT-4
+  - jurisdiction_id: jur_at_sbg
+    slug: at-sbg
+    name: Salzburg
+    iso_3166_2: AT-5
+  - jurisdiction_id: jur_at_stmk
+    slug: at-stmk
+    name: Steiermark
+    iso_3166_2: AT-6
+  - jurisdiction_id: jur_at_tir
+    slug: at-tir
+    name: Tirol
+    iso_3166_2: AT-7
+  - jurisdiction_id: jur_at_vbg
+    slug: at-vbg
+    name: Vorarlberg
+    iso_3166_2: AT-8
+  - jurisdiction_id: jur_at_wien
+    slug: at-wien
+    name: Wien
+    iso_3166_2: AT-9
 
+# NOTE: The existing auth_at_* IDs in this file differ from the canonical
+# seed in platform-control/.../authorities.yaml (auth_ris, auth_ogh, ...).
+# That drift is unchanged by this PR and should be reconciled in a separate
+# follow-up (same shape as the CH alignment in #244).
 authorities:
   - authority_id: auth_at_ris
     jurisdiction_id: jur_at

@@ -8,6 +8,8 @@ jurisdiction_overlay:
   hierarchy_paths:
     - at
     - at/federal
+    - at/bundesland
+    - at/bundesland/{bundesland_code}
 
 language_defaults:
   primary: de
@@ -24,9 +26,16 @@ source_family_overlay:
     - local_type: rechtssatz
       canonical_type: decision
       note: Austrian legal principle entries map to decision-family discovery.
+    - local_type: landesgesetz
+      canonical_type: law
+      note: Bundesland statutes; level disambiguated by hierarchy_path at/bundesland/{code}.
+    - local_type: landesverordnung
+      canonical_type: law
+      note: Bundesland ordinances.
 
 court_level_overlay:
   expected_levels:
     - supreme
     - appellate
     - administrative
+    - landesverwaltungsgericht

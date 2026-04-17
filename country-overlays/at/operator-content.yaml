@@ -2,10 +2,11 @@ version: 1
 country_code: AT
 
 onboarding_checklist:
-  - Confirm scope maps to jurisdiction code AT.
-  - Confirm source family mapping for laws, decisions, and commentary.
+  - Confirm scope maps to jurisdiction code AT and hierarchy paths at/federal and at/bundesland/{code}.
+  - Confirm source family mapping for laws (including Landesgesetze and Landesverordnungen), decisions, and commentary.
   - Confirm Austrian legal principle (Rechtssatz) handling maps to decision discovery.
   - Confirm authority records include RIS and high courts.
+  - Confirm Bundesland jurisdictions cover all 9 states.
 
 approval_hotspots:
   - authority taxonomy correctness
