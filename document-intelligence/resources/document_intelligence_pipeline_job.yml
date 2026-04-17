@@ -48,6 +48,7 @@ resources:
               - dbt snapshot --target ${bundle.target}
               - dbt run --target ${bundle.target}
               - dbt test --target ${bundle.target}
+              - dbt run-operation elementary.upload_dbt_monitor --target ${bundle.target}
           max_retries: 1
           min_retry_interval_millis: 300000
           timeout_seconds: 10800

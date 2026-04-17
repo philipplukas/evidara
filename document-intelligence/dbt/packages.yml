@@ -1,3 +1,8 @@
 packages:
   - package: calogica/dbt_expectations
     version: [">=0.10.0", "<1.0.0"]
+  # Elementary surfaces dbt run/test results, freshness, and anomaly detection
+  # into a dedicated schema so we get an observability layer without a separate
+  # orchestrator. See https://docs.elementary-data.com/.
+  - package: elementary-data/elementary
+    version: [">=0.16.0", "<0.17.0"]

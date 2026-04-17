@@ -1,0 +1,47 @@
+version: 2
+
+exposures:
+  - name: legal_search_api
+    type: application
+    label: Legal Search API
+    description: >
+      Serves document and chunk-level queries to the legal-search frontend
+      via Databricks SQL. Consumes the document- and chunk-level serving
+      models.
+    maturity: medium
+    owner:
+      name: Evidara Platform
+      email: platform@evidara.example
+    depends_on:
+      - ref('srv_search_documents')
+      - ref('srv_search_chunks')
+      - ref('dim_document')
+
+  - name: vector_index
+    type: ml
+    label: Vector search index
+    description: >
+      Mosaic AI Vector Search index (or external vector DB) built from
+      embeddings_ready chunks. Sync job lives in the bundle as
+      document_intelligence_embeddings_sync.
+    maturity: low
+    owner:
+      name: Evidara Platform
+      email: platform@evidara.example
+    depends_on:
+      - ref('embeddings_ready')
+
+  - name: processing_analytics
+    type: dashboard
+    label: DI processing analytics
+    description: >
+      Dashboards reporting per-source, per-jurisdiction processing latency,
+      failure rates, and volume. Consumes the fact + dim tables.
+    maturity: medium
+    owner:
+      name: Evidara Platform
+      email: platform@evidara.example
+    depends_on:
+      - ref('fct_document_processing')
+      - ref('dim_document')
+      - ref('analytics_mart')
