@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -14,7 +15,10 @@ const nextConfig: NextConfig = {
     ];
   },
   turbopack: {
-    root: __dirname,
+    // Widen the Turbopack root to the monorepo so globals.css can
+    // @import the shared design tokens at styles/tokens/tokens.css.
+    // Matches platform-control/admin/next.config.ts.
+    root: path.resolve(__dirname, "../.."),
   },
 };
 
