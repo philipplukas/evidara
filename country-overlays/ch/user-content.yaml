@@ -1,0 +1,33 @@
+version: 1
+country_code: CH
+
+filters:
+  jurisdiction:
+    label: Jurisdiction
+    helper_text: Swiss scope spans federal, cantonal, and municipal law.
+  source_type:
+    label: Source type
+    helper_text: Includes federal statutes, cantonal collections, municipal regulations, decisions, and commentary.
+  court_level:
+    label: Court level
+    helper_text: Distinguishes federal supreme, cantonal, and administrative courts.
+  language:
+    label: Language
+    helper_text: Swiss sources appear in German, French, Italian, and Romansh; canton determines primary language.
+  official_only:
+    label: Official sources only
+    helper_text: Restricts to authoritative Swiss public sources (Fedlex, cantonal and municipal publishers).
+
+result_subtitle_pattern:
+  template: "{jurisdiction} • {source_type} • {court_or_authority} • {effective_date}"
+
+detail_copy:
+  translation_indicator:
+    original: Original language
+    translated: Machine translated from {language}
+    unavailable: Translation unavailable
+
+empty_states:
+  no_results:
+    message: No Swiss results for this query and filter set.
+    recovery: Clear one filter, broaden source type, or widen to federal scope.
