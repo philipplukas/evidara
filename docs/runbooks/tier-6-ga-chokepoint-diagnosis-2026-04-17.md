@@ -1,6 +1,8 @@
 # Tier 6 GA chokepoint diagnosis — 2026-04-17
 
 Owner: Platform / GA
+Last reviewed: 2026-04-17
+Last verified: 2026-04-17
 Applies to: GA operator board lanes TAR-70 (gate policy), TAR-238 (runner
 reliability), TAR-241 (relevance baseline), TAR-214 (release evidence
 refresh) — snapshot taken from PR #241 (`claude/plan-next-steps-OANlO`,

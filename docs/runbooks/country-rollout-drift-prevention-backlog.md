@@ -1,8 +1,9 @@
 # Country rollout & drift-prevention backlog
 
 Owner: Contracts / Platform
-Last reviewed: 2026-04-16
-Status: Active — updated after commit `2a02573` on `claude/plan-next-steps-OANlO`
+Last reviewed: 2026-04-17
+Last verified: 2026-04-17
+Status: Active — updated after commit `ec5efca` on `claude/plan-next-steps-OANlO` (post-main merge)
 Applies to: everything still needed to ship five-country + EU coverage without
 accumulating drift
 

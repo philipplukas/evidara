@@ -13,7 +13,7 @@
  * CI can assert no drift with `npm run generate:icons:check`.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +21,41 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "../../..");
 const SUBDIVISIONS_PATH = resolve(REPO_ROOT, "contracts/vocabularies/subdivisions.json");
 const OUTPUT_PATH = resolve(__dirname, "../src/lib/subdivisions.generated.ts");
+
+// Graceful fallback when the source file isn't available — e.g. the
+// Dockerfile builds with `context: ./legal-search/frontend`, which places
+// contracts/ outside the build context. In that case we emit an empty
+// SUBDIVISION_REGISTRY (+ typed exports) so TypeScript compilation still
+// succeeds; country + meta icons keep working via icons.ts. Dev and CI
+// always have the file and get the full generated output.
+if (!existsSync(SUBDIVISIONS_PATH)) {
+  const stub = [
+    "// THIS FILE IS GENERATED (fallback mode).",
+    "// Source: contracts/vocabularies/subdivisions.json — NOT available in this build context.",
+    "// Regenerate in a repo-root-aware shell with: npm run generate:icons",
+    "",
+    "export interface SubdivisionEntry {",
+    "  country: string;",
+    "  prefLabel: Record<string, string>;",
+    "  slug: string;",
+    "  iconKey: string;",
+    "  iconText: string;",
+    "  hierarchyTier: string;",
+    "  hierarchyPath: string;",
+    "  providerTokens: Record<string, string>;",
+    "}",
+    "",
+    "export const SUBDIVISION_REGISTRY: Record<string, SubdivisionEntry> = {};",
+    "export const SUBDIVISIONS_BY_COUNTRY: Record<string, readonly string[]> = {};",
+    "export const SUBDIVISION_ICONS: Record<string, string> = {};",
+    "",
+  ];
+  writeFileSync(OUTPUT_PATH, stub.join("\n"));
+  console.log(
+    `subdivisions.json not found at ${SUBDIVISIONS_PATH}; emitted empty stub at ${OUTPUT_PATH}`,
+  );
+  process.exit(0);
+}
 
 const payload = JSON.parse(readFileSync(SUBDIVISIONS_PATH, "utf-8"));
 const entries = Object.entries(payload.values);
