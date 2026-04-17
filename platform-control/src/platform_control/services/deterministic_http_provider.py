@@ -171,9 +171,7 @@ class DeterministicHttpProvider:
                 acquisition_spec.get("user_agent")
                 or "platform-control-deterministic-http/1.0 (+https://evidara.ai)"
             ),
-            request_timeout_seconds=float(
-                acquisition_spec.get("request_timeout_seconds") or 30.0
-            ),
+            request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 30.0),
             raw=dict(acquisition_spec),
         )
 

@@ -51,14 +51,8 @@ async def test_respects_disallow_rule_for_user_agent() -> None:
     transport = _transport_for({"https://example.com/robots.txt": (200, robots_body)})
     checker = _ClockedChecker(transport)
 
-    assert (
-        await checker.is_allowed("https://example.com/private/secret", "evidara-bot")
-        is False
-    )
-    assert (
-        await checker.is_allowed("https://example.com/public/page", "evidara-bot")
-        is True
-    )
+    assert await checker.is_allowed("https://example.com/private/secret", "evidara-bot") is False
+    assert await checker.is_allowed("https://example.com/public/page", "evidara-bot") is True
 
 
 @pytest.mark.asyncio

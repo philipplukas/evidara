@@ -67,9 +67,7 @@ class CompliancePolicyService:
             raise NotFoundError(f"CompliancePolicy not found: {compliance_policy_id}")
         return policy
 
-    async def create_policy(
-        self, request: CreateCompliancePolicyRequest
-    ) -> CompliancePolicy:
+    async def create_policy(self, request: CreateCompliancePolicyRequest) -> CompliancePolicy:
         policy = CompliancePolicy(
             name=request.name,
             description=request.description,

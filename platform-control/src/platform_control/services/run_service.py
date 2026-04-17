@@ -1169,9 +1169,7 @@ class RunService:
         authority = await self.session.get(Authority, authority_id)
         return authority.name if authority is not None else None
 
-    async def _resolve_attribution(
-        self, jurisdiction_id: str | None
-    ) -> dict[str, Any] | None:
+    async def _resolve_attribution(self, jurisdiction_id: str | None) -> dict[str, Any] | None:
         """Return the attribution block for the manifest when required.
 
         Falls back to ``None`` when the jurisdiction has no policy or attribution

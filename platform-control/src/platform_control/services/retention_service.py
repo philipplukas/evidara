@@ -109,9 +109,7 @@ class RetentionService:
             if not dry_run:
                 artifact_ids = [artifact.artifact_id for artifact in artifacts]
                 resources_result = await self.session.execute(
-                    delete(CapturedResource).where(
-                        CapturedResource.artifact_id.in_(artifact_ids)
-                    )
+                    delete(CapturedResource).where(CapturedResource.artifact_id.in_(artifact_ids))
                 )
                 report.resources_purged += int(resources_result.rowcount or 0)
                 artifacts_result = await self.session.execute(

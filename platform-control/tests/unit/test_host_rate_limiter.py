@@ -30,9 +30,7 @@ def test_rejects_non_positive_config() -> None:
 @pytest.mark.asyncio
 async def test_initial_bucket_is_full(monkeypatch: pytest.MonkeyPatch) -> None:
     clock = _FakeClock()
-    limiter = HostRateLimiter(
-        max_requests_per_minute=60, max_concurrent=5, monotonic=clock
-    )
+    limiter = HostRateLimiter(max_requests_per_minute=60, max_concurrent=5, monotonic=clock)
 
     async def _never_sleep(_seconds: float) -> None:
         raise AssertionError("initial bucket should not require sleep")
@@ -53,9 +51,7 @@ async def test_exhaustion_waits_for_refill() -> None:
         sleeps.append(seconds)
         clock.advance(seconds)
 
-    limiter = HostRateLimiter(
-        max_requests_per_minute=60, max_concurrent=10, monotonic=clock
-    )
+    limiter = HostRateLimiter(max_requests_per_minute=60, max_concurrent=10, monotonic=clock)
     # Drain the bucket fully.
     for _ in range(60):
         permit = await limiter.acquire("example.com")
@@ -79,9 +75,7 @@ async def test_exhaustion_waits_for_refill() -> None:
 @pytest.mark.asyncio
 async def test_distinct_hosts_do_not_share_budget() -> None:
     clock = _FakeClock()
-    limiter = HostRateLimiter(
-        max_requests_per_minute=60, max_concurrent=5, monotonic=clock
-    )
+    limiter = HostRateLimiter(max_requests_per_minute=60, max_concurrent=5, monotonic=clock)
     # Drain host A fully.
     for _ in range(60):
         permit = await limiter.acquire("a.example")
@@ -109,9 +103,7 @@ async def test_distinct_hosts_do_not_share_budget() -> None:
 @pytest.mark.asyncio
 async def test_concurrent_acquires_are_bounded_by_semaphore() -> None:
     clock = _FakeClock()
-    limiter = HostRateLimiter(
-        max_requests_per_minute=600, max_concurrent=2, monotonic=clock
-    )
+    limiter = HostRateLimiter(max_requests_per_minute=600, max_concurrent=2, monotonic=clock)
 
     permit_a = await limiter.acquire("x.example")
     permit_b = await limiter.acquire("x.example")

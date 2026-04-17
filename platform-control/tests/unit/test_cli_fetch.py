@@ -40,9 +40,7 @@ class _CannedProvider:
         raise NotImplementedError
 
 
-async def _seed_version(
-    session, *, execution_mode: ExecutionMode = ExecutionMode.LIVE
-) -> str:
+async def _seed_version(session, *, execution_mode: ExecutionMode = ExecutionMode.LIVE) -> str:
     session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
     session.add(
         Authority(
@@ -75,9 +73,7 @@ async def _seed_version(
 
 
 @pytest.mark.asyncio
-async def test_record_writes_cassette_that_ingest_can_load(
-    session, tmp_path: Path
-) -> None:
+async def test_record_writes_cassette_that_ingest_can_load(session, tmp_path: Path) -> None:
     source_version_id = await _seed_version(session)
     provider = _CannedProvider(
         [
@@ -111,9 +107,7 @@ async def test_record_writes_cassette_that_ingest_can_load(
 
 
 @pytest.mark.asyncio
-async def test_record_refuses_shadow_source_version(
-    session, tmp_path: Path
-) -> None:
+async def test_record_refuses_shadow_source_version(session, tmp_path: Path) -> None:
     source_version_id = await _seed_version(session, execution_mode=ExecutionMode.SHADOW)
     provider = _CannedProvider([])
 
@@ -140,9 +134,7 @@ async def test_record_raises_when_version_missing(session, tmp_path: Path) -> No
 
 
 @pytest.mark.asyncio
-async def test_cassette_is_loadable_by_ingest_loader_shape(
-    session, tmp_path: Path
-) -> None:
+async def test_cassette_is_loadable_by_ingest_loader_shape(session, tmp_path: Path) -> None:
     """Sanity check the on-disk JSON is well-formed for downstream tooling."""
     source_version_id = await _seed_version(session)
     provider = _CannedProvider(

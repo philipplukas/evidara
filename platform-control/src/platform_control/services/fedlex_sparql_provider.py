@@ -192,9 +192,7 @@ LIMIT 1
             seed_urls=work_uris,
             estimated_request_count=len(work_uris) * max_expressions,
             user_agent=acquisition_spec.get("user_agent"),
-            request_timeout_seconds=float(
-                acquisition_spec.get("request_timeout_seconds") or 30.0
-            ),
+            request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 30.0),
             notes=[f"sparql_endpoint={sparql_endpoint}"],
             raw=dict(acquisition_spec),
         )

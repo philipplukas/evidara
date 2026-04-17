@@ -104,17 +104,13 @@ async def _seed_jurisdiction_with_policy(
 async def test_policy_attached_to_jurisdiction_reaches_provider_via_contextvar(
     session,
 ) -> None:
-    await _seed_jurisdiction_with_policy(
-        session, requests_per_minute=45, max_concurrent=3
-    )
+    await _seed_jurisdiction_with_policy(session, requests_per_minute=45, max_concurrent=3)
     provider = _LimiterObservingProvider()
     registry = ProviderRegistry()
     registry.register(provider)
     service = RunService(session=session, provider_registry=registry)
 
-    await service.create_run(
-        CreateRunRequest(source_id="src_obs", source_version_id="sv_obs")
-    )
+    await service.create_run(CreateRunRequest(source_id="src_obs", source_version_id="sv_obs"))
 
     assert provider.observed_once is True
     assert provider.observed is not None
@@ -124,18 +120,14 @@ async def test_policy_attached_to_jurisdiction_reaches_provider_via_contextvar(
 
 @pytest.mark.asyncio
 async def test_contextvar_is_reset_after_dispatch(session) -> None:
-    await _seed_jurisdiction_with_policy(
-        session, requests_per_minute=60, max_concurrent=2
-    )
+    await _seed_jurisdiction_with_policy(session, requests_per_minute=60, max_concurrent=2)
     provider = _LimiterObservingProvider()
     registry = ProviderRegistry()
     registry.register(provider)
     service = RunService(session=session, provider_registry=registry)
 
     assert current_rate_limiter.get() is None
-    await service.create_run(
-        CreateRunRequest(source_id="src_obs", source_version_id="sv_obs")
-    )
+    await service.create_run(CreateRunRequest(source_id="src_obs", source_version_id="sv_obs"))
     assert current_rate_limiter.get() is None
 
 

@@ -18,9 +18,7 @@ from platform_control.services.artifact_store import LocalArtifactStore
 from platform_control.services.retention_service import RetentionService
 
 
-async def _seed_source_with_policy(
-    session, *, retention_days: int
-) -> tuple[str, str]:
+async def _seed_source_with_policy(session, *, retention_days: int) -> tuple[str, str]:
     policy = CompliancePolicy(
         name="ch-retention",
         retention_days=retention_days,
@@ -113,9 +111,7 @@ async def _seed_artifact(
 
 
 @pytest.mark.asyncio
-async def test_sweep_purges_artifacts_older_than_retention(
-    session, tmp_path: Path
-) -> None:
+async def test_sweep_purges_artifacts_older_than_retention(session, tmp_path: Path) -> None:
     await _seed_source_with_policy(session, retention_days=7)
     old_blob = tmp_path / "old.json"
     old_blob.write_text("{}")
@@ -151,9 +147,7 @@ async def test_sweep_purges_artifacts_older_than_retention(
 
 
 @pytest.mark.asyncio
-async def test_sweep_leaves_artifacts_untouched_without_policy(
-    session, tmp_path: Path
-) -> None:
+async def test_sweep_leaves_artifacts_untouched_without_policy(session, tmp_path: Path) -> None:
     session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
     session.add(
         Authority(

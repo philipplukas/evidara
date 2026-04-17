@@ -224,9 +224,7 @@ class RisOgdProvider:
             seed_urls=[base_url],
             estimated_request_count=page_size * max_pages,
             user_agent=str(acquisition_spec.get("user_agent") or _USER_AGENT),
-            request_timeout_seconds=float(
-                acquisition_spec.get("request_timeout_seconds") or 15.0
-            ),
+            request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 15.0),
             notes=notes,
             raw=dict(acquisition_spec),
         )

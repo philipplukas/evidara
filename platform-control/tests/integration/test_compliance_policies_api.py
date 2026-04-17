@@ -11,9 +11,7 @@ from platform_control.models.authority import Jurisdiction
 @pytest.mark.asyncio
 async def test_compliance_policy_crud_and_jurisdiction_attachment(session_maker) -> None:
     async with session_maker() as seed_session:
-        seed_session.add(
-            Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch")
-        )
+        seed_session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
         await seed_session.commit()
 
     app = create_app()
@@ -25,9 +23,7 @@ async def test_compliance_policy_crud_and_jurisdiction_attachment(session_maker)
     app.dependency_overrides[get_session] = override_get_session
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://testserver"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         # --- Create ---
         create_response = await client.post(
             "/v1/compliance-policies",
@@ -81,9 +77,7 @@ async def test_compliance_policy_crud_and_jurisdiction_attachment(session_maker)
         }
 
         # --- Detach ---
-        detach_response = await client.delete(
-            "/v1/jurisdictions/jur_ch/compliance-policy"
-        )
+        detach_response = await client.delete("/v1/jurisdictions/jur_ch/compliance-policy")
         assert detach_response.status_code == 200
         assert detach_response.json() == {
             "jurisdiction_id": "jur_ch",
@@ -94,9 +88,7 @@ async def test_compliance_policy_crud_and_jurisdiction_attachment(session_maker)
 @pytest.mark.asyncio
 async def test_attach_unknown_policy_returns_404(session_maker) -> None:
     async with session_maker() as seed_session:
-        seed_session.add(
-            Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch")
-        )
+        seed_session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
         await seed_session.commit()
 
     app = create_app()
@@ -108,9 +100,7 @@ async def test_attach_unknown_policy_returns_404(session_maker) -> None:
     app.dependency_overrides[get_session] = override_get_session
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://testserver"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
             "/v1/jurisdictions/jur_ch/compliance-policy",
             json={"compliance_policy_id": "cp_missing"},
@@ -129,15 +119,9 @@ async def test_update_policy_requires_at_least_one_field(session_maker) -> None:
     app.dependency_overrides[get_session] = override_get_session
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://testserver"
-    ) as client:
-        create = await client.post(
-            "/v1/compliance-policies", json={"name": "ch-default"}
-        )
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        create = await client.post("/v1/compliance-policies", json={"name": "ch-default"})
         policy_id = create.json()["compliance_policy_id"]
 
-        response = await client.patch(
-            f"/v1/compliance-policies/{policy_id}", json={}
-        )
+        response = await client.patch(f"/v1/compliance-policies/{policy_id}", json={})
         assert response.status_code == 422

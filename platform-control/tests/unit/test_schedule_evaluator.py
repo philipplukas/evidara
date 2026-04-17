@@ -102,5 +102,3 @@ async def test_evaluator_runs_shadow_schedule(session) -> None:
     created = await evaluate_due_schedules(session)
 
     assert created == 1
-
-

@@ -117,9 +117,7 @@ async def test_format_plan_surfaces_execution_mode_and_seed_urls(session) -> Non
         execution_mode=ExecutionMode.SHADOW,
     )
 
-    source, source_version, plan = await resolve_plan(
-        session, _build_registry(), source_version_id
-    )
+    source, source_version, plan = await resolve_plan(session, _build_registry(), source_version_id)
     rendered = format_plan(source, source_version, plan)
 
     assert "execution_mode       shadow" in rendered

@@ -129,10 +129,7 @@ async def run_from_args(namespace: argparse.Namespace) -> int:
             cassette_dir=cassette_dir,
         )
 
-    print(
-        f"recorded {len(result.inline_resources)} resource(s) from "
-        f"{result.provider} to {path}"
-    )
+    print(f"recorded {len(result.inline_resources)} resource(s) from {result.provider} to {path}")
     return 0
 
 

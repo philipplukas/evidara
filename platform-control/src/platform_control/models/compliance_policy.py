@@ -40,9 +40,7 @@ class CompliancePolicy(TimestampMixin, Base):
         default=RobotsMode.STRICT,
         server_default=RobotsMode.STRICT.value,
     )
-    max_requests_per_minute_per_host: Mapped[int] = mapped_column(
-        default=60, server_default="60"
-    )
+    max_requests_per_minute_per_host: Mapped[int] = mapped_column(default=60, server_default="60")
     max_concurrent_per_host: Mapped[int] = mapped_column(default=2, server_default="2")
     retention_days: Mapped[int | None] = mapped_column(nullable=True)
     attribution_required: Mapped[bool] = mapped_column(default=False, server_default="0")

@@ -26,22 +26,16 @@ def upgrade() -> None:
         sa.Column("compliance_policy_id", sa.String(), primary_key=True),
         sa.Column("name", sa.String(), nullable=False, unique=True),
         sa.Column("description", sa.String(), nullable=True),
-        sa.Column(
-            "robots_mode", sa.String(), nullable=False, server_default="strict"
-        ),
+        sa.Column("robots_mode", sa.String(), nullable=False, server_default="strict"),
         sa.Column(
             "max_requests_per_minute_per_host",
             sa.Integer(),
             nullable=False,
             server_default="60",
         ),
-        sa.Column(
-            "max_concurrent_per_host", sa.Integer(), nullable=False, server_default="2"
-        ),
+        sa.Column("max_concurrent_per_host", sa.Integer(), nullable=False, server_default="2"),
         sa.Column("retention_days", sa.Integer(), nullable=True),
-        sa.Column(
-            "attribution_required", sa.Boolean(), nullable=False, server_default="0"
-        ),
+        sa.Column("attribution_required", sa.Boolean(), nullable=False, server_default="0"),
         sa.Column("attribution_text", sa.String(), nullable=True),
         sa.Column("contact_url", sa.String(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -49,9 +43,7 @@ def upgrade() -> None:
     )
 
     with op.batch_alter_table("jurisdictions") as batch_op:
-        batch_op.add_column(
-            sa.Column("compliance_policy_id", sa.String(), nullable=True)
-        )
+        batch_op.add_column(sa.Column("compliance_policy_id", sa.String(), nullable=True))
         batch_op.create_foreign_key(
             "fk_jurisdictions_compliance_policy",
             "compliance_policies",
@@ -62,8 +54,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table("jurisdictions") as batch_op:
-        batch_op.drop_constraint(
-            "fk_jurisdictions_compliance_policy", type_="foreignkey"
-        )
+        batch_op.drop_constraint("fk_jurisdictions_compliance_policy", type_="foreignkey")
         batch_op.drop_column("compliance_policy_id")
     op.drop_table("compliance_policies")

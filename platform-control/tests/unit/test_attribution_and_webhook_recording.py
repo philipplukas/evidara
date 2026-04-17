@@ -110,8 +110,7 @@ async def _seed_jurisdiction(
 def _signed(payload: dict[str, object], secret: str) -> tuple[bytes, str]:
     body = json.dumps(payload, sort_keys=True).encode("utf-8")
     signature = (
-        "sha256="
-        + hmac.new(secret.encode("utf-8"), body, digestmod=hashlib.sha256).hexdigest()
+        "sha256=" + hmac.new(secret.encode("utf-8"), body, digestmod=hashlib.sha256).hexdigest()
     )
     return body, signature
 
@@ -143,9 +142,7 @@ async def _drive_crawl_through_completion(
 
 
 @pytest.mark.asyncio
-async def test_attribution_block_included_when_policy_requires_it(
-    session, tmp_path: Path
-) -> None:
+async def test_attribution_block_included_when_policy_requires_it(session, tmp_path: Path) -> None:
     await _seed_jurisdiction(
         session,
         attribution_required=True,
@@ -174,12 +171,8 @@ async def test_attribution_block_included_when_policy_requires_it(
 
 
 @pytest.mark.asyncio
-async def test_attribution_block_absent_when_not_required(
-    session, tmp_path: Path
-) -> None:
-    await _seed_jurisdiction(
-        session, attribution_required=False, attribution_text="ignored"
-    )
+async def test_attribution_block_absent_when_not_required(session, tmp_path: Path) -> None:
+    await _seed_jurisdiction(session, attribution_required=False, attribution_text="ignored")
     publisher = _CollectingPublisher()
     service = FirecrawlWebhookService(
         session=session,
@@ -198,12 +191,8 @@ async def test_attribution_block_absent_when_not_required(
 
 
 @pytest.mark.asyncio
-async def test_webhook_record_dir_mirrors_payload_to_disk(
-    session, tmp_path: Path
-) -> None:
-    await _seed_jurisdiction(
-        session, attribution_required=False, attribution_text=None
-    )
+async def test_webhook_record_dir_mirrors_payload_to_disk(session, tmp_path: Path) -> None:
+    await _seed_jurisdiction(session, attribution_required=False, attribution_text=None)
     record_dir = tmp_path / "webhook-log"
     publisher = _CollectingPublisher()
     service = FirecrawlWebhookService(
@@ -236,12 +225,8 @@ async def test_webhook_record_dir_mirrors_payload_to_disk(
 
 
 @pytest.mark.asyncio
-async def test_webhook_record_dir_absent_by_default(
-    session, tmp_path: Path
-) -> None:
-    await _seed_jurisdiction(
-        session, attribution_required=False, attribution_text=None
-    )
+async def test_webhook_record_dir_absent_by_default(session, tmp_path: Path) -> None:
+    await _seed_jurisdiction(session, attribution_required=False, attribution_text=None)
     publisher = _CollectingPublisher()
     service = FirecrawlWebhookService(
         session=session,
