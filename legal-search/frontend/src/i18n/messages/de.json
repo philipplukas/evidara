@@ -1,6 +1,10 @@
 {
   "header": {
     "searchPlaceholder": "Nach Artikel, Urteil, Kommentar oder Zitat suchen…",
+    "searchAction": "Suchen",
+    "searchingAction": "Suche läuft",
+    "clearSearch": "Suche löschen",
+    "recentSearches": "Letzte Suchen",
     "filters": "Filter",
     "trail": "Verlauf",
     "pinned": "Merkliste",
@@ -18,12 +22,119 @@
     "searchPlaceholder": "Suchen...",
     "yes": "Ja",
     "clearAll": "Verfeinerungen löschen",
-    "resetAll": "Alles zurücksetzen"
+    "resetAll": "Alles zurücksetzen",
+    "sheetDescription": "Suchergebnisse nach Gerichtsbarkeit, Sprache, Instanz und weiteren Kriterien einschränken.",
+    "empty": {
+      "title": "Keine Filter verfügbar",
+      "description": "Die aktuelle Ergebnismenge bietet noch keine Verfeinerungsmöglichkeiten.",
+      "noMatch": "Keine passenden Optionen",
+      "noMatchHint": "Versuchen Sie einen anderen Suchbegriff."
+    }
   },
   "context": {
     "officialSourcesOnly": "Nur offizielle Quellen"
   },
+  "detail": {
+    "metadataHeading": "Metadaten",
+    "showMore": "{count} weitere Felder anzeigen",
+    "showLess": "Weniger anzeigen",
+    "notAvailable": "Nicht verfügbar",
+    "sheetDescription": "Detailansicht des ausgewählten Suchergebnisses.",
+    "tabs": {
+      "documentDetails": "Dokumentdetails",
+      "content": "Inhalt",
+      "references": "Verweise",
+      "relatedMaterials": "Verknüpfte Materialien",
+      "annotations": "Anmerkungen",
+      "localStructure": "Lokale Struktur",
+      "showAll": "Alle anzeigen",
+      "current": "Aktuell"
+    },
+    "descriptions": {
+      "details": "Metadaten stehen zuerst, danach folgt der Dokumenttext für schnelleres Erfassen.",
+      "references": "Eingehende und ausgehende Verweise sind getrennt, damit Sie Zitierpfade gezielt verfolgen können.",
+      "related": "Verknüpfte Treffer sind thematisch gruppiert, damit die stärksten Zusammenhänge zuerst sichtbar werden.",
+      "annotations": "Anmerkungen sind thematisch gebündelt, damit Sie Hinweise schnell erfassen, ohne den Kontext zu verlieren.",
+      "structure": "Sprünge durch die Gliederung halten den Lesekontext im aktuellen Dokument verankert."
+    },
+    "empty": {
+      "noSelection": "Kein Ergebnis ausgewählt",
+      "label": "Dokumentdetail",
+      "description": "Wählen Sie ein Ergebnis, um Dokumentdetails, verknüpfte Materialien und Verweise zu öffnen.",
+      "noMetadataTitle": "Keine Metadaten verfügbar",
+      "noMetadataDescription": "Metadaten erscheinen hier, sobald das Dokument verarbeitet wurde.",
+      "noDocumentDetailsTitle": "Keine Dokumentdetails",
+      "noDocumentDetailsDescription": "Für dieses Ergebnis sind derzeit weder Metadaten noch Textinhalt verfügbar.",
+      "noReferencesTitle": "Keine Verweise",
+      "noReferencesDescription": "Verweise erscheinen hier, sobald das Dokument anderes Material zitiert oder selbst zitiert wird.",
+      "noRelatedTitle": "Keine verknüpften Materialien",
+      "noRelatedDescription": "Probieren Sie ein anderes Ergebnis oder pivotieren Sie von einem stärkeren Treffer, um den Lesekontext zu erweitern.",
+      "noAnnotationsTitle": "Keine Anmerkungen verfügbar",
+      "noAnnotationsDescription": "Anmerkungen erscheinen hier, sobald das Dokument Kommentare oder Prüfhilfen enthält.",
+      "noStructureTitle": "Keine lokale Struktur",
+      "noStructureDescription": "Dieses Dokument stellt derzeit keine navigierbare Gliederung bereit."
+    },
+    "confidenceSuffix": "Vertrauen",
+    "sourcesSuffix": "Quellen",
+    "fallbackTitle": "Dokument ohne Titel",
+    "fallbackSubtitle": "Keine Zusammenfassung verfügbar",
+    "translatedContent": "Übersetzter Inhalt",
+    "pin": "Anheften",
+    "unpin": "Lösen",
+    "copyCitation": "Zitat kopieren"
+  },
+  "results": {
+    "exactMatches": {
+      "title": "Exakte Treffer",
+      "confidence": "Hohe Übereinstimmung",
+      "description": "Diese Ergebnisse entsprechen der Suchanfrage exakt im aktuellen Geltungsbereich.",
+      "found": "{count} gefunden",
+      "openLabel": "Exakten Treffer {title} öffnen",
+      "translatedFallback": "Übersetzt"
+    },
+    "scope": {
+      "currentScope": "Aktueller Bereich",
+      "previousScope": "Vorheriger Bereich",
+      "rootSearch": "Ausgangssuche",
+      "refinedScope": "Eingegrenzter Bereich",
+      "back": "Zum vorherigen Bereich",
+      "searchFor": "Suche nach \u201E{query}\u201C",
+      "reopen": "{scope} erneut öffnen",
+      "pivotDescription": "Der Bereich wurde gegenüber der vorherigen Ergebnismenge eingegrenzt, damit die aktuellen Belege fokussierter bleiben."
+    },
+    "sourceTypes": {
+      "all": "Alle",
+      "law": "Gesetze",
+      "decision": "Urteile",
+      "rechtssatz": "Rechtssätze",
+      "commentary": "Kommentare"
+    },
+    "card": {
+      "selected": "Ausgewählt",
+      "pin": "Anheften",
+      "pinned": "Angeheftet",
+      "loadMore": "Weitere Ergebnisse laden",
+      "remaining": "{count} verbleibend",
+      "openResult": "{title} öffnen",
+      "seeRelated": "{count} verwandte {label} anzeigen",
+      "pinResult": "Ergebnis anheften",
+      "unpinResult": "Ergebnis lösen"
+    },
+    "list": {
+      "sortedByRelevance": "Nach Relevanz sortiert",
+      "sortedByRelevanceHelp": "Treffer sind nach algorithmischer Relevanz geordnet (keine manuelle Prüfung jedes Ergebnisses)."
+    },
+    "empty": {
+      "pivotNoResults": "Keine Ergebnisse in diesem Pivot",
+      "pivotHint": "Kehren Sie zum vorherigen Bereich zurück oder probieren Sie eine andere Verknüpfung.",
+      "noResults": "Keine Ergebnisse für \"{query}\"",
+      "noResultsHint": "Versuchen Sie, die Anfrage zu erweitern oder Filter anzupassen.",
+      "startTitle": "Suche starten",
+      "startHint": "Geben Sie eine Anfrage ein, um Gesetze, Urteile und Kommentare zu durchsuchen."
+    }
+  },
   "workspace": {
-    "detailLoadFailed": "Dokumentdetails konnten nicht geladen werden."
+    "detailLoadFailed": "Dokumentdetails konnten nicht geladen werden.",
+    "resultsControlRegion": "Suchergebnisse und Steuerelemente"
   }
 }

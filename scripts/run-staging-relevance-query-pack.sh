@@ -71,8 +71,8 @@ cells: list[str] = []
 for i in range(3):
     if i < len(results):
         r = results[i]
-        did = str(r.get("document_id", "") or "")
-        sc = str(r.get("relevance_score", "") or "")
+        did = str(r.get("id") or r.get("document_id") or "")
+        sc = str(r.get("relevance_score") or r.get("score") or "")
         cells.extend([did, sc])
     else:
         cells.extend(["", ""])

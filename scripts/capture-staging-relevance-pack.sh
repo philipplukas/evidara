@@ -40,7 +40,7 @@ for q in "${QUERIES[@]}"; do
   i=$((i + 1))
   enc="$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$q")"
   json="$(curl -fsS --connect-timeout 5 --max-time 30 "${BASE_URL}/v1/search?q=${enc}&page=1&page_size=3")"
-  readarray -t ids < <(echo "$json" | python3 -c "import json,sys; d=json.load(sys.stdin); r=d.get('results')or[]; print('\n'.join((x.get('id')or'') for x in r[:3]))")
+  readarray -t ids < <(echo "$json" | python3 -c "import json,sys; d=json.load(sys.stdin); r=d.get('results')or[]; print('\n'.join(((x.get('id') or x.get('document_id') or '')) for x in r[:3]))")
   while [[ ${#ids[@]} -lt 3 ]]; do ids+=(""); done
   echo "| $i | $q | ${ids[0]:-} | n/a | ${ids[1]:-} | n/a | ${ids[2]:-} | n/a | TBD | |" >>"$tmp"
 done

@@ -157,3 +157,5 @@ async def test_minimal_work_to_expression_flow_extracts_expression_uris(
     assert payload.metadata["expression_uris"] == [
         "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303/de"
     ]
+    assert payload.metadata["title"] == "Bundesverfassung"
+    assert payload.metadata["title_short"] == "BV"

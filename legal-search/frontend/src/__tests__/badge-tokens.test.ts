@@ -27,7 +27,10 @@ describe("getBadgeColor", () => {
    */
   it("returns correct colors for each palette key", () => {
     expect(getBadgeColor("blue")).toEqual({ bg: "#dbeafe", text: "#1e40af" });
-    expect(getBadgeColor("pink")).toEqual({ bg: "#fce7f3", text: "#9d174d" });
+    // UX-7: `pink` was retuned from fuchsia (#fce7f3/#9d174d) to sky-blue so
+    // court-decision badges no longer read as an error state next to the red
+    // Swiss cross icon. Palette key kept for BFF backwards compatibility.
+    expect(getBadgeColor("pink")).toEqual({ bg: "#e0f2fe", text: "#075985" });
     expect(getBadgeColor("indigo")).toEqual({ bg: "#e0e7ff", text: "#3730a3" });
     expect(getBadgeColor("green")).toEqual({ bg: "#d1fae5", text: "#065f46" });
   });

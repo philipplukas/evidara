@@ -75,6 +75,26 @@ It maps each UX journey to the narrowest automated test layer that should own it
 - `e2e/smoke.spec.ts`, `e2e/workspace-panels.spec.ts`, `e2e/mobile-workspace.spec.ts`: critical browser journeys.
 - `e2e/visual.spec.ts`: visual baselines for layout/design tokens.
 
+## Visual regression (two tracks)
+
+| Track | Command | What it does | Baselines |
+|------|---------|----------------|-----------|
+| **Evidence pack** | `npm run e2e:screenshot-pack` | Writes PNGs + JSON under `screenshot-pack/` for human / design review | None — always overwrites; no pixel diff in CI |
+| **Pixel regression** | `npm run e2e:visual` | `expect(...).toHaveScreenshot()` compares UI to committed PNGs in `e2e/visual.spec.ts-snapshots/` | Per-OS filenames (e.g. `*-darwin.png`, `*-linux.png`) |
+
+**Workflow for intentional UI changes**
+
+1. Run `npm run e2e:visual` locally — failures show `*-actual.png` / `*-diff.png` under `test-results/`.
+2. If the new look is correct, refresh baselines in a **dedicated commit**: `npm run e2e:visual:update` (or `npx playwright test e2e/visual.spec.ts --update-snapshots`).
+3. Open a PR whose description states *why* pixels changed (e.g. “Kontrollbereich: reduce mobile weight — visual baselines updated”).
+4. Keep mocks and routes stable (`mockSearchApi`, etc.); avoid snapshotting clocks, random IDs, or live network without masks.
+
+**Cross-OS CI:** GitHub Actions runners are Linux. Baselines generated on macOS (`*-darwin.png`) are not reused on Linux. Run `scripts/playwright-visual-update-docker.sh` from the repo root (Playwright Docker image) to regenerate `*-linux.png`, commit them, then enable job `frontend-visual-regression` in `.github/workflows/legal-search.yml` (`if: true`). Until then, the workflow job stays disabled (`if: false`).
+
+**Determinism:** Wait for stable DOM (e.g. first `article` card) before `toHaveScreenshot`. Playwright waits for fonts during the screenshot capture. Global defaults live in `playwright.config.ts` under `expect.toHaveScreenshot` (including `maxDiffPixelRatio` for full-page Next dev drift). Do not rely on `networkidle` with `next dev` — long-lived HMR sockets keep it from settling.
+
+**Growing coverage:** Add new `test(...)` blocks (or a second spec file) that mirror high-value states from `screenshot-pack.spec.ts` — search results open, detail tabs, admin dashboard — each ending in `toHaveScreenshot` with the same mock setup as smoke.
+
 ### Declarative Naming Convention
 
 - `*.unit.test.ts(x)`: pure logic, no browser/runtime concerns.

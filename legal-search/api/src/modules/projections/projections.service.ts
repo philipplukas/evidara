@@ -228,6 +228,7 @@ export class ProjectionsService {
         !llmMeta.title.startsWith('extractor_failed:')
           ? this.normalizeTitle(llmMeta.title)
           : undefined,
+      structuredBodyTitle: this.extractStructuredBodyTitle(bodyPreviewFallback),
       officialCitation,
       previewText,
       bodyPreviewFallback,
@@ -259,6 +260,7 @@ export class ProjectionsService {
     title?: string;
     structuredTitle?: string;
     llmTitle?: string;
+    structuredBodyTitle?: string;
     officialCitation?: string;
     previewText?: string;
     bodyPreviewFallback?: string;
@@ -269,6 +271,7 @@ export class ProjectionsService {
       args.title,
       args.structuredTitle,
       args.llmTitle,
+      args.structuredBodyTitle,
       args.officialCitation,
       this.firstSubstantiveLine(args.previewText ?? args.bodyPreviewFallback),
       structuralTail,
@@ -339,7 +342,15 @@ export class ProjectionsService {
   private normalizeTitle(value: string): string | undefined {
     const title = value.trim();
     if (!title) return undefined;
-    if (title.toLowerCase() === 'untitled document') return undefined;
+    const lower = title.toLowerCase();
+    if (
+      lower === 'untitled document' ||
+      lower === 'ris dokument' ||
+      lower.startsWith('ris -') ||
+      lower.startsWith('ris —')
+    ) {
+      return undefined;
+    }
     return title;
   }
 
@@ -410,6 +421,40 @@ export class ProjectionsService {
         return current.trim();
       }
     }
+    return undefined;
+  }
+
+  private extractStructuredBodyTitle(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    try {
+      const parsed = JSON.parse(value.trim()) as unknown;
+      return this.findFirstStringByKey(parsed, 'title');
+    } catch {
+      return undefined;
+    }
+  }
+
+  private findFirstStringByKey(value: unknown, key: string): string | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const nested = this.findFirstStringByKey(item, key);
+        if (nested) return nested;
+      }
+      return undefined;
+    }
+
+    const record = value as Record<string, unknown>;
+    const direct = record[key];
+    if (typeof direct === 'string' && direct.trim()) {
+      return this.normalizeTitle(direct);
+    }
+
+    for (const nested of Object.values(record)) {
+      const found = this.findFirstStringByKey(nested, key);
+      if (found) return found;
+    }
+
     return undefined;
   }
 

@@ -35,8 +35,8 @@ export default function ErrorPage({
         <button
           type="button"
           onClick={reset}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium
-            hover:bg-brand-strong transition-colors focus:outline-none focus:ring-2 focus:ring-focus-ring"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium
+            hover:bg-primary/85 transition-colors focus:outline-none focus:ring-2 focus:ring-focus-ring"
         >
           <RotateCcw className="w-4 h-4" />
           Try again

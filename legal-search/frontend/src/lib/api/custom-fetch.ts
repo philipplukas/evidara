@@ -19,6 +19,22 @@ interface OrvalRequestConfig {
   signal?: AbortSignal;
 }
 
+function parseJsonBody(body: string | null): unknown {
+  if (!body) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { detail: body };
+  }
+}
+
+export function parseApiResponseBody(body: string | null): unknown {
+  return parseJsonBody(body);
+}
+
 export async function customFetch<T>(
   urlOrConfig: string | OrvalRequestConfig,
   options: RequestInit = {},
@@ -41,7 +57,7 @@ export async function customFetch<T>(
 
     const res = await fetch(url, init);
     const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-    const data = body ? JSON.parse(body) : {};
+    const data = parseJsonBody(body);
     return { data, status: res.status, headers: res.headers } as T;
   }
 
@@ -71,7 +87,7 @@ export async function customFetch<T>(
 
   const res = await fetch(url, init);
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  return body ? JSON.parse(body) : ({} as T);
+  return parseJsonBody(body) as T;
 }
 
 export default customFetch;

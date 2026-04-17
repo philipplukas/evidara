@@ -1,6 +1,10 @@
 {
   "header": {
     "searchPlaceholder": "Rechercher un article, un arrêt, un commentaire ou une citation…",
+    "searchAction": "Rechercher",
+    "searchingAction": "Recherche en cours",
+    "clearSearch": "Effacer la recherche",
+    "recentSearches": "Recherches récentes",
     "filters": "Filtres",
     "trail": "Historique",
     "pinned": "Épinglés",
@@ -18,12 +22,119 @@
     "searchPlaceholder": "Rechercher...",
     "yes": "Oui",
     "clearAll": "Effacer les filtres",
-    "resetAll": "Réinitialiser"
+    "resetAll": "Réinitialiser",
+    "sheetDescription": "Affiner les résultats par juridiction, langue, instance et autres critères.",
+    "empty": {
+      "title": "Aucun filtre disponible",
+      "description": "Le jeu de résultats actuel ne propose pas encore de filtres.",
+      "noMatch": "Aucune option correspondante",
+      "noMatchHint": "Essayez un autre terme de recherche."
+    }
   },
   "context": {
     "officialSourcesOnly": "Sources officielles uniquement"
   },
+  "detail": {
+    "metadataHeading": "Métadonnées",
+    "showMore": "Afficher {count} champs supplémentaires",
+    "showLess": "Afficher moins",
+    "notAvailable": "Non disponible",
+    "sheetDescription": "Vue détaillée du résultat de recherche sélectionné.",
+    "tabs": {
+      "documentDetails": "Détails du document",
+      "content": "Contenu",
+      "references": "Références",
+      "relatedMaterials": "Documents liés",
+      "annotations": "Annotations",
+      "localStructure": "Structure locale",
+      "showAll": "Tout afficher",
+      "current": "Actuel"
+    },
+    "descriptions": {
+      "details": "Les métadonnées apparaissent d'abord, puis le corps du document pour une lecture plus rapide.",
+      "references": "Les références entrantes et sortantes sont séparées pour vous permettre de suivre le fil des citations dans une seule direction à la fois.",
+      "related": "Les résultats liés sont regroupés par thème pour faire ressortir d'abord les connexions les plus fortes.",
+      "annotations": "Les annotations sont regroupées par thème pour faciliter le balayage sans perdre le contexte de la source.",
+      "structure": "Naviguer dans le plan permet de garder la lecture ancrée dans le document courant."
+    },
+    "empty": {
+      "noSelection": "Aucun résultat sélectionné",
+      "label": "Détails du document",
+      "description": "Sélectionnez un résultat pour afficher les détails, les documents liés et les références.",
+      "noMetadataTitle": "Aucune métadonnée disponible",
+      "noMetadataDescription": "Les métadonnées apparaîtront ici une fois le document traité.",
+      "noDocumentDetailsTitle": "Aucun détail de document",
+      "noDocumentDetailsDescription": "Ce résultat n'expose pas encore de métadonnées ni de contenu.",
+      "noReferencesTitle": "Aucune référence",
+      "noReferencesDescription": "Les références apparaîtront ici lorsque le document citera d'autres sources ou sera lui-même cité.",
+      "noRelatedTitle": "Aucun document lié",
+      "noRelatedDescription": "Essayez un autre résultat ou pivotez depuis un match plus fort pour élargir le contexte de lecture.",
+      "noAnnotationsTitle": "Aucune annotation disponible",
+      "noAnnotationsDescription": "Les annotations apparaîtront ici lorsque le document contiendra des commentaires ou des notes de revue.",
+      "noStructureTitle": "Aucune structure locale",
+      "noStructureDescription": "Ce document ne propose pas encore de plan navigable."
+    },
+    "fallbackTitle": "Document sans titre",
+    "fallbackSubtitle": "Aucun résumé disponible",
+    "translatedContent": "Contenu traduit",
+    "pin": "Épingler",
+    "unpin": "Détacher",
+    "copyCitation": "Copier la citation",
+    "confidenceSuffix": "confiance",
+    "sourcesSuffix": "sources"
+  },
+  "results": {
+    "exactMatches": {
+      "title": "Correspondances exactes",
+      "confidence": "Confiance élevée",
+      "description": "Ces résultats correspondent exactement à la requête dans le périmètre courant.",
+      "found": "{count} trouvés",
+      "openLabel": "Ouvrir la correspondance exacte {title}",
+      "translatedFallback": "Traduit"
+    },
+    "scope": {
+      "currentScope": "Périmètre courant",
+      "previousScope": "Périmètre précédent",
+      "rootSearch": "Recherche initiale",
+      "refinedScope": "Périmètre affiné",
+      "back": "Retour au périmètre précédent",
+      "searchFor": "Recherche de « {query} »",
+      "reopen": "Rouvrir {scope}",
+      "pivotDescription": "Le périmètre a été resserré par rapport au jeu de résultats précédent pour garder les éléments actuels plus ciblés."
+    },
+    "sourceTypes": {
+      "all": "Tout",
+      "law": "Lois",
+      "decision": "Arrêts",
+      "rechtssatz": "Rechtssätze",
+      "commentary": "Commentaires"
+    },
+    "card": {
+      "selected": "Sélectionné",
+      "pin": "Épingler",
+      "pinned": "Épinglé",
+      "loadMore": "Charger plus de résultats",
+      "remaining": "{count} restants",
+      "openResult": "Ouvrir {title}",
+      "seeRelated": "Voir {count} {label} associés",
+      "pinResult": "Épingler le résultat",
+      "unpinResult": "Détacher le résultat"
+    },
+    "list": {
+      "sortedByRelevance": "Tri par pertinence",
+      "sortedByRelevanceHelp": "Les résultats sont classés par pertinence algorithmique (aucune validation manuelle de chaque résultat)."
+    },
+    "empty": {
+      "pivotNoResults": "Aucun résultat dans ce pivot",
+      "pivotHint": "Revenez au périmètre précédent ou essayez une autre connexion.",
+      "noResults": "Aucun résultat pour \"{query}\"",
+      "noResultsHint": "Essayez d'élargir la requête ou d'ajuster les filtres.",
+      "startTitle": "Démarrer la recherche",
+      "startHint": "Saisissez une requête pour explorer les lois, arrêts et commentaires."
+    }
+  },
   "workspace": {
-    "detailLoadFailed": "Impossible de charger les détails du document."
+    "detailLoadFailed": "Impossible de charger les détails du document.",
+    "resultsControlRegion": "Résultats de recherche et commandes"
   }
 }

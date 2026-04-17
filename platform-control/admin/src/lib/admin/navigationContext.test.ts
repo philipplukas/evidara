@@ -22,8 +22,20 @@ describe("navigationContext", () => {
       selectedId: "doc-1",
     });
     expect(describeLegalSearchHandoff(handoff)).toBe(
-      'Results for "Art 754 OR" · Search "Art 754 OR"',
+      'Results for "Art 754 OR" · Search "Art 754 OR" · Selected item: doc-1',
     );
+  });
+
+  it("describes selected item handoffs when only an item is available", () => {
+    const handoff = resolveLegalSearchHandoff(
+      new URLSearchParams({
+        from: "legal-search",
+        ls_item: "doc-7",
+      }),
+      "https://search.example/",
+    );
+
+    expect(describeLegalSearchHandoff(handoff)).toBe("Selected item: doc-7");
   });
 
   it("falls back to the configured legal-search URL when returnTo targets another origin", () => {
@@ -36,6 +48,18 @@ describe("navigationContext", () => {
     );
 
     expect(handoff.returnToUrl).toBe("https://search.example/");
+  });
+
+  it("accepts localhost alias handoffs when protocol and port match", () => {
+    const handoff = resolveLegalSearchHandoff(
+      new URLSearchParams({
+        from: "legal-search",
+        ls_return_to: "http://127.0.0.1:3101/?q=Art%20754%20OR&item=doc-1",
+      }),
+      "http://localhost:3101/",
+    );
+
+    expect(handoff.returnToUrl).toBe("http://127.0.0.1:3101/?q=Art%20754%20OR&item=doc-1");
   });
 
   it("falls back to the configured legal-search URL when returnTo is malformed", () => {

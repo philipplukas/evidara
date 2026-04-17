@@ -7,6 +7,12 @@ Use this when you need **search + projections + `GET …/lean`** without staging
 - **Docker**
 - **jq** on the host only if you use **up-split** or run `validate-tar89-metadata-local.sh` locally. The **lean-stack** Compose path installs `jq` inside the bootstrap container — you do not need it on the host for `docker compose --profile lean-stack up`.
 - **curl** (for `replay` / `smoke` from the host)
+- **Node / npm** for the frontend and admin apps
+
+Notes:
+
+- `shellcheck` is already available from this repo’s `nix develop` shell.
+- Docker should come from the workstation baseline (for example MacConfig-managed machine setup), not from the repo flake.
 
 OpenSearch’s `/_cluster/health?wait_for_status=…` long-poll and **HEAD** on index names have proven flaky with some local setups; `validate-tar89-metadata-local.sh` uses short **GET** polls and **GET + HTTP status** for index existence instead.
 
@@ -40,6 +46,41 @@ Stop:
 
 Host port overrides: `EVIDARA_OPENSEARCH_HTTP_PORT`, `EVIDARA_DOCUMENT_SERVICE_PORT`, `EVIDARA_LEGAL_SEARCH_API_PORT`.
 
+## Cross-surface live workflow
+
+For day-to-day legal-search ↔ control-panel validation, use the repo-root launcher:
+
+```bash
+npm run dev:cross-surface:live
+```
+
+This starts:
+
+- the lean backend stack (`legal-search-api` on `3102`, plus OpenSearch and Document Service)
+- legal-search frontend on `3101`
+- platform-control admin on `3100`
+
+The launcher waits for a local preflight before it reports ready.
+If Docker is missing, the launcher now fails immediately with a setup hint instead of failing later inside Compose.
+
+To run the same readiness check on demand:
+
+```bash
+npm run preflight:cross-surface:live
+```
+
+Use this loop:
+
+1. UI work: mocked Playwright + Vitest
+2. Flow validation: `npm run dev:cross-surface:live`, then backend-backed Playwright
+3. Final confidence: run a staging smoke before shipping
+
+The live browser flow expects:
+
+- legal-search frontend: `http://localhost:3101`
+- control-panel admin: `http://localhost:3100`
+- legal-search API: `http://localhost:3102`
+
 ## Host BFF (hot reload) instead of the API container
 
 ```bash
@@ -49,6 +90,16 @@ cd legal-search/api && npm run dev
 ```
 
 `up-split` starts only OpenSearch + Document Service and runs bootstrap **on the host** (needs **jq**).
+
+When running the split setup, use the preflight after the API comes up:
+
+```bash
+./scripts/dev-lean-search-stack.sh up-split
+eval "$(./scripts/dev-lean-search-stack.sh print-env)"
+cd legal-search/api && npm run dev
+# in another shell, from repo root:
+npm run preflight:cross-surface:live
+```
 
 ## Optional checks
 

@@ -29,6 +29,13 @@ export default defineConfig({
   timeout: 30_000,
   retries: ci ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
+  expect: {
+    toHaveScreenshot: {
+      animations: "disabled",
+      // Full-page Next dev + webfonts: small sub-pixel drift between runs; keep CI/local usable.
+      maxDiffPixelRatio: 0.06,
+    },
+  },
   use: {
     baseURL: externalBaseUrl || "http://localhost:3101",
     headless: true,

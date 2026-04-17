@@ -1,9 +1,9 @@
 # GA operator board
 
 Owner: Platform / release
-Last reviewed: 2026-04-14
-Last verified: 2026-04-14
-Applies to: GA readiness coordination after the 2026-04-13 merge wave
+Last reviewed: 2026-04-15
+Last verified: 2026-04-15
+Applies to: GA readiness coordination after the 2026-04-15 dev runtime and AT rerun refresh
 
 ## Purpose
 
@@ -41,10 +41,16 @@ What is not yet true:
 - The branch-gate model is not yet in its intended steady state.
 - Runner stability is improved but not yet trusted as a solved problem.
 - Five-country acceptance and relevance still need current evidence attached to the GA
-  umbrella, but CH and AT now have live fast-loop run evidence on dev.
-- The current dev relevance signal now includes an empty `q=*` control row, which points
-  to alias/index/corpus drift rather than a pure ranking regression; the follow-up stays
-  on `TAR-242`.
+  umbrella, but CH and AT now have live fast-loop run evidence on dev and the AT
+  runtime blocker is no longer the active issue.
+- The current dev relevance signal no longer has an empty `q=*` control row; the dev
+  index returns results again, the replayed CH/AT proof docs are visible under
+  paginated `q=*` search, the CH proof doc carries the corrected title and
+  controlled type, and the agreed seed queries still collapse to generic top
+  hits. The 2026-04-15 rerun proves the AT runtime path is healthy again, but the
+  AT proof doc still renders as `RIS Dokument`, so the active follow-up split is:
+  `TAR-241` for wider-corpus ranking / sparse-row quality and `TAR-242` for residual
+  title / projection / metadata cleanup.
 
 ## Board status
 
@@ -55,7 +61,7 @@ What is not yet true:
 | Runner reliability | `TAR-238` | active | yes | light/heavy pools are stable across rotation and preflight checks pass reliably |
 | Five-country acceptance A (CH + AT) | `TAR-239` | active | track in parallel | CH/AT checklist is executed and evidence is attached into `TAR-160` |
 | Five-country acceptance B (DE + FR) | `TAR-240` | ready | track in parallel | DE/FR checklist is executed and evidence is attached into `TAR-160` |
-| Relevance baseline | `TAR-241` | active | yes | query pack is rerun with the `q=*` control row, result table is attached, and regressions are split into follow-up issues |
+| Relevance baseline | `TAR-241` | active | yes | query pack is rerun with the `q=*` control row, replayed CH/AT proof docs stay visible, broad seed queries are attached, and regressions are split into follow-up issues |
 | GA umbrella / final sign-off | `TAR-160` | collecting | no, assemble after inputs land | consolidated GA evidence pack and release decision are ready |
 
 ## What to push now
@@ -181,9 +187,14 @@ Current evidence highlights:
 - AT now has clean live RIS fast-loop proof for:
   - narrow run `run_01kp5xqgrfyqq2abez3r666d9h`
   - tiny batch run `run_01kp5xrqvh61xfdace1x9sqed1`
+  - post-runtime-fix rerun `run_01kp8aek9590wsaas3patxbct7`
 - AT recovery also surfaced an important operator invariant:
   `platform-control-worker` must keep GCS artifact-store and Pub/Sub env parity with
   `platform-control-api`, or DI cannot read worker-published bundle manifests
+- Current AT status after the 2026-04-15 rerun:
+  - replay path: healthy
+  - proof-doc title: still `RIS Dokument`
+  - next engineering lane: DI / metadata title cleanup, not worker dispatch
 
 ### `TAR-240` - five-country acceptance B (DE + FR)
 

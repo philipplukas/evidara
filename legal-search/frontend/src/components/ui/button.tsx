@@ -1,56 +1,35 @@
-import { cva, type VariantProps } from "class-variance-authority";
+"use client";
+
 import { Slot } from "radix-ui";
 import type * as React from "react";
-
+import { type MouseEvent, type ReactNode, useState } from "react";
+import { buttonVariants, type VariantProps } from "@/components/ui/button-variants";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-        outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
-        icon: "size-8",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  },
-);
+export type ConsequenceTier = "safe" | "notable" | "destructive";
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  asChild = false,
-  ...props
-}: React.ComponentProps<"button"> &
+type ButtonBaseProps = React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
-  }) {
+  };
+
+function ButtonBase({ className, variant = "default", size = "default", asChild = false, ...props }: ButtonBaseProps) {
   const Comp = asChild ? Slot.Root : "button";
 
   return (
@@ -64,4 +43,162 @@ function Button({
   );
 }
 
-export { Button, buttonVariants };
+type ButtonProps = ButtonBaseProps & {
+  tier?: ConsequenceTier;
+  confirmTitle?: string;
+  confirmDescription?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+};
+
+function Button({
+  tier = "safe",
+  confirmTitle,
+  confirmDescription,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  onClick,
+  children,
+  ...buttonProps
+}: ButtonProps) {
+  if (tier === "safe") {
+    return (
+      <ButtonBase {...buttonProps} onClick={onClick}>
+        {children}
+      </ButtonBase>
+    );
+  }
+
+  if (tier === "notable") {
+    return (
+      <NotableConfirm
+        buttonProps={buttonProps}
+        cancelLabel={cancelLabel}
+        confirmDescription={confirmDescription}
+        confirmLabel={confirmLabel}
+        confirmTitle={confirmTitle ?? "Are you sure?"}
+        onConfirm={onClick}
+      >
+        {children}
+      </NotableConfirm>
+    );
+  }
+
+  return (
+    <DestructiveConfirm
+      buttonProps={buttonProps}
+      cancelLabel={cancelLabel}
+      confirmDescription={confirmDescription}
+      confirmLabel={confirmLabel}
+      confirmTitle={confirmTitle ?? "This action cannot be undone"}
+      onConfirm={onClick}
+    >
+      {children}
+    </DestructiveConfirm>
+  );
+}
+
+function NotableConfirm({
+  buttonProps,
+  cancelLabel,
+  children,
+  confirmDescription,
+  confirmLabel,
+  confirmTitle,
+  onConfirm,
+}: {
+  buttonProps: Omit<ButtonProps, "tier" | "onClick" | "children" | "confirmTitle" | "confirmDescription" | "confirmLabel" | "cancelLabel">;
+  cancelLabel: string;
+  children: ReactNode;
+  confirmDescription?: string;
+  confirmLabel: string;
+  confirmTitle: string;
+  onConfirm: React.MouseEventHandler<HTMLButtonElement> | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger asChild>
+        <ButtonBase {...buttonProps} type="button">
+          {children}
+        </ButtonBase>
+      </PopoverTrigger>
+      <PopoverContent className="w-64">
+        <PopoverHeader>
+          <PopoverTitle>{confirmTitle}</PopoverTitle>
+          {confirmDescription ? <PopoverDescription>{confirmDescription}</PopoverDescription> : null}
+        </PopoverHeader>
+        <div className="flex justify-end gap-2">
+          <ButtonBase size="sm" type="button" variant="ghost" onClick={() => setOpen(false)}>
+            {cancelLabel}
+          </ButtonBase>
+          <ButtonBase
+            size="sm"
+            type="button"
+            variant="default"
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
+              setOpen(false);
+              onConfirm?.(e);
+            }}
+          >
+            {confirmLabel}
+          </ButtonBase>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function DestructiveConfirm({
+  buttonProps,
+  cancelLabel,
+  children,
+  confirmDescription,
+  confirmLabel,
+  confirmTitle,
+  onConfirm,
+}: {
+  buttonProps: Omit<ButtonProps, "tier" | "onClick" | "children" | "confirmTitle" | "confirmDescription" | "confirmLabel" | "cancelLabel">;
+  cancelLabel: string;
+  children: ReactNode;
+  confirmDescription?: string;
+  confirmLabel: string;
+  confirmTitle: string;
+  onConfirm: React.MouseEventHandler<HTMLButtonElement> | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <ButtonBase {...buttonProps} type="button" onClick={() => setOpen(true)}>
+        {children}
+      </ButtonBase>
+      <Dialog onOpenChange={setOpen} open={open}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmTitle}</DialogTitle>
+            {confirmDescription ? <DialogDescription>{confirmDescription}</DialogDescription> : null}
+          </DialogHeader>
+          <DialogFooter>
+            <ButtonBase type="button" variant="ghost" onClick={() => setOpen(false)}>
+              {cancelLabel}
+            </ButtonBase>
+            <ButtonBase
+              type="button"
+              variant="destructive"
+              onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                setOpen(false);
+                onConfirm?.(e);
+              }}
+            >
+              {confirmLabel}
+            </ButtonBase>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export { Button, ButtonBase, buttonVariants };

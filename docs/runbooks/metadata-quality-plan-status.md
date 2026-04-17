@@ -1,8 +1,8 @@
 # Metadata & search quality — plan status report
 
 Owner: Platform / legal-search
-Last reviewed: 2026-04-14 (dev replay pass; CH/AT metadata drift narrowed to ranking debt)
-Last verified: 2026-04-14
+Last reviewed: 2026-04-15 (dev replay pass; CH/AT metadata drift narrowed to ranking debt)
+Last verified: 2026-04-15
 Applies to: MVP demo path, **Linear TAR-89** (search/detail metadata quality), related release gates
 
 This report ties together the **stated plan** (runbooks + Linear) and **repo reality** (what ships in code today). Update it when TAR-89 scope closes or gates move.
@@ -29,7 +29,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 - **OpenSearch ranking shape** — `multi_match` boosts documented in [search-relevance-baseline.md](search-relevance-baseline.md) (`title`, `structural_path`, `regeste`, `content`, `content_preview`, `docket_number`).
 - **Projection mapping** — `ProjectionsService` builds search documents from canonical lean rows; extracts nested metadata paths (e.g. `metadata.official_citation`, `metadata.original_language`, effective date, structural path). **Document type** is normalized to contract vocabulary codes when present on the lean row, with fallbacks from `metadata.source_defaults.document_type_hint`, `metadata.extracted_metadata.document_type`, and (when `applied`) `metadata.llm_extraction.document_type`, using the same alias map as document-intelligence (`statute` → `law`, etc.). **Title** falls back past placeholder `Untitled document` to LLM title (when applied), official citation, first substantive line of preview/body text (min length 24), then structural-path tail, before `Document <id>`. See `legal-search/api/src/modules/projections/projections.service.ts`.
-- **Result + detail view models** — `MetadataRow` / `metadataRows` in API mappers and generated clients; **detail** renders via `MetadataSection` (`legal-search/frontend/src/components/detail/MetadataSection.tsx`). Controlled document types add an explicit **Dokumenttyp** row (vocabulary label) with `dtype-*` icons; date, citation, official source, language, authority, and status rows use stable `meta-*` icon keys mapped in `frontend/src/lib/icons.ts` (see `legal-search/api/src/core/presentation/metadata-icons.ts`).
+- **Result + detail view models** — `MetadataRow` / `metadataRows` in API mappers and generated clients; **detail** renders via `MetadataList` in `DetailsTab.tsx`, fed by `enrichMetadataRows` from `legal-search/frontend/src/lib/metadata-visibility.ts`. Controlled document types add an explicit **Dokumenttyp** row (vocabulary label) with `dtype-*` icons; date, citation, official source, language, authority, and status rows use stable `meta-*` icon keys mapped in `frontend/src/lib/icons.ts` (see `legal-search/api/src/core/presentation/metadata-icons.ts`).
 
 ### 2.2 Document-intelligence pipeline (canonical metadata)
 
@@ -41,6 +41,15 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 - Demo packet expectations, interaction-flow hooks, and **phase 5** workstream list (TAR-66 → TAR-62 → TAR-63 → TAR-67) documented in runbooks above.
 
+### 2.4 Current proof state (2026-04-15)
+
+- Targeted CH/AT replay on dev is visible again through legal-search: both proof docs are reachable by ID and also surface under paginated `q=*` search on page 6.
+- The CH proof doc `doc_1wxstrwdxtwh0zaxag6x37hya2` resolves to `Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999` with `document_type=law`.
+- The 2026-04-15 runtime rerun (`run_01kp8aek9590wsaas3patxbct7`) proves the AT worker-backed replay path is healthy again after the runtime fix and `di-consumer-dev` redeploy.
+- The AT proof doc `doc_7m5fzs4ksj057ft0sgzqaecpyh` still resolves with the generic `RIS Dokument` title on legal-search detail; that residual title cleanup remains an active metadata / DI follow-up.
+- The remaining broader issue is relevance quality: `Bundesgericht`, `Art. 8 EMRK`, and `BVGE` still return generic top docs even though the `q=*` control row is non-empty again.
+- Therefore the current debt is split more cleanly: alias / empty-index drift is materially improved, one CH proof doc now renders correctly, the AT runtime path is recovered, residual AT title polish stays on the DI / metadata track, and broader ranking / discrimination across the wider corpus remains open.
+
 ---
 
 ## 3. Outstanding (explicit gaps)
@@ -49,7 +58,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 
 **Projection layer (legal-search):** inferring type from bundle hints and richer title fallbacks is implemented in `ProjectionsService` (2026-04-09). **Existing OpenSearch rows** still show old titles/types until projections are replayed or documents are re-processed and re-indexed.
 
-**Current dev snapshot (2026-04-14):** the major metadata drift identified in `TAR-241` is now materially reduced for the replayed CH/AT proof documents. After restoring Document Service wiring and replaying known-good documents:
+**Current dev snapshot (2026-04-15):** the major metadata drift identified in `TAR-241` is now materially reduced for the replayed CH/AT proof documents. The 2026-04-15 rerun proves the AT runtime path is healthy again after the worker / `di-consumer` refresh. After restoring Document Service wiring and replaying known-good documents:
 
 - AT RIS doc `doc_7m5fzs4ksj057ft0sgzqaecpyh` now indexes as canonical type `law` and is rank 1 for `Produktdeklaration`, `BGBl. Nr. 43/1975`, and `RIS Dokument`.
 - CH Fedlex doc `doc_1wxstrwdxtwh0zaxag6x37hya2` now indexes as canonical type `law`, and projection title extraction now uses the embedded Fedlex title (`Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999`) instead of the raw JSON blob.
@@ -60,6 +69,7 @@ This report ties together the **stated plan** (runbooks + Linear) and **repo rea
 | **Generic titles / weak document typing in UI** | [mvp-website-walkthrough.md](mvp-website-walkthrough.md) — materially improved for replayed CH/AT proofs after Document Service restore + projection replay; broad corpus still needs ranking / re-projection follow-through |
 | **Trust/explainability**                        | [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) — “demo-quality polish (metadata credibility)”; **BFF** `MetadataRow` labels/icons still thin where facets are sparse |
 | **LLM enrichment not a default path**           | Policy recorded in [document-intelligence README](../../document-intelligence/README.md) (“LLM extraction policy”): **default off**; pilot requires observability + cost bounds; BFF consumes `metadata.llm_extraction` when present |
+| **Broad relevance / wider-corpus ranking**     | `Bundesgericht`, `Art. 8 EMRK`, and `BVGE` still return generic top docs in the dev relevance pack even after proof-doc replay fixes; track this as ranking quality on TAR-241 rather than metadata/title drift |
 
 **Likely workstreams** (not all tracked as separate issues in this file): richer **source-acquisition** metadata into bundles; **DI** normalization improvements per corpus; **re-projection / re-index** for demo envs; **BFF mapper** labels/icons for `MetadataRow`; optional **LLM** rollout with guardrails and cost/quality metrics.
 

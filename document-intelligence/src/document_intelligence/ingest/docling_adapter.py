@@ -14,6 +14,20 @@ from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
 from document_intelligence.normalize.xml import normalize_xml_document
 
 
+def _is_placeholder_title(title: str | None) -> bool:
+    if title is None:
+        return True
+    normalized = title.strip()
+    if not normalized:
+        return True
+    lowered = normalized.lower()
+    if lowered in {"untitled document", "ris dokument"}:
+        return True
+    if lowered.startswith("ris —") or lowered.startswith("ris -"):
+        return True
+    return False
+
+
 def normalize_with_docling(
     *,
     artifact_id: str,
@@ -103,7 +117,9 @@ def _convert_with_docling(
         converter = DocumentConverter()
         conversion_result = converter.convert(str(temp_path))
         doc = conversion_result.document
-        title = (getattr(doc, "name", "") or "").strip() or "Untitled document"
+        title = (getattr(doc, "name", "") or "").strip()
+        if _is_placeholder_title(title):
+            title = "Untitled document"
         blocks: list[Block] = []
         for order, item in enumerate(doc.iterate_items()):
             text = _item_text(item)

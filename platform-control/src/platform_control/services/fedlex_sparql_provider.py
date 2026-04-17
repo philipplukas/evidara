@@ -139,6 +139,12 @@ LIMIT 1
                                 "concrete_work_uri": concrete_work_uri,
                                 "expression_uris": selected_expression_uris,
                                 "manifestation_url": resolved_url,
+                                "title": (
+                                    title
+                                    or html_title
+                                    or title_short
+                                    or work_uri.rsplit("/", 1)[-1]
+                                ),
                                 "title_short": title_short,
                                 "describe_turtle": describe_turtle,
                                 "fetched_at": datetime.now(UTC).isoformat(),

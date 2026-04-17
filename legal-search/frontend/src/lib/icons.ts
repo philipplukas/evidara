@@ -1,10 +1,14 @@
-// Icon Registry
-// Maps iconKey strings from the BFF to emoji/text representations.
-// In production, these would be SVG components or an icon library like circle-flags.
+const FLAG_KEYS: Record<string, string> = {
+  ch: "/flags/ch.svg",
+  at: "/flags/at.svg",
+};
 
-const iconMap: Record<string, string> = {
-  ch: "🇨🇭",
-  at: "🇦🇹",
+const FLAG_ALT: Record<string, string> = {
+  ch: "Switzerland",
+  at: "Austria",
+};
+
+const textIconMap: Record<string, string> = {
   "ch-zh": "ZH",
   "ch-be": "BE",
   "ch-lu": "LU",
@@ -25,7 +29,19 @@ const iconMap: Record<string, string> = {
   "meta-authority": "🏛",
 };
 
+export function isFlagIcon(iconKey?: string): boolean {
+  return !!iconKey && iconKey in FLAG_KEYS;
+}
+
+export function getFlagSrc(iconKey: string): string | null {
+  return FLAG_KEYS[iconKey] ?? null;
+}
+
+export function getFlagAlt(iconKey: string): string {
+  return FLAG_ALT[iconKey] ?? iconKey.toUpperCase();
+}
+
 export function getIcon(iconKey?: string): string | null {
   if (!iconKey) return null;
-  return iconMap[iconKey] ?? null;
+  return textIconMap[iconKey] ?? null;
 }

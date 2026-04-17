@@ -1,6 +1,10 @@
 "use client";
 
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -31,6 +35,13 @@ import type {
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
+import { formatSwissDateTime } from "../../lib/format/date";
+import {
+  type AdminStatusLevel,
+  adminLevelBorder,
+  pipelineHealthToLevel,
+  StatusBadge,
+} from "../shared/StatusBadge";
 import {
   type ChecklistItem,
   type ChecklistState,
@@ -60,15 +71,11 @@ type RunTableSectionProps<TRecord extends { id: Identifier }> = {
   error: unknown;
   emptyMessage: string;
   columns: SectionColumn<TRecord>[];
+  defaultExpanded?: boolean;
 };
 
 const formatDateTime = (value: string | null | undefined): string =>
-  value
-    ? new Intl.DateTimeFormat("en", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(new Date(value))
-    : "—";
+  formatSwissDateTime(value) || "—";
 
 const formatJson = (value: unknown): string => JSON.stringify(value, null, 2);
 
@@ -91,15 +98,19 @@ export const overallSummaryByStatus = (status: RunPipelineHealth["overall_status
   return "At least one stage is still moving through the pipeline.";
 };
 
-const stageBorderColorByStatus = (
-  status: RunPipelineHealth["stages"][number]["status"],
-): string => {
-  if (status === "failed") return "error.main";
-  if (status === "blocked") return "warning.main";
-  if (status === "in_progress") return "info.main";
-  if (status === "ok") return "success.main";
-  return "divider";
-};
+const stageBorderColorByStatus = (status: RunPipelineHealth["stages"][number]["status"]): string =>
+  adminLevelBorder(pipelineHealthToLevel(status));
+
+function checklistStateToLevel(state: ChecklistState): AdminStatusLevel {
+  if (state === "ok") return "healthy";
+  if (state === "blocked") return "degraded";
+  if (state === "in_progress") return "info";
+  return "neutral";
+}
+
+function rowStatusLevel(isFailed: boolean): AdminStatusLevel {
+  return isFailed ? "critical" : "neutral";
+}
 
 const renderCodeBlock = (value: unknown): ReactNode => {
   const json = formatJson(value);
@@ -121,6 +132,101 @@ const renderCodeBlock = (value: unknown): ReactNode => {
     </Box>
   );
 };
+
+export type PipelineDecisionSupport = {
+  whyItMatters: string;
+  whatIsBlocked: string;
+  whatChangedRecently: string;
+  whatHappensIfIgnored: string;
+};
+
+const stageLabel = (stage: RunPipelineHealth["stages"][number]): string =>
+  stage.stage.replaceAll("_", " ");
+
+const mostRecentStage = (
+  stages: RunPipelineHealth["stages"],
+): RunPipelineHealth["stages"][number] | null =>
+  stages.reduce<RunPipelineHealth["stages"][number] | null>((latest, stage) => {
+    if (!stage.updated_at) {
+      return latest;
+    }
+    if (!latest?.updated_at) {
+      return stage;
+    }
+    return new Date(stage.updated_at).getTime() > new Date(latest.updated_at).getTime()
+      ? stage
+      : latest;
+  }, null);
+
+export function buildPipelineDecisionSupport(options: {
+  run: RunRecord;
+  health: RunPipelineHealth | null;
+}): PipelineDecisionSupport {
+  const { run, health } = options;
+
+  const whyItMatters =
+    run.mode === "production"
+      ? "This production run determines whether the source version can safely flow into the live operator surface."
+      : "This preview run is the gate before promotion, so the result tells operators whether the version is ready.";
+
+  if (!health) {
+    return {
+      whyItMatters,
+      whatIsBlocked: "Pipeline health has not loaded yet, so the blocked state is still unknown.",
+      whatChangedRecently:
+        "The latest stage movement will appear once the pipeline health snapshot loads.",
+      whatHappensIfIgnored:
+        "Without an operator check, the run will remain in its current state and no remediation guidance will surface.",
+    };
+  }
+
+  const blockedStages = health.stages.filter(
+    (stage) => stage.status === "blocked" || stage.status === "failed",
+  );
+  const latestStage = mostRecentStage(health.stages);
+
+  const whatIsBlocked =
+    health.overall_status === "ok"
+      ? "No stage is blocked right now."
+      : blockedStages.length > 0
+        ? `Blocked stages: ${blockedStages.map(stageLabel).join(", ")}.`
+        : "No stage is blocked, but the pipeline is still moving and may need operator attention soon.";
+
+  const whatChangedRecently = latestStage
+    ? `Most recent stage update: ${stageLabel(latestStage)} is ${latestStage.status.replaceAll("_", " ")}.`
+    : `Health snapshot recorded ${health.processing_status_event_count} processing events and ${health.document_lifecycle_event_count} lifecycle events.`;
+
+  const whatHappensIfIgnored =
+    health.overall_status === "ok"
+      ? "Nothing urgent happens; the run remains a completed audit trail unless someone investigates it later."
+      : health.overall_status === "blocked"
+        ? "The run stays blocked until the relevant stage is remediated."
+        : health.overall_status === "failed"
+          ? "The failure remains unresolved and downstream progress will not clear itself."
+          : "The pipeline continues to advance and may still require intervention if a later stage stops.";
+
+  return {
+    whyItMatters,
+    whatIsBlocked,
+    whatChangedRecently,
+    whatHappensIfIgnored,
+  };
+}
+
+function DecisionSupportItem({ label, value }: { label: string; value: string }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, background: "rgba(15, 76, 129, 0.03)" }}>
+      <Stack spacing={0.5}>
+        <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+          {label}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {value}
+        </Typography>
+      </Stack>
+    </Paper>
+  );
+}
 
 function PreviewSummarySection({ run }: { run: RunRecord }) {
   const [summary, setSummary] = useState<RunPreviewSummary | null>(null);
@@ -350,14 +456,6 @@ function RunSectionNav() {
   );
 }
 
-function pipelineChipColor(status: string): "default" | "info" | "warning" | "error" | "success" {
-  if (status === "ok") return "success";
-  if (status === "failed") return "error";
-  if (status === "blocked") return "warning";
-  if (status === "in_progress") return "info";
-  return "default";
-}
-
 export function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
   if (stage.status === "ok") return "No action required.";
   if (stage.stage === "acquisition") {
@@ -389,13 +487,6 @@ export function stageActionTarget(
     return { label: "Open legal-search verification", href: options.legalSearchUrl };
   }
   return { label: "Open evidence runbook", href: options.evidenceRunbookPath };
-}
-
-function checklistChipColor(state: ChecklistState): "default" | "info" | "warning" | "success" {
-  if (state === "ok") return "success";
-  if (state === "blocked") return "warning";
-  if (state === "in_progress") return "info";
-  return "default";
 }
 
 function PipelineHealthSection({ run }: { run: RunRecord }) {
@@ -448,6 +539,28 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
         verificationOpened,
       }),
     [run, health, readinessConfirmed, readinessBlockedCodes, verificationOpened],
+  );
+
+  const stageSummary = useMemo(
+    () =>
+      health?.stages.reduce(
+        (counts, stage) => {
+          counts[stage.status] = (counts[stage.status] ?? 0) + 1;
+          return counts;
+        },
+        {
+          ok: 0,
+          blocked: 0,
+          failed: 0,
+          in_progress: 0,
+          pending: 0,
+        } as Record<string, number>,
+      ) ?? null,
+    [health],
+  );
+  const decisionSupport = useMemo(
+    () => buildPipelineDecisionSupport({ run, health }),
+    [health, run],
   );
 
   useEffect(() => {
@@ -527,25 +640,79 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {overallSummaryByStatus(health.overall_status)}
                 </Typography>
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  <Chip
-                    size="small"
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                  <StatusBadge
+                    level={pipelineHealthToLevel(health.overall_status)}
                     label={`Overall ${health.overall_status}`}
-                    color={pipelineChipColor(health.overall_status)}
-                    variant="outlined"
                   />
                   <Chip size="small" label={`Run ${health.run_status}`} variant="outlined" />
-                  <Chip
-                    size="small"
-                    label={`Processing events ${health.processing_status_event_count}`}
-                  />
-                  <Chip
-                    size="small"
-                    label={`Lifecycle events ${health.document_lifecycle_event_count}`}
-                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {health.processing_status_event_count} processing
+                    {" / "}
+                    {health.document_lifecycle_event_count} lifecycle events
+                  </Typography>
                 </Stack>
               </Stack>
             </Alert>
+
+            <Paper variant="outlined" sx={{ p: 1.5, background: "rgba(15, 76, 129, 0.03)" }}>
+              <Stack spacing={1.25}>
+                <Box>
+                  <Typography variant="subtitle2">Decision support</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    The cues below translate the health snapshot into operator decisions.
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gap: 1,
+                    gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+                  }}
+                >
+                  <DecisionSupportItem
+                    label="Why this matters"
+                    value={decisionSupport.whyItMatters}
+                  />
+                  <DecisionSupportItem
+                    label="What is blocked"
+                    value={decisionSupport.whatIsBlocked}
+                  />
+                  <DecisionSupportItem
+                    label="What changed recently"
+                    value={decisionSupport.whatChangedRecently}
+                  />
+                  <DecisionSupportItem
+                    label="If you do nothing"
+                    value={decisionSupport.whatHappensIfIgnored}
+                  />
+                </Box>
+              </Stack>
+            </Paper>
+
+            {stageSummary ? (
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2">Stage summary</Typography>
+                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                    <StatusBadge level="healthy" label={`Healthy ${stageSummary.ok ?? 0}`} />
+                    <StatusBadge
+                      level="degraded"
+                      label={`Needs action ${(stageSummary.blocked ?? 0) + (stageSummary.failed ?? 0)}`}
+                    />
+                    <StatusBadge
+                      level="info"
+                      label={`In progress ${stageSummary.in_progress ?? 0}`}
+                    />
+                    <StatusBadge
+                      level="neutral"
+                      label={`Pending ${stageSummary.pending ?? 0}`}
+                      emphasis="subtle"
+                    />
+                  </Stack>
+                </Stack>
+              </Paper>
+            ) : null}
 
             <Paper variant="outlined" sx={{ p: 1.5 }}>
               <Stack spacing={1}>
@@ -557,7 +724,10 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                     spacing={1}
                     alignItems="start"
                   >
-                    <Chip size="small" label={item.state} color={checklistChipColor(item.state)} />
+                    <StatusBadge
+                      level={checklistStateToLevel(item.state)}
+                      label={item.state.replaceAll("_", " ")}
+                    />
                     <Box>
                       <Typography variant="body2">{item.label}</Typography>
                       <Typography variant="caption" color="text.secondary">
@@ -621,19 +791,29 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                       <Stack
                         direction="row"
                         spacing={1}
-                        alignItems="center"
+                        alignItems="flex-start"
+                        justifyContent="space-between"
                         useFlexGap
                         flexWrap="wrap"
                       >
-                        <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
-                          {stage.stage.replace("_", " ")}
-                        </Typography>
-                        <Chip
-                          size="small"
-                          label={stage.status}
-                          color={pipelineChipColor(stage.status)}
-                          variant="outlined"
-                        />
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
+                            {stage.stage.replaceAll("_", " ")}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDateTime(stage.updated_at)}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                          <StatusBadge
+                            level={pipelineHealthToLevel(stage.status)}
+                            label={stage.status.replaceAll("_", " ")}
+                          />
+                          <StatusBadge
+                            level={isHealthy ? "healthy" : "degraded"}
+                            label={isHealthy ? "No action required" : "Action required"}
+                          />
+                        </Stack>
                       </Stack>
                       <Typography variant="body2" color="text.secondary">
                         {stage.detail}
@@ -643,19 +823,30 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                           No remediation required.
                         </Typography>
                       ) : (
-                        <Alert
-                          severity={stage.status === "failed" ? "error" : "warning"}
-                          icon={false}
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 1.25,
+                            background:
+                              stage.status === "failed"
+                                ? "rgba(211, 47, 47, 0.04)"
+                                : "rgba(245, 158, 11, 0.06)",
+                          }}
                         >
                           <Stack
                             direction={{ xs: "column", md: "row" }}
-                            spacing={1}
-                            alignItems="center"
+                            spacing={1.25}
+                            alignItems={{ xs: "stretch", md: "center" }}
                             justifyContent="space-between"
                           >
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              Next action: {stageNextAction(stage)}
-                            </Typography>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                Next action: {stageNextAction(stage)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                The button on the right opens the most relevant remediation surface.
+                              </Typography>
+                            </Box>
                             <Button
                               component="a"
                               href={actionTarget.href}
@@ -681,11 +872,8 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                               {actionTarget.label}
                             </Button>
                           </Stack>
-                        </Alert>
+                        </Paper>
                       )}
-                      <Typography variant="caption" color="text.secondary">
-                        Updated: {formatDateTime(stage.updated_at)}
-                      </Typography>
                     </Stack>
                   </Paper>
                 );
@@ -749,62 +937,78 @@ function RunTableSection<TRecord extends { id: Identifier }>({
   error,
   emptyMessage,
   columns,
+  defaultExpanded = false,
 }: RunTableSectionProps<TRecord>) {
+  const rowCount = rows?.length ?? 0;
+  const summaryChip = !isPending && !error && (
+    <Chip label={`${rowCount} ${rowCount === 1 ? "row" : "rows"}`} size="small" sx={{ ml: 1 }} />
+  );
+
   return (
-    <Paper id={sectionId} sx={{ p: 3 }}>
-      <Stack spacing={2}>
-        <Box>
+    <Accordion
+      id={sectionId}
+      defaultExpanded={defaultExpanded}
+      disableGutters
+      sx={{ "&::before": { display: "none" } }}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
           <Typography variant="h6">{title}</Typography>
+          {summaryChip}
+        </Box>
+      </AccordionSummary>
+      <AccordionDetails>
+        <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
             {description}
           </Typography>
-        </Box>
 
-        {isPending ? (
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <CircularProgress size={18} />
+          {isPending ? (
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <CircularProgress size={18} />
+              <Typography variant="body2" color="text.secondary">
+                Loading {title.toLowerCase()} rows...
+              </Typography>
+            </Stack>
+          ) : null}
+
+          {!isPending && error ? (
+            <Alert severity="error">
+              {error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.`}
+            </Alert>
+          ) : null}
+
+          {!isPending && !error && rows?.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              Loading {title.toLowerCase()} rows...
+              {emptyMessage}
             </Typography>
-          </Stack>
-        ) : null}
+          ) : null}
 
-        {!isPending && error ? (
-          <Alert severity="error">
-            {error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.`}
-          </Alert>
-        ) : null}
-
-        {!isPending && !error && rows?.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            {emptyMessage}
-          </Typography>
-        ) : null}
-
-        {!isPending && !error && rows && rows.length > 0 ? (
-          <Box sx={{ overflowX: "auto" }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  {columns.map((column) => (
-                    <TableCell key={column.header}>{column.header}</TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
+          {!isPending && !error && rows && rows.length > 0 ? (
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
                     {columns.map((column) => (
-                      <TableCell key={column.header}>{column.render(row)}</TableCell>
+                      <TableCell key={column.header}>{column.header}</TableCell>
                     ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
-        ) : null}
-      </Stack>
-    </Paper>
+                </TableHead>
+                <TableBody>
+                  {rows.map((row) => (
+                    <TableRow key={row.id}>
+                      {columns.map((column) => (
+                        <TableCell key={column.header}>{column.render(row)}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          ) : null}
+        </Stack>
+      </AccordionDetails>
+    </Accordion>
   );
 }
 
@@ -876,11 +1080,7 @@ export function RunDetailSections() {
           {
             header: "Status",
             render: (job) => (
-              <Chip
-                size="small"
-                label={job.status}
-                color={job.status === "failed" ? "error" : "default"}
-              />
+              <StatusBadge level={rowStatusLevel(job.status === "failed")} label={job.status} />
             ),
           },
           { header: "Last event", render: (job) => renderInlineValue(job.last_event_type) },
@@ -963,10 +1163,9 @@ export function RunDetailSections() {
           {
             header: "Status",
             render: (update) => (
-              <Chip
-                size="small"
+              <StatusBadge
+                level={rowStatusLevel(update.status === "failed")}
                 label={update.status}
-                color={update.status === "failed" ? "error" : "default"}
               />
             ),
           },

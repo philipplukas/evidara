@@ -35,6 +35,29 @@ class TestCoerceExtractionHints(unittest.TestCase):
 
 
 class TestExtractionHintsInPipeline(unittest.TestCase):
+    def test_placeholder_html_title_without_better_signal_becomes_untitled(self):
+        html = """<html><head><title>RIS Dokument</title></head><body>
+        <p>Body only.</p></body></html>"""
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
+            f.write(html)
+            artifact_path = f.name
+
+        payload = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as mf:
+            json.dump(payload, mf)
+            manifest_path = mf.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_hints_test").process_event(
+                build_bundle_event(manifest_path)
+            )
+            self.assertEqual(result.document.title, "Untitled document")
+            fp = result.document.metadata.get("field_provenance", {})
+            self.assertEqual(fp.get("title", {}).get("source"), "heuristic")
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
     def test_title_hint_replaces_placeholder_html_title(self):
         html = """<html><head><title>RIS Dokument</title></head><body>
         <h1>Heading</h1><p>Body.</p></body></html>"""
@@ -62,6 +85,37 @@ class TestExtractionHintsInPipeline(unittest.TestCase):
             self.assertEqual(hint, "VfGH — G 1/2026 zu Beispiel")
             fp = result.document.metadata.get("field_provenance", {})
             self.assertEqual(fp.get("title", {}).get("source"), "manifest")
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_placeholder_title_hint_does_not_win_over_structured_heading(self):
+        html = """<html><head><title>RIS Dokument</title></head><body>
+        <h1>VfGH — G 1/2026 zu Beispiel</h1><p>Body.</p></body></html>"""
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
+            f.write(html)
+            artifact_path = f.name
+
+        payload = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        payload["bundle_metadata"] = {
+            "extraction_hints": {
+                "title_hint": "RIS Dokument",
+                "document_type_hint": "decision",
+            }
+        }
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as mf:
+            json.dump(payload, mf)
+            manifest_path = mf.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_hints_test").process_event(
+                build_bundle_event(manifest_path)
+            )
+            self.assertEqual(result.document.title, "VfGH — G 1/2026 zu Beispiel")
+            hint = result.document.metadata.get("extraction_hints", {}).get("title_hint")
+            self.assertEqual(hint, "RIS Dokument")
+            fp = result.document.metadata.get("field_provenance", {})
+            self.assertEqual(fp.get("title", {}).get("source"), "structured")
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)

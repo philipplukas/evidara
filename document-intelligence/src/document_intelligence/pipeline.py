@@ -393,6 +393,8 @@ def _effective_title_from_normalized(
         raw = hints.get("title_hint")
         if isinstance(raw, str) and raw.strip():
             hint_title = raw.strip()
+            if _is_placeholder_title(hint_title):
+                hint_title = None
 
     structured = normalized_document.metadata.get("title")
     if isinstance(structured, str):
@@ -407,8 +409,6 @@ def _effective_title_from_normalized(
     for block in normalized_document.blocks:
         if block.type == "heading":
             return block.text, "structured"
-    if structured:
-        return structured, "structured"
     return "Untitled document", "heuristic"
 
 

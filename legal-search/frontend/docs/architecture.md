@@ -36,7 +36,7 @@ RootLayout (layout.tsx)                       [Server Component]
                         ├── DetailPanelHeader [Title, AccentButton pin/copy]
                         ├── DetailTabs       [URL-driven tab switcher]
                         ├── DetailsTab
-                        │   └── MetadataSection
+                        │   └── MetadataList
                         ├── RelatedTab       [SectionLabel + InteractiveRow + ActionTextLink]
                         ├── ReferencesTab    [SectionLabel + InteractiveRow + ActionTextLink]
                         ├── AnnotationTab    [AI/editorial annotations]

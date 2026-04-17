@@ -48,7 +48,8 @@ predicate in [`flake.nix`](../../flake.nix).
 **Not** pinned in Nix (use the stack’s own tooling):
 
 - **Node / npm** — `legal-search/` (`npm install`, `npm run check`)
-- **Rust, Docker, etc.** — install separately or extend the flake if the team standardizes on Nix for them
+- **Docker runtime** — install as part of the machine baseline (for example via MacConfig workstation setup). The repo uses `docker compose`, but the daemon/runtime is intentionally not managed by this flake.
+- **Rust, etc.** — install separately or extend the flake if the team standardizes on Nix for them
 
 ## Adding a missing tool
 
@@ -67,4 +68,5 @@ The same `flake.nix` still defines **wallpaper** packages and Home Manager modul
 
 - [Infrastructure overview](infrastructure-overview.md) — Terraform layout
 - [GCP local Cloud Run auth](gcp-local-cloud-run-auth.md) — identity tokens alongside `gcloud`
+- [Legal-search + lean (local)](legal-search-lean-local.md) — local cross-surface and search stack workflow
 - [AGENTS.md](../../AGENTS.md) — language-specific tools (`uv`, `npm`, `ruff`, …)

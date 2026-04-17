@@ -26,7 +26,7 @@ export default function DocsPage() {
       {docsBase ? (
         <a
           href={`${docsBase}/`}
-          className="text-primary hover:text-brand-strong inline-flex w-fit text-sm font-medium underline-offset-4 hover:underline"
+          className="text-primary hover:text-primary/80 inline-flex w-fit text-sm font-medium underline-offset-4 hover:underline"
           rel="noreferrer"
         >
           Vollständige Dokumentation öffnen
@@ -65,7 +65,7 @@ export default function DocsPage() {
       <p className="text-muted-foreground text-sm">
         <Link
           href="/"
-          className="text-primary hover:text-brand-strong underline-offset-4 hover:underline"
+          className="text-primary hover:text-primary/80 underline-offset-4 hover:underline"
         >
           Zurück zur Suche
         </Link>

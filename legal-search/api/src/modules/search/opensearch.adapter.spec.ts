@@ -33,6 +33,7 @@ describe('SearchOpenSearchAdapter', () => {
           bool: {
             filter: unknown[];
             must?: [{ multi_match: { fields: string[] } }];
+            should?: unknown[];
           };
         };
       };
@@ -49,11 +50,39 @@ describe('SearchOpenSearchAdapter', () => {
     expect(must).toBeDefined();
     expect(must![0].multi_match.fields).toEqual([
       'title^4',
+      'authority_name^3',
+      'official_citation^3',
       'structural_path^2',
       'regeste^2',
       'content',
       'content_preview',
       'docket_number^2',
+    ]);
+    expect(firstCall.body.query.bool.should).toEqual([
+      { match_phrase: { title: { query: 'verantwortlichkeit', boost: 8 } } },
+      { match_phrase: { official_citation: { query: 'verantwortlichkeit', boost: 6 } } },
+      { match_phrase: { authority_name: { query: 'verantwortlichkeit', boost: 5 } } },
+      { match_phrase: { structural_path: { query: 'verantwortlichkeit', boost: 4 } } },
+      { match_phrase: { docket_number: { query: 'verantwortlichkeit', boost: 4 } } },
+    ]);
+    expect(firstCall.body.query.bool.must).toEqual([
+      {
+        multi_match: {
+          query: 'verantwortlichkeit',
+          fields: [
+            'title^4',
+            'authority_name^3',
+            'official_citation^3',
+            'structural_path^2',
+            'regeste^2',
+            'content',
+            'content_preview',
+            'docket_number^2',
+          ],
+          type: 'best_fields',
+          operator: 'and',
+        },
+      },
     ]);
   });
 
@@ -198,5 +227,88 @@ describe('SearchOpenSearchAdapter', () => {
         is_official: true,
       }),
     );
+  });
+
+  it('does not fall back to match_all when a non-wildcard query returns zero hits', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    const result = await adapter.search('Bundesgericht');
+
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(result.total).toBe(0);
+    expect(result.hits).toEqual([]);
+  });
+
+  it('uses phrase-heavy non-fuzzy matching for short legal queries', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    await adapter.search('Art. 8 EMRK');
+
+    const firstCall = search.mock.calls[0][0] as {
+      body: { query: { bool: { must: [{ multi_match: Record<string, unknown> }] } } };
+    };
+    expect(firstCall.body.query.bool.must[0].multi_match).toEqual(
+      expect.objectContaining({
+        query: 'Art. 8 EMRK',
+        operator: 'and',
+      }),
+    );
+    expect(firstCall.body.query.bool.must[0].multi_match.fuzziness).toBeUndefined();
+  });
+
+  it('keeps fuzzy broad matching for longer free-text queries', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    await adapter.search('verwaltungsrat haftung gesellschaftsrecht');
+
+    const firstCall = search.mock.calls[0][0] as {
+      body: { query: { bool: { must: [{ multi_match: Record<string, unknown> }] } } };
+    };
+    expect(firstCall.body.query.bool.must[0].multi_match).toEqual(
+      expect.objectContaining({
+        query: 'verwaltungsrat haftung gesellschaftsrecht',
+        fuzziness: 'AUTO',
+      }),
+    );
+    expect(firstCall.body.query.bool.must[0].multi_match.operator).toBeUndefined();
   });
 });
