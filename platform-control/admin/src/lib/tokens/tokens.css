@@ -1,0 +1,201 @@
+/**
+ * GENERATED — DO NOT EDIT.
+ *
+ * Mirror of styles/tokens/tokens.css. Edit the source and run:
+ *   node scripts/sync-tokens.mjs
+ * CI enforces drift via scripts/sync-tokens.mjs --check.
+ */
+
+/**
+ * Evidara design tokens — canonical CSS-variable source of truth.
+ *
+ * Consumed by both frontends via `@import "../lib/tokens/tokens.css"` after
+ * sync (see scripts/sync-tokens.mjs). The `:root` block mirrors
+ * `styles/tokens/tokens.ts`; edits here should also land there.
+ *
+ * Values chosen to match the Evidara design system:
+ *   - navy `--brand` = environment/identity only
+ *   - violet `--accent-core` = the one action color
+ *   - shadcn semantic tokens (oklch) map onto the same palette for Tailwind
+ *     consumers. The oklch choice gives perceptual uniformity under dark mode.
+ */
+
+:root {
+  /* ─── shadcn semantic tokens (navy-tinted neutrals, hue ≈ 215) ─── */
+  --background: oklch(0.985 0.008 215);
+  --foreground: oklch(0.25 0.04 215);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.25 0.04 215);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.25 0.04 215);
+  --primary: oklch(0.44 0.24 284); /* #6246D9 violet — THE action color */
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.94 0.01 215);
+  --secondary-foreground: oklch(0.25 0.04 215);
+  --muted: oklch(0.94 0.008 215);
+  --muted-foreground: oklch(0.55 0.025 215);
+  --accent: oklch(0.93 0.015 215);
+  --accent-foreground: oklch(0.25 0.04 215);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.87 0.012 215);
+  --input: oklch(0.87 0.012 215);
+  --ring: oklch(0.44 0.18 284);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.96 0.008 215);
+  --sidebar-foreground: oklch(0.25 0.04 215);
+  --sidebar-primary: oklch(0.44 0.24 284);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.94 0.01 215);
+  --sidebar-accent-foreground: oklch(0.25 0.04 215);
+  --sidebar-border: oklch(0.87 0.012 215);
+  --sidebar-ring: oklch(0.44 0.18 284);
+
+  /* ─── Brand (navy — environment/identity only) ─── */
+  --brand: #0f4c81;
+  --brand-hover: #0b3d68;
+  --brand-strong: #1d293d;
+
+  /* ─── Surfaces ─── */
+  --surface-page: #e4e9ef;
+  --surface-panel: #f8fafc;
+  --surface-input: #f1f5f9;
+  --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
+  --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
+
+  /* ─── Accent core (Evidara violet — the one action color) ─── */
+  --accent-core: #6246D9;
+  --accent-core-foreground: oklch(0.985 0 0);
+  --accent-core-subtle: color-mix(in oklab, var(--accent-core) 14%, transparent);
+  --accent-core-muted: color-mix(in oklab, var(--accent-core) 22%, transparent);
+
+  /* ─── Interactive (violet-tinted) ─── */
+  --interactive-accent-subtle: rgb(98 70 217 / 8%);
+  --interactive-accent-muted: rgb(98 70 217 / 14%);
+
+  /* ─── Focus ─── */
+  --focus-ring: rgb(98 70 217 / 24%);
+
+  /* ─── Attention ─── */
+  --attention: #92400e;
+  --attention-subtle: #fef3c7;
+  --attention-border: #fde68a;
+
+  /* ─── Status ─── */
+  --status-healthy: #166534;
+  --status-healthy-subtle: #f0fdf4;
+  --status-degraded: #92400e;
+  --status-degraded-subtle: #fffbeb;
+  --status-critical: #991b1b;
+  --status-critical-subtle: #fef2f2;
+  --status-neutral: #525252;
+  --status-neutral-subtle: #f5f5f5;
+  --status-info: #1e40af;
+  --status-info-subtle: #eff6ff;
+
+  /* ─── Tabs (Radix line: indicator + active weight) ─── */
+  --tab-indicator-color: var(--accent-core);
+  --tab-active-font-weight: 700;
+
+  /* ─── Elevation ─── */
+  --shadow-shell: 0 18px 56px rgb(15 23 42 / 8%);
+  --shadow-control-plane: 0 18px 40px rgb(15 76 129 / 18%);
+  --shadow-panel: 0 20px 48px rgb(15 23 42 / 8%);
+  --shadow-raised: 0 16px 36px rgb(15 23 42 / 6%);
+  --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 55%);
+  --shadow-sheet-top: 0 -12px 40px rgb(15 23 42 / 6%);
+  --shadow-card: 0 1px 3px rgb(15 76 129 / 8%), 0 1px 2px rgb(15 76 129 / 4%);
+  --shadow-card-hover: 0 6px 18px rgb(15 76 129 / 10%), 0 2px 6px rgb(15 76 129 / 6%);
+
+  /* ─── Motion ─── */
+  --motion-duration-short: 150ms;
+  --motion-duration-medium: 200ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.65 0.22 284);
+  --primary-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.65 0.18 284);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.65 0.22 284);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.65 0.18 284);
+
+  --brand: #4a9eda;
+  --brand-hover: #5ab0ef;
+  --brand-strong: #c7dff0;
+
+  --surface-page: #0f1419;
+  --surface-panel: #1a2028;
+  --surface-input: #151b22;
+  --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
+  --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
+
+  --interactive-accent-subtle: rgb(138 118 240 / 10%);
+  --interactive-accent-muted: rgb(138 118 240 / 18%);
+
+  --focus-ring: rgb(138 118 240 / 30%);
+
+  --attention: #fbbf24;
+  --attention-subtle: rgba(251, 191, 36, 0.1);
+  --attention-border: rgba(251, 191, 36, 0.25);
+
+  --status-healthy: #4ade80;
+  --status-healthy-subtle: rgba(74, 222, 128, 0.1);
+  --status-degraded: #fbbf24;
+  --status-degraded-subtle: rgba(251, 191, 36, 0.1);
+  --status-critical: #f87171;
+  --status-critical-subtle: rgba(248, 113, 113, 0.1);
+  --status-neutral: #a3a3a3;
+  --status-neutral-subtle: rgba(163, 163, 163, 0.1);
+  --status-info: #60a5fa;
+  --status-info-subtle: rgba(96, 165, 250, 0.1);
+
+  --accent-core: #8a76f0;
+  --accent-core-foreground: oklch(0.15 0 0);
+  --accent-core-subtle: color-mix(in oklab, var(--accent-core) 14%, transparent);
+  --accent-core-muted: color-mix(in oklab, var(--accent-core) 22%, transparent);
+
+  --tab-indicator-color: var(--accent-core);
+  --tab-active-font-weight: 700;
+
+  --shadow-shell: 0 18px 56px rgb(0 0 0 / 30%);
+  --shadow-control-plane: 0 18px 40px rgb(138 118 240 / 12%);
+  --shadow-panel: 0 20px 48px rgb(0 0 0 / 24%);
+  --shadow-raised: 0 16px 36px rgb(0 0 0 / 18%);
+  --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 6%);
+  --shadow-sheet-top: 0 -12px 40px rgb(0 0 0 / 20%);
+
+  --motion-duration-short: 150ms;
+  --motion-duration-medium: 200ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
