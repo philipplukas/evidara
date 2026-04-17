@@ -58,11 +58,14 @@ def build_artifact_bundle_manifest(
     document_type_hint: str | None = None,
     bundle_metadata: dict[str, Any] | None = None,
     snapshot_captured_at: datetime | None = None,
+    attribution: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     captured_at = snapshot_captured_at or datetime.now(UTC)
     bundle_metadata_payload: dict[str, Any] = {"generated_by": "platform-control"}
     if bundle_metadata:
         bundle_metadata_payload.update(bundle_metadata)
+    if attribution:
+        bundle_metadata_payload["attribution"] = attribution
     return {
         "bundle_manifest_id": bundle_manifest_id,
         "manifest_version": 1,

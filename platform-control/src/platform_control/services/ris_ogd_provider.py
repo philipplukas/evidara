@@ -17,9 +17,11 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    ProviderPlan,
     ProviderResource,
     ProviderStartResult,
 )
+from platform_control.services.politeness import limited_get
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +112,7 @@ class RisOgdProvider:
                     params["ImRisSeitDatumBis"] = _format_date(until_date)
 
                 try:
-                    listing = await client.get(base_url, params=params)
+                    listing = await limited_get(client, base_url, params=params)
                     listing.raise_for_status()
                     listing_json = listing.json()
                 except httpx.TimeoutException:
@@ -201,6 +203,30 @@ class RisOgdProvider:
             response_payload=response_payload,
             inline_resources=resources,
             inline_failure_reason=inline_failure_reason,
+        )
+
+    def plan(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+    ) -> ProviderPlan:
+        del source
+        acquisition_spec = source_version.acquisition_spec or {}
+        base_url = str(acquisition_spec.get("base_url") or f"{_BASE_URL}/Bundesrecht")
+        page_size = int(acquisition_spec.get("page_size") or _DEFAULT_PAGE_SIZE)
+        max_pages = int(acquisition_spec.get("max_pages") or _MAX_PAGES)
+        notes: list[str] = []
+        if applikation := acquisition_spec.get("applikation"):
+            notes.append(f"applikation={applikation}")
+        return ProviderPlan(
+            provider=self.provider_name,
+            mode="ogd_rest_paged",
+            seed_urls=[base_url],
+            estimated_request_count=page_size * max_pages,
+            user_agent=str(acquisition_spec.get("user_agent") or _USER_AGENT),
+            request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 15.0),
+            notes=notes,
+            raw=dict(acquisition_spec),
         )
 
 
@@ -304,7 +330,7 @@ async def _fetch_single_document(
     content_type = _FORMAT_CONTENT_TYPE.get(data_type, "application/octet-stream")
 
     try:
-        response = await client.get(url)
+        response = await limited_get(client, url)
         response.raise_for_status()
     except httpx.TimeoutException:
         return {"url": url, "error": f"timed out after {request_timeout_seconds:.1f}s"}

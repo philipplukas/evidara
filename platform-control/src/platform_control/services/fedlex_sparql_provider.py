@@ -12,9 +12,11 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    ProviderPlan,
     ProviderResource,
     ProviderStartResult,
 )
+from platform_control.services.politeness import limited_get
 
 _FEDLEX_HOST = "fedlex.data.admin.ch"
 _FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
@@ -172,6 +174,29 @@ LIMIT 1
             inline_failure_reason=inline_failure_reason,
         )
 
+    def plan(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+    ) -> ProviderPlan:
+        del source
+        acquisition_spec = source_version.acquisition_spec or {}
+        work_uris = self._seed_work_uris(acquisition_spec)
+        max_expressions = int(acquisition_spec.get("max_expressions") or 1)
+        sparql_endpoint = str(
+            acquisition_spec.get("sparql_endpoint") or f"https://{_FEDLEX_HOST}/sparqlendpoint"
+        )
+        return ProviderPlan(
+            provider=self.provider_name,
+            mode="work_to_expression",
+            seed_urls=work_uris,
+            estimated_request_count=len(work_uris) * max_expressions,
+            user_agent=acquisition_spec.get("user_agent"),
+            request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 30.0),
+            notes=[f"sparql_endpoint={sparql_endpoint}"],
+            raw=dict(acquisition_spec),
+        )
+
     def _seed_work_uris(self, acquisition_spec: dict[str, object]) -> list[str]:
         seed_urls = [
             str(url)
@@ -230,7 +255,8 @@ LIMIT 1
         sparql_endpoint: str,
         work_uri: str,
     ) -> list[str]:
-        response = await client.get(
+        response = await limited_get(
+            client,
             sparql_endpoint,
             params={
                 "query": self._MEMBER_QUERY.format(work_uri=work_uri),
@@ -255,7 +281,8 @@ LIMIT 1
         sparql_endpoint: str,
         work_uri: str,
     ) -> list[str]:
-        response = await client.get(
+        response = await limited_get(
+            client,
             sparql_endpoint,
             params={
                 "query": self._EXPRESSION_QUERY.format(work_uri=work_uri),
@@ -305,7 +332,8 @@ LIMIT 1
     ) -> str:
         targets = " ".join(f"<{uri}>" for uri in [work_uri, *expression_uris])
         query = f"DESCRIBE {targets}"
-        response = await client.get(
+        response = await limited_get(
+            client,
             sparql_endpoint,
             params={"query": query},
             headers={"Accept": "text/turtle"},
@@ -332,7 +360,8 @@ LIMIT 1
             if abstract_expression_uri is not None:
                 candidate_uris.append(abstract_expression_uri)
         for expression_uri in dict.fromkeys(candidate_uris):
-            response = await client.get(
+            response = await limited_get(
+                client,
                 sparql_endpoint,
                 params={
                     "query": self._TITLE_QUERY.format(expression_uri=expression_uri),
@@ -359,7 +388,7 @@ LIMIT 1
         url: str,
         max_content_bytes: int,
     ) -> tuple[str, httpx.Response, bytes]:
-        response = await client.get(url, headers={"Accept": "text/html"})
+        response = await limited_get(client, url, headers={"Accept": "text/html"})
         response.raise_for_status()
         body = await self._read_body_limited(response=response, max_content_bytes=max_content_bytes)
         if body is None:

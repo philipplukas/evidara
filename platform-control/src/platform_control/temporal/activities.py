@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -12,6 +13,7 @@ from platform_control.models.review_task import ReviewTask
 from platform_control.models.wizard_project import WizardProject
 from platform_control.models.wizard_run import WizardRun
 from platform_control.models.wizard_run_ledger import WizardRunLedger
+from platform_control.services.provider_registry import ProviderRegistry
 
 
 def _sanitize_shard_key(key: str) -> str:
@@ -110,9 +112,13 @@ class ScopeShardActivities:
     and owns its own retry/circuit-breaker behaviour.
 
     ``session_factory`` must point to the same database as the rest of platform-control.
+    ``provider_registry_factory`` is the seam used by TAR-108 to dispatch the per-shard
+    provider run; tests inject a factory returning a registry of fake providers to exercise
+    the shard workflow offline.
     """
 
     session_factory: async_sessionmaker[AsyncSession]
+    provider_registry_factory: Callable[[], ProviderRegistry] | None = field(default=None)
 
     @activity.defn
     async def run_shard_crawl(

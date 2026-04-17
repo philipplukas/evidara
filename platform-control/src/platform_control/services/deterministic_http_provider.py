@@ -12,9 +12,11 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    ProviderPlan,
     ProviderResource,
     ProviderStartResult,
 )
+from platform_control.services.politeness import HostRateLimiter, limited_get
 
 IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
@@ -22,6 +24,10 @@ IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 class DeterministicHttpProvider:
     provider_name = "deterministic_http"
     _MAX_REDIRECTS = 5
+
+    def __init__(self, rate_limiter: HostRateLimiter | None = None) -> None:
+        self.rate_limiter = rate_limiter
+
     _DENYLIST_HOSTNAMES = {
         "localhost",
         "metadata",
@@ -149,6 +155,26 @@ class DeterministicHttpProvider:
             inline_failure_reason=inline_failure_reason,
         )
 
+    def plan(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+    ) -> ProviderPlan:
+        del source
+        acquisition_spec = source_version.acquisition_spec or {}
+        seed_urls = self._seed_urls(acquisition_spec)
+        return ProviderPlan(
+            provider=self.provider_name,
+            seed_urls=seed_urls,
+            estimated_request_count=len(seed_urls),
+            user_agent=str(
+                acquisition_spec.get("user_agent")
+                or "platform-control-deterministic-http/1.0 (+https://evidara.ai)"
+            ),
+            request_timeout_seconds=float(acquisition_spec.get("request_timeout_seconds") or 30.0),
+            raw=dict(acquisition_spec),
+        )
+
     @staticmethod
     def _seed_urls(acquisition_spec: dict) -> list[str]:
         seed_urls = [
@@ -184,7 +210,9 @@ class DeterministicHttpProvider:
     ) -> tuple[str, httpx.Response]:
         current_url = self._validate_target_url(url)
         for _ in range(self._MAX_REDIRECTS + 1):
-            response = await client.get(current_url, headers=headers)
+            response = await self._get_with_rate_limit(
+                client=client, url=current_url, headers=headers
+            )
             if not response.is_redirect:
                 return current_url, response
             location = response.headers.get("location")
@@ -195,6 +223,15 @@ class DeterministicHttpProvider:
         raise ProviderConfigurationError(
             f"deterministic_http provider exceeded max redirects ({self._MAX_REDIRECTS}) for {url}."
         )
+
+    async def _get_with_rate_limit(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        url: str,
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        return await limited_get(client, url, limiter=self.rate_limiter, headers=headers)
 
     async def _read_body_limited(
         self,

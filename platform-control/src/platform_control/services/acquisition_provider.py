@@ -1,3 +1,13 @@
-from acquisition_core.providers import AcquisitionProvider, ProviderResource, ProviderStartResult
+from acquisition_core.providers import (
+    AcquisitionProvider,
+    ProviderPlan,
+    ProviderResource,
+    ProviderStartResult,
+)
 
-__all__ = ["AcquisitionProvider", "ProviderResource", "ProviderStartResult"]
+__all__ = [
+    "AcquisitionProvider",
+    "ProviderPlan",
+    "ProviderResource",
+    "ProviderStartResult",
+]

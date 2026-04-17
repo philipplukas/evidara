@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from platform_control.domain import SourceVersionStatus
+from platform_control.domain import ExecutionMode, SourceVersionStatus
 from platform_control.errors import InvalidStateTransitionError, NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.schemas.source import (
@@ -527,3 +527,105 @@ async def test_create_source_with_initial_version_from_fedlex_sparql_blueprint(
     assert (
         version.acquisition_spec["sparql_endpoint"] == "https://fedlex.data.admin.ch/sparqlendpoint"
     )
+
+
+@pytest.mark.asyncio
+async def test_create_source_version_defaults_execution_mode_to_live(session) -> None:
+    session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+    session.add(
+        Authority(
+            authority_id="auth_zh_admin",
+            jurisdiction_id="jur_ch",
+            name="Zurich Administrative Court",
+            slug="zh-admin-court",
+        )
+    )
+    await session.commit()
+
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="Zurich decisions",
+            jurisdiction_id="jur_ch",
+            authority_id="auth_zh_admin",
+        )
+    )
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="draft-v1",
+            acquisition_spec=FirecrawlAcquisitionSpec(seed_url="https://example.com/decisions"),
+        ),
+    )
+
+    assert version.execution_mode is ExecutionMode.LIVE
+
+
+@pytest.mark.asyncio
+async def test_create_source_version_honours_shadow_execution_mode(session) -> None:
+    session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+    session.add(
+        Authority(
+            authority_id="auth_zh_admin",
+            jurisdiction_id="jur_ch",
+            name="Zurich Administrative Court",
+            slug="zh-admin-court",
+        )
+    )
+    await session.commit()
+
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="Zurich decisions",
+            jurisdiction_id="jur_ch",
+            authority_id="auth_zh_admin",
+        )
+    )
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="draft-v1",
+            acquisition_spec=FirecrawlAcquisitionSpec(seed_url="https://example.com/decisions"),
+            execution_mode=ExecutionMode.SHADOW,
+        ),
+    )
+
+    assert version.execution_mode is ExecutionMode.SHADOW
+
+
+@pytest.mark.asyncio
+async def test_update_source_version_can_toggle_execution_mode(session) -> None:
+    session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+    session.add(
+        Authority(
+            authority_id="auth_zh_admin",
+            jurisdiction_id="jur_ch",
+            name="Zurich Administrative Court",
+            slug="zh-admin-court",
+        )
+    )
+    await session.commit()
+
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="Zurich decisions",
+            jurisdiction_id="jur_ch",
+            authority_id="auth_zh_admin",
+        )
+    )
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="draft-v1",
+            acquisition_spec=FirecrawlAcquisitionSpec(seed_url="https://example.com/decisions"),
+        ),
+    )
+
+    updated = await service.update_source_version(
+        version.source_version_id,
+        UpdateSourceVersionRequest(execution_mode=ExecutionMode.OFF),
+    )
+
+    assert updated.execution_mode is ExecutionMode.OFF

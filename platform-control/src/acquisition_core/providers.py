@@ -26,6 +26,27 @@ class ProviderStartResult:
     inline_failure_reason: str | None = None
 
 
+@dataclass(slots=True)
+class ProviderPlan:
+    """Static description of what ``start_run`` would execute, without touching the network.
+
+    Enables ``pc source plan`` and shadow-mode dispatch to surface budget, targets
+    and policy without spending an external API call.
+    """
+
+    provider: str
+    mode: str | None = None
+    seed_urls: list[str] = field(default_factory=list)
+    estimated_request_count: int | None = None
+    max_discovery_depth: int | None = None
+    include_paths: list[str] = field(default_factory=list)
+    exclude_paths: list[str] = field(default_factory=list)
+    user_agent: str | None = None
+    request_timeout_seconds: float | None = None
+    notes: list[str] = field(default_factory=list)
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
 class AcquisitionProvider(Protocol):
     provider_name: str
 
@@ -35,6 +56,14 @@ class AcquisitionProvider(Protocol):
         source_version: Any,
         run: Any,
     ) -> ProviderStartResult: ...
+
+    def plan(
+        self,
+        source: Any,
+        source_version: Any,
+    ) -> ProviderPlan:
+        """Return the acquisition plan ``start_run`` would execute, without network IO."""
+        ...
 
 
 class ProviderRegistry:

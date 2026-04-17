@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import JSON, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from platform_control.domain import SourceVersionStatus
+from platform_control.domain import ExecutionMode, SourceVersionStatus
 from platform_control.ids import generate_prefixed_id
 from platform_control.models.base import Base, TimestampMixin
 
@@ -26,6 +26,15 @@ class SourceVersion(TimestampMixin, Base):
             values_callable=lambda enum_cls: [member.value for member in enum_cls],
         ),
         default=SourceVersionStatus.DRAFT,
+    )
+    execution_mode: Mapped[ExecutionMode] = mapped_column(
+        Enum(
+            ExecutionMode,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=ExecutionMode.LIVE,
+        server_default=ExecutionMode.LIVE.value,
     )
     acquisition_spec: Mapped[dict] = mapped_column(JSON, default=dict)
 
