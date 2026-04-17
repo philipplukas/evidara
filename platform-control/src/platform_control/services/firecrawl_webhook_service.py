@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -49,8 +50,33 @@ class FirecrawlWebhookService:
         raw_body: bytes,
         signature: str | None,
     ) -> None:
+        """HTTP entrypoint: verify the Firecrawl signature, then delegate to ``process_payload``."""
         self._verify_signature(raw_body, signature)
         payload_sha256 = hashlib.sha256(raw_body).hexdigest()
+        await self.process_payload(
+            payload,
+            signature=signature,
+            payload_sha256=payload_sha256,
+        )
+
+    async def process_payload(
+        self,
+        payload: dict[str, Any],
+        *,
+        signature: str | None = None,
+        payload_sha256: str | None = None,
+    ) -> None:
+        """Pure ingest entrypoint: apply a Firecrawl webhook payload without HTTP context.
+
+        Callable from fixture-based replay (``pc ingest --from-fixture``) and from the
+        HTTP handler's ``process`` wrapper. ``payload_sha256`` is used for idempotent
+        dedupe against ``webhook_receipts``; when omitted it is derived from a canonical
+        JSON serialization of ``payload``.
+        """
+        if payload_sha256 is None:
+            payload_sha256 = hashlib.sha256(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
 
         # Atomic dedupe: attempt insert and skip if the (provider, payload_sha256)
         # unique constraint already exists. This keeps webhook replay handling safe

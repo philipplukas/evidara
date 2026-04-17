@@ -10,7 +10,7 @@ from platform_control.errors import ProviderConfigurationError
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
-from platform_control.services.acquisition_provider import ProviderStartResult
+from platform_control.services.acquisition_provider import ProviderPlan, ProviderStartResult
 
 
 class FirecrawlProvider:
@@ -50,6 +50,45 @@ class FirecrawlProvider:
             external_job_id=external_job_id,
             request_payload=payload,
             response_payload=response_payload,
+        )
+
+    def plan(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+    ) -> ProviderPlan:
+        del source
+        acquisition_spec = source_version.acquisition_spec or {}
+        mode_value = str(acquisition_spec.get("mode") or FirecrawlMode.CRAWL.value)
+        mode = FirecrawlMode(mode_value)
+        seed_urls: list[str]
+        estimated_request_count: int | None
+        if mode is FirecrawlMode.CRAWL:
+            seed_url = acquisition_spec.get("seed_url")
+            seed_urls = [str(seed_url)] if seed_url else []
+            estimated_request_count = int(acquisition_spec.get("limit", 20))
+        else:
+            seed_urls = [str(url) for url in acquisition_spec.get("seed_urls") or []]
+            estimated_request_count = len(seed_urls) or None
+        notes: list[str] = []
+        if acquisition_spec.get("zero_data_retention"):
+            notes.append("zero_data_retention=true")
+        return ProviderPlan(
+            provider=self.provider_name,
+            mode=mode.value,
+            seed_urls=seed_urls,
+            estimated_request_count=estimated_request_count,
+            max_discovery_depth=(
+                int(acquisition_spec.get("max_discovery_depth", 2))
+                if mode is FirecrawlMode.CRAWL
+                else None
+            ),
+            include_paths=list(acquisition_spec.get("include_paths") or []),
+            exclude_paths=list(acquisition_spec.get("exclude_paths") or []),
+            user_agent=acquisition_spec.get("user_agent"),
+            request_timeout_seconds=acquisition_spec.get("request_timeout_seconds"),
+            notes=notes,
+            raw=dict(acquisition_spec),
         )
 
     def _build_request_payload(

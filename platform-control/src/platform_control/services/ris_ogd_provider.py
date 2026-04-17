@@ -17,6 +17,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    ProviderPlan,
     ProviderResource,
     ProviderStartResult,
 )
@@ -201,6 +202,32 @@ class RisOgdProvider:
             response_payload=response_payload,
             inline_resources=resources,
             inline_failure_reason=inline_failure_reason,
+        )
+
+    def plan(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+    ) -> ProviderPlan:
+        del source
+        acquisition_spec = source_version.acquisition_spec or {}
+        base_url = str(acquisition_spec.get("base_url") or f"{_BASE_URL}/Bundesrecht")
+        page_size = int(acquisition_spec.get("page_size") or _DEFAULT_PAGE_SIZE)
+        max_pages = int(acquisition_spec.get("max_pages") or _MAX_PAGES)
+        notes: list[str] = []
+        if applikation := acquisition_spec.get("applikation"):
+            notes.append(f"applikation={applikation}")
+        return ProviderPlan(
+            provider=self.provider_name,
+            mode="ogd_rest_paged",
+            seed_urls=[base_url],
+            estimated_request_count=page_size * max_pages,
+            user_agent=str(acquisition_spec.get("user_agent") or _USER_AGENT),
+            request_timeout_seconds=float(
+                acquisition_spec.get("request_timeout_seconds") or 15.0
+            ),
+            notes=notes,
+            raw=dict(acquisition_spec),
         )
 
 

@@ -62,6 +62,20 @@ class AcquisitionProvider(StrEnum):
     RIS_OGD = "ris_ogd"
 
 
+class ExecutionMode(StrEnum):
+    """Run-time execution posture for a source version.
+
+    ``LIVE`` dispatches to the configured provider normally. ``SHADOW`` wires the
+    full scheduler + workflow + webhook path but substitutes a fixture-backed
+    provider so a new jurisdiction can be exercised end-to-end without touching
+    the upstream server. ``OFF`` disables scheduled runs entirely.
+    """
+
+    OFF = "off"
+    SHADOW = "shadow"
+    LIVE = "live"
+
+
 class ProcessingStatus(StrEnum):
     ACCEPTED = "accepted"
     PROCESSING = "processing"

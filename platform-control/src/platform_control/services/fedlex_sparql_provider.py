@@ -12,6 +12,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    ProviderPlan,
     ProviderResource,
     ProviderStartResult,
 )
@@ -170,6 +171,31 @@ LIMIT 1
             response_payload=response_payload,
             inline_resources=resources,
             inline_failure_reason=inline_failure_reason,
+        )
+
+    def plan(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+    ) -> ProviderPlan:
+        del source
+        acquisition_spec = source_version.acquisition_spec or {}
+        work_uris = self._seed_work_uris(acquisition_spec)
+        max_expressions = int(acquisition_spec.get("max_expressions") or 1)
+        sparql_endpoint = str(
+            acquisition_spec.get("sparql_endpoint") or f"https://{_FEDLEX_HOST}/sparqlendpoint"
+        )
+        return ProviderPlan(
+            provider=self.provider_name,
+            mode="work_to_expression",
+            seed_urls=work_uris,
+            estimated_request_count=len(work_uris) * max_expressions,
+            user_agent=acquisition_spec.get("user_agent"),
+            request_timeout_seconds=float(
+                acquisition_spec.get("request_timeout_seconds") or 30.0
+            ),
+            notes=[f"sparql_endpoint={sparql_endpoint}"],
+            raw=dict(acquisition_spec),
         )
 
     def _seed_work_uris(self, acquisition_spec: dict[str, object]) -> list[str]:

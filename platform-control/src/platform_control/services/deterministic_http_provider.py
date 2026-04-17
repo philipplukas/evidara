@@ -12,6 +12,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    ProviderPlan,
     ProviderResource,
     ProviderStartResult,
 )
@@ -147,6 +148,28 @@ class DeterministicHttpProvider:
             response_payload=response_payload,
             inline_resources=resources,
             inline_failure_reason=inline_failure_reason,
+        )
+
+    def plan(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+    ) -> ProviderPlan:
+        del source
+        acquisition_spec = source_version.acquisition_spec or {}
+        seed_urls = self._seed_urls(acquisition_spec)
+        return ProviderPlan(
+            provider=self.provider_name,
+            seed_urls=seed_urls,
+            estimated_request_count=len(seed_urls),
+            user_agent=str(
+                acquisition_spec.get("user_agent")
+                or "platform-control-deterministic-http/1.0 (+https://evidara.ai)"
+            ),
+            request_timeout_seconds=float(
+                acquisition_spec.get("request_timeout_seconds") or 30.0
+            ),
+            raw=dict(acquisition_spec),
         )
 
     @staticmethod
