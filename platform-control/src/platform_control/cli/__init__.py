@@ -14,6 +14,7 @@ import asyncio
 import sys
 from collections.abc import Callable, Sequence
 
+from platform_control.cli import fetch as fetch_cmd
 from platform_control.cli import ingest as ingest_cmd
 from platform_control.cli import plan as plan_cmd
 
@@ -45,6 +46,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to a JSON file holding one Firecrawl payload or an array of payloads.",
     )
     ingest_parser.set_defaults(runner=ingest_cmd.run_from_args)
+
+    fetch_parser = subparsers.add_parser(
+        "fetch",
+        help="Record a live provider run as a cassette for later shadow replay.",
+    )
+    fetch_parser.add_argument(
+        "source_version_id",
+        help="SourceVersion to record (must be execution_mode=live).",
+    )
+    fetch_parser.add_argument(
+        "--record",
+        dest="cassette_dir",
+        default=None,
+        help="Cassette directory (defaults to Settings.cassette_dir).",
+    )
+    fetch_parser.set_defaults(runner=fetch_cmd.run_from_args)
 
     return parser
 
