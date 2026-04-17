@@ -50,8 +50,8 @@ services:
 
   platform-control-admin:
     build:
-      context: ./platform-control/admin
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: platform-control/admin/Dockerfile
     profiles: ["apps"]
     environment:
       PLATFORM_CONTROL_API_URL: http://platform-control-api:8000
@@ -110,8 +110,8 @@ services:
 
   legal-search-frontend:
     build:
-      context: ./legal-search/frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: legal-search/frontend/Dockerfile
     profiles: ["apps"]
     environment:
       NEXT_PUBLIC_API_URL: http://legal-search-api:3102
