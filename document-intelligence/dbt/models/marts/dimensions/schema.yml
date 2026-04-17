@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: dim_document
+    description: >
+      Document dimension at document_id grain with a SHA2 surrogate key.
+      Type 1 for now (only the latest version is represented). Upgraded to
+      SCD2 via snapshot in step 5.
+    columns:
+      - name: document_sk
+        description: Surrogate key (SHA2 of document_id).
+        tests:
+          - not_null
+          - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^[0-9a-f]{64}$"
+      - name: document_id
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('int_document_identity')
+              field: document_id
+      - name: current_version_id
+        tests:
+          - not_null
+      - name: source_system
+        tests:
+          - not_null
+      - name: jurisdiction
+        tests:
+          - not_null

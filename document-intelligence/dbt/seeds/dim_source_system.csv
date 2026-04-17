@@ -1,0 +1,5 @@
+source_system_code,display_name,country,authority_type
+ris,Austrian Legal Information System,AT,federal
+fedlex,Swiss Federal Law Collection,CH,federal
+eur-lex,EU Law Portal,EU,supranational
+unknown,Unknown,ZZ,other

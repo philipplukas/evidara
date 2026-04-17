@@ -95,10 +95,25 @@ supersession as (
         true as is_superseded
     from manifests
     where supersedes_processing_manifest_id is not null
+),
+
+dim_document as (
+    select document_sk, document_id from {{ ref('dim_document') }}
+),
+
+dim_source_system as (
+    select source_system_code from {{ ref('dim_source_system') }}
+),
+
+dim_jurisdiction as (
+    select jurisdiction_code from {{ ref('dim_jurisdiction') }}
 )
 
 select
     m.processing_manifest_id,
+    dd.document_sk,
+    coalesce(dss.source_system_code, 'unknown') as source_system_code,
+    coalesce(dj.jurisdiction_code, 'UNKNOWN') as jurisdiction_code,
     m.document_id,
     m.document_revision,
     id.document_version_id,
@@ -161,3 +176,9 @@ left join events_by_version evs
     on id.document_version_id = evs.document_version_id
 left join supersession s
     on m.processing_manifest_id = s.manifest_id
+left join dim_document dd
+    on m.document_id = dd.document_id
+left join dim_source_system dss
+    on env.source_system = dss.source_system_code
+left join dim_jurisdiction dj
+    on env.jurisdiction = dj.jurisdiction_code

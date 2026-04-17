@@ -1,0 +1,35 @@
+version: 2
+
+seeds:
+  - name: dim_source_system
+    description: >
+      Reference data for source system codes. Expand as new crawlers are
+      added; unknown rows land as 'unknown'.
+    config:
+      schema: di_marts
+    columns:
+      - name: source_system_code
+        tests:
+          - not_null
+          - unique
+      - name: display_name
+        tests:
+          - not_null
+      - name: country
+        tests:
+          - not_null
+
+  - name: dim_jurisdiction
+    description: >
+      Reference data for jurisdiction codes. Expand as coverage broadens;
+      unlabelled documents land as 'UNKNOWN'.
+    config:
+      schema: di_marts
+    columns:
+      - name: jurisdiction_code
+        tests:
+          - not_null
+          - unique
+      - name: display_name
+        tests:
+          - not_null
