@@ -53,7 +53,7 @@ municipalities:
       format: html
       note: Ortsrecht collection; URL to be confirmed by operator.
 
-  - ags: "05911000"
+  - ags: "05913000"
     land_jurisdiction_id: jur_de_nw
     name: Dortmund
     primary_language: de
@@ -62,7 +62,7 @@ municipalities:
       format: html
       note: Ortsrecht collection; URL to be confirmed.
 
-  - ags: "05513000"
+  - ags: "05111000"
     land_jurisdiction_id: jur_de_nw
     name: Düsseldorf
     primary_language: de
