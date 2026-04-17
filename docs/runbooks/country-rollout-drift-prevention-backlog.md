@@ -217,19 +217,33 @@ TAR-240.
 Each scaffold provider needs its live adapter. All three are independent
 and can run in parallel.
 
-### 4.1 EurLexSparqlProvider live adapter
+### 4.1 EurLexSparqlProvider live adapter 🟡 CODE LANDED; ACCEPTANCE RUN PENDING
 
-Ticket: `docs/runbooks/eu-eur-lex-fast-loop-backlog.md`.
+**Code landed:**
+- `platform_control/services/eur_lex_sparql_provider.py` implements
+  the full CDM work → expression → manifestation flow (mirrors Fedlex
+  structure): `_query_expressions`, `_select_expressions` (ranked by
+  preferred language), `_pick_html_manifestation` (HTML > XHTML,
+  skips PDF), `_query_title`, `_fetch_text_manifestation`.
+- ISO 639-1 → EUR-Lex 3-letter authority-list language IRI
+  translation for 24 EU languages.
+- ELI URI validation (host + path prefix).
+- `ProviderResource.metadata` round-trips `eli_uri`, `celex`,
+  `expression_uri`, `language_iri`, `language` for T5.1 downstream
+  wiring.
+- `live_ready = True`; two-key lock now accepts blueprint templates
+  that reference `eur_lex_sparql`.
+- 14 unit tests: GDPR end-to-end, language ranking, ISO/authority
+  mapping, ELI validation, seed input modes.
 
-- Implement `_resolve_concrete_work_uri`, `_query_expression_uris`,
-  `_select_expression_uris`, `_describe_graph`, `_query_title`,
-  `_fetch_text_manifestation` mirroring Fedlex.
-- Smoke anchor: CELEX `32016R0679` (GDPR), ELI
-  `http://data.europa.eu/eli/reg/2016/679/oj`.
-- Flip `live_ready = True` on the class.
-- Enable `eur_lex_sparql_regulation_en` template.
-- Capture evidence at
-  `docs/runbooks/evidence/<date>-eu-eurlex-smoke-run1.md`.
+**Still needed:**
+- First acceptance run against `http://publications.europa.eu/webapi/rdf/sparql`
+  with CELEX `32016R0679` (GDPR), seed URI
+  `http://data.europa.eu/eli/reg/2016/679/oj`. Needs GCP auth + dev.
+- Flip `enabled: true` on `eur_lex_sparql_regulation_en` once
+  evidence captures `content_type=text/html`, ≥1 raw artifact, and
+  lifecycle event `document.processed`.
+- Evidence under `docs/runbooks/evidence/<date>-eu-eurlex-smoke-run1.md`.
 
 ### 4.2 BundeslandHttpProvider Bayern adapter
 

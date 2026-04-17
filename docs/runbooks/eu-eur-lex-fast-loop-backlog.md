@@ -3,7 +3,7 @@
 Owner: Platform / GA
 Last reviewed: 2026-04-16
 Last verified: 2026-04-16 (scaffold only; no live run yet)
-Status: Scaffold — provider raises `NotImplementedError` until the first live adapter lands
+Status: Code ready — adapter implemented with mocked tests; live acceptance run still pending
 Applies to: EU EUR-Lex provider iteration on `dev`
 
 ## Purpose
@@ -25,22 +25,42 @@ This backlog is the execution companion to:
 
 ## Current state
 
-Scaffold:
+Code ready:
 
-- `platform_control/services/eur_lex_sparql_provider.py` exists with class shape mirroring `FedlexSparqlProvider`
-- `platform_control/services/provider_registry_factory.py` registers it under provider name `eur_lex_sparql`
-- `platform-control/src/platform_control/hierarchies/source_blueprints.yaml` has two `enabled: false` templates (`eur_lex_sparql_regulation_en`, `eur_lex_sparql_directive_en`)
-- `contracts/vocabularies/jurisdiction.json` includes `EU`
-- `platform-control/seeds/reference/jurisdictions.yaml` includes `jur_eu`
-- `platform-control/seeds/reference/authorities.yaml` includes `auth_eu_eurlex`, `auth_eu_parliament`, `auth_eu_council`, `auth_eu_commission`, `auth_eu_cjeu`, `auth_eu_general_court`
-- `country-overlays/eu/` carries the overlay YAML quartet
-- `document_intelligence/nlp/citation_extractor.py` recognizes CELEX and `ECLI:EU:*` identifiers
+- `platform_control/services/eur_lex_sparql_provider.py` implements the
+  full work → expression → manifestation flow against the CDM ontology.
+  - `_query_expressions` enumerates expressions + languages + CELEX.
+  - `_select_expressions` ranks by `preferred_languages`.
+  - `_pick_html_manifestation` prefers HTML over XHTML; skips PDFs in
+    this scaffold (document-intelligence handles binary formats).
+  - `_query_title` captures the expression title.
+  - `_fetch_text_manifestation` fetches from Cellar and applies
+    `max_content_bytes` safety.
+  - ELI URI + CELEX round-trip to `ProviderResource.metadata`.
+- 14 unit tests cover the GDPR end-to-end flow, language ranking, ISO
+  639-1 ↔ authority-list mapping, ELI-URI validation, and seed input
+  modes. `live_ready = True`.
+- `provider_registry_factory.py` registers it; the two-key lock now
+  accepts blueprint templates that reference it.
+- Blueprint templates `eur_lex_sparql_regulation_en` (GDPR) and
+  `eur_lex_sparql_directive_en` (DSM Copyright Directive) are still
+  `enabled: false` pending acceptance-run evidence.
+- `contracts/vocabularies/jurisdiction.json` includes `EU`.
+- `platform-control/seeds/reference/jurisdictions.yaml` includes `jur_eu`.
+- `platform-control/seeds/reference/authorities.yaml` includes all EU
+  authorities.
+- `country-overlays/eu/` carries the overlay YAML quartet.
+- `document_intelligence/nlp/citation_extractor.py` recognizes CELEX
+  and `ECLI:EU:*` identifiers.
 
 Not yet done:
 
-- `start_run` raises `NotImplementedError`
-- no live SPARQL query against `http://publications.europa.eu/webapi/rdf/sparql`
-- no evidence capture
+- First acceptance run against
+  `http://publications.europa.eu/webapi/rdf/sparql` with CELEX
+  `32016R0679` (GDPR). Needs GCP auth + dev environment.
+- Flip `enabled: true` on at least one blueprint template once the
+  acceptance run captures evidence.
+- Evidence under `docs/runbooks/evidence/<date>-eu-eurlex-smoke-run1.md`.
 
 ## Known-good smoke targets
 

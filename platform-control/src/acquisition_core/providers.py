@@ -28,10 +28,19 @@ class ProviderStartResult:
 
 class AcquisitionProvider(Protocol):
     provider_name: str
-    # live_ready = True means start_run() makes real network calls end-to-end.
-    # live_ready = False means start_run() raises NotImplementedError; the
-    # provider is registered only so blueprint templates referencing it parse,
-    # and is rejected by the loader's two-key lock before any run is launched.
+    # live_ready distinguishes scaffolds from implementations:
+    # - True: the provider's `start_run` is internally consistent and
+    #   mocked tests cover the logic against its target API contract.
+    #   Blueprint templates MAY reference it and, once the operator
+    #   enables a template, runs go live.
+    # - False: `start_run` is a stub (typically raises NotImplementedError).
+    #   The provider is registered only so blueprint templates referencing
+    #   it parse, but the loader's two-key lock rejects any run attempt.
+    #
+    # Production-readiness (whether a template is safe to enable for live
+    # acquisition) lives separately on each blueprint template via
+    # `enabled: true` in source_blueprints.yaml. An operator flips that
+    # after capturing acceptance-run evidence.
     live_ready: bool
 
     async def start_run(
