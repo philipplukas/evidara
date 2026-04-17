@@ -8,6 +8,12 @@ from document_intelligence.bootstrap.bronze_schemas import (
     BRONZE_TABLE_DEFINITIONS,
     render_register_bronze_sql,
 )
+from document_intelligence.bootstrap.governance import (
+    PII_COLUMN_TAGS,
+    PRINCIPAL_GROUPS,
+    render_column_tags_sql,
+    render_grants_sql,
+)
 from document_intelligence.bootstrap.register_surfaces import (
     render_register_surfaces_sql,
 )
@@ -177,6 +183,40 @@ class PublishedSourceContractsTests(unittest.TestCase):
                 break
         else:
             self.fail("effective_date column not found in rendered YAML")
+
+
+class GovernanceSqlTests(unittest.TestCase):
+    def test_grants_emits_catalog_and_schema_privileges_per_group(self) -> None:
+        sql = render_grants_sql(catalog_name="document_intelligence")
+
+        for group in PRINCIPAL_GROUPS:
+            self.assertIn(f"TO `{group.name}`", sql)
+            for grant in group.schema_grants:
+                self.assertIn(
+                    f"ON SCHEMA `document_intelligence`.`{grant.schema}` TO `{group.name}`",
+                    sql,
+                )
+
+    def test_grants_covers_expected_group_set(self) -> None:
+        names = {group.name for group in PRINCIPAL_GROUPS}
+        self.assertEqual(names, {"di_readers", "di_service", "di_engineers"})
+
+    def test_column_tags_emits_alter_for_every_pii_column(self) -> None:
+        sql = render_column_tags_sql(catalog_name="document_intelligence")
+
+        for tag in PII_COLUMN_TAGS:
+            self.assertIn(
+                f"ALTER TABLE `document_intelligence`.`{tag.schema}`.`{tag.table}` "
+                f"ALTER COLUMN `{tag.column}`",
+                sql,
+            )
+            self.assertIn(f"'{tag.tag_key}' = '{tag.tag_value}'", sql)
+
+    def test_column_tags_cover_known_pii_surfaces(self) -> None:
+        columns = {(tag.schema, tag.table, tag.column) for tag in PII_COLUMN_TAGS}
+        self.assertIn(("di_intermediate", "int_entities", "entity_text"), columns)
+        self.assertIn(("di_marts", "embeddings_ready", "chunk_text"), columns)
+        self.assertIn(("di_marts", "srv_search_chunks", "chunk_text"), columns)
 
 
 class TerraformModuleShapeTests(unittest.TestCase):
