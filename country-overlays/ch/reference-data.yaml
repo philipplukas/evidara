@@ -10,7 +10,7 @@ country_code: CH
 jurisdictions:
   - jurisdiction_id: jur_ch
     slug: ch
-    name: Switzerland (Confederation)
+    name: Switzerland
   - jurisdiction_id: jur_ch_zh
     slug: ch-zh
     name: Kanton Zürich
