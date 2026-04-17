@@ -133,14 +133,32 @@ async def limited_get(
     limiter: HostRateLimiter | None = None,
     **kwargs: Any,
 ) -> httpx.Response:
-    """GET ``url`` through the effective rate limiter for the current run.
+    """GET ``url`` through the effective rate limiter + robots check for the current run.
 
-    Resolution order: explicit ``limiter`` → ``current_rate_limiter`` contextvar
-    → no limiter (bypass). Providers that own their HTTP boundary (deterministic,
-    fedlex, ris) call this in place of ``client.get`` so the per-jurisdiction
-    :class:`CompliancePolicy` is honoured without each provider needing its own
-    integration code.
+    Resolution order for the limiter: explicit ``limiter`` → ``current_rate_limiter``
+    contextvar → no limiter (bypass). The robots check is driven only by
+    ``current_robots_context`` — when present and ``mode=strict``, a disallowed
+    URL raises :class:`RobotsDisallowedError` *before* any token is consumed,
+    so robots blocks never deplete the rate budget.
+
+    Providers that own their HTTP boundary (deterministic, fedlex, ris) call this
+    in place of ``client.get`` so the per-jurisdiction :class:`CompliancePolicy`
+    is honoured without each provider needing its own integration code.
     """
+    # Local import to avoid a circular import via services/robots.py if it later
+    # needs anything from politeness. The modules are independent today.
+    from platform_control.domain import RobotsMode
+    from platform_control.services.robots import (
+        RobotsDisallowedError,
+        current_robots_context,
+    )
+
+    robots_ctx = current_robots_context.get()
+    if robots_ctx is not None and robots_ctx.mode is RobotsMode.STRICT:
+        allowed = await robots_ctx.checker.is_allowed(url, robots_ctx.user_agent)
+        if not allowed:
+            raise RobotsDisallowedError(url)
+
     effective = limiter if limiter is not None else current_rate_limiter.get()
     if effective is None:
         return await client.get(url, **kwargs)

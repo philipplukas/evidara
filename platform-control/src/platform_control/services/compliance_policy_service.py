@@ -24,6 +24,7 @@ from platform_control.schemas.compliance_policy import (
     UpdateCompliancePolicyRequest,
 )
 from platform_control.services.politeness import HostRateLimiter
+from platform_control.services.robots import RobotsChecker, RobotsContext
 
 
 class RateLimiterRegistry:
@@ -126,6 +127,18 @@ class CompliancePolicyService:
         return jurisdiction
 
 
+_DEFAULT_USER_AGENT = "platform-control/1.0 (+https://evidara.ai)"
+
+
+async def _resolve_policy_for_source(
+    session: AsyncSession, source: Source
+) -> CompliancePolicy | None:
+    jurisdiction = await session.get(Jurisdiction, source.jurisdiction_id)
+    if jurisdiction is None or jurisdiction.compliance_policy_id is None:
+        return None
+    return await session.get(CompliancePolicy, jurisdiction.compliance_policy_id)
+
+
 async def resolve_rate_limiter_for_source(
     session: AsyncSession,
     source: Source,
@@ -139,10 +152,32 @@ async def resolve_rate_limiter_for_source(
     jurisdiction is either whitelisted (e.g. their own test domains) or that a
     policy has yet to be written.
     """
-    jurisdiction = await session.get(Jurisdiction, source.jurisdiction_id)
-    if jurisdiction is None or jurisdiction.compliance_policy_id is None:
-        return None
-    policy = await session.get(CompliancePolicy, jurisdiction.compliance_policy_id)
+    policy = await _resolve_policy_for_source(session, source)
     if policy is None:
         return None
     return registry.get_or_create(policy)
+
+
+async def resolve_robots_context_for_source(
+    session: AsyncSession,
+    source: Source,
+    checker: RobotsChecker,
+) -> RobotsContext | None:
+    """Return the robots enforcement envelope for ``source``'s jurisdiction.
+
+    ``None`` when the jurisdiction has no policy — same semantics as
+    :func:`resolve_rate_limiter_for_source`. The ``user_agent`` falls back to a
+    service default when the policy does not declare a ``contact_url`` so a
+    robots-compliant UA is always used.
+    """
+    policy = await _resolve_policy_for_source(session, source)
+    if policy is None:
+        return None
+    user_agent = _DEFAULT_USER_AGENT
+    if policy.contact_url:
+        user_agent = f"{_DEFAULT_USER_AGENT} (+{policy.contact_url})"
+    return RobotsContext(
+        checker=checker,
+        mode=policy.robots_mode,
+        user_agent=user_agent,
+    )
