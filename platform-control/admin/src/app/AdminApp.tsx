@@ -26,6 +26,7 @@ import {
   Resource,
   TitlePortal,
 } from "react-admin";
+import { publicConfig } from "../config/publicConfig";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
 import {
   ACCENT_CORE,
@@ -63,8 +64,7 @@ import { SourceCreate } from "../resources/sources/SourceCreate";
 import { SourceList } from "../resources/sources/SourceList";
 import { SourceShow } from "../resources/sources/SourceShow";
 
-const LEGAL_SEARCH_URL =
-  process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
+const LEGAL_SEARCH_URL = publicConfig.legalSearchBaseUrl;
 
 const adminTheme = createTheme({
   palette: {
