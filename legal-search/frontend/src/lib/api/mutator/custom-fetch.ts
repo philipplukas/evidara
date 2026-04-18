@@ -1,3 +1,5 @@
+import { publicConfig } from "@/config/publicConfig";
+
 export type CustomFetchConfig = {
   url: string;
   method: string;
@@ -30,8 +32,7 @@ export async function customFetch<T>({
   headers,
   data,
 }: CustomFetchConfig): Promise<T> {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3102";
-  const response = await fetch(buildUrl(apiBase, url, params), {
+  const response = await fetch(buildUrl(publicConfig.apiBaseUrl, url, params), {
     method,
     signal,
     headers: {

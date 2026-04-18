@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { publicConfig } from "@/config/publicConfig";
 
 const DEV_API_URL = "https://legal-search-api-dev-kxc5agexna-oa.a.run.app";
 const STAGING_API_URL = "https://legal-search-api-staging-kxc5agexna-oa.a.run.app";
-const LOCAL_API_URL = "http://localhost:3102";
 
 function resolveApiBase(hostname: string): string {
   if (hostname.includes("legal-search-frontend-staging")) {
@@ -12,7 +12,7 @@ function resolveApiBase(hostname: string): string {
   if (hostname.includes("legal-search-frontend-dev")) {
     return DEV_API_URL;
   }
-  return process.env.NEXT_PUBLIC_API_URL ?? LOCAL_API_URL;
+  return publicConfig.apiBaseUrl;
 }
 
 export function middleware(request: NextRequest) {
