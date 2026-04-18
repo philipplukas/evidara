@@ -147,7 +147,7 @@ Severity scale: **Critical** (blocks release) / **High** / **Medium** / **Low**.
 
 ### 6.2 Open
 
-**Pass 4 — open**
+#### Pass 4 — open
 
 | ID | Sev | Finding | Status |
 |----|-----|---------|--------|
