@@ -24,7 +24,8 @@
       },
       "style": {
         "noNonNullAssertion": "off",
-        "useImportType": "warn"
+        "useImportType": "warn",
+        "noProcessEnv": "error"
       }
     }
   },
@@ -50,5 +51,27 @@
       "!!src/lib/document-intelligence/generated/**",
       "!!src/__tests__/**"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/core/config/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/**/*.smoke.spec.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
+      }
+    }
+  ]
 }
