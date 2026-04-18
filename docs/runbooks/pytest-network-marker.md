@@ -1,5 +1,10 @@
 # Pytest `requires_network` marker (platform-control)
 
+Owner: Platform / DevEx
+Last reviewed: 2026-04-18
+Last verified: 2026-04-18
+Applies to: `platform-control/tests/` — any test marked `@pytest.mark.requires_network`
+
 ## What
 
 A `requires_network` pytest marker that skips network-dependent tests by default
