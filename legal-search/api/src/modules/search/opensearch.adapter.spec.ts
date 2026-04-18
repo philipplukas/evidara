@@ -15,7 +15,7 @@ describe('SearchOpenSearchAdapter', () => {
       { search } as never,
       {
         get: (key: string) =>
-          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
     );
 
@@ -98,7 +98,7 @@ describe('SearchOpenSearchAdapter', () => {
       { search } as never,
       {
         get: (key: string) =>
-          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
     );
 
@@ -134,7 +134,7 @@ describe('SearchOpenSearchAdapter', () => {
       { search } as never,
       {
         get: (key: string) =>
-          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
     );
 
@@ -174,7 +174,7 @@ describe('SearchOpenSearchAdapter', () => {
       { search } as never,
       {
         get: (key: string) =>
-          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
     );
 
@@ -213,7 +213,7 @@ describe('SearchOpenSearchAdapter', () => {
       { search } as never,
       {
         get: (key: string) =>
-          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
     );
 
@@ -241,7 +241,7 @@ describe('SearchOpenSearchAdapter', () => {
       { search } as never,
       {
         get: (key: string) =>
-          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
     );
 
@@ -264,7 +264,7 @@ describe('SearchOpenSearchAdapter', () => {
       { search } as never,
       {
         get: (key: string) =>
-          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
     );
 
@@ -294,7 +294,7 @@ describe('SearchOpenSearchAdapter', () => {
       { search } as never,
       {
         get: (key: string) =>
-          key === 'opensearch.indexDocumentsRead' ? 'documents-read-test' : null,
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
     );
 

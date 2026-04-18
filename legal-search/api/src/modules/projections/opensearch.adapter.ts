@@ -24,9 +24,9 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
     config: ConfigService,
   ) {
     this.indexDocumentsWrite =
-      config.get<string>('opensearch.indexDocumentsWrite') ?? 'documents-write';
+      config.get<string>('opensearch.documentsWriteAlias') ?? 'documents-write';
     this.indexProjectionHistory =
-      config.get<string>('opensearch.indexProjectionHistory') ?? 'projection-history';
+      config.get<string>('opensearch.projectionHistoryIndex') ?? 'projection-history';
   }
 
   async hasHistoryEvent(eventId: string): Promise<boolean> {
