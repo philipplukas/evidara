@@ -1,11 +1,17 @@
 FROM node:22-alpine
 
-WORKDIR /app
+# Build context is the repo root so shared design tokens at /styles/tokens/
+# can be copied alongside the app.
+WORKDIR /workspace
 
-COPY package*.json ./
+COPY styles/tokens ./styles/tokens
+
+COPY legal-search/frontend/package*.json ./legal-search/frontend/
+WORKDIR /workspace/legal-search/frontend
 RUN npm ci
 
-COPY . .
+COPY legal-search/frontend ./
+
 RUN npm run build
 
 EXPOSE 8080

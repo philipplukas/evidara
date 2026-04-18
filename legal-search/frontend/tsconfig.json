@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@evidara/tokens": ["../../styles/tokens/tokens"]
     }
   },
   "include": [

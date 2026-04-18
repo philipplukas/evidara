@@ -10,11 +10,13 @@ from temporalio.worker import Worker
 
 from platform_control.config import get_settings
 from platform_control.temporal.activities import (
+    RetentionActivities,
     ReviewDrainActivities,
     ScopeShardActivities,
     WizardStateActivities,
 )
 from platform_control.temporal.workflows import (
+    RetentionSweepWorkflow,
     ReviewDrainWorkflow,
     ScopeShardWorkflow,
     WizardRunWorkflow,
@@ -46,6 +48,7 @@ async def _async_main() -> None:
         argilla_api_key=settings.argilla_api_key,
         argilla_dataset_id=settings.argilla_dataset_id,
     )
+    retention_acts = RetentionActivities(session_factory=session_factory)
 
     client = await Client.connect(
         settings.temporal_target,
@@ -54,7 +57,12 @@ async def _async_main() -> None:
     worker = Worker(
         client,
         task_queue=settings.temporal_task_queue,
-        workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
+        workflows=[
+            WizardRunWorkflow,
+            ScopeShardWorkflow,
+            ReviewDrainWorkflow,
+            RetentionSweepWorkflow,
+        ],
         activities=[
             wizard_state_acts.persist_pilot_completed,
             wizard_state_acts.fetch_scope_shards,
@@ -62,6 +70,7 @@ async def _async_main() -> None:
             scope_shard_acts.report_shard_progress,
             review_drain_acts.enqueue_pending_reviews,
             review_drain_acts.check_review_drain_complete,
+            retention_acts.run_retention_sweep,
         ],
     )
     LOGGER.info(

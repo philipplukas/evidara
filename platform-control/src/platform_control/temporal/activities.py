@@ -331,3 +331,53 @@ class ReviewDrainActivities:
                 or 0
             )
             return pending == 0
+
+
+# ---------------------------------------------------------------------------
+# RetentionActivities — schedule-driven compliance-policy retention sweep
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RetentionActivities:
+    """Runs :class:`RetentionService.sweep` from a Temporal schedule.
+
+    Deferred imports inside the activity method avoid pulling FastAPI/asyncpg
+    machinery into module load when the worker is booted from a minimal
+    context. Temporal activities run in the worker process, so re-importing
+    on each invocation is fine.
+
+    ``settings_factory`` returns the current ``Settings`` so the activity
+    picks up any config change on the next run without restarting the worker.
+    """
+
+    session_factory: async_sessionmaker[AsyncSession]
+    settings_factory: Callable[[], _SettingsLike] | None = None
+
+    @activity.defn(name="run_retention_sweep")
+    async def run_retention_sweep(self, dry_run: bool = False) -> dict:
+        """Execute one retention sweep pass, returning the usual report dict.
+
+        Parameters are kept kwarg-free on the Temporal wire (single positional
+        bool) so the schedule payload stays trivial. The returned dict matches
+        :class:`RetentionSweepReport` so dashboards can log the counts.
+        """
+        from dataclasses import asdict as _asdict
+
+        from platform_control.config import get_settings
+        from platform_control.integrations import get_artifact_store
+        from platform_control.services.retention_service import RetentionService
+
+        settings = self.settings_factory() if self.settings_factory is not None else get_settings()
+        artifact_store = get_artifact_store(settings)
+
+        async with self.session_factory() as session:
+            service = RetentionService(session=session, artifact_store=artifact_store)
+            report = await service.sweep(dry_run=dry_run)
+        return _asdict(report)
+
+
+# Placeholder type alias so `settings_factory` can stay optional without
+# pulling the full Settings object into the activity module's import graph.
+class _SettingsLike:  # pragma: no cover - typing only
+    pass

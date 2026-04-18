@@ -1,9 +1,8 @@
 /**
  * Thin re-export shim for historical import paths.
  *
- * Canonical values live in `../tokens/tokens`, which is synced from
- * `/styles/tokens/tokens.ts` via `scripts/sync-tokens.mjs`. Edit the source
- * there and run `npm run tokens:sync`; CI enforces drift.
+ * Canonical values live at `/styles/tokens/tokens.ts` and are consumed here
+ * through the `@evidara/tokens` tsconfig alias. Edit the source there.
  */
 
-export * from "../tokens/tokens";
+export * from "@evidara/tokens";

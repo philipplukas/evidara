@@ -1,15 +1,19 @@
 """``pc plan <source_version_id>`` — dry-run an acquisition plan.
 
 Resolves the ``SourceVersion``, dispatches to the provider's ``plan()``
-implementation, and prints a human-readable summary. No network IO, no DB
-writes. Use this to validate acquisition config before spending a Firecrawl
-credit or triggering a scheduled run.
+implementation, and prints a human-readable summary. No network IO by default.
+
+``--check-robots`` adds an optional live probe: each seed URL is checked
+against the target host's robots.txt under the jurisdiction's policy UA, so
+operators catch "this whole source is denied" mistakes before spending a real
+provider call.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -19,8 +23,19 @@ from platform_control.errors import NotFoundError
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import ProviderPlan
+from platform_control.services.compliance_policy_service import (
+    resolve_robots_context_for_source,
+)
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.provider_registry_factory import build_provider_registry
+from platform_control.services.robots import RobotsChecker
+
+
+@dataclass(slots=True)
+class RobotsVerdict:
+    url: str
+    allowed: bool
+    user_agent: str
 
 
 async def resolve_plan(
@@ -43,6 +58,33 @@ async def resolve_plan(
     provider = registry.resolve_for_spec(source_version.acquisition_spec)
     plan = provider.plan(source, source_version)
     return source, source_version, plan
+
+
+async def check_seed_robots(
+    session: AsyncSession,
+    source: Source,
+    plan: ProviderPlan,
+    *,
+    checker: RobotsChecker | None = None,
+    fallback_user_agent: str = "platform-control/1.0 (+https://evidara.ai)",
+) -> list[RobotsVerdict]:
+    """Probe robots.txt for each seed URL in ``plan`` and return verdicts.
+
+    Uses the jurisdiction's ``RobotsContext`` user-agent when the source has a
+    policy with ``contact_url``; otherwise falls back to the service default.
+    Callers can inject a pre-seeded ``RobotsChecker`` (useful for tests); the
+    default is a fresh instance with the standard TTL.
+    """
+    if not plan.seed_urls:
+        return []
+    effective_checker = checker or RobotsChecker()
+    robots_context = await resolve_robots_context_for_source(session, source, effective_checker)
+    user_agent = robots_context.user_agent if robots_context else fallback_user_agent
+    verdicts: list[RobotsVerdict] = []
+    for url in plan.seed_urls:
+        allowed = await effective_checker.is_allowed(url, user_agent)
+        verdicts.append(RobotsVerdict(url=url, allowed=allowed, user_agent=user_agent))
+    return verdicts
 
 
 def format_plan(source: Source, source_version: SourceVersion, plan: ProviderPlan) -> str:
@@ -82,6 +124,18 @@ def format_plan(source: Source, source_version: SourceVersion, plan: ProviderPla
     return "\n".join(lines)
 
 
+def format_robots_verdicts(verdicts: list[RobotsVerdict]) -> str:
+    if not verdicts:
+        return "robots_check:\n  (no seed URLs to probe)"
+    lines = ["robots_check:"]
+    user_agent = verdicts[0].user_agent
+    lines.append(f"  user_agent           {user_agent}")
+    for verdict in verdicts:
+        status = "allowed" if verdict.allowed else "DISALLOWED"
+        lines.append(f"  {status:<20} {verdict.url}")
+    return "\n".join(lines)
+
+
 async def run_from_args(namespace: argparse.Namespace) -> int:
     session_maker: async_sessionmaker[AsyncSession] = get_session_maker()
     registry = build_provider_registry(get_settings())
@@ -93,8 +147,22 @@ async def run_from_args(namespace: argparse.Namespace) -> int:
         except NotFoundError as exc:
             print(str(exc), file=sys.stderr)
             return 2
+        verdicts: list[RobotsVerdict] = []
+        if getattr(namespace, "check_robots", False):
+            verdicts = await check_seed_robots(session, source, plan)
+
     print(format_plan(source, source_version, plan))
+    if verdicts:
+        print("")
+        print(format_robots_verdicts(verdicts))
     return 0
 
 
-__all__ = ["resolve_plan", "format_plan", "run_from_args"]
+__all__ = [
+    "RobotsVerdict",
+    "check_seed_robots",
+    "format_plan",
+    "format_robots_verdicts",
+    "resolve_plan",
+    "run_from_args",
+]
