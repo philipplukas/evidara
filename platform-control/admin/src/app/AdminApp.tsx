@@ -1,6 +1,7 @@
 "use client";
 
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
 import {
   alpha,
   Box,
@@ -20,12 +21,14 @@ import {
   Admin,
   AppBar,
   type AppBarProps,
+  CustomRoutes,
   Layout,
   type LayoutProps,
   Menu,
   Resource,
   TitlePortal,
 } from "react-admin";
+import { Route } from "react-router-dom";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
 import {
   ACCENT_CORE,
@@ -50,18 +53,26 @@ import {
 } from "../lib/admin/navigationContext";
 import { Dashboard } from "../resources/dashboard/Dashboard";
 import { AuthorityCreate } from "../resources/reference-data/AuthorityCreate";
+import AuthorityCreateV2 from "../resources/reference-data/AuthorityCreateV2";
 import { AuthorityEdit } from "../resources/reference-data/AuthorityEdit";
+import AuthorityEditV2 from "../resources/reference-data/AuthorityEditV2";
 import { AuthorityList } from "../resources/reference-data/AuthorityList";
 import { JurisdictionCreate } from "../resources/reference-data/JurisdictionCreate";
+import JurisdictionCreateV2 from "../resources/reference-data/JurisdictionCreateV2";
 import { JurisdictionEdit } from "../resources/reference-data/JurisdictionEdit";
+import JurisdictionEditV2 from "../resources/reference-data/JurisdictionEditV2";
 import { JurisdictionList } from "../resources/reference-data/JurisdictionList";
 import { PreviewReviewList } from "../resources/runs/PreviewReviewList";
 import { PreviewReviewShow } from "../resources/runs/PreviewReviewShow";
 import { RunList } from "../resources/runs/RunList";
+import RunListV2 from "../resources/runs/RunListV2";
 import { RunShow } from "../resources/runs/RunShow";
+import RunShowV2 from "../resources/runs/RunShowV2";
 import { SourceCreate } from "../resources/sources/SourceCreate";
 import { SourceList } from "../resources/sources/SourceList";
+import SourceListV2 from "../resources/sources/SourceListV2";
 import { SourceShow } from "../resources/sources/SourceShow";
+import SourceShowV2 from "../resources/sources/SourceShowV2";
 
 const LEGAL_SEARCH_URL =
   process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
@@ -488,7 +499,35 @@ function EvidaraAdminMenu() {
       }}
     >
       <Box sx={{ flexShrink: 0 }}>
-        <Menu />
+        <Menu>
+          <Menu.ResourceItems />
+          {/*
+           * Spike-only entry — mounts the Tailwind + ra-core port of
+           * SourceList at `/sources-v2` so it renders side-by-side with
+           * the MUI `/sources` page for visual diff. Delete when the
+           * spike graduates or is rejected.
+           */}
+          <Menu.Item
+            to="/sources-v2"
+            primaryText="Sources (v2 preview)"
+            leftIcon={<ScienceOutlinedIcon />}
+          />
+          <Menu.Item
+            to="/runs-v2"
+            primaryText="Runs (v2 preview)"
+            leftIcon={<ScienceOutlinedIcon />}
+          />
+          <Menu.Item
+            to="/authorities-v2/create"
+            primaryText="Authority form (v2 preview)"
+            leftIcon={<ScienceOutlinedIcon />}
+          />
+          <Menu.Item
+            to="/jurisdictions-v2/create"
+            primaryText="Jurisdiction form (v2 preview)"
+            leftIcon={<ScienceOutlinedIcon />}
+          />
+        </Menu>
       </Box>
       <Box
         sx={{
@@ -639,6 +678,22 @@ export default function AdminApp() {
         options={{ label: "Preview Review" }}
       />
       <Resource name="runs" list={RunList} show={RunShow} recordRepresentation="run_id" />
+      {/*
+       * Spike: Tailwind + ra-core port of the sources list. Lives under a
+       * custom route rather than replacing the `sources` resource so both
+       * versions render concurrently for side-by-side review. Mounted at
+       * `/sources-v2`. Remove once the spike is accepted.
+       */}
+      <CustomRoutes>
+        <Route path="/sources-v2" element={<SourceListV2 />} />
+        <Route path="/sources-v2/:id" element={<SourceShowV2 />} />
+        <Route path="/runs-v2" element={<RunListV2 />} />
+        <Route path="/runs-v2/:id" element={<RunShowV2 />} />
+        <Route path="/authorities-v2/create" element={<AuthorityCreateV2 />} />
+        <Route path="/authorities-v2/:id/edit" element={<AuthorityEditV2 />} />
+        <Route path="/jurisdictions-v2/create" element={<JurisdictionCreateV2 />} />
+        <Route path="/jurisdictions-v2/:id/edit" element={<JurisdictionEditV2 />} />
+      </CustomRoutes>
     </Admin>
   );
 }
