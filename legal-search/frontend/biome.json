@@ -25,7 +25,8 @@
       },
       "style": {
         "noNonNullAssertion": "off",
-        "useImportType": "warn"
+        "useImportType": "warn",
+        "noProcessEnv": "error"
       },
       "a11y": {
         "useButtonType": "warn",
@@ -91,6 +92,16 @@
       },
       "formatter": {
         "enabled": false
+      }
+    },
+    {
+      "includes": ["src/config/publicConfig.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
       }
     }
   ]
