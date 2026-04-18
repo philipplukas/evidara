@@ -3,6 +3,7 @@
 import { Chip, Stack, Typography } from "@mui/material";
 import { Datagrid, FunctionField, List, ReferenceField, TextField } from "react-admin";
 import { SwissDateField } from "../../components/SwissDateField";
+import { ResourceName } from "../../domain/resourceNames";
 import type {
   AuthorityRecord,
   JurisdictionRecord,
@@ -29,7 +30,7 @@ const SOURCE_STATUS_META = {
 export function SourceList() {
   return (
     <List
-      resource="sources"
+      resource={ResourceName.Sources}
       title="Sources"
       perPage={50}
       sort={{ field: "updated_at", order: "DESC" }}
@@ -73,7 +74,7 @@ export function SourceList() {
         />
         <ReferenceField
           source="jurisdiction_id"
-          reference="jurisdictions"
+          reference={ResourceName.Jurisdictions}
           label="Jurisdiction"
           link={false}
         >
@@ -81,7 +82,7 @@ export function SourceList() {
         </ReferenceField>
         <ReferenceField
           source="authority_id"
-          reference="authorities"
+          reference={ResourceName.Authorities}
           label="Authority"
           link={false}
         >

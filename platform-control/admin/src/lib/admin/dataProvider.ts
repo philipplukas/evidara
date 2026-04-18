@@ -16,6 +16,7 @@ import {
   type UpdateManyResult,
   type UpdateResult,
 } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 
 type ListResponse<T> = {
   data: T[];
@@ -725,16 +726,16 @@ export const controlPlaneActions = {
 
 export const controlPlaneDataProvider: DataProvider = {
   async getList(resource, params): Promise<GetListResult> {
-    if (resource === "jurisdictions") {
-      return getSimpleListResult("jurisdictions", "jurisdiction_id", params);
+    if (resource === ResourceName.Jurisdictions) {
+      return getSimpleListResult(ResourceName.Jurisdictions, "jurisdiction_id", params);
     }
 
-    if (resource === "authorities") {
-      return getSimpleListResult("authorities", "authority_id", params);
+    if (resource === ResourceName.Authorities) {
+      return getSimpleListResult(ResourceName.Authorities, "authority_id", params);
     }
 
-    if (resource === "sources") {
-      return getSimpleListResult("sources", "source_id", params);
+    if (resource === ResourceName.Sources) {
+      return getSimpleListResult(ResourceName.Sources, "source_id", params);
     }
 
     if (resource === "source-versions") {
@@ -752,7 +753,7 @@ export const controlPlaneDataProvider: DataProvider = {
       return applyClientListWindow(records, params);
     }
 
-    if (resource === "runs") {
+    if (resource === ResourceName.Runs) {
       const response = await requestJson<ListResponse<RunListItem>>(
         `/v1/runs${toQueryString(params)}`,
       );
@@ -760,7 +761,7 @@ export const controlPlaneDataProvider: DataProvider = {
       return applyClientListWindow(records, params);
     }
 
-    if (resource === "preview-review") {
+    if (resource === ResourceName.PreviewReview) {
       const previewParams: GetListParams = {
         ...params,
         filter: {
@@ -783,39 +784,39 @@ export const controlPlaneDataProvider: DataProvider = {
   },
 
   async getOne(resource, params): Promise<GetOneResult> {
-    if (resource === "jurisdictions") {
+    if (resource === ResourceName.Jurisdictions) {
       return {
         data: toRecord(
-          await findInSimpleList("jurisdictions", "jurisdiction_id", params.id),
+          await findInSimpleList(ResourceName.Jurisdictions, "jurisdiction_id", params.id),
           "jurisdiction_id",
         ),
       };
     }
 
-    if (resource === "authorities") {
+    if (resource === ResourceName.Authorities) {
       return {
         data: toRecord(
-          await findInSimpleList("authorities", "authority_id", params.id),
+          await findInSimpleList(ResourceName.Authorities, "authority_id", params.id),
           "authority_id",
         ),
       };
     }
 
-    if (resource === "sources") {
+    if (resource === ResourceName.Sources) {
       const response = await requestJson<Source>(`/v1/sources/${params.id}`);
       return {
         data: toRecord(response, "source_id"),
       };
     }
 
-    if (resource === "runs") {
+    if (resource === ResourceName.Runs) {
       const response = await requestJson<RunResponse>(`/v1/runs/${params.id}`);
       return {
         data: toRecord(response, "run_id"),
       };
     }
 
-    if (resource === "preview-review") {
+    if (resource === ResourceName.PreviewReview) {
       const response = await requestJson<RunResponse>(`/v1/runs/${params.id}`);
       if (response.mode !== "preview") {
         throw new HttpError("Preview review run not found", 404);
@@ -829,8 +830,8 @@ export const controlPlaneDataProvider: DataProvider = {
   },
 
   async getMany(resource, params): Promise<GetManyResult> {
-    if (resource === "jurisdictions") {
-      const items = await fetchSimpleList("jurisdictions");
+    if (resource === ResourceName.Jurisdictions) {
+      const items = await fetchSimpleList(ResourceName.Jurisdictions);
       return {
         data: items
           .filter((item) => params.ids.includes(item.jurisdiction_id))
@@ -838,8 +839,8 @@ export const controlPlaneDataProvider: DataProvider = {
       };
     }
 
-    if (resource === "authorities") {
-      const items = await fetchSimpleList("authorities");
+    if (resource === ResourceName.Authorities) {
+      const items = await fetchSimpleList(ResourceName.Authorities);
       return {
         data: items
           .filter((item) => params.ids.includes(item.authority_id))
@@ -847,8 +848,8 @@ export const controlPlaneDataProvider: DataProvider = {
       };
     }
 
-    if (resource === "sources") {
-      const items = await fetchSimpleList("sources");
+    if (resource === ResourceName.Sources) {
+      const items = await fetchSimpleList(ResourceName.Sources);
       return {
         data: items
           .filter((item) => params.ids.includes(item.source_id))
@@ -864,7 +865,7 @@ export const controlPlaneDataProvider: DataProvider = {
   },
 
   async update(resource, params): Promise<UpdateResult> {
-    if (resource === "jurisdictions") {
+    if (resource === ResourceName.Jurisdictions) {
       const response = await requestJson<Jurisdiction>(
         `/v1/reference-data/jurisdictions/${params.id}`,
         {
@@ -877,7 +878,7 @@ export const controlPlaneDataProvider: DataProvider = {
       };
     }
 
-    if (resource === "authorities") {
+    if (resource === ResourceName.Authorities) {
       const response = await requestJson<Authority>(`/v1/reference-data/authorities/${params.id}`, {
         method: "PATCH",
         body: toAuthorityPayload(params.data),
@@ -905,7 +906,7 @@ export const controlPlaneDataProvider: DataProvider = {
   },
 
   async create(resource, params): Promise<CreateResult> {
-    if (resource === "jurisdictions") {
+    if (resource === ResourceName.Jurisdictions) {
       const response = await requestJson<Jurisdiction>("/v1/reference-data/jurisdictions", {
         method: "POST",
         body: toJurisdictionPayload(params.data),
@@ -915,7 +916,7 @@ export const controlPlaneDataProvider: DataProvider = {
       };
     }
 
-    if (resource === "authorities") {
+    if (resource === ResourceName.Authorities) {
       const response = await requestJson<Authority>("/v1/reference-data/authorities", {
         method: "POST",
         body: toAuthorityPayload(params.data),
@@ -925,7 +926,7 @@ export const controlPlaneDataProvider: DataProvider = {
       };
     }
 
-    if (resource === "sources") {
+    if (resource === ResourceName.Sources) {
       const response = await requestJson<Source>("/v1/sources", {
         method: "POST",
         body: toSourcePayload(params.data),
@@ -969,7 +970,7 @@ export const controlPlaneDataProvider: DataProvider = {
       };
     }
 
-    if (resource === "runs") {
+    if (resource === ResourceName.Runs) {
       const response = await requestJson<RunResponse>("/v1/runs", {
         method: "POST",
         body: params.data as RunCreateInput,

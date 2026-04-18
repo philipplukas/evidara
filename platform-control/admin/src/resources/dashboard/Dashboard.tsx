@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import { type ReactNode, useEffect, useState } from "react";
 import { useRedirect } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 import type { RunPipelineHealth } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
@@ -305,7 +306,7 @@ export function Dashboard() {
                   <RunLaunchButton
                     label="Create Run"
                     defaultMode="production"
-                    redirectResource="runs"
+                    redirectResource={ResourceName.Runs}
                   />
                 }
               />
@@ -325,7 +326,7 @@ export function Dashboard() {
                     disabled={!attentionRun}
                     onClick={() => {
                       if (attentionRun) {
-                        redirect("show", "runs", attentionRun.run_id);
+                        redirect("show", ResourceName.Runs, attentionRun.run_id);
                       }
                     }}
                   >
@@ -339,7 +340,7 @@ export function Dashboard() {
                 description="Switch to the list view when you want the full operator queue, then filter by state to clear the next item."
                 tone="info"
                 action={
-                  <Button variant="outlined" onClick={() => redirect("list", "runs")}>
+                  <Button variant="outlined" onClick={() => redirect("list", ResourceName.Runs)}>
                     Open queue
                   </Button>
                 }
@@ -499,7 +500,7 @@ export function Dashboard() {
                         key={run.run_id}
                         hover
                         sx={{ cursor: "pointer" }}
-                        onClick={() => redirect("show", "runs", run.run_id)}
+                        onClick={() => redirect("show", ResourceName.Runs, run.run_id)}
                       >
                         <TableCell>
                           <Stack spacing={0.25}>
@@ -536,7 +537,7 @@ export function Dashboard() {
                             color={healthTone === "warning" ? "warning" : "inherit"}
                             onClick={(event) => {
                               event.stopPropagation();
-                              redirect("show", "runs", run.run_id);
+                              redirect("show", ResourceName.Runs, run.run_id);
                             }}
                           >
                             Inspect

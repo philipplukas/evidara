@@ -3,13 +3,14 @@
 import { Box } from "@mui/material";
 import { NumberField, Show, SimpleShowLayout, TextField } from "react-admin";
 import { SwissDateField } from "../../components/SwissDateField";
+import { ResourceName } from "../../domain/resourceNames";
 import { RunActionStack } from "./RunActions";
 import { RunDetailSections } from "./RunDetailSections";
 
 export function PreviewReviewShow() {
   return (
     <Show
-      resource="preview-review"
+      resource={ResourceName.PreviewReview}
       title="Preview Review"
       queryOptions={{ meta: { mode: "preview" } }}
     >

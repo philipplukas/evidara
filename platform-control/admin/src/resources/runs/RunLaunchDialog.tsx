@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDataProvider, useGetList, useNotify, useRedirect } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 import type {
   RunCreateInput,
   RunReadiness,
@@ -34,13 +35,15 @@ const LIST_PARAMS = {
   sort: { field: "name", order: "ASC" as const },
 };
 
+type RunLaunchRedirectResource = typeof ResourceName.Runs | typeof ResourceName.PreviewReview;
+
 type RunLaunchButtonProps = {
   label: string;
   buttonVariant?: "contained" | "outlined" | "text";
   buttonColor?: "primary" | "secondary";
   defaultMode?: "preview" | "production";
   allowedModes?: Array<"preview" | "production">;
-  redirectResource?: "runs" | "preview-review";
+  redirectResource?: RunLaunchRedirectResource;
 };
 
 type RunLaunchFormState = {
@@ -93,7 +96,7 @@ export function RunLaunchButton({
   buttonColor = "primary",
   defaultMode = "production",
   allowedModes = ["preview", "production"],
-  redirectResource = "runs",
+  redirectResource = ResourceName.Runs,
 }: RunLaunchButtonProps) {
   const dataProvider = useDataProvider();
   const notify = useNotify();
@@ -108,7 +111,7 @@ export function RunLaunchButton({
   const [formState, setFormState] = useState<RunLaunchFormState>(createInitialState(initialMode));
   const readinessCheckStartedAtRef = useRef<number | null>(null);
 
-  const sources = useGetList<SourceRecord>("sources", {
+  const sources = useGetList<SourceRecord>(ResourceName.Sources, {
     ...LIST_PARAMS,
     filter: {},
   });
@@ -169,7 +172,7 @@ export function RunLaunchButton({
   const submit = async () => {
     try {
       setIsSubmitting(true);
-      const result = await dataProvider.create<RunRecord>("runs", {
+      const result = await dataProvider.create<RunRecord>(ResourceName.Runs, {
         data: formState as RunCreateInput,
       });
       if (typeof window !== "undefined") {

@@ -26,6 +26,7 @@ import {
   Resource,
   TitlePortal,
 } from "react-admin";
+import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
 import {
   ACCENT_CORE,
@@ -608,7 +609,7 @@ export default function AdminApp() {
         }}
       />
       <Resource
-        name="jurisdictions"
+        name={ResourceName.Jurisdictions}
         list={JurisdictionList}
         create={JurisdictionCreate}
         edit={JurisdictionEdit}
@@ -616,7 +617,7 @@ export default function AdminApp() {
         options={{ label: "Jurisdictions" }}
       />
       <Resource
-        name="authorities"
+        name={ResourceName.Authorities}
         list={AuthorityList}
         create={AuthorityCreate}
         edit={AuthorityEdit}
@@ -624,7 +625,7 @@ export default function AdminApp() {
         options={{ label: "Authorities" }}
       />
       <Resource
-        name="sources"
+        name={ResourceName.Sources}
         list={SourceList}
         create={SourceCreate}
         show={SourceShow}
@@ -632,13 +633,18 @@ export default function AdminApp() {
         options={{ label: "Sources" }}
       />
       <Resource
-        name="preview-review"
+        name={ResourceName.PreviewReview}
         list={PreviewReviewList}
         show={PreviewReviewShow}
         recordRepresentation="run_id"
         options={{ label: "Preview Review" }}
       />
-      <Resource name="runs" list={RunList} show={RunShow} recordRepresentation="run_id" />
+      <Resource
+        name={ResourceName.Runs}
+        list={RunList}
+        show={RunShow}
+        recordRepresentation="run_id"
+      />
     </Admin>
   );
 }

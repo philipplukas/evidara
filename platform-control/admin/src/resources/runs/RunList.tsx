@@ -13,6 +13,7 @@ import {
   useRedirect,
 } from "react-admin";
 import { SwissDateField } from "../../components/SwissDateField";
+import { ResourceName } from "../../domain/resourceNames";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { runModeToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
 import { CancelRunButton } from "./RunActions";
@@ -245,7 +246,7 @@ function RunQueueHeader() {
         return;
       }
 
-      redirect("show", "runs", shortcut.runId);
+      redirect("show", ResourceName.Runs, shortcut.runId);
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -306,7 +307,7 @@ function RunQueueHeader() {
               <RunLaunchButton
                 label="Create Run"
                 defaultMode="production"
-                redirectResource="runs"
+                redirectResource={ResourceName.Runs}
               />
               <Button
                 variant="outlined"
@@ -314,7 +315,7 @@ function RunQueueHeader() {
                 disabled={!attentionRun}
                 onClick={() => {
                   if (attentionRun) {
-                    redirect("show", "runs", attentionRun.run_id);
+                    redirect("show", ResourceName.Runs, attentionRun.run_id);
                   }
                 }}
               >
@@ -487,7 +488,7 @@ function RunQueueHeader() {
                 variant="outlined"
                 color="warning"
                 onClick={() => {
-                  redirect("show", "runs", attentionRun.run_id);
+                  redirect("show", ResourceName.Runs, attentionRun.run_id);
                 }}
                 sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}
               >
@@ -561,7 +562,7 @@ function RunListGrid() {
 export function RunList() {
   return (
     <List
-      resource="runs"
+      resource={ResourceName.Runs}
       title="Runs"
       perPage={25}
       sort={{ field: "created_at", order: "DESC" }}

@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { Role } from "../domain/roles";
 import {
+  DEFAULT_ADMIN_ALLOWED_ROLES,
   isRoleAuthorized,
   normalizeRole,
   parseAllowedRoles,
@@ -43,8 +45,9 @@ export default function AdminShell() {
   const fallbackRole = normalizeRole(process.env.NEXT_PUBLIC_USER_ROLE);
   const [userRole, setUserRole] = useState(fallbackRole);
   const [isRoleResolved, setIsRoleResolved] = useState(false);
-  const allowedRoles = parseAllowedRoles(process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES ?? "admin");
-  const effectiveAllowedRoles = allowedRoles.length > 0 ? allowedRoles : ["admin"];
+  const allowedRoles = parseAllowedRoles(process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES ?? Role.Admin);
+  const effectiveAllowedRoles =
+    allowedRoles.length > 0 ? allowedRoles : [...DEFAULT_ADMIN_ALLOWED_ROLES];
   const legalSearchUrl =
     process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
   const [handoff, setHandoff] = useState(() => resolveLegalSearchHandoff(null, legalSearchUrl));
