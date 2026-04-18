@@ -69,7 +69,7 @@ Produces 22 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
   `admin-jurisdiction-create-v2.png`, `admin-jurisdiction-edit-v2.png` —
   Tailwind + `ra-core` ports using the graduated primitives in
   `platform-control/admin/src/ui/primitives/`. Pass 4 diff review concluded
-  on 2026-04-18; see ADR-0025.
+  on 2026-04-18; see ADR-0026.
 
 The spec hides Next.js dev indicators and TanStack Query devtools by stripping
 the corresponding shadow-DOM hosts before each screenshot — confirm none bleed
@@ -162,7 +162,7 @@ Pass 4 concluded **proceed with graduation**. Primitives moved from
 `platform-control/admin/src/ui/primitives/`; `Spike*` prefixes dropped;
 `TextField` renamed to `TextInput` (matches ra-core naming). V2 pages
 keep the `V2` suffix and coexist with MUI originals until they reach
-parity (per ADR-0025 migration phases). A second form pair —
+parity (per ADR-0026 migration phases). A second form pair —
 `JurisdictionCreateV2` / `JurisdictionEditV2` — shipped alongside the
 graduation because it's a trivial pattern copy of the authority form.
 

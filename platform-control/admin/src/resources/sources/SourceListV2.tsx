@@ -2,7 +2,7 @@
  * `SourceListV2` — v2 preview of the sources list, rendered with Tailwind +
  * `ra-core` primitives from `src/ui/primitives/`. Mounted at `/sources-v2`
  * via `<CustomRoutes>` while the MUI `SourceList` stays canonical at
- * `/sources`; per ADR-0025 migration plan the v2 page replaces the MUI
+ * `/sources`; per ADR-0026 migration plan the v2 page replaces the MUI
  * version once it reaches parity.
  *
  *   - `useListController` drives list-page behaviour (sort, pagination,
@@ -175,7 +175,7 @@ export default function SourceListV2() {
               <code className="font-mono text-[12px]">src/ui/primitives/</code> and{" "}
               <code className="font-mono text-[12px]">ra-core</code> hooks instead of MUI. Replaces
               the MUI page at <code className="font-mono text-[12px]">/sources</code> once it
-              reaches parity (see ADR-0025).
+              reaches parity (see ADR-0026).
             </p>
           </header>
 

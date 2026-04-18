@@ -1,4 +1,4 @@
-# ADR-0025: Admin UI — Tailwind + ra-core (amending ADR-0015)
+# ADR-0026: Admin UI — Tailwind + ra-core (amending ADR-0015)
 
 ## Status
 

@@ -8,7 +8,7 @@
  * Deferred until follow-up increments (see the deferred-panel footnote
  * on the page itself):
  *   - `RunDetailSections` — accordion stack with 5 nested fetches; needs
- *     the `Accordion` primitive (ADR-0025 phase P3).
+ *     the `Accordion` primitive (ADR-0026 phase P3).
  *   - `RunHandoffCard` — stateful URL-param read; ports with the shell.
  *   - `RunActionStack` (cancel button) — mutation migration.
  *
