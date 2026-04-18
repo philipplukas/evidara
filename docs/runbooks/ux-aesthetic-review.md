@@ -53,7 +53,7 @@ NEXT_PUBLIC_ADMIN_ALLOWED_ROLES=admin \
 pnpm exec playwright test e2e/screenshot-pack.spec.ts --reporter=list
 ```
 
-Produces 14 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
+Produces 22 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
 
 - `cross-surface-header-navigation.png`
 - `legal-search-result-list.png`
@@ -63,6 +63,13 @@ Produces 14 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
 - `admin-dashboard.png`, `admin-run-launch-preflight.png`,
   `admin-run-lifecycle-visibility.png`, `admin-source-detail.png`
 - `mobile-search-home.png`, `mobile-result-list.png`, `mobile-detail-sheet.png`
+- **Pass 4 graduation:** `admin-sources-list-v2.png`, `admin-source-detail-v2.png`,
+  `admin-runs-list-v2.png`, `admin-run-detail-v2.png`,
+  `admin-authority-create-v2.png`, `admin-authority-edit-v2.png`,
+  `admin-jurisdiction-create-v2.png`, `admin-jurisdiction-edit-v2.png` —
+  Tailwind + `ra-core` ports using the graduated primitives in
+  `platform-control/admin/src/ui/primitives/`. Pass 4 diff review concluded
+  on 2026-04-18; see ADR-0026.
 
 The spec hides Next.js dev indicators and TanStack Query devtools by stripping
 the corresponding shadow-DOM hosts before each screenshot — confirm none bleed
@@ -140,7 +147,39 @@ Severity scale: **Critical** (blocks release) / **High** / **Medium** / **Low**.
 
 ### 6.2 Open
 
-_All Pass 3 findings resolved in this batch. Next review pass will start from a fresh screenshot capture._
+**Pass 4 — open**
+
+| ID | Sev | Finding | Status |
+|----|-----|---------|--------|
+| UX-12 | Normal | Pass 4 spike ships six Tailwind + `ra-core` ports alongside the MUI versions: sources list (`/sources-v2`), sources show (`/sources-v2/:id`), runs list (`/runs-v2`), runs show (`/runs-v2/:id`), authority create (`/authorities-v2/create`), authority edit (`/authorities-v2/:id/edit`). The matrix covers list / detail / filter / create / edit + a large detail page (`RunShowV2`) with derived content (decision-support 2×2, duration compute), exercising `useListController`, `useShowController`, `useGetMany`, `useGetOne`, `Form`, `useInput`, `useCreateController`, `useEditController`, and `useNotify` with zero MUI primitives. Captures: `admin-sources-list-v2.png`, `admin-source-detail-v2.png`, `admin-runs-list-v2.png`, `admin-run-detail-v2.png`, `admin-authority-create-v2.png`, `admin-authority-edit-v2.png`. | **Review** — diff the v1/v2 pairs, decide graduate-to-`@evidara/ui` vs. discard. Deferred from the spike (all intentional, all listed as follow-up increments): bulk selection, MUI `SelectInput` (jurisdiction dropdown), source-versions section, handoff panel, `RunDetailSections` accordion stack, run mutations (`CancelRunButton`, `RunLaunchButton`), keyboard shortcuts, scope/slug-change alerts. See header comments in `SourceListV2.tsx`, `SourceShowV2.tsx`, `RunListV2.tsx`, `RunShowV2.tsx`, `AuthorityCreateV2.tsx`, `AuthorityEditV2.tsx`, `AuthorityFormV2.tsx`, and `_spike/` primitives. Notifications still render via the MUI shell's `<Notification>` — intentional coexistence until the shell ports. |
+
+_All Pass 3 findings were resolved in the previous batch._
+
+#### UX-12 — Pass 4 outcome (2026-04-18)
+
+Pass 4 concluded **proceed with graduation**. Primitives moved from
+`platform-control/admin/src/resources/sources/_spike/` to
+`platform-control/admin/src/ui/primitives/`; `Spike*` prefixes dropped;
+`TextField` renamed to `TextInput` (matches ra-core naming). V2 pages
+keep the `V2` suffix and coexist with MUI originals until they reach
+parity (per ADR-0026 migration phases). A second form pair —
+`JurisdictionCreateV2` / `JurisdictionEditV2` — shipped alongside the
+graduation because it's a trivial pattern copy of the authority form.
+
+#### UX-12 sub-findings (from first visual pass, 2026-04-18)
+
+Structured findings from the first side-by-side review of the v1/v2 pack.
+Resolve inside `_spike/*` (or the v2 page files) and re-capture before
+promoting to `@evidara/ui`. All "proceed-with-graduation" severity —
+none are architectural.
+
+| ID | Sev | Finding | Action |
+|----|-----|---------|--------|
+| UX-12.1 | Low | v2 card elevation was sharper than v1: spike primitives hard-coded `0_18px_44px_rgba(29,41,61,0.06)` while MUI used a different `SHADOW_CARD`. | **Fixed (2026-04-18).** Promoted both `--shadow-card` and `--shadow-card-hover` to CSS custom properties in `globals.css`; `designTokens.ts` now exports them as `var(...)` strings so MUI theme and Tailwind utilities read from a single source. All v2 primitives use `shadow-[var(--shadow-card)]`. |
+| UX-12.2 | Low | "Deferred in this spike" aside on `/sources-v2/:id` and `/runs-v2/:id` was prominent enough to be read as immaturity rather than intentional deferral. | **Fixed (2026-04-18).** Reworked as a compact footnote: smaller radius, lighter dashed border, 11px text, single-paragraph summary instead of bulleted list. Still visible but reads as a footnote rather than a card. |
+| UX-12.3 | Normal | Runs list v2 drops the gradient hero panel that v1 uses to onboard operators ("Task-led run operations" + keyboard-shortcut hint). | **Open** — design call, not a defect: re-add as a compact banner component if operator onboarding matters; keep dropped for power-user density. |
+| UX-12.4 | Low | "Active" status pill appeared twice on v2 source-show (header + lifecycle card). | **Fixed (2026-04-18).** Dropped the pill from the lifecycle card; kept it in the header. Card keeps its heading, description, and status-detail copy so the contextual meaning isn't lost. |
+| UX-12.5 | Normal | MUI shell chrome is subtitle-mismatched on v2 pages (`Source lifecycle, approval state, and run operations.` shows on `/runs-v2` and `/authorities-v2/*`). | **Open** — pre-existing chrome bug exposed by v2; fixes when the shell migrates. Track here so it's not silently carried forward. |
 
 ## 7. Linear sync — roadmap and templates
 
