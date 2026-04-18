@@ -15,9 +15,7 @@ from platform_control.database import reset_database_caches
 from platform_control.models.base import Base
 
 
-def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item]
-) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     if os.environ.get("EVIDARA_TEMPORAL_TESTS") == "1":
         return
     skip_marker = pytest.mark.skip(
