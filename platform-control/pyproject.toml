@@ -53,6 +53,9 @@ artifacts = ["src/platform_control/hierarchies/*.yaml"]
 asyncio_mode = "auto"
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+  "temporal: test requires the Temporal test server binary (downloaded from temporal.download); skipped by default, set EVIDARA_TEMPORAL_TESTS=1 to run",
+]
 
 [tool.ruff]
 line-length = 100

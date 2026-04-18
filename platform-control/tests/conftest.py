@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -12,6 +13,20 @@ from platform_control import models as _models  # noqa: F401
 from platform_control.config import get_settings
 from platform_control.database import reset_database_caches
 from platform_control.models.base import Base
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    if os.environ.get("EVIDARA_TEMPORAL_TESTS") == "1":
+        return
+    skip_marker = pytest.mark.skip(
+        reason="Temporal test server download requires network egress to temporal.download; "
+        "set EVIDARA_TEMPORAL_TESTS=1 to run"
+    )
+    for item in items:
+        if "temporal" in item.keywords:
+            item.add_marker(skip_marker)
 
 
 @pytest_asyncio.fixture

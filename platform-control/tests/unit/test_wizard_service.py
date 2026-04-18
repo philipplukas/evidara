@@ -69,6 +69,7 @@ async def test_wizard_state_guards_and_transitions(session) -> None:
     assert run.state is WizardRunState.SCALED_RUN
 
 
+@pytest.mark.temporal
 @pytest.mark.asyncio
 async def test_temporal_orchestrator_starts_workflow_and_signals(
     session_maker: async_sessionmaker[AsyncSession],
@@ -123,6 +124,7 @@ async def test_temporal_orchestrator_starts_workflow_and_signals(
             assert await handle.result() == "scaled"
 
 
+@pytest.mark.temporal
 @pytest.mark.asyncio
 async def test_temporal_orchestrator_starts_standalone_child_workflows(
     session_maker: async_sessionmaker[AsyncSession],
