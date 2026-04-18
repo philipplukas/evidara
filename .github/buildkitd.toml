@@ -1,0 +1,10 @@
+# BuildKit daemon config for self-hosted runners.
+#
+# Mirrors docker.io through Google's public pull-through cache to sidestep the
+# Docker Hub anonymous pull rate limit that broke PR image builds on the
+# shared `evidara-heavy` scale-set (#274). Google's mirror is a transport-only
+# proxy for public Docker Hub images; private images and push targets are
+# unaffected. See docs/adr/ follow-up if we later pin base images by digest.
+
+[registry."docker.io"]
+  mirrors = ["mirror.gcr.io"]
