@@ -2,10 +2,11 @@
 
 import { Datagrid, EditButton, List, TextField } from "react-admin";
 import { SwissDateField } from "../../components/SwissDateField";
+import { ResourceName } from "../../domain/resourceNames";
 
 export function JurisdictionList() {
   return (
-    <List resource="jurisdictions" title="Jurisdictions" perPage={50}>
+    <List resource={ResourceName.Jurisdictions} title="Jurisdictions" perPage={50}>
       <Datagrid bulkActionButtons={false}>
         <TextField source="jurisdiction_id" label="Jurisdiction" />
         <TextField source="name" label="Name" />

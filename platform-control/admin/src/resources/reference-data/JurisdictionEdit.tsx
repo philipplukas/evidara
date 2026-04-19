@@ -2,6 +2,7 @@
 
 import { Alert, Stack } from "@mui/material";
 import { Edit, required, SimpleForm, TextInput, useRecordContext } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 import type { JurisdictionRecord } from "../../lib/admin/dataProvider";
 import {
   ReferenceFormSection,
@@ -52,7 +53,7 @@ function JurisdictionEditFormBody() {
 
 export function JurisdictionEdit() {
   return (
-    <Edit resource="jurisdictions" title="Edit Jurisdiction" redirect="list">
+    <Edit resource={ResourceName.Jurisdictions} title="Edit Jurisdiction" redirect="list">
       <SimpleForm warnWhenUnsavedChanges sanitizeEmptyValues>
         <JurisdictionEditFormBody />
       </SimpleForm>

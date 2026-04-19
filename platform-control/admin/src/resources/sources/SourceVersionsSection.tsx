@@ -32,6 +32,7 @@ import {
   useRedirect,
   useRefresh,
 } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 import type {
   AcquisitionSpec,
   DeterministicHttpAcquisitionSpec,
@@ -943,7 +944,7 @@ export function SourceVersionsSection() {
   const createRun = async (mode: "preview" | "production", version: SourceVersionRecord) => {
     try {
       setActionVersionId(version.source_version_id);
-      const result = await dataProvider.create<RunRecord>("runs", {
+      const result = await dataProvider.create<RunRecord>(ResourceName.Runs, {
         data: {
           source_id: source.source_id,
           source_version_id: version.source_version_id,
@@ -953,7 +954,7 @@ export function SourceVersionsSection() {
       notify(`${mode === "preview" ? "Preview" : "Production"} run created.`, {
         type: "success",
       });
-      redirect("show", "runs", result.data.id, result.data);
+      redirect("show", ResourceName.Runs, result.data.id, result.data);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Unable to create run.", {
         type: "error",

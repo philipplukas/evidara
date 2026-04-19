@@ -1,12 +1,13 @@
 "use client";
 
 import { publicConfig } from "../../config/publicConfig";
+import { HandoffOriginValue, NavigationParam } from "../../domain/navigationParams";
 
-const HANDOFF_ORIGIN_PARAM = "from";
-const HANDOFF_RETURN_TO_PARAM = "ls_return_to";
-const HANDOFF_QUERY_PARAM = "ls_query";
-const HANDOFF_SCOPE_PARAM = "ls_scope";
-const HANDOFF_ITEM_PARAM = "ls_item";
+const HANDOFF_ORIGIN_PARAM = NavigationParam.HandoffOrigin;
+const HANDOFF_RETURN_TO_PARAM = NavigationParam.HandoffReturnTo;
+const HANDOFF_QUERY_PARAM = NavigationParam.HandoffQuery;
+const HANDOFF_SCOPE_PARAM = NavigationParam.HandoffScope;
+const HANDOFF_ITEM_PARAM = NavigationParam.HandoffItem;
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
@@ -86,7 +87,8 @@ export function resolveLegalSearchHandoff(
   }
 
   return {
-    hasOrigin: (searchParams?.get(HANDOFF_ORIGIN_PARAM) ?? "").trim() === "legal-search",
+    hasOrigin:
+      (searchParams?.get(HANDOFF_ORIGIN_PARAM) ?? "").trim() === HandoffOriginValue.LegalSearch,
     returnToUrl,
     query: normalizeValue(searchParams?.get(HANDOFF_QUERY_PARAM) ?? null),
     scopeLabel: normalizeValue(searchParams?.get(HANDOFF_SCOPE_PARAM) ?? null),

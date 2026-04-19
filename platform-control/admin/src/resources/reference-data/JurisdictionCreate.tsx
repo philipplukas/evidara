@@ -2,6 +2,7 @@
 
 import { Alert, Stack } from "@mui/material";
 import { Create, required, SimpleForm, TextInput } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 import {
   ReferenceFormSection,
   referenceSlugHelperText,
@@ -10,7 +11,7 @@ import {
 
 export function JurisdictionCreate() {
   return (
-    <Create resource="jurisdictions" title="Create Jurisdiction" redirect="list">
+    <Create resource={ResourceName.Jurisdictions} title="Create Jurisdiction" redirect="list">
       <SimpleForm warnWhenUnsavedChanges sanitizeEmptyValues>
         <Stack spacing={2}>
           <Alert severity="info" variant="outlined">

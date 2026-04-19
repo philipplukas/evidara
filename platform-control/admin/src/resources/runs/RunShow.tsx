@@ -11,6 +11,7 @@ import {
   useRecordContext,
 } from "react-admin";
 import { SwissDateField } from "../../components/SwissDateField";
+import { ResourceName } from "../../domain/resourceNames";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import {
   describeLegalSearchHandoff,
@@ -353,7 +354,7 @@ function RunFieldCell({ label, children }: { label: string; children: ReactNode 
 
 export function RunShow() {
   return (
-    <Show resource="runs" title="Run Detail">
+    <Show resource={ResourceName.Runs} title="Run Detail">
       <SimpleShowLayout>
         <RunHandoffCard />
         <RunPageContextBar />

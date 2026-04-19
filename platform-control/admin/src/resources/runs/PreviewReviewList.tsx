@@ -2,6 +2,7 @@
 
 import { Datagrid, List, NumberField, SelectInput, TextField, TopToolbar } from "react-admin";
 import { SwissDateField } from "../../components/SwissDateField";
+import { ResourceName } from "../../domain/resourceNames";
 import { CancelRunButton } from "./RunActions";
 import { RunLaunchButton } from "./RunLaunchDialog";
 
@@ -28,7 +29,7 @@ function PreviewReviewActions() {
         label="Create Preview Run"
         defaultMode="preview"
         allowedModes={["preview"]}
-        redirectResource="preview-review"
+        redirectResource={ResourceName.PreviewReview}
       />
     </TopToolbar>
   );
@@ -37,7 +38,7 @@ function PreviewReviewActions() {
 export function PreviewReviewList() {
   return (
     <List
-      resource="preview-review"
+      resource={ResourceName.PreviewReview}
       title="Preview Review"
       perPage={25}
       sort={{ field: "created_at", order: "DESC" }}

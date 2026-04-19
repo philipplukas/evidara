@@ -11,6 +11,7 @@ import {
   useRecordContext,
 } from "react-admin";
 import { SwissDateField } from "../../components/SwissDateField";
+import { ResourceName } from "../../domain/resourceNames";
 import type {
   AuthorityRecord,
   JurisdictionRecord,
@@ -202,7 +203,7 @@ function SourceFieldCell({ label, children }: { label: string; children: ReactNo
 
 export function SourceShow() {
   return (
-    <Show resource="sources" title="Source">
+    <Show resource={ResourceName.Sources} title="Source">
       <SimpleShowLayout>
         <SourceHandoffPanel />
         <SourcePageContextBar />
@@ -225,7 +226,11 @@ export function SourceShow() {
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <SourceFieldCell label="Jurisdiction">
-              <ReferenceField source="jurisdiction_id" reference="jurisdictions" link={false}>
+              <ReferenceField
+                source="jurisdiction_id"
+                reference={ResourceName.Jurisdictions}
+                link={false}
+              >
                 <FunctionField<JurisdictionRecord>
                   render={(record) => formatReferenceLabel(record)}
                 />
@@ -234,7 +239,11 @@ export function SourceShow() {
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <SourceFieldCell label="Authority">
-              <ReferenceField source="authority_id" reference="authorities" link={false}>
+              <ReferenceField
+                source="authority_id"
+                reference={ResourceName.Authorities}
+                link={false}
+              >
                 <FunctionField<AuthorityRecord> render={(record) => formatReferenceLabel(record)} />
               </ReferenceField>
             </SourceFieldCell>

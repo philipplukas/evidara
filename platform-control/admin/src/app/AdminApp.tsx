@@ -23,6 +23,7 @@ import { CustomRoutes } from "ra-core";
 import type { ReactNode } from "react";
 import { Admin, Resource } from "react-admin";
 import { Route } from "react-router-dom";
+import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
 import { Dashboard } from "../resources/dashboard/Dashboard";
 import { AuthorityCreate } from "../resources/reference-data/AuthorityCreate";
@@ -63,7 +64,7 @@ export default function AdminApp() {
       layout={AdminLayout}
     >
       <Resource
-        name="jurisdictions"
+        name={ResourceName.Jurisdictions}
         list={JurisdictionList}
         create={JurisdictionCreate}
         edit={JurisdictionEdit}
@@ -71,7 +72,7 @@ export default function AdminApp() {
         options={{ label: "Jurisdictions" }}
       />
       <Resource
-        name="authorities"
+        name={ResourceName.Authorities}
         list={AuthorityList}
         create={AuthorityCreate}
         edit={AuthorityEdit}
@@ -79,7 +80,7 @@ export default function AdminApp() {
         options={{ label: "Authorities" }}
       />
       <Resource
-        name="sources"
+        name={ResourceName.Sources}
         list={SourceList}
         create={SourceCreate}
         show={SourceShow}
@@ -87,13 +88,18 @@ export default function AdminApp() {
         options={{ label: "Sources" }}
       />
       <Resource
-        name="preview-review"
+        name={ResourceName.PreviewReview}
         list={PreviewReviewList}
         show={PreviewReviewShow}
         recordRepresentation="run_id"
         options={{ label: "Preview Review" }}
       />
-      <Resource name="runs" list={RunList} show={RunShow} recordRepresentation="run_id" />
+      <Resource
+        name={ResourceName.Runs}
+        list={RunList}
+        show={RunShow}
+        recordRepresentation="run_id"
+      />
       {/*
        * Tailwind + ra-core v2 previews (coexistence window, see ADR-0026).
        * Each pair lives alongside the MUI canonical page until the

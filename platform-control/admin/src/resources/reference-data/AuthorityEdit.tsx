@@ -2,6 +2,7 @@
 
 import { Alert, Stack } from "@mui/material";
 import { Edit, required, SimpleForm, TextInput, useRecordContext } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 import type { AuthorityRecord } from "../../lib/admin/dataProvider";
 import {
   AuthorityScopeChangeAlert,
@@ -69,7 +70,7 @@ function AuthorityEditFormBody() {
 
 export function AuthorityEdit() {
   return (
-    <Edit resource="authorities" title="Edit Authority" redirect="list">
+    <Edit resource={ResourceName.Authorities} title="Edit Authority" redirect="list">
       <SimpleForm warnWhenUnsavedChanges sanitizeEmptyValues>
         <AuthorityEditFormBody />
       </SimpleForm>

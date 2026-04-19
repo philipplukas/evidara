@@ -4,6 +4,7 @@ import { Alert, AlertTitle, Paper, Stack, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import { SelectInput, useGetList, type Validator } from "react-admin";
 import { useWatch } from "react-hook-form";
+import { ResourceName } from "../../domain/resourceNames";
 import type { AuthorityRecord, JurisdictionRecord } from "../../lib/admin/dataProvider";
 import {
   filterAuthoritiesByJurisdiction,
@@ -265,7 +266,7 @@ export function JurisdictionSelectInput({
   helperText,
   validate,
 }: JurisdictionSelectInputProps) {
-  const jurisdictions = useGetList<JurisdictionRecord>("jurisdictions", {
+  const jurisdictions = useGetList<JurisdictionRecord>(ResourceName.Jurisdictions, {
     ...LIST_PARAMS,
     filter: {},
   });
@@ -320,7 +321,7 @@ export function AuthoritySelectInput({
   jurisdictionId,
   validate,
 }: AuthoritySelectInputProps) {
-  const authorities = useGetList<AuthorityRecord>("authorities", {
+  const authorities = useGetList<AuthorityRecord>(ResourceName.Authorities, {
     ...LIST_PARAMS,
     filter: {},
   });

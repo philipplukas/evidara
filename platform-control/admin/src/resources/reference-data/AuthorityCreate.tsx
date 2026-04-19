@@ -2,6 +2,7 @@
 
 import { Alert, Stack } from "@mui/material";
 import { Create, required, SimpleForm, TextInput } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 import {
   AuthorityScopeChangeAlert,
   JurisdictionSelectInput,
@@ -12,7 +13,7 @@ import {
 
 export function AuthorityCreate() {
   return (
-    <Create resource="authorities" title="Create Authority" redirect="list">
+    <Create resource={ResourceName.Authorities} title="Create Authority" redirect="list">
       <SimpleForm warnWhenUnsavedChanges sanitizeEmptyValues>
         <Stack spacing={2}>
           <Alert severity="info" variant="outlined">

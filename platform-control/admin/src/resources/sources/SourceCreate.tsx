@@ -14,6 +14,7 @@ import {
   useRedirect,
 } from "react-admin";
 import { useWatch } from "react-hook-form";
+import { ResourceName } from "../../domain/resourceNames";
 import {
   controlPlaneActions,
   type FedlexSparqlAcquisitionSpec,
@@ -251,11 +252,11 @@ export function SourceCreate() {
       },
     });
     notify("Source and initial version created from overlay template.", { type: "success" });
-    redirect("show", "sources", result.data.id, result.data);
+    redirect("show", ResourceName.Sources, result.data.id, result.data);
   };
 
   return (
-    <Create resource="sources" title="Create Source">
+    <Create resource={ResourceName.Sources} title="Create Source">
       <SimpleForm
         defaultValues={{
           source_type: "website",
