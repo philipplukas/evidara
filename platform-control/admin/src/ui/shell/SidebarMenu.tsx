@@ -1,0 +1,140 @@
+/**
+ * `SidebarMenu` — Tailwind-rendered admin sidebar.
+ *
+ * Replaces `EvidaraAdminMenu` (MUI). Auto-renders one link per registered
+ * resource (via `useResourceDefinitions` from `ra-core`) plus any extra
+ * items passed through from `AppShell` (v2-preview entries today).
+ *
+ * Selected-state styling uses `ACCENT_CORE_SUBTLE` from the shared token
+ * palette — matches the v1 MUI `Mui-selected` background, so the "where am
+ * I" cue stays consistent for operators across the P4a cutover.
+ */
+"use client";
+
+import { FlaskConical } from "lucide-react";
+import { useResourceDefinitions } from "ra-core";
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import { NavLink } from "react-router-dom";
+import {
+  describeLegalSearchHandoff,
+  type LegalSearchHandoff,
+  resolveLegalSearchHandoff,
+} from "../../lib/admin/navigationContext";
+
+const LEGAL_SEARCH_URL =
+  process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
+
+export interface SidebarMenuExtraItem {
+  to: string;
+  label: string;
+  icon?: ReactNode;
+  /** `"preview"` marks v2-preview entries; we render a FlaskConical icon. */
+  kind?: "preview" | "custom";
+}
+
+interface SidebarMenuProps {
+  extraItems?: SidebarMenuExtraItem[];
+}
+
+function navItemClass(isActive: boolean): string {
+  const base =
+    "flex items-center gap-3 mx-[10px] my-1 px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold leading-tight transition-[background-color,transform] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(15,76,129,0.42)]";
+  if (isActive) {
+    // Violet (ACCENT_CORE_SUBTLE) background + violet text matches the v1 MUI
+    // Mui-selected state. Operators recognise this as the "current page" cue.
+    return `${base} bg-[var(--accent-core-subtle)] text-[var(--accent-core)] shadow-[inset_0_0_0_1px_rgba(98,70,217,0.22)] hover:bg-[var(--accent-core-muted)]`;
+  }
+  return `${base} text-[#1d293d] hover:bg-[var(--interactive-accent-subtle)]`;
+}
+
+function labelForResource(name: string, options: { label?: string } | undefined): string {
+  const raw = options?.label ?? name;
+  // Capitalise first letter if ra-core didn't supply a human label.
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
+  const definitions = useResourceDefinitions();
+  const [handoff, setHandoff] = useState<LegalSearchHandoff>(() =>
+    resolveLegalSearchHandoff(null, LEGAL_SEARCH_URL),
+  );
+
+  useEffect(() => {
+    setHandoff(
+      resolveLegalSearchHandoff(new URLSearchParams(window.location.search), LEGAL_SEARCH_URL),
+    );
+  }, []);
+
+  const resourceEntries = Object.values(definitions).filter((r) => r?.hasList);
+  const footerLabel =
+    handoff.hasOrigin && handoff.query ? "Return to active search" : "Back to legal search";
+  const footerSecondary = describeLegalSearchHandoff(handoff);
+
+  return (
+    <nav
+      aria-label="Primary navigation"
+      className="flex flex-col h-full min-h-[calc(100vh-80px)] pt-4 md:pt-6"
+    >
+      <ul className="flex-shrink-0 list-none m-0 p-0">
+        {resourceEntries.map((resource) => (
+          <li key={resource.name}>
+            <NavLink
+              to={`/${resource.name}`}
+              className={({ isActive }) => navItemClass(isActive)}
+              end={false}
+            >
+              <span>{labelForResource(resource.name, resource.options)}</span>
+            </NavLink>
+          </li>
+        ))}
+        {extraItems.length > 0 ? (
+          <li className="mx-[10px] my-2">
+            <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[rgba(29,41,61,0.5)] px-[14px]">
+              Previews
+            </div>
+          </li>
+        ) : null}
+        {extraItems.map((item) => (
+          <li key={item.to}>
+            <NavLink to={item.to} className={({ isActive }) => navItemClass(isActive)}>
+              <span className="text-[var(--accent-core)] flex items-center" aria-hidden>
+                {item.icon ?? <FlaskConical size={16} strokeWidth={2} />}
+              </span>
+              <span>{item.label}</span>
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+
+      {/* Footer — "Back to legal search" */}
+      <div className="mt-auto pb-3">
+        <div
+          className="py-2"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(248,243,235,0), rgba(248,243,235,0.92) 40%, rgba(248,243,235,0.98))",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div className="mx-4 mb-2 border-t border-[var(--border)]" />
+          <a
+            href={handoff.returnToUrl}
+            className="flex items-center gap-3 mx-[10px] px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold text-[#0f4c81] hover:bg-[var(--interactive-accent-subtle)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(15,76,129,0.42)]"
+          >
+            {/* lucide ArrowLeft lives in AppBar; keep sidebar dep-light */}
+            <span aria-hidden className="text-[#0f4c81]">
+              ←
+            </span>
+            <span className="flex flex-col min-w-0">
+              <span className="leading-tight">{footerLabel}</span>
+              <span className="text-[11px] font-normal text-[rgba(29,41,61,0.62)] truncate">
+                {footerSecondary}
+              </span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </nav>
+  );
+}
