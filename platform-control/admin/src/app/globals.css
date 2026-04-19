@@ -1,3 +1,24 @@
+/*
+ * Tailwind v4 — selective imports only.
+ *
+ * We intentionally skip `@import "tailwindcss"` (which pulls in preflight)
+ * because this app still renders MUI pages, and preflight's aggressive
+ * resets would break MUI's base styling. Importing just the `theme` and
+ * `utilities` layers gives the v2 pages Tailwind's design-token custom
+ * properties and utility classes without touching MUI's base styles.
+ *
+ * Coexists with the shared token import below; once every surface ports
+ * to Tailwind we can switch to a full `@import "tailwindcss"`.
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/*
+ * Canonical design tokens — single source shared with `legal-search/frontend`.
+ * Defines `--shadow-card`, `--shadow-card-hover`, `--brand`, `--accent-core`
+ * etc. Consumed by MUI theme overrides (via `designTokens.ts` re-exports)
+ * and by v2 Tailwind primitives (e.g. `shadow-[var(--shadow-card)]`).
+ */
 @import "../../../../styles/tokens/tokens.css";
 
 html,
@@ -196,6 +217,63 @@ a {
 @keyframes evidara-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/*
+ * Accordion open/close animations — consumed by `src/ui/primitives/Accordion.tsx`.
+ * Radix exposes `--radix-accordion-content-height` on the content node so the
+ * panel can slide from 0 → natural height (and back) without JS measurement.
+ * Wrapped in `prefers-reduced-motion: no-preference` so users who opt out of
+ * animation get instant state changes (the primitive also applies
+ * `motion-reduce:!animate-none` for belt-and-braces).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes accordion-open {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-closed {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+ * Shell toast enter/exit animations — consumed by `src/ui/shell/Toast.tsx`.
+ * Paired with `motion-safe:` so `prefers-reduced-motion: reduce` users skip
+ * the slide and see the toast pop in/out statically.
+ */
+@keyframes evidara-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes evidara-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(8px);
   }
 }
 

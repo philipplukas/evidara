@@ -115,3 +115,6 @@ scripts/deploy-hetzner-runner.sh
 
 # Pnpm store artifacts from local Docker runs
 .pnpm-store/
+
+# --- Claude Code agent harness ---
+.claude/worktrees/

@@ -53,6 +53,9 @@ artifacts = ["src/platform_control/hierarchies/*.yaml"]
 asyncio_mode = "auto"
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+  "requires_network: test needs outbound network access (e.g. temporal-test-server download). Skipped by default; set PYTEST_NETWORK_TESTS=1 to include.",
+]
 
 [tool.ruff]
 line-length = 100
