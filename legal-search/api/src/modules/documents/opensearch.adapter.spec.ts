@@ -26,11 +26,11 @@ describe('DocumentsOpenSearchAdapter', () => {
       {
         get: (key: string) => {
           switch (key) {
-            case 'opensearch.indexDocumentsRead':
+            case 'opensearch.documentsReadAlias':
               return 'documents-read-test';
-            case 'opensearch.indexSections':
+            case 'opensearch.sectionsIndex':
               return 'sections-test';
-            case 'opensearch.indexCitations':
+            case 'opensearch.citationsIndex':
               return 'citations-test';
             default:
               return null;
@@ -72,11 +72,11 @@ describe('DocumentsOpenSearchAdapter', () => {
       {
         get: (key: string) => {
           switch (key) {
-            case 'opensearch.indexDocumentsRead':
+            case 'opensearch.documentsReadAlias':
               return 'documents-read-test';
-            case 'opensearch.indexSections':
+            case 'opensearch.sectionsIndex':
               return 'sections-test';
-            case 'opensearch.indexCitations':
+            case 'opensearch.citationsIndex':
               return 'citations-test';
             default:
               return null;

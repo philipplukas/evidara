@@ -31,9 +31,9 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
     @Inject(ConfigService)
     config: ConfigService,
   ) {
-    this.indexDocuments = config.get<string>('opensearch.indexDocumentsRead') ?? 'documents-read';
-    this.indexSections = config.get<string>('opensearch.indexSections') ?? 'sections';
-    this.indexCitations = config.get<string>('opensearch.indexCitations') ?? 'citations';
+    this.indexDocuments = config.get<string>('opensearch.documentsReadAlias') ?? 'documents-read';
+    this.indexSections = config.get<string>('opensearch.sectionsIndex') ?? 'sections';
+    this.indexCitations = config.get<string>('opensearch.citationsIndex') ?? 'citations';
   }
 
   async getById(id: string): Promise<DocumentEntity | null> {
