@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -12,6 +13,27 @@ from platform_control import models as _models  # noqa: F401
 from platform_control.config import get_settings
 from platform_control.database import reset_database_caches
 from platform_control.models.base import Base
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Skip `requires_network` tests unless PYTEST_NETWORK_TESTS=1.
+
+    Rationale: sandboxed CI and dev environments block outbound traffic to
+    hosts like `temporal.download`, which the temporalio SDK's
+    `WorkflowEnvironment.start_time_skipping` helper needs to fetch an
+    ephemeral test server binary. Marked tests stay visible in `--collect-only`
+    output; an allow-listed CI job can opt in via the env var.
+
+    See: docs/runbooks/pytest-network-marker.md (#278).
+    """
+    if os.environ.get("PYTEST_NETWORK_TESTS") == "1":
+        return
+    skip_marker = pytest.mark.skip(
+        reason="requires outbound network; set PYTEST_NETWORK_TESTS=1 to run"
+    )
+    for item in items:
+        if "requires_network" in item.keywords:
+            item.add_marker(skip_marker)
 
 
 @pytest_asyncio.fixture

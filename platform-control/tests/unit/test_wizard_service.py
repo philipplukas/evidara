@@ -70,6 +70,7 @@ async def test_wizard_state_guards_and_transitions(session) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.requires_network
 async def test_temporal_orchestrator_starts_workflow_and_signals(
     session_maker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -124,6 +125,7 @@ async def test_temporal_orchestrator_starts_workflow_and_signals(
 
 
 @pytest.mark.asyncio
+@pytest.mark.requires_network
 async def test_temporal_orchestrator_starts_standalone_child_workflows(
     session_maker: async_sessionmaker[AsyncSession],
 ) -> None:

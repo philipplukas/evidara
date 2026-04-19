@@ -26,6 +26,28 @@ from platform_control.seed_schemas import (
 DEFAULT_SEED_DIR = Path(__file__).resolve().parents[2] / "seeds"
 
 
+class AliasedIdRenameRequiredError(RuntimeError):
+    """A seed entry declares a deprecated alias that still exists in the DB.
+
+    Renaming a primary-key ID in-place would violate the UNIQUE constraints
+    on `slug` / `name` (both columns have them). Seed upserts must therefore
+    never silently resolve this collision — the caller runs a data migration
+    first, then reseeds. See issue #264 for policy context.
+    """
+
+    def __init__(self, *, model_name: str, table: str, current_id: str, target_id: str) -> None:
+        self.model_name = model_name
+        self.table = table
+        self.current_id = current_id
+        self.target_id = target_id
+        super().__init__(
+            f"{model_name} row {current_id!r} is on the deprecated-alias list "
+            f"for {target_id!r}. A data migration that renames the primary key "
+            f"(and updates FK-referencing rows) must run before reseeding. "
+            f"See issue #264 for the alias-pattern policy."
+        )
+
+
 class ReferenceDataSeeder:
     def __init__(self, session_maker: async_sessionmaker[AsyncSession]) -> None:
         self.session_maker = session_maker
@@ -137,12 +159,23 @@ class ReferenceDataSeeder:
                         "Jurisdiction seed references missing compliance policy: "
                         f"{item.jurisdiction_id} -> {item.compliance_policy_id}"
                     )
-            item_payload = item.model_dump()
             existing = await session.get(Jurisdiction, item.jurisdiction_id)
+            if existing is None:
+                await self._check_alias_collision(
+                    session=session,
+                    model=Jurisdiction,
+                    model_name="Jurisdiction",
+                    table="jurisdictions",
+                    target_id=item.jurisdiction_id,
+                    aliases=item.deprecated_aliases,
+                )
+            item_payload = self._entity_payload(item, exclude={"deprecated_aliases"})
             await self._upsert_entity(
                 existing=existing,
                 create=lambda item_payload=item_payload: Jurisdiction(**item_payload),
-                updates=item.model_dump(exclude={"jurisdiction_id"}),
+                updates=self._entity_payload(
+                    item, exclude={"jurisdiction_id", "deprecated_aliases"}
+                ),
                 session=session,
                 summary=summary,
                 summary_key="jurisdictions",
@@ -161,12 +194,21 @@ class ReferenceDataSeeder:
                     "Authority seed references missing jurisdiction: "
                     f"{item.authority_id} -> {item.jurisdiction_id}"
                 )
-            item_payload = item.model_dump()
             existing = await session.get(Authority, item.authority_id)
+            if existing is None:
+                await self._check_alias_collision(
+                    session=session,
+                    model=Authority,
+                    model_name="Authority",
+                    table="authorities",
+                    target_id=item.authority_id,
+                    aliases=item.deprecated_aliases,
+                )
+            item_payload = self._entity_payload(item, exclude={"deprecated_aliases"})
             await self._upsert_entity(
                 existing=existing,
                 create=lambda item_payload=item_payload: Authority(**item_payload),
-                updates=item.model_dump(exclude={"authority_id"}),
+                updates=self._entity_payload(item, exclude={"authority_id", "deprecated_aliases"}),
                 session=session,
                 summary=summary,
                 summary_key="authorities",
@@ -189,6 +231,45 @@ class ReferenceDataSeeder:
                 summary=summary,
                 summary_key="extractor_profiles",
             )
+
+    @staticmethod
+    async def _check_alias_collision(
+        *,
+        session: AsyncSession,
+        model: type[Any],
+        model_name: str,
+        table: str,
+        target_id: str,
+        aliases: list[str],
+    ) -> None:
+        """Raise AliasedIdRenameRequiredError if any deprecated alias row exists.
+
+        Prevents silently inserting a new row that would collide with an
+        existing aliased row's UNIQUE slug/name. The caller is expected to
+        run the matching data migration (rename PK + update FK references),
+        after which the alias row will no longer exist and the seeder's
+        normal upsert-by-PK path resolves.
+        """
+        for alias in aliases:
+            row = await session.get(model, alias)
+            if row is not None:
+                raise AliasedIdRenameRequiredError(
+                    model_name=model_name,
+                    table=table,
+                    current_id=alias,
+                    target_id=target_id,
+                )
+
+    @staticmethod
+    def _entity_payload(item: Any, *, exclude: set[str]) -> dict[str, Any]:
+        """model_dump with extra fields (like deprecated_aliases) stripped.
+
+        The model class doesn't have a `deprecated_aliases` column — that
+        field only lives in the seed schema as metadata for the migration
+        policy. Attempting to forward it into the SQLAlchemy constructor
+        would raise TypeError.
+        """
+        return item.model_dump(exclude=exclude)
 
     @staticmethod
     async def _upsert_entity(

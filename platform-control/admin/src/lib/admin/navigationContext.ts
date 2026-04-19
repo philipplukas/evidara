@@ -1,5 +1,6 @@
 "use client";
 
+import { publicConfig } from "../../config/publicConfig";
 import { HandoffOriginValue, NavigationParam } from "../../domain/navigationParams";
 
 const HANDOFF_ORIGIN_PARAM = NavigationParam.HandoffOrigin;
@@ -95,8 +96,7 @@ export function resolveLegalSearchHandoff(
   };
 }
 
-const LEGAL_SEARCH_FALLBACK_URL =
-  process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
+const LEGAL_SEARCH_FALLBACK_URL = publicConfig.legalSearchBaseUrl;
 
 export function readLegalSearchHandoff(): LegalSearchHandoff {
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;

@@ -1,9 +1,7 @@
 import Link from "next/link";
+import { publicConfig } from "@/config/publicConfig";
 
-const docsBase =
-  typeof process.env.NEXT_PUBLIC_EVIDARA_DOCS_BASE_URL === "string"
-    ? process.env.NEXT_PUBLIC_EVIDARA_DOCS_BASE_URL.replace(/\/$/, "")
-    : "";
+const docsBase = publicConfig.docsBaseUrl;
 
 /**
  * Operator-facing documentation entry (walkthrough parity with other surfaces).

@@ -4,6 +4,15 @@ items:
     slug: ch
     name: Switzerland
     compliance_policy_id: cp_ch_fedlex_open_data
+  # Federal scope is a separate jurisdiction from the country-level
+  # identifier. Federal Swiss authorities (Fedlex, BGer, BVGer) bind here,
+  # not to jur_ch. ~15 downstream consumers already use jur_ch_federal
+  # (DI jurisdiction resolver, canary workflow, golden datasets, fast-loop
+  # script) — it was dropped in error and is being restored (see #264).
+  - jurisdiction_id: jur_ch_federal
+    slug: ch-federal
+    name: Swiss Confederation
+    compliance_policy_id: cp_ch_fedlex_open_data
   - jurisdiction_id: jur_at
     slug: at
     name: Austria

@@ -23,6 +23,7 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type Identifier, useGetList, useRecordContext } from "react-admin";
+import { publicConfig } from "../../config/publicConfig";
 import type {
   CapturedResourceRecord,
   DocumentLifecycleRecord,
@@ -496,7 +497,10 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
   const [readinessConfirmed, setReadinessConfirmed] = useState(false);
   const [readinessBlockedCodes, setReadinessBlockedCodes] = useState<string[]>([]);
   const [verificationOpened, setVerificationOpened] = useState(false);
-  const legalSearchUrl = process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim();
+  // Use the "or undefined" form: this section hides the verification button
+  // entirely when no legal-search URL is configured rather than defaulting
+  // to localhost (matches pre-refactor behavior).
+  const legalSearchUrl = publicConfig.legalSearchBaseUrlOrUndefined;
   const evidenceRunbookPath =
     "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
   const healthLoadStartedAtRef = useRef<number | null>(null);

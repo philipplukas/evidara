@@ -2,14 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { Role } from "../domain/roles";
-import {
-  DEFAULT_ADMIN_ALLOWED_ROLES,
-  isRoleAuthorized,
-  normalizeRole,
-  parseAllowedRoles,
-  resolveUserRole,
-} from "../lib/admin/accessControl";
+import { publicConfig } from "../config/publicConfig";
+import { isRoleAuthorized, normalizeRole, resolveUserRole } from "../lib/admin/accessControl";
 import { resolveLegalSearchHandoff } from "../lib/admin/navigationContext";
 
 const AdminApp = dynamic(() => import("./AdminApp"), {
@@ -42,14 +36,12 @@ const AdminApp = dynamic(() => import("./AdminApp"), {
 });
 
 export default function AdminShell() {
-  const fallbackRole = normalizeRole(process.env.NEXT_PUBLIC_USER_ROLE);
+  const fallbackRole = normalizeRole(publicConfig.defaultUserRole);
   const [userRole, setUserRole] = useState(fallbackRole);
   const [isRoleResolved, setIsRoleResolved] = useState(false);
-  const allowedRoles = parseAllowedRoles(process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES ?? Role.Admin);
-  const effectiveAllowedRoles =
-    allowedRoles.length > 0 ? allowedRoles : [...DEFAULT_ADMIN_ALLOWED_ROLES];
-  const legalSearchUrl =
-    process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
+  const allowedRoles = publicConfig.adminAllowedRoles;
+  const effectiveAllowedRoles = allowedRoles.length > 0 ? [...allowedRoles] : ["admin"];
+  const legalSearchUrl = publicConfig.legalSearchBaseUrl;
   const [handoff, setHandoff] = useState(() => resolveLegalSearchHandoff(null, legalSearchUrl));
 
   useEffect(() => {
@@ -57,11 +49,14 @@ export default function AdminShell() {
     setIsRoleResolved(true);
   }, [fallbackRole]);
 
+  // legalSearchUrl is a module-scope constant (publicConfig), so the effect
+  // only needs to run once on mount to read window.location.search.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: legalSearchUrl is stable across renders
   useEffect(() => {
     setHandoff(
       resolveLegalSearchHandoff(new URLSearchParams(window.location.search), legalSearchUrl),
     );
-  }, [legalSearchUrl]);
+  }, []);
 
   if (!isRoleResolved) {
     return null;
