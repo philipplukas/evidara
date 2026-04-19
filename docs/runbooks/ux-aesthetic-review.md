@@ -53,7 +53,7 @@ NEXT_PUBLIC_ADMIN_ALLOWED_ROLES=admin \
 pnpm exec playwright test e2e/screenshot-pack.spec.ts --reporter=list
 ```
 
-Produces 22 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
+Produces 23 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
 
 - `cross-surface-header-navigation.png`
 - `legal-search-result-list.png`
@@ -66,10 +66,14 @@ Produces 22 canonical PNGs in `legal-search/frontend/screenshot-pack/`:
 - **Pass 4 graduation:** `admin-sources-list-v2.png`, `admin-source-detail-v2.png`,
   `admin-runs-list-v2.png`, `admin-run-detail-v2.png`,
   `admin-authority-create-v2.png`, `admin-authority-edit-v2.png`,
-  `admin-jurisdiction-create-v2.png`, `admin-jurisdiction-edit-v2.png` —
-  Tailwind + `ra-core` ports using the graduated primitives in
-  `platform-control/admin/src/ui/primitives/`. Pass 4 diff review concluded
-  on 2026-04-18; see ADR-0026.
+  `admin-jurisdiction-create-v2.png`, `admin-jurisdiction-edit-v2.png`,
+  `admin-source-create-v2.png` — Tailwind + `ra-core` ports using the
+  graduated primitives in `platform-control/admin/src/ui/primitives/`.
+  Pass 4 diff review concluded on 2026-04-18; see ADR-0026.
+  ADR-0026 phase P2 (Select primitive + SourceCreateV2) adds
+  `admin-source-create-v2.png`; the `Select` primitive (radix-ui under
+  `useInput`) graduates alongside it and powers the jurisdiction /
+  authority pickers on the v2 page.
 
 The spec hides Next.js dev indicators and TanStack Query devtools by stripping
 the corresponding shadow-DOM hosts before each screenshot — confirm none bleed
