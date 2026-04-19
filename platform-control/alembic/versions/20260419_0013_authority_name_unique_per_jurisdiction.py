@@ -27,7 +27,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "uq_authorities_name_jurisdiction", "authorities", type_="unique"
-    )
+    op.drop_constraint("uq_authorities_name_jurisdiction", "authorities", type_="unique")
     op.create_unique_constraint("authorities_name_key", "authorities", ["name"])
