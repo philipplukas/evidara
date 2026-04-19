@@ -69,6 +69,7 @@ import RunListV2 from "../resources/runs/RunListV2";
 import { RunShow } from "../resources/runs/RunShow";
 import RunShowV2 from "../resources/runs/RunShowV2";
 import { SourceCreate } from "../resources/sources/SourceCreate";
+import SourceCreateV2 from "../resources/sources/SourceCreateV2";
 import { SourceList } from "../resources/sources/SourceList";
 import SourceListV2 from "../resources/sources/SourceListV2";
 import { SourceShow } from "../resources/sources/SourceShow";
@@ -513,6 +514,11 @@ function EvidaraAdminMenu() {
             leftIcon={<ScienceOutlinedIcon />}
           />
           <Menu.Item
+            to="/sources-v2/create"
+            primaryText="Source form (v2 preview)"
+            leftIcon={<ScienceOutlinedIcon />}
+          />
+          <Menu.Item
             to="/runs-v2"
             primaryText="Runs (v2 preview)"
             leftIcon={<ScienceOutlinedIcon />}
@@ -686,6 +692,7 @@ export default function AdminApp() {
        */}
       <CustomRoutes>
         <Route path="/sources-v2" element={<SourceListV2 />} />
+        <Route path="/sources-v2/create" element={<SourceCreateV2 />} />
         <Route path="/sources-v2/:id" element={<SourceShowV2 />} />
         <Route path="/runs-v2" element={<RunListV2 />} />
         <Route path="/runs-v2/:id" element={<RunShowV2 />} />

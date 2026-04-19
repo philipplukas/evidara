@@ -290,6 +290,28 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-authority-edit-v2.png");
   });
 
+  test("@screenshots captures admin source form v2", async ({ page }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources-v2/create`);
+    await expect(page.getByRole("heading", { name: /Create source/ })).toBeVisible();
+    // Wait for useGetList("jurisdictions") to hydrate so the Select has
+    // at least one real option before the capture. The jurisdiction
+    // helperText is static, so assert via the combobox trigger — radix
+    // renders the trigger with role="combobox" and the accessible name
+    // from the label via `htmlFor`.
+    const jurisdictionTrigger = page.getByRole("combobox", { name: "Jurisdiction" });
+    await expect(jurisdictionTrigger).toBeVisible();
+    await jurisdictionTrigger.click();
+    await expect(page.getByRole("option", { name: /Switzerland/ })).toBeVisible();
+    // Dismiss the open listbox so the captured frame shows the closed
+    // trigger, matching the other form screenshots in the pack.
+    await page.keyboard.press("Escape");
+    await saveScreenshot(page, "admin-source-create-v2.png");
+  });
+
   test("@screenshots captures admin jurisdiction form v2 (create + edit)", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);

@@ -16,4 +16,5 @@ export {
 export { DetailGrid, FieldCell } from "./DetailGrid";
 export { FormField } from "./FormField";
 export { Pill, type PillLevel } from "./Pill";
+export { Select, type SelectChoice } from "./Select";
 export { TextInput } from "./TextInput";
