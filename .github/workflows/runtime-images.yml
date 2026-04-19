@@ -468,7 +468,7 @@ jobs:
     name: Build document-intelligence document-service image
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.document_intelligence_consumer == 'true'
-    runs-on: ${{ fromJSON(vars.HEAVY_RUNNER_RUNS_ON_JSON || '["self-hosted","linux","x64"]') }}
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: dev
 
     steps:
