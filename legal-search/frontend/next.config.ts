@@ -1,12 +1,18 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { publicConfig } from "./src/config/publicConfig";
 
 const nextConfig: NextConfig = {
   // Proxy API calls to the BFF during local development.
   // The Orval-generated client uses relative URLs (/v1/...),
   // so Next.js rewrites route them to the NestJS API.
+  //
+  // `next.config.ts` is a documented config-boundary exception per #270:
+  // Next loads it before the full app graph exists, but importing the
+  // pure `publicConfig` module (which only reads process.env) is safe
+  // here and keeps the `NEXT_PUBLIC_API_URL` default centralized.
   async rewrites() {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3102";
+    const apiBase = publicConfig.apiBaseUrl;
     return [
       {
         source: "/v1/:path*",
