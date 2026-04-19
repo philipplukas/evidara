@@ -1,14 +1,12 @@
 /**
  * `RunShowV2` — v2 preview of the run detail page. Largest single admin
  * page (v1's `RunShow.tsx` is 433 LoC before `RunDetailSections`). This
- * port covers the top half: header + metric band + decision-support 2×2
- * + 13-field metadata grid + failure alert. All primitives come from
- * `src/ui/primitives/` (`DetailGrid` / `FieldCell` / `Pill`).
+ * port covers header + metric band + decision-support 2×2 + 13-field
+ * metadata grid + failure alert, then delegates the lifecycle stack to
+ * `<RunDetailSectionsV2>` (ADR-0026 P3 — pipeline health + 5 accordion
+ * sections). All primitives come from `src/ui/primitives/`.
  *
- * Deferred until follow-up increments (see the deferred-panel footnote
- * on the page itself):
- *   - `RunDetailSections` — accordion stack with 5 nested fetches; needs
- *     the `Accordion` primitive (ADR-0026 phase P3).
+ * Deferred until follow-up increments:
  *   - `RunHandoffCard` — stateful URL-param read; ports with the shell.
  *   - `RunActionStack` (cancel button) — mutation migration.
  *
@@ -17,12 +15,13 @@
  */
 "use client";
 
-import { useShowController } from "ra-core";
+import { RecordContextProvider, useShowController } from "ra-core";
 import { useParams } from "react-router-dom";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DetailGrid, FieldCell, Pill } from "../../ui/primitives";
 import { runModeToLevel, runRecordStatusToLevel } from "../shared/StatusBadge";
+import RunDetailSectionsV2 from "./RunDetailSectionsV2";
 import { buildRunDecisionSupport } from "./RunShow";
 
 function formatDuration(run: RunRecord): string {
@@ -178,16 +177,20 @@ export default function RunShowV2() {
         <FieldCell label="Updated">{formatSwissDateTime(run.updated_at)}</FieldCell>
       </DetailGrid>
 
-      {/* UX-12.2: softened. Kept as a quiet footnote, not a prominent card. */}
+      {/* Lifecycle stack — pipeline health banner + 5 collapsed accordion sections. */}
+      <RecordContextProvider value={run}>
+        <RunDetailSectionsV2 />
+      </RecordContextProvider>
+
+      {/* UX-12.2: softened footnote — remaining deferred items only. */}
       <aside className="rounded-[10px] border border-dashed border-[rgba(29,41,61,0.1)] px-3 py-2.5 text-[11px] text-[rgba(29,41,61,0.55)] space-y-1">
         <p className="font-semibold text-[rgba(29,41,61,0.7)] text-[11px] uppercase tracking-[0.06em]">
           Deferred in this spike
         </p>
         <p>
-          <code className="font-mono">RunDetailSections</code> (accordion with 5 nested fetches),
-          legal-search handoff card (stateful), and the run action stack (cancel mutation) are
-          intentionally absent — open <code className="font-mono">/runs/{run.run_id}/show</code> for
-          the complete MUI view.
+          The legal-search handoff card (stateful URL-param read) and the run action stack (cancel
+          mutation) are intentionally absent — open{" "}
+          <code className="font-mono">/runs/{run.run_id}/show</code> for the complete MUI view.
         </p>
       </aside>
     </div>
