@@ -267,6 +267,10 @@ test.describe("Canonical screenshot evidence pack", () => {
     // `Run run_01` heading renders at the top — wait for it so the status
     // pills and duration have resolved before capture.
     await expect(page.getByRole("heading", { name: /Run run_01/ })).toBeVisible();
+    // P3 — `RunDetailSectionsV2` renders five collapsed accordion items
+    // below the metadata grid. Wait for the `Provider Jobs` trigger so
+    // the capture includes the full lifecycle stack.
+    await expect(page.getByRole("button", { name: /Provider Jobs/ })).toBeVisible();
     await saveScreenshot(page, "admin-run-detail-v2.png");
   });
 

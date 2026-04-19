@@ -220,6 +220,34 @@ a {
   }
 }
 
+/*
+ * Accordion open/close animations — consumed by `src/ui/primitives/Accordion.tsx`.
+ * Radix exposes `--radix-accordion-content-height` on the content node so the
+ * panel can slide from 0 → natural height (and back) without JS measurement.
+ * Wrapped in `prefers-reduced-motion: no-preference` so users who opt out of
+ * animation get instant state changes (the primitive also applies
+ * `motion-reduce:!animate-none` for belt-and-braces).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes accordion-open {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-closed {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
 @media (max-width: 640px) {
   body {
     background-attachment: scroll;
