@@ -225,6 +225,113 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-source-detail.png");
   });
 
+  // ---------------------------------------------------------------------------
+  // Pass 4 spike — Tailwind + ra-core port of the sources list and show pages.
+  // Captures render side-by-side with the MUI versions above so the UX review
+  // can diff them. Delete these two captures (and the corresponding entries in
+  // `docs/runbooks/ux-aesthetic-review.md`) when the spike is graduated into
+  // `@evidara/ui` or rejected.
+  // ---------------------------------------------------------------------------
+  test("@screenshots captures admin sources-v2 spike (list + detail)", async ({ page }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources-v2`);
+    await expect(page.getByRole("heading", { name: /Sources/ })).toBeVisible();
+    // Wait for reference data to resolve so the Jurisdiction / Authority
+    // columns are populated before the capture.
+    await expect(page.getByText("Swiss Federal Court")).toBeVisible();
+    await saveScreenshot(page, "admin-sources-list-v2.png");
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources-v2/src_01`);
+    await expect(page.getByRole("heading", { name: "Swiss Federal Court" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Source lifecycle" })).toBeVisible();
+    await saveScreenshot(page, "admin-source-detail-v2.png");
+  });
+
+  test("@screenshots captures admin runs-v2 spike (list + detail)", async ({ page }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs-v2`);
+    await expect(page.getByRole("heading", { name: /Run queue/ })).toBeVisible();
+    // Wait for the first row to render so the preset count pills are
+    // populated (otherwise the bar shows zeros for all statuses).
+    await expect(page.locator("table tbody tr").first()).toBeVisible();
+    await saveScreenshot(page, "admin-runs-list-v2.png");
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs-v2/run_01`);
+    await expect(page.getByRole("heading", { name: /Decision support/ })).toBeVisible();
+    // `Run run_01` heading renders at the top — wait for it so the status
+    // pills and duration have resolved before capture.
+    await expect(page.getByRole("heading", { name: /Run run_01/ })).toBeVisible();
+    // P3 — `RunDetailSectionsV2` renders five collapsed accordion items
+    // below the metadata grid. Wait for the `Provider Jobs` trigger so
+    // the capture includes the full lifecycle stack.
+    await expect(page.getByRole("button", { name: /Provider Jobs/ })).toBeVisible();
+    await saveScreenshot(page, "admin-run-detail-v2.png");
+  });
+
+  test("@screenshots captures admin authority form v2 spike (create + edit)", async ({
+    page,
+  }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/authorities-v2/create`);
+    await expect(page.getByRole("heading", { name: /Create authority/ })).toBeVisible();
+    await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
+    await saveScreenshot(page, "admin-authority-create-v2.png");
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/authorities-v2/auth_bger/edit`);
+    await expect(page.getByRole("heading", { name: /Edit Bundesgericht/ })).toBeVisible();
+    // Wait for useEditController to hydrate the record so the Name field
+    // has its existing value before we capture.
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Bundesgericht");
+    await saveScreenshot(page, "admin-authority-edit-v2.png");
+  });
+
+  test("@screenshots captures admin source form v2", async ({ page }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources-v2/create`);
+    await expect(page.getByRole("heading", { name: /Create source/ })).toBeVisible();
+    // Wait for useGetList("jurisdictions") to hydrate so the Select has
+    // at least one real option before the capture. The jurisdiction
+    // helperText is static, so assert via the combobox trigger — radix
+    // renders the trigger with role="combobox" and the accessible name
+    // from the label via `htmlFor`.
+    const jurisdictionTrigger = page.getByRole("combobox", { name: "Jurisdiction" });
+    await expect(jurisdictionTrigger).toBeVisible();
+    await jurisdictionTrigger.click();
+    await expect(page.getByRole("option", { name: /Switzerland/ })).toBeVisible();
+    // Dismiss the open listbox so the captured frame shows the closed
+    // trigger, matching the other form screenshots in the pack.
+    await page.keyboard.press("Escape");
+    await saveScreenshot(page, "admin-source-create-v2.png");
+  });
+
+  test("@screenshots captures admin jurisdiction form v2 (create + edit)", async ({ page }) => {
+    await mockSearchApi(page);
+    await mockAdminRunFlowApi(page);
+    await setupAdmin(page);
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/jurisdictions-v2/create`);
+    await expect(page.getByRole("heading", { name: /Create jurisdiction/ })).toBeVisible();
+    await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
+    await saveScreenshot(page, "admin-jurisdiction-create-v2.png");
+
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/jurisdictions-v2/jur_ch/edit`);
+    await expect(page.getByRole("heading", { name: /Edit Switzerland/ })).toBeVisible();
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Switzerland");
+    await saveScreenshot(page, "admin-jurisdiction-edit-v2.png");
+  });
+
   test("@screenshots captures filter panel with data", async ({ page }) => {
     await mockSearchApi(page, { richFacets: true });
     await mockAdminRunFlowApi(page);
