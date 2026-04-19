@@ -10,7 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.extractor_profile import ExtractorProfile
-from platform_control.seed_reference_data import ReferenceDataSeeder
+from platform_control.seed_reference_data import (
+    AliasedIdRenameRequiredError,
+    ReferenceDataSeeder,
+)
 
 
 def _write_seed_file(path: Path, payload: dict) -> None:
@@ -250,6 +253,159 @@ async def test_seed_rejects_jurisdiction_with_missing_policy_reference(
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
+async def test_seeder_raises_when_authority_alias_row_still_exists(
+    session_maker: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    """The alias-pattern contract: a seed entry that declares a
+    deprecated_alias must not silently collide with an existing aliased
+    row. The seeder raises AliasedIdRenameRequiredError until a data migration
+    has renamed the PK and re-pointed FKs. See issue #264."""
+    _write_compliance_policies(tmp_path / "reference" / "compliance_policies.yaml")
+    _write_seed_file(
+        tmp_path / "reference" / "jurisdictions.yaml",
+        {
+            "version": 1,
+            "items": [{"jurisdiction_id": "jur_ch", "slug": "ch", "name": "Switzerland"}],
+        },
+    )
+    # First seed: insert under the old ID.
+    _write_seed_file(
+        tmp_path / "reference" / "authorities.yaml",
+        {
+            "version": 1,
+            "items": [
+                {
+                    "authority_id": "auth_old_id",
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "test-slug",
+                    "name": "Test Authority",
+                }
+            ],
+        },
+    )
+    _write_seed_file(
+        tmp_path / "reference" / "extractor_profiles.yaml",
+        {"version": 1, "items": []},
+    )
+    seeder = ReferenceDataSeeder(session_maker)
+    await seeder.seed(tmp_path, dry_run=False)
+
+    # Now rewrite seed to declare the new ID + alias, without running a
+    # data migration first. The seeder must refuse to proceed.
+    _write_seed_file(
+        tmp_path / "reference" / "authorities.yaml",
+        {
+            "version": 1,
+            "items": [
+                {
+                    "authority_id": "auth_new_id",
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "test-slug",
+                    "name": "Test Authority",
+                    "deprecated_aliases": ["auth_old_id"],
+                }
+            ],
+        },
+    )
+    with pytest.raises(AliasedIdRenameRequiredError) as exc_info:
+        await seeder.seed(tmp_path, dry_run=False)
+    assert exc_info.value.current_id == "auth_old_id"
+    assert exc_info.value.target_id == "auth_new_id"
+    assert exc_info.value.table == "authorities"
+
+
+@pytest.mark.asyncio
+async def test_seeder_no_ops_when_alias_row_has_already_been_renamed(
+    session_maker: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    """Once the data migration has renamed the row, the alias no longer
+    resolves — so the seeder finds the row under the new PK and upserts
+    normally. The deprecated_aliases list can stay in the YAML as
+    documentation without triggering the guard on every run."""
+    _write_compliance_policies(tmp_path / "reference" / "compliance_policies.yaml")
+    _write_seed_file(
+        tmp_path / "reference" / "jurisdictions.yaml",
+        {
+            "version": 1,
+            "items": [{"jurisdiction_id": "jur_ch", "slug": "ch", "name": "Switzerland"}],
+        },
+    )
+    _write_seed_file(
+        tmp_path / "reference" / "authorities.yaml",
+        {
+            "version": 1,
+            "items": [
+                {
+                    "authority_id": "auth_new_id",
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "test-slug",
+                    "name": "Test Authority",
+                    "deprecated_aliases": ["auth_old_id"],
+                }
+            ],
+        },
+    )
+    _write_seed_file(
+        tmp_path / "reference" / "extractor_profiles.yaml",
+        {"version": 1, "items": []},
+    )
+    seeder = ReferenceDataSeeder(session_maker)
+    first_summary = await seeder.seed(tmp_path, dry_run=False)
+    second_summary = await seeder.seed(tmp_path, dry_run=False)
+
+    assert first_summary.created["authorities"] == 1
+    assert second_summary.unchanged["authorities"] == 1
+
+
+@pytest.mark.asyncio
+async def test_seeder_raises_when_jurisdiction_alias_row_still_exists(
+    session_maker: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    """Same alias contract, but for jurisdictions."""
+    _write_compliance_policies(tmp_path / "reference" / "compliance_policies.yaml")
+    _write_seed_file(
+        tmp_path / "reference" / "jurisdictions.yaml",
+        {
+            "version": 1,
+            "items": [{"jurisdiction_id": "jur_old", "slug": "test", "name": "Test Place"}],
+        },
+    )
+    _write_seed_file(
+        tmp_path / "reference" / "authorities.yaml",
+        {"version": 1, "items": []},
+    )
+    _write_seed_file(
+        tmp_path / "reference" / "extractor_profiles.yaml",
+        {"version": 1, "items": []},
+    )
+    seeder = ReferenceDataSeeder(session_maker)
+    await seeder.seed(tmp_path, dry_run=False)
+
+    _write_seed_file(
+        tmp_path / "reference" / "jurisdictions.yaml",
+        {
+            "version": 1,
+            "items": [
+                {
+                    "jurisdiction_id": "jur_new",
+                    "slug": "test",
+                    "name": "Test Place",
+                    "deprecated_aliases": ["jur_old"],
+                }
+            ],
+        },
+    )
+    with pytest.raises(AliasedIdRenameRequiredError) as exc_info:
+        await seeder.seed(tmp_path, dry_run=False)
+    assert exc_info.value.current_id == "jur_old"
+    assert exc_info.value.target_id == "jur_new"
+    assert exc_info.value.table == "jurisdictions"
+
+
 async def test_repo_jurisdictions_and_compliance_policies_are_consistent() -> None:
     """File-level consistency check on the repo's own seed YAMLs.
 
