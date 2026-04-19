@@ -4,6 +4,7 @@
  *
  * Base URL and optional API key come from the environment (Nest ConfigModule loads `.env`).
  */
+import { readDocumentIntelligenceRuntimeEnv } from '../../core/config/document-intelligence.config';
 
 export class DocumentIntelligenceHttpError extends Error {
   readonly status: number;
@@ -16,13 +17,11 @@ export class DocumentIntelligenceHttpError extends Error {
 }
 
 export const documentIntelligenceFetch = async <T>(path: string, init: RequestInit): Promise<T> => {
-  const rawBase = process.env.DOCUMENT_INTELLIGENCE_BASE_URL?.trim() ?? '';
-  const base = rawBase.replace(/\/$/, '');
+  const { baseUrl: base, apiKey } = readDocumentIntelligenceRuntimeEnv();
   if (!base) {
     throw new Error('DOCUMENT_INTELLIGENCE_BASE_URL is not set');
   }
 
-  const apiKey = process.env.DOCUMENT_INTELLIGENCE_API_KEY?.trim();
   const headers = new Headers(init.headers);
   if (!headers.has('Accept')) {
     headers.set('Accept', path.endsWith('/text') ? 'text/plain,*/*;q=0.8' : 'application/json');
