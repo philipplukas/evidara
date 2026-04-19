@@ -99,6 +99,8 @@ Changes to files in `contracts/` require additional scrutiny:
 - Verify backwards compatibility or document breaking changes.
 - Update any related ADRs or architecture docs.
 
+Renames of `authority_id` or `jurisdiction_id` values are contract changes, not refactors. See [ADR-0026](docs/adr/adr-0026-id-naming-policy.md) — they must ship in a dedicated PR labeled `ids-migration` with deprecation aliases for any already-persisted IDs.
+
 ## Required Local Checks
 
 Install hooks once per clone (idempotent):
