@@ -10,7 +10,6 @@ from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.review_task import ReviewTask
 from platform_control.models.run import Run
 from platform_control.models.schedule import Schedule
-from platform_control.models.scrape_target import ScrapeTarget
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.models.webhook_receipt import WebhookReceipt
@@ -31,7 +30,6 @@ __all__ = [
     "RawArtifact",
     "Run",
     "Schedule",
-    "ScrapeTarget",
     "Source",
     "SourceVersion",
     "WebhookReceipt",

@@ -86,11 +86,9 @@ async def sync_hierarchy(
     session: SessionDep,
     dry_run: bool = Query(default=False),
 ) -> HierarchySyncResponse:
-    # Backwards-compatible shim over ReferenceDataSeeder (issue #312). The
-    # legacy HierarchySyncService and its path-based YAMLs are gone; the
-    # canonical `seeds/reference/` bundles are the single source of truth.
-    # `scrape_targets` is kept in the response with zeros for shape
-    # compatibility with `scripts/e2e-smoke-test.sh` and other callers.
+    # Thin shim over ReferenceDataSeeder (issue #312). The legacy
+    # HierarchySyncService and its path-based YAMLs are gone; the canonical
+    # `seeds/reference/` bundles are the single source of truth.
     seeder = ReferenceDataSeeder(get_session_maker())
     summary = await seeder.seed_with_session(session, DEFAULT_SEED_DIR, dry_run=dry_run)
     return HierarchySyncResponse(
@@ -105,5 +103,4 @@ async def sync_hierarchy(
             updated=summary.updated["authorities"],
             unchanged=summary.unchanged["authorities"],
         ),
-        scrape_targets=HierarchySyncCountsResponse(created=0, updated=0, unchanged=0),
     )

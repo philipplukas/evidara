@@ -107,7 +107,7 @@ class NegativeCaseTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        seeds_dir = root / "platform-control" / "seeds" / "reference"
+        seeds_dir = root / "platform-control" / "src" / "platform_control" / "seeds" / "reference"
         self._write_yaml(
             seeds_dir / "jurisdictions.yaml",
             {"version": 1, "items": [{"jurisdiction_id": f"jur_{iso_lower}", "slug": iso_lower}]},
@@ -201,6 +201,7 @@ class NegativeCaseTests(unittest.TestCase):
         """Overlay may not reference an authority whose seed jurisdiction disagrees."""
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
+            # Use a country without REQUIRED_AUTHORITIES to isolate the mismatch check.
             self._scaffold_minimal_root(root, "CH")
             self._write_yaml(
                 root / "country-overlays" / "ch" / "reference-data.yaml",
@@ -211,9 +212,10 @@ class NegativeCaseTests(unittest.TestCase):
                     "authority_ids": ["auth_foreign"],
                 },
             )
+            seeds_dir = root / "platform-control" / "src" / "platform_control" / "seeds" / "reference"
             # auth_foreign is defined but under a different jurisdiction.
             self._write_yaml(
-                root / "platform-control" / "seeds" / "reference" / "authorities.yaml",
+                seeds_dir / "authorities.yaml",
                 {
                     "version": 1,
                     "items": [
@@ -229,7 +231,7 @@ class NegativeCaseTests(unittest.TestCase):
             exit_code, errors = MODULE.evaluate(country="CH", root=root)
             self.assertEqual(exit_code, 1)
             self.assertTrue(
-                any("jur_at" in e and "auth_foreign" in e for e in errors),
+                any("auth_foreign" in e and "sub-jurisdiction" in e for e in errors),
                 errors,
             )
 
