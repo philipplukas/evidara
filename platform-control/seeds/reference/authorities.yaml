@@ -25,10 +25,43 @@ items:
     name: Bundesverwaltungsgericht
     deprecated_aliases:
       - auth_ch_bundesverwaltungsgericht
+  - authority_id: auth_bstger
+    jurisdiction_id: jur_ch_federal
+    slug: ch-bstger
+    name: Bundesstrafgericht / Tribunal pénal fédéral
+  - authority_id: auth_bpger
+    jurisdiction_id: jur_ch_federal
+    slug: ch-bpger
+    name: Bundespatentgericht / Tribunal fédéral des brevets
+  # ─── Swiss cantonal authorities ────────────────────────────
+  - authority_id: auth_zh_sk
+    jurisdiction_id: jur_ch_zh
+    slug: zh-staatskanzlei
+    name: Staatskanzlei Kanton Zürich
   - authority_id: auth_zh_admin
-    jurisdiction_id: jur_ch
+    jurisdiction_id: jur_ch_zh
     slug: zh-admin-court
     name: Zurich Administrative Court
+  - authority_id: auth_be_sk
+    jurisdiction_id: jur_ch_be
+    slug: be-staatskanzlei
+    name: Staatskanzlei Kanton Bern / Chancellerie d'État du canton de Berne
+  - authority_id: auth_bs_sk
+    jurisdiction_id: jur_ch_bs
+    slug: bs-staatskanzlei
+    name: Staatskanzlei Basel-Stadt
+  - authority_id: auth_ge_ce
+    jurisdiction_id: jur_ch_ge
+    slug: ge-chancellerie
+    name: Chancellerie d'État du canton de Genève
+  - authority_id: auth_vd_ce
+    jurisdiction_id: jur_ch_vd
+    slug: vd-chancellerie
+    name: Chancellerie d'État du canton de Vaud
+  - authority_id: auth_ti_cs
+    jurisdiction_id: jur_ch_ti
+    slug: ti-cancelleria
+    name: Cancelleria dello Stato del Cantone Ticino
 
   # ─── Austria ────────────────────────────────────────────────
   - authority_id: auth_at_ris

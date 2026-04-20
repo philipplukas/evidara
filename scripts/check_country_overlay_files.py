@@ -240,25 +240,22 @@ def evaluate(country: str, root: Path) -> tuple[int, list[str]]:
         for item in seed_authorities
         if isinstance(item, dict)
     }
+    # Include authorities whose jurisdiction is the country-level one OR any
+    # sub-jurisdiction (e.g. jur_ch_federal, jur_ch_zh are children of jur_ch).
+    jur_prefix = jur_id + "_"
     existing_authority_ids = {
-        aid for aid, jid in seed_authority_index.items() if jid == jur_id
+        aid
+        for aid, jid in seed_authority_index.items()
+        if jid == jur_id or (jid and jid.startswith(jur_prefix))
     }
 
     required_auth = REQUIRED_AUTHORITIES.get(country, set())
-    # `missing_in_seeds` is only enforced for the citation shape. The
-    # embedded shape (used by overlays that model multiple jurisdictions
-    # per country, e.g. CH federal + 26 cantons) carries the authorities
-    # inline and doesn't need seeds as the lookup source.
-    is_embedded_shape_early = bool(reference_data.get("jurisdictions")) or bool(
-        reference_data.get("authorities")
-    )
-    if not is_embedded_shape_early:
-        missing_in_seeds = sorted(required_auth - existing_authority_ids)
-        if missing_in_seeds:
-            errors.append(
-                f"platform-control authority seeds missing {country} IDs: "
-                f"{', '.join(missing_in_seeds)}"
-            )
+    missing_in_seeds = sorted(required_auth - existing_authority_ids)
+    if missing_in_seeds:
+        errors.append(
+            f"platform-control authority seeds missing {country} IDs: "
+            f"{', '.join(missing_in_seeds)}"
+        )
 
     # ─── reference-data.yaml consistency ───
     # Two valid shapes (see contracts/schemas/country-overlay.schema.json):
@@ -298,12 +295,14 @@ def evaluate(country: str, root: Path) -> tuple[int, list[str]]:
                     f"reference-data.yaml references unknown authority_id {aid!r}; "
                     f"not present in platform-control/seeds/reference/authorities.yaml"
                 )
-            elif seed_authority_index[aid] != jur_id:
-                errors.append(
-                    f"reference-data.yaml references authority_id {aid!r} whose "
-                    f"jurisdiction_id in seeds is {seed_authority_index[aid]!r}, "
-                    f"expected {jur_id!r}"
-                )
+            else:
+                auth_jur = seed_authority_index[aid]
+                if auth_jur != jur_id and not (auth_jur and auth_jur.startswith(jur_prefix)):
+                    errors.append(
+                        f"reference-data.yaml references authority_id {aid!r} whose "
+                        f"jurisdiction_id in seeds is {auth_jur!r}, "
+                        f"expected {jur_id!r} or a sub-jurisdiction"
+                    )
         overlay_authority_id_set = set(overlay_authority_ids)
 
     else:
