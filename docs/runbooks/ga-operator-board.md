@@ -57,12 +57,12 @@ What is not yet true:
 | Lane | Linear | Status | Push now? | Exit condition |
 |------|--------|--------|-----------|----------------|
 | Release evidence refresh | `TAR-214` | refreshed | no | Prod e2e smoke PASS (2026-04-20): health, compliance-policies (2), jurisdictions (49), authorities (38). Local suites green. See `evidence/tar-214-release-evidence-2026-04-20.md`. Branch protection still enforce_admins=false, no required checks — TAR-77 needs policy decision. |
-| Gate policy hardening | `TAR-70` | active | yes | required-check model is agreed, documented, and validated against representative PR types |
+| Gate policy hardening | `TAR-70` | implemented | no | Branch protection set 2026-04-20: strict=true, required checks=[check-title, contract-validation]. These are the only always-on workflows. Path-filtered checks gate only their PRs. Release Readiness and scraping-qa remain release-evidence gates. |
 | Runner reliability | `TAR-238` | resolved | no | GitHub-hosted CI fully reliable (billing fix 2026-04-20). Self-hosted pool degraded (heavy offline, light unlabeled) — only affects image builds, not code quality gates. See evidence in `tar-238-runner-evidence-2026-04-20.md` |
 | Five-country acceptance A (CH + AT) | `TAR-239` | verified | no | Prod verified 2026-04-20: CH 28 jurisdictions, 12 authorities, Fedlex compliance policy (AIMD 30–60–600 rpm, attribution). AT 1 jurisdiction, 4 authorities, RIS OGD policy. See `evidence/tar-239-ch-at-acceptance-2026-04-20.md` |
-| Five-country acceptance B (DE + FR) | `TAR-240` | ready | track in parallel | DE/FR checklist is executed and evidence is attached into `TAR-160` |
-| Relevance baseline | `TAR-241` | active | yes | query pack is rerun with the `q=*` control row, replayed CH/AT proof docs stay visible, broad seed queries are attached, and regressions are split into follow-up issues |
-| GA umbrella / final sign-off | `TAR-160` | collecting | no, assemble after inputs land | consolidated GA evidence pack and release decision are ready |
+| Five-country acceptance B (DE + FR) | `TAR-240` | verified | no | Prod verified 2026-04-20: DE 17 jurisdictions (federal + 16 Länder), 7 authorities, 10-city municipality pilot. FR 1 jurisdiction, 4 authorities. Both overlays pass validation. No new contract keys. See `evidence/tar-240-de-fr-acceptance-2026-04-20.md` |
+| Relevance baseline | `TAR-241` | blocked | no | Query pack runs but dev index is empty — 0 results for all queries. Blocked on corpus data (CH/AT fast-loop run needed to populate dev OpenSearch). Search infra is verified healthy. See `evidence/tar-241-relevance-baseline-2026-04-20.md` |
+| GA umbrella / final sign-off | `TAR-160` | near-ready | no | 5/6 input lanes resolved/verified (TAR-238, TAR-214, TAR-70, TAR-239, TAR-240). TAR-241 (relevance) blocked on dev corpus data. Once a CH fast-loop populates the index, the final assembly can proceed. |
 
 ## What to push now
 
