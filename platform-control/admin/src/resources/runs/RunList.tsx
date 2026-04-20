@@ -258,10 +258,10 @@ function RunQueueHeader() {
     justifyContent: "flex-start",
     textTransform: "none",
     fontWeight: 600,
-    borderColor: isActive ? "rgba(15, 76, 129, 0.5)" : "rgba(29, 41, 61, 0.18)",
-    backgroundColor: isActive ? "rgba(15, 76, 129, 0.08)" : "transparent",
+    borderColor: isActive ? "rgba(15, 76, 129, 0.5)" : "var(--border-strong)", /* active border is a custom brand opacity — intentionally inline */
+    backgroundColor: isActive ? "var(--brand-wash-8)" : "transparent",
     "&:hover": {
-      backgroundColor: isActive ? "rgba(15, 76, 129, 0.12)" : "rgba(15, 76, 129, 0.04)",
+      backgroundColor: isActive ? "var(--border)" : "var(--brand-wash-4)",
     },
   });
 
@@ -271,7 +271,7 @@ function RunQueueHeader() {
         sx={{
           p: { xs: 2.25, md: 3 },
           background:
-            "linear-gradient(145deg, rgba(15, 76, 129, 0.06), rgba(154, 122, 74, 0.05) 60%, rgba(255, 253, 248, 0.92))",
+            "linear-gradient(145deg, var(--brand-wash-6), rgba(154, 122, 74, 0.05) 60%, rgba(255, 253, 248, 0.92))",
         }}
       >
         <Stack spacing={2.5}>

@@ -53,7 +53,7 @@ export function Toast({ type, message, duration = 5000, open, onOpenChange }: To
       </ToastPrimitive.Description>
       <ToastPrimitive.Close
         aria-label="Dismiss notification"
-        className="absolute right-2 top-2 inline-flex items-center justify-center w-7 h-7 rounded-full text-current/70 hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[rgba(15,76,129,0.42)]"
+        className="absolute right-2 top-2 inline-flex items-center justify-center w-7 h-7 rounded-full text-current/70 hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--brand-focus-ring)]"
       >
         <CloseIcon size={14} strokeWidth={2.2} aria-hidden />
       </ToastPrimitive.Close>

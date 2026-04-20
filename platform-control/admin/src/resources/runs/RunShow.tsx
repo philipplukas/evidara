@@ -124,7 +124,7 @@ export function buildRunHandoffGuidance(
 
 function DecisionSupportItem({ label, value }: { label: string; value: string }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, background: "rgba(15, 76, 129, 0.03)" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, background: "var(--brand-wash-3)" }}>
       <Stack spacing={0.5}>
         <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
           {label}
@@ -220,7 +220,7 @@ function RunOverviewCard() {
       sx={{
         p: 2,
         mb: 2,
-        background: "linear-gradient(180deg, rgba(15, 76, 129, 0.04), rgba(255, 255, 255, 0.98))",
+        background: "linear-gradient(180deg, var(--brand-wash-4), rgba(255, 255, 255, 0.98))",
       }}
     >
       <Stack spacing={2}>
@@ -238,7 +238,7 @@ function RunOverviewCard() {
           {describeRunNextStep(run)}
         </Typography>
 
-        <Paper variant="outlined" sx={{ p: 1.5, background: "rgba(15, 76, 129, 0.03)" }}>
+        <Paper variant="outlined" sx={{ p: 1.5, background: "var(--brand-wash-3)" }}>
           <Stack spacing={1.25}>
             <Box>
               <Typography variant="subtitle2">Decision support</Typography>
@@ -308,7 +308,7 @@ function RunHandoffCard() {
       sx={{
         p: 2,
         mb: 2,
-        background: "linear-gradient(180deg, rgba(15, 76, 129, 0.035), rgba(255, 255, 255, 0.97))",
+        background: "linear-gradient(180deg, var(--brand-wash-4), rgba(255, 255, 255, 0.97))",
       }}
     >
       <Stack spacing={1.5}>

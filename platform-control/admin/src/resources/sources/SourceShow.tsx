@@ -157,7 +157,7 @@ function SourceHandoffPanel() {
       sx={{
         p: 2,
         mb: 2,
-        background: "linear-gradient(180deg, rgba(15, 76, 129, 0.035), rgba(255, 255, 255, 0.97))",
+        background: "linear-gradient(180deg, var(--brand-wash-4), rgba(255, 255, 255, 0.97))",
       }}
     >
       <Stack spacing={1.5}>

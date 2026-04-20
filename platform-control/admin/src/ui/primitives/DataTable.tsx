@@ -81,7 +81,7 @@ export function DataTable<T>({
       ) : null}
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm text-[#1d293d]">
+        <table className="w-full border-collapse text-sm text-[var(--foreground)]">
           <thead>
             <tr className="bg-[rgba(244,239,231,0.72)]">
               {columns.map((col) => {
@@ -99,7 +99,7 @@ export function DataTable<T>({
                     className={cn(
                       "text-left px-4 py-3 border-b border-[rgba(29,41,61,0.08)]",
                       "text-[12px] font-bold uppercase tracking-[0.08em] text-[rgba(29,41,61,0.7)]",
-                      canSort && "cursor-pointer select-none hover:text-[#1d293d]",
+                      canSort && "cursor-pointer select-none hover:text-[var(--foreground)]",
                       col.headerClassName,
                     )}
                     onClick={
@@ -166,7 +166,7 @@ export function DataTable<T>({
                   onClick={onRowClick ? () => onRowClick(record) : undefined}
                   className={cn(
                     "border-b border-[rgba(29,41,61,0.06)] last:border-b-0 align-top",
-                    onRowClick && "cursor-pointer hover:bg-[rgba(15,76,129,0.04)]",
+                    onRowClick && "cursor-pointer hover:bg-[var(--brand-wash-4)]",
                   )}
                 >
                   {columns.map((col) => (
@@ -191,7 +191,7 @@ export function DataTable<T>({
               type="button"
               onClick={() => onPageChange(Math.max(1, page - 1))}
               disabled={page <= 1}
-              className="px-3 h-8 rounded-full border border-[rgba(29,41,61,0.12)] bg-white/70 disabled:opacity-40 hover:bg-white"
+              className="px-3 h-8 rounded-full border border-[var(--border)] bg-white/70 disabled:opacity-40 hover:bg-white"
             >
               Previous
             </button>
@@ -199,7 +199,7 @@ export function DataTable<T>({
               type="button"
               onClick={() => onPageChange(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages}
-              className="px-3 h-8 rounded-full border border-[rgba(29,41,61,0.12)] bg-white/70 disabled:opacity-40 hover:bg-white"
+              className="px-3 h-8 rounded-full border border-[var(--border)] bg-white/70 disabled:opacity-40 hover:bg-white"
             >
               Next
             </button>

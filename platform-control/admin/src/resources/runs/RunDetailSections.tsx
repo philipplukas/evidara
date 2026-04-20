@@ -124,7 +124,7 @@ const renderCodeBlock = (value: unknown): ReactNode => {
         p: 1.5,
         overflowX: "auto",
         borderRadius: 2,
-        backgroundColor: "rgba(15, 76, 129, 0.06)",
+        backgroundColor: "var(--brand-wash-6)",
         fontSize: 12,
         lineHeight: 1.4,
       }}
@@ -216,7 +216,7 @@ export function buildPipelineDecisionSupport(options: {
 
 function DecisionSupportItem({ label, value }: { label: string; value: string }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, background: "rgba(15, 76, 129, 0.03)" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, background: "var(--brand-wash-3)" }}>
       <Stack spacing={0.5}>
         <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
           {label}
@@ -659,7 +659,7 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
               </Stack>
             </Alert>
 
-            <Paper variant="outlined" sx={{ p: 1.5, background: "rgba(15, 76, 129, 0.03)" }}>
+            <Paper variant="outlined" sx={{ p: 1.5, background: "var(--brand-wash-3)" }}>
               <Stack spacing={1.25}>
                 <Box>
                   <Typography variant="subtitle2">Decision support</Typography>

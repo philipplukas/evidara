@@ -59,6 +59,19 @@
   --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
   --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
 
+  /* ─── Brand wash (decorative card/paper background tints) ─── */
+  --brand-wash-3: rgb(15 76 129 / 3%);
+  --brand-wash-4: rgb(15 76 129 / 4%);
+  --brand-wash-6: rgb(15 76 129 / 6%);
+  --brand-wash-8: rgb(15 76 129 / 8%);
+
+  /* ─── Foreground opacity variants ─── */
+  --foreground-subtle: rgb(29 41 61 / 56%);
+  --border-strong: rgb(29 41 61 / 20%);
+
+  /* ─── Brand focus ring ─── */
+  --brand-focus-ring: rgb(15 76 129 / 42%);
+
   /* ─── Accent core (Evidara violet — the one action color) ─── */
   --accent-core: #6246D9;
   --accent-core-foreground: oklch(0.985 0 0);

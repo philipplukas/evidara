@@ -28,11 +28,11 @@ interface TextInputProps {
 }
 
 const BASE_INPUT =
-  "w-full rounded-xl border bg-white/85 px-3 py-2.5 text-sm text-[#1d293d] " +
+  "w-full rounded-xl border bg-white/85 px-3 py-2.5 text-sm text-[var(--foreground)] " +
   "placeholder:text-[rgba(29,41,61,0.35)] " +
   "transition-[border-color,box-shadow] " +
   "focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-[rgba(15,76,129,0.42)] " +
+  "focus-visible:outline-[var(--brand-focus-ring)] " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 const BORDER_OK = "border-[rgba(29,41,61,0.16)] hover:border-[rgba(29,41,61,0.28)]";

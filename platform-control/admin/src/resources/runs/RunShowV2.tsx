@@ -81,7 +81,7 @@ export default function RunShowV2() {
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
           Preview · Tailwind + ra-core · Run detail
         </p>
-        <h1 className="font-serif text-[28px] font-semibold text-[#1d293d] leading-tight">
+        <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
           Run <span className="font-mono text-[22px]">{run.run_id}</span>
         </h1>
         <div className="text-[13px] text-[rgba(29,41,61,0.7)] font-mono">
@@ -97,7 +97,7 @@ export default function RunShowV2() {
       </header>
 
       {/* Overview band — metric chips + next-step narrative. */}
-      <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-gradient-to-b from-[rgba(15,76,129,0.04)] to-white/95 p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-4">
+      <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-gradient-to-b from-[var(--brand-wash-4)] to-white/95 p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill variant="meta">{`Captured ${run.captured_resources_count}`}</Pill>
           <Pill variant="meta">{`Artifacts ${run.artifacts_count}`}</Pill>
@@ -106,9 +106,9 @@ export default function RunShowV2() {
         <p className="text-[14px] text-[rgba(29,41,61,0.75)]">{describeRunNextStep(run)}</p>
 
         {/* Decision support — 2x2 on md+, stacked on mobile. */}
-        <div className="rounded-[14px] border border-[rgba(29,41,61,0.08)] bg-[rgba(15,76,129,0.03)] p-4 space-y-3">
+        <div className="rounded-[14px] border border-[rgba(29,41,61,0.08)] bg-[var(--brand-wash-3)] p-4 space-y-3">
           <div>
-            <h2 className="text-[14px] font-semibold text-[#1d293d]">Decision support</h2>
+            <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Decision support</h2>
             <p className="text-[12px] text-[rgba(29,41,61,0.65)]">
               The four cues below answer the operator questions we use most often on active runs.
             </p>

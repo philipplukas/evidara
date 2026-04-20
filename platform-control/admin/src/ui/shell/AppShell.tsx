@@ -141,7 +141,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
                 type="button"
                 onClick={closeMobile}
                 aria-label="Close navigation"
-                className="inline-flex items-center justify-center w-10 h-10 rounded-full text-[#1d293d] hover:bg-[rgba(29,41,61,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(15,76,129,0.42)]"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-full text-[var(--foreground)] hover:bg-[var(--brand-wash-8)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-focus-ring)]"
               >
                 <CloseIcon size={18} strokeWidth={2} aria-hidden />
               </button>

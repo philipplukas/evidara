@@ -33,6 +33,7 @@ html {
 body {
   margin: 0;
   color: var(--brand-strong);
+  /* brand chrome — intentionally inline (decorative page-level gradient) */
   background:
     radial-gradient(circle at top left, rgb(15 76 129 / 10%), transparent 30%),
     radial-gradient(circle at top right, rgb(92 107 126 / 8%), transparent 26%),
@@ -52,6 +53,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  /* brand chrome — intentionally inline (decorative overlay gradient) */
   background:
     linear-gradient(135deg, rgb(15 76 129 / 10%), transparent 35%),
     radial-gradient(circle at 50% -10%, rgb(255 255 255 / 45%), transparent 28%);
@@ -77,6 +79,7 @@ a {
   display: grid;
   place-items: center;
   padding: 24px;
+  /* brand chrome — intentionally inline (decorative shell gradient) */
   background:
     radial-gradient(circle at top left, rgb(15 76 129 / 10%), transparent 30%),
     radial-gradient(circle at top right, rgb(92 107 126 / 8%), transparent 26%),
@@ -99,7 +102,7 @@ a {
   align-items: flex-start;
   gap: 16px;
   padding: 24px 28px;
-  background: linear-gradient(120deg, rgb(15 76 129 / 98%), rgb(11 61 104 / 94%));
+  background: linear-gradient(120deg, rgb(15 76 129 / 98%), rgb(11 61 104 / 94%)); /* brand chrome — intentionally inline */
   color: #fffdf8;
 }
 
@@ -165,14 +168,14 @@ a {
 
 .evidara-shell__copy {
   margin: 0;
-  color: rgba(29, 41, 61, 0.72);
+  color: var(--foreground-muted);
   font-size: 14px;
   line-height: 1.7;
 }
 
 .evidara-shell__fineprint {
   margin: 8px 0 0;
-  color: rgba(29, 41, 61, 0.56);
+  color: var(--foreground-subtle);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -190,7 +193,7 @@ a {
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: 0 16px 30px rgba(15, 76, 129, 0.22);
+  box-shadow: 0 16px 30px rgba(15, 76, 129, 0.22); /* brand chrome — intentionally inline */
   transition:
     background-color var(--motion-duration-medium) var(--motion-easing-standard),
     border-color var(--motion-duration-medium) var(--motion-easing-standard),
@@ -201,7 +204,7 @@ a {
 .evidara-shell__button:hover {
   border-color: rgba(255, 253, 248, 0.2);
   background: linear-gradient(120deg, var(--brand-hover), #092f52);
-  box-shadow: 0 18px 34px rgba(15, 76, 129, 0.28);
+  box-shadow: 0 18px 34px rgba(15, 76, 129, 0.28); /* brand chrome — intentionally inline */
   transform: translateY(-1px);
 }
 

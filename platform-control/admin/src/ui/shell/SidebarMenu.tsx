@@ -39,13 +39,13 @@ interface SidebarMenuProps {
 
 function navItemClass(isActive: boolean): string {
   const base =
-    "flex items-center gap-3 mx-[10px] my-1 px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold leading-tight transition-[background-color,transform] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(15,76,129,0.42)]";
+    "flex items-center gap-3 mx-[10px] my-1 px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold leading-tight transition-[background-color,transform] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-focus-ring)]";
   if (isActive) {
     // Violet (ACCENT_CORE_SUBTLE) background + violet text matches the v1 MUI
     // Mui-selected state. Operators recognise this as the "current page" cue.
     return `${base} bg-[var(--accent-core-subtle)] text-[var(--accent-core)] shadow-[inset_0_0_0_1px_rgba(98,70,217,0.22)] hover:bg-[var(--accent-core-muted)]`;
   }
-  return `${base} text-[#1d293d] hover:bg-[var(--interactive-accent-subtle)]`;
+  return `${base} text-[var(--foreground)] hover:bg-[var(--interactive-accent-subtle)]`;
 }
 
 function labelForResource(name: string, options: { label?: string } | undefined): string {
@@ -120,10 +120,10 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
           <div className="mx-4 mb-2 border-t border-[var(--border)]" />
           <a
             href={handoff.returnToUrl}
-            className="flex items-center gap-3 mx-[10px] px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold text-[#0f4c81] hover:bg-[var(--interactive-accent-subtle)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(15,76,129,0.42)]"
+            className="flex items-center gap-3 mx-[10px] px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold text-[var(--brand)] hover:bg-[var(--interactive-accent-subtle)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-focus-ring)]"
           >
             {/* lucide ArrowLeft lives in AppBar; keep sidebar dep-light */}
-            <span aria-hidden className="text-[#0f4c81]">
+            <span aria-hidden className="text-[var(--brand)]">
               ←
             </span>
             <span className="flex flex-col min-w-0">

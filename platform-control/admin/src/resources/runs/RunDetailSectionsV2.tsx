@@ -66,7 +66,7 @@ function rowFailureLevel(isFailed: boolean): PillLevel {
 
 function CodeBlock({ value }: { value: unknown }) {
   return (
-    <pre className="mt-1 overflow-x-auto rounded-[8px] bg-[rgba(15,76,129,0.06)] px-3 py-2 text-[12px] leading-[1.4] text-[#1d293d]">
+    <pre className="mt-1 overflow-x-auto rounded-[8px] bg-[var(--brand-wash-6)] px-3 py-2 text-[12px] leading-[1.4] text-[var(--foreground)]">
       {formatJson(value)}
     </pre>
   );
@@ -121,7 +121,7 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
   return (
     <section className="space-y-4 rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 p-5 shadow-[var(--shadow-card)] backdrop-blur-[12px] sm:p-6">
       <header className="space-y-1">
-        <h2 className="text-[16px] font-semibold text-[#1d293d]">Pipeline Health</h2>
+        <h2 className="text-[16px] font-semibold text-[var(--foreground)]">Pipeline Health</h2>
         <p className="text-[13px] text-[rgba(29,41,61,0.65)]">
           Expanded by default so the overall signal is visible without a click; drill into the stage
           sections below for row-level detail.
@@ -153,13 +153,13 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
             </Pill>
           </div>
 
-          <p className="text-[13px] font-semibold text-[#1d293d]">
+          <p className="text-[13px] font-semibold text-[var(--foreground)]">
             {overallSummaryByStatus(health.overall_status)}
           </p>
 
-          <div className="rounded-[14px] border border-[rgba(29,41,61,0.08)] bg-[rgba(15,76,129,0.03)] p-4">
+          <div className="rounded-[14px] border border-[rgba(29,41,61,0.08)] bg-[var(--brand-wash-3)] p-4">
             <div className="mb-3">
-              <h3 className="text-[14px] font-semibold text-[#1d293d]">
+              <h3 className="text-[14px] font-semibold text-[var(--foreground)]">
                 Pipeline decision support
               </h3>
               <p className="text-[12px] text-[rgba(29,41,61,0.65)]">
@@ -196,7 +196,7 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-[13px] font-semibold capitalize text-[#1d293d]">
+                      <p className="text-[13px] font-semibold capitalize text-[var(--foreground)]">
                         {stage.stage.replaceAll("_", " ")}
                       </p>
                       <p className="text-[11px] text-[rgba(29,41,61,0.6)]">
@@ -208,14 +208,14 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                   <p className="mt-1.5 text-[13px] text-[rgba(29,41,61,0.75)]">{stage.detail}</p>
                   {!isHealthy ? (
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[rgba(237,108,2,0.2)] bg-[rgba(237,108,2,0.06)] p-2.5">
-                      <p className="text-[12px] font-semibold text-[#1d293d]">
+                      <p className="text-[12px] font-semibold text-[var(--foreground)]">
                         Next action: {stageNextAction(stage)}
                       </p>
                       <a
                         href={action.href}
                         target={isInPageAnchor ? undefined : "_blank"}
                         rel={isInPageAnchor ? undefined : "noreferrer"}
-                        className="inline-flex h-8 items-center rounded-full border border-[rgba(29,41,61,0.12)] bg-white/80 px-3 text-[12px] font-semibold text-[#0f4c81] hover:bg-white"
+                        className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
                       >
                         {action.label}
                       </a>
@@ -273,7 +273,7 @@ function RunAccordionSection<TRecord extends { id: Identifier }>({
   return (
     <AccordionItem value={value}>
       <AccordionTrigger>
-        <span className="text-[15px] font-semibold text-[#1d293d]">{title}</span>
+        <span className="text-[15px] font-semibold text-[var(--foreground)]">{title}</span>
         {isPending ? (
           <Pill variant="meta">Loading…</Pill>
         ) : error ? (
@@ -357,14 +357,14 @@ const capturedResourceColumns: DataTableColumn<CapturedResourceRecord>[] = [
     header: "Resource",
     render: (resource) => (
       <div>
-        <p className="text-[13px] font-semibold text-[#1d293d]">
+        <p className="text-[13px] font-semibold text-[var(--foreground)]">
           {resource.title ?? "Untitled resource"}
         </p>
         <a
           href={resource.final_url}
           target="_blank"
           rel="noreferrer"
-          className="text-[12px] text-[#0f4c81] underline-offset-2 hover:underline"
+          className="text-[12px] text-[var(--brand)] underline-offset-2 hover:underline"
         >
           {resource.final_url}
         </a>

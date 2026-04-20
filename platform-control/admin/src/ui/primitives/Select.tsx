@@ -47,10 +47,10 @@ interface SelectProps {
 
 const BASE_TRIGGER =
   "inline-flex w-full items-center justify-between gap-2 rounded-xl border bg-white/85 " +
-  "px-3 py-2.5 text-sm text-[#1d293d] " +
+  "px-3 py-2.5 text-sm text-[var(--foreground)] " +
   "transition-[border-color,box-shadow] " +
   "focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-[rgba(15,76,129,0.42)] " +
+  "focus-visible:outline-[var(--brand-focus-ring)] " +
   "disabled:opacity-50 disabled:cursor-not-allowed " +
   // `[&>span]:truncate` keeps long choice labels from blowing past the trigger width.
   "[&>span:first-child]:truncate [&>span:first-child]:text-left [&>span:first-child]:flex-1";
@@ -60,16 +60,16 @@ const BORDER_ERROR = "border-[#b71c1c] hover:border-[#b71c1c]";
 
 const CONTENT_CLASS =
   "z-50 min-w-[var(--radix-select-trigger-width)] max-h-[320px] overflow-hidden " +
-  "rounded-xl border border-[rgba(29,41,61,0.12)] bg-white/98 text-[#1d293d] " +
+  "rounded-xl border border-[var(--border)] bg-white/98 text-[var(--foreground)] " +
   "shadow-[var(--shadow-card)] backdrop-blur-[12px] " +
   "data-[state=open]:animate-in data-[state=closed]:animate-out " +
   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0";
 
 const ITEM_CLASS =
   "relative flex w-full cursor-pointer select-none items-center gap-2 " +
-  "rounded-lg px-2.5 py-2 text-sm text-[#1d293d] outline-none " +
-  "data-[highlighted]:bg-[rgba(15,76,129,0.08)] data-[highlighted]:text-[#0f4c81] " +
-  "data-[state=checked]:font-semibold data-[state=checked]:text-[#0f4c81] " +
+  "rounded-lg px-2.5 py-2 text-sm text-[var(--foreground)] outline-none " +
+  "data-[highlighted]:bg-[var(--brand-wash-8)] data-[highlighted]:text-[var(--brand)] " +
+  "data-[state=checked]:font-semibold data-[state=checked]:text-[var(--brand)] " +
   "data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed";
 
 // Radix forbids the empty string as an item value. We round-trip the

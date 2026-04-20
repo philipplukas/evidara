@@ -37,7 +37,9 @@ export const FOCUS_RING = "rgba(98, 70, 217, 0.24)";
 // ─── Foreground / border (neutral text + dividers) ───
 export const FOREGROUND = "#1d293d";
 export const FOREGROUND_MUTED = "rgba(29, 41, 61, 0.72)";
+export const FOREGROUND_SUBTLE = "rgba(29, 41, 61, 0.56)";
 export const BORDER = "rgba(29, 41, 61, 0.12)";
+export const BORDER_STRONG = "rgba(29, 41, 61, 0.20)";
 
 // ─── Attention (warm highlight, distinct from brand) ───
 export const ATTENTION = "#92400e";
