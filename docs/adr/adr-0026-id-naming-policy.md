@@ -8,7 +8,7 @@ Related: ADR-0004 (contract strategy), ADR-0012 (layered contract governance)
 ## Context
 
 In January 2026 commit `9549fba` (merged via #241) renamed the Swiss
-authority IDs in `platform-control/seeds/reference/authorities.yaml`
+authority IDs in `platform-control/src/platform_control/seeds/reference/authorities.yaml`
 from a flat scheme (`auth_fedlex`, `auth_bger`, `auth_bvger`) to a
 country-prefixed scheme (`auth_ch_fedlex`, `auth_ch_bundesgericht`, …)
 and dropped `jur_ch_federal` from `jurisdictions.yaml`. The PR touched
@@ -31,7 +31,7 @@ test asserted seed / downstream referential integrity.
 At the same time the repository has two files claiming canonicity for
 the same classes of IDs:
 
-- `platform-control/seeds/reference/{authorities,jurisdictions}.yaml`
+- `platform-control/src/platform_control/seeds/reference/{authorities,jurisdictions}.yaml`
   (used by the seeding and reference-data services)
 - `platform-control/src/platform_control/hierarchies/{authorities,jurisdictions}.yaml`
   (older, used by the hierarchy-sync service and overlay loader)
@@ -91,8 +91,8 @@ country qualifier, drop it from the ID.*
 
 ### 4. One canonical source per ID class
 
-`platform-control/seeds/reference/authorities.yaml` and
-`platform-control/seeds/reference/jurisdictions.yaml` are the single
+`platform-control/src/platform_control/seeds/reference/authorities.yaml` and
+`platform-control/src/platform_control/seeds/reference/jurisdictions.yaml` are the single
 source of truth. The older files at
 `platform-control/src/platform_control/hierarchies/{authorities,jurisdictions}.yaml`
 must be **retired or demoted to a generated mirror** of the reference
@@ -162,7 +162,7 @@ extending an already-complex shell script.
 
 - Renames are explicit data migrations with a deprecation window, not
   seed-file refactors.
-- `platform-control/seeds/reference/*` is unambiguously canonical.
+- `platform-control/src/platform_control/seeds/reference/*` is unambiguously canonical.
 - The enforcement test shipped in #266 makes silent drift impossible —
   any new `authority_id` / `jurisdiction_id` in a durable surface must
   resolve in the seed or be explicitly allowlisted with a comment.
@@ -198,6 +198,6 @@ extending an already-complex shell script.
 - Issue #264 — policy proposal.
 - PR #241 and commit `9549fba` — the original drift.
 - PR #266 — CH reconciliation + enforcement test.
-- `platform-control/seeds/reference/authorities.yaml`
-- `platform-control/seeds/reference/jurisdictions.yaml`
+- `platform-control/src/platform_control/seeds/reference/authorities.yaml`
+- `platform-control/src/platform_control/seeds/reference/jurisdictions.yaml`
 - `scripts/check_country_overlay_files.py`

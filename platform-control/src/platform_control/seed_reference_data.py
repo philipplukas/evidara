@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from collections.abc import Callable
+from importlib import resources as importlib_resources
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,10 @@ from platform_control.seed_schemas import (
     SeedSummary,
 )
 
-DEFAULT_SEED_DIR = Path(__file__).resolve().parents[2] / "seeds"
+# Load seeds via importlib.resources so the same code path works in editable
+# dev installs and in the production wheel that ships inside
+# platform-control's Docker image (see `artifacts` in pyproject.toml).
+DEFAULT_SEED_DIR = Path(str(importlib_resources.files("platform_control").joinpath("seeds")))
 
 
 class AliasedIdRenameRequiredError(RuntimeError):

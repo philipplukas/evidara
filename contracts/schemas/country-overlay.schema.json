@@ -100,7 +100,7 @@
       "additionalProperties": false
     },
     "referenceDataFile": {
-      "description": "reference-data.yaml — jurisdiction and authority records for the overlay. Two valid shapes: (a) ID-citation — `jurisdiction_id` + `authority_ids[]` pointing at platform-control/seeds/reference/*.yaml (preferred when the overlay scope is a single jurisdiction + a small authority set); (b) embedded — full `jurisdictions[]` + `authorities[]` arrays (required when the overlay models multiple jurisdictions per country, e.g. CH federal + 26 cantons).",
+      "description": "reference-data.yaml — jurisdiction and authority records for the overlay. Two valid shapes: (a) ID-citation — `jurisdiction_id` + `authority_ids[]` pointing at platform-control/src/platform_control/seeds/reference/*.yaml (preferred when the overlay scope is a single jurisdiction + a small authority set); (b) embedded — full `jurisdictions[]` + `authorities[]` arrays (required when the overlay models multiple jurisdictions per country, e.g. CH federal + 26 cantons).",
       "type": "object",
       "required": ["version", "country_code"],
       "oneOf": [

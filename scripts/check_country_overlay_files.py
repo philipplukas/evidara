@@ -44,7 +44,7 @@ import yaml
 OVERLAY_FILES = ("overlay.yaml", "reference-data.yaml", "user-content.yaml", "operator-content.yaml")
 
 # Per-country minimum authority IDs that MUST appear in
-# platform-control/seeds/reference/authorities.yaml for the overlay to be
+# platform-control/src/platform_control/seeds/reference/authorities.yaml for the overlay to be
 # considered consistent. Additive — extend as overlays mature.
 REQUIRED_AUTHORITIES: dict[str, set[str]] = {
     "AT": {"auth_at_ris", "auth_at_ogh", "auth_at_vfgh", "auth_at_vwgh"},
@@ -96,7 +96,7 @@ def evaluate(country: str, root: Path) -> tuple[int, list[str]]:
     overlay_root = root / "country-overlays" / iso_lower
     vocab_dir = root / "contracts" / "vocabularies"
     schema_file = root / "contracts" / "schemas" / "country-overlay.schema.json"
-    seeds_dir = root / "platform-control" / "seeds" / "reference"
+    seeds_dir = root / "platform-control" / "src" / "platform_control" / "seeds" / "reference"
 
     required = {name: overlay_root / name for name in OVERLAY_FILES}
     required.update(
@@ -293,7 +293,7 @@ def evaluate(country: str, root: Path) -> tuple[int, list[str]]:
             if aid not in seed_authority_index:
                 errors.append(
                     f"reference-data.yaml references unknown authority_id {aid!r}; "
-                    f"not present in platform-control/seeds/reference/authorities.yaml"
+                    f"not present in platform-control/src/platform_control/seeds/reference/authorities.yaml"
                 )
             else:
                 auth_jur = seed_authority_index[aid]

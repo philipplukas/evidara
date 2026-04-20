@@ -1,7 +1,7 @@
 version: 1
 country_code: IT
 
-# Canonical reference data lives in platform-control/seeds/reference/
+# Canonical reference data lives in platform-control/src/platform_control/seeds/reference/
 # {jurisdictions,authorities}.yaml. This file cites IDs only so the
 # overlay stays in sync without duplication; the validator cross-checks
 # every ID against the seed index.

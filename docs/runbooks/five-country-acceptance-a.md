@@ -48,7 +48,7 @@ Canonical source context:
 - `platform-control/tests/fixtures/scraping_baseline/ch_commentary_html.json` anchors CH commentary evidence with `jurisdiction_id: jur_ch_federal`, `authority_id: auth_commentary_publisher`, `document_type_hint: commentary`, `language_codes: de`.
 - `platform-control/tests/fixtures/scraping_baseline/clean_html.json`, `xml_primary.json`, and `multi_language_fr_de.json` provide additional CH law fixtures, including multilingual `fr,de,it` coverage for the structured-law slice.
 - `platform-control/tests/fixtures/scraping_baseline/at_ris_decision.json` anchors AT decision evidence with `jurisdiction_id: jur_at_federal`, `authority_id: auth_vfgh`, `document_type_hint: decision`, `language_codes: de`.
-- `platform-control/seeds/reference/{jurisdictions,authorities}.yaml` contains the canonical CH/AT seed rows (`jur_ch`, `jur_ch_federal`, `jur_at`, `jur_at_federal`, and their authorities).
+- `platform-control/src/platform_control/seeds/reference/{jurisdictions,authorities}.yaml` contains the canonical CH/AT seed rows (`jur_ch`, `jur_ch_federal`, `jur_at`, `jur_at_federal`, and their authorities).
 - `contracts/vocabularies/jurisdiction.json` and the search/projection contracts already constrain the canonical jurisdiction and projection fields used by these fixtures.
 - Not executed here: live browser screenshots, operator workflow URLs, and `uv run pytest platform-control/tests/unit/test_scraping_fixture_baseline.py -q` in this shell (the current Python environment cannot spawn `pytest`).
 
@@ -82,7 +82,7 @@ Canonical source context:
 |------|--------|--------|----------|
 | CH overlay consistency | `country-overlays/at/*` + CH source blueprints | pass | `python3 scripts/check_country_overlay.py --country CH` |
 | AT overlay consistency | `country-overlays/at/*` + AT source blueprints | pass | `python3 scripts/check_country_overlay.py --country AT` |
-| AT contract + seed consistency | `contracts/vocabularies/jurisdiction.json` + `platform-control/seeds/reference/{jurisdictions,authorities}.yaml` | pass | `python3 scripts/check_country_overlay_at.py` |
+| AT contract + seed consistency | `contracts/vocabularies/jurisdiction.json` + `platform-control/src/platform_control/seeds/reference/{jurisdictions,authorities}.yaml` | pass | `python3 scripts/check_country_overlay_at.py` |
 | CH fixture anchors | `ch_commentary_html.json`, `clean_html.json`, `xml_primary.json`, `multi_language_fr_de.json` | pass | repo-backed fixture files with canonical CH jurisdiction / authority fields |
 | CH live deterministic thin slice | `run_01kp3rqx5nw6gyyrtnzcy48z3y` | partial pass / config-change-needed | [2026-04-13 CH Fedlex Thin Slice Run 1](evidence/2026-04-13-ch-fedlex-thin-slice-run1.md) |
 | AT fixture anchors | `at_ris_decision.json` | pass | repo-backed fixture file with canonical AT jurisdiction / authority fields |

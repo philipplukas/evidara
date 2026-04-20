@@ -412,7 +412,9 @@ async def test_repo_jurisdictions_and_compliance_policies_are_consistent() -> No
     Pure YAML load + FK check — avoids the DB path so pre-existing authority
     name collisions (DE vs CH Bundesverwaltungsgericht) don't mask this.
     """
-    repo_seed_dir = Path(__file__).resolve().parents[2] / "seeds" / "reference"
+    repo_seed_dir = (
+        Path(__file__).resolve().parents[2] / "src" / "platform_control" / "seeds" / "reference"
+    )
     policies = yaml.safe_load((repo_seed_dir / "compliance_policies.yaml").read_text())
     jurisdictions = yaml.safe_load((repo_seed_dir / "jurisdictions.yaml").read_text())
 

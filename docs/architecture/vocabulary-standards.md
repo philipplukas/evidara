@@ -87,7 +87,7 @@ Concretely, for sub-federal identity:
 
 For reference data (jurisdictions + authorities):
 
-- `platform-control/seeds/reference/{jurisdictions,authorities}.yaml`
+- `platform-control/src/platform_control/seeds/reference/{jurisdictions,authorities}.yaml`
   own the canonical rows.
 - Each `country-overlays/<iso>/reference-data.yaml` cites IDs only —
   `jurisdiction_id` + `authority_ids[]` — never re-embeds rows.

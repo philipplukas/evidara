@@ -3,7 +3,7 @@
 Enforces the invariant that every `authority_id` / `jurisdiction_id`
 referenced anywhere in the repo (contract examples, golden datasets,
 fixtures, scripts, workflows, DI jurisdiction resolver) resolves to a
-row in `platform-control/seeds/reference/{authorities,jurisdictions}.yaml`.
+row in `platform-control/src/platform_control/seeds/reference/{authorities,jurisdictions}.yaml`.
 
 This catches the #241-class drift where a seed rename landed without
 updating the ~20 downstream callers. See issue #264 for the naming policy.
@@ -27,7 +27,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-_SEEDS_DIR = REPO_ROOT / "platform-control" / "seeds" / "reference"
+_SEEDS_DIR = REPO_ROOT / "platform-control" / "src" / "platform_control" / "seeds" / "reference"
 _AUTHORITIES_YAML = _SEEDS_DIR / "authorities.yaml"
 _JURISDICTIONS_YAML = _SEEDS_DIR / "jurisdictions.yaml"
 
