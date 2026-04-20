@@ -6,8 +6,9 @@ published surfaces.
 
 Reference data is embedded here rather than loaded from platform-control at
 runtime to avoid a cross-component dependency in the processing path. The
-mapping must be kept in sync with ``platform-control/hierarchies/jurisdictions.yaml``
-and ``contracts/vocabularies/jurisdiction.json``.
+mapping must be kept in sync with
+``platform-control/seeds/reference/jurisdictions.yaml`` and
+``contracts/vocabularies/jurisdiction.json``.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from typing import Any
 #   - Path slugs from the hierarchy (ch, at, ch-federal, at-federal)
 #   - Common name aliases in DE, FR, IT, EN
 _HINT_TO_CANONICAL: dict[str, str] = {
-    # Passthrough: canonical IDs from platform-control/hierarchies/jurisdictions.yaml
+    # Passthrough: canonical IDs from platform-control/seeds/reference/jurisdictions.yaml
     "jur_ch": "jur_ch",
     "jur_ch_federal": "jur_ch_federal",
     "jur_at": "jur_at",
