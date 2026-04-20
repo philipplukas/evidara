@@ -24,14 +24,16 @@ def upgrade() -> None:
     op.drop_table("scrape_targets")
 
     # Drop dead path/depth columns on authorities.
-    op.drop_constraint("uq_authorities_path", "authorities", type_="unique")
-    op.drop_column("authorities", "path")
-    op.drop_column("authorities", "depth")
+    # Use batch_alter_table to avoid hardcoded constraint names that differ
+    # between fresh installs and existing DBs.
+    with op.batch_alter_table("authorities") as batch_op:
+        batch_op.drop_column("path")
+        batch_op.drop_column("depth")
 
     # Drop dead path/depth columns on jurisdictions.
-    op.drop_constraint("jurisdictions_path_key", "jurisdictions", type_="unique")
-    op.drop_column("jurisdictions", "path")
-    op.drop_column("jurisdictions", "depth")
+    with op.batch_alter_table("jurisdictions") as batch_op:
+        batch_op.drop_column("path")
+        batch_op.drop_column("depth")
 
 
 def downgrade() -> None:
