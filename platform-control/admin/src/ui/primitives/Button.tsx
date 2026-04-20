@@ -35,7 +35,8 @@ const VARIANT: Record<Variant, string> = {
     "bg-white/80 text-[var(--foreground)] border border-[var(--border)] " +
     "hover:bg-white hover:border-[var(--border-strong)]",
   ghost:
-    "bg-transparent text-[var(--brand)] border border-transparent " + "hover:bg-[var(--brand-wash-8)]",
+    "bg-transparent text-[var(--brand)] border border-transparent " +
+    "hover:bg-[var(--brand-wash-8)]",
 };
 
 const SIZE: Record<Size, string> = {

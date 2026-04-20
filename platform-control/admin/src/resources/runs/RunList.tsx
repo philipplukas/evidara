@@ -258,7 +258,9 @@ function RunQueueHeader() {
     justifyContent: "flex-start",
     textTransform: "none",
     fontWeight: 600,
-    borderColor: isActive ? "rgba(15, 76, 129, 0.5)" : "var(--border-strong)", /* active border is a custom brand opacity — intentionally inline */
+    borderColor: isActive
+      ? "rgba(15, 76, 129, 0.5)"
+      : "var(--border-strong)" /* active border is a custom brand opacity — intentionally inline */,
     backgroundColor: isActive ? "var(--brand-wash-8)" : "transparent",
     "&:hover": {
       backgroundColor: isActive ? "var(--border)" : "var(--brand-wash-4)",
