@@ -1,0 +1,350 @@
+environment = "prod"
+
+project_id      = "evidara-prod"
+region          = "europe-west6"
+bucket_location = "EUROPE-WEST6"
+
+# Runtime Pub/Sub defaults (runtime_stack `variables.tf`) create topics without an env suffix
+# and push `document-processing-status-updated` / `document-processed` to platform-control-api
+# unless overridden. Prod inherits those unsuffixed topic names (see di-consumer env_vars below).
+
+raw_artifact_bucket_name = "evidara-raw-artifacts-prod"
+manifest_bucket_name     = "evidara-manifests-prod"
+
+document_intelligence_published_bucket_name = "evidara-document-intelligence-surfaces-prod"
+
+artifact_bundle_subscription_push = {
+  subscription_key = "document-intelligence-artifact-bundle-available"
+  target_service   = "di-consumer"
+}
+
+enable_cloud_sql       = true
+cloud_sql_tier         = "db-custom-2-7680"
+cloud_sql_disk_size_gb = 50
+
+cloud_run_services = {
+  "platform-control-api" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/platform-control:latest"
+    service_account_key   = "platform_control_api"
+    allow_unauthenticated = false
+    vpc_connector         = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress            = "PRIVATE_RANGES_ONLY"
+    cloud_sql_instances   = ["evidara-prod:europe-west6:evidara-control-prod"]
+    env_vars = {
+      PLATFORM_CONTROL_GCP_PROJECT_ID               = "evidara-prod"
+      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND       = "gcs"
+      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND      = "pubsub"
+      PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET          = "evidara-raw-artifacts-prod"
+      PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC    = "raw-artifact-available"
+      PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC = "artifact-bundle-available"
+      # Keep acquisition dispatch off the API process; `platform-control-worker` polls `dispatch_pending_runs`.
+      PLATFORM_CONTROL_RUN_DISPATCH_BACKEND = "worker"
+      # PLATFORM_CONTROL_FIRECRAWL_WEBHOOK_RECORD_DIR = "/var/firecrawl-webhook-log"
+      # ^ Leave commented until a durable GCS FUSE mount is added under volumes (see #254).
+    }
+    secret_env_vars = {
+      PLATFORM_CONTROL_DATABASE_URL = {
+        secret_name = "platform_control_dsn"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_API_KEY = {
+        secret_name = "firecrawl_api_key"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_WEBHOOK_SECRET = {
+        secret_name = "firecrawl_webhook"
+      }
+    }
+  }
+
+  "legal-search-api" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/legal-search-api:latest"
+    service_account_key   = "legal_search_api"
+    allow_unauthenticated = false
+    env_vars = {
+      OPENSEARCH_ALIAS_READ               = "evidara-documents-read-prod"
+      OPENSEARCH_ALIAS_WRITE              = "evidara-documents-write-prod"
+      OPENSEARCH_INDEX_SECTIONS           = "evidara-sections-read-prod"
+      OPENSEARCH_INDEX_CITATIONS          = "evidara-citations-read-prod"
+      OPENSEARCH_INDEX_PROJECTION_HISTORY = "evidara-projection-history-prod"
+      # TODO: replace after first terraform apply creates services (placeholder Cloud Run hostname).
+      DOCUMENT_INTELLIGENCE_BASE_URL = "https://document-intelligence-document-service-prod.example.run.app"
+    }
+    secret_env_vars = {
+      OPENSEARCH_NODE = {
+        secret_name = "opensearch_node"
+      }
+      OPENSEARCH_USERNAME = {
+        secret_name = "opensearch_username"
+      }
+      OPENSEARCH_PASSWORD = {
+        secret_name = "opensearch_password"
+      }
+      DOCUMENT_INTELLIGENCE_API_KEY = {
+        secret_name = "document_service_bearer_token"
+      }
+    }
+    vpc_connector = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
+  }
+
+  "document-intelligence-document-service" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/document-intelligence-document-service:latest"
+    service_account_key   = "document_intelligence"
+    allow_unauthenticated = true
+    startup_probe_path    = "/health"
+    liveness_probe_path   = "/health"
+    env_vars = {
+      DI_SURFACES_ROOT_URI = "gs://evidara-document-intelligence-surfaces-prod/published"
+    }
+    secret_env_vars = {
+      DOCUMENT_SERVICE_BEARER_TOKEN = {
+        secret_name = "document_service_bearer_token"
+      }
+    }
+    vpc_connector = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
+  }
+
+  "platform-control-admin" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/platform-control-admin:latest"
+    service_account_key   = "platform_control_admin"
+    allow_unauthenticated = false
+    env_vars = {
+      # TODO: replace after first terraform apply creates services (placeholder Cloud Run hostname).
+      PLATFORM_CONTROL_API_URL = "https://platform-control-api-prod.example.run.app"
+    }
+    vpc_connector = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
+  }
+
+  "legal-search-frontend" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/legal-search-frontend:latest"
+    service_account_key   = "legal_search_frontend"
+    allow_unauthenticated = false
+    env_vars = {
+      # TODO: replace after first terraform apply creates services (placeholder Cloud Run hostnames).
+      NEXT_PUBLIC_API_URL           = "https://legal-search-api-prod.example.run.app"
+      NEXT_PUBLIC_CONTROL_PANEL_URL = "https://platform-control-admin-prod.example.run.app"
+    }
+    vpc_connector = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress    = "PRIVATE_RANGES_ONLY"
+  }
+
+  "platform-control-worker" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/platform-control-worker:latest"
+    service_account_key   = "platform_control_worker"
+    allow_unauthenticated = false
+    min_instance_count    = 1
+    max_instance_count    = 1
+    startup_probe_path    = "/health"
+    liveness_probe_path   = "/health"
+    vpc_connector         = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress            = "PRIVATE_RANGES_ONLY"
+    cloud_sql_instances   = ["evidara-prod:europe-west6:evidara-control-prod"]
+    env_vars = {
+      PLATFORM_CONTROL_GCP_PROJECT_ID               = "evidara-prod"
+      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND       = "gcs"
+      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND      = "pubsub"
+      PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET          = "evidara-raw-artifacts-prod"
+      PLATFORM_CONTROL_RAW_ARTIFACT_PUBSUB_TOPIC    = "raw-artifact-available"
+      PLATFORM_CONTROL_ARTIFACT_BUNDLE_PUBSUB_TOPIC = "artifact-bundle-available"
+      PLATFORM_CONTROL_RUN_DISPATCH_BACKEND         = "worker"
+    }
+    secret_env_vars = {
+      PLATFORM_CONTROL_DATABASE_URL = {
+        secret_name = "platform_control_dsn"
+      }
+      PLATFORM_CONTROL_FIRECRAWL_API_KEY = {
+        secret_name = "firecrawl_api_key"
+      }
+    }
+  }
+
+  "di-consumer" = {
+    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/di-consumer:latest"
+    service_account_key   = "document_intelligence"
+    allow_unauthenticated = false
+    min_instance_count    = 0
+    startup_probe_path    = "/health"
+    liveness_probe_path   = "/health"
+    env_vars = {
+      DI_GCP_PROJECT_ID                  = "evidara-prod"
+      DI_EVENT_PUBLISHER_BACKEND         = "pubsub"
+      DI_STATUS_TOPIC_NAME               = "document-processing-status-updated"
+      DI_PROCESSED_TOPIC_NAME            = "document-processed"
+      DI_DOCUMENT_PROCESSED_PUBSUB_TOPIC = "document-processed"
+      DI_SURFACES_ROOT_URI               = "gs://evidara-document-intelligence-surfaces-prod/published"
+      DI_PROCESSING_VERSION              = "0.1.0"
+      DI_PARSER_BACKEND                  = "legacy"
+    }
+  }
+}
+
+cloud_run_jobs = {
+  "platform-control-db-migrate" = {
+    image               = "europe-west6-docker.pkg.dev/evidara-prod/runtime/platform-control:latest"
+    service_account_key = "platform_control_api"
+    command             = ["sh"]
+    args = [
+      "-lc",
+      <<-EOT
+      set -euo pipefail
+      if [ -f /app/alembic.ini ]; then
+        (cd /app && alembic -c alembic.ini upgrade head) || echo "Alembic migration failed; applying metadata bootstrap fallback."
+      else
+        echo "Missing /app/alembic.ini; applying metadata bootstrap fallback."
+      fi
+      python - <<'PY'
+      import asyncio
+      import platform_control.models  # noqa: F401
+      from platform_control.config import get_settings
+      from platform_control.models.base import Base
+      from sqlalchemy.ext.asyncio import create_async_engine
+
+
+      async def main() -> None:
+          engine = create_async_engine(get_settings().database_url)
+          async with engine.begin() as conn:
+              await conn.run_sync(Base.metadata.create_all)
+          await engine.dispose()
+
+
+      asyncio.run(main())
+      print("platform-control schema bootstrap complete")
+      PY
+      EOT
+    ]
+    timeout_seconds     = 900
+    max_retries         = 1
+    vpc_connector       = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress          = "PRIVATE_RANGES_ONLY"
+    cloud_sql_instances = ["evidara-prod:europe-west6:evidara-control-prod"]
+    secret_env_vars = {
+      PLATFORM_CONTROL_DATABASE_URL = {
+        secret_name = "platform_control_dsn"
+      }
+    }
+  }
+
+  "os-alias-check" = {
+    image               = "curlimages/curl:8.10.1"
+    service_account_key = "legal_search_api"
+    command             = ["sh"]
+    args = [
+      "-lc",
+      "set -euo pipefail; NODE=\"$${OPENSEARCH_NODE%/}\"; AUTH=\"$${OPENSEARCH_USERNAME}:$${OPENSEARCH_PASSWORD}\"; for alias in \"$${OPENSEARCH_ALIAS_READ}\" \"$${OPENSEARCH_ALIAS_WRITE}\"; do if ! curl -fsS -u \"$${AUTH}\" \"$${NODE}/_alias/$${alias}\" >/dev/null; then echo \"Missing OpenSearch alias '$${alias}' in prod. Run job os-alias-bootstrap-prod, then rerun smoke.\" >&2; exit 1; fi; done; echo 'OpenSearch aliases exist and are reachable.'"
+    ]
+    timeout_seconds = 300
+    max_retries     = 0
+    vpc_connector   = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress      = "PRIVATE_RANGES_ONLY"
+    env_vars = {
+      OPENSEARCH_ALIAS_READ  = "evidara-documents-read-prod"
+      OPENSEARCH_ALIAS_WRITE = "evidara-documents-write-prod"
+    }
+    secret_env_vars = {
+      OPENSEARCH_NODE = {
+        secret_name = "opensearch_node"
+      }
+      OPENSEARCH_USERNAME = {
+        secret_name = "opensearch_username"
+      }
+      OPENSEARCH_PASSWORD = {
+        secret_name = "opensearch_password"
+      }
+    }
+  }
+
+  "os-alias-bootstrap" = {
+    image               = "curlimages/curl:8.10.1"
+    service_account_key = "legal_search_api"
+    command             = ["sh"]
+    args = [
+      "-lc",
+      <<-EOT
+      set -euo pipefail
+      NODE="$${OPENSEARCH_NODE%/}"
+      AUTH="$${OPENSEARCH_USERNAME}:$${OPENSEARCH_PASSWORD}"
+
+      if ! curl -fsS -u "$${AUTH}" "$${NODE}/$${OPENSEARCH_INDEX_NAME}" >/dev/null 2>&1; then
+        create_status="$(curl -sS -u "$${AUTH}" \
+          -o /tmp/index-create-response.txt \
+          -w "%%{http_code}" \
+          -H "Content-Type: application/json" \
+          -X PUT "$${NODE}/$${OPENSEARCH_INDEX_NAME}" \
+          -d '{"settings":{"number_of_shards":1,"number_of_replicas":1}}' || true)"
+        if [ "$${create_status}" != "200" ] && [ "$${create_status}" != "201" ] && [ "$${create_status}" != "400" ]; then
+          echo "Failed creating index $${OPENSEARCH_INDEX_NAME} (HTTP $${create_status})."
+          cat /tmp/index-create-response.txt
+          exit 1
+        fi
+      fi
+
+      for alias in "$${OPENSEARCH_ALIAS_READ}" "$${OPENSEARCH_ALIAS_WRITE}"; do
+        delete_status="$(curl -sS -u "$${AUTH}" -o /tmp/delete-alias-index-response.txt -w "%%{http_code}" -X DELETE "$${NODE}/$${alias}" || true)"
+        if [ "$${delete_status}" != "200" ] && [ "$${delete_status}" != "404" ] && [ "$${delete_status}" != "400" ]; then
+          echo "Failed deleting legacy index named $${alias} (HTTP $${delete_status})."
+          cat /tmp/delete-alias-index-response.txt
+          exit 1
+        fi
+
+        unalias_status="$(curl -sS -u "$${AUTH}" -o /tmp/remove-alias-response.txt -w "%%{http_code}" -X DELETE "$${NODE}/_all/_alias/$${alias}" || true)"
+        if [ "$${unalias_status}" != "200" ] && [ "$${unalias_status}" != "404" ]; then
+          echo "Failed removing alias $${alias} from existing indices (HTTP $${unalias_status})."
+          cat /tmp/remove-alias-response.txt
+          exit 1
+        fi
+      done
+
+      alias_status="$(curl -sS -u "$${AUTH}" \
+        -o /tmp/alias-update-response.txt \
+        -w "%%{http_code}" \
+        -H "Content-Type: application/json" \
+        -X POST "$${NODE}/_aliases" \
+        -d "{\"actions\":[{\"add\":{\"alias\":\"$${OPENSEARCH_ALIAS_READ}\",\"index\":\"$${OPENSEARCH_INDEX_NAME}\"}},{\"add\":{\"alias\":\"$${OPENSEARCH_ALIAS_WRITE}\",\"index\":\"$${OPENSEARCH_INDEX_NAME}\",\"is_write_index\":true}}]}")"
+
+      if [ "$${alias_status}" -lt 200 ] || [ "$${alias_status}" -ge 300 ]; then
+        echo "Failed updating aliases (HTTP $${alias_status})."
+        cat /tmp/alias-update-response.txt
+        exit 1
+      fi
+
+      echo "OpenSearch aliases now point to $${OPENSEARCH_INDEX_NAME}."
+      EOT
+    ]
+    timeout_seconds = 300
+    max_retries     = 0
+    vpc_connector   = "projects/evidara-prod/locations/europe-west6/connectors/evidara-search-prod-connector"
+    vpc_egress      = "PRIVATE_RANGES_ONLY"
+    env_vars = {
+      OPENSEARCH_INDEX_NAME  = "evidara-documents-prod-v1"
+      OPENSEARCH_ALIAS_READ  = "evidara-documents-read-prod"
+      OPENSEARCH_ALIAS_WRITE = "evidara-documents-write-prod"
+    }
+    secret_env_vars = {
+      OPENSEARCH_NODE = {
+        secret_name = "opensearch_node"
+      }
+      OPENSEARCH_USERNAME = {
+        secret_name = "opensearch_username"
+      }
+      OPENSEARCH_PASSWORD = {
+        secret_name = "opensearch_password"
+      }
+    }
+  }
+}
+
+runtime_service_account_ids = {
+  platform_control_api    = "evd-pc-api"
+  platform_control_admin  = "evd-pc-admin"
+  platform_control_worker = "evd-pc-worker"
+  legal_search_api        = "evd-ls-api"
+  legal_search_frontend   = "evd-ls-frontend"
+  document_intelligence   = "evd-di-consumer"
+}
+
+# --- Optional billing guardrails (Cloud Billing budgets) ---
+# See infra/terraform/gcp/runtime_stack/billing_guardrails.tf and dev/runtime.gcp.tfvars.example.
+# enable_billing_budget = false
+
+enable_billing_budget = false

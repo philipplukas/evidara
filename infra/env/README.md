@@ -12,6 +12,8 @@ Current scaffold:
 - [`staging/runtime.gcp.tfvars.example`](staging/runtime.gcp.tfvars.example)
 - [`staging/runtime.gcp.ci.tfvars`](staging/runtime.gcp.ci.tfvars)
 - [`prod/runtime.gcp.tfvars.example`](prod/runtime.gcp.tfvars.example)
+- [`prod/runtime.gcp.tfvars`](prod/runtime.gcp.tfvars)
+- [`prod/runtime.gcp.ci.tfvars`](prod/runtime.gcp.ci.tfvars)
 - [`dev/opensearch.gke.tfvars.example`](dev/opensearch.gke.tfvars.example)
 - [`staging/opensearch.gke.tfvars.example`](staging/opensearch.gke.tfvars.example)
 - [`prod/opensearch.gke.tfvars.example`](prod/opensearch.gke.tfvars.example)
