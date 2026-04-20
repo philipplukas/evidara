@@ -82,10 +82,10 @@ export const AccordionTrigger = forwardRef<
         {...rest}
         className={cn(
           "group flex w-full items-center justify-between gap-3 px-5 py-4 text-left",
-          "text-[15px] font-semibold text-[#1d293d] leading-tight",
+          "text-[15px] font-semibold text-[var(--foreground)] leading-tight",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]",
-          "focus-visible:outline-[rgba(15,76,129,0.42)]",
-          "hover:bg-[rgba(15,76,129,0.03)] transition-colors",
+          "focus-visible:outline-[var(--brand-focus-ring)]",
+          "hover:bg-[var(--brand-wash-3)] transition-colors",
           className,
         )}
       >

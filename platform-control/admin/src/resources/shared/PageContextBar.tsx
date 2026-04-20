@@ -24,7 +24,7 @@ export function PageContextBar({ children }: PageContextBarProps) {
         backgroundColor: "rgba(255, 253, 248, 0.96)",
         backdropFilter: "blur(10px)",
         borderBottom: "1px solid",
-        borderColor: "rgba(29, 41, 61, 0.12)",
+        borderColor: "var(--border)",
       }}
     >
       {children}

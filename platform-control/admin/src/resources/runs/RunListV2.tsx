@@ -59,7 +59,7 @@ function PresetButton({ isActive, onClick, children, tone = "accent" }: PresetBu
   const toneActive =
     tone === "warning"
       ? "bg-[rgba(237,108,2,0.1)] border-[rgba(237,108,2,0.4)] text-[#e65100]"
-      : "bg-[rgba(15,76,129,0.08)] border-[rgba(15,76,129,0.5)] text-[#0f4c81]";
+      : "bg-[var(--brand-wash-8)] border-[rgba(15,76,129,0.5)] text-[var(--brand)]";
   return (
     <button
       type="button"
@@ -127,7 +127,7 @@ export default function RunListV2() {
       sortField: "run_id",
       render: (record) => (
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[12px] text-[#1d293d]">{record.run_id}</span>
+          <span className="font-mono text-[12px] text-[var(--foreground)]">{record.run_id}</span>
           <div>
             <Pill level={runModeToLevel(record.mode)}>{record.mode}</Pill>
           </div>
@@ -205,7 +205,7 @@ export default function RunListV2() {
           <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
             Preview · Tailwind + ra-core · Runs
           </p>
-          <h1 className="font-serif text-[28px] font-semibold text-[#1d293d] leading-tight">
+          <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
             Run queue <span className="text-[rgba(29,41,61,0.5)]">(v2 preview)</span>
           </h1>
           <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[72ch]">

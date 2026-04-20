@@ -93,7 +93,7 @@ export default function SourceListV2() {
       sortField: "name",
       render: (record) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-semibold text-[#1d293d]">{record.name}</span>
+          <span className="font-semibold text-[var(--foreground)]">{record.name}</span>
           <span className="text-[12px] text-[rgba(29,41,61,0.6)]">{record.source_id}</span>
         </div>
       ),
@@ -166,7 +166,7 @@ export default function SourceListV2() {
             <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
               Preview · Tailwind + ra-core
             </p>
-            <h1 className="font-serif text-[28px] font-semibold text-[#1d293d] leading-tight">
+            <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
               Sources <span className="text-[rgba(29,41,61,0.5)]">(v2 preview)</span>
             </h1>
             <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[68ch]">

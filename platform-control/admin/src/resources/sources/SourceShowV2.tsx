@@ -73,7 +73,7 @@ export default function SourceShowV2() {
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
           Preview · Tailwind + ra-core · Show
         </p>
-        <h1 className="font-serif text-[28px] font-semibold text-[#1d293d] leading-tight">
+        <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
           {source.name}
         </h1>
         <div className="font-mono text-[12px] text-[rgba(29,41,61,0.6)]">{source.source_id}</div>
@@ -91,7 +91,7 @@ export default function SourceShowV2() {
        * give context the header pills alone can't.
        */}
       <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-1.5">
-        <h2 className="text-[15px] font-semibold text-[#1d293d]">Source lifecycle</h2>
+        <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Source lifecycle</h2>
         <p className="text-[13px] text-[rgba(29,41,61,0.65)]">
           Status, operating posture, and the main attention cue for this source.
         </p>

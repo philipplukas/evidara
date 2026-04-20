@@ -42,7 +42,7 @@ const LEVELS: Record<PillLevel, LevelStyle> = {
   },
   neutral: {
     Icon: MinusCircle,
-    className: "bg-[rgba(29,41,61,0.06)] text-[rgba(29,41,61,0.75)] border-[rgba(29,41,61,0.2)]",
+    className: "bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] text-[var(--foreground-muted)] border-[var(--border-strong)]",
   },
   info: {
     Icon: Info,

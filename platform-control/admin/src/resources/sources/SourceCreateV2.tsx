@@ -128,7 +128,7 @@ export default function SourceCreateV2() {
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
           Preview · Tailwind + ra-core · Form path
         </p>
-        <h1 className="font-serif text-[28px] font-semibold text-[#1d293d] leading-tight">
+        <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
           Create source <span className="text-[rgba(29,41,61,0.5)]">(v2 preview)</span>
         </h1>
         <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[72ch]">

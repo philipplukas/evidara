@@ -39,7 +39,7 @@ export function FieldCell({
       <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[rgba(29,41,61,0.6)] leading-[1.2]">
         {label}
       </span>
-      <div className="text-sm text-[#1d293d]">{children}</div>
+      <div className="text-sm text-[var(--foreground)]">{children}</div>
     </div>
   );
 }

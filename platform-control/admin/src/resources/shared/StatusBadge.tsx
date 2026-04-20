@@ -37,9 +37,9 @@ const LEVEL_META: Record<
   },
   neutral: {
     Icon: RemoveCircleOutlineIcon,
-    border: "rgba(29, 41, 61, 0.2)",
-    bg: "rgba(29, 41, 61, 0.06)",
-    color: "rgba(29, 41, 61, 0.75)",
+    border: "var(--border-strong)",
+    bg: "color-mix(in srgb, var(--foreground) 6%, transparent)",
+    color: "var(--foreground-muted)",
   },
   info: {
     Icon: InfoOutlinedIcon,

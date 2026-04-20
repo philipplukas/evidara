@@ -272,7 +272,7 @@ export function Dashboard() {
             overflow: "hidden",
             position: "relative",
             background:
-              "linear-gradient(145deg, rgba(15, 76, 129, 0.06), rgba(154, 122, 74, 0.05) 60%, rgba(255, 253, 248, 0.92))",
+              "linear-gradient(145deg, var(--brand-wash-6), rgba(154, 122, 74, 0.05) 60%, rgba(255, 253, 248, 0.92))",
           }}
         >
           <Stack spacing={2.25}>
@@ -465,7 +465,7 @@ export function Dashboard() {
                     backdropFilter: "blur(10px)",
                   },
                   "& .MuiTableRow-root:hover": {
-                    backgroundColor: "rgba(15, 76, 129, 0.03)",
+                    backgroundColor: "var(--brand-wash-3)",
                   },
                 }}
               >

@@ -103,7 +103,7 @@ export function AppBar() {
             aria-hidden
             className="w-[42px] h-[42px] rounded-2xl grid place-items-center text-[18px] font-bold leading-none border border-[rgba(255,253,248,0.16)] shadow-[0_12px_24px_rgba(7,23,40,0.16)]"
             style={{
-              background: "linear-gradient(135deg, #0f4c81, #0b3d68)",
+              background: "linear-gradient(135deg, var(--brand), var(--brand-hover))",
               fontFamily: "var(--font-admin-serif), Georgia, serif",
             }}
           >

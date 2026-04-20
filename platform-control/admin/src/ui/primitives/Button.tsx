@@ -24,18 +24,18 @@ const BASE =
   "inline-flex items-center justify-center gap-2 rounded-full font-semibold " +
   "transition-[background-color,border-color,transform,box-shadow] duration-150 " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-[rgba(15,76,129,0.42)] " +
+  "focus-visible:outline-[var(--brand-focus-ring)] " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 const VARIANT: Record<Variant, string> = {
   primary:
-    "bg-[#0f4c81] text-[#fffdf8] border border-transparent shadow-[0_10px_24px_rgba(15,76,129,0.18)] " +
-    "hover:bg-[#0b3d68] hover:shadow-[0_14px_28px_rgba(15,76,129,0.24)]",
+    "bg-[var(--brand)] text-[#fffdf8] border border-transparent shadow-[0_10px_24px_rgba(15,76,129,0.18)] " +
+    "hover:bg-[var(--brand-hover)] hover:shadow-[0_14px_28px_rgba(15,76,129,0.24)]",
   secondary:
-    "bg-white/80 text-[#1d293d] border border-[rgba(29,41,61,0.12)] " +
-    "hover:bg-white hover:border-[rgba(29,41,61,0.2)]",
+    "bg-white/80 text-[var(--foreground)] border border-[var(--border)] " +
+    "hover:bg-white hover:border-[var(--border-strong)]",
   ghost:
-    "bg-transparent text-[#0f4c81] border border-transparent " + "hover:bg-[rgba(15,76,129,0.08)]",
+    "bg-transparent text-[var(--brand)] border border-transparent " + "hover:bg-[var(--brand-wash-8)]",
 };
 
 const SIZE: Record<Size, string> = {
