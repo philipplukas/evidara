@@ -6,7 +6,7 @@ on:
 
 jobs:
   check-title:
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    runs-on: ubuntu-latest
     permissions:
       pull-requests: read
     steps:
