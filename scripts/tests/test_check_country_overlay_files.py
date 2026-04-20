@@ -1,7 +1,7 @@
 """Tests for the generalized country-overlay validator.
 
 Exercises the validator against the real `country-overlays/` and
-`contracts/` + `platform-control/seeds/` data shipped in the repo, plus
+`contracts/` + `platform-control/src/platform_control/seeds/` data shipped in the repo, plus
 a temp-dir negative case that omits required authorities.
 """
 

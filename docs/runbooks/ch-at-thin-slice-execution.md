@@ -166,10 +166,10 @@ Operational implication:
 
 ### Existing repo-backed CH/AT reference anchors
 
-- `platform-control/seeds/reference/jurisdictions.yaml`
+- `platform-control/src/platform_control/seeds/reference/jurisdictions.yaml`
   - `jur_ch`
   - `jur_at`
-- `platform-control/seeds/reference/authorities.yaml`
+- `platform-control/src/platform_control/seeds/reference/authorities.yaml`
   - `auth_ch_fedlex`
   - `auth_zh_admin`
 - `auth_at_ris`

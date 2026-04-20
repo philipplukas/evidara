@@ -17,8 +17,12 @@ OPERATOR_CONTENT_FILE = AT_OVERLAY_ROOT / "operator-content.yaml"
 REFERENCE_DATA_FILE = AT_OVERLAY_ROOT / "reference-data.yaml"
 
 JURISDICTION_VOCAB_FILE = Path("contracts/vocabularies/jurisdiction.json")
-SEED_JURISDICTIONS_FILE = Path("platform-control/seeds/reference/jurisdictions.yaml")
-SEED_AUTHORITIES_FILE = Path("platform-control/seeds/reference/authorities.yaml")
+SEED_JURISDICTIONS_FILE = Path(
+    "platform-control/src/platform_control/seeds/reference/jurisdictions.yaml"
+)
+SEED_AUTHORITIES_FILE = Path(
+    "platform-control/src/platform_control/seeds/reference/authorities.yaml"
+)
 
 
 def load_yaml(path: Path) -> dict[str, Any]:

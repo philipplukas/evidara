@@ -46,8 +46,8 @@ Code ready:
   `eur_lex_sparql_directive_en` (DSM Copyright Directive) are still
   `enabled: false` pending acceptance-run evidence.
 - `contracts/vocabularies/jurisdiction.json` includes `EU`.
-- `platform-control/seeds/reference/jurisdictions.yaml` includes `jur_eu`.
-- `platform-control/seeds/reference/authorities.yaml` includes all EU
+- `platform-control/src/platform_control/seeds/reference/jurisdictions.yaml` includes `jur_eu`.
+- `platform-control/src/platform_control/seeds/reference/authorities.yaml` includes all EU
   authorities.
 - `country-overlays/eu/` carries the overlay YAML quartet.
 - `document_intelligence/nlp/citation_extractor.py` recognizes CELEX

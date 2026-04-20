@@ -29,7 +29,7 @@ From `gh pr diff $1 --name-only`, dedupe path prefixes and map to the gate table
 | `platform-control/` (non-admin) | `cd platform-control && uv run pytest` |
 | `legal-search/api/` | `cd legal-search/api && npm test` |
 | `legal-search/frontend/` | `cd legal-search/frontend && npm run check` |
-| `country-overlays/` or `platform-control/seeds/` | `python scripts/check_country_overlay_files.py` |
+| `country-overlays/` or `platform-control/src/platform_control/seeds/` | `python scripts/check_country_overlay_files.py` |
 | scraping-touching | `bash scripts/check-scraping-qa.sh` |
 
 Do **not** run a gate if nothing in its surface changed. List the gates that would apply, but only execute those whose surface is actually touched.

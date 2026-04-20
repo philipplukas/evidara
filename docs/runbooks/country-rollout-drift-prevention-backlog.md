@@ -31,7 +31,7 @@ runs or operator work.
 
 ### 1.1 Authorities deduplication ✅ LANDED
 
-**Problem:** Authority rows lived in two places — `platform-control/seeds/reference/authorities.yaml` and each `country-overlays/<iso>/reference-data.yaml`. Drift was guaranteed.
+**Problem:** Authority rows lived in two places — `platform-control/src/platform_control/seeds/reference/authorities.yaml` and each `country-overlays/<iso>/reference-data.yaml`. Drift was guaranteed.
 
 **Outcome:** Seeds are now the single source of truth. Each overlay
 `reference-data.yaml` carries only `jurisdiction_id` (single string)
@@ -113,7 +113,7 @@ The `hierarchyPath` wire format stays the same so no URLs break.
 
 ### 1.6 Per-country authority-seed expansion ✅ LANDED
 
-**Outcome:** `platform-control/seeds/reference/authorities.yaml` grew
+**Outcome:** `platform-control/src/platform_control/seeds/reference/authorities.yaml` grew
 from 19 to 30 rows. DE: 2 → 7 (added BGH, BVerwG, BFH, BAG, BSG). FR: 2
 → 4 (added Conseil d'État, Conseil constitutionnel). IT: 4 → 5 (added
 Corte Costituzionale). Per-country `REQUIRED_AUTHORITIES` minimums in
