@@ -130,6 +130,71 @@ items:
   - jurisdiction_id: jur_de
     slug: de
     name: Germany
+  # ─── German Länder (ISO 3166-2:DE, alphabetical by code) ───
+  - jurisdiction_id: jur_de_bb
+    slug: de-bb
+    name: Brandenburg
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_be
+    slug: de-be
+    name: Berlin
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_bw
+    slug: de-bw
+    name: Baden-Württemberg
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_by
+    slug: de-by
+    name: Bayern
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_hb
+    slug: de-hb
+    name: Bremen
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_he
+    slug: de-he
+    name: Hessen
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_hh
+    slug: de-hh
+    name: Hamburg
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_mv
+    slug: de-mv
+    name: Mecklenburg-Vorpommern
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_ni
+    slug: de-ni
+    name: Niedersachsen
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_nw
+    slug: de-nw
+    name: Nordrhein-Westfalen
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_rp
+    slug: de-rp
+    name: Rheinland-Pfalz
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_sh
+    slug: de-sh
+    name: Schleswig-Holstein
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_sl
+    slug: de-sl
+    name: Saarland
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_sn
+    slug: de-sn
+    name: Sachsen
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_st
+    slug: de-st
+    name: Sachsen-Anhalt
+    parent_id: jur_de
+  - jurisdiction_id: jur_de_th
+    slug: de-th
+    name: Thüringen
+    parent_id: jur_de
   - jurisdiction_id: jur_fr
     slug: fr
     name: France

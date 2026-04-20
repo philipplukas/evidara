@@ -1,0 +1,106 @@
+version: 1
+country_code: DE
+
+# German municipality registry (Gemeinden).
+#
+# Scope:
+#   This file is an out-of-band registry — it is NOT part of the core
+#   reference-data seeds consumed by platform-control's Jurisdiction /
+#   Authority contract. Municipalities are tracked here because:
+#     - there are ~11,000 of them, which is far too large for the curated
+#       reference-data.yaml pattern used by other overlays,
+#     - not every municipality publishes a structured law collection, so
+#       treating each as a first-class Authority would inflate the taxonomy
+#       with non-publishing entities,
+#     - publication practice varies (own Rechtssammlung, Land portal,
+#       PDFs only, or print-only), and that variation is modelled below
+#       with an optional law_collection block.
+#
+# Identifier:
+#   Each entry is keyed by the AGS (Amtlicher Gemeindeschlüssel), the
+#   8-digit Destatis identifier for a municipality.
+#
+# Parent linkage:
+#   land_jurisdiction_id references an entry in reference-data.yaml.
+#
+# Seed scope:
+#   This pilot set contains large cities from several Länder. The full
+#   ~11,000-entry registry should be loaded from the Destatis
+#   Gemeindeverzeichnis via a separate ingestion job rather than
+#   hand-maintained here. City-states (Berlin, Hamburg, Bremen) are
+#   omitted because they are already covered at Land level.
+
+schema:
+  required:
+    - ags
+    - land_jurisdiction_id
+    - name
+    - primary_language
+  optional:
+    - names  # localized display names keyed by language code
+    - law_collection
+  law_collection_shape:
+    required:
+      - publisher
+      - format
+    optional:
+      - url
+      - language
+      - note
+
+municipalities:
+  # ─── Nordrhein-Westfalen ───
+  - ags: "05111000"
+    land_jurisdiction_id: jur_de_nw
+    name: Düsseldorf
+    primary_language: de
+
+  - ags: "05315000"
+    land_jurisdiction_id: jur_de_nw
+    name: Köln
+    primary_language: de
+
+  - ags: "05913000"
+    land_jurisdiction_id: jur_de_nw
+    name: Dortmund
+    primary_language: de
+
+  # ─── Bayern ───
+  - ags: "09162000"
+    land_jurisdiction_id: jur_de_by
+    name: München
+    primary_language: de
+
+  - ags: "09564000"
+    land_jurisdiction_id: jur_de_by
+    name: Nürnberg
+    primary_language: de
+
+  # ─── Baden-Württemberg ───
+  - ags: "08111000"
+    land_jurisdiction_id: jur_de_bw
+    name: Stuttgart
+    primary_language: de
+
+  # ─── Hessen ───
+  - ags: "06412000"
+    land_jurisdiction_id: jur_de_he
+    name: Frankfurt am Main
+    primary_language: de
+
+  # ─── Sachsen ───
+  - ags: "14612000"
+    land_jurisdiction_id: jur_de_sn
+    name: Dresden
+    primary_language: de
+
+  - ags: "14713000"
+    land_jurisdiction_id: jur_de_sn
+    name: Leipzig
+    primary_language: de
+
+  # ─── Niedersachsen ───
+  - ags: "03241001"
+    land_jurisdiction_id: jur_de_ni
+    name: Hannover
+    primary_language: de
