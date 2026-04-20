@@ -25,6 +25,10 @@ repository_variables = {
   SMOKE_SEED_URL_STAGING               = "http://example.org"
   SMOKE_REQUEST_TIMEOUT_SECONDS_DEV    = "10"
   SMOKE_REQUEST_TIMEOUT_SECONDS_STAGING = "10"
+  # ARC runner scale-set labels (see ADR-0024, incident #311). Values must match
+  # the workflow `runs-on: ${{ vars.*_RUNNER_SCALE_SET || 'evidara-*' }}` fallbacks.
+  LIGHT_RUNNER_SCALE_SET               = "evidara-light"
+  HEAVY_RUNNER_SCALE_SET               = "evidara-heavy"
 }
 
 # Optional environment-scoped variables.

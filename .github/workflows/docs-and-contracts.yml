@@ -129,6 +129,10 @@ jobs:
         run: |
           python scripts/check-staging-smoke-workflow-isolation.py
 
+      - name: Check workflow vars.* references are terraform-managed
+        run: |
+          python3 scripts/check_workflow_vars.py
+
       - name: Check Austria overlay consistency
         run: |
           python scripts/check_country_overlay_at.py
