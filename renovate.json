@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["dockerfile"],
+  "packageRules": [
+    {
+      "description": "Group all Python base image digest bumps into a single PR",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["python"],
+      "groupName": "python base image",
+      "labels": ["state:review", "role:engineer", "infra"]
+    },
+    {
+      "description": "Group all Node base image digest bumps into a single PR",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["node"],
+      "groupName": "node base image",
+      "labels": ["state:review", "role:engineer", "infra"]
+    }
+  ],
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 5,
+  "schedule": ["before 8am on Monday"],
+  "ignorePaths": [
+    "**/node_modules/**",
+    ".claude/worktrees/**"
+  ]
+}
