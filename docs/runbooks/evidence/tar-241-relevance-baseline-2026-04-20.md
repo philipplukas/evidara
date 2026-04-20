@@ -28,3 +28,18 @@ meaningfully evaluated until the corpus contains representative documents.
 TAR-241 should be marked as **blocked on corpus data**, not on code or
 infrastructure. The next step is to trigger a CH Fedlex fast-loop run on
 dev to populate the index, then re-run the query pack.
+
+## Update: Fast-loop attempt (2026-04-20 21:40 UTC)
+
+- Dev DB upgraded to migration 0014 and seeded (49 jurisdictions, 38 authorities, 2 compliance policies)
+- Dev platform-control-api redeployed with latest image
+- CH Fedlex fast-loop launched: source created, version approved, preview run started
+- Run ID: `run_01kppdc38wgh8rm0knxvr1r94s`
+- **Result: run stayed `pending` for 5 minutes (60 polls × 5s)**
+- Root cause: the platform-control-worker (Temporal activity executor) is not processing
+  the run. The worker service likely needs redeployment + a running Temporal server.
+
+**Remaining blocker for TAR-241:**
+The run execution pipeline (Temporal + worker + Firecrawl provider) must be operational
+for documents to flow through ingestion into OpenSearch. This is infrastructure work
+beyond the API/DB layer.
