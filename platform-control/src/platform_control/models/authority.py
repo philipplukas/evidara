@@ -16,8 +16,6 @@ class Jurisdiction(TimestampMixin, Base):
     parent_id: Mapped[str | None] = mapped_column(
         ForeignKey("jurisdictions.jurisdiction_id"), nullable=True
     )
-    path: Mapped[str | None] = mapped_column(unique=True, nullable=True)
-    depth: Mapped[int] = mapped_column(default=0)
     name: Mapped[str] = mapped_column(unique=True)
     slug: Mapped[str] = mapped_column(unique=True)
     compliance_policy_id: Mapped[str | None] = mapped_column(
@@ -37,8 +35,6 @@ class Authority(TimestampMixin, Base):
     parent_id: Mapped[str | None] = mapped_column(
         ForeignKey("authorities.authority_id"), nullable=True
     )
-    path: Mapped[str | None] = mapped_column(unique=True, nullable=True)
-    depth: Mapped[int] = mapped_column(default=0)
     jurisdiction_id: Mapped[str | None] = mapped_column(
         ForeignKey("jurisdictions.jurisdiction_id"), nullable=True
     )

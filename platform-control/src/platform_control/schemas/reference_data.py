@@ -77,13 +77,9 @@ class HierarchySyncCountsResponse(BaseModel):
 class HierarchySyncResponse(BaseModel):
     """Response from ``POST /v1/reference-data/hierarchy/sync``.
 
-    The endpoint is now a thin shim over ``ReferenceDataSeeder`` (issue #312).
-    ``scrape_targets`` is retained with zero counts for response-shape
-    compatibility with ``scripts/e2e-smoke-test.sh`` and is scheduled for
-    removal alongside the ``scrape_targets`` table.
+    The endpoint is a thin shim over ``ReferenceDataSeeder`` (issue #312).
     """
 
     dry_run: bool
     jurisdictions: HierarchySyncCountsResponse
     authorities: HierarchySyncCountsResponse
-    scrape_targets: HierarchySyncCountsResponse

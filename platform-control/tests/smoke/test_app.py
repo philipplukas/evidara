@@ -314,8 +314,6 @@ async def test_sync_hierarchy_endpoint(session_maker) -> None:
         assert body["dry_run"] is True
         assert body["jurisdictions"]["created"] >= 1
         assert body["authorities"]["created"] >= 1
-        # scrape_targets is retained for shape compatibility but always zero
-        # since the endpoint now delegates to ReferenceDataSeeder (issue #312).
-        assert body["scrape_targets"]["created"] == 0
+        assert "scrape_targets" not in body
 
     app.dependency_overrides.clear()
