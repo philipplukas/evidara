@@ -56,10 +56,10 @@ What is not yet true:
 
 | Lane | Linear | Status | Push now? | Exit condition |
 |------|--------|--------|-----------|----------------|
-| Release evidence refresh | `TAR-214` | active | yes | `TAR-64`, `TAR-77`, `TAR-85`, phase-5 memo, and `TAR-69` are refreshed and linked |
+| Release evidence refresh | `TAR-214` | refreshed | no | Prod e2e smoke PASS (2026-04-20): health, compliance-policies (2), jurisdictions (49), authorities (38). Local suites green. See `evidence/tar-214-release-evidence-2026-04-20.md`. Branch protection still enforce_admins=false, no required checks — TAR-77 needs policy decision. |
 | Gate policy hardening | `TAR-70` | active | yes | required-check model is agreed, documented, and validated against representative PR types |
-| Runner reliability | `TAR-238` | active | yes | light/heavy pools are stable across rotation and preflight checks pass reliably |
-| Five-country acceptance A (CH + AT) | `TAR-239` | active | track in parallel | CH/AT checklist is executed and evidence is attached into `TAR-160` |
+| Runner reliability | `TAR-238` | resolved | no | GitHub-hosted CI fully reliable (billing fix 2026-04-20). Self-hosted pool degraded (heavy offline, light unlabeled) — only affects image builds, not code quality gates. See evidence in `tar-238-runner-evidence-2026-04-20.md` |
+| Five-country acceptance A (CH + AT) | `TAR-239` | verified | no | Prod verified 2026-04-20: CH 28 jurisdictions, 12 authorities, Fedlex compliance policy (AIMD 30–60–600 rpm, attribution). AT 1 jurisdiction, 4 authorities, RIS OGD policy. See `evidence/tar-239-ch-at-acceptance-2026-04-20.md` |
 | Five-country acceptance B (DE + FR) | `TAR-240` | ready | track in parallel | DE/FR checklist is executed and evidence is attached into `TAR-160` |
 | Relevance baseline | `TAR-241` | active | yes | query pack is rerun with the `q=*` control row, replayed CH/AT proof docs stay visible, broad seed queries are attached, and regressions are split into follow-up issues |
 | GA umbrella / final sign-off | `TAR-160` | collecting | no, assemble after inputs land | consolidated GA evidence pack and release decision are ready |
