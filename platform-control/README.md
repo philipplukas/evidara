@@ -18,14 +18,9 @@ bash ../scripts/platform-control-demo.sh seed-dry-run
 bash ../scripts/platform-control-demo.sh seed
 ```
 
-Sync hierarchy data (jurisdictions, authorities, scrape targets):
-
-```bash
-uv run platform-control-sync-hierarchy --dry-run
-uv run platform-control-sync-hierarchy
-```
-
-Run hierarchy sync via API:
+The legacy `platform-control-sync-hierarchy` CLI was removed in issue #312;
+the canonical `seeds/reference/` bundles plus `platform-control-seed-reference-data`
+cover the same work. The HTTP endpoint remains as a thin shim for existing callers:
 
 ```bash
 curl -X POST "http://localhost:8080/v1/reference-data/hierarchy/sync?dry_run=true"

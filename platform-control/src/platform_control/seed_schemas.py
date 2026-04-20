@@ -83,6 +83,7 @@ class JurisdictionSeed(BaseModel):
     jurisdiction_id: str
     slug: str
     name: str
+    parent_id: str | None = None
     compliance_policy_id: str | None = None
     # Previously-used jurisdiction_ids for this same logical entity. When
     # the seeder encounters an existing row under one of these aliases,

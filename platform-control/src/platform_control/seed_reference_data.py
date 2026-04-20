@@ -53,6 +53,23 @@ class ReferenceDataSeeder:
         self.session_maker = session_maker
 
     async def seed(self, seed_dir: Path, *, dry_run: bool) -> SeedSummary:
+        async with self.session_maker() as session:
+            return await self.seed_with_session(session, seed_dir, dry_run=dry_run)
+
+    async def seed_with_session(
+        self,
+        session: AsyncSession,
+        seed_dir: Path,
+        *,
+        dry_run: bool,
+    ) -> SeedSummary:
+        """Run the seed upserts against an already-open session.
+
+        Used by HTTP handlers that receive a session via FastAPI dependency
+        injection and want to reuse it (so one request maps to one
+        transaction). The standalone CLI still calls ``seed()``, which opens
+        its own session from ``session_maker``.
+        """
         bundles = self._load_seed_bundles(seed_dir)
         counter_keys = (
             "compliance_policies",
@@ -68,25 +85,24 @@ class ReferenceDataSeeder:
             unchanged=dict.fromkeys(counter_keys, 0),
         )
 
-        async with self.session_maker() as session:
-            # Policies land before jurisdictions so jurisdictions.compliance_policy_id
-            # resolves its FK on the first run. Jurisdictions without a policy
-            # stay unconstrained (absence is the explicit operator signal).
-            await self._upsert_compliance_policies(
-                session, bundles["compliance_policies"].items, summary
-            )
-            await self._upsert_jurisdictions(session, bundles["jurisdictions"].items, summary)
-            await self._upsert_authorities(session, bundles["authorities"].items, summary)
-            await self._upsert_extractor_profiles(
-                session,
-                bundles["extractor_profiles"].items,
-                summary,
-            )
+        # Policies land before jurisdictions so jurisdictions.compliance_policy_id
+        # resolves its FK on the first run. Jurisdictions without a policy
+        # stay unconstrained (absence is the explicit operator signal).
+        await self._upsert_compliance_policies(
+            session, bundles["compliance_policies"].items, summary
+        )
+        await self._upsert_jurisdictions(session, bundles["jurisdictions"].items, summary)
+        await self._upsert_authorities(session, bundles["authorities"].items, summary)
+        await self._upsert_extractor_profiles(
+            session,
+            bundles["extractor_profiles"].items,
+            summary,
+        )
 
-            if dry_run:
-                await session.rollback()
-            else:
-                await session.commit()
+        if dry_run:
+            await session.rollback()
+        else:
+            await session.commit()
 
         return summary
 
@@ -151,6 +167,11 @@ class ReferenceDataSeeder:
         items: list[JurisdictionSeed],
         summary: SeedSummary,
     ) -> None:
+        # parent_id refers to another jurisdiction in the same bundle; the seed
+        # file is authored parent-first, so by the time we reach a child the
+        # parent is already in this session (session.get resolves it without a
+        # flush). If a child lists a parent that wasn't seeded, we raise with
+        # the same shape as the compliance-policy check.
         for item in items:
             if item.compliance_policy_id is not None:
                 policy = await session.get(CompliancePolicy, item.compliance_policy_id)
@@ -158,6 +179,13 @@ class ReferenceDataSeeder:
                     raise ValueError(
                         "Jurisdiction seed references missing compliance policy: "
                         f"{item.jurisdiction_id} -> {item.compliance_policy_id}"
+                    )
+            if item.parent_id is not None:
+                parent = await session.get(Jurisdiction, item.parent_id)
+                if parent is None:
+                    raise ValueError(
+                        "Jurisdiction seed references missing parent: "
+                        f"{item.jurisdiction_id} -> {item.parent_id}"
                     )
             existing = await session.get(Jurisdiction, item.jurisdiction_id)
             if existing is None:

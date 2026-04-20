@@ -2,7 +2,6 @@ from platform_control.services.argilla_enqueue_service import ArgillaEnqueueServ
 from platform_control.services.artifact_store import LocalArtifactStore
 from platform_control.services.firecrawl_provider import FirecrawlProvider
 from platform_control.services.firecrawl_webhook_service import FirecrawlWebhookService
-from platform_control.services.hierarchy_sync_service import HierarchySyncService
 from platform_control.services.orchestrator import (
     InMemoryOrchestrator,
     TemporalOrchestrator,
@@ -16,7 +15,6 @@ __all__ = [
     "ArgillaEnqueueService",
     "FirecrawlProvider",
     "FirecrawlWebhookService",
-    "HierarchySyncService",
     "InMemoryOrchestrator",
     "LocalArtifactStore",
     "RunService",

@@ -48,7 +48,7 @@ Canonical source context:
 - `platform-control/tests/fixtures/scraping_baseline/ch_commentary_html.json` anchors CH commentary evidence with `jurisdiction_id: jur_ch_federal`, `authority_id: auth_commentary_publisher`, `document_type_hint: commentary`, `language_codes: de`.
 - `platform-control/tests/fixtures/scraping_baseline/clean_html.json`, `xml_primary.json`, and `multi_language_fr_de.json` provide additional CH law fixtures, including multilingual `fr,de,it` coverage for the structured-law slice.
 - `platform-control/tests/fixtures/scraping_baseline/at_ris_decision.json` anchors AT decision evidence with `jurisdiction_id: jur_at_federal`, `authority_id: auth_vfgh`, `document_type_hint: decision`, `language_codes: de`.
-- `platform-control/hierarchies/jurisdictions.yaml` contains canonical `ch`, `ch/federal`, `at`, and `at/federal` hierarchy paths, and `platform-control/seeds/reference/{jurisdictions,authorities}.yaml` contains the corresponding CH/AT seed rows.
+- `platform-control/seeds/reference/{jurisdictions,authorities}.yaml` contains the canonical CH/AT seed rows (`jur_ch`, `jur_ch_federal`, `jur_at`, `jur_at_federal`, and their authorities).
 - `contracts/vocabularies/jurisdiction.json` and the search/projection contracts already constrain the canonical jurisdiction and projection fields used by these fixtures.
 - Not executed here: live browser screenshots, operator workflow URLs, and `uv run pytest platform-control/tests/unit/test_scraping_fixture_baseline.py -q` in this shell (the current Python environment cannot spawn `pytest`).
 

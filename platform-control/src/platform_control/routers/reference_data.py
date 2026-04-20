@@ -1,11 +1,9 @@
-from importlib import resources as importlib_resources
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from platform_control.database import get_session
+from platform_control.database import get_session, get_session_maker
 from platform_control.schemas.reference_data import (
     AuthorityListResponse,
     AuthorityResponse,
@@ -18,14 +16,11 @@ from platform_control.schemas.reference_data import (
     UpdateAuthorityRequest,
     UpdateJurisdictionRequest,
 )
-from platform_control.services.hierarchy_sync_service import HierarchySyncService
+from platform_control.seed_reference_data import DEFAULT_SEED_DIR, ReferenceDataSeeder
 from platform_control.services.reference_data_service import ReferenceDataService
 
 router = APIRouter(prefix="/v1/reference-data", tags=["reference-data"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-DEFAULT_HIERARCHY_DIR = Path(
-    str(importlib_resources.files("platform_control").joinpath("hierarchies"))
-)
 
 
 @router.get("/jurisdictions", response_model=JurisdictionListResponse)
@@ -91,22 +86,24 @@ async def sync_hierarchy(
     session: SessionDep,
     dry_run: bool = Query(default=False),
 ) -> HierarchySyncResponse:
-    summary = await HierarchySyncService(session).sync(DEFAULT_HIERARCHY_DIR, dry_run=dry_run)
+    # Backwards-compatible shim over ReferenceDataSeeder (issue #312). The
+    # legacy HierarchySyncService and its path-based YAMLs are gone; the
+    # canonical `seeds/reference/` bundles are the single source of truth.
+    # `scrape_targets` is kept in the response with zeros for shape
+    # compatibility with `scripts/e2e-smoke-test.sh` and other callers.
+    seeder = ReferenceDataSeeder(get_session_maker())
+    summary = await seeder.seed_with_session(session, DEFAULT_SEED_DIR, dry_run=dry_run)
     return HierarchySyncResponse(
         dry_run=dry_run,
         jurisdictions=HierarchySyncCountsResponse(
-            created=summary.jurisdictions.created,
-            updated=summary.jurisdictions.updated,
-            unchanged=summary.jurisdictions.unchanged,
+            created=summary.created["jurisdictions"],
+            updated=summary.updated["jurisdictions"],
+            unchanged=summary.unchanged["jurisdictions"],
         ),
         authorities=HierarchySyncCountsResponse(
-            created=summary.authorities.created,
-            updated=summary.authorities.updated,
-            unchanged=summary.authorities.unchanged,
+            created=summary.created["authorities"],
+            updated=summary.updated["authorities"],
+            unchanged=summary.unchanged["authorities"],
         ),
-        scrape_targets=HierarchySyncCountsResponse(
-            created=summary.scrape_targets.created,
-            updated=summary.scrape_targets.updated,
-            unchanged=summary.scrape_targets.unchanged,
-        ),
+        scrape_targets=HierarchySyncCountsResponse(created=0, updated=0, unchanged=0),
     )
