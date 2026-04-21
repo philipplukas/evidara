@@ -140,9 +140,7 @@ function computeSourceHealth(
       (r) => r.status === "completed" || r.status === "failed",
     ).length;
     const successRate =
-      completedOrFailed > 0
-        ? ((completedOrFailed - failedRuns) / completedOrFailed) * 100
-        : null;
+      completedOrFailed > 0 ? ((completedOrFailed - failedRuns) / completedOrFailed) * 100 : null;
 
     const sortedRuns = [...sourceRuns].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -198,9 +196,7 @@ export function SourceHealthCard() {
         const versionResults = await Promise.all(
           allSources.map(async (source) => {
             try {
-              const res = await fetch(
-                `${API_PREFIX}/v1/sources/${source.source_id}/versions`,
-              );
+              const res = await fetch(`${API_PREFIX}/v1/sources/${source.source_id}/versions`);
               if (!res.ok) return [];
               const body = (await res.json()) as { data: SourceVersionItem[] };
               return body.data;
@@ -346,9 +342,7 @@ export function SourceHealthCard() {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
-                        {formatRelativeTime(row.lastRunDate)}
-                      </Typography>
+                      <Typography variant="body2">{formatRelativeTime(row.lastRunDate)}</Typography>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
