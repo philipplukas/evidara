@@ -453,9 +453,10 @@ LIMIT 1
         payload = response.json()
         bindings = payload.get("results", {}).get("bindings", [])
         # Prefer HTML; fall back to XHTML; skip PDFs (binary) in this scaffold.
+        # The format value may be a full authority IRI or a short label (e.g. "xhtml").
         html_iri = f"{_EUR_LEX_FILE_TYPE_AUTHORITY}HTML"
         xhtml_iri = f"{_EUR_LEX_FILE_TYPE_AUTHORITY}XHTML"
-        preferred = [html_iri, xhtml_iri]
+        preferred = [html_iri, xhtml_iri, "html", "xhtml"]
         best_url: str | None = None
         best_rank = len(preferred)
         for binding in bindings:
@@ -463,12 +464,13 @@ LIMIT 1
             fmt = binding.get("format", {}).get("value")
             if not isinstance(manifestation, str) or not isinstance(fmt, str):
                 continue
-            if fmt not in preferred:
-                continue
-            rank = preferred.index(fmt)
-            if rank < best_rank:
-                best_rank = rank
-                best_url = manifestation
+            fmt_lower = fmt.lower()
+            for rank, candidate in enumerate(preferred):
+                if fmt == candidate or fmt_lower == candidate:
+                    if rank < best_rank:
+                        best_rank = rank
+                        best_url = manifestation
+                    break
         return best_url
 
     async def _query_title(
