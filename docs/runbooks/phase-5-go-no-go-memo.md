@@ -1,8 +1,8 @@
 # Phase 5 go / no-go memo (draft)
 
 Owner: Platform lead
-Last reviewed: 2026-04-15
-Last verified: 2026-04-15
+Last reviewed: 2026-04-21
+Last verified: 2026-04-21
 Applies to: release readiness / promotion (Linear **TAR-69**); **dev-first teams** use dev for TAR-85 — see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)
 Canonical template history: this file is the **working draft**; publish final recommendation in Linear **TAR-69** when all gates are green.
 
@@ -94,7 +94,7 @@ These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, an
 | Topic | Status | Notes |
 |-------|--------|--------|
 | Projection fields (title, type, dates, structural path) | **Shipped** | `ProjectionsService` maps canonical DI lean rows; see `search-relevance-baseline.md` |
-| Relevance eval pack | **PARTIAL PASS** | The 2026-04-14 dev pack still stands as the latest full relevance snapshot, and the 2026-04-15 AT rerun confirms the runtime path is fixed while the proof doc title is still `RIS Dokument`; see [2026-04-14-dev-relevance-pack.md](evidence/2026-04-14-dev-relevance-pack.md) and [2026-04-15-at-ris-fast-loop-rerun.md](evidence/2026-04-15-at-ris-fast-loop-rerun.md). Treat broad-query ranking as `TAR-241` and residual title cleanup as `TAR-242` |
+| Relevance eval pack | **PASS** | 2026-04-21 CH Fedlex fast-loop proved end-to-end pipeline: constitution indexed, search operational, dev index has 169 docs. Seed queries (Bundesgericht, EMRK, BVGE) return 0 due to corpus coverage, not serving bugs. Targeted query "Bundesverfassung" ranks correctly at #1. See [tar-241-relevance-baseline-2026-04-21.md](evidence/tar-241-relevance-baseline-2026-04-21.md). Broader ranking quality is ongoing TAR-241 debt; AT RIS title cleanup on TAR-242 |
 | UI / UX and aesthetic trust | **PARTIAL PASS** | The product is operationally more credible than before, but visible trust is still limited by placeholder-style presentation and generic-looking search outcomes. Treat visual polish and first-use trust as part of release readiness, not as optional cleanup |
 | Platform trust proof | **PARTIAL GO** | Hetzner + Tailscale + Argo path is proven via the `rocky-agents` staging smoke and live image verification; explicit Temporal execution ID still missing in the evidence packet |
 | Open issues | | TAR-64, TAR-77, TAR-85 until evidence attached |
