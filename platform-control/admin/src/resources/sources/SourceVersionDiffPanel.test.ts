@@ -67,10 +67,7 @@ describe("SourceVersionDiffPanel diff logic", () => {
   });
 
   it("detects removed fields", () => {
-    const result = diffSpecs(
-      { provider: "firecrawl", limit: 20 },
-      { provider: "firecrawl" },
-    );
+    const result = diffSpecs({ provider: "firecrawl", limit: 20 }, { provider: "firecrawl" });
     const limitEntry = result.find((e) => e.key === "limit");
     expect(limitEntry).toEqual({
       key: "limit",
@@ -103,18 +100,12 @@ describe("SourceVersionDiffPanel diff logic", () => {
   });
 
   it("sorts keys alphabetically", () => {
-    const result = diffSpecs(
-      { z_field: 1, a_field: 2 },
-      { z_field: 1, a_field: 2 },
-    );
+    const result = diffSpecs({ z_field: 1, a_field: 2 }, { z_field: 1, a_field: 2 });
     expect(result.map((e) => e.key)).toEqual(["a_field", "z_field"]);
   });
 
   it("formats arrays as comma-separated values", () => {
-    const result = diffSpecs(
-      { paths: ["a", "b"] },
-      { paths: ["a", "b", "c"] },
-    );
+    const result = diffSpecs({ paths: ["a", "b"] }, { paths: ["a", "b", "c"] });
     const entry = result.find((e) => e.key === "paths");
     expect(entry?.previous).toBe("a, b");
     expect(entry?.current).toBe("a, b, c");
@@ -122,10 +113,7 @@ describe("SourceVersionDiffPanel diff logic", () => {
   });
 
   it("formats booleans as yes/no", () => {
-    const result = diffSpecs(
-      { zero_data_retention: false },
-      { zero_data_retention: true },
-    );
+    const result = diffSpecs({ zero_data_retention: false }, { zero_data_retention: true });
     const entry = result.find((e) => e.key === "zero_data_retention");
     expect(entry?.previous).toBe("no");
     expect(entry?.current).toBe("yes");
@@ -133,10 +121,7 @@ describe("SourceVersionDiffPanel diff logic", () => {
   });
 
   it("formats null as (empty)", () => {
-    const result = diffSpecs(
-      { seed_url: null },
-      { seed_url: "https://example.com" },
-    );
+    const result = diffSpecs({ seed_url: null }, { seed_url: "https://example.com" });
     const entry = result.find((e) => e.key === "seed_url");
     expect(entry?.previous).toBe("(empty)");
     expect(entry?.current).toBe("https://example.com");
