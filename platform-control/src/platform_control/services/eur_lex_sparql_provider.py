@@ -262,7 +262,9 @@ LIMIT 1
                                     "manifestation_url": resolved_url,
                                     "language_iri": language_iri,
                                     "language": iso_language,
-                                    "eli_uri": original_uri if self._looks_like_eli(original_uri) else None,
+                                    "eli_uri": (
+                                        original_uri if self._looks_like_eli(original_uri) else None
+                                    ),
                                     "celex": celex,
                                     "fetched_at": datetime.now(UTC).isoformat(),
                                 },
