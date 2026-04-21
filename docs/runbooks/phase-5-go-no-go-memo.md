@@ -10,8 +10,8 @@ Canonical template history: this file is the **working draft**; publish final re
 
 ## 1. Summary recommendation
 
-- **Recommendation:** **PENDING** — operator evidence still required for full dev smoke (TAR-64 ×2), branch protection proof (TAR-77), and fresh **remote** MVP acceptance (**TAR-85** — use **dev** Cloud Run when no staging GCP project exists). Repo implementation for search/metadata/relevance is merged.
-- **Date:** 2026-04-09 (draft); **local re-verify ([TAR-214](https://linear.app/tart-baozi/issue/TAR-214)):** 2026-04-12 — see §1.1
+- **Recommendation:** **GO** — all 6 GA input lanes resolved with evidence. Prod, staging, and dev deployed and verified. Full pipeline proven end-to-end (fast-loop -> search). See `evidence/tar-160-ga-signoff-2026-04-21.md` for the consolidated packet.
+- **Date:** 2026-04-21 (GA sign-off); prior drafts: 2026-04-09, 2026-04-12
 - **Environment(s) covered:** **dev** (primary remote integration + TAR-85 target for dev-first posture); staging only if your org provisions it — **re-verify** MVP acceptance tables after each promotion batch on `main`
 
 ### 1.0 Planning posture (2026-04-15)
