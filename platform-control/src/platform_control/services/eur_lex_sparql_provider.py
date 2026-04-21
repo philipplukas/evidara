@@ -96,6 +96,15 @@ WHERE {{
 LIMIT 1
 """.strip()
 
+    _RESOLVE_ELI_CELEX_QUERY = """
+PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
+SELECT ?work
+WHERE {{
+  ?work cdm:resource_legal_id_celex '{celex}'^^<http://www.w3.org/2001/XMLSchema#string> .
+}}
+LIMIT 1
+""".strip()
+
     _EXPRESSION_QUERY = """
 PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
 SELECT ?expression ?language ?celex
@@ -376,18 +385,26 @@ LIMIT 1
         sparql_endpoint: str,
         eli_uri: str,
     ) -> str | None:
-        response = await client.get(
-            sparql_endpoint,
-            params={
-                "query": self._RESOLVE_ELI_QUERY.format(eli_uri=eli_uri),
-                "format": "application/sparql-results+json",
-            },
-            headers={"Accept": "application/sparql-results+json"},
+        # The SPARQL endpoint stores sameAs as <cellar> owl:sameAs <pub-eli>,
+        # where the ELI host is publications.europa.eu (not data.europa.eu).
+        # Try the publications.europa.eu variant first.
+        pub_eli = eli_uri.replace(
+            "http://data.europa.eu/eli/",
+            "http://publications.europa.eu/resource/eli/",
         )
-        response.raise_for_status()
-        bindings = response.json().get("results", {}).get("bindings", [])
-        if bindings:
-            return bindings[0].get("cellar_uri", {}).get("value")
+        for candidate in [pub_eli, eli_uri]:
+            response = await client.get(
+                sparql_endpoint,
+                params={
+                    "query": self._RESOLVE_ELI_QUERY.format(eli_uri=candidate),
+                    "format": "application/sparql-results+json",
+                },
+                headers={"Accept": "application/sparql-results+json"},
+            )
+            response.raise_for_status()
+            bindings = response.json().get("results", {}).get("bindings", [])
+            if bindings:
+                return bindings[0].get("cellar_uri", {}).get("value")
         return None
 
     async def _query_expressions(
