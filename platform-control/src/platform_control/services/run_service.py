@@ -918,6 +918,7 @@ class RunService:
             )
             artifact.artifact_metadata = {
                 **payload,
+                "title": captured_record.title,
                 "byte_size": len(payload_bytes),
                 "checksum": hashlib.sha256(payload_bytes).hexdigest(),
                 "checksum_algorithm": "sha256",
