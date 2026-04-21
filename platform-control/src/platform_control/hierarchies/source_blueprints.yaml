@@ -111,6 +111,40 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+      # Major German federal codes — verified URLs (2026-04-22).
+      # Each URL is the TOC/index page; the DeterministicHttpProvider
+      # fetches the HTML. Full-text versions are at BJNR*.html.
+      deterministic_http_bundesrecht_codes:
+        provider: deterministic_http
+        seed_urls:
+          - https://www.gesetze-im-internet.de/gg/index.html        # Grundgesetz
+          - https://www.gesetze-im-internet.de/bgb/index.html       # BGB
+          - https://www.gesetze-im-internet.de/stgb/index.html      # StGB
+          - https://www.gesetze-im-internet.de/hgb/index.html       # HGB
+          - https://www.gesetze-im-internet.de/zpo/index.html       # ZPO
+          - https://www.gesetze-im-internet.de/stpo/index.html      # StPO
+          - https://www.gesetze-im-internet.de/vwvfg/index.html     # VwVfG
+          - https://www.gesetze-im-internet.de/vwgo/index.html      # VwGO
+          - https://www.gesetze-im-internet.de/gvg/index.html       # GVG
+          - https://www.gesetze-im-internet.de/ao_1977/index.html   # AO
+          - https://www.gesetze-im-internet.de/bverfgg/index.html   # BVerfGG
+          - https://www.gesetze-im-internet.de/arbgg/index.html     # ArbGG
+          - https://www.gesetze-im-internet.de/inso/index.html      # InsO
+          - https://www.gesetze-im-internet.de/betrvg/index.html    # BetrVG
+          - https://www.gesetze-im-internet.de/gwb/index.html       # GWB
+          - https://www.gesetze-im-internet.de/stvg/index.html      # StVG
+          - https://www.gesetze-im-internet.de/sgb_1/index.html     # SGB I
+          - https://www.gesetze-im-internet.de/sgb_2/index.html     # SGB II
+          - https://www.gesetze-im-internet.de/sgb_3/index.html     # SGB III
+          - https://www.gesetze-im-internet.de/sgb_5/index.html     # SGB V
+        tenant_id: tenant_public
+        corpus_id: corpus_public_de_bundesrecht_codes
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: true
       # Sub-federal: Länder template. Provider scaffold; live adapter
       # lands per-state alongside its first acceptance run.
       bundesland_http_bayern:
