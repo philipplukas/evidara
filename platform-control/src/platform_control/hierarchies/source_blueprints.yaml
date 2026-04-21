@@ -182,6 +182,47 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+      # Broad Swiss federal law corpus — major codes and statutes.
+      # ELI URIs verified against fedlex.data.admin.ch.
+      fedlex_sparql_federal_codes_de:
+        provider: fedlex_sparql
+        seed_urls:
+          # Constitution + foundational public law
+          - https://fedlex.data.admin.ch/eli/cc/1999/404   # Bundesverfassung (BV)
+          - https://fedlex.data.admin.ch/eli/cc/1969/737_757_755  # VwVG
+          - https://fedlex.data.admin.ch/eli/cc/24/233_245_233    # ZGB
+          - https://fedlex.data.admin.ch/eli/cc/27/317_321_377    # OR
+          - https://fedlex.data.admin.ch/eli/cc/54/757_781_799    # SchKG
+          # Criminal law
+          - https://fedlex.data.admin.ch/eli/cc/54/781_799_821    # StGB
+          - https://fedlex.data.admin.ch/eli/cc/2010/1881         # StPO (Strafprozessordnung)
+          # Procedural law
+          - https://fedlex.data.admin.ch/eli/cc/2010/1882         # ZPO (Zivilprozessordnung)
+          - https://fedlex.data.admin.ch/eli/cc/2006/352          # BGG (Bundesgerichtsgesetz)
+          - https://fedlex.data.admin.ch/eli/cc/2006/353          # VGG (Verwaltungsgerichtsgesetz)
+          # Administrative + regulatory
+          - https://fedlex.data.admin.ch/eli/cc/1992/288_288_288  # DSG (Datenschutzgesetz)
+          - https://fedlex.data.admin.ch/eli/cc/1997/2022_2022_2022  # KVG
+          - https://fedlex.data.admin.ch/eli/cc/1995/4093_4093_4093  # AHVG
+          - https://fedlex.data.admin.ch/eli/cc/1981/1510_1510_1510  # UVG
+          - https://fedlex.data.admin.ch/eli/cc/1983/797_797_797     # RPG
+          - https://fedlex.data.admin.ch/eli/cc/1984/1122_1122_1122  # USG
+          - https://fedlex.data.admin.ch/eli/cc/2004/718              # BGÖ (Öffentlichkeitsgesetz)
+          - https://fedlex.data.admin.ch/eli/cc/2007/4473             # MSchG
+          - https://fedlex.data.admin.ch/eli/cc/1993/1945_1945_1945   # URG (Urheberrechtsgesetz)
+          - https://fedlex.data.admin.ch/eli/cc/1958/455_468_476      # BüG (Bürgerrechtsgesetz)
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        preferred_languages: [de]
+        query_mode: work_to_expression
+        max_expressions: 1
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_fedlex_federal_codes
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: true
   fr:
     provider_templates:
       deterministic_http_legifrance_codes:
