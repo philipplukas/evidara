@@ -23,7 +23,11 @@ def _is_placeholder_title(title: str | None) -> bool:
     lowered = normalized.lower()
     if lowered in {"untitled document", "ris dokument"}:
         return True
-    if lowered.startswith("ris —") or lowered.startswith("ris -"):
+    # Normalize whitespace + dashes for RIS placeholder variants
+    # ("RIS — Dokument", "RIS – Dokument", "RIS - Dokument", "RIS  -  Dokument")
+    collapsed = " ".join(lowered.split())
+    ris_normalized = collapsed.replace("\u2014", "-").replace("\u2013", "-")
+    if ris_normalized.startswith("ris -") or ris_normalized.startswith("ris-"):
         return True
     return False
 
@@ -118,7 +122,8 @@ def _convert_with_docling(
         conversion_result = converter.convert(str(temp_path))
         doc = conversion_result.document
         title = (getattr(doc, "name", "") or "").strip()
-        if _is_placeholder_title(title):
+        placeholder = _is_placeholder_title(title)
+        if placeholder:
             title = "Untitled document"
         blocks: list[Block] = []
         for order, item in enumerate(doc.iterate_items()):
@@ -141,6 +146,15 @@ def _convert_with_docling(
 
         if not blocks:
             return None
+        # When the HTML <title> was a placeholder (e.g. "RIS Dokument"),
+        # prefer the first heading in the body as the document title.
+        if placeholder:
+            for block in blocks:
+                if block.type == "heading" and block.text.strip():
+                    heading = block.text.strip()
+                    if not _is_placeholder_title(heading):
+                        title = heading
+                        break
         return blocks, title
     except Exception:
         return None
