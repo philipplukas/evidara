@@ -11,6 +11,8 @@ MAX_RESOURCES=25
 KEEP_SOURCE=0
 JSON_OUTPUT=0
 DRY_RUN=0
+COPY_EVIDENCE=0
+COPY_EVIDENCE=0
 MAX_POLLS=60
 POLL_INTERVAL=5
 WORKDIR_ROOT="${TMPDIR:-/tmp}/ch-fedlex-fast-loop"
@@ -45,6 +47,7 @@ Options:
   --json                         Emit final machine-readable summary JSON
   --dry-run                      Print resolved settings and exit before mutating APIs
   --keep-source                  Do not report cleanup guidance as follow-up work
+  --copy-evidence                Copy evidence markdown to docs/runbooks/evidence/
   --workdir-root <path>          Directory for persisted evidence bundles
   -h, --help                     Show this help
 EOF
@@ -100,8 +103,16 @@ while [[ $# -gt 0 ]]; do
       DRY_RUN=1
       shift
       ;;
+    --copy-evidence)
+      COPY_EVIDENCE=1
+      shift
+      ;;
     --keep-source)
       KEEP_SOURCE=1
+      shift
+      ;;
+    --copy-evidence)
+      COPY_EVIDENCE=1
       shift
       ;;
     --out-dir)
@@ -405,6 +416,16 @@ else
   if [[ "${KEEP_SOURCE}" -eq 0 ]]; then
     log "==> Note: created source_id=${SOURCE_ID} source_version_id=${SOURCE_VERSION_ID}"
   fi
+fi
+
+if [[ "${COPY_EVIDENCE}" -eq 1 ]]; then
+  evidence_dest="$(copy_evidence_to_repo "${RUN_DIR}/summary.json" "${RUN_DIR}/evidence-summary.md" "ch-fedlex")"
+  log "==> Evidence copied to ${evidence_dest}"
+fi
+
+if [[ "${COPY_EVIDENCE}" -eq 1 ]]; then
+  evidence_dest="$(copy_evidence_to_repo "${RUN_DIR}/summary.json" "${RUN_DIR}/evidence-summary.md" "ch-fedlex")"
+  log "==> Evidence copied to ${evidence_dest}"
 fi
 
 if [[ "${verdict}" != "pass" ]]; then

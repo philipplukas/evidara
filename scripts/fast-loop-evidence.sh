@@ -21,6 +21,27 @@ fast_loop_next_action() {
   esac
 }
 
+copy_evidence_to_repo() {
+  local summary_path="${1:?missing summary_path}"
+  local evidence_md_path="${2:?missing evidence_md_path}"
+  local corpus_slug="${3:?missing corpus_slug}"  # e.g. "ch-fedlex", "eu-eurlex"
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local repo_root="${script_dir}/.."
+  local evidence_dir="${repo_root}/docs/runbooks/evidence"
+  local date_stamp
+  date_stamp="$(date -u +%Y-%m-%d)"
+  local dest="${evidence_dir}/${corpus_slug}-fast-loop-${date_stamp}.md"
+
+  if [[ ! -d "${evidence_dir}" ]]; then
+    echo "warning: evidence directory not found at ${evidence_dir}" >&2
+    return 1
+  fi
+
+  cp "${evidence_md_path}" "${dest}"
+  echo "${dest}"
+}
+
 render_fast_loop_evidence_markdown() {
   local summary_path="${1:?missing summary_path}"
   local output_path="${2:?missing output_path}"
