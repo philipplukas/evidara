@@ -23,7 +23,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   useDataProvider,
   useGetList,
@@ -47,6 +47,7 @@ import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { ConfirmButton } from "../shared/ConfirmButton";
 import { StatusBadge, sourceVersionStatusToLevel } from "../shared/StatusBadge";
+import { SourceVersionDiffPanel } from "./SourceVersionDiffPanel";
 
 type ProviderType = "firecrawl" | "deterministic_http" | "ris_ogd" | "fedlex_sparql";
 
@@ -820,6 +821,7 @@ export function SourceVersionsSection() {
   const [formState, setFormState] = useState<SourceVersionFormState>(emptyFormState());
   const [isSaving, setIsSaving] = useState(false);
   const [actionVersionId, setActionVersionId] = useState<string | null>(null);
+  const [diffVersionId, setDiffVersionId] = useState<string | null>(null);
 
   const versions = useGetList<SourceVersionRecord>("source-versions", {
     pagination: LIST_PARAMS.pagination,
@@ -1074,7 +1076,7 @@ export function SourceVersionsSection() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {versions.data.map((version) => {
+                {versions.data.map((version, versionIndex) => {
                   const canEdit = version.status === "draft" || version.status === "rejected";
                   const canReview =
                     version.status === "draft" || version.status === "pending_approval";
@@ -1083,122 +1085,152 @@ export function SourceVersionsSection() {
                   const canProduction = version.status === "approved";
                   const isActing = actionVersionId === version.source_version_id;
                   const statusMeta = describeSourceVersionStatus(version.status);
+                  const previousVersion =
+                    versions.data && versionIndex < versions.data.length - 1
+                      ? versions.data[versionIndex + 1]
+                      : null;
+                  const isDiffOpen = diffVersionId === version.source_version_id;
                   return (
-                    <TableRow key={version.id}>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {version.version_label}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {version.source_version_id}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Stack spacing={0.5} alignItems="flex-start">
-                          <StatusBadge
-                            level={sourceVersionStatusToLevel(version.status)}
-                            label={statusMeta.label}
-                          />
-                          <Typography variant="caption" color="text.secondary">
-                            {statusMeta.detail}
+                    <React.Fragment key={version.id}>
+                      <TableRow>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {version.version_label}
                           </Typography>
-                        </Stack>
-                      </TableCell>
-                      <TableCell>{version.extractor_profile_id ?? "—"}</TableCell>
-                      <TableCell>
-                        <Box
-                          component="pre"
-                          sx={{
-                            m: 0,
-                            p: 1,
-                            borderRadius: 1,
-                            bgcolor: "grey.50",
-                            border: "1px solid",
-                            borderColor: "grey.200",
-                            fontSize: "0.7rem",
-                            lineHeight: 1.6,
-                            fontFamily: "monospace",
-                            whiteSpace: "pre-wrap",
-                            maxWidth: 260,
-                            overflow: "hidden",
-                          }}
-                        >
-                          {summarizeAcquisitionSpec(version.acquisition_spec).join("\n")}
-                        </Box>
-                      </TableCell>
-                      <TableCell>{formatDateTime(version.updated_at)}</TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} flexWrap="wrap">
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => openEditDialog(version)}
-                            disabled={!canEdit || isActing}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="primary"
-                            onClick={() => createRun("preview", version)}
-                            disabled={!canPreview || isActing}
-                          >
-                            Preview Run
-                          </Button>
+                          <Typography variant="caption" color="text.secondary">
+                            {version.source_version_id}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Stack spacing={0.5} alignItems="flex-start">
+                            <StatusBadge
+                              level={sourceVersionStatusToLevel(version.status)}
+                              label={statusMeta.label}
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                              {statusMeta.detail}
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+                        <TableCell>{version.extractor_profile_id ?? "—"}</TableCell>
+                        <TableCell>
                           <Box
-                            component="span"
+                            component="pre"
                             sx={{
-                              alignSelf: "center",
-                              display: { xs: "none", sm: "inline-block" },
-                              width: "1px",
-                              height: 24,
-                              mx: 0.75,
-                              bgcolor: "divider",
+                              m: 0,
+                              p: 1,
+                              borderRadius: 1,
+                              bgcolor: "grey.50",
+                              border: "1px solid",
+                              borderColor: "grey.200",
+                              fontSize: "0.7rem",
+                              lineHeight: 1.6,
+                              fontFamily: "monospace",
+                              whiteSpace: "pre-wrap",
+                              maxWidth: 260,
+                              overflow: "hidden",
                             }}
-                            aria-hidden
-                          />
-                          <ConfirmButton
-                            tier="notable"
-                            size="small"
-                            variant="contained"
-                            color="warning"
-                            confirmTitle="Launch production run?"
-                            confirmDescription={`This will start a production pipeline for ${version.version_label}. Production runs create real artifacts.`}
-                            confirmLabel="Launch production"
-                            onConfirm={() => createRun("production", version)}
-                            disabled={!canProduction || isActing}
                           >
-                            Production Run
-                          </ConfirmButton>
-                          <ConfirmButton
-                            tier="notable"
-                            size="small"
-                            variant="outlined"
-                            confirmTitle="Approve this version?"
-                            confirmDescription={`Approving ${version.version_label} makes it eligible for production runs. Ensure the version has been reviewed.`}
-                            confirmLabel="Approve"
-                            onConfirm={() => runVersionAction("approve", version)}
-                            disabled={!canReview || isActing}
-                          >
-                            Approve
-                          </ConfirmButton>
-                          <ConfirmButton
-                            tier="destructive"
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            confirmTitle="Reject this version?"
-                            confirmDescription={`Rejecting ${version.version_label} will permanently block it from production use. This cannot be undone.`}
-                            confirmLabel="Reject version"
-                            onConfirm={() => runVersionAction("reject", version)}
-                            disabled={!canReview || isActing}
-                          >
-                            Reject
-                          </ConfirmButton>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
+                            {summarizeAcquisitionSpec(version.acquisition_spec).join("\n")}
+                          </Box>
+                        </TableCell>
+                        <TableCell>{formatDateTime(version.updated_at)}</TableCell>
+                        <TableCell>
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => openEditDialog(version)}
+                              disabled={!canEdit || isActing}
+                            >
+                              Edit
+                            </Button>
+                            {previousVersion ? (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color={isDiffOpen ? "secondary" : "inherit"}
+                                onClick={() =>
+                                  setDiffVersionId(isDiffOpen ? null : version.source_version_id)
+                                }
+                              >
+                                {isDiffOpen ? "Hide diff" : "Compare"}
+                              </Button>
+                            ) : null}
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="primary"
+                              onClick={() => createRun("preview", version)}
+                              disabled={!canPreview || isActing}
+                            >
+                              Preview Run
+                            </Button>
+                            <Box
+                              component="span"
+                              sx={{
+                                alignSelf: "center",
+                                display: { xs: "none", sm: "inline-block" },
+                                width: "1px",
+                                height: 24,
+                                mx: 0.75,
+                                bgcolor: "divider",
+                              }}
+                              aria-hidden
+                            />
+                            <ConfirmButton
+                              tier="notable"
+                              size="small"
+                              variant="contained"
+                              color="warning"
+                              confirmTitle="Launch production run?"
+                              confirmDescription={`This will start a production pipeline for ${version.version_label}. Production runs create real artifacts.`}
+                              confirmLabel="Launch production"
+                              onConfirm={() => createRun("production", version)}
+                              disabled={!canProduction || isActing}
+                            >
+                              Production Run
+                            </ConfirmButton>
+                            <ConfirmButton
+                              tier="notable"
+                              size="small"
+                              variant="outlined"
+                              confirmTitle="Approve this version?"
+                              confirmDescription={`Approving ${version.version_label} makes it eligible for production runs. Ensure the version has been reviewed.`}
+                              confirmLabel="Approve"
+                              onConfirm={() => runVersionAction("approve", version)}
+                              disabled={!canReview || isActing}
+                            >
+                              Approve
+                            </ConfirmButton>
+                            <ConfirmButton
+                              tier="destructive"
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              confirmTitle="Reject this version?"
+                              confirmDescription={`Rejecting ${version.version_label} will permanently block it from production use. This cannot be undone.`}
+                              confirmLabel="Reject version"
+                              onConfirm={() => runVersionAction("reject", version)}
+                              disabled={!canReview || isActing}
+                            >
+                              Reject
+                            </ConfirmButton>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                      {isDiffOpen && previousVersion ? (
+                        <TableRow>
+                          <TableCell colSpan={6} sx={{ p: 2, bgcolor: "grey.50" }}>
+                            <SourceVersionDiffPanel
+                              previous={previousVersion}
+                              current={version}
+                              defaultOpen
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </React.Fragment>
                   );
                 })}
               </TableBody>
