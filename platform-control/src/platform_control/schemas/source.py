@@ -108,11 +108,30 @@ class RisOgdAcquisitionSpec(BaseAcquisitionSpec):
     max_pages: int = Field(default=50, ge=1, le=500)
 
 
+class EurLexSparqlAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.EUR_LEX_SPARQL] = AcquisitionProvider.EUR_LEX_SPARQL
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+    sparql_endpoint: HttpUrl = "http://publications.europa.eu/webapi/rdf/sparql"
+    preferred_languages: list[LanguageCode] = Field(default_factory=list)
+    query_mode: Literal["work_to_expression"] = "work_to_expression"
+    max_expressions: int = Field(default=1, ge=1, le=10)
+    request_timeout_seconds: float = Field(default=30.0, ge=1.0, le=300.0)
+    max_content_bytes: int = Field(default=2_000_000, ge=1, le=50_000_000)
+
+    @model_validator(mode="after")
+    def validate_eur_lex_sparql_config(self) -> EurLexSparqlAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("eur_lex_sparql provider requires seed_url or seed_urls")
+        return self
+
+
 AcquisitionSpec = Annotated[
     FirecrawlAcquisitionSpec
     | DeterministicHttpAcquisitionSpec
     | FedlexSparqlAcquisitionSpec
-    | RisOgdAcquisitionSpec,
+    | RisOgdAcquisitionSpec
+    | EurLexSparqlAcquisitionSpec,
     Field(discriminator="provider"),
 ]
 AcquisitionSpecAdapter = TypeAdapter(AcquisitionSpec)
