@@ -241,7 +241,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [en]
         document_type_hint: legislation
-        enabled: false
+        enabled: true
       eur_lex_sparql_directive_en:
         provider: eur_lex_sparql
         seed_url: http://data.europa.eu/eli/dir/2019/790/oj
@@ -256,4 +256,4 @@ overlays:
         trust_tier: authoritative
         language_codes: [en]
         document_type_hint: legislation
-        enabled: false
+        enabled: true
