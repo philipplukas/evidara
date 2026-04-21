@@ -60,7 +60,7 @@ jobs:
         run: bash scripts/check-document-intelligence.sh
 
   document-intelligence-runtime-check:
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout

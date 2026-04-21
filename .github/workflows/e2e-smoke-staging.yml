@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   smoke-staging:
-    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
+    runs-on: ubuntu-latest
     environment: staging
     env:
       TARGET_ENV: staging
