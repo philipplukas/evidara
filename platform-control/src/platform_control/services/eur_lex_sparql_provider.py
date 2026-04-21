@@ -86,11 +86,21 @@ class EurLexSparqlProvider:
     provider_name = AcquisitionProvider.EUR_LEX_SPARQL.value
     live_ready = True
 
+    _RESOLVE_ELI_QUERY = """
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT ?cellar_uri
+WHERE {{
+  ?cellar_uri owl:sameAs <{eli_uri}> .
+  FILTER(STRSTARTS(STR(?cellar_uri), "http://publications.europa.eu/resource/cellar/"))
+}}
+LIMIT 1
+""".strip()
+
     _EXPRESSION_QUERY = """
 PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
 SELECT ?expression ?language ?celex
 WHERE {{
-  <{work_uri}> cdm:work_has_expression ?expression .
+  ?expression cdm:expression_belongs_to_work <{work_uri}> .
   ?expression cdm:expression_uses_language ?language .
   OPTIONAL {{ <{work_uri}> cdm:resource_legal_id_celex ?celex . }}
 }}
@@ -100,7 +110,7 @@ WHERE {{
 PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
 SELECT ?manifestation ?format
 WHERE {{
-  <{expression_uri}> cdm:expression_manifested_by_manifestation ?manifestation .
+  ?manifestation cdm:manifestation_manifests_expression <{expression_uri}> .
   ?manifestation cdm:manifestation_type ?format .
 }}
 """.strip()
@@ -136,7 +146,22 @@ LIMIT 1
 
         async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
             for work_uri in work_uris:
+                original_uri = work_uri
                 try:
+                    # Resolve ELI URI to Cellar URI if needed.
+                    if self._looks_like_eli(work_uri):
+                        cellar_uri = await self._resolve_eli_to_cellar(
+                            client=client,
+                            sparql_endpoint=sparql_endpoint,
+                            eli_uri=work_uri,
+                        )
+                        if cellar_uri is None:
+                            failures.append(
+                                {"url": work_uri, "error": "could not resolve ELI to Cellar URI"}
+                            )
+                            continue
+                        work_uri = cellar_uri
+
                     expression_bindings = await self._query_expressions(
                         client=client,
                         sparql_endpoint=sparql_endpoint,
@@ -214,7 +239,7 @@ LIMIT 1
                         body_text = body.decode(charset, errors="replace")
                         resources.append(
                             ProviderResource(
-                                source_url=work_uri,
+                                source_url=original_uri,
                                 final_url=resolved_url,
                                 content_type=content_type,
                                 body=body_text,
@@ -228,7 +253,7 @@ LIMIT 1
                                     "manifestation_url": resolved_url,
                                     "language_iri": language_iri,
                                     "language": iso_language,
-                                    "eli_uri": work_uri if self._looks_like_eli(work_uri) else None,
+                                    "eli_uri": original_uri if self._looks_like_eli(original_uri) else None,
                                     "celex": celex,
                                     "fetched_at": datetime.now(UTC).isoformat(),
                                 },
@@ -343,6 +368,27 @@ LIMIT 1
                     ranked.append((preferred_languages.index(iso), binding))
         ranked.sort(key=lambda pair: pair[0])
         return [binding for _, binding in ranked[: max(1, max_expressions)]]
+
+    async def _resolve_eli_to_cellar(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        sparql_endpoint: str,
+        eli_uri: str,
+    ) -> str | None:
+        response = await client.get(
+            sparql_endpoint,
+            params={
+                "query": self._RESOLVE_ELI_QUERY.format(eli_uri=eli_uri),
+                "format": "application/sparql-results+json",
+            },
+            headers={"Accept": "application/sparql-results+json"},
+        )
+        response.raise_for_status()
+        bindings = response.json().get("results", {}).get("bindings", [])
+        if bindings:
+            return bindings[0].get("cellar_uri", {}).get("value")
+        return None
 
     async def _query_expressions(
         self,

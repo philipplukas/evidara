@@ -55,7 +55,24 @@ class FakeAsyncClient:
                 request=request,
             )
 
-        if "cdm:work_has_expression" in query:
+        if "owl:sameAs" in query:
+            return httpx.Response(
+                200,
+                json={
+                    "results": {
+                        "bindings": [
+                            {
+                                "cellar_uri": {
+                                    "type": "uri",
+                                    "value": "http://publications.europa.eu/resource/cellar/3e485e15-gdpr",
+                                }
+                            }
+                        ]
+                    }
+                },
+                request=request,
+            )
+        if "cdm:expression_belongs_to_work" in query:
             return httpx.Response(
                 200,
                 json={
@@ -94,7 +111,7 @@ class FakeAsyncClient:
                 },
                 request=request,
             )
-        if "cdm:expression_manifested_by_manifestation" in query:
+        if "cdm:manifestation_manifests_expression" in query:
             return httpx.Response(
                 200,
                 json={
