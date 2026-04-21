@@ -348,12 +348,43 @@ processing_count="$(jq -r '[.data[]? | select(.status=="processing")] | length' 
 canonical_ready_count="$(jq -r '[.data[]? | select(.status=="canonical_ready")] | length' < "${RUN_DIR}/processing-status.json")"
 processed_count="$(jq -r '[.data[]? | select(.event_type=="document.processed")] | length' < "${RUN_DIR}/document-lifecycle.json")"
 
+# --- Content quality gates ---
+
+# Article density: at least 3 occurrences of "Art." across all raw artifacts
+art_density_count="$(jq -r '[.data[]? |
+  ((.artifact_metadata.inline_body // "") + (.artifact_metadata.body // "") +
+   (.artifact_metadata.provider_metadata.inline_body // "") + (.artifact_metadata.provider_metadata.body // ""))
+] | map([ match("Art\\."; "g") ] | length) | add // 0' < "${RUN_DIR}/raw-artifacts.json")"
+art_density_ok=$(( art_density_count >= 3 ? 1 : 0 ))
+
+# Minimum content length: at least 10 KB (10240 bytes) in the largest artifact body
+body_max_length="$(jq -r '[.data[]? |
+  [(.artifact_metadata.inline_body // "" | length),
+   (.artifact_metadata.body // "" | length),
+   (.artifact_metadata.provider_metadata.inline_body // "" | length),
+   (.artifact_metadata.provider_metadata.body // "" | length)] | max
+] | max // 0' < "${RUN_DIR}/raw-artifacts.json")"
+min_content_length_ok=$(( body_max_length >= 10240 ? 1 : 0 ))
+
+# Language agreement: for German templates, body must contain "Abs." or "Bund" or "Recht"
+lang_agreement_ok=1
+if [[ "${TEMPLATE_ID}" == *_de ]]; then
+  lang_agreement_ok="$(jq -r '[.data[]? | select(
+    ((.artifact_metadata.inline_body // "") | test("Abs\\.|Bund|Recht"))
+    or ((.artifact_metadata.body // "") | test("Abs\\.|Bund|Recht"))
+    or ((.artifact_metadata.provider_metadata.inline_body // "") | test("Abs\\.|Bund|Recht"))
+    or ((.artifact_metadata.provider_metadata.body // "") | test("Abs\\.|Bund|Recht"))
+  )] | if length > 0 then 1 else 0 end' < "${RUN_DIR}/raw-artifacts.json")"
+fi
+
 verdict="pass"
 if [[ "${content_type_count}" -lt 1 || "${captured_count}" -lt 1 || "${raw_artifact_count}" -lt 1 ]]; then
   verdict="provider_failed"
 elif [[ "${accepted_count}" -lt 1 || "${processing_count}" -lt 1 || "${canonical_ready_count}" -lt 1 || "${processed_count}" -lt 1 ]]; then
   verdict="downstream_failed"
 elif [[ "${title_ok}" -lt 1 || "${fedlex_html_ok}" -lt 1 || "${art1_ok}" -lt 1 ]]; then
+  verdict="pipeline_pass_content_suspect"
+elif [[ "${art_density_ok}" -lt 1 || "${min_content_length_ok}" -lt 1 || "${lang_agreement_ok}" -lt 1 ]]; then
   verdict="pipeline_pass_content_suspect"
 fi
 
@@ -378,6 +409,11 @@ SUMMARY_JSON="$(jq -n \
   --argjson title_ok "${title_ok}" \
   --argjson fedlex_html_ok "${fedlex_html_ok}" \
   --argjson art1_ok "${art1_ok}" \
+  --argjson art_density_count "${art_density_count}" \
+  --argjson art_density_ok "${art_density_ok}" \
+  --argjson body_max_length "${body_max_length}" \
+  --argjson min_content_length_ok "${min_content_length_ok}" \
+  --argjson lang_agreement_ok "${lang_agreement_ok}" \
   '{
     environment: $environment,
     template_id: $template_id,
@@ -399,7 +435,12 @@ SUMMARY_JSON="$(jq -n \
       processed_count: $processed_count,
       title_ok: $title_ok,
       fedlex_html_ok: $fedlex_html_ok,
-      art1_ok: $art1_ok
+      art1_ok: $art1_ok,
+      art_density_count: $art_density_count,
+      art_density_ok: $art_density_ok,
+      body_max_length: $body_max_length,
+      min_content_length_ok: $min_content_length_ok,
+      lang_agreement_ok: $lang_agreement_ok
     }
   }')"
 
