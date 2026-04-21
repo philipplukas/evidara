@@ -61,7 +61,7 @@ Use [TAR-214 release evidence refresh](tar-214-release-evidence-refresh.md) as t
 | Step | Current status | What to do next |
 |------|----------------|-----------------|
 | `TAR-77` branch protection proof | stale because `main` changed on 2026-04-13 and the required-check model was simplified to always-on checks only | Capture a fresh GitHub protection screenshot and one green strict `Release Readiness` run URL; link the policy drift back to `TAR-70` |
-| `TAR-64` dev smoke evidence | blocked on a fresh green `E2E Smoke Dev` after the Cloud Run token mint path failed on self-hosted runner egress | Merge the CI/auth fix from `#220`, rerun `E2E Smoke Dev`, then attach the run URL, timestamp, exit code, and Gate D IDs |
+| `TAR-64` dev smoke evidence | **PASS** — two green E2E Smoke Dev runs on 2026-04-21 (GitHub-hosted runners after #327/#328 migration) | See [tar-64-dev-smoke-2026-04-21.md](evidence/tar-64-dev-smoke-2026-04-21.md); runs [24720182399](https://github.com/philipplukas/evidara/actions/runs/24720182399) and [24720205793](https://github.com/philipplukas/evidara/actions/runs/24720205793) |
 | `TAR-85` remote MVP acceptance | fresh dev run captured on 2026-04-13 with `evidence_pack_version=tar-85-2026-04-11` | Attach [2026-04-13-dev-mvp-acceptance-run1.json](evidence/2026-04-13-dev-mvp-acceptance-run1.json) to `TAR-85`, then link it from `TAR-69` |
 | `TAR-69` synthesis | pending | Post one summary comment linking the refreshed evidence and update §2 with the final run URLs |
 
@@ -69,7 +69,7 @@ Use [TAR-214 release evidence refresh](tar-214-release-evidence-refresh.md) as t
 
 | Gate | Source | Result | Evidence link |
 |------|--------|--------|----------------|
-| A–C vertical slice | `docs/runbooks/first-vertical-slice-exit-gates.md` | **PENDING** (dev smoke ×2) | See **TAR-64: dev smoke evidence** in that runbook |
+| A–C vertical slice | `docs/runbooks/first-vertical-slice-exit-gates.md` | **PASS** (dev smoke ×2 on 2026-04-21) | [tar-64-dev-smoke-2026-04-21.md](evidence/tar-64-dev-smoke-2026-04-21.md) |
 | Local pre-flight | `scripts/vertical-slice-exit-gates-local.sh` (2×) | pass | [Verification log](first-vertical-slice-exit-gates.md#verification-log) rows **2026-04-09** and **2026-04-12**; DI pytest + schema validate 2026-04-12 — §1.1 |
 | MVP acceptance (remote) | `docs/runbooks/mvp-acceptance-scenario-pack.md` | pass (**2026-04-13 dev refresh**) | [2026-04-13-dev-mvp-acceptance-run1.json](evidence/2026-04-13-dev-mvp-acceptance-run1.json) — `evidara workflow mvp-acceptance` against **dev** with `evidence_pack_version=tar-85-2026-04-11` |
 | Release Readiness (strict) | `Release Readiness` workflow | GO (historical) | Re-run on current `main`; download artifact **`release-readiness-<run_id>`** (JSON gate snapshots) and keep the run URL + GCS report path together in Linear (see section 2.1) |
@@ -97,7 +97,7 @@ These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, an
 | Relevance eval pack | **PASS** | 2026-04-21 CH Fedlex fast-loop proved end-to-end pipeline: constitution indexed, search operational, dev index has 169 docs. Seed queries (Bundesgericht, EMRK, BVGE) return 0 due to corpus coverage, not serving bugs. Targeted query "Bundesverfassung" ranks correctly at #1. See [tar-241-relevance-baseline-2026-04-21.md](evidence/tar-241-relevance-baseline-2026-04-21.md). Broader ranking quality is ongoing TAR-241 debt; AT RIS title cleanup on TAR-242 |
 | UI / UX and aesthetic trust | **PARTIAL PASS** | The product is operationally more credible than before, but visible trust is still limited by placeholder-style presentation and generic-looking search outcomes. Treat visual polish and first-use trust as part of release readiness, not as optional cleanup |
 | Platform trust proof | **PARTIAL GO** | Hetzner + Tailscale + Argo path is proven via the `rocky-agents` staging smoke and live image verification; explicit Temporal execution ID still missing in the evidence packet |
-| Open issues | | TAR-64, TAR-77, TAR-85 until evidence attached |
+| Open issues | | TAR-77, TAR-85 until evidence attached (TAR-64 resolved 2026-04-21) |
 
 ## 4. Risk register
 
@@ -105,12 +105,12 @@ These changes **lower friction** for operators filing **TAR-64**, **TAR-67**, an
 |------|----------|------------|-------|
 | Branch protection not enforced | High | Complete TAR-77; block merge until required check appears on PRs | Repo admin |
 | Stale remote acceptance (dev/staging) | Medium | Re-run MVP acceptance after each release candidate | Platform |
-| Dev smoke drift | Medium | Two smoke passes on current `main` for TAR-64 | Platform |
+| Dev smoke drift | ~~Medium~~ Resolved | Two smoke passes completed 2026-04-21 — see [tar-64-dev-smoke-2026-04-21.md](evidence/tar-64-dev-smoke-2026-04-21.md) | Platform |
 | Acquisition replay resume gaps | Medium | Use `GET /v1/runs/{run_id}` `replay_checkpoint` plus provider reruns; treat Temporal `resume_token` as experimental until activities persist full frontiers | Platform |
 
 ## 5. Follow-ups (must be tracked issues)
 
-- [ ] TAR-64 — two dev smokes with Gate D IDs  
+- [x] TAR-64 — two dev smokes with Gate D IDs ([evidence](evidence/tar-64-dev-smoke-2026-04-21.md))  
 - [ ] TAR-77 — ruleset screenshot + green `Release Readiness`  
 - [ ] TAR-85 — `evidara workflow mvp-acceptance` output (dev Cloud Run when no staging project)  
 - [ ] Phase 5 workstreams: TAR-66 → **TAR-62 (merged)** → **TAR-63 (merged)** → **TAR-67 (runbook + CI drill surfaces merged; execute drills + attach evidence)** (see section 7)
