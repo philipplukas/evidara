@@ -116,8 +116,6 @@ class EurLexSparqlAcquisitionSpec(BaseAcquisitionSpec):
     preferred_languages: list[LanguageCode] = Field(default_factory=list)
     query_mode: Literal["work_to_expression"] = "work_to_expression"
     max_expressions: int = Field(default=1, ge=1, le=10)
-    request_timeout_seconds: float = Field(default=30.0, ge=1.0, le=300.0)
-    max_content_bytes: int = Field(default=2_000_000, ge=1, le=50_000_000)
 
     @model_validator(mode="after")
     def validate_eur_lex_sparql_config(self) -> EurLexSparqlAcquisitionSpec:

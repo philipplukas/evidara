@@ -39,7 +39,8 @@ def resolve_source_blueprint(overlay_id: str, provider_template_id: str) -> dict
         raise NotFoundError(
             f"Unknown provider_template_id '{provider_template_id}' in overlay '{overlay_id}'."
         )
-    return template_payload
+    # Strip blueprint-level metadata before handing to AcquisitionSpec parsing.
+    return {k: v for k, v in template_payload.items() if k != "enabled"}
 
 
 def list_source_blueprint_templates() -> list[dict[str, str]]:
