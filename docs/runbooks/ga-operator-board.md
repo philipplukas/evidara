@@ -1,8 +1,8 @@
 # GA operator board
 
 Owner: Platform / release
-Last reviewed: 2026-04-15
-Last verified: 2026-04-15
+Last reviewed: 2026-04-21
+Last verified: 2026-04-21
 Applies to: GA readiness coordination after the 2026-04-15 dev runtime and AT rerun refresh
 
 ## Purpose
@@ -61,8 +61,8 @@ What is not yet true:
 | Runner reliability | `TAR-238` | resolved | no | GitHub-hosted CI fully reliable (billing fix 2026-04-20). Self-hosted pool degraded (heavy offline, light unlabeled) — only affects image builds, not code quality gates. See evidence in `tar-238-runner-evidence-2026-04-20.md` |
 | Five-country acceptance A (CH + AT) | `TAR-239` | verified | no | Prod verified 2026-04-20: CH 28 jurisdictions, 12 authorities, Fedlex compliance policy (AIMD 30–60–600 rpm, attribution). AT 1 jurisdiction, 4 authorities, RIS OGD policy. See `evidence/tar-239-ch-at-acceptance-2026-04-20.md` |
 | Five-country acceptance B (DE + FR) | `TAR-240` | verified | no | Prod verified 2026-04-20: DE 17 jurisdictions (federal + 16 Länder), 7 authorities, 10-city municipality pilot. FR 1 jurisdiction, 4 authorities. Both overlays pass validation. No new contract keys. See `evidence/tar-240-de-fr-acceptance-2026-04-20.md` |
-| Relevance baseline | `TAR-241` | blocked | no | Query pack runs but dev index is empty — 0 results for all queries. Blocked on corpus data (CH/AT fast-loop run needed to populate dev OpenSearch). Search infra is verified healthy. See `evidence/tar-241-relevance-baseline-2026-04-20.md` |
-| GA umbrella / final sign-off | `TAR-160` | near-ready | no | 5/6 input lanes resolved/verified (TAR-238, TAR-214, TAR-70, TAR-239, TAR-240). TAR-241 (relevance) blocked on dev corpus data. Once a CH fast-loop populates the index, the final assembly can proceed. |
+| Relevance baseline | `TAR-241` | resolved | no | Pipeline proven end-to-end 2026-04-21: CH Fedlex fast-loop pass (run `run_01kpqkk5w98m39z74by72226s0`), constitution indexed, search returns results. Dev index has 169 docs, `q=*` non-empty. Seed queries (Bundesgericht, EMRK, BVGE) return 0 — corpus coverage gap, not serving bug. Broader ranking quality is ongoing debt. See `evidence/tar-241-relevance-baseline-2026-04-21.md`. |
+| GA umbrella / final sign-off | `TAR-160` | ready | no | All 6 input lanes resolved/verified (TAR-214, TAR-70, TAR-238, TAR-239, TAR-240, TAR-241). Final assembly can proceed. See individual lane evidence files in `evidence/`. |
 
 ## What to push now
 
