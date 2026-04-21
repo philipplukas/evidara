@@ -504,7 +504,10 @@ LIMIT 1
         url: str,
         max_content_bytes: int,
     ) -> tuple[str, httpx.Response, bytes]:
-        response = await client.get(url)
+        response = await client.get(
+            url,
+            headers={"Accept": "application/xhtml+xml, text/html;q=0.9, */*;q=0.1"},
+        )
         response.raise_for_status()
         body = await self._read_body_limited(response, max_content_bytes)
         return str(response.url), response, body
