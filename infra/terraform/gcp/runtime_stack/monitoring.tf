@@ -4,29 +4,12 @@
 # Provisions Cloud Monitoring alert policies and notification channels
 # for the Evidara runtime stack.
 #
+# Variables: enable_monitoring, monitoring_notification_email,
+#            monitoring_slack_webhook_url, cloud_sql_max_connections
+#            (all defined in variables.tf)
+#
 # See docs/adr/sli-slo-definitions.md for SLI/SLO definitions.
 # --------------------------------------------------------------------------
-
-# --- Variables ---
-
-variable "enable_monitoring" {
-  description = "Whether to provision alert policies and notification channels."
-  type        = bool
-  default     = false
-}
-
-variable "monitoring_notification_email" {
-  description = "Email address for alert notifications."
-  type        = string
-  default     = ""
-}
-
-variable "monitoring_slack_webhook_url" {
-  description = "Slack webhook URL for alert notifications. Leave empty to skip."
-  type        = string
-  default     = ""
-  sensitive   = true
-}
 
 # --- Notification channels ---
 
@@ -185,7 +168,7 @@ resource "google_monitoring_alert_policy" "cloud_run_error_rate" {
   }
 }
 
-# --- Tier 2: Cloud Run latency p95 (> 5s for 15 minutes) ---
+# --- Tier 1: Cloud Run latency p99 (> 5s for 5 minutes) ---
 
 resource "google_monitoring_alert_policy" "cloud_run_latency" {
   for_each = var.enable_monitoring ? {
@@ -194,12 +177,12 @@ resource "google_monitoring_alert_policy" "cloud_run_latency" {
     if contains(["platform-control-api", "legal-search-api"], name)
   } : {}
 
-  display_name = "High latency p95: ${each.key} (${local.environment})"
+  display_name = "High latency p99: ${each.key} (${local.environment})"
   combiner     = "OR"
   severity     = "WARNING"
 
   conditions {
-    display_name = "Request latency p95 > 5s for 15 min"
+    display_name = "Request latency p99 > 5s for 5 min"
 
     condition_threshold {
       filter          = <<-EOT
@@ -209,11 +192,11 @@ resource "google_monitoring_alert_policy" "cloud_run_latency" {
       EOT
       comparison      = "COMPARISON_GT"
       threshold_value = 5000
-      duration        = "900s"
+      duration        = "300s"
 
       aggregations {
         alignment_period     = "300s"
-        per_series_aligner   = "ALIGN_PERCENTILE_95"
+        per_series_aligner   = "ALIGN_PERCENTILE_99"
         cross_series_reducer = "REDUCE_MAX"
       }
     }
@@ -228,7 +211,7 @@ resource "google_monitoring_alert_policy" "cloud_run_latency" {
       **Service**: ${each.key} (${each.value.prefixed_name})
       **Environment**: ${local.environment}
 
-      P95 request latency has exceeded 5 seconds for 15 minutes.
+      P99 request latency has exceeded 5 seconds for 5 minutes.
 
       ### Response
 
@@ -236,6 +219,126 @@ resource "google_monitoring_alert_policy" "cloud_run_latency" {
       2. Review slow database queries
       3. Check OpenSearch cluster health
       4. Consider scaling up instance count or resources
+    EOT
+    mime_type = "text/markdown"
+  }
+
+  alert_strategy {
+    auto_close = "3600s"
+  }
+}
+
+# --- Tier 2: Cloud SQL connection count (> 80% of max connections) ---
+#
+# Cloud SQL Postgres max_connections depends on tier; for db-custom-2-7680
+# the default is ~200. We alert at 80% to give time to react.
+# The threshold is configurable via the cloud_sql_max_connections variable
+# so operators can tune it per tier.
+
+resource "google_monitoring_alert_policy" "cloud_sql_connection_count" {
+  count = var.enable_monitoring && var.enable_cloud_sql ? 1 : 0
+
+  display_name = "High Cloud SQL connections: ${local.cloud_sql_instance_name} (${local.environment})"
+  combiner     = "OR"
+  severity     = "WARNING"
+
+  conditions {
+    display_name = "Connection count > 80% of max (${floor(var.cloud_sql_max_connections * 0.8)}) for 5 min"
+
+    condition_threshold {
+      filter          = <<-EOT
+        resource.type = "cloudsql_database"
+        AND resource.labels.database_id = "${var.project_id}:${local.cloud_sql_instance_name}"
+        AND metric.type = "cloudsql.googleapis.com/database/postgresql/num_backends"
+      EOT
+      comparison      = "COMPARISON_GT"
+      threshold_value = floor(var.cloud_sql_max_connections * 0.8)
+      duration        = "300s"
+
+      aggregations {
+        alignment_period   = "60s"
+        per_series_aligner = "ALIGN_MEAN"
+      }
+    }
+  }
+
+  notification_channels = local.notification_channels
+
+  documentation {
+    content   = <<-EOT
+      ## High Cloud SQL connection count
+
+      **Instance**: ${local.cloud_sql_instance_name}
+      **Environment**: ${local.environment}
+      **Threshold**: ${floor(var.cloud_sql_max_connections * 0.8)} connections (80% of ${var.cloud_sql_max_connections} max)
+
+      The number of active database connections has exceeded 80% of the
+      configured maximum for more than 5 minutes. If connections continue
+      to rise, new connection attempts will be rejected.
+
+      ### Response
+
+      1. Check for connection leaks in application logs
+      2. Review Cloud Run instance counts — each instance holds a connection pool
+      3. Consider scaling down idle services or increasing `max_connections` via Cloud SQL flags
+      4. As a stop-gap, restart the offending Cloud Run service to release leaked connections
+    EOT
+    mime_type = "text/markdown"
+  }
+
+  alert_strategy {
+    auto_close = "3600s"
+  }
+}
+
+# --- Tier 2: Cloud SQL CPU utilization (> 80% for 10 minutes) ---
+
+resource "google_monitoring_alert_policy" "cloud_sql_cpu_utilization" {
+  count = var.enable_monitoring && var.enable_cloud_sql ? 1 : 0
+
+  display_name = "High Cloud SQL CPU: ${local.cloud_sql_instance_name} (${local.environment})"
+  combiner     = "OR"
+  severity     = "WARNING"
+
+  conditions {
+    display_name = "CPU utilization > 80% for 10 min"
+
+    condition_threshold {
+      filter          = <<-EOT
+        resource.type = "cloudsql_database"
+        AND resource.labels.database_id = "${var.project_id}:${local.cloud_sql_instance_name}"
+        AND metric.type = "cloudsql.googleapis.com/database/cpu/utilization"
+      EOT
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0.8
+      duration        = "600s"
+
+      aggregations {
+        alignment_period   = "60s"
+        per_series_aligner = "ALIGN_MEAN"
+      }
+    }
+  }
+
+  notification_channels = local.notification_channels
+
+  documentation {
+    content   = <<-EOT
+      ## High Cloud SQL CPU utilization
+
+      **Instance**: ${local.cloud_sql_instance_name}
+      **Environment**: ${local.environment}
+
+      CPU utilization has exceeded 80% for more than 10 minutes. Sustained
+      high CPU can degrade query performance and increase latency for all
+      services using this database.
+
+      ### Response
+
+      1. Check for long-running or expensive queries via `pg_stat_activity`
+      2. Review recent schema migrations or index changes
+      3. Look for unexpected spikes in acquisition or processing workloads
+      4. Consider upgrading the Cloud SQL tier if sustained load is legitimate
     EOT
     mime_type = "text/markdown"
   }
