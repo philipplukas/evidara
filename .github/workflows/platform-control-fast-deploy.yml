@@ -10,6 +10,8 @@ on:
         type: choice
         options:
           - dev
+          - staging
+          - prod
       image_tag:
         description: Optional image tag override. Defaults to the triggering commit SHA.
         required: false
@@ -46,7 +48,7 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
       ARTIFACT_PROJECT_ID: ${{ vars.GCP_ARTIFACT_PROJECT_ID }}
-      PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      PROJECT_ID: ${{ (inputs.environment || 'dev') == 'prod' && vars.GCP_PROJECT_ID_PROD || (inputs.environment || 'dev') == 'staging' && vars.GCP_PROJECT_ID_STAGING || vars.GCP_PROJECT_ID_DEV }}
       PLATFORM_CONTROL_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_SERVICE_NAME }}
       PLATFORM_CONTROL_WORKER_SERVICE_NAME: ${{ vars.PLATFORM_CONTROL_WORKER_SERVICE_NAME }}
 
@@ -58,7 +60,7 @@ jobs:
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_DEV }}
+          service_account: ${{ (inputs.environment || 'dev') == 'prod' && secrets.GCP_SERVICE_ACCOUNT_PROD || (inputs.environment || 'dev') == 'staging' && secrets.GCP_SERVICE_ACCOUNT_STAGING || secrets.GCP_SERVICE_ACCOUNT_DEV }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v3
@@ -122,7 +124,7 @@ jobs:
             --format='value(status.url)')
           echo "platform_control_revision=${PC_REV}" >> "$GITHUB_OUTPUT"
           echo "platform_control_url=${PC_URL}" >> "$GITHUB_OUTPUT"
-          echo "### Platform-control fast deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Platform-control fast deploy (${TARGET_ENV})" >> "$GITHUB_STEP_SUMMARY"
           echo "- Revision: \`${PC_REV}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- URL: ${PC_URL}" >> "$GITHUB_STEP_SUMMARY"
 
