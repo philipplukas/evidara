@@ -111,32 +111,32 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
-      # Major German federal codes — verified URLs (2026-04-22).
-      # Each URL is the TOC/index page; the DeterministicHttpProvider
-      # fetches the HTML. Full-text versions are at BJNR*.html.
+      # Major German federal codes — full-text BJNR URLs for proper titles.
+      # Index pages give abbreviated titles ("StGB - nichtamtliches
+      # Inhaltsverzeichnis"); BJNR pages give full law names.
       deterministic_http_bundesrecht_codes:
         provider: deterministic_http
         seed_urls:
-          - https://www.gesetze-im-internet.de/gg/index.html        # Grundgesetz
-          - https://www.gesetze-im-internet.de/bgb/index.html       # BGB
-          - https://www.gesetze-im-internet.de/stgb/index.html      # StGB
-          - https://www.gesetze-im-internet.de/hgb/index.html       # HGB
-          - https://www.gesetze-im-internet.de/zpo/index.html       # ZPO
-          - https://www.gesetze-im-internet.de/stpo/index.html      # StPO
-          - https://www.gesetze-im-internet.de/vwvfg/index.html     # VwVfG
-          - https://www.gesetze-im-internet.de/vwgo/index.html      # VwGO
-          - https://www.gesetze-im-internet.de/gvg/index.html       # GVG
-          - https://www.gesetze-im-internet.de/ao_1977/index.html   # AO
-          - https://www.gesetze-im-internet.de/bverfgg/index.html   # BVerfGG
-          - https://www.gesetze-im-internet.de/arbgg/index.html     # ArbGG
-          - https://www.gesetze-im-internet.de/inso/index.html      # InsO
-          - https://www.gesetze-im-internet.de/betrvg/index.html    # BetrVG
-          - https://www.gesetze-im-internet.de/gwb/index.html       # GWB
-          - https://www.gesetze-im-internet.de/stvg/index.html      # StVG
-          - https://www.gesetze-im-internet.de/sgb_1/index.html     # SGB I
-          - https://www.gesetze-im-internet.de/sgb_2/index.html     # SGB II
-          - https://www.gesetze-im-internet.de/sgb_3/index.html     # SGB III
-          - https://www.gesetze-im-internet.de/sgb_5/index.html     # SGB V
+          - https://www.gesetze-im-internet.de/gg/BJNR000010949.html      # Grundgesetz
+          - https://www.gesetze-im-internet.de/bgb/BJNR001950896.html     # BGB
+          - https://www.gesetze-im-internet.de/stgb/BJNR001270871.html    # StGB
+          - https://www.gesetze-im-internet.de/hgb/BJNR002190897.html     # HGB
+          - https://www.gesetze-im-internet.de/zpo/BJNR005330950.html     # ZPO
+          - https://www.gesetze-im-internet.de/stpo/BJNR006290950.html    # StPO
+          - https://www.gesetze-im-internet.de/vwvfg/BJNR012530976.html   # VwVfG
+          - https://www.gesetze-im-internet.de/vwgo/BJNR000170960.html    # VwGO
+          - https://www.gesetze-im-internet.de/gvg/BJNR005130950.html     # GVG
+          - https://www.gesetze-im-internet.de/ao_1977/BJNR006130976.html # AO
+          - https://www.gesetze-im-internet.de/bverfgg/BJNR002430951.html # BVerfGG
+          - https://www.gesetze-im-internet.de/arbgg/BJNR012670953.html   # ArbGG
+          - https://www.gesetze-im-internet.de/inso/BJNR286600994.html    # InsO
+          - https://www.gesetze-im-internet.de/betrvg/BJNR000130972.html  # BetrVG
+          - https://www.gesetze-im-internet.de/gwb/BJNR252110998.html     # GWB
+          - https://www.gesetze-im-internet.de/stvg/BJNR004370909.html    # StVG
+          - https://www.gesetze-im-internet.de/sgb_1/BJNR030150975.html   # SGB I
+          - https://www.gesetze-im-internet.de/sgb_2/BJNR295500003.html   # SGB II
+          - https://www.gesetze-im-internet.de/sgb_3/BJNR059500997.html   # SGB III
+          - https://www.gesetze-im-internet.de/sgb_5/BJNR024820988.html   # SGB V
         tenant_id: tenant_public
         corpus_id: corpus_public_de_bundesrecht_codes
         scope_type: global_public
