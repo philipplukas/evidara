@@ -152,6 +152,28 @@ jobs:
           WORKER_REV=$(echo "${WORKER_JSON}" | jq -r '.status.latestReadyRevisionName')
           echo "- Worker revision: \`${WORKER_REV}\`" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Check API/worker image tag parity
+        run: |
+          set -euo pipefail
+          API_IMAGE=$(gcloud run services describe "${PLATFORM_CONTROL_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(spec.template.spec.containers[0].image)')
+          WORKER_IMAGE=$(gcloud run services describe "${PLATFORM_CONTROL_WORKER_SERVICE_NAME}-${TARGET_ENV}" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format='value(spec.template.spec.containers[0].image)')
+          API_TAG="${API_IMAGE##*:}"
+          WORKER_TAG="${WORKER_IMAGE##*:}"
+          echo "API image tag:    ${API_TAG}"
+          echo "Worker image tag: ${WORKER_TAG}"
+          if [ "${API_TAG}" != "${WORKER_TAG}" ]; then
+            echo "::warning::API and worker image tags differ — API=${API_TAG}, Worker=${WORKER_TAG}. Consider redeploying with deploy_worker enabled."
+            echo "- ⚠️ **Image parity mismatch** — API tag \`${API_TAG}\` ≠ Worker tag \`${WORKER_TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ✅ API and worker image tags match (\`${API_TAG}\`)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Smoke test health
         run: |
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
