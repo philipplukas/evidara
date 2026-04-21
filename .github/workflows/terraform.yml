@@ -45,7 +45,7 @@ jobs:
   fmt-check:
     name: Terraform fmt check
     if: github.event_name == 'pull_request'
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -65,7 +65,7 @@ jobs:
     name: Terraform plan (dev)
     if: github.event_name == 'pull_request'
     needs: fmt-check
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    runs-on: ubuntu-latest
     environment: dev
 
     steps:
@@ -190,7 +190,7 @@ jobs:
     name: Terraform plan (staging)
     if: github.event_name == 'pull_request'
     needs: fmt-check
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    runs-on: ubuntu-latest
     environment: staging
 
     steps:
@@ -315,7 +315,7 @@ jobs:
   apply-dev:
     name: Terraform apply (dev)
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    runs-on: ubuntu-latest
     environment: dev
     outputs:
       staging_apply_enabled: ${{ steps.meta.outputs.staging_apply_enabled }}
@@ -379,7 +379,7 @@ jobs:
       always() &&
       needs.apply-dev.result == 'success' &&
       needs.apply-dev.outputs.staging_apply_enabled == 'true'
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    runs-on: ubuntu-latest
     environment: staging
 
     steps:
@@ -440,7 +440,7 @@ jobs:
         (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TERRAFORM_APPLY_ENABLED_PROD == 'true') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.run_apply == 'true')
       )
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    runs-on: ubuntu-latest
     environment: prod
 
     steps:
