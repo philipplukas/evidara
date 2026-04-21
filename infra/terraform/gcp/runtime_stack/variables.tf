@@ -322,3 +322,30 @@ variable "billing_budget_disable_default_iam_recipients" {
   type        = bool
   default     = false
 }
+
+# --- Monitoring & alerting (see monitoring.tf) ---
+
+variable "enable_monitoring" {
+  description = "Whether to provision alert policies and notification channels."
+  type        = bool
+  default     = true
+}
+
+variable "monitoring_notification_email" {
+  description = "Email address for alert notifications. Leave empty to skip email channel."
+  type        = string
+  default     = ""
+}
+
+variable "monitoring_slack_webhook_url" {
+  description = "Slack webhook URL for alert notifications. Leave empty to skip."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "cloud_sql_max_connections" {
+  description = "Expected max_connections for the Cloud SQL instance (depends on tier). Used to compute the 80% alert threshold."
+  type        = number
+  default     = 200
+}
