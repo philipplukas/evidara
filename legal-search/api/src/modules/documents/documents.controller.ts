@@ -24,4 +24,10 @@ export class DocumentsController {
     const data = await this.documentsService.getSections(id);
     return { data };
   }
+
+  @Get(':document_id/cited_by')
+  async getCitedBy(@Param('document_id') id: string) {
+    const data = await this.documentsService.getCitedBy(id);
+    return { data, total: data.length };
+  }
 }

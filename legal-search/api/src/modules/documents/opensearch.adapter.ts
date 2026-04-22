@@ -150,4 +150,39 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
       return [];
     }
   }
+
+  async getCitedBy(documentId: string): Promise<CitationEntity[]> {
+    this.logger.debug(`Fetching reverse citations for ${documentId}`);
+
+    try {
+      const response = await this.client.search({
+        index: this.indexCitations,
+        body: {
+          size: 100,
+          query: { term: { target_document_id: documentId } },
+        },
+      });
+
+      return (response.body.hits.hits as OpenSearchHit[])
+        .filter((hit) => hit._source != null)
+        .map((hit) => {
+          const src = hit._source as Record<string, unknown>;
+          return {
+            citation_id: src.citation_id as string,
+            source_document_id: src.source_document_id as string,
+            source_section_id: src.source_section_id as string | undefined,
+            target_document_id: src.target_document_id as string | undefined,
+            target_title: src.target_title as string | undefined,
+            target_subtitle: src.target_subtitle as string | undefined,
+            target_document_type: src.target_document_type as string | undefined,
+            citation_text: src.citation_text as string,
+            citation_type: src.citation_type as string | undefined,
+            resolved: (src.resolved as boolean) ?? false,
+          };
+        });
+    } catch (err) {
+      this.logger.error(`Failed to fetch reverse citations for ${documentId}`, err);
+      return [];
+    }
+  }
 }

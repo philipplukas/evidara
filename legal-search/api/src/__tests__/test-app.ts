@@ -151,6 +151,7 @@ export async function createTestApp(overrides?: {
         resolved: true,
       },
     ]),
+    getCitedBy: vi.fn().mockResolvedValue([]),
     ...overrides?.documentsRepo,
   };
   const projectionsRepo: ProjectionRepository = {
