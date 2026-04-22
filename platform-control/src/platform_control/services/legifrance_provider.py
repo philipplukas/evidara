@@ -174,11 +174,12 @@ class LegifranceProvider:
         del source
         acquisition_spec = source_version.acquisition_spec or {}
         code_ids = acquisition_spec.get("code_ids") or [c["id"] for c in _SEED_CODES]
+        max_articles = int(acquisition_spec.get("max_articles") or _DEFAULT_MAX_ARTICLES)
         return ProviderPlan(
             provider=self.provider_name,
             mode="piste_api_code_articles",
             seed_urls=[f"https://www.legifrance.gouv.fr/codes/texte_lc/{cid}" for cid in code_ids],
-            estimated_request_count=len(code_ids) * _DEFAULT_MAX_ARTICLES,
+            estimated_request_count=len(code_ids) * max_articles,
             user_agent=_USER_AGENT,
             request_timeout_seconds=30.0,
             notes=["OAuth 2.0 via PISTE/DILA", f"{len(code_ids)} codes"],

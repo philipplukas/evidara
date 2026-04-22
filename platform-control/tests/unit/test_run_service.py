@@ -282,6 +282,56 @@ async def test_get_run_readiness_reports_pass_for_valid_configuration(session) -
 
 
 @pytest.mark.asyncio
+async def test_get_run_readiness_accepts_legifrance_code_ids(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "legifrance",
+        "code_ids": ["LEGITEXT000006070721"],
+        "max_articles": 5,
+    }
+    await session.commit()
+    run_service = RunService(session, StubProvider())
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    seed_check = next(
+        check for check in readiness.checks if check.code == "acquisition_seed_present"
+    )
+    assert readiness.ready is True
+    assert seed_check.ok is True
+
+
+@pytest.mark.asyncio
+async def test_get_run_readiness_rejects_empty_legifrance_code_ids(session) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "legifrance",
+        "code_ids": [],
+    }
+    await session.commit()
+    run_service = RunService(session, StubProvider())
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    seed_check = next(
+        check for check in readiness.checks if check.code == "acquisition_seed_present"
+    )
+    assert readiness.ready is False
+    assert seed_check.ok is False
+    assert seed_check.detail == "Legifrance acquisition spec must define code_ids."
+
+
+@pytest.mark.asyncio
 async def test_overlay_template_source_version_passes_readiness_checks(session) -> None:
     session.add(Jurisdiction(jurisdiction_id="jur_at", name="Austria", slug="at"))
     session.add(

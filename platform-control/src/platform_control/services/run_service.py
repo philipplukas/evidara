@@ -609,6 +609,7 @@ class RunService:
             seed_url = acquisition_spec.get("seed_url")
             seed_urls = acquisition_spec.get("seed_urls")
             base_url = acquisition_spec.get("base_url")
+            code_ids = acquisition_spec.get("code_ids")
             normalized_seed_url = seed_url.strip() if isinstance(seed_url, str) else ""
             normalized_seed_urls = (
                 [url.strip() for url in seed_urls if isinstance(url, str) and url.strip()]
@@ -616,11 +617,29 @@ class RunService:
                 else []
             )
             normalized_base_url = base_url.strip() if isinstance(base_url, str) else ""
-            has_seed = bool(normalized_seed_url or normalized_seed_urls or normalized_base_url)
+            normalized_code_ids = (
+                [
+                    code_id.strip()
+                    for code_id in code_ids
+                    if isinstance(code_id, str) and code_id.strip()
+                ]
+                if acquisition_spec.get("provider") == "legifrance" and isinstance(code_ids, list)
+                else []
+            )
+            has_seed = bool(
+                normalized_seed_url
+                or normalized_seed_urls
+                or normalized_base_url
+                or normalized_code_ids
+            )
             seed_detail = (
-                "Acquisition spec has at least one seed or base URL."
+                "Acquisition spec has at least one seed, base URL, or provider-specific seed."
                 if has_seed
-                else "Acquisition spec must define seed_url, seed_urls, or base_url."
+                else (
+                    "Legifrance acquisition spec must define code_ids."
+                    if acquisition_spec.get("provider") == "legifrance"
+                    else "Acquisition spec must define seed_url, seed_urls, or base_url."
+                )
             )
         checks.append(
             RunReadinessCheck(
