@@ -244,10 +244,14 @@ overlays:
         enabled: true
   fr:
     provider_templates:
-      deterministic_http_legifrance_codes:
-        provider: deterministic_http
-        seed_urls:
-          - https://www.legifrance.gouv.fr/
+      legifrance_codes:
+        provider: legifrance
+        code_ids:
+          - LEGITEXT000006070721   # Code civil
+          - LEGITEXT000006070719   # Code pénal
+          - LEGITEXT000006070933   # Code de commerce
+          - LEGITEXT000006072050   # Code du travail
+          - LEGITEXT000006069577   # Code général des impôts
         tenant_id: tenant_public
         corpus_id: corpus_public_fr_legifrance_codes
         scope_type: global_public
@@ -255,6 +259,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [fr]
         document_type_hint: legislation
+        enabled: false
   it:
     provider_templates:
       deterministic_http_normattiva_legislation:

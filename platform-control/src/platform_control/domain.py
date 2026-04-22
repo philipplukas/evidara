@@ -63,6 +63,7 @@ class AcquisitionProvider(StrEnum):
     EUR_LEX_SPARQL = "eur_lex_sparql"
     BUNDESLAND_HTTP = "bundesland_http"
     REGIONE_HTTP = "regione_http"
+    LEGIFRANCE = "legifrance"
 
 
 class RobotsMode(StrEnum):

@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     temporal_task_queue: str = "platform-control-wizard"
     temporal_target: str = "localhost:7233"
 
+    legifrance_client_id: str | None = None
+    legifrance_client_secret: str | None = None
+
     argilla_api_base_url: str | None = None
     argilla_api_key: str | None = None
     argilla_dataset_id: str | None = None
@@ -80,6 +83,8 @@ class Settings(BaseSettings):
         "operator_api_key",
         "service_api_key",
         "argilla_api_key",
+        "legifrance_client_id",
+        "legifrance_client_secret",
         mode="before",
     )
     @classmethod
