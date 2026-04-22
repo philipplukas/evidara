@@ -285,9 +285,9 @@ overlays:
         document_type_hint: legislation
         enabled: false
   eu:
-    # EU scaffold. Live SPARQL endpoint is wired in the EurLexSparqlProvider
-    # class, but start_run() raises NotImplementedError until the follow-up
-    # ticket lands. Templates kept `enabled: false` to document the intent.
+    # EUR-Lex SPARQL provider resolves ELI URIs via the Cellar SPARQL endpoint
+    # and fetches HTML manifestations. Provider is live_ready=True; templates
+    # are enabled for acceptance-run evidence capture.
     provider_templates:
       eur_lex_sparql_regulation_en:
         provider: eur_lex_sparql

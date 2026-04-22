@@ -15,9 +15,8 @@ approval_hotspots:
   - language-version selection (EUR-Lex exposes all 24 official languages)
   - CELEX vs ECLI identifier disambiguation
 
-status: scaffold-only
+status: live
 status_note: |
-  EU overlay is scaffold-only. The EUR-Lex SPARQL acquisition provider is
-  registered as a stub in platform_control/services/provider_registry_factory.py
-  but raises NotImplementedError on discover/fetch. Live fetch and evidence
-  capture land in a follow-up ticket.
+  EUR-Lex SPARQL provider is live_ready=True. Templates for GDPR (regulation)
+  and Copyright Directive are enabled. Acceptance-run evidence can be captured
+  via scripts/eu-eurlex-fast-loop.sh.
