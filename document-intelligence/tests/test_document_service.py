@@ -32,6 +32,11 @@ def _write_published_documents(uri: str, rows: list[dict[str, object]]) -> None:
     deltalake.write_deltalake(uri, pa.Table.from_pylist(rows))
 
 
+def _write_published_sections(uri: str, rows: list[dict[str, object]]) -> None:
+    assert pa is not None
+    deltalake.write_deltalake(uri, pa.Table.from_pylist(rows))
+
+
 @unittest.skipUnless(TestClient is not None, "Install document-intelligence[service] for HTTP tests")
 class TestDocumentServiceHTTP(unittest.TestCase):
     def setUp(self) -> None:
@@ -228,6 +233,122 @@ class TestDeltaPublishedDocumentStore(unittest.TestCase):
             assert row is not None
             self.assertEqual(row["document_revision"], 1)
             self.assertEqual(row["title"], "Revision one")
+
+    def test_includes_sections_for_selected_document_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            documents_uri = str(base / "published_documents")
+            sections_uri = str(base / "published_sections")
+            latest_pm = "pm_01jq7chgy7g0pkj4f1d03f8f8c"
+            _write_published_documents(
+                documents_uri,
+                [
+                    {
+                        "document_id": _DOC,
+                        "document_revision": 1,
+                        "processing_manifest_id": _PM,
+                        "provenance": {"run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d"},
+                        "primary_artifact_id": "art_01jq7af3f8qqc46zc6xvkf9y4x",
+                        "jurisdiction_id": "jur_ch_federal",
+                        "authority_id": "auth_bvwg",
+                        "title": "Revision one",
+                        "document_type": "decision",
+                        "effective_date": "2024-01-01",
+                        "processed_at": "2026-04-12T19:00:00Z",
+                        "processing_version": "0.1.0-dev",
+                        "lifecycle_status": "active",
+                        "full_text": "older full",
+                        "body_text": "older body",
+                        "metadata": {"official_citation": "old"},
+                        "extensions": {"source": "fixture-old"},
+                    },
+                    {
+                        "document_id": _DOC,
+                        "document_revision": 2,
+                        "processing_manifest_id": latest_pm,
+                        "provenance": {"run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d"},
+                        "primary_artifact_id": "art_01jq7af3f8qqc46zc6xvkf9y4y",
+                        "jurisdiction_id": "jur_ch_federal",
+                        "authority_id": "auth_bvwg",
+                        "title": "Revision two",
+                        "document_type": "law",
+                        "effective_date": "2024-02-01",
+                        "processed_at": "2026-04-12T19:05:00Z",
+                        "processing_version": "0.1.0-dev",
+                        "lifecycle_status": "active",
+                        "full_text": "new full",
+                        "body_text": "new body",
+                        "metadata": {"official_citation": "new"},
+                        "extensions": {"source": "fixture-new"},
+                    },
+                ],
+            )
+            _write_published_sections(
+                sections_uri,
+                [
+                    {
+                        "section_id": "sec_old",
+                        "document_id": _DOC,
+                        "document_revision": 1,
+                        "processing_manifest_id": _PM,
+                        "provenance": {"run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d"},
+                        "ordinal": 0,
+                        "depth": 0,
+                        "title": "Old section",
+                        "content": "Old content",
+                        "section_type": "body",
+                        "metadata": {},
+                    },
+                    {
+                        "section_id": "sec_two",
+                        "document_id": _DOC,
+                        "document_revision": 2,
+                        "processing_manifest_id": latest_pm,
+                        "provenance": {"run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d"},
+                        "ordinal": 1,
+                        "depth": 1,
+                        "title": "Second",
+                        "content": "Second content",
+                        "section_type": "body",
+                        "metadata": {},
+                    },
+                    {
+                        "section_id": "sec_one",
+                        "document_id": _DOC,
+                        "document_revision": 2,
+                        "processing_manifest_id": latest_pm,
+                        "provenance": {"run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d"},
+                        "ordinal": 0,
+                        "depth": 0,
+                        "title": "First",
+                        "content": "First content",
+                        "section_type": "heading",
+                        "metadata": {
+                            "citations": [
+                                {
+                                    "text": "BGBl. Nr. 43/1975",
+                                    "citation_type": "at_bgbl",
+                                }
+                            ]
+                        },
+                    },
+                ],
+            )
+
+            store = DeltaPublishedDocumentStore(documents_uri, sections_uri)
+            row = store.get_full(_DOC, None)
+
+            self.assertIsNotNone(row)
+            assert row is not None
+            self.assertEqual(row["document_revision"], 2)
+            self.assertEqual(
+                [section["section_id"] for section in row["sections"]],
+                ["sec_one", "sec_two"],
+            )
+            self.assertEqual(
+                row["sections"][0]["metadata"]["citations"][0]["citation_type"],
+                "at_bgbl",
+            )
 
 
 if __name__ == "__main__":
