@@ -21,6 +21,7 @@ import type { RunRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DetailGrid, FieldCell, Pill } from "../../ui/primitives";
 import { runModeToLevel, runRecordStatusToLevel } from "../shared/StatusBadge";
+import { canPromoteRunToProduction, PromoteToProductionButton } from "./RunActions";
 import RunDetailSectionsV2 from "./RunDetailSectionsV2";
 import { buildRunDecisionSupport } from "./RunShow";
 
@@ -94,6 +95,11 @@ export default function RunShowV2() {
           </Pill>
           <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
         </div>
+        {canPromoteRunToProduction(run) ? (
+          <RecordContextProvider value={run}>
+            <PromoteToProductionButton size="medium" variant="contained" />
+          </RecordContextProvider>
+        ) : null}
       </header>
 
       {/* Overview band — metric chips + next-step narrative. */}
