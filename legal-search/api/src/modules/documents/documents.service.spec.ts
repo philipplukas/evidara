@@ -39,6 +39,7 @@ function createMockRepo(overrides?: Partial<DocumentsRepository>): DocumentsRepo
         resolved: true,
       },
     ]),
+    getCitedBy: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }
