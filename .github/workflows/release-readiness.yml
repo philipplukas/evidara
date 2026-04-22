@@ -50,6 +50,40 @@ jobs:
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
+      - name: Ensure GitHub CLI
+        run: |
+          set -euo pipefail
+          if command -v gh >/dev/null 2>&1; then
+            gh --version
+            exit 0
+          fi
+
+          if ! command -v sudo >/dev/null 2>&1; then
+            echo "GitHub CLI is not installed and sudo is unavailable on this runner." >&2
+            exit 2
+          fi
+          for cmd in curl dpkg apt-get; do
+            if ! command -v "${cmd}" >/dev/null 2>&1; then
+              echo "GitHub CLI is not installed and required bootstrap command is missing: ${cmd}" >&2
+              exit 2
+            fi
+          done
+
+          sudo mkdir -p -m 755 /etc/apt/keyrings
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
+          sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+          sudo find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) \
+            -exec sed -i \
+              -e 's|http://archive.ubuntu.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|g' \
+              -e 's|http://security.ubuntu.com/ubuntu/|https://security.ubuntu.com/ubuntu/|g' \
+              {} +
+          sudo apt-get update
+          sudo apt-get install -y gh
+          gh --version
+
       - name: Verify latest E2E smoke run (configurable workflow)
         id: smoke_gate
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict == 'false' }}

@@ -29,7 +29,7 @@ See `scripts/analyze_github_actions_queue.py --help` for filters (`--repo`, `--b
 | Light | `LIGHT_RUNNER_RUNS_ON_JSON` | fmt, unit tests, npm `check`, Terraform fmt/plan when pointed here |
 | Heavy | `HEAVY_RUNNER_RUNS_ON_JSON` | Playwright / interaction-flow, e2e smokes, multi-arch image builds |
 | GitHub-hosted | `ubuntu-latest` | Remaining bridge jobs that still need GitHub-hosted Linux while the self-hosted bootstrap path is being proven. |
-| Light | `LIGHT_RUNNER_SCALE_SET` | **Release Readiness** (WIF + `gh` API). **Dev-first orgs:** set **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** = **`dev`**, **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** = **`E2E Smoke Dev`**, and ensure GitHub **Environment `dev`** has the same OIDC secrets as E2E Smoke Dev — see [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md) §2.1 and [Runtime stack §7](runtime-stack.md#7-release-readiness-go-no-go-operation). |
+| Light | `LIGHT_RUNNER_SCALE_SET` | **Release Readiness** (WIF + `gh` API). The workflow bootstraps GitHub CLI when it is not already present, so the light pool must allow `curl`, `sudo`, and apt package installation. **Dev-first orgs:** set **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** = **`dev`**, **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** = **`E2E Smoke Dev`**, and ensure GitHub **Environment `dev`** has the same OIDC secrets as E2E Smoke Dev — see [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md) §2.1 and [Runtime stack §7](runtime-stack.md#7-release-readiness-go-no-go-operation). |
 
 Current exception:
 
@@ -110,7 +110,7 @@ Use this when the ARC / self-hosted pools drift, queue jobs, or re-register with
 ### Remediation checklist
 
 1. Confirm both pools are online and advertising the full target label set.
-2. Verify light-pool jobs can bootstrap Node 22, Python 3.11, `git`, `curl`, and `unzip` with `runner-bootstrap-preflight.yml`.
+2. Verify light-pool jobs can bootstrap Node 22, Python 3.11, `git`, `curl`, and `unzip` with `runner-bootstrap-preflight.yml`, and can run Release Readiness' GitHub CLI bootstrap when `gh` is absent.
 3. Verify heavy-pool jobs can launch Chromium and complete the Playwright smoke path with `runner-bootstrap-preflight.yml` and `runner-pool-smoke.yml`.
 4. Verify Docker/buildx availability before routing image jobs to heavy. If Docker is not guaranteed, keep `runtime-images.yml` off that pool.
 5. Keep `terraform.yml` on a bootstrap path that does not depend on the Terraform wrapper assuming Node is present on the runner.
