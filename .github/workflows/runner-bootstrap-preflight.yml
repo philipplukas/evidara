@@ -109,6 +109,15 @@ jobs:
         working-directory: legal-search/frontend
         run: npm ci
 
+      - name: Use HTTPS apt mirrors for Playwright deps
+        if: ${{ inputs.frontend_playwright_smoke }}
+        run: |
+          set -euo pipefail
+          sudo sed -i \
+            -e 's|http://archive.ubuntu.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|g' \
+            -e 's|http://security.ubuntu.com/ubuntu/|https://security.ubuntu.com/ubuntu/|g' \
+            /etc/apt/sources.list /etc/apt/sources.list.d/*.sources
+
       - name: Install Playwright Chromium
         if: ${{ inputs.frontend_playwright_smoke }}
         working-directory: legal-search/frontend
