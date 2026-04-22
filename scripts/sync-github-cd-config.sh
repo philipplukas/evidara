@@ -38,6 +38,8 @@ Options:
   --databricks-host-dev <url>
   --databricks-host-staging <url>
   --databricks-host-prod <url>
+  --databricks-host-source <mode>  (tfvars|profile, default: tfvars; explicit host flags win)
+  --skip-databricks-host-dns-check
   --databricks-profile-dev <name>   (default: dev)
   --databricks-profile-staging <name> (default: staging)
   --databricks-profile-prod <name>  (default: prod)
@@ -218,6 +220,86 @@ detect_databricks_host_from_profile() {
   printf '%s' "$payload" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("env",{}).get("DATABRICKS_HOST",""))'
 }
 
+read_tfvars_string() {
+  local tfvars_path="$1"
+  local field_name="$2"
+  [[ -f "$tfvars_path" ]] || die "Missing tfvars file: $tfvars_path"
+  python3 - "$tfvars_path" "$field_name" <<'PY'
+import re
+import sys
+
+path, field = sys.argv[1:3]
+pattern = re.compile(rf"^\s*{re.escape(field)}\s*=\s*\"([^\"]+)\"\s*(?:#.*)?$")
+with open(path, encoding="utf-8") as handle:
+    for line in handle:
+        match = pattern.match(line)
+        if match:
+            print(match.group(1))
+            sys.exit(0)
+sys.exit(1)
+PY
+}
+
+detect_databricks_host_from_tfvars() {
+  local environment="$1"
+  read_tfvars_string "infra/env/$environment/document_intelligence.databricks.tfvars" "workspace_host"
+}
+
+needs_databricks_cli() {
+  [[ "$DATABRICKS_HOST_SOURCE" == "profile" || "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]
+}
+
+validate_databricks_host() {
+  local environment="$1"
+  local host="$2"
+  [[ -n "$host" ]] || die "Databricks host for '$environment' is empty."
+  python3 - "$environment" "$host" "$CHECK_DATABRICKS_HOST_DNS" <<'PY'
+import socket
+import sys
+from urllib.parse import urlparse
+
+environment, raw_url, check_dns = sys.argv[1:4]
+url = raw_url.strip()
+parsed = urlparse(url)
+
+def fail(message: str) -> None:
+    print(f"ERROR: invalid Databricks host for {environment}: {message}", file=sys.stderr)
+    sys.exit(1)
+
+if "${" in url:
+    fail(f"{url!r} still contains interpolation")
+if "0000000000000000" in url or "dbc-xxxx" in url or "dbc-yyyy" in url:
+    fail(f"{url!r} is a placeholder")
+if parsed.scheme != "https":
+    fail(f"{url!r} must use https://")
+if not parsed.hostname:
+    fail(f"{url!r} is missing a hostname")
+if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+    fail(f"{url!r} should be the workspace origin only, without path/query/fragment")
+if check_dns == "true":
+    try:
+        socket.getaddrinfo(parsed.hostname, 443)
+    except OSError as exc:
+        fail(f"{parsed.hostname!r} does not resolve from this machine: {exc}")
+PY
+}
+
+resolve_databricks_host() {
+  local environment="$1"
+  local explicit_host="$2"
+  local profile_name="$3"
+  local host="$explicit_host"
+  if [[ -z "$host" ]]; then
+    case "$DATABRICKS_HOST_SOURCE" in
+      tfvars) host="$(detect_databricks_host_from_tfvars "$environment")" ;;
+      profile) host="$(detect_databricks_host_from_profile "$profile_name")" ;;
+      *) die "--databricks-host-source must be 'tfvars' or 'profile'." ;;
+    esac
+  fi
+  validate_databricks_host "$environment" "$host" || return 1
+  printf '%s\n' "$host"
+}
+
 get_databricks_token_from_profile() {
   local profile_name="$1"
   local payload
@@ -394,10 +476,14 @@ run_preflight_checks() {
     if [[ -n "${STAGING_PROJECT:-}" ]]; then
       preflight_check "STAGING secrets listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud secrets list --project "$STAGING_PROJECT" --limit=1 || failures=$((failures + 1))
     fi
-    preflight_check "Databricks CLI available" databricks --version || failures=$((failures + 1))
-    if [[ "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]; then
+    if needs_databricks_cli; then
+      preflight_check "Databricks CLI available" databricks --version || failures=$((failures + 1))
+    fi
+    if [[ "$DATABRICKS_HOST_SOURCE" == "profile" || "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]; then
       preflight_check "Databricks dev profile auth env readable ($DATABRICKS_PROFILE_DEV)" databricks auth env --profile "$DATABRICKS_PROFILE_DEV" --output json || failures=$((failures + 1))
-      preflight_check "Databricks staging profile auth env readable ($DATABRICKS_PROFILE_STAGING)" databricks auth env --profile "$DATABRICKS_PROFILE_STAGING" --output json || failures=$((failures + 1))
+      if [[ -n "${STAGING_PROJECT:-}" || "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]; then
+        preflight_check "Databricks staging profile auth env readable ($DATABRICKS_PROFILE_STAGING)" databricks auth env --profile "$DATABRICKS_PROFILE_STAGING" --output json || failures=$((failures + 1))
+      fi
       preflight_check "Databricks prod profile auth env readable ($DATABRICKS_PROFILE_PROD)" databricks auth env --profile "$DATABRICKS_PROFILE_PROD" --output json || failures=$((failures + 1))
     fi
   fi
@@ -476,6 +562,8 @@ EOF
   databricks host dev:         $DATABRICKS_HOST_DEV
   databricks host staging:     $DATABRICKS_HOST_STAGING
   databricks host prod:        $DATABRICKS_HOST_PROD
+  databricks host source:      $DATABRICKS_HOST_SOURCE
+  databricks host DNS check:   $CHECK_DATABRICKS_HOST_DNS
   databricks token source:     $DATABRICKS_TOKEN_SOURCE
   databricks profile dev:      $DATABRICKS_PROFILE_DEV
   databricks profile staging:  $DATABRICKS_PROFILE_STAGING
@@ -513,6 +601,8 @@ SERVICE_ACCOUNT_PROD=""
 DATABRICKS_HOST_DEV=""
 DATABRICKS_HOST_STAGING=""
 DATABRICKS_HOST_PROD=""
+DATABRICKS_HOST_SOURCE="tfvars"
+CHECK_DATABRICKS_HOST_DNS="true"
 DATABRICKS_PROFILE_DEV="dev"
 DATABRICKS_PROFILE_STAGING="staging"
 DATABRICKS_PROFILE_PROD="prod"
@@ -544,6 +634,8 @@ while [[ $# -gt 0 ]]; do
     --databricks-host-dev) DATABRICKS_HOST_DEV="$2"; shift 2 ;;
     --databricks-host-staging) DATABRICKS_HOST_STAGING="$2"; shift 2 ;;
     --databricks-host-prod) DATABRICKS_HOST_PROD="$2"; shift 2 ;;
+    --databricks-host-source) DATABRICKS_HOST_SOURCE="$2"; shift 2 ;;
+    --skip-databricks-host-dns-check) CHECK_DATABRICKS_HOST_DNS="false"; shift ;;
     --databricks-profile-dev) DATABRICKS_PROFILE_DEV="$2"; shift 2 ;;
     --databricks-profile-staging) DATABRICKS_PROFILE_STAGING="$2"; shift 2 ;;
     --databricks-profile-prod) DATABRICKS_PROFILE_PROD="$2"; shift 2 ;;
@@ -564,6 +656,9 @@ done
 if [[ "$SYNC_COMPUTE_POLICY_IDS" == "true" && "$SYNC_SECRETS" != "true" ]]; then
   die "--sync-databricks-compute-policy-ids requires --sync-secrets"
 fi
+if [[ "$DATABRICKS_HOST_SOURCE" != "tfvars" && "$DATABRICKS_HOST_SOURCE" != "profile" ]]; then
+  die "--databricks-host-source must be 'tfvars' or 'profile'."
+fi
 
 require_cmd gh
 require_cmd gcloud
@@ -583,7 +678,21 @@ if [[ -z "$DEV_PROJECT" || -z "$PROD_PROJECT" ]]; then
   die "Both --dev-project and --prod-project are required (or use --interactive)."
 fi
 
+if [[ "$SYNC_SECRETS" == "true" ]]; then
+  require_cmd python3
+  if needs_databricks_cli; then
+    require_cmd databricks
+  fi
+  [[ "$DATABRICKS_TOKEN_SOURCE" == "gsm" || "$DATABRICKS_TOKEN_SOURCE" == "profile" ]] || die "--databricks-token-source must be 'gsm' or 'profile'."
+  DATABRICKS_HOST_DEV="$(resolve_databricks_host "dev" "$DATABRICKS_HOST_DEV" "$DATABRICKS_PROFILE_DEV")"
+  if [[ -n "$STAGING_PROJECT" || -n "$DATABRICKS_HOST_STAGING" || "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]; then
+    DATABRICKS_HOST_STAGING="$(resolve_databricks_host "staging" "$DATABRICKS_HOST_STAGING" "$DATABRICKS_PROFILE_STAGING")"
+  fi
+  DATABRICKS_HOST_PROD="$(resolve_databricks_host "prod" "$DATABRICKS_HOST_PROD" "$DATABRICKS_PROFILE_PROD")"
+fi
+
 if [[ "$PREFLIGHT_ONLY" == "true" ]]; then
+  print_plan
   run_preflight_checks
   exit 0
 fi
@@ -595,9 +704,6 @@ fi
 [[ -n "$LEGAL_SEARCH_API_SERVICE" ]] || LEGAL_SEARCH_API_SERVICE="$(detect_legal_search_api_service "$DEV_PROJECT" "$REGION")"
 
 if [[ "$SYNC_SECRETS" == "true" ]]; then
-  require_cmd databricks
-  require_cmd python3
-  [[ "$DATABRICKS_TOKEN_SOURCE" == "gsm" || "$DATABRICKS_TOKEN_SOURCE" == "profile" ]] || die "--databricks-token-source must be 'gsm' or 'profile'."
   [[ -n "$WIF_PROJECT" ]] || WIF_PROJECT="$DEV_PROJECT"
   [[ -n "$WIF_PROVIDER" ]] || WIF_PROVIDER="$(detect_wif_provider "$WIF_PROJECT" "$WIF_POOL_ID" "$WIF_PROVIDER_ID")"
   [[ -n "$SERVICE_ACCOUNT_DEV" ]] || SERVICE_ACCOUNT_DEV="$(detect_service_account "$DEV_PROJECT" "dev")"
@@ -605,9 +711,6 @@ if [[ "$SYNC_SECRETS" == "true" ]]; then
   if [[ -n "$STAGING_PROJECT" ]]; then
     [[ -n "$SERVICE_ACCOUNT_STAGING" ]] || SERVICE_ACCOUNT_STAGING="$(detect_service_account "$STAGING_PROJECT" "staging")"
   fi
-  [[ -n "$DATABRICKS_HOST_DEV" ]] || DATABRICKS_HOST_DEV="$(detect_databricks_host_from_profile "$DATABRICKS_PROFILE_DEV")"
-  [[ -n "$DATABRICKS_HOST_STAGING" ]] || DATABRICKS_HOST_STAGING="$(detect_databricks_host_from_profile "$DATABRICKS_PROFILE_STAGING")"
-  [[ -n "$DATABRICKS_HOST_PROD" ]] || DATABRICKS_HOST_PROD="$(detect_databricks_host_from_profile "$DATABRICKS_PROFILE_PROD")"
   if [[ "$DATABRICKS_TOKEN_SOURCE" == "gsm" || -n "$GSM_TOKEN_SECRET_DEV" || -n "$GSM_TOKEN_SECRET_PROD" ]]; then
     [[ -n "$GSM_TOKEN_SECRET_DEV" ]] || GSM_TOKEN_SECRET_DEV="$(detect_gsm_token_secret_name "$DEV_PROJECT" "dev")"
     [[ -n "$GSM_TOKEN_SECRET_PROD" ]] || GSM_TOKEN_SECRET_PROD="$(detect_gsm_token_secret_name "$PROD_PROJECT" "prod")"

@@ -53,6 +53,14 @@ Repository environments/variables/secrets can be provisioned via Terraform in [`
 
 For CLI-driven synchronization (discovery via `gcloud`/Databricks CLI and write via `gh`), use [`../../scripts/sync-github-cd-config.sh`](../../scripts/sync-github-cd-config.sh). It supports dry-run by default, optional secret sync via Google Secret Manager, optional Databricks PAT sourcing from local Databricks CLI profiles (`--databricks-token-source profile`) with Secret Manager rotation, auto-detection for common WIF/token naming patterns, GitHub environment **staging** (with `--staging-project`), optional **`--sync-databricks-compute-policy-ids`**, and an `--interactive` mode for account/project selection when gcloud context needs fixing. Run [`../../scripts/ensure-evidara-cli-auth.sh`](../../scripts/ensure-evidara-cli-auth.sh) first if you need guided **gh** / **gcloud** / **databricks** logins.
 
+For Databricks, keep the sync declarative by making the environment tfvars the host source of truth:
+
+- `infra/env/dev/document_intelligence.databricks.tfvars`
+- `infra/env/staging/document_intelligence.databricks.tfvars`
+- `infra/env/prod/document_intelligence.databricks.tfvars`
+
+`sync-github-cd-config.sh` reads `workspace_host` from those files by default, rejects placeholder values, and verifies DNS resolution before writing GitHub `DATABRICKS_HOST`. Use explicit `--databricks-host-*` flags only as an emergency override, or `--databricks-host-source profile` when the Databricks CLI profiles are the intended host source. The token remains secret material and should come from Secret Manager (`--databricks-token-source gsm`) or from Databricks CLI profiles during rotation (`--databricks-token-source profile`).
+
 Recommended first run:
 
 ```bash
@@ -77,6 +85,7 @@ scripts/sync-github-cd-config.sh \
   --wif-provider "projects/585502170445/locations/global/workloadIdentityPools/github/providers/evidara" \
   --service-account-dev "gha-deployer-dev@data-platform-dev-492214.iam.gserviceaccount.com" \
   --service-account-prod "gha-deployer-prod@data-platform-prod-492214.iam.gserviceaccount.com" \
+  --databricks-host-source tfvars \
   --databricks-profile-dev DEFAULT \
   --databricks-profile-prod DEFAULT \
   --databricks-token-source profile \

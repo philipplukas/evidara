@@ -64,6 +64,14 @@ This directory documents the first Databricks-oriented runtime packaging for `do
 
 4. **Bulk GitHub CD sync** (variables + `DATABRICKS_*` secrets from GSM or CLI profiles): `../scripts/sync-github-cd-config.sh --help`
 
+   The idempotent path is:
+
+   - declare the desired Databricks workspace origin in `../../infra/env/<env>/document_intelligence.databricks.tfvars` as `workspace_host`
+   - keep the token in Secret Manager or a Databricks CLI profile
+   - run the sync script in dry-run/preflight mode first, then rerun with `--apply`
+
+   The sync script reads `workspace_host` from tfvars by default, rejects placeholders, and checks DNS before writing the GitHub environment `DATABRICKS_HOST` secret. Use `--databricks-host-source profile` only when Databricks CLI profiles are deliberately the host source of truth.
+
 Typical commands from the `document-intelligence/` directory:
 
 ```bash

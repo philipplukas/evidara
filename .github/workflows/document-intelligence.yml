@@ -35,9 +35,7 @@ on:
 
 jobs:
   document-intelligence-check:
-    # This job bootstraps both Python and Node; keep it on GitHub-hosted Linux
-    # until the Hetzner K8s runner pools replace the legacy NixOS VM path.
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
 
     steps:
       - name: Checkout
@@ -60,7 +58,7 @@ jobs:
         run: bash scripts/check-document-intelligence.sh
 
   document-intelligence-runtime-check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
 
     steps:
       - name: Checkout

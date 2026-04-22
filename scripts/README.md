@@ -11,7 +11,7 @@ Operator-focused entry points (from repo root unless noted).
 | [`ensure-evidara-cli-auth.sh`](ensure-evidara-cli-auth.sh) | Interactive **gh**, **gcloud** (user + optional ADC), and **databricks** profile login before operator scripts. |
 | [`export-databricks-auth-env.sh`](export-databricks-auth-env.sh) | Prints `export DATABRICKS_HOST=…` / `DATABRICKS_TOKEN=…` from `databricks auth env` for a profile (`eval "$(… --profile dev)"`). |
 | [`sync-databricks-cluster-policy-github-secret.sh`](sync-databricks-cluster-policy-github-secret.sh) | `databricks cluster-policies list` + `gh secret set` for `DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID` (dry-run unless `--apply`). |
-| [`sync-github-cd-config.sh`](sync-github-cd-config.sh) | Syncs GitHub Actions variables/secrets from **gcloud** + **Databricks**; **staging** env, optional **`--sync-databricks-compute-policy-ids`**, `--databricks-token-source profile`. |
+| [`sync-github-cd-config.sh`](sync-github-cd-config.sh) | Syncs GitHub Actions variables/secrets from **gcloud** + **Databricks**; reads Databricks hosts from env tfvars by default, supports **staging**, optional **`--sync-databricks-compute-policy-ids`**, `--databricks-token-source profile`. |
 | [`smoke-evidara-cli.sh`](smoke-evidara-cli.sh) | Local/API `evidara` pings when `EVIDARA_CLI_SMOKE=1`. |
 | [`analyze_github_actions_queue.py`](analyze_github_actions_queue.py) | Summarize GitHub Actions **queue vs run** time via `gh` (`--csv`, `--per-job`, `--aggregate-jobs`). See [CI Actions duration metrics](../docs/runbooks/ci-actions-duration-metrics.md). |
 | [`validate_k8s_gitops_kustomize.sh`](validate_k8s_gitops_kustomize.sh) | Renders `k8s/gitops/{dev,staging,prod}` with `kubectl kustomize` (skips if `kubectl` missing locally; required in CI). |

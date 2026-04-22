@@ -26,10 +26,9 @@ See `scripts/analyze_github_actions_queue.py --help` for filters (`--repo`, `--b
 
 | Pool | Org variable | Typical jobs |
 |------|----------------|--------------|
-| Light | `LIGHT_RUNNER_RUNS_ON_JSON` | fmt, unit tests, npm `check`, Terraform fmt/plan when pointed here |
-| Heavy | `HEAVY_RUNNER_RUNS_ON_JSON` | Playwright / interaction-flow, e2e smokes, multi-arch image builds |
-| GitHub-hosted | `ubuntu-latest` | Remaining bridge jobs that still need GitHub-hosted Linux while the self-hosted bootstrap path is being proven. |
-| Light | `LIGHT_RUNNER_SCALE_SET` | **Release Readiness** (WIF + `gh` API). The workflow bootstraps GitHub CLI when it is not already present, so the light pool must allow `curl`, `sudo`, and apt package installation. **Dev-first orgs:** set **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** = **`dev`**, **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** = **`E2E Smoke Dev`**, and ensure GitHub **Environment `dev`** has the same OIDC secrets as E2E Smoke Dev — see [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md) §2.1 and [Runtime stack §7](runtime-stack.md#7-release-readiness-go-no-go-operation). |
+| Light | `LIGHT_RUNNER_SCALE_SET` | PR title, path detection, docs/contracts, runtime config checks, Cloud Run/Databricks deploy orchestration, Release Readiness (WIF + `gh` API). The light pool must allow `curl`, `sudo`, and apt package installation when workflows bootstrap missing tools. **Dev-first orgs:** set **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** = **`dev`**, **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** = **`E2E Smoke Dev`**, and ensure GitHub **Environment `dev`** has the same OIDC secrets as E2E Smoke Dev — see [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md) §2.1 and [Runtime stack §7](runtime-stack.md#7-release-readiness-go-no-go-operation). |
+| Heavy | `HEAVY_RUNNER_SCALE_SET` | Docker/image builds, fuller document-intelligence checks, Playwright / interaction-flow, e2e smokes. |
+| GitHub-hosted | `ubuntu-latest` | Emergency fallback only for jobs that cannot yet run on the self-hosted pools. |
 
 Current exception:
 
@@ -46,14 +45,12 @@ MacConfig owns the Hetzner Kubernetes cluster and the cluster-scoped runner plat
 
 ### Current GitHub-hosted bridge inventory
 
-These workflows intentionally use `ubuntu-latest` today because they rely on `actions/setup-node` and/or `actions/setup-python` and have not yet been moved behind the light/heavy pool variables:
+These workflows still intentionally use `ubuntu-latest` today because they rely on `actions/setup-node` and/or `actions/setup-python` and have not yet been moved behind the light/heavy pool variables:
 
 | Workflow | Job | Reason |
 |------|------|------|
 | `legal-search.yml` | `api`, `frontend`, `interaction-flow-evidence` | `setup-node` Node 22 |
-| `docs-and-contracts.yml` | `contract-validation` | `setup-python` + `setup-node` |
 | `platform-control.yml` | `check` | `setup-python` + `setup-node` |
-| `document-intelligence.yml` | `document-intelligence-check` | `setup-python` + `setup-node` |
 | `evidara-cli.yml` | `evidara-cli` | `setup-python` |
 | `evidara-cli-remote-smoke.yml` | `remote-smoke` | `setup-python` |
 | `scraping-qa.yml` | `scraping-qa` | `setup-python` |
