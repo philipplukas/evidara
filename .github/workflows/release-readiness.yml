@@ -284,6 +284,21 @@ jobs:
           import sys
 
           payload = json.loads(open("tmp/release-readiness/dlq-timeseries.json", "r", encoding="utf-8").read())
+          if "error" in payload:
+              error = payload["error"]
+              code = error.get("code", "unknown")
+              status = error.get("status", "unknown")
+              message = error.get("message", "unknown")
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+                  fh.write("dlq_max_depth=unknown\n")
+                  fh.write("dlq_subscription_count=unknown\n")
+              print(
+                  "DLQ Monitoring query failed: "
+                  f"code={code}, status={status}, message={message}",
+                  file=sys.stderr,
+              )
+              sys.exit(2)
+
           series = payload.get("timeSeries", [])
 
           max_depth = 0
