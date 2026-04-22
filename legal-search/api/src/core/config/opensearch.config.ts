@@ -21,5 +21,4 @@ export default registerAs('opensearch', () => ({
   citationsIndex: process.env.OPENSEARCH_INDEX_CITATIONS ?? 'citations',
   citationTargetsIndex: process.env.OPENSEARCH_INDEX_CITATION_TARGETS ?? 'citation-targets',
   projectionHistoryIndex: process.env.OPENSEARCH_INDEX_PROJECTION_HISTORY ?? 'projection-history',
-  citationTargetsIndex: process.env.OPENSEARCH_INDEX_CITATION_TARGETS ?? 'citation-targets',
 }));
