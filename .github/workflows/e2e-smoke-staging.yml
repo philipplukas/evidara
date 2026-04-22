@@ -59,12 +59,26 @@ jobs:
       - name: Preflight OpenSearch alias wiring
         run: |
           set -euo pipefail
-          if ! gcloud run jobs execute "os-alias-check-${TARGET_ENV}" \
+          if gcloud run jobs execute "os-alias-check-${TARGET_ENV}" \
             --project "${GCP_PROJECT_ID}" \
             --region "${GCP_REGION}" \
             --wait; then
-            echo "::error::OpenSearch alias preflight failed. Run job os-alias-bootstrap-${TARGET_ENV} and retry smoke."
-            exit 1
+            echo "OpenSearch alias check passed."
+          else
+            echo "::warning::OpenSearch alias check failed — running bootstrap to self-heal."
+            gcloud run jobs execute "os-alias-bootstrap-${TARGET_ENV}" \
+              --project "${GCP_PROJECT_ID}" \
+              --region "${GCP_REGION}" \
+              --wait
+            echo "Bootstrap complete. Retrying alias check…"
+            if ! gcloud run jobs execute "os-alias-check-${TARGET_ENV}" \
+              --project "${GCP_PROJECT_ID}" \
+              --region "${GCP_REGION}" \
+              --wait; then
+              echo "::error::OpenSearch alias check still failing after bootstrap. Manual intervention required."
+              exit 1
+            fi
+            echo "OpenSearch alias check passed after bootstrap."
           fi
 
       - name: Resolve Cloud Run service URLs

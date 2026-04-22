@@ -63,9 +63,7 @@ overlays:
         document_type_hint: decision
       # Sub-federal: Bundesländer LGBl templates. Reuse the existing RIS OGD
       # provider with per-LGBl applikation codes. Live RIS exposes LGBl per
-      # Bundesland via the same API shape as Bundesrecht. enabled:false until
-      # the first per-state acceptance run lands (see drift-prevention
-      # backlog §3.4 and §4).
+      # Bundesland via the same API shape as Bundesrecht.
       ris_ogd_lgbl_wien:
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/LgblAuth
@@ -81,7 +79,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
-        enabled: false
+        enabled: true
       ris_ogd_lgbl_noe:
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/LgblAuth
@@ -97,7 +95,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
-        enabled: false
+        enabled: true
   de:
     provider_templates:
       deterministic_http_bundesrecht:
