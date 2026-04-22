@@ -77,6 +77,12 @@ export type CitationTargetEntry = {
   jurisdiction?: string;
 };
 
+export type CitationTargetMatch = {
+  document_id: string;
+  title?: string;
+  document_type?: string;
+};
+
 export interface ProjectionRepository {
   hasHistoryEvent(eventId: string): Promise<boolean>;
   getLatestRevision(documentId: string): Promise<number | null>;
@@ -90,6 +96,7 @@ export interface ProjectionRepository {
   appendHistory(entry: ProjectionHistoryEntry): Promise<void>;
   queryHistory(query: ProjectionHistoryQuery): Promise<ProjectionHistoryPage>;
   getHistoryStats(): Promise<ProjectionHistoryStats>;
+  resolveCitationTargets(normalizedRefs: string[]): Promise<Map<string, CitationTargetMatch>>;
 }
 
 export type ProjectionHistoryQuery = {

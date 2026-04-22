@@ -9,6 +9,7 @@ const ENV_KEYS = [
   'OPENSEARCH_INDEX_CITATIONS',
   'OPENSEARCH_INDEX_CITATION_TARGETS',
   'OPENSEARCH_INDEX_PROJECTION_HISTORY',
+  'OPENSEARCH_INDEX_CITATION_TARGETS',
 ] as const;
 
 describe('opensearch.config', () => {
@@ -42,6 +43,7 @@ describe('opensearch.config', () => {
       citationsIndex: 'citations',
       citationTargetsIndex: 'citation-targets',
       projectionHistoryIndex: 'projection-history',
+      citationTargetsIndex: 'citation-targets',
     });
   });
 
@@ -53,6 +55,7 @@ describe('opensearch.config', () => {
     process.env.OPENSEARCH_INDEX_CITATIONS = 'citations-prod';
     process.env.OPENSEARCH_INDEX_CITATION_TARGETS = 'citation-targets-prod';
     process.env.OPENSEARCH_INDEX_PROJECTION_HISTORY = 'projection-history-prod';
+    process.env.OPENSEARCH_INDEX_CITATION_TARGETS = 'citation-targets-prod';
 
     const config = opensearchConfig();
 
@@ -64,6 +67,7 @@ describe('opensearch.config', () => {
       citationsIndex: 'citations-prod',
       citationTargetsIndex: 'citation-targets-prod',
       projectionHistoryIndex: 'projection-history-prod',
+      citationTargetsIndex: 'citation-targets-prod',
     });
   });
 

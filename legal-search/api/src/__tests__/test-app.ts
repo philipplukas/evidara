@@ -175,6 +175,7 @@ export async function createTestApp(overrides?: {
         ignoredDuplicate: 0,
         uniqueDocuments: 0,
       }),
+    resolveCitationTargets: vi.fn().mockResolvedValue(new Map()),
     ...overrides?.projectionsRepo,
   };
 
