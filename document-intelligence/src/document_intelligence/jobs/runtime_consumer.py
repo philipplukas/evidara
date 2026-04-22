@@ -24,11 +24,8 @@ from document_intelligence.events.publisher import (
 )
 from document_intelligence.ingest.loaders import GcsBundleLoader
 from document_intelligence.observability.event_logging import log_event
-from document_intelligence.persist.sinks import (
-    DeltaCanonicalSink,
-    InMemoryCanonicalSink,
-)
 from document_intelligence.pipeline import ProcessingPipeline
+from document_intelligence.processing_runtime import build_processing_pipeline
 
 LOGGER = logging.getLogger("document_intelligence.runtime_consumer")
 
@@ -76,18 +73,12 @@ def _start_health_server() -> None:
 
 def _build_pipeline(
     environment: Mapping[str, str],
-) -> tuple[ProcessingPipeline, Any]:
+) -> ProcessingPipeline:
     settings = RuntimeSettings.from_mapping(environment)
-    if settings.surface_uris is None:
-        sink = InMemoryCanonicalSink()
-    else:
-        sink = DeltaCanonicalSink(settings.surface_uris.to_delta_sink_config())
-    pipeline = ProcessingPipeline(
+    return build_processing_pipeline(
+        runtime_settings=settings,
         bundle_loader=GcsBundleLoader(),
-        sink=sink,
-        processing_version=settings.processing_version,
     )
-    return pipeline, sink
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -142,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     _start_health_server()
 
-    pipeline, _ = _build_pipeline(os.environ)
+    pipeline = _build_pipeline(os.environ)
     publisher = (
         None
         if args.dry_run_publish
