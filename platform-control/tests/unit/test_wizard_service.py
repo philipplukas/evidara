@@ -9,10 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from acquisition_core.providers import ProviderPlan, ProviderResource, ProviderStartResult
 from platform_control.config import get_settings
-from platform_control.domain import ReviewTaskStatus, WizardRunState
+from platform_control.domain import ReviewTaskStatus, RunStatus, WizardRunState
 from platform_control.errors import ConflictError, InvalidStateTransitionError
+from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.review_task import ReviewTask
+from platform_control.models.run import Run
+from platform_control.models.source import Source
+from platform_control.models.source_version import SourceVersion
 from platform_control.schemas.wizard import (
     ArgillaReviewSyncItem,
     ArgillaReviewSyncRequest,
@@ -21,6 +26,7 @@ from platform_control.schemas.wizard import (
 )
 from platform_control.services.argilla_enqueue_service import ArgillaEnqueueService
 from platform_control.services.orchestrator import InMemoryOrchestrator, TemporalOrchestrator
+from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.wizard_service import WizardService
 from platform_control.temporal.activities import (
     ReviewDrainActivities,
@@ -290,3 +296,148 @@ async def test_argilla_sync_is_idempotent(session) -> None:
     assert first.duplicates == 0
     assert second.accepted == 0
     assert second.duplicates == 1
+
+
+# ---------------------------------------------------------------------------
+# TAR-108: Provider dispatch from run_shard_crawl
+# ---------------------------------------------------------------------------
+
+
+class _FakeInlineProvider:
+    """Fake provider that returns inline resources without network access."""
+
+    provider_name = "fake_inline"
+    live_ready = True
+
+    async def start_run(self, source, source_version, run):
+        return ProviderStartResult(
+            provider=self.provider_name,
+            external_job_id=f"fake_{run.run_id}",
+            request_payload={"seed": "test"},
+            response_payload={"captured": 1},
+            inline_resources=[
+                ProviderResource(
+                    source_url="https://example.com/doc1",
+                    final_url="https://example.com/doc1",
+                    content_type="text/html",
+                    body="<html><body>Test law</body></html>",
+                    title="Test Law §1",
+                    http_status=200,
+                    discovery_depth=0,
+                    metadata={"source_url": "https://example.com/doc1"},
+                ),
+            ],
+        )
+
+    def plan(self, source, source_version):
+        return ProviderPlan(provider=self.provider_name)
+
+
+def _build_fake_registry() -> ProviderRegistry:
+    registry = ProviderRegistry()
+    registry.register(_FakeInlineProvider())
+    return registry
+
+
+async def _seed_source_fixtures(
+    session: AsyncSession,
+) -> tuple[str, str]:
+    """Create minimal jurisdiction → authority → source → source_version fixtures.
+
+    Returns (source_id, source_version_id).
+    """
+    jur = Jurisdiction(jurisdiction_id="jur_test", name="Test", slug="test")
+    session.add(jur)
+    auth = Authority(
+        authority_id="auth_test", jurisdiction_id="jur_test", name="Test Auth", slug="test-auth"
+    )
+    session.add(auth)
+    await session.flush()
+
+    source = Source(
+        name="Test Source",
+        jurisdiction_id="jur_test",
+        authority_id="auth_test",
+    )
+    session.add(source)
+    await session.flush()
+
+    sv = SourceVersion(
+        source_id=source.source_id,
+        version_label="v1",
+        acquisition_spec={"provider": "fake_inline", "seed_urls": ["https://example.com"]},
+    )
+    session.add(sv)
+    await session.flush()
+    return source.source_id, sv.source_version_id
+
+
+@pytest.mark.asyncio
+async def test_run_shard_crawl_dispatches_provider(session_maker) -> None:
+    """TAR-108: run_shard_crawl creates a Run and dispatches the provider."""
+    async with session_maker() as session:
+        source_id, sv_id = await _seed_source_fixtures(session)
+        await session.commit()
+
+    # Create wizard project with source refs in discovery_plan.
+    async with session_maker() as session:
+        service = WizardService(session, InMemoryOrchestrator())
+        project = await service.create_project(CreateWizardProjectRequest(name="TAR-108 test"))
+        await service.update_scope(
+            project.wizard_project_id,
+            {"domains": ["example.com"]},
+        )
+        await service.update_discovery_plan(
+            project.wizard_project_id,
+            {
+                "source_id": source_id,
+                "source_version_id": sv_id,
+            },
+        )
+        wizard_run = await service._get_latest_run_for_project(project.wizard_project_id)
+        wizard_run_id = wizard_run.wizard_run_id
+        await session.commit()
+
+    # Run the shard crawl activity directly (no Temporal worker needed).
+    shard_acts = ScopeShardActivities(
+        session_factory=session_maker,
+        provider_registry_factory=_build_fake_registry,
+    )
+    result = await shard_acts.run_shard_crawl(wizard_run_id, "default", None)
+
+    assert result["status"] == "completed", f"Unexpected result: {result}"
+    assert result["nodes_discovered"] >= 1
+    assert "run_id" in result
+
+    # Verify a Run record was persisted.
+    async with session_maker() as session:
+        run = await session.get(Run, result["run_id"])
+        assert run is not None
+        assert run.status is RunStatus.COMPLETED
+        assert run.captured_resources_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_run_shard_crawl_skips_without_source_ref(session_maker) -> None:
+    """run_shard_crawl returns skipped when discovery_plan has no source refs."""
+    async with session_maker() as session:
+        service = WizardService(session, InMemoryOrchestrator())
+        project = await service.create_project(CreateWizardProjectRequest(name="No refs"))
+        await service.update_scope(
+            project.wizard_project_id,
+            {"domains": ["example.com"]},
+        )
+        await service.update_discovery_plan(
+            project.wizard_project_id,
+            {"seed_urls": ["https://example.com"]},
+        )
+        wizard_run = await service._get_latest_run_for_project(project.wizard_project_id)
+        wizard_run_id = wizard_run.wizard_run_id
+        await session.commit()
+
+    shard_acts = ScopeShardActivities(
+        session_factory=session_maker,
+        provider_registry_factory=_build_fake_registry,
+    )
+    result = await shard_acts.run_shard_crawl(wizard_run_id, "default", None)
+    assert result["status"] == "skipped_no_source_ref"

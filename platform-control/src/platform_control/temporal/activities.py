@@ -1,19 +1,26 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio import activity
 
-from platform_control.domain import ReviewTaskStatus, WizardRunState
+from platform_control.domain import ReviewTaskStatus, RunMode, RunStatus, WizardRunState
 from platform_control.models.review_task import ReviewTask
+from platform_control.models.run import Run
+from platform_control.models.source import Source
+from platform_control.models.source_version import SourceVersion
 from platform_control.models.wizard_project import WizardProject
 from platform_control.models.wizard_run import WizardRun
 from platform_control.models.wizard_run_ledger import WizardRunLedger
 from platform_control.services.provider_registry import ProviderRegistry
+
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_shard_key(key: str) -> str:
@@ -100,6 +107,114 @@ class WizardStateActivities:
 
 
 # ---------------------------------------------------------------------------
+# Provider dispatch helper (TAR-108)
+# ---------------------------------------------------------------------------
+
+
+async def _dispatch_provider_run(
+    *,
+    session: AsyncSession,
+    provider_registry_factory: Callable[[], ProviderRegistry] | None,
+    source_id: str,
+    source_version_id: str,
+    scope_shard_key: str,
+    scope: dict[str, Any],
+    wizard_run_id: str,
+) -> dict[str, Any]:
+    """Create a Run, resolve the provider, dispatch, and return summary stats.
+
+    Reuses :class:`RunService` so inline-resource persistence, artifact-bundle
+    publishing, rate-limiting, and robots compliance all work identically to the
+    regular (non-wizard) run path.
+    """
+    from platform_control.services.run_service import RunService
+
+    source = await session.get(Source, source_id)
+    source_version = await session.get(SourceVersion, source_version_id)
+    if source is None or source_version is None:
+        return {
+            "status": "skipped_source_not_found",
+            "nodes_discovered": 0,
+            "records_accepted": 0,
+            "records_sent_to_review": 0,
+            "fatal_error_count": 0,
+        }
+
+    if provider_registry_factory is None:
+        return {
+            "status": "skipped_no_registry",
+            "nodes_discovered": 0,
+            "records_accepted": 0,
+            "records_sent_to_review": 0,
+            "fatal_error_count": 0,
+        }
+
+    registry = provider_registry_factory()
+
+    run_metadata: dict[str, Any] = {
+        "scope": {
+            "kind": scope.get("scope_kind", "full_source"),
+            "max_resources": scope.get("max_resources"),
+        },
+        "wizard_run_id": wizard_run_id,
+        "scope_shard_key": scope_shard_key,
+    }
+    run = Run(
+        source_id=source.source_id,
+        source_version_id=source_version.source_version_id,
+        mode=RunMode.PREVIEW,
+        status=RunStatus.PENDING,
+        run_metadata=run_metadata,
+    )
+    session.add(run)
+    await session.flush()
+
+    run_service = RunService(session, provider_registry=registry)
+    try:
+        pending_publications = await run_service._dispatch_run(source, source_version, run)
+    except Exception:
+        logger.exception(
+            "Provider dispatch failed for shard %s (wizard_run=%s)",
+            scope_shard_key,
+            wizard_run_id,
+        )
+        run.status = RunStatus.FAILED
+        run.failure_reason = "Provider dispatch raised an exception."
+        run.completed_at = datetime.now(UTC)
+        await session.commit()
+        return {
+            "status": "failed",
+            "run_id": run.run_id,
+            "nodes_discovered": 0,
+            "records_accepted": 0,
+            "records_sent_to_review": 0,
+            "fatal_error_count": 1,
+        }
+
+    await session.commit()
+    await session.refresh(run)
+
+    # Publish artifact-bundle events outside the DB transaction.
+    try:
+        await run_service._publish_pending_dispatch_events([pending_publications])
+    except Exception:
+        logger.warning(
+            "Post-dispatch event publishing failed for run %s (non-fatal)",
+            run.run_id,
+            exc_info=True,
+        )
+
+    return {
+        "status": run.status.value,
+        "run_id": run.run_id,
+        "nodes_discovered": run.captured_resources_count,
+        "records_accepted": run.captured_resources_count,
+        "records_sent_to_review": 0,
+        "fatal_error_count": 1 if run.status is RunStatus.FAILED else 0,
+    }
+
+
+# ---------------------------------------------------------------------------
 # ScopeShardActivities — per-shard discovery / extraction activities
 # ---------------------------------------------------------------------------
 
@@ -112,9 +227,9 @@ class ScopeShardActivities:
     and owns its own retry/circuit-breaker behaviour.
 
     ``session_factory`` must point to the same database as the rest of platform-control.
-    ``provider_registry_factory`` is the seam used by TAR-108 to dispatch the per-shard
-    provider run; tests inject a factory returning a registry of fake providers to exercise
-    the shard workflow offline.
+    ``provider_registry_factory`` returns a ``ProviderRegistry`` used to resolve and
+    dispatch the per-shard provider run.  Tests inject a factory returning a registry
+    of fake providers to exercise the shard workflow offline.
     """
 
     session_factory: async_sessionmaker[AsyncSession]
@@ -129,15 +244,18 @@ class ScopeShardActivities:
     ) -> dict:
         """Execute the crawl/discovery/extraction slice for one scope shard.
 
-        Reads the wizard run's project scope to determine the crawl configuration,
-        updates ``WizardRun.progress`` with per-shard stats, and returns a summary dict.
+        Reads the wizard run's project scope and discovery plan to determine the
+        crawl configuration, creates a ``Run`` record, dispatches the resolved
+        provider, persists inline resources, and returns a summary dict with real
+        acquisition statistics.
 
-        The actual provider dispatch (Firecrawl / DeterministicHTTP / RIS-OGD) is wired here;
-        today the implementation records progress and returns a stub summary.
-        Provider invocation will be added in the shard-dispatch follow-on (TAR-108).
+        The ``discovery_plan`` must contain ``source_id`` and ``source_version_id``
+        referencing an existing Source and approved SourceVersion.  When either is
+        missing the shard is skipped with ``status=skipped_no_source_ref``.
 
-        Returns an empty result dict when the wizard run is not found (e.g. in test scenarios
-        where a child workflow is started standalone without a corresponding DB record).
+        Returns an empty result dict when the wizard run is not found (e.g. in test
+        scenarios where a child workflow is started standalone without a
+        corresponding DB record).
         """
         async with self.session_factory() as session:
             wizard_run = await session.get(WizardRun, wizard_run_id)
@@ -150,10 +268,11 @@ class ScopeShardActivities:
 
             project = await session.get(WizardProject, wizard_run.wizard_project_id)
             scope = dict(project.scope if project else {})
+            discovery_plan = dict(project.discovery_plan if project else {})
 
+            # Mark shard as running.
             progress = dict(wizard_run.progress or {})
             shards_progress: dict = dict(progress.get("shards", {}))
-
             shard_entry = dict(shards_progress.get(scope_shard_key, {}))
             shard_entry["status"] = "running"
             shard_entry["started_at"] = datetime.now(UTC).isoformat()
@@ -164,14 +283,32 @@ class ScopeShardActivities:
             wizard_run.progress = progress
             await session.commit()
 
-            # TODO(TAR-108): dispatch actual provider crawl here using scope config.
-            # e.g.:  await _dispatch_provider_run(session, wizard_run, scope, scope_shard_key)
-            _ = scope  # consumed once provider dispatch is wired
+            # Resolve source + version from discovery plan (or scope fallback).
+            source_id = discovery_plan.get("source_id") or scope.get("source_id")
+            source_version_id = discovery_plan.get("source_version_id") or scope.get(
+                "source_version_id"
+            )
+            if not source_id or not source_version_id:
+                return {
+                    "wizard_run_id": wizard_run_id,
+                    "scope_shard_key": scope_shard_key,
+                    "status": "skipped_no_source_ref",
+                }
+
+            result = await _dispatch_provider_run(
+                session=session,
+                provider_registry_factory=self.provider_registry_factory,
+                source_id=str(source_id),
+                source_version_id=str(source_version_id),
+                scope_shard_key=scope_shard_key,
+                scope=scope,
+                wizard_run_id=wizard_run_id,
+            )
 
         return {
             "wizard_run_id": wizard_run_id,
             "scope_shard_key": scope_shard_key,
-            "status": "crawl_dispatched",
+            **result,
         }
 
     @activity.defn
