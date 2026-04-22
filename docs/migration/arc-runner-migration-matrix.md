@@ -20,6 +20,8 @@ These are the best first targets once the new light pool is healthy.
   This is the canonical smoke for `actions/setup-node` and `actions/setup-python`.
 - [`runner-pool-smoke.yml`](../../.github/workflows/runner-pool-smoke.yml)
   Keep this as the recurring validation entrypoint for both pools.
+- [`release-readiness.yml`](../../.github/workflows/release-readiness.yml)
+  Release evidence is lightweight control-plane work and should use the light pool once WIF is validated there.
 - [`document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
   `document-intelligence-runtime-check` already targets the light runner variable.
 - [`terraform.yml`](../../.github/workflows/terraform.yml)
