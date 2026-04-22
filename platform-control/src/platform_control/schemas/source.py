@@ -108,6 +108,13 @@ class RisOgdAcquisitionSpec(BaseAcquisitionSpec):
     max_pages: int = Field(default=50, ge=1, le=500)
 
 
+class LegifranceAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.LEGIFRANCE] = AcquisitionProvider.LEGIFRANCE
+    code_ids: list[str] = Field(default_factory=list)
+    max_articles: int = Field(default=100, ge=1, le=5000)
+    page_size: int = Field(default=25, ge=1, le=100)
+
+
 class EurLexSparqlAcquisitionSpec(BaseAcquisitionSpec):
     provider: Literal[AcquisitionProvider.EUR_LEX_SPARQL] = AcquisitionProvider.EUR_LEX_SPARQL
     seed_url: HttpUrl | None = None
@@ -129,6 +136,7 @@ AcquisitionSpec = Annotated[
     | DeterministicHttpAcquisitionSpec
     | FedlexSparqlAcquisitionSpec
     | RisOgdAcquisitionSpec
+    | LegifranceAcquisitionSpec
     | EurLexSparqlAcquisitionSpec,
     Field(discriminator="provider"),
 ]
