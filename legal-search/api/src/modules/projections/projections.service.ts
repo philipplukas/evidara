@@ -11,6 +11,7 @@ import type {
 import {
   type CitationProjection,
   type CitationTargetEntry,
+  type CitationTargetMatch,
   PROJECTION_REPOSITORY,
   type ProjectionHistoryEntry,
   type ProjectionHistoryPage,
@@ -69,7 +70,9 @@ export class ProjectionsService {
     // dedicated indices so document-detail views can display them and
     // citation resolution can link across documents.
     const sections = this.extractSections(event.payload.document_id, leanDocument);
-    const citations = this.extractCitations(event.payload.document_id, leanDocument);
+    const citations = await this.resolveCitations(
+      this.extractCitations(event.payload.document_id, leanDocument),
+    );
     const citationTargets = this.extractCitationTargets(projection);
 
     await Promise.all([
@@ -629,6 +632,33 @@ export class ProjectionsService {
     }
 
     return targets;
+  }
+
+  async resolveCitations(citations: CitationProjection[]): Promise<CitationProjection[]> {
+    const resolvable = citations.filter((c) => c.normalized_reference && !c.resolved);
+    if (resolvable.length === 0) return citations;
+
+    const refs = [...new Set(resolvable.map((c) => c.normalized_reference!))];
+    let resolved: Map<string, CitationTargetMatch>;
+    try {
+      resolved = await this.repository.resolveCitationTargets(refs);
+    } catch {
+      this.logger.warn('citation_resolution_failed_fallback_unresolved');
+      return citations;
+    }
+    if (resolved.size === 0) return citations;
+
+    return citations.map((c) => {
+      if (!c.normalized_reference || c.resolved) return c;
+      const match = resolved.get(c.normalized_reference);
+      if (!match) return c;
+      return {
+        ...c,
+        target_document_id: match.document_id,
+        target_title: match.title,
+        resolved: true,
+      };
+    });
   }
 
   private async appendHistory(

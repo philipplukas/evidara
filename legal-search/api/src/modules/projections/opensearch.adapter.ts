@@ -5,6 +5,7 @@ import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type {
   CitationProjection,
   CitationTargetEntry,
+  CitationTargetMatch,
   ProjectionHistoryEntry,
   ProjectionHistoryPage,
   ProjectionHistoryQuery,
@@ -341,5 +342,61 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
         uniqueDocuments: 0,
       };
     }
+  }
+
+  async resolveCitationTargets(
+    normalizedRefs: string[],
+  ): Promise<Map<string, CitationTargetMatch>> {
+    const result = new Map<string, CitationTargetMatch>();
+    if (normalizedRefs.length === 0) return result;
+
+    const shouldClauses = normalizedRefs.map((ref) => {
+      const colonIdx = ref.indexOf(':');
+      const identifierType = colonIdx > 0 ? ref.slice(0, colonIdx) : ref;
+      const identifierValue = colonIdx > 0 ? ref.slice(colonIdx + 1) : '';
+      return {
+        bool: {
+          filter: [
+            { term: { 'identifier_type.keyword': identifierType } },
+            { term: { 'identifier_value.keyword': identifierValue } },
+          ],
+        },
+      };
+    });
+
+    try {
+      const response = await this.client.search({
+        index: this.indexCitationTargets,
+        body: {
+          size: normalizedRefs.length,
+          query: {
+            bool: { should: shouldClauses, minimum_should_match: 1 },
+          },
+        },
+      });
+
+      const hits = (response.body.hits?.hits ?? []) as Array<{
+        _source: Record<string, unknown>;
+      }>;
+
+      for (const hit of hits) {
+        const src = hit._source;
+        const idType = src.identifier_type as string | undefined;
+        const idValue = src.identifier_value as string | undefined;
+        if (!idType || idValue === undefined) continue;
+        const normalizedRef = `${idType}:${idValue}`;
+        if (!normalizedRefs.includes(normalizedRef)) continue;
+
+        result.set(normalizedRef, {
+          document_id: src.document_id as string,
+          title: src.title as string | undefined,
+          document_type: src.document_type as string | undefined,
+        });
+      }
+    } catch (err) {
+      this.logger.warn('Failed to resolve citation targets', err as Error);
+    }
+
+    return result;
   }
 }

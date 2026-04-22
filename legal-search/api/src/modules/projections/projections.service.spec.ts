@@ -27,6 +27,7 @@ function createRepositoryMock(): ProjectionRepository {
       ignoredDuplicate: 0,
       uniqueDocuments: 0,
     }),
+    resolveCitationTargets: vi.fn().mockResolvedValue(new Map()),
   };
 }
 

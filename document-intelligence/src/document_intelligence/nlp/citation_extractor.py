@@ -480,3 +480,53 @@ def extract_citations(text: str) -> list[Citation]:
             unique.append(c)
 
     return sorted(unique, key=lambda c: c.start)
+
+
+def normalize_citation(citation: Citation) -> str | None:
+    """Return a canonical lookup key for deterministic and semi-deterministic citations.
+
+    Returns None for fuzzy citation types that need search-based resolution.
+    Key format: {type}:{value} matching citation-targets index entries.
+    """
+    ct = citation.citation_type
+    meta = citation.metadata
+
+    # Deterministic identifiers
+    if ct == "sr" and "sr_number" in meta:
+        return f"sr:{meta['sr_number']}"
+    if ct == "eu_celex" and "celex" in meta:
+        return f"celex:{meta['celex']}"
+    if ct in ("eu_ecli", "de_ecli", "fr_ecli", "it_ecli") and "ecli" in meta:
+        return f"ecli:{meta['ecli']}"
+    if ct == "de_bverfg_docket":
+        senate = meta.get("senate", "")
+        ptype = meta.get("proceeding_type", "")
+        ordinal = meta.get("ordinal", "")
+        year = meta.get("year", "")
+        if senate and ptype and ordinal and year:
+            return f"de_docket:{senate} {ptype} {ordinal}/{year}"
+
+    # Semi-deterministic (text form -> deterministic key)
+    if ct == "eu_regulation":
+        m = re.search(r"(\d{4})/(\d{1,4})", citation.text)
+        if m:
+            return f"celex:3{m.group(1)}R{m.group(2).zfill(4)}"
+    if ct == "eu_directive":
+        m = re.search(r"(\d{4})/(\d{1,4})", citation.text)
+        if m:
+            return f"celex:3{m.group(1)}L{m.group(2).zfill(4)}"
+    if ct == "de_paragraph" and "statute" in meta:
+        return f"de_statute:{meta['statute']}"
+    if ct == "fr_pourvoi" and "number" in meta:
+        return f"fr_pourvoi:{meta['number']}"
+    if ct == "fr_conseil_etat" and "number" in meta:
+        return f"fr_ce:{meta['number']}"
+    if ct == "it_cassazione" and "number" in meta and "year" in meta:
+        return f"it_cass:{meta['number']}/{meta['year']}"
+    if ct == "it_consiglio_stato" and "number" in meta and "year" in meta:
+        return f"it_cds:{meta['number']}/{meta['year']}"
+    if ct == "it_codice_article" and "codice" in meta:
+        return f"it_codice:{meta['codice'].lower().replace(' ', '')}"
+
+    # Fuzzy -- needs search-based resolution
+    return None

@@ -31,7 +31,7 @@ from document_intelligence.extractors.metadata import (
 )
 from document_intelligence.ingest.docling_adapter import normalize_with_docling
 from document_intelligence.ingest.loaders import BundleLoader, DispatchingBundleLoader
-from document_intelligence.nlp.citation_extractor import extract_citations
+from document_intelligence.nlp.citation_extractor import extract_citations, normalize_citation
 from document_intelligence.nlp.spacy_pipeline import enrich_with_spacy
 from document_intelligence.normalize.html import (
     normalize_html_document,
@@ -199,7 +199,14 @@ class ProcessingPipeline:
         # Citation extraction
         citations = extract_citations(document.body_text or document.full_text)
         if citations:
-            document.extensions["citations"] = [c.to_dict() for c in citations]
+            citation_dicts = []
+            for c in citations:
+                d = c.to_dict()
+                normalized = normalize_citation(c)
+                if normalized:
+                    d["normalized_reference"] = normalized
+                citation_dicts.append(d)
+            document.extensions["citations"] = citation_dicts
 
         manifest = _build_processing_manifest(
             manifest=selected_bundle.manifest,
@@ -608,7 +615,14 @@ def _build_sections(
         section_metadata = dict(candidate.metadata)
         section_citations = extract_citations(candidate.content)
         if section_citations:
-            section_metadata["citations"] = [c.to_dict() for c in section_citations]
+            section_citation_dicts = []
+            for c in section_citations:
+                d = c.to_dict()
+                normalized = normalize_citation(c)
+                if normalized:
+                    d["normalized_reference"] = normalized
+                section_citation_dicts.append(d)
+            section_metadata["citations"] = section_citation_dicts
         sections.append(
             Section(
                 section_id=stable_prefixed_id("sec", document_id, str(document_revision), str(ordinal)),

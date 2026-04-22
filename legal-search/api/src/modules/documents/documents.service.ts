@@ -49,4 +49,8 @@ export class DocumentsService {
   async getSections(documentId: string) {
     return this.repository.getSections(documentId);
   }
+
+  async getCitedBy(documentId: string) {
+    return this.repository.getCitedBy(documentId);
+  }
 }
