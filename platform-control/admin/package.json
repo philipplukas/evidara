@@ -6,10 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "biome check src/",
-    "format": "biome check --write src/",
+    "lint": "biome check src/ e2e/ playwright.config.ts",
+    "format": "biome check --write src/ e2e/ playwright.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:browsers": "playwright install chromium",
+    "e2e:headed": "playwright test --headed",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run test"
   },
@@ -32,6 +35,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.9",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.8.1",
     "@types/react": "^19.2.2",

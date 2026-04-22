@@ -84,7 +84,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
       {/* Header row (spans the main-content column on desktop) */}
       <div
         style={{ gridArea: "header" }}
-        className="relative flex items-stretch border-b border-white/10"
+        className="relative z-20 flex items-stretch border-b border-white/10"
       >
         {/* Mobile hamburger — hidden on md+. Sits inside the header so the
             header still spans full width on narrow viewports. */}
