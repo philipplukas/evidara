@@ -82,9 +82,10 @@ databricks bundle deploy -t prod
 databricks bundle run -t dev document_intelligence_process_bundle --params event_path=/Workspace/...
 ```
 
+Bundle authentication comes from `DATABRICKS_HOST` and `DATABRICKS_TOKEN`
+(`export-databricks-auth-env.sh` locally, GitHub Environment secrets in CI).
 The checked-in targets mirror the tracked Terraform env files for:
 
-- `workspace_host`
 - `surfaces_root_uri`
 
 That keeps the bundle and Unity Catalog stack aligned for `dev`, `staging`, and `prod`.

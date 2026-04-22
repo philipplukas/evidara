@@ -122,14 +122,11 @@ class DatabricksBundleConfigTests(unittest.TestCase):
 
                 target = bundle_config["targets"][environment]
                 self.assertEqual(
-                    target["variables"]["workspace_host"],
-                    _read_tfvars_string(tfvars_body, "workspace_host"),
-                )
-                self.assertEqual(
                     target["variables"]["surfaces_root_uri"],
                     _read_tfvars_string(tfvars_body, "external_location_url"),
                 )
-                self.assertEqual(target["workspace"]["host"], "${var.workspace_host}")
+                self.assertNotIn("workspace_host", target["variables"])
+                self.assertNotIn("host", target["workspace"])
 
 
 def _read_tfvars_string(tfvars_body: str, field_name: str) -> str:
