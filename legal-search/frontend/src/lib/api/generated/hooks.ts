@@ -13,7 +13,7 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.3.3
+ * OpenAPI spec version: 0.3.4
  */
 import {
   useQuery
@@ -31,6 +31,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CitedByResponse,
   DetailView,
   GetDocumentSections200,
   SearchContextView,
@@ -412,6 +413,99 @@ export function useGetDocumentSections<TData = Awaited<ReturnType<typeof getDocu
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetDocumentSectionsQueryOptions(documentId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+/**
+ * @summary Get reverse citations for a document
+ */
+export const getDocumentCitedBy = (
+    documentId: string,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<CitedByResponse>(
+      {url: `/v1/documents/${documentId}/cited_by`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetDocumentCitedByQueryKey = (documentId?: string,) => {
+    return [
+    `/v1/documents/${documentId}/cited_by`
+    ] as const;
+    }
+
+    
+export const getGetDocumentCitedByQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentCitedBy>>, TError = void>(documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentCitedBy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDocumentCitedByQueryKey(documentId);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentCitedBy>>> = ({ signal }) => getDocumentCitedBy(documentId, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(documentId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDocumentCitedBy>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDocumentCitedByQueryResult = NonNullable<Awaited<ReturnType<typeof getDocumentCitedBy>>>
+export type GetDocumentCitedByQueryError = void
+
+
+export function useGetDocumentCitedBy<TData = Awaited<ReturnType<typeof getDocumentCitedBy>>, TError = void>(
+ documentId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentCitedBy>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDocumentCitedBy>>,
+          TError,
+          Awaited<ReturnType<typeof getDocumentCitedBy>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDocumentCitedBy<TData = Awaited<ReturnType<typeof getDocumentCitedBy>>, TError = void>(
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentCitedBy>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDocumentCitedBy>>,
+          TError,
+          Awaited<ReturnType<typeof getDocumentCitedBy>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDocumentCitedBy<TData = Awaited<ReturnType<typeof getDocumentCitedBy>>, TError = void>(
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentCitedBy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get reverse citations for a document
+ */
+
+export function useGetDocumentCitedBy<TData = Awaited<ReturnType<typeof getDocumentCitedBy>>, TError = void>(
+ documentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentCitedBy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDocumentCitedByQueryOptions(documentId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

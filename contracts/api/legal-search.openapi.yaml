@@ -12,7 +12,7 @@ info:
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
     Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
-  version: 0.3.3
+  version: 0.3.4
   contact:
     name: Evidara Team
   license:
@@ -191,6 +191,27 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/SectionSummary"
+        "404":
+          description: Document not found
+
+  /v1/documents/{document_id}/cited_by:
+    get:
+      operationId: getDocumentCitedBy
+      summary: Get reverse citations for a document
+      tags: [documents, agent-discovery]
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Citations from other documents that resolve to this document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CitedByResponse"
         "404":
           description: Document not found
 
@@ -538,6 +559,43 @@ components:
           type: string
         href:
           type: string
+
+    CitedByResponse:
+      type: object
+      required: [data, total]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CitationLink"
+          default: []
+        total:
+          type: integer
+
+    CitationLink:
+      type: object
+      required: [citation_id, source_document_id, citation_text, resolved]
+      properties:
+        citation_id:
+          type: string
+        source_document_id:
+          type: string
+        source_section_id:
+          type: string
+        target_document_id:
+          type: string
+        target_title:
+          type: string
+        target_subtitle:
+          type: string
+        target_document_type:
+          type: string
+        citation_text:
+          type: string
+        citation_type:
+          type: string
+        resolved:
+          type: boolean
 
     Annotation:
       type: object

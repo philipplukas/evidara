@@ -16,14 +16,15 @@ Document body reads use the Document Service (`contracts/api/document-intelligen
  * OpenAPI spec version: 0.3.4
  */
 
-export type FilterFacetViewType = typeof FilterFacetViewType[keyof typeof FilterFacetViewType];
-
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const FilterFacetViewType = {
-  checkbox: 'checkbox',
-  chip: 'chip',
-  dropdown: 'dropdown',
-  date: 'date',
-  toggle: 'toggle',
-} as const;
+export interface CitationLink {
+  citation_id: string;
+  source_document_id: string;
+  source_section_id?: string;
+  target_document_id?: string;
+  target_title?: string;
+  target_subtitle?: string;
+  target_document_type?: string;
+  citation_text: string;
+  citation_type?: string;
+  resolved: boolean;
+}

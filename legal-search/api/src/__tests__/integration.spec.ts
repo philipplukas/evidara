@@ -204,6 +204,33 @@ describe('document detail contract (ADR-0011)', () => {
     expect(res.body.references[0].items[0].title).toBe('BGE 144 III 264');
   });
 
+  it('reverse citations return data and total', async () => {
+    (documentsRepo.getCitedBy as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      {
+        citation_id: 'cit_reverse_001',
+        source_document_id: 'doc_002',
+        target_document_id: 'doc_001',
+        target_title: 'Obligationenrecht',
+        citation_text: 'Art. 716a OR',
+        citation_type: 'statute_reference',
+        resolved: true,
+      },
+    ]);
+
+    const res = await supertest(app.getHttpServer())
+      .get('/v1/documents/doc_001/cited_by')
+      .expect(200);
+
+    expect(res.body.total).toBe(1);
+    expect(res.body.data[0]).toMatchObject({
+      citation_id: 'cit_reverse_001',
+      source_document_id: 'doc_002',
+      target_document_id: 'doc_001',
+      citation_text: 'Art. 716a OR',
+      resolved: true,
+    });
+  });
+
   it('breadcrumbs are split from structural_path', async () => {
     const res = await supertest(app.getHttpServer()).get('/v1/documents/doc_001').expect(200);
 

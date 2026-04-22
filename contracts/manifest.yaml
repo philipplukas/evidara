@@ -1,5 +1,5 @@
-version: "1.5.2"
-last_reviewed: "2026-04-17"
+version: "1.6.0"
+last_reviewed: "2026-04-22"
 owner: "Platform Team"
 
 mvp_flow:
@@ -35,10 +35,11 @@ apis:
     version: "0.1.0"
   legal_search:
     file: "contracts/api/legal-search.openapi.yaml"
-    version: "0.3.3"
+    version: "0.3.4"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"
+      - "/v1/documents/{document_id}/cited_by"
       - "/v1/projections/events/history"
 
 events:

@@ -13,9 +13,10 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.3.3
+ * OpenAPI spec version: 0.3.4
  */
 import type {
+  CitedByResponse,
   DetailView,
   GetDocumentSections200,
   SearchContextView,
@@ -200,6 +201,49 @@ export const getGetDocumentSectionsUrl = (documentId: string,) => {
 export const getDocumentSections = async (documentId: string, options?: RequestInit): Promise<getDocumentSectionsResponse> => {
   
   return customFetch<getDocumentSectionsResponse>(getGetDocumentSectionsUrl(documentId),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+/**
+ * @summary Get reverse citations for a document
+ */
+export type getDocumentCitedByResponse200 = {
+  data: CitedByResponse
+  status: 200
+}
+
+export type getDocumentCitedByResponse404 = {
+  data: void
+  status: 404
+}
+    
+export type getDocumentCitedByResponseSuccess = (getDocumentCitedByResponse200) & {
+  headers: Headers;
+};
+export type getDocumentCitedByResponseError = (getDocumentCitedByResponse404) & {
+  headers: Headers;
+};
+
+export type getDocumentCitedByResponse = (getDocumentCitedByResponseSuccess | getDocumentCitedByResponseError)
+
+export const getGetDocumentCitedByUrl = (documentId: string,) => {
+
+
+  
+
+  return `/v1/documents/${documentId}/cited_by`
+}
+
+export const getDocumentCitedBy = async (documentId: string, options?: RequestInit): Promise<getDocumentCitedByResponse> => {
+  
+  return customFetch<getDocumentCitedByResponse>(getGetDocumentCitedByUrl(documentId),
   {      
     ...options,
     method: 'GET'
