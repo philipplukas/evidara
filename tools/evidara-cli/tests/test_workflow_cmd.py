@@ -6,7 +6,7 @@ import pytest
 import typer
 
 from evidara_cli.envelope import build_envelope, evidence_assertion, evidence_count, evidence_http
-from evidara_cli.main import workflow_mvp_acceptance
+from evidara_cli.main import _detail_checks, workflow_mvp_acceptance
 from evidara_cli.proposal import SourceSpecProposal
 from evidara_cli.workflow_cmd import (
     run_evidence,
@@ -46,7 +46,7 @@ def test_workflow_mvp_acceptance_emits_summary(
             "id": "doc_123",
             "title": "Example title",
             "subtitle": "Example subtitle",
-            "metadata": [],
+            "metadataRows": [],
             "tabs": [],
         },
     ]
@@ -59,8 +59,9 @@ def test_workflow_mvp_acceptance_emits_summary(
     assert payload["workflow"] == "mvp-acceptance"
     assert payload["evidence_pack_version"] == "tar-85-2026-04-11"
     assert payload["scenario_1"]["platform_control_health_http_code"] == 200
-    assert payload["scenario_2"]["queries"][0]["query"] == "art 754"
+    assert payload["scenario_2"]["queries"][0]["query"] == "Bundesverfassung"
     assert payload["scenario_3"]["document_id"] == "doc_123"
+    assert payload["scenario_3"]["checks"]["metadata_is_array"] is True
     assert payload["scenario_3"]["checks"]["subtitle_present"] is True
     assert payload["scenario_4"]["admin_ui_sources_http_code"] == 200
 
@@ -83,10 +84,10 @@ def test_workflow_mvp_acceptance_exits_when_detail_cannot_be_resolved(
 ) -> None:
     request_status_mock.side_effect = [200, 200, 200, 200, 200, 200]
     request_json_mock.side_effect = [
-        {"totalResults": 13, "results": []},
-        {"totalResults": 13, "results": []},
-        {"totalResults": 13, "results": []},
-        {"totalResults": 13, "results": []},
+        {"totalResults": 0, "results": []},
+        {"totalResults": 0, "results": []},
+        {"totalResults": 0, "results": []},
+        {"totalResults": 0, "results": []},
     ]
 
     with pytest.raises(typer.Exit) as exc_info:
@@ -96,8 +97,37 @@ def test_workflow_mvp_acceptance_exits_when_detail_cannot_be_resolved(
     emit_mock.assert_called_once()
     payload = emit_mock.call_args.args[0]
     assert payload["ok"] is False
+    assert payload["scenario_2"]["queries"][0]["total_results"] == 0
     assert payload["scenario_3"]["document_id"] is None
     assert payload["scenario_3"]["document_http_code"] is None
+
+
+def test_detail_checks_accepts_metadata_rows_shape():
+    payload = {
+        "id": "doc_123",
+        "title": "Example title",
+        "subtitle": "Example subtitle",
+        "metadataRows": [],
+        "tabs": [],
+    }
+
+    checks = _detail_checks(payload, document_id="doc_123")
+
+    assert checks["metadata_is_array"] is True
+
+
+def test_detail_checks_accepts_legacy_metadata_shape():
+    payload = {
+        "id": "doc_123",
+        "title": "Example title",
+        "subtitle": "Example subtitle",
+        "metadata": [],
+        "tabs": [],
+    }
+
+    checks = _detail_checks(payload, document_id="doc_123")
+
+    assert checks["metadata_is_array"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -364,7 +394,7 @@ def test_search_inspect_unreachable(_ls_base, _req_status, emit_mock):
 @patch("evidara_cli.workflow_cmd.legal_search_base_url", return_value="http://ls.test")
 def test_search_verify_passes(_ls_base, req_json_mock, emit_mock):
     req_json_mock.return_value = {"totalResults": 5, "results": []}
-    search_verify(queries=["art 754"], min_results=1, human=False, correlation_id=None)
+    search_verify(queries=["Bundesverfassung"], min_results=1, human=False, correlation_id=None)
     payload = emit_mock.call_args.args[0]
     assert payload["ok"] is True
     assert payload["step"] == "search.verify"

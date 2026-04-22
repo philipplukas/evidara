@@ -138,7 +138,7 @@ Fresh **remote** MVP acceptance against **dev** Cloud Run (or staging if operate
 ### Tasks
 - [ ] Env URLs per `docs/setup/environment-strategy.md` (dev-first).
 - [ ] Mint tokens per `docs/setup/gcp-local-cloud-run-auth.md` / `scripts/mint-cloud-run-tokens.sh`.
-- [ ] `cd tools/evidara-cli && uv run evidara workflow mvp-acceptance --json` (or `--human` + save stdout).
+- [ ] `cd tools/evidara-cli && uv run evidara workflow mvp-acceptance` (or `--human` + save stdout).
 - [ ] Confirm JSON includes `evidence_pack_version`.
 - [ ] Attach output to this issue; link from TAR-69 / memo §2.
 
