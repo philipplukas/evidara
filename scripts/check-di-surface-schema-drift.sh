@@ -150,6 +150,10 @@ def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, capture_output=True, text=True, check=False)
 
 
+def batched(items: list[str], size: int) -> list[list[str]]:
+    return [items[index : index + size] for index in range(0, len(items), size)]
+
+
 def list_delta_logs(surface_name: str) -> list[str]:
     uri = f"{surfaces_root_uri}/{surface_name}/_delta_log/*.json"
     proc = _run(["gcloud", "storage", "ls", uri, "--project", project_id])
@@ -163,11 +167,16 @@ def list_delta_logs(surface_name: str) -> list[str]:
 
 
 def extract_latest_metadata_schema(log_paths: list[str]) -> str | None:
-    for path in log_paths:
-        proc = _run(["gcloud", "storage", "cat", path, "--project", project_id])
+    # Delta metadata actions are sparse after table creation. Batch reads keep
+    # this preflight fast when dev surfaces have hundreds of append commits.
+    for chunk in batched(log_paths, 64):
+        proc = _run(["gcloud", "storage", "cat", *chunk, "--project", project_id])
         if proc.returncode != 0:
+            first = chunk[0]
+            last = chunk[-1]
             raise RuntimeError(
-                f"Failed to read Delta log {path}: {proc.stderr.strip() or proc.stdout.strip()}"
+                f"Failed to read Delta logs {first}..{last}: "
+                f"{proc.stderr.strip() or proc.stdout.strip()}"
             )
         for raw_line in proc.stdout.splitlines():
             line = raw_line.strip()
