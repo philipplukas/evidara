@@ -21,7 +21,7 @@ import type { RunRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DetailGrid, FieldCell, Pill } from "../../ui/primitives";
 import { runModeToLevel, runRecordStatusToLevel } from "../shared/StatusBadge";
-import { PromoteToProductionButton } from "./RunActions";
+import { canPromoteRunToProduction, PromoteToProductionButton } from "./RunActions";
 import RunDetailSectionsV2 from "./RunDetailSectionsV2";
 import { buildRunDecisionSupport } from "./RunShow";
 
@@ -95,7 +95,7 @@ export default function RunShowV2() {
           </Pill>
           <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
         </div>
-        {run.status === "completed" && run.mode === "preview" ? (
+        {canPromoteRunToProduction(run) ? (
           <RecordContextProvider value={run}>
             <PromoteToProductionButton size="medium" variant="contained" />
           </RecordContextProvider>

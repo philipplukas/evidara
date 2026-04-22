@@ -75,11 +75,10 @@ export function PromoteToProductionButton({
   const run = useRecordContext<RunRecord>();
   const dataProvider = useDataProvider();
   const notify = useNotify();
-  const refresh = useRefresh();
   const redirect = useRedirect();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!run || run.status !== "completed" || run.mode !== "preview") {
+  if (!run || !canPromoteRunToProduction(run)) {
     return null;
   }
 
@@ -117,9 +116,13 @@ export function PromoteToProductionButton({
       onConfirm={promoteRun}
       disabled={isSubmitting}
     >
-      {isSubmitting ? "Promoting…" : "Promote to Production"}
+      {isSubmitting ? "Promoting..." : "Promote to Production"}
     </ConfirmButton>
   );
+}
+
+export function canPromoteRunToProduction(run: RunRecord): boolean {
+  return run.status === "completed" && run.mode === "preview";
 }
 
 export function RunActionStack() {
@@ -130,7 +133,7 @@ export function RunActionStack() {
   }
 
   const canCancel = ["pending", "running"].includes(run.status);
-  const canPromote = run.status === "completed" && run.mode === "preview";
+  const canPromote = canPromoteRunToProduction(run);
   const actionCopy =
     run.status === "pending"
       ? {
