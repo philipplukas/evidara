@@ -23,10 +23,12 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     # templates referencing them stay `enabled: false` until an operator
     # captures acceptance-run evidence for each jurisdiction.
     registry.register(EurLexSparqlProvider())
-    registry.register(LegifranceProvider(
-        client_id=settings.legifrance_client_id,
-        client_secret=settings.legifrance_client_secret,
-    ))
+    registry.register(
+        LegifranceProvider(
+            client_id=settings.legifrance_client_id,
+            client_secret=settings.legifrance_client_secret,
+        )
+    )
     registry.register(BundeslandHttpProvider())
     registry.register(RegioneHttpProvider())
     # Fixture-backed replay for SHADOW execution mode.

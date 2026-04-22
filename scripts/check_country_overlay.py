@@ -63,6 +63,7 @@ _SUPPORTED_PROVIDERS = {
     "eur_lex_sparql",
     "bundesland_http",
     "regione_http",
+    "legifrance",
 }
 
 
@@ -140,6 +141,13 @@ def _validate_template(
                 f"Overlay '{overlay_id}' template '{template_id}' regione_http requires seed_url or seed_urls."
             )
         return errors
+
+    if provider == "legifrance":
+        if not _has_nonempty_str_list(payload.get("code_ids")):
+            return [
+                f"Overlay '{overlay_id}' template '{template_id}' legifrance requires code_ids."
+            ]
+        return []
 
     # ris_ogd
     if not _has_nonempty_str(payload.get("base_url")):
