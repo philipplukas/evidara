@@ -2,7 +2,8 @@
 
 import { Chip, Paper, Stack, Typography } from "@mui/material";
 import { useState } from "react";
-import { useNotify, useRecordContext, useRefresh } from "react-admin";
+import { useDataProvider, useNotify, useRecordContext, useRedirect, useRefresh } from "react-admin";
+import { ResourceName } from "../../domain/resourceNames";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { ConfirmButton } from "../shared/ConfirmButton";
@@ -60,6 +61,67 @@ export function CancelRunButton({
   );
 }
 
+type PromoteButtonProps = {
+  size?: "small" | "medium" | "large";
+  variant?: "contained" | "outlined" | "text";
+  fullWidth?: boolean;
+};
+
+export function PromoteToProductionButton({
+  size = "small",
+  variant = "outlined",
+  fullWidth = false,
+}: PromoteButtonProps) {
+  const run = useRecordContext<RunRecord>();
+  const dataProvider = useDataProvider();
+  const notify = useNotify();
+  const refresh = useRefresh();
+  const redirect = useRedirect();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!run || run.status !== "completed" || run.mode !== "preview") {
+    return null;
+  }
+
+  const promoteRun = async () => {
+    try {
+      setIsSubmitting(true);
+      const result = await dataProvider.create<RunRecord>(ResourceName.Runs, {
+        data: {
+          source_id: run.source_id,
+          source_version_id: run.source_version_id,
+          mode: "production",
+        },
+      });
+      notify("Production run created from preview.", { type: "success" });
+      redirect("show", ResourceName.Runs, result.data.id, result.data);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Unable to promote run.", {
+        type: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <ConfirmButton
+      tier="notable"
+      color="success"
+      size={size}
+      variant={variant}
+      fullWidth={fullWidth}
+      confirmTitle="Promote to production?"
+      confirmDescription="This will create a new production run using the same source version. The original preview run remains unchanged."
+      confirmLabel="Create production run"
+      onConfirm={promoteRun}
+      disabled={isSubmitting}
+    >
+      {isSubmitting ? "Promoting…" : "Promote to Production"}
+    </ConfirmButton>
+  );
+}
+
 export function RunActionStack() {
   const run = useRecordContext<RunRecord>();
 
@@ -68,6 +130,7 @@ export function RunActionStack() {
   }
 
   const canCancel = ["pending", "running"].includes(run.status);
+  const canPromote = run.status === "completed" && run.mode === "preview";
   const actionCopy =
     run.status === "pending"
       ? {
@@ -83,11 +146,18 @@ export function RunActionStack() {
             followUp:
               "If you do nothing, it continues to progress and may complete or fail without intervention.",
           }
-        : {
-            summary: "This run is read-only now. Use the detail sections to review the outcome.",
-            followUp:
-              "If you do nothing, the run stays as an audit trail and no more work is scheduled.",
-          };
+        : canPromote
+          ? {
+              summary:
+                "This preview run completed successfully. You can promote it to a production run.",
+              followUp:
+                "If you do nothing, the preview stays as an audit trail. Promote when you are ready to go live.",
+            }
+          : {
+              summary: "This run is read-only now. Use the detail sections to review the outcome.",
+              followUp:
+                "If you do nothing, the run stays as an audit trail and no more work is scheduled.",
+            };
 
   return (
     <Paper
@@ -123,6 +193,9 @@ export function RunActionStack() {
           {actionCopy.followUp}
         </Typography>
         {canCancel ? <CancelRunButton size="medium" variant="contained" fullWidth /> : null}
+        {canPromote ? (
+          <PromoteToProductionButton size="medium" variant="contained" fullWidth />
+        ) : null}
       </Stack>
     </Paper>
   );
