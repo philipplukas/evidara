@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { filterByDensity } from "@/lib/metadata-visibility";
 import type { MetadataDensity, MetadataField } from "@/lib/types";
 import { SectionLabel } from "../primitives";

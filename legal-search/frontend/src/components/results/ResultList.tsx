@@ -9,12 +9,15 @@ import { ResultCard } from "./ResultCard";
 
 const PAGE_SIZE = 10;
 
-function describeScopeTrail(source: ResultSetSource): string {
+function describeScopeTrail(
+  source: ResultSetSource,
+  scopeSearchFn: (query: string) => string,
+): string {
   if (source.type === "search") {
-    return `Search for "${source.query}"`;
+    return scopeSearchFn(source.query);
   }
 
-  return `${describeScopeTrail(source.parentSource)} · ${source.label}`;
+  return `${describeScopeTrail(source.parentSource, scopeSearchFn)} \u00b7 ${source.label}`;
 }
 
 function getEmptyStateCopy(
@@ -84,12 +87,14 @@ export function ResultList({
   const visibleResults = results.slice(0, visibleCount);
   const hasMore = visibleCount < results.length;
   const currentSource = state.resultSet.source;
-  const scopeTrail = describeScopeTrail(currentSource);
-  const resultsWord = results.length === 1 ? "result" : "results";
+  const scopeTrail = describeScopeTrail(currentSource, (q) => tList("scopeSearch", { query: q }));
   const resultsSummary =
     visibleResults.length === results.length
-      ? `${results.length} ${resultsWord}`
-      : `Showing ${visibleResults.length} of ${results.length} ${resultsWord}`;
+      ? tList("resultCount", { count: results.length })
+      : tList("resultCountPartial", {
+          visible: visibleResults.length,
+          total: results.length,
+        });
 
   if (isLoading) {
     return (
@@ -99,7 +104,7 @@ export function ResultList({
         aria-live="polite"
       >
         <div className="w-8 h-8 border-2 border-accent-core border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-sm font-medium text-foreground">Searching current scope…</p>
+        <p className="text-sm font-medium text-foreground">{tList("searchingScope")}</p>
         <p className="mt-1 max-w-sm text-xs text-muted-foreground">{scopeTrail}</p>
       </div>
     );
@@ -162,10 +167,10 @@ export function ResultList({
               bg-background px-4 py-3 text-sm font-medium text-muted-foreground transition-colors
               hover:border-accent-core/20 hover:bg-muted/40 hover:text-foreground"
           >
-            <span>Load more results</span>
+            <span>{tList("loadMore")}</span>
             <ArrowRight className="h-3.5 w-3.5" />
             <span className="text-xs text-muted-foreground/60">
-              ({results.length - visibleCount} remaining)
+              {tList("remaining", { count: results.length - visibleCount })}
             </span>
           </button>
         </div>

@@ -3,7 +3,7 @@
 import { ChevronDown, Shield } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 /**
  * Next.js route-level error boundary.
@@ -13,6 +14,8 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useTranslations("error");
+
   return (
     <div className="flex items-center justify-center h-screen bg-surface-page">
       <div className="max-w-md mx-auto text-center px-6">
@@ -20,15 +23,15 @@ export default function ErrorPage({
           <AlertTriangle className="w-6 h-6 text-destructive" />
         </div>
 
-        <h2 className="text-lg font-semibold text-foreground mb-2">Something went wrong</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-2">{t("title")}</h2>
 
         <p className="text-sm text-muted-foreground mb-6">
-          {error.message || "An unexpected error occurred while loading the workspace."}
+          {error.message || t("fallbackMessage")}
         </p>
 
         {error.digest && (
           <p className="text-xs text-muted-foreground/60 mb-4 font-mono">
-            Error ID: {error.digest}
+            {t("errorId", { digest: error.digest })}
           </p>
         )}
 
@@ -39,7 +42,7 @@ export default function ErrorPage({
             hover:bg-primary/85 transition-colors focus:outline-none focus:ring-2 focus:ring-focus-ring"
         >
           <RotateCcw className="w-4 h-4" />
-          Try again
+          {t("tryAgain")}
         </button>
       </div>
     </div>

@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel } from "@/lib/types";
 import { SectionLabel } from "../primitives";

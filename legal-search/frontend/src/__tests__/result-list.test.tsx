@@ -79,7 +79,7 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("Searching current scope…")).toBeInTheDocument();
+    expect(screen.getByText("Aktuellen Bereich durchsuchen…")).toBeInTheDocument();
   });
 
   it("renders result count and cards", () => {
@@ -94,7 +94,7 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("3 results")).toBeInTheDocument();
+    expect(screen.getByText("3 Ergebnisse")).toBeInTheDocument();
     expect(screen.getByText("Result 1")).toBeInTheDocument();
     expect(screen.getByText("Result 2")).toBeInTheDocument();
     expect(screen.getByText("Result 3")).toBeInTheDocument();
@@ -112,8 +112,8 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("Load more results")).toBeInTheDocument();
-    expect(screen.getByText("(5 remaining)")).toBeInTheDocument();
+    expect(screen.getByText("Weitere Ergebnisse laden")).toBeInTheDocument();
+    expect(screen.getByText("(5 verbleibend)")).toBeInTheDocument();
     // Only first 10 visible
     expect(screen.getByText("Result 1")).toBeInTheDocument();
     expect(screen.getByText("Result 10")).toBeInTheDocument();
@@ -132,11 +132,11 @@ describe("ResultList", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Load more results"));
+    fireEvent.click(screen.getByText("Weitere Ergebnisse laden"));
     expect(screen.getByText("Result 11")).toBeInTheDocument();
     expect(screen.getByText("Result 15")).toBeInTheDocument();
     // No more "Load more" button
-    expect(screen.queryByText("Load more results")).not.toBeInTheDocument();
+    expect(screen.queryByText("Weitere Ergebnisse laden")).not.toBeInTheDocument();
   });
 
   it("shows pivot-aware empty state when the current scope is empty", async () => {

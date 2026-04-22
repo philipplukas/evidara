@@ -2,7 +2,7 @@
 
 import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
 

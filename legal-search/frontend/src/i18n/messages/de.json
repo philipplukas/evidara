@@ -1,18 +1,18 @@
 {
   "header": {
-    "searchPlaceholder": "Nach Artikel, Urteil, Kommentar oder Zitat suchen…",
+    "searchPlaceholder": "Nach Artikel, Urteil, Kommentar oder Zitat suchen\u2026",
     "searchAction": "Suchen",
-    "searchingAction": "Suche läuft",
-    "clearSearch": "Suche löschen",
+    "searchingAction": "Suche l\u00e4uft",
+    "clearSearch": "Suche l\u00f6schen",
     "recentSearches": "Letzte Suchen",
     "filters": "Filter",
     "trail": "Verlauf",
     "pinned": "Merkliste",
     "controlPanel": "Kontrollbereich",
     "languageGroup": "Sprache",
-    "openUserMenu": "Benutzermenü öffnen",
-    "controlPanelRestricted": "Kontrollbereich nur mit Administratorprofil verfügbar.",
-    "controlPanelUnavailable": "Kontrollbereich-URL ist für diese Umgebung nicht konfiguriert.",
+    "openUserMenu": "Benutzermen\u00fc \u00f6ffnen",
+    "controlPanelRestricted": "Kontrollbereich nur mit Administratorprofil verf\u00fcgbar.",
+    "controlPanelUnavailable": "Kontrollbereich-URL ist f\u00fcr diese Umgebung nicht konfiguriert.",
     "profileLabel": "Profil",
     "profileOperator": "Operator",
     "profileStandard": "Standard"
@@ -21,15 +21,17 @@
     "filtersTitle": "Filter",
     "searchPlaceholder": "Suchen...",
     "yes": "Ja",
-    "clearAll": "Verfeinerungen löschen",
-    "resetAll": "Alles zurücksetzen",
-    "sheetDescription": "Suchergebnisse nach Gerichtsbarkeit, Sprache, Instanz und weiteren Kriterien einschränken.",
+    "clearAll": "Verfeinerungen l\u00f6schen",
+    "resetAll": "Alles zur\u00fccksetzen",
+    "sheetDescription": "Suchergebnisse nach Gerichtsbarkeit, Sprache, Instanz und weiteren Kriterien einschr\u00e4nken.",
     "empty": {
-      "title": "Keine Filter verfügbar",
-      "description": "Die aktuelle Ergebnismenge bietet noch keine Verfeinerungsmöglichkeiten.",
+      "title": "Keine Filter verf\u00fcgbar",
+      "description": "Die aktuelle Ergebnismenge bietet noch keine Verfeinerungsm\u00f6glichkeiten.",
       "noMatch": "Keine passenden Optionen",
       "noMatchHint": "Versuchen Sie einen anderen Suchbegriff."
-    }
+    },
+    "loadFailed": "Filter konnten nicht geladen werden",
+    "loadFailedDescription": "Filteroptionen konnten nicht abgerufen werden."
   },
   "context": {
     "officialSourcesOnly": "Nur offizielle Quellen"
@@ -38,59 +40,63 @@
     "metadataHeading": "Metadaten",
     "showMore": "{count} weitere Felder anzeigen",
     "showLess": "Weniger anzeigen",
-    "notAvailable": "Nicht verfügbar",
-    "sheetDescription": "Detailansicht des ausgewählten Suchergebnisses.",
+    "notAvailable": "Nicht verf\u00fcgbar",
+    "sheetDescription": "Detailansicht des ausgew\u00e4hlten Suchergebnisses.",
     "tabs": {
       "documentDetails": "Dokumentdetails",
       "content": "Inhalt",
       "references": "Verweise",
-      "relatedMaterials": "Verknüpfte Materialien",
+      "relatedMaterials": "Verkn\u00fcpfte Materialien",
       "annotations": "Anmerkungen",
       "localStructure": "Lokale Struktur",
       "showAll": "Alle anzeigen",
       "current": "Aktuell"
     },
     "descriptions": {
-      "details": "Metadaten stehen zuerst, danach folgt der Dokumenttext für schnelleres Erfassen.",
-      "references": "Eingehende und ausgehende Verweise sind getrennt, damit Sie Zitierpfade gezielt verfolgen können.",
-      "related": "Verknüpfte Treffer sind thematisch gruppiert, damit die stärksten Zusammenhänge zuerst sichtbar werden.",
-      "annotations": "Anmerkungen sind thematisch gebündelt, damit Sie Hinweise schnell erfassen, ohne den Kontext zu verlieren.",
-      "structure": "Sprünge durch die Gliederung halten den Lesekontext im aktuellen Dokument verankert."
+      "details": "Metadaten stehen zuerst, danach folgt der Dokumenttext f\u00fcr schnelleres Erfassen.",
+      "references": "Eingehende und ausgehende Verweise sind getrennt, damit Sie Zitierpfade gezielt verfolgen k\u00f6nnen.",
+      "related": "Verkn\u00fcpfte Treffer sind thematisch gruppiert, damit die st\u00e4rksten Zusammenh\u00e4nge zuerst sichtbar werden.",
+      "annotations": "Anmerkungen sind thematisch geb\u00fcndelt, damit Sie Hinweise schnell erfassen, ohne den Kontext zu verlieren.",
+      "structure": "Spr\u00fcnge durch die Gliederung halten den Lesekontext im aktuellen Dokument verankert."
     },
     "empty": {
-      "noSelection": "Kein Ergebnis ausgewählt",
+      "noSelection": "Kein Ergebnis ausgew\u00e4hlt",
       "label": "Dokumentdetail",
-      "description": "Wählen Sie ein Ergebnis, um Dokumentdetails, verknüpfte Materialien und Verweise zu öffnen.",
-      "noMetadataTitle": "Keine Metadaten verfügbar",
+      "description": "W\u00e4hlen Sie ein Ergebnis, um Dokumentdetails, verkn\u00fcpfte Materialien und Verweise zu \u00f6ffnen.",
+      "noMetadataTitle": "Keine Metadaten verf\u00fcgbar",
       "noMetadataDescription": "Metadaten erscheinen hier, sobald das Dokument verarbeitet wurde.",
       "noDocumentDetailsTitle": "Keine Dokumentdetails",
-      "noDocumentDetailsDescription": "Für dieses Ergebnis sind derzeit weder Metadaten noch Textinhalt verfügbar.",
+      "noDocumentDetailsDescription": "F\u00fcr dieses Ergebnis sind derzeit weder Metadaten noch Textinhalt verf\u00fcgbar.",
       "noReferencesTitle": "Keine Verweise",
       "noReferencesDescription": "Verweise erscheinen hier, sobald das Dokument anderes Material zitiert oder selbst zitiert wird.",
-      "noRelatedTitle": "Keine verknüpften Materialien",
-      "noRelatedDescription": "Probieren Sie ein anderes Ergebnis oder pivotieren Sie von einem stärkeren Treffer, um den Lesekontext zu erweitern.",
-      "noAnnotationsTitle": "Keine Anmerkungen verfügbar",
-      "noAnnotationsDescription": "Anmerkungen erscheinen hier, sobald das Dokument Kommentare oder Prüfhilfen enthält.",
+      "noRelatedTitle": "Keine verkn\u00fcpften Materialien",
+      "noRelatedDescription": "Probieren Sie ein anderes Ergebnis oder pivotieren Sie von einem st\u00e4rkeren Treffer, um den Lesekontext zu erweitern.",
+      "noAnnotationsTitle": "Keine Anmerkungen verf\u00fcgbar",
+      "noAnnotationsDescription": "Anmerkungen erscheinen hier, sobald das Dokument Kommentare oder Pr\u00fcfhilfen enth\u00e4lt.",
       "noStructureTitle": "Keine lokale Struktur",
-      "noStructureDescription": "Dieses Dokument stellt derzeit keine navigierbare Gliederung bereit."
+      "noStructureDescription": "Dieses Dokument stellt derzeit keine navigierbare Gliederung bereit.",
+      "loadFailed": "Dokument konnte nicht geladen werden",
+      "loadFailedDescription": "Das Dokument konnte nicht abgerufen werden. Bitte versuchen Sie es erneut.",
+      "loadFailedRetry": "Erneut versuchen"
     },
     "confidenceSuffix": "Vertrauen",
     "sourcesSuffix": "Quellen",
     "fallbackTitle": "Dokument ohne Titel",
-    "fallbackSubtitle": "Keine Zusammenfassung verfügbar",
-    "translatedContent": "Übersetzter Inhalt",
+    "fallbackSubtitle": "Keine Zusammenfassung verf\u00fcgbar",
+    "translatedContent": "\u00dcbersetzter Inhalt",
     "pin": "Anheften",
-    "unpin": "Lösen",
-    "copyCitation": "Zitat kopieren"
+    "unpin": "L\u00f6sen",
+    "copyCitation": "Zitat kopieren",
+    "print": "Drucken"
   },
   "results": {
     "exactMatches": {
       "title": "Exakte Treffer",
-      "confidence": "Hohe Übereinstimmung",
+      "confidence": "Hohe \u00dcbereinstimmung",
       "description": "Diese Ergebnisse entsprechen der Suchanfrage exakt im aktuellen Geltungsbereich.",
       "found": "{count} gefunden",
-      "openLabel": "Exakten Treffer {title} öffnen",
-      "translatedFallback": "Übersetzt"
+      "openLabel": "Exakten Treffer {title} \u00f6ffnen",
+      "translatedFallback": "\u00dcbersetzt"
     },
     "scope": {
       "currentScope": "Aktueller Bereich",
@@ -99,39 +105,62 @@
       "refinedScope": "Eingegrenzter Bereich",
       "back": "Zum vorherigen Bereich",
       "searchFor": "Suche nach \u201E{query}\u201C",
-      "reopen": "{scope} erneut öffnen",
-      "pivotDescription": "Der Bereich wurde gegenüber der vorherigen Ergebnismenge eingegrenzt, damit die aktuellen Belege fokussierter bleiben."
+      "reopen": "{scope} erneut \u00f6ffnen",
+      "pivotDescription": "Der Bereich wurde gegen\u00fcber der vorherigen Ergebnismenge eingegrenzt, damit die aktuellen Belege fokussierter bleiben."
     },
     "sourceTypes": {
       "all": "Alle",
       "law": "Gesetze",
       "decision": "Urteile",
-      "rechtssatz": "Rechtssätze",
+      "rechtssatz": "Rechtss\u00e4tze",
       "commentary": "Kommentare"
     },
     "card": {
-      "selected": "Ausgewählt",
+      "selected": "Ausgew\u00e4hlt",
       "pin": "Anheften",
       "pinned": "Angeheftet",
       "loadMore": "Weitere Ergebnisse laden",
       "remaining": "{count} verbleibend",
-      "openResult": "{title} öffnen",
+      "openResult": "{title} \u00f6ffnen",
       "seeRelated": "{count} verwandte {label} anzeigen",
       "pinResult": "Ergebnis anheften",
-      "unpinResult": "Ergebnis lösen"
+      "unpinResult": "Ergebnis l\u00f6sen"
     },
     "list": {
       "sortedByRelevance": "Nach Relevanz sortiert",
-      "sortedByRelevanceHelp": "Treffer sind nach algorithmischer Relevanz geordnet (keine manuelle Prüfung jedes Ergebnisses)."
+      "sortedByRelevanceHelp": "Treffer sind nach algorithmischer Relevanz geordnet (keine manuelle Pr\u00fcfung jedes Ergebnisses).",
+      "resultCount": "{count, plural, one {# Ergebnis} other {# Ergebnisse}}",
+      "resultCountPartial": "{visible} von {total, plural, one {# Ergebnis} other {# Ergebnissen}} angezeigt",
+      "searchingScope": "Aktuellen Bereich durchsuchen\u2026",
+      "loadMore": "Weitere Ergebnisse laden",
+      "remaining": "({count} verbleibend)",
+      "scopeSearch": "Suche nach \u201E{query}\u201C"
     },
     "empty": {
       "pivotNoResults": "Keine Ergebnisse in diesem Pivot",
-      "pivotHint": "Kehren Sie zum vorherigen Bereich zurück oder probieren Sie eine andere Verknüpfung.",
-      "noResults": "Keine Ergebnisse für \"{query}\"",
+      "pivotHint": "Kehren Sie zum vorherigen Bereich zur\u00fcck oder probieren Sie eine andere Verkn\u00fcpfung.",
+      "noResults": "Keine Ergebnisse f\u00fcr \"{query}\"",
       "noResultsHint": "Versuchen Sie, die Anfrage zu erweitern oder Filter anzupassen.",
       "startTitle": "Suche starten",
-      "startHint": "Geben Sie eine Anfrage ein, um Gesetze, Urteile und Kommentare zu durchsuchen."
+      "startHint": "Geben Sie eine Anfrage ein, um Gesetze, Urteile und Kommentare zu durchsuchen.",
+      "searchFailed": "Suche fehlgeschlagen",
+      "searchFailedDescription": "Die Ergebnisse f\u00fcr diese Anfrage konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      "searchFailedRetry": "Erneut versuchen"
     }
+  },
+  "theme": {
+    "switchToLight": "Zum hellen Modus wechseln",
+    "switchToDark": "Zum dunklen Modus wechseln"
+  },
+  "share": {
+    "copyLink": "Link kopieren",
+    "linkCopied": "Link kopiert"
+  },
+  "error": {
+    "title": "Ein Fehler ist aufgetreten",
+    "fallbackMessage": "Beim Laden des Arbeitsbereichs ist ein unerwarteter Fehler aufgetreten.",
+    "errorId": "Fehler-ID: {digest}",
+    "tryAgain": "Erneut versuchen"
   },
   "workspace": {
     "detailLoadFailed": "Dokumentdetails konnten nicht geladen werden.",
