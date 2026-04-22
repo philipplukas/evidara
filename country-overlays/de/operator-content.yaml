@@ -15,9 +15,9 @@ approval_hotspots:
   - state-level labels diverging from canonical keys
   - federal vs Länder hierarchy-path boundary
 
-status: scaffold-only
+status: live
 status_note: |
-  DE overlay is scaffold-only. deterministic_http_bundesrecht template
-  exists in source_blueprints.yaml; Länder providers (bundesland_http)
-  are registered as scaffolds. Live acceptance run evidence lands in a
-  follow-up ticket.
+  DE federal overlay is live. deterministic_http_bundesrecht templates are
+  enabled in source_blueprints.yaml. Länder providers (bundesland_http)
+  are live_ready=True but individual state templates remain enabled: false
+  pending per-state acceptance runs.
