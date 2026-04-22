@@ -106,6 +106,9 @@ describe("WorkspaceClient mobile behavior", () => {
           context: expect.any(Object),
           refinements: expect.any(Array),
         }),
+        expect.objectContaining({
+          pageSize: expect.any(Number),
+        }),
       );
     });
   });

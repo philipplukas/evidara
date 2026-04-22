@@ -4,11 +4,10 @@ import { ArrowRight, Download, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorState } from "@/components/ui/error-state";
+import { usePreferences } from "@/hooks/use-preferences";
 import type { ResultSetSource, SearchResultViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 import { ResultCard } from "./ResultCard";
-
-const PAGE_SIZE = 10;
 
 function describeScopeTrail(
   source: ResultSetSource,
@@ -85,7 +84,9 @@ export function ResultList({
   onRetry,
   onSearch: _onSearch,
 }: ResultListProps) {
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const { preferences } = usePreferences();
+  const pageSize = preferences.resultsPerPage;
+  const [visibleCount, setVisibleCount] = useState<number>(pageSize);
   const { state } = useWorkspace();
   const tList = useTranslations("results.list");
   const tEmpty = useTranslations("results.empty");
@@ -98,8 +99,8 @@ export function ResultList({
     }
 
     previousResultSignatureRef.current = resultSignature;
-    setVisibleCount(PAGE_SIZE);
-  }, [resultSignature]);
+    setVisibleCount(pageSize);
+  }, [resultSignature, pageSize]);
 
   const handleExportCsv = useCallback(() => {
     const header = ["Title", "Type", "Subtitle", "Snippet"].map(escapeCsvField).join(",");
@@ -217,7 +218,7 @@ export function ResultList({
         <div className="border-t border-border/60 px-4 py-4 sm:px-5">
           <button
             type="button"
-            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            onClick={() => setVisibleCount((c) => c + pageSize)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border
               bg-background px-4 py-3 text-sm font-medium text-muted-foreground transition-colors
               hover:border-accent-core/20 hover:bg-muted/40 hover:text-foreground"

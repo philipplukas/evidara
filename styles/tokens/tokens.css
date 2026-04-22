@@ -138,7 +138,7 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 16%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.65 0.18 284);
   --chart-1: oklch(0.87 0 0);
@@ -152,7 +152,7 @@
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: oklch(1 0 0 / 16%);
   --sidebar-ring: oklch(0.65 0.18 284);
 
   --brand: #4a9eda;
@@ -165,10 +165,10 @@
   --surface-shell: color-mix(in oklab, var(--surface-panel) 88%, var(--background));
   --surface-shell-strong: color-mix(in oklab, var(--surface-panel) 78%, var(--brand) 22%);
 
-  --interactive-accent-subtle: rgb(138 118 240 / 10%);
-  --interactive-accent-muted: rgb(138 118 240 / 18%);
+  --interactive-accent-subtle: rgb(148 132 245 / 10%);
+  --interactive-accent-muted: rgb(148 132 245 / 18%);
 
-  --focus-ring: rgb(138 118 240 / 30%);
+  --focus-ring: rgb(148 132 245 / 30%);
 
   --attention: #fbbf24;
   --attention-subtle: rgba(251, 191, 36, 0.1);
@@ -185,7 +185,7 @@
   --status-info: #60a5fa;
   --status-info-subtle: rgba(96, 165, 250, 0.1);
 
-  --accent-core: #8a76f0;
+  --accent-core: #9484f5;
   --accent-core-foreground: oklch(0.15 0 0);
   --accent-core-subtle: color-mix(in oklab, var(--accent-core) 14%, transparent);
   --accent-core-muted: color-mix(in oklab, var(--accent-core) 22%, transparent);
@@ -194,7 +194,7 @@
   --tab-active-font-weight: 700;
 
   --shadow-shell: 0 18px 56px rgb(0 0 0 / 30%);
-  --shadow-control-plane: 0 18px 40px rgb(138 118 240 / 12%);
+  --shadow-control-plane: 0 18px 40px rgb(148 132 245 / 12%);
   --shadow-panel: 0 20px 48px rgb(0 0 0 / 24%);
   --shadow-raised: 0 16px 36px rgb(0 0 0 / 18%);
   --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 6%);

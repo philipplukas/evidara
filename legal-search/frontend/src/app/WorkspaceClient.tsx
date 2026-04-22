@@ -21,6 +21,7 @@ import {
 import { useDesktop } from "@/hooks/use-desktop";
 import { useDetail } from "@/hooks/use-detail";
 import { usePageView } from "@/hooks/use-page-view";
+import { usePreferences } from "@/hooks/use-preferences";
 import { runSearch } from "@/hooks/use-search";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
@@ -43,6 +44,7 @@ export default function WorkspaceClient({
   const t = useTranslations();
   usePageView();
   const isDesktop = useDesktop();
+  const { preferences } = usePreferences();
   const { state, dispatch } = useWorkspace();
   const { state: constraints } = useSearchConstraints();
   const [activeFilters, setActiveFilters] = useState(filters);
@@ -109,7 +111,9 @@ export default function WorkspaceClient({
       const requestId = ++searchRequestIdRef.current;
       const signature = createSearchSignature(query);
       try {
-        const { results, filters: nextFilters } = await runSearch(query, constraints);
+        const { results, filters: nextFilters } = await runSearch(query, constraints, {
+          pageSize: preferences.resultsPerPage,
+        });
         if (requestId !== searchRequestIdRef.current) {
           // Ignore stale responses when newer searches have already started.
           return;
@@ -128,7 +132,7 @@ export default function WorkspaceClient({
         setSearchError(true);
       }
     },
-    [constraints, dispatch, createSearchSignature],
+    [constraints, dispatch, createSearchSignature, preferences.resultsPerPage],
   );
 
   const handlePivot = useCallback(
@@ -136,7 +140,9 @@ export default function WorkspaceClient({
       track(AnalyticsEvent.RESULT_PIVOTED, { sourceId, label });
       const sourceResult = state.resultSet.items.find((r) => r.id === sourceId);
       const pivotQuery = sourceResult?.title ?? label;
-      const { results, filters: nextFilters } = await runSearch(pivotQuery, constraints);
+      const { results, filters: nextFilters } = await runSearch(pivotQuery, constraints, {
+        pageSize: preferences.resultsPerPage,
+      });
       setActiveFilters(nextFilters);
       dispatch({
         type: "PIVOT",
@@ -149,7 +155,7 @@ export default function WorkspaceClient({
         scopeLabel: `${label} for ${state.resultSet.items.find((r) => r.id === sourceId)?.title ?? sourceId}`,
       });
     },
-    [dispatch, state.resultSet, constraints],
+    [dispatch, state.resultSet, constraints, preferences.resultsPerPage],
   );
 
   const handleSearch = executeSearch;

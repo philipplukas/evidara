@@ -5,7 +5,15 @@ import type { SearchDocumentsParams } from "@/lib/api/generated/model";
 import { mapSearchResponse } from "@/lib/api-adapters";
 import type { SearchConstraintsState } from "@/lib/types";
 
-function toSearchParams(query: string, constraints: SearchConstraintsState): SearchDocumentsParams {
+export interface SearchOptions {
+  pageSize?: number;
+}
+
+function toSearchParams(
+  query: string,
+  constraints: SearchConstraintsState,
+  options?: SearchOptions,
+): SearchDocumentsParams {
   const documentTypes = constraints.context.sourceType
     ? [constraints.context.sourceType]
     : undefined;
@@ -18,11 +26,16 @@ function toSearchParams(query: string, constraints: SearchConstraintsState): Sea
     official_only: constraints.context.officialOnly,
     refinements:
       constraints.refinements.length > 0 ? JSON.stringify(constraints.refinements) : undefined,
+    page_size: options?.pageSize,
   };
 }
 
-export async function runSearch(query: string, constraints: SearchConstraintsState) {
-  const response = await searchDocuments(toSearchParams(query, constraints));
+export async function runSearch(
+  query: string,
+  constraints: SearchConstraintsState,
+  options?: SearchOptions,
+) {
+  const response = await searchDocuments(toSearchParams(query, constraints, options));
   if (response.status !== 200) {
     throw new Error("Search request failed.");
   }

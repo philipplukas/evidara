@@ -101,9 +101,10 @@ describe("ResultList", () => {
   });
 
   it("shows Load more button when results exceed page size", () => {
+    // Default resultsPerPage preference is 25
     renderWithProviders(
       <ResultList
-        results={makeResults(15)}
+        results={makeResults(30)}
         selectedId={null}
         onFocus={vi.fn()}
         onPivot={vi.fn()}
@@ -114,16 +115,17 @@ describe("ResultList", () => {
 
     expect(screen.getByText("Weitere Ergebnisse laden")).toBeInTheDocument();
     expect(screen.getByText("(5 verbleibend)")).toBeInTheDocument();
-    // Only first 10 visible
+    // Only first 25 visible
     expect(screen.getByText("Result 1")).toBeInTheDocument();
-    expect(screen.getByText("Result 10")).toBeInTheDocument();
-    expect(screen.queryByText("Result 11")).not.toBeInTheDocument();
+    expect(screen.getByText("Result 25")).toBeInTheDocument();
+    expect(screen.queryByText("Result 26")).not.toBeInTheDocument();
   });
 
   it("loads more results when button is clicked", () => {
+    // Default resultsPerPage preference is 25
     renderWithProviders(
       <ResultList
-        results={makeResults(15)}
+        results={makeResults(30)}
         selectedId={null}
         onFocus={vi.fn()}
         onPivot={vi.fn()}
@@ -133,8 +135,8 @@ describe("ResultList", () => {
     );
 
     fireEvent.click(screen.getByText("Weitere Ergebnisse laden"));
-    expect(screen.getByText("Result 11")).toBeInTheDocument();
-    expect(screen.getByText("Result 15")).toBeInTheDocument();
+    expect(screen.getByText("Result 26")).toBeInTheDocument();
+    expect(screen.getByText("Result 30")).toBeInTheDocument();
     // No more "Load more" button
     expect(screen.queryByText("Weitere Ergebnisse laden")).not.toBeInTheDocument();
   });
