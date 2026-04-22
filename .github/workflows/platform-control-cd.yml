@@ -26,7 +26,7 @@ env:
 jobs:
   deploy-dev:
     name: Deploy runtime services to dev
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     environment: dev
     env:
       REGION: ${{ vars.GCP_REGION }}
@@ -317,7 +317,7 @@ jobs:
 
   deploy-prod:
     name: Deploy runtime services to prod
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     needs: deploy-dev
     environment: prod
     env:
