@@ -57,6 +57,7 @@ export function ResultCard({
     <article
       aria-current={isSelected ? "true" : undefined}
       aria-label={t("openResult", { title: result.title })}
+      onClick={() => onFocus(result.id)}
       className={`group cursor-pointer border-b border-border/60 px-4 py-3.5 transition-all
         transition-motion-medium focus-within:ring-2 focus-within:ring-focus-ring sm:px-5
         ${
