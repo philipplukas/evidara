@@ -13,6 +13,11 @@ function createRepositoryMock(): ProjectionRepository {
     getLatestRevision: vi.fn().mockResolvedValue(null),
     upsertProjection: vi.fn().mockResolvedValue(undefined),
     deleteProjection: vi.fn().mockResolvedValue(undefined),
+    bulkIndexSections: vi.fn().mockResolvedValue(undefined),
+    bulkIndexCitations: vi.fn().mockResolvedValue(undefined),
+    bulkIndexCitationTargets: vi.fn().mockResolvedValue(undefined),
+    deleteSectionsForDocument: vi.fn().mockResolvedValue(undefined),
+    deleteCitationsForDocument: vi.fn().mockResolvedValue(undefined),
     appendHistory: vi.fn().mockResolvedValue(undefined),
     queryHistory: vi.fn().mockResolvedValue({ data: [], total: 0, limit: 50, offset: 0 }),
     getHistoryStats: vi.fn().mockResolvedValue({

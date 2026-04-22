@@ -45,11 +45,48 @@ export type SearchProjectionDocument = {
   structural_path?: string;
 };
 
+export type SectionProjection = {
+  section_id: string;
+  document_id: string;
+  title?: string;
+  ordinal: number;
+  depth: number;
+  content_preview?: string;
+  parent_section_id?: string;
+};
+
+export type CitationProjection = {
+  citation_id: string;
+  source_document_id: string;
+  source_section_id?: string;
+  target_document_id?: string;
+  target_title?: string;
+  citation_text: string;
+  citation_type?: string;
+  normalized_reference?: string;
+  resolved: boolean;
+  metadata?: Record<string, unknown>;
+};
+
+export type CitationTargetEntry = {
+  document_id: string;
+  identifier_type: string;
+  identifier_value: string;
+  title?: string;
+  document_type?: string;
+  jurisdiction?: string;
+};
+
 export interface ProjectionRepository {
   hasHistoryEvent(eventId: string): Promise<boolean>;
   getLatestRevision(documentId: string): Promise<number | null>;
   upsertProjection(document: SearchProjectionDocument): Promise<void>;
   deleteProjection(documentId: string): Promise<void>;
+  bulkIndexSections(sections: SectionProjection[]): Promise<void>;
+  bulkIndexCitations(citations: CitationProjection[]): Promise<void>;
+  bulkIndexCitationTargets(targets: CitationTargetEntry[]): Promise<void>;
+  deleteSectionsForDocument(documentId: string): Promise<void>;
+  deleteCitationsForDocument(documentId: string): Promise<void>;
   appendHistory(entry: ProjectionHistoryEntry): Promise<void>;
   queryHistory(query: ProjectionHistoryQuery): Promise<ProjectionHistoryPage>;
   getHistoryStats(): Promise<ProjectionHistoryStats>;

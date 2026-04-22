@@ -19,5 +19,6 @@ export default registerAs('opensearch', () => ({
   documentsWriteAlias: process.env.OPENSEARCH_ALIAS_WRITE ?? 'documents-write',
   sectionsIndex: process.env.OPENSEARCH_INDEX_SECTIONS ?? 'sections',
   citationsIndex: process.env.OPENSEARCH_INDEX_CITATIONS ?? 'citations',
+  citationTargetsIndex: process.env.OPENSEARCH_INDEX_CITATION_TARGETS ?? 'citation-targets',
   projectionHistoryIndex: process.env.OPENSEARCH_INDEX_PROJECTION_HISTORY ?? 'projection-history',
 }));
