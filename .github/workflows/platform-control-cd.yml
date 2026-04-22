@@ -233,6 +233,19 @@ jobs:
             exit 1
           fi
 
+      - name: Verify DI consumer surface config (dev)
+        run: |
+          set -euo pipefail
+          DI_SURFACES_ROOT_URI=$(gcloud run services describe "${DI_CONSUMER_SERVICE_NAME}-dev" \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --format=json | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="DI_SURFACES_ROOT_URI") | .value // empty')
+          if [ -z "${DI_SURFACES_ROOT_URI}" ]; then
+            echo "::error::DI consumer is missing DI_SURFACES_ROOT_URI in dev"
+            exit 1
+          fi
+          echo "DI consumer source: DI_SURFACES_ROOT_URI=${DI_SURFACES_ROOT_URI}"
+
       - name: Smoke test — Document Service health (dev)
         run: |
           DS_URL=$(gcloud run services describe "${DOCUMENT_SERVICE_NAME}-dev" \

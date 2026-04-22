@@ -218,6 +218,79 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('keeps Austrian corpus ids from being misclassified by substring matches', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: '"Produktdeklaration" - Erweiterung der Verwendung',
+      jurisdiction_id: 'jur_at_federal',
+      body_text: 'RIS Dokument mit Bundesrecht-Inhalt.',
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed({
+      ...baseProcessedEvent,
+      payload: {
+        ...baseProcessedEvent.payload,
+        provenance: {
+          ...baseProcessedEvent.payload.provenance,
+          corpus_id: 'corpus_public_at_bundesrecht_small_batch',
+        },
+      },
+    });
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jurisdiction: 'AT',
+      }),
+    );
+  });
+
+  it('indexes citations stored on section metadata', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Austrian federal law',
+      jurisdiction_id: 'at_federal',
+      sections: [
+        {
+          section_id: 'sec_at_1',
+          title: 'Produktdeklaration',
+          ordinal: 0,
+          depth: 0,
+          content: 'Siehe BGBl. Nr. 43/1975.',
+          metadata: {
+            citations: [
+              {
+                text: 'BGBl. Nr. 43/1975',
+                citation_type: 'at_bgbl',
+                normalized_reference: 'at_bgbl:43/1975',
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        citations_count: 1,
+        sections_count: 1,
+      }),
+    );
+    expect(repository.bulkIndexCitations).toHaveBeenCalledWith([
+      expect.objectContaining({
+        citation_text: 'BGBl. Nr. 43/1975',
+        citation_type: 'at_bgbl',
+        normalized_reference: 'at_bgbl:43/1975',
+        source_section_id: 'sec_at_1',
+      }),
+    ]);
+  });
+
   it('normalizes aliased document type hints from lean metadata before indexing', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();

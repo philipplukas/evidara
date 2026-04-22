@@ -203,7 +203,9 @@ export class ProjectionsService {
     ];
     const textCandidates = [doc.content_text, doc.text, doc.summary];
     const sectionsCount = this.countArrayLike(sectionCandidates);
-    const citationsCount = this.countArrayLike(citationCandidatesWithExtensions);
+    const citationsCount =
+      this.countArrayLike(citationCandidatesWithExtensions) +
+      this.extractSectionCitationRecords(doc).length;
     const meta = this.asRecord(doc.metadata);
     const extractedMeta = meta ? this.asRecord(meta.extracted_metadata) : undefined;
     const sourceDefaults = meta ? this.asRecord(meta.source_defaults) : undefined;
@@ -514,10 +516,14 @@ export class ProjectionsService {
   }
 
   private inferJurisdiction(corpusId: string): string | undefined {
-    if (corpusId.includes('ch')) return 'CH';
-    if (corpusId.includes('at')) return 'AT';
-    if (corpusId.includes('de')) return 'DE';
-    if (corpusId.includes('li')) return 'LI';
+    const tokens = corpusId
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+    if (tokens.includes('ch')) return 'CH';
+    if (tokens.includes('at')) return 'AT';
+    if (tokens.includes('de')) return 'DE';
+    if (tokens.includes('li')) return 'LI';
     this.logger.warn(`[contract] unknown_corpus_jurisdiction`, { corpusId });
     return undefined;
   }
@@ -558,34 +564,61 @@ export class ProjectionsService {
     if (!leanDocument || typeof leanDocument !== 'object') return [];
     const doc = leanDocument as Record<string, unknown>;
     const extensions = this.asRecord(doc.extensions);
-    const raw = doc.citations ?? doc.document_citations ?? (extensions?.citations as unknown);
-    if (!Array.isArray(raw)) return [];
-
+    const raw = [
+      ...this.asArrayOfRecords(doc.citations),
+      ...this.asArrayOfRecords(doc.document_citations),
+      ...this.asArrayOfRecords(extensions?.citations),
+      ...this.extractSectionCitationRecords(doc),
+    ];
     let counter = 0;
-    return raw
-      .filter((c): c is Record<string, unknown> => c != null && typeof c === 'object')
-      .map((c) => {
-        counter++;
-        return {
-          citation_id:
-            typeof c.citation_id === 'string' ? c.citation_id : `cit_${documentId}_${counter}`,
-          source_document_id: documentId,
+    return raw.map((c) => {
+      counter++;
+      return {
+        citation_id:
+          typeof c.citation_id === 'string' ? c.citation_id : `cit_${documentId}_${counter}`,
+        source_document_id: documentId,
+        source_section_id:
+          typeof c.source_section_id === 'string' ? c.source_section_id : undefined,
+        target_document_id:
+          typeof c.target_document_id === 'string' ? c.target_document_id : undefined,
+        target_title: typeof c.target_title === 'string' ? c.target_title : undefined,
+        citation_text: typeof c.text === 'string' ? c.text : String(c.citation_text ?? ''),
+        citation_type: typeof c.citation_type === 'string' ? c.citation_type : undefined,
+        normalized_reference:
+          typeof c.normalized_reference === 'string' ? c.normalized_reference : undefined,
+        resolved: typeof c.resolved === 'boolean' ? c.resolved : false,
+        metadata:
+          typeof c.metadata === 'object' && c.metadata
+            ? (c.metadata as Record<string, unknown>)
+            : undefined,
+      };
+    });
+  }
+
+  private extractSectionCitationRecords(doc: Record<string, unknown>): Record<string, unknown>[] {
+    const rawSections = doc.sections ?? doc.document_sections ?? doc.body_sections;
+    const records: Record<string, unknown>[] = [];
+    for (const section of this.asArrayOfRecords(rawSections)) {
+      const sectionId = typeof section.section_id === 'string' ? section.section_id : undefined;
+      const metadata = this.asRecord(section.metadata);
+      for (const citation of this.asArrayOfRecords(metadata?.citations)) {
+        records.push({
+          ...citation,
           source_section_id:
-            typeof c.source_section_id === 'string' ? c.source_section_id : undefined,
-          target_document_id:
-            typeof c.target_document_id === 'string' ? c.target_document_id : undefined,
-          target_title: typeof c.target_title === 'string' ? c.target_title : undefined,
-          citation_text: typeof c.text === 'string' ? c.text : String(c.citation_text ?? ''),
-          citation_type: typeof c.citation_type === 'string' ? c.citation_type : undefined,
-          normalized_reference:
-            typeof c.normalized_reference === 'string' ? c.normalized_reference : undefined,
-          resolved: typeof c.resolved === 'boolean' ? c.resolved : false,
-          metadata:
-            typeof c.metadata === 'object' && c.metadata
-              ? (c.metadata as Record<string, unknown>)
-              : undefined,
-        };
-      });
+            typeof citation.source_section_id === 'string' ? citation.source_section_id : sectionId,
+        });
+      }
+    }
+    return records;
+  }
+
+  private asArrayOfRecords(value: unknown): Record<string, unknown>[] {
+    return Array.isArray(value)
+      ? value.filter(
+          (item): item is Record<string, unknown> =>
+            item != null && typeof item === 'object' && !Array.isArray(item),
+        )
+      : [];
   }
 
   /**

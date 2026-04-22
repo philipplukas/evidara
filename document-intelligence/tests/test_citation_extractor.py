@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from document_intelligence.nlp.citation_extractor import extract_citations
+from document_intelligence.nlp.citation_extractor import extract_citations, normalize_citation
 
 
 class TestSRCitations:
@@ -38,6 +38,30 @@ class TestBGECitations:
         bge = [c for c in citations if c.citation_type == "bge"]
         assert len(bge) == 1
         assert "E. 3.2" in bge[0].text
+
+
+class TestAustrianCitations:
+    def test_bgbl_number_year(self):
+        citations = extract_citations("Die Kundmachung erfolgte in BGBl. Nr. 43/1975.")
+        bgbl = [c for c in citations if c.citation_type == "at_bgbl"]
+        assert len(bgbl) == 1
+        assert bgbl[0].metadata["number"] == "43"
+        assert bgbl[0].metadata["year"] == "1975"
+        assert normalize_citation(bgbl[0]) == "at_bgbl:43/1975"
+
+    def test_bgbl_part_number_year(self):
+        citations = extract_citations("Vgl. BGBl. III Nr. 62/2013 zur Umsetzung.")
+        bgbl = [c for c in citations if c.citation_type == "at_bgbl"]
+        assert len(bgbl) == 1
+        assert bgbl[0].metadata["part"] == "III"
+        assert normalize_citation(bgbl[0]) == "at_bgbl:iii:62/2013"
+
+    def test_bundesgesetzblatt_long_form(self):
+        citations = extract_citations("Gemäß Bundesgesetzblatt Nr. 825 aus 1994 gilt die Fassung.")
+        bgbl = [c for c in citations if c.citation_type == "at_bgbl"]
+        assert len(bgbl) == 1
+        assert bgbl[0].metadata["number"] == "825"
+        assert bgbl[0].metadata["year"] == "1994"
 
 
 class TestEUCitations:

@@ -1,8 +1,9 @@
-"""Legal citation extraction for Swiss, EU, DE, FR, and IT legal documents.
+"""Legal citation extraction for Swiss, Austrian, EU, DE, FR, and IT legal documents.
 
 Extracts references to:
 - Swiss federal law (SR numbers): e.g., "SR 210", "SR 311.0"
 - Swiss BGE decisions: e.g., "BGE 147 III 49", "BGE 148 IV 234"
+- Austrian Federal Law Gazette: e.g., "BGBl. Nr. 43/1975", "BGBl. III Nr. 62/2013"
 - EU regulations/directives: e.g., "Regulation (EU) 2016/679", "Directive 2013/36/EU"
 - EU CELEX IDs: e.g., "32016R0679" (GDPR), "32019L0790" (Copyright Directive)
 - EU ECLI identifiers: e.g., "ECLI:EU:C:2019:218", "ECLI:EU:T:2020:338"
@@ -51,6 +52,18 @@ _SR_PATTERN = re.compile(
 # BGE decisions: "BGE 147 III 49", "BGE 148 IV 234 E. 3.2"
 _BGE_PATTERN = re.compile(
     r"\bBGE\s+\d{1,3}\s+[IV]+\s+\d+(?:\s+E\.\s+[\d.]+)?\b",
+)
+
+# Austrian Federal Law Gazette:
+# "BGBl. Nr. 43/1975", "BGBl. III Nr. 62/2013",
+# and long-form "Bundesgesetzblatt Nr. 825 aus 1994".
+_AT_BGBL_PATTERN = re.compile(
+    r"\b(?:"
+    r"BGBl\.\s*(?:(?P<part>[IVX]+)\s*)?Nr\.\s*(?P<number>\d+[a-zA-Z]?)/(?P<year>\d{4})"
+    r"|Bundesgesetzblatt\s+(?:(?:Teil\s*)?(?P<part_word>[IVX]+)\s*,?\s*)?"
+    r"Nr\.\s*(?P<number_word>\d+[a-zA-Z]?)\s+aus\s+(?P<year_word>\d{4})"
+    r")\b",
+    re.IGNORECASE,
 )
 
 # EU Regulations: "Regulation (EU) 2016/679", "Verordnung (EU) 2016/679"
@@ -260,6 +273,23 @@ def extract_citations(text: str) -> list[Citation]:
                 citation_type="bge",
                 start=m.start(),
                 end=m.end(),
+            )
+        )
+
+    for m in _AT_BGBL_PATTERN.finditer(text):
+        part = m.group("part") or m.group("part_word")
+        number = m.group("number") or m.group("number_word")
+        year = m.group("year") or m.group("year_word")
+        metadata = {"country": "AT", "number": number, "year": year}
+        if part:
+            metadata["part"] = part.upper()
+        citations.append(
+            Citation(
+                text=m.group(0),
+                citation_type="at_bgbl",
+                start=m.start(),
+                end=m.end(),
+                metadata=metadata,
             )
         )
 
@@ -505,6 +535,10 @@ def normalize_citation(citation: Citation) -> str | None:
         year = meta.get("year", "")
         if senate and ptype and ordinal and year:
             return f"de_docket:{senate} {ptype} {ordinal}/{year}"
+    if ct == "at_bgbl" and "number" in meta and "year" in meta:
+        part = str(meta.get("part") or "").lower()
+        suffix = f":{part}" if part else ""
+        return f"at_bgbl{suffix}:{meta['number']}/{meta['year']}"
 
     # Semi-deterministic (text form -> deterministic key)
     if ct == "eu_regulation":

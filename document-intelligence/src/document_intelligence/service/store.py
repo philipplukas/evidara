@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -13,6 +14,7 @@ from document_intelligence.config.runtime import RuntimeSettings
 
 _DOC_ID_RE = re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
 _PM_ID_RE = re.compile(r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
+logger = logging.getLogger(__name__)
 
 
 class PublishedDocumentStore(Protocol):
@@ -75,8 +77,13 @@ class FilePublishedDocumentStore:
 class DeltaPublishedDocumentStore:
     """Read published document rows from the Delta-backed published surface."""
 
-    def __init__(self, published_documents_uri: str) -> None:
+    def __init__(
+        self,
+        published_documents_uri: str,
+        published_sections_uri: str | None = None,
+    ) -> None:
         self._published_documents_uri = published_documents_uri
+        self._published_sections_uri = published_sections_uri
 
     def get_full(
         self,
@@ -110,14 +117,61 @@ class DeltaPublishedDocumentStore:
         if not rows:
             return None
         row = _pick_latest_row(rows)
-        return _row_to_document_payload(row)
+        payload = _row_to_document_payload(row)
+        sections = self._get_sections(
+            document_id,
+            int(row["document_revision"]) if row.get("document_revision") is not None else document_revision,
+            str(row["processing_manifest_id"])
+            if row.get("processing_manifest_id") is not None
+            else processing_manifest_id,
+        )
+        if sections:
+            payload["sections"] = sections
+        return payload
+
+    def _get_sections(
+        self,
+        document_id: str,
+        document_revision: int | None,
+        processing_manifest_id: str | None,
+    ) -> list[dict[str, Any]]:
+        if not self._published_sections_uri:
+            return []
+
+        deltalake = importlib.import_module("deltalake")
+        dataset_mod = importlib.import_module("pyarrow.dataset")
+        filters = [dataset_mod.field("document_id") == document_id]
+        if document_revision is not None:
+            filters.append(dataset_mod.field("document_revision") == document_revision)
+        if processing_manifest_id is not None:
+            filters.append(dataset_mod.field("processing_manifest_id") == processing_manifest_id)
+
+        try:
+            table = (
+                deltalake.DeltaTable(self._published_sections_uri)
+                .to_pyarrow_dataset()
+                .to_table(filter=_and_filters(filters))
+            )
+        except Exception as exc:  # pragma: no cover - depends on Delta backend failure mode
+            logger.warning(
+                "published_sections_unavailable",
+                extra={"uri": self._published_sections_uri, "error": str(exc)},
+            )
+            return []
+
+        rows = table.to_pylist()
+        rows.sort(key=lambda row: (int(row.get("ordinal") or 0), str(row.get("section_id") or "")))
+        return [_row_to_section_payload(row) for row in rows]
 
 
 def store_from_env() -> PublishedDocumentStore | None:
     """Prefer Delta-backed published surfaces, then fall back to file fixtures."""
     runtime_settings = RuntimeSettings.from_environment()
     if runtime_settings.surface_uris is not None:
-        return DeltaPublishedDocumentStore(runtime_settings.surface_uris.published_documents_uri)
+        return DeltaPublishedDocumentStore(
+            runtime_settings.surface_uris.published_documents_uri,
+            runtime_settings.surface_uris.published_sections_uri,
+        )
 
     raw = os.environ.get("DOCUMENT_SERVICE_CONTENT_DIR", "").strip()
     if not raw:
@@ -160,6 +214,28 @@ def _row_to_document_payload(row: dict[str, Any]) -> dict[str, Any]:
     extensions = row.get("extensions")
     if isinstance(extensions, dict):
         body["extensions"] = extensions
+    provenance = row.get("provenance")
+    if isinstance(provenance, dict):
+        body["provenance"] = provenance
+    return body
+
+
+def _row_to_section_payload(row: dict[str, Any]) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "section_id": row.get("section_id"),
+        "document_id": row.get("document_id"),
+        "document_revision": row.get("document_revision"),
+        "processing_manifest_id": row.get("processing_manifest_id"),
+        "parent_section_id": row.get("parent_section_id"),
+        "ordinal": row.get("ordinal"),
+        "depth": row.get("depth"),
+        "title": row.get("title"),
+        "content": row.get("content"),
+        "section_type": row.get("section_type"),
+    }
+    metadata = row.get("metadata")
+    if isinstance(metadata, dict):
+        body["metadata"] = metadata
     provenance = row.get("provenance")
     if isinstance(provenance, dict):
         body["provenance"] = provenance
