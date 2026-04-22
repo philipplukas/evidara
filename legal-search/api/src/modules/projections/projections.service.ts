@@ -9,6 +9,8 @@ import type {
   DocumentWithdrawnEventDto,
 } from './dto/projection-events.dto';
 import {
+  type CitationProjection,
+  type CitationTargetEntry,
   PROJECTION_REPOSITORY,
   type ProjectionHistoryEntry,
   type ProjectionHistoryPage,
@@ -16,6 +18,7 @@ import {
   type ProjectionHistoryStats,
   type ProjectionRepository,
   type SearchProjectionDocument,
+  type SectionProjection,
 } from './projections.repository';
 
 export type ProjectionApplyResult = {
@@ -61,6 +64,30 @@ export class ProjectionsService {
     }
     const projection = this.buildProjection(event, leanDocument);
     await this.repository.upsertProjection(projection);
+
+    // Index sections and citations from the lean document into their
+    // dedicated indices so document-detail views can display them and
+    // citation resolution can link across documents.
+    const sections = this.extractSections(event.payload.document_id, leanDocument);
+    const citations = this.extractCitations(event.payload.document_id, leanDocument);
+    const citationTargets = this.extractCitationTargets(projection);
+
+    await Promise.all([
+      sections.length > 0
+        ? this.repository
+            .deleteSectionsForDocument(event.payload.document_id)
+            .then(() => this.repository.bulkIndexSections(sections))
+        : Promise.resolve(),
+      citations.length > 0
+        ? this.repository
+            .deleteCitationsForDocument(event.payload.document_id)
+            .then(() => this.repository.bulkIndexCitations(citations))
+        : Promise.resolve(),
+      citationTargets.length > 0
+        ? this.repository.bulkIndexCitationTargets(citationTargets)
+        : Promise.resolve(),
+    ]);
+
     await this.appendHistory(event, 'applied');
     return { eventId: event.event_id, status: 'applied' };
   }
@@ -77,7 +104,11 @@ export class ProjectionsService {
     }
 
     // Current behavior: both `remove` and `hide` result in de-indexing from search surfaces.
-    await this.repository.deleteProjection(event.payload.document_id);
+    await Promise.all([
+      this.repository.deleteProjection(event.payload.document_id),
+      this.repository.deleteSectionsForDocument(event.payload.document_id),
+      this.repository.deleteCitationsForDocument(event.payload.document_id),
+    ]);
     await this.appendWithdrawnHistory(event, 'applied');
     return { eventId: event.event_id, status: 'applied' };
   }
@@ -493,6 +524,111 @@ export class ProjectionsService {
     if (corpusId.includes('fr')) return 'fr';
     if (corpusId.includes('it')) return 'it';
     return undefined;
+  }
+
+  private extractSections(documentId: string, leanDocument: unknown): SectionProjection[] {
+    if (!leanDocument || typeof leanDocument !== 'object') return [];
+    const doc = leanDocument as Record<string, unknown>;
+    const raw = doc.sections ?? doc.document_sections ?? doc.body_sections;
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .filter((s): s is Record<string, unknown> => s != null && typeof s === 'object')
+      .map((s, index) => ({
+        section_id: typeof s.section_id === 'string' ? s.section_id : `sec_${documentId}_${index}`,
+        document_id: documentId,
+        title: typeof s.title === 'string' ? s.title : undefined,
+        ordinal: typeof s.ordinal === 'number' ? s.ordinal : index,
+        depth: typeof s.depth === 'number' ? s.depth : 0,
+        content_preview:
+          typeof s.content === 'string'
+            ? s.content.slice(0, 400)
+            : typeof s.content_preview === 'string'
+              ? s.content_preview
+              : undefined,
+        parent_section_id:
+          typeof s.parent_section_id === 'string' ? s.parent_section_id : undefined,
+      }));
+  }
+
+  private extractCitations(documentId: string, leanDocument: unknown): CitationProjection[] {
+    if (!leanDocument || typeof leanDocument !== 'object') return [];
+    const doc = leanDocument as Record<string, unknown>;
+    const extensions = this.asRecord(doc.extensions);
+    const raw = doc.citations ?? doc.document_citations ?? (extensions?.citations as unknown);
+    if (!Array.isArray(raw)) return [];
+
+    let counter = 0;
+    return raw
+      .filter((c): c is Record<string, unknown> => c != null && typeof c === 'object')
+      .map((c) => {
+        counter++;
+        return {
+          citation_id:
+            typeof c.citation_id === 'string' ? c.citation_id : `cit_${documentId}_${counter}`,
+          source_document_id: documentId,
+          source_section_id:
+            typeof c.source_section_id === 'string' ? c.source_section_id : undefined,
+          target_document_id:
+            typeof c.target_document_id === 'string' ? c.target_document_id : undefined,
+          target_title: typeof c.target_title === 'string' ? c.target_title : undefined,
+          citation_text: typeof c.text === 'string' ? c.text : String(c.citation_text ?? ''),
+          citation_type: typeof c.citation_type === 'string' ? c.citation_type : undefined,
+          normalized_reference:
+            typeof c.normalized_reference === 'string' ? c.normalized_reference : undefined,
+          resolved: typeof c.resolved === 'boolean' ? c.resolved : false,
+          metadata:
+            typeof c.metadata === 'object' && c.metadata
+              ? (c.metadata as Record<string, unknown>)
+              : undefined,
+        };
+      });
+  }
+
+  /**
+   * Extract identifier→document_id mappings so other documents' citations can
+   * resolve against our corpus. Identifiers include official_citation,
+   * jurisdiction-specific codes (SR, CELEX, ECLI), and docket numbers.
+   */
+  private extractCitationTargets(projection: SearchProjectionDocument): CitationTargetEntry[] {
+    const targets: CitationTargetEntry[] = [];
+    const base = {
+      document_id: projection.document_id,
+      title: projection.title,
+      document_type: projection.document_type,
+      jurisdiction: projection.jurisdiction,
+    };
+
+    if (projection.official_citation) {
+      targets.push({
+        ...base,
+        identifier_type: 'official_citation',
+        identifier_value: projection.official_citation,
+      });
+    }
+
+    // Extract structured identifiers from the content_preview or title
+    // that match deterministic patterns (SR, CELEX, ECLI).
+    const text = [projection.title, projection.official_citation, projection.structural_path]
+      .filter(Boolean)
+      .join(' ');
+
+    const srMatch = text.match(/\bSR\s+(\d{3}(?:\.\d+)*)\b/);
+    if (srMatch) {
+      targets.push({ ...base, identifier_type: 'sr', identifier_value: srMatch[1] });
+    }
+
+    const celexMatch = text.match(/\b([1-9]\d{4}[A-Z]{1,2}\d{4})\b/);
+    if (celexMatch) {
+      targets.push({ ...base, identifier_type: 'celex', identifier_value: celexMatch[1] });
+    }
+
+    const ecliMatch = text.match(/\bECLI:[A-Z]{2}:[A-Z0-9]+:\d{4}:[A-Z0-9.]+\b/);
+    if (ecliMatch) {
+      targets.push({ ...base, identifier_type: 'ecli', identifier_value: ecliMatch[0] });
+    }
+
+    return targets;
   }
 
   private async appendHistory(

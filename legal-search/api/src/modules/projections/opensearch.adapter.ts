@@ -3,18 +3,24 @@ import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type {
+  CitationProjection,
+  CitationTargetEntry,
   ProjectionHistoryEntry,
   ProjectionHistoryPage,
   ProjectionHistoryQuery,
   ProjectionHistoryStats,
   ProjectionRepository,
   SearchProjectionDocument,
+  SectionProjection,
 } from './projections.repository';
 
 @Injectable()
 export class ProjectionOpenSearchAdapter implements ProjectionRepository {
   private readonly logger = new Logger(ProjectionOpenSearchAdapter.name);
   private readonly indexDocumentsWrite: string;
+  private readonly indexSections: string;
+  private readonly indexCitations: string;
+  private readonly indexCitationTargets: string;
   private readonly indexProjectionHistory: string;
 
   constructor(
@@ -25,6 +31,10 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
   ) {
     this.indexDocumentsWrite =
       config.get<string>('opensearch.documentsWriteAlias') ?? 'documents-write';
+    this.indexSections = config.get<string>('opensearch.sectionsIndex') ?? 'sections';
+    this.indexCitations = config.get<string>('opensearch.citationsIndex') ?? 'citations';
+    this.indexCitationTargets =
+      config.get<string>('opensearch.citationTargetsIndex') ?? 'citation-targets';
     this.indexProjectionHistory =
       config.get<string>('opensearch.projectionHistoryIndex') ?? 'projection-history';
   }
@@ -86,6 +96,105 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
         return;
       }
       throw err;
+    }
+  }
+
+  async bulkIndexSections(sections: SectionProjection[]): Promise<void> {
+    if (sections.length === 0) return;
+    const body = sections.flatMap((section) => [
+      { index: { _index: this.indexSections, _id: section.section_id } },
+      section,
+    ]);
+    try {
+      const response = await this.client.bulk({ body, refresh: 'wait_for' });
+      if (response.body.errors) {
+        const failed = (response.body.items as Array<{ index?: { error?: unknown } }>).filter(
+          (item) => item.index?.error,
+        );
+        this.logger.warn(`bulk_index_sections_partial_failure`, {
+          total: sections.length,
+          failed: failed.length,
+        });
+      }
+    } catch (err) {
+      this.logger.error('bulk_index_sections_failed', err as Error);
+    }
+  }
+
+  async bulkIndexCitations(citations: CitationProjection[]): Promise<void> {
+    if (citations.length === 0) return;
+    const body = citations.flatMap((citation) => [
+      { index: { _index: this.indexCitations, _id: citation.citation_id } },
+      citation,
+    ]);
+    try {
+      const response = await this.client.bulk({ body, refresh: 'wait_for' });
+      if (response.body.errors) {
+        const failed = (response.body.items as Array<{ index?: { error?: unknown } }>).filter(
+          (item) => item.index?.error,
+        );
+        this.logger.warn(`bulk_index_citations_partial_failure`, {
+          total: citations.length,
+          failed: failed.length,
+        });
+      }
+    } catch (err) {
+      this.logger.error('bulk_index_citations_failed', err as Error);
+    }
+  }
+
+  async bulkIndexCitationTargets(targets: CitationTargetEntry[]): Promise<void> {
+    if (targets.length === 0) return;
+    const body = targets.flatMap((target) => [
+      {
+        index: {
+          _index: this.indexCitationTargets,
+          _id: `${target.identifier_type}:${target.identifier_value}`,
+        },
+      },
+      target,
+    ]);
+    try {
+      const response = await this.client.bulk({ body, refresh: 'wait_for' });
+      if (response.body.errors) {
+        const failed = (response.body.items as Array<{ index?: { error?: unknown } }>).filter(
+          (item) => item.index?.error,
+        );
+        this.logger.warn(`bulk_index_citation_targets_partial_failure`, {
+          total: targets.length,
+          failed: failed.length,
+        });
+      }
+    } catch (err) {
+      this.logger.error('bulk_index_citation_targets_failed', err as Error);
+    }
+  }
+
+  async deleteSectionsForDocument(documentId: string): Promise<void> {
+    try {
+      await this.client.deleteByQuery({
+        index: this.indexSections,
+        body: { query: { term: { document_id: documentId } } },
+        refresh: true,
+      });
+    } catch (err) {
+      const message = String((err as { message?: string }).message ?? '');
+      if (message.includes('index_not_found_exception')) return;
+      this.logger.warn(`delete_sections_for_document_failed`, err as Error);
+    }
+  }
+
+  async deleteCitationsForDocument(documentId: string): Promise<void> {
+    try {
+      await this.client.deleteByQuery({
+        index: this.indexCitations,
+        body: { query: { term: { source_document_id: documentId } } },
+        refresh: true,
+      });
+    } catch (err) {
+      const message = String((err as { message?: string }).message ?? '');
+      if (message.includes('index_not_found_exception')) return;
+      this.logger.warn(`delete_citations_for_document_failed`, err as Error);
     }
   }
 

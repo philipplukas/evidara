@@ -7,6 +7,7 @@ const ENV_KEYS = [
   'OPENSEARCH_ALIAS_WRITE',
   'OPENSEARCH_INDEX_SECTIONS',
   'OPENSEARCH_INDEX_CITATIONS',
+  'OPENSEARCH_INDEX_CITATION_TARGETS',
   'OPENSEARCH_INDEX_PROJECTION_HISTORY',
 ] as const;
 
@@ -39,6 +40,7 @@ describe('opensearch.config', () => {
       documentsWriteAlias: 'documents-write',
       sectionsIndex: 'sections',
       citationsIndex: 'citations',
+      citationTargetsIndex: 'citation-targets',
       projectionHistoryIndex: 'projection-history',
     });
   });
@@ -49,6 +51,7 @@ describe('opensearch.config', () => {
     process.env.OPENSEARCH_ALIAS_WRITE = 'docs-write-prod';
     process.env.OPENSEARCH_INDEX_SECTIONS = 'sections-prod';
     process.env.OPENSEARCH_INDEX_CITATIONS = 'citations-prod';
+    process.env.OPENSEARCH_INDEX_CITATION_TARGETS = 'citation-targets-prod';
     process.env.OPENSEARCH_INDEX_PROJECTION_HISTORY = 'projection-history-prod';
 
     const config = opensearchConfig();
@@ -59,6 +62,7 @@ describe('opensearch.config', () => {
       documentsWriteAlias: 'docs-write-prod',
       sectionsIndex: 'sections-prod',
       citationsIndex: 'citations-prod',
+      citationTargetsIndex: 'citation-targets-prod',
       projectionHistoryIndex: 'projection-history-prod',
     });
   });
