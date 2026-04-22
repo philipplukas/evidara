@@ -20,7 +20,6 @@ import {
   type LegalSearchHandoff,
   resolveLegalSearchHandoff,
 } from "../../lib/admin/navigationContext";
-import { Button } from "../primitives";
 
 const LEGAL_SEARCH_URL =
   process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim() || "http://localhost:3101";
@@ -159,19 +158,15 @@ export function AppBar() {
 
         {/* Back-to-legal-search CTA */}
         <div className="flex md:items-center self-stretch md:self-auto">
-          <Button
-            onClick={() => {
-              window.location.href = handoff.returnToUrl;
-            }}
-            variant="secondary"
-            leftIcon={<ArrowLeft size={14} strokeWidth={2.2} aria-hidden />}
-            // Override the light-surface secondary variant with the
-            // dark-chrome variant the v1 MUI button used. `cn` + twMerge
-            // resolves the conflicting classes in favour of the last one.
-            className="bg-white/[0.08] border-white/[0.28] text-[#fffdf8] hover:bg-white/[0.16] hover:border-white/[0.42] whitespace-nowrap self-stretch md:self-auto w-full md:w-auto"
+          <a
+            href={handoff.returnToUrl}
+            className="inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-[background-color,border-color,transform,box-shadow] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-focus-ring)] px-4 min-h-11 sm:h-10 text-sm bg-white/[0.08] border border-white/[0.28] text-[#fffdf8] hover:bg-white/[0.16] hover:border-white/[0.42] whitespace-nowrap self-stretch md:self-auto w-full md:w-auto"
           >
-            {ctaLabel}
-          </Button>
+            <span aria-hidden>
+              <ArrowLeft size={14} strokeWidth={2.2} />
+            </span>
+            <span>{ctaLabel}</span>
+          </a>
         </div>
       </div>
     </header>

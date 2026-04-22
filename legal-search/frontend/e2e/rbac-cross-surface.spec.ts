@@ -126,11 +126,14 @@ test.describe("@contract RBAC cross-surface (legal-search header + admin denial)
     await expect(page.getByText(`Selected item: ${selectedItem}`, { exact: true })).toBeVisible();
 
     // Disambiguate: the admin chrome renders two "Return to active search"
-    // links — the header button (exact label) and the sidebar footer
-    // ListItemButton (primary + secondary line, name contains "Open").
-    // We click the header button so the assertion remains scoped to the
+    // links — the header link (exact label) and the sidebar footer link
+    // (primary + secondary line).
+    // We click the header link so the assertion remains scoped to the
     // original cross-surface return affordance.
-    const returnLink = page.getByRole("link", { name: "Return to active search", exact: true });
+    const returnLink = page.getByRole("link", {
+      name: "Return to active search",
+      exact: true,
+    });
     await Promise.all([
       page.waitForURL((url) => {
         const parsed = new URL(url.toString());
