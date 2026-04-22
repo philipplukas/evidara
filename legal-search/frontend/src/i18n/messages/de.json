@@ -15,7 +15,24 @@
     "controlPanelUnavailable": "Kontrollbereich-URL ist f\u00fcr diese Umgebung nicht konfiguriert.",
     "profileLabel": "Profil",
     "profileOperator": "Operator",
-    "profileStandard": "Standard"
+    "profileStandard": "Standard",
+    "savedSearches": "Gespeicherte Suchen",
+    "saveSearch": "Suche speichern",
+    "removeSavedSearch": "Gespeicherte Suche entfernen",
+    "restoreSavedSearch": "Gespeicherte Suche wiederherstellen",
+    "openSettings": "Einstellungen",
+    "openKeyboardShortcuts": "Tastenkombinationen anzeigen"
+  },
+  "help": {
+    "shortcuts": {
+      "title": "Tastenkombinationen",
+      "description": "Schneller arbeiten mit der Tastatur.",
+      "focusSearch": "Suchfeld fokussieren",
+      "closePanels": "Panels schliessen",
+      "navigateResults": "Ergebnisse durchblättern",
+      "selectResult": "Ergebnis auswählen",
+      "openHelp": "Hilfe anzeigen"
+    }
   },
   "filter": {
     "filtersTitle": "Filter",
@@ -31,7 +48,13 @@
       "noMatchHint": "Versuchen Sie einen anderen Suchbegriff."
     },
     "loadFailed": "Filter konnten nicht geladen werden",
-    "loadFailedDescription": "Filteroptionen konnten nicht abgerufen werden."
+    "loadFailedDescription": "Filteroptionen konnten nicht abgerufen werden.",
+    "tooltip": {
+      "checkbox": "W\u00e4hlen Sie eine oder mehrere Optionen aus der Liste.",
+      "chip": "Klicken Sie auf die Chips, um Ergebnisse einzugrenzen.",
+      "dropdown": "W\u00e4hlen Sie einen Wert aus dem Dropdown-Men\u00fc.",
+      "toggle": "Aktivieren oder deaktivieren Sie diese Option."
+    }
   },
   "context": {
     "officialSourcesOnly": "Nur offizielle Quellen"
@@ -134,7 +157,8 @@
       "searchingScope": "Aktuellen Bereich durchsuchen\u2026",
       "loadMore": "Weitere Ergebnisse laden",
       "remaining": "({count} verbleibend)",
-      "scopeSearch": "Suche nach \u201E{query}\u201C"
+      "scopeSearch": "Suche nach \u201E{query}\u201C",
+      "exportCsv": "CSV exportieren"
     },
     "empty": {
       "pivotNoResults": "Keine Ergebnisse in diesem Pivot",

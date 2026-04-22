@@ -2,6 +2,7 @@
 
 import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { ShareButton } from "@/components/ui/ShareButton";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
@@ -68,6 +69,7 @@ export function ResultCard({
         <h3 className="min-w-0 flex-1 text-[15px] font-semibold leading-5 text-foreground">
           {result.title}
         </h3>
+        <ShareButton size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
           {isSelected && (
             <span className="inline-flex items-center rounded-full border border-accent-core/20 bg-accent-core/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-core">

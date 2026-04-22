@@ -2,6 +2,7 @@
 
 import { parseAsString, useQueryState } from "nuqs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AnalyticsEvent, track } from "@/lib/analytics";
 import type { TabViewModel } from "@/lib/types";
 
 interface DetailTabsProps {
@@ -15,7 +16,10 @@ export function DetailTabs({ tabs }: DetailTabsProps) {
     <div className="border-b border-border/60 px-3 py-2">
       <Tabs
         value={activeTab}
-        onValueChange={(value) => setActiveTab(value === "details" ? null : value)}
+        onValueChange={(value) => {
+          track(AnalyticsEvent.DETAIL_TAB_CHANGED, { tab: value, previousTab: activeTab });
+          setActiveTab(value === "details" ? null : value);
+        }}
       >
         <TabsList variant="line" className="h-auto w-full justify-start gap-1 p-0">
           {tabs.map((tab) => (

@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, Info, Search, SlidersHorizontal } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel } from "@/lib/types";
@@ -35,26 +36,28 @@ export function FilterPanel({ filters }: FilterPanelProps) {
   }
 
   return (
-    <div className="space-y-2 py-3">
-      <FilterBar filters={filters} />
-      <div className="px-4 pb-2">
-        <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[--shadow-inset-surface]">
-          <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "RESET_ALL" })}
-              className="inline-flex items-center rounded-full border border-border/70 bg-surface-panel px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {t("filter.resetAll")}
-            </button>
+    <TooltipProvider>
+      <div className="space-y-2 py-3">
+        <FilterBar filters={filters} />
+        <div className="px-4 pb-2">
+          <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[--shadow-inset-surface]">
+            <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "RESET_ALL" })}
+                className="inline-flex items-center rounded-full border border-border/70 bg-surface-panel px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {t("filter.resetAll")}
+              </button>
+            </div>
           </div>
         </div>
+        {filters.map((filter) => (
+          <FilterGroup key={filter.key} filter={filter} />
+        ))}
       </div>
-      {filters.map((filter) => (
-        <FilterGroup key={filter.key} filter={filter} />
-      ))}
-    </div>
+    </TooltipProvider>
   );
 }
 
@@ -118,6 +121,21 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
       >
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate">{filter.label}</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                role="img"
+                aria-label={t(`filter.tooltip.${filter.type}`)}
+                className="inline-flex shrink-0 text-muted-foreground/60 hover:text-muted-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Info className="h-3 w-3" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-[200px] text-xs">
+              {t(`filter.tooltip.${filter.type}`)}
+            </TooltipContent>
+          </Tooltip>
           {selectedCount > 0 && (
             <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-core/10 px-1.5 text-tiny font-semibold text-accent-core">
               {selectedCount}

@@ -30,6 +30,8 @@ interface MobileWorkspaceProps {
   onSearch: (query: string) => Promise<void>;
   showControlPlaneEntry?: boolean;
   controlPanelUrl?: string;
+  isSearchError?: boolean;
+  onSearchRetry?: () => void;
 }
 
 export function MobileWorkspace({
@@ -46,6 +48,8 @@ export function MobileWorkspace({
   onSearch,
   showControlPlaneEntry = true,
   controlPanelUrl,
+  isSearchError,
+  onSearchRetry,
 }: MobileWorkspaceProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -76,6 +80,8 @@ export function MobileWorkspace({
               onPivot={onPivot}
               onPin={onPin}
               pinnedIds={pinnedIds}
+              isError={isSearchError}
+              onRetry={onSearchRetry}
             />
           </ResultsControlRegion>
         </div>

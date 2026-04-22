@@ -15,7 +15,24 @@
     "controlPanelUnavailable": "L'URL du panneau de contr\u00f4le n'est pas configur\u00e9e pour cet environnement.",
     "profileLabel": "Profil",
     "profileOperator": "Op\u00e9rateur",
-    "profileStandard": "Standard"
+    "profileStandard": "Standard",
+    "savedSearches": "Recherches enregistr\u00e9es",
+    "saveSearch": "Enregistrer la recherche",
+    "removeSavedSearch": "Supprimer la recherche enregistr\u00e9e",
+    "restoreSavedSearch": "Restaurer la recherche enregistr\u00e9e",
+    "openSettings": "Param\u00e8tres",
+    "openKeyboardShortcuts": "Afficher les raccourcis clavier"
+  },
+  "help": {
+    "shortcuts": {
+      "title": "Raccourcis clavier",
+      "description": "Travaillez plus vite avec le clavier.",
+      "focusSearch": "Mettre le champ de recherche en surbrillance",
+      "closePanels": "Fermer les panneaux",
+      "navigateResults": "Parcourir les r\u00e9sultats",
+      "selectResult": "S\u00e9lectionner un r\u00e9sultat",
+      "openHelp": "Afficher l'aide"
+    }
   },
   "filter": {
     "filtersTitle": "Filtres",
@@ -31,7 +48,13 @@
       "noMatchHint": "Essayez un autre terme de recherche."
     },
     "loadFailed": "Impossible de charger les filtres",
-    "loadFailedDescription": "Les options de filtre n'ont pas pu \u00eatre r\u00e9cup\u00e9r\u00e9es."
+    "loadFailedDescription": "Les options de filtre n'ont pas pu \u00eatre r\u00e9cup\u00e9r\u00e9es.",
+    "tooltip": {
+      "checkbox": "S\u00e9lectionnez une ou plusieurs options dans la liste.",
+      "chip": "Cliquez sur les chips pour affiner les r\u00e9sultats.",
+      "dropdown": "Choisissez une valeur dans le menu d\u00e9roulant.",
+      "toggle": "Activez ou d\u00e9sactivez cette option."
+    }
   },
   "context": {
     "officialSourcesOnly": "Sources officielles uniquement"
@@ -134,7 +157,8 @@
       "searchingScope": "Recherche dans le p\u00e9rim\u00e8tre courant\u2026",
       "loadMore": "Charger plus de r\u00e9sultats",
       "remaining": "({count} restants)",
-      "scopeSearch": "Recherche de \u00ab\u00a0{query}\u00a0\u00bb"
+      "scopeSearch": "Recherche de \u00ab\u00a0{query}\u00a0\u00bb",
+      "exportCsv": "Exporter en CSV"
     },
     "empty": {
       "pivotNoResults": "Aucun r\u00e9sultat dans ce pivot",

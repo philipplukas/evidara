@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Download, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ErrorState } from "@/components/ui/error-state";
 import type { ResultSetSource, SearchResultViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 import { ResultCard } from "./ResultCard";
@@ -18,6 +19,13 @@ function describeScopeTrail(
   }
 
   return `${describeScopeTrail(source.parentSource, scopeSearchFn)} \u00b7 ${source.label}`;
+}
+
+function escapeCsvField(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
 }
 
 function getEmptyStateCopy(
@@ -56,6 +64,12 @@ interface ResultListProps {
   isLoading?: boolean;
   /** Optional query string for contextual empty state */
   query?: string;
+  /** When true, show an error state instead of results */
+  isError?: boolean;
+  /** Callback to retry the failed operation */
+  onRetry?: () => void;
+  /** Callback to trigger a new search */
+  onSearch?: (query: string) => void;
 }
 
 export function ResultList({
@@ -67,6 +81,9 @@ export function ResultList({
   pinnedIds,
   isLoading,
   query,
+  isError,
+  onRetry,
+  onSearch: _onSearch,
 }: ResultListProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { state } = useWorkspace();
@@ -83,6 +100,24 @@ export function ResultList({
     previousResultSignatureRef.current = resultSignature;
     setVisibleCount(PAGE_SIZE);
   }, [resultSignature]);
+
+  const handleExportCsv = useCallback(() => {
+    const header = ["Title", "Type", "Subtitle", "Snippet"].map(escapeCsvField).join(",");
+    const rows = results.map((r) =>
+      [r.title, r.type, r.subtitle, r.snippet].map(escapeCsvField).join(","),
+    );
+    const csv = [header, ...rows].join("\n");
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "results.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [results]);
 
   const visibleResults = results.slice(0, visibleCount);
   const hasMore = visibleCount < results.length;
@@ -107,6 +142,16 @@ export function ResultList({
         <p className="text-sm font-medium text-foreground">{tList("searchingScope")}</p>
         <p className="mt-1 max-w-sm text-xs text-muted-foreground">{scopeTrail}</p>
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <ErrorState
+        message={tEmpty("searchFailed")}
+        description={tEmpty("searchFailedDescription")}
+        onRetry={onRetry}
+      />
     );
   }
 
@@ -136,12 +181,22 @@ export function ResultList({
           <span className="block text-xs font-semibold text-foreground">{resultsSummary}</span>
           <span className="block truncate text-[11px] text-muted-foreground">{scopeTrail}</span>
         </div>
-        <span
-          className="inline-flex shrink-0 items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80"
-          title={tList("sortedByRelevanceHelp")}
-        >
-          {tList("sortedByRelevance")}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80"
+            title={tList("sortedByRelevanceHelp")}
+          >
+            {tList("sortedByRelevance")}
+          </span>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80 transition-colors hover:border-accent-core/20 hover:bg-muted/40 hover:text-foreground"
+          >
+            <Download className="h-3 w-3" />
+            {tList("exportCsv")}
+          </button>
+        </div>
       </div>
 
       {/* Results */}
