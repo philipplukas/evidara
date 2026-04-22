@@ -58,12 +58,17 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
               onClick={() => onPin(detail.id, safeTitle, detail.type)}
               active={isPinned}
               title={isPinned ? t("unpin") : t("pin")}
+              className="min-w-11 sm:min-w-0"
             >
               <MapPin className="h-3 w-3" />
             </AccentButton>
           )}
-          <ShareButton size="sm" />
-          <AccentButton onClick={() => window.print()} title={t("print")}>
+          <ShareButton size="sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" />
+          <AccentButton
+            onClick={() => window.print()}
+            title={t("print")}
+            className="min-w-11 sm:min-w-0"
+          >
             <Printer className="h-3 w-3" />
           </AccentButton>
           <AccentButton
@@ -73,6 +78,7 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
               track(AnalyticsEvent.SHARE_LINK_COPIED, {});
             }}
             title={t("copyCitation")}
+            className="min-w-11 sm:min-w-0"
           >
             <Copy className="h-3 w-3" />
           </AccentButton>

@@ -260,8 +260,12 @@ export function AppHeader({
             <div className="app-header__search-shell flex flex-col gap-2 rounded-3xl border border-border/70 bg-surface-input/95 p-2.5 shadow-inner transition-shadow focus-within:ring-2 focus-within:ring-focus-ring">
               <div className="flex items-center gap-2">
                 <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <label htmlFor="evidara-search" className="sr-only">
+                  Rechtsdokumente durchsuchen
+                </label>
                 <input
                   ref={searchInputRef}
+                  id="evidara-search"
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
@@ -428,13 +432,13 @@ export function AppHeader({
             </div>
 
             <ThemeToggle />
-            <ShareButton size="sm" />
+            <ShareButton size="sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" />
             <PreferencesDialog>
               <button
                 type="button"
                 aria-label={t("header.openSettings")}
                 title={t("header.openSettings")}
-                className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Settings2 className="h-4 w-4" />
               </button>
@@ -444,7 +448,7 @@ export function AppHeader({
               onClick={() => setShowShortcuts(true)}
               aria-label={t("header.openKeyboardShortcuts")}
               title={t("header.openKeyboardShortcuts")}
-              className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <HelpCircle className="h-4 w-4" />
             </button>

@@ -31,9 +31,12 @@ export function FilterBar({ filters }: FilterBarProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 sm:px-5">
+    <fieldset
+      aria-label="Aktive Filter"
+      className="flex flex-wrap items-center gap-1.5 border-0 px-4 py-2 sm:px-5"
+    >
       <span className="shrink-0 text-tiny font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        {activeCount} {activeCount === 1 ? "active filter" : "active filters"}
+        {activeCount} {activeCount === 1 ? t("activeFilterSingular") : t("activeFilterPlural")}
       </span>
       {activeRefinements.map((item) => (
         <span
@@ -47,7 +50,7 @@ export function FilterBar({ filters }: FilterBarProps) {
             type="button"
             onClick={() => dispatch({ type: "CLEAR_REFINEMENT", field: item.field })}
             className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-accent-core/10"
-            aria-label={`Remove ${item.filterLabel} filter`}
+            aria-label={`${item.filterLabel} Filter entfernen`}
           >
             <X className="h-3 w-3" />
           </button>
@@ -60,6 +63,6 @@ export function FilterBar({ filters }: FilterBarProps) {
       >
         {t("clearAll")}
       </button>
-    </div>
+    </fieldset>
   );
 }

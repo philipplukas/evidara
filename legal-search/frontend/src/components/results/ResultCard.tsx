@@ -20,7 +20,15 @@ const iconComponents: Record<string, React.ComponentType<{ className?: string }>
 function IconCell({ iconKey, className }: { iconKey?: string; className?: string }) {
   if (!iconKey) return null;
   if (isFlagIcon(iconKey)) {
-    return <img src={getFlagSrc(iconKey)!} alt="" width={14} height={14} className={className} />;
+    return (
+      <img
+        src={getFlagSrc(iconKey)!}
+        alt={iconKey.toUpperCase()}
+        width={14}
+        height={14}
+        className={className}
+      />
+    );
   }
   const text = getIcon(iconKey);
   if (!text) return null;
@@ -49,7 +57,6 @@ export function ResultCard({
     <article
       aria-current={isSelected ? "true" : undefined}
       aria-label={t("openResult", { title: result.title })}
-      onClick={() => onFocus(result.id)}
       className={`group cursor-pointer border-b border-border/60 px-4 py-3.5 transition-all
         transition-motion-medium focus-within:ring-2 focus-within:ring-focus-ring sm:px-5
         ${
@@ -66,8 +73,17 @@ export function ResultCard({
 
       {/* Title row */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-        <h3 className="min-w-0 flex-1 text-[15px] font-semibold leading-5 text-foreground">
-          {result.title}
+        <h3 className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFocus(result.id);
+            }}
+            className="text-left text-[15px] font-semibold leading-5 text-foreground hover:text-accent-core focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:rounded"
+          >
+            {result.title}
+          </button>
         </h3>
         <ShareButton size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">

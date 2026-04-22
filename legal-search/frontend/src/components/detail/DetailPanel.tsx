@@ -40,7 +40,7 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <section aria-label="Dokumentdetail" className="flex h-full min-h-0 flex-col">
       <DetailPanelHeader detail={detail} onPin={onPin} isPinned={isPinned} />
       <DetailTabs tabs={detail.tabs} />
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -73,7 +73,7 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
             />
           ))}
       </div>
-    </div>
+    </section>
   );
 }
 

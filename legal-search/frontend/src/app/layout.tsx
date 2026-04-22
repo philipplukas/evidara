@@ -35,6 +35,12 @@ export default function RootLayout({
         className="min-h-full flex flex-col font-[family-name:var(--font-inter)]"
         style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
       >
+        <a
+          href="#main-content"
+          className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-0 focus-visible:left-0 focus-visible:z-50 focus-visible:bg-primary focus-visible:text-white focus-visible:px-4 focus-visible:py-2 focus-visible:rounded-br-lg"
+        >
+          Zum Hauptinhalt springen
+        </a>
         <Suspense>
           <Providers>{children}</Providers>
         </Suspense>

@@ -271,7 +271,8 @@ export default function WorkspaceClient({
       />
       <ContextBar context={searchContext} />
 
-      <div className="min-h-0 flex-1 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
+      <main id="main-content" className="min-h-0 flex-1 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
+        <h1 className="sr-only">Evidara Rechtsrecherche</h1>
         <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left: Filters */}
           <ResizablePanel
@@ -344,7 +345,7 @@ export default function WorkspaceClient({
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
-      </div>
+      </main>
     </div>
   );
 }

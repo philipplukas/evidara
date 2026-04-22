@@ -39,6 +39,8 @@
     "searchPlaceholder": "Suchen...",
     "yes": "Ja",
     "clearAll": "Verfeinerungen l\u00f6schen",
+    "activeFilterSingular": "aktiver Filter",
+    "activeFilterPlural": "aktive Filter",
     "resetAll": "Alles zur\u00fccksetzen",
     "sheetDescription": "Suchergebnisse nach Gerichtsbarkeit, Sprache, Instanz und weiteren Kriterien einschr\u00e4nken.",
     "empty": {

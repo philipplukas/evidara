@@ -32,7 +32,7 @@ export function EmptyState({ icon: Icon, title, description, action, className }
       role="status"
       aria-live="polite"
     >
-      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4" aria-hidden="true">
         <Icon className="w-5 h-5 text-muted-foreground/40" />
       </div>
       <h3 className="mb-1 text-sm font-medium text-foreground">{title}</h3>

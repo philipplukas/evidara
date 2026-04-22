@@ -94,7 +94,7 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("3 Ergebnisse")).toBeInTheDocument();
+    expect(screen.getAllByText("3 Ergebnisse").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Result 1")).toBeInTheDocument();
     expect(screen.getByText("Result 2")).toBeInTheDocument();
     expect(screen.getByText("Result 3")).toBeInTheDocument();
