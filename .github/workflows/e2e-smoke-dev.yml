@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   smoke-dev:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy-v2' }}
     environment: dev
     env:
       TARGET_ENV: dev

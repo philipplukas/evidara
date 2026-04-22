@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   release-readiness:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     # Dev-first: set repository variable RELEASE_READINESS_GITHUB_ENVIRONMENT to "dev"
     # (GitHub Environment must exist with WIF secrets for that env — same pattern as E2E Smoke Dev).
     environment: ${{ vars.RELEASE_READINESS_GITHUB_ENVIRONMENT || 'staging' }}
