@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { filterByDensity } from "@/lib/metadata-visibility";
 import type { MetadataDensity, MetadataField } from "@/lib/types";
 import { SectionLabel } from "../primitives";
@@ -39,11 +39,11 @@ export function MetadataList({
   return (
     <div className="space-y-2">
       {showHeading ? <SectionLabel>{t("metadataHeading")}</SectionLabel> : null}
-      <div className={density === "compact" ? "space-y-0.5" : "space-y-1.5"}>
+      <dl className={density === "compact" ? "space-y-0.5" : "space-y-1.5"}>
         {visibleFields.map((field, i) => (
           <MetadataRow key={i} field={field} compact={density === "compact"} />
         ))}
-      </div>
+      </dl>
       {(canExpand || canCollapse) && (
         <button
           type="button"
@@ -74,12 +74,12 @@ function MetadataRow({ field, compact }: { field: MetadataField; compact: boolea
 
   return (
     <div className={`flex items-baseline gap-2 ${compact ? "text-[10px]" : "text-xs"}`}>
-      <span className="text-muted-foreground w-28 shrink-0 font-medium">{field.label}</span>
-      <span
+      <dt className="text-muted-foreground w-28 shrink-0 font-medium">{field.label}</dt>
+      <dd
         className={
           hasValue
-            ? "text-foreground/80 flex items-center gap-1"
-            : "text-muted-foreground/70 italic flex items-center gap-1"
+            ? "text-foreground/80 flex items-center gap-1 m-0"
+            : "text-muted-foreground/70 italic flex items-center gap-1 m-0"
         }
       >
         {field.iconKey && isFlagIcon(field.iconKey) ? (
@@ -97,7 +97,7 @@ function MetadataRow({ field, compact }: { field: MetadataField; compact: boolea
           })()
         )}
         {hasValue ? field.value : t("notAvailable")}
-      </span>
+      </dd>
     </div>
   );
 }

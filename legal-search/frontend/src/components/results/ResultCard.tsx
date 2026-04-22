@@ -2,7 +2,8 @@
 
 import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { ShareButton } from "@/components/ui/ShareButton";
+import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
 
@@ -19,7 +20,15 @@ const iconComponents: Record<string, React.ComponentType<{ className?: string }>
 function IconCell({ iconKey, className }: { iconKey?: string; className?: string }) {
   if (!iconKey) return null;
   if (isFlagIcon(iconKey)) {
-    return <img src={getFlagSrc(iconKey)!} alt="" width={14} height={14} className={className} />;
+    return (
+      <img
+        src={getFlagSrc(iconKey)!}
+        alt={iconKey.toUpperCase()}
+        width={14}
+        height={14}
+        className={className}
+      />
+    );
   }
   const text = getIcon(iconKey);
   if (!text) return null;
@@ -65,9 +74,19 @@ export function ResultCard({
 
       {/* Title row */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-        <h3 className="min-w-0 flex-1 text-[15px] font-semibold leading-5 text-foreground">
-          {result.title}
+        <h3 className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFocus(result.id);
+            }}
+            className="text-left text-[15px] font-semibold leading-5 text-foreground hover:text-accent-core focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:rounded"
+          >
+            {result.title}
+          </button>
         </h3>
+        <ShareButton size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
           {isSelected && (
             <span className="inline-flex items-center rounded-full border border-accent-core/20 bg-accent-core/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-core">

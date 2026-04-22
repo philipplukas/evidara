@@ -79,7 +79,7 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("Searching current scope…")).toBeInTheDocument();
+    expect(screen.getByText("Aktuellen Bereich durchsuchen…")).toBeInTheDocument();
   });
 
   it("renders result count and cards", () => {
@@ -94,16 +94,17 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("3 results")).toBeInTheDocument();
+    expect(screen.getAllByText("3 Ergebnisse").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Result 1")).toBeInTheDocument();
     expect(screen.getByText("Result 2")).toBeInTheDocument();
     expect(screen.getByText("Result 3")).toBeInTheDocument();
   });
 
   it("shows Load more button when results exceed page size", () => {
+    // Default resultsPerPage preference is 25
     renderWithProviders(
       <ResultList
-        results={makeResults(15)}
+        results={makeResults(30)}
         selectedId={null}
         onFocus={vi.fn()}
         onPivot={vi.fn()}
@@ -112,18 +113,19 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getByText("Load more results")).toBeInTheDocument();
-    expect(screen.getByText("(5 remaining)")).toBeInTheDocument();
-    // Only first 10 visible
+    expect(screen.getByText("Weitere Ergebnisse laden")).toBeInTheDocument();
+    expect(screen.getByText("(5 verbleibend)")).toBeInTheDocument();
+    // Only first 25 visible
     expect(screen.getByText("Result 1")).toBeInTheDocument();
-    expect(screen.getByText("Result 10")).toBeInTheDocument();
-    expect(screen.queryByText("Result 11")).not.toBeInTheDocument();
+    expect(screen.getByText("Result 25")).toBeInTheDocument();
+    expect(screen.queryByText("Result 26")).not.toBeInTheDocument();
   });
 
   it("loads more results when button is clicked", () => {
+    // Default resultsPerPage preference is 25
     renderWithProviders(
       <ResultList
-        results={makeResults(15)}
+        results={makeResults(30)}
         selectedId={null}
         onFocus={vi.fn()}
         onPivot={vi.fn()}
@@ -132,11 +134,11 @@ describe("ResultList", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Load more results"));
-    expect(screen.getByText("Result 11")).toBeInTheDocument();
-    expect(screen.getByText("Result 15")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Weitere Ergebnisse laden"));
+    expect(screen.getByText("Result 26")).toBeInTheDocument();
+    expect(screen.getByText("Result 30")).toBeInTheDocument();
     // No more "Load more" button
-    expect(screen.queryByText("Load more results")).not.toBeInTheDocument();
+    expect(screen.queryByText("Weitere Ergebnisse laden")).not.toBeInTheDocument();
   });
 
   it("shows pivot-aware empty state when the current scope is empty", async () => {

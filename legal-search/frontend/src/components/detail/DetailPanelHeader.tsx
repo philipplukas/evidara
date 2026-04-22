@@ -1,8 +1,11 @@
 "use client";
 
-import { Copy, MapPin } from "lucide-react";
+import { Copy, MapPin, Printer } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { MetadataList } from "@/components/detail/MetadataList";
+import { ShareButton } from "@/components/ui/ShareButton";
+import { toast } from "@/hooks/use-toast";
+import { AnalyticsEvent, track } from "@/lib/analytics";
 import { enrichMetadataRows } from "@/lib/metadata-visibility";
 import type { DetailViewModel } from "@/lib/types";
 import { AccentButton } from "../primitives";
@@ -55,13 +58,27 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
               onClick={() => onPin(detail.id, safeTitle, detail.type)}
               active={isPinned}
               title={isPinned ? t("unpin") : t("pin")}
+              className="min-w-11 sm:min-w-0"
             >
               <MapPin className="h-3 w-3" />
             </AccentButton>
           )}
+          <ShareButton size="sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" />
           <AccentButton
-            onClick={() => navigator.clipboard.writeText(safeTitle)}
+            onClick={() => window.print()}
+            title={t("print")}
+            className="min-w-11 sm:min-w-0"
+          >
+            <Printer className="h-3 w-3" />
+          </AccentButton>
+          <AccentButton
+            onClick={() => {
+              navigator.clipboard.writeText(safeTitle);
+              toast.success(t("copyCitation"));
+              track(AnalyticsEvent.SHARE_LINK_COPIED, {});
+            }}
             title={t("copyCitation")}
+            className="min-w-11 sm:min-w-0"
           >
             <Copy className="h-3 w-3" />
           </AccentButton>

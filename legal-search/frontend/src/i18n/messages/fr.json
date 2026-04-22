@@ -1,140 +1,195 @@
 {
   "header": {
-    "searchPlaceholder": "Rechercher un article, un arrêt, un commentaire ou une citation…",
+    "searchPlaceholder": "Rechercher un article, un arr\u00eat, un commentaire ou une citation\u2026",
     "searchAction": "Rechercher",
     "searchingAction": "Recherche en cours",
     "clearSearch": "Effacer la recherche",
-    "recentSearches": "Recherches récentes",
+    "recentSearches": "Recherches r\u00e9centes",
     "filters": "Filtres",
     "trail": "Historique",
-    "pinned": "Épinglés",
-    "controlPanel": "Panneau de contrôle",
+    "pinned": "\u00c9pingl\u00e9s",
+    "controlPanel": "Panneau de contr\u00f4le",
     "languageGroup": "Langue",
     "openUserMenu": "Ouvrir le menu utilisateur",
-    "controlPanelRestricted": "Le panneau de contrôle est réservé au profil administrateur.",
-    "controlPanelUnavailable": "L'URL du panneau de contrôle n'est pas configurée pour cet environnement.",
+    "controlPanelRestricted": "Le panneau de contr\u00f4le est r\u00e9serv\u00e9 au profil administrateur.",
+    "controlPanelUnavailable": "L'URL du panneau de contr\u00f4le n'est pas configur\u00e9e pour cet environnement.",
     "profileLabel": "Profil",
-    "profileOperator": "Opérateur",
-    "profileStandard": "Standard"
+    "profileOperator": "Op\u00e9rateur",
+    "profileStandard": "Standard",
+    "savedSearches": "Recherches enregistr\u00e9es",
+    "saveSearch": "Enregistrer la recherche",
+    "removeSavedSearch": "Supprimer la recherche enregistr\u00e9e",
+    "restoreSavedSearch": "Restaurer la recherche enregistr\u00e9e",
+    "openSettings": "Param\u00e8tres",
+    "openKeyboardShortcuts": "Afficher les raccourcis clavier"
+  },
+  "help": {
+    "shortcuts": {
+      "title": "Raccourcis clavier",
+      "description": "Travaillez plus vite avec le clavier.",
+      "focusSearch": "Mettre le champ de recherche en surbrillance",
+      "closePanels": "Fermer les panneaux",
+      "navigateResults": "Parcourir les r\u00e9sultats",
+      "selectResult": "S\u00e9lectionner un r\u00e9sultat",
+      "openHelp": "Afficher l'aide"
+    }
   },
   "filter": {
     "filtersTitle": "Filtres",
     "searchPlaceholder": "Rechercher...",
     "yes": "Oui",
     "clearAll": "Effacer les filtres",
-    "resetAll": "Réinitialiser",
-    "sheetDescription": "Affiner les résultats par juridiction, langue, instance et autres critères.",
+    "activeFilterSingular": "filtre actif",
+    "activeFilterPlural": "filtres actifs",
+    "resetAll": "R\u00e9initialiser",
+    "sheetDescription": "Affiner les r\u00e9sultats par juridiction, langue, instance et autres crit\u00e8res.",
     "empty": {
       "title": "Aucun filtre disponible",
-      "description": "Le jeu de résultats actuel ne propose pas encore de filtres.",
+      "description": "Le jeu de r\u00e9sultats actuel ne propose pas encore de filtres.",
       "noMatch": "Aucune option correspondante",
       "noMatchHint": "Essayez un autre terme de recherche."
+    },
+    "loadFailed": "Impossible de charger les filtres",
+    "loadFailedDescription": "Les options de filtre n'ont pas pu \u00eatre r\u00e9cup\u00e9r\u00e9es.",
+    "tooltip": {
+      "checkbox": "S\u00e9lectionnez une ou plusieurs options dans la liste.",
+      "chip": "Cliquez sur les chips pour affiner les r\u00e9sultats.",
+      "dropdown": "Choisissez une valeur dans le menu d\u00e9roulant.",
+      "toggle": "Activez ou d\u00e9sactivez cette option."
     }
   },
   "context": {
     "officialSourcesOnly": "Sources officielles uniquement"
   },
   "detail": {
-    "metadataHeading": "Métadonnées",
-    "showMore": "Afficher {count} champs supplémentaires",
+    "metadataHeading": "M\u00e9tadonn\u00e9es",
+    "showMore": "Afficher {count} champs suppl\u00e9mentaires",
     "showLess": "Afficher moins",
     "notAvailable": "Non disponible",
-    "sheetDescription": "Vue détaillée du résultat de recherche sélectionné.",
+    "sheetDescription": "Vue d\u00e9taill\u00e9e du r\u00e9sultat de recherche s\u00e9lectionn\u00e9.",
     "tabs": {
-      "documentDetails": "Détails du document",
+      "documentDetails": "D\u00e9tails du document",
       "content": "Contenu",
-      "references": "Références",
-      "relatedMaterials": "Documents liés",
+      "references": "R\u00e9f\u00e9rences",
+      "relatedMaterials": "Documents li\u00e9s",
       "annotations": "Annotations",
       "localStructure": "Structure locale",
       "showAll": "Tout afficher",
       "current": "Actuel"
     },
     "descriptions": {
-      "details": "Les métadonnées apparaissent d'abord, puis le corps du document pour une lecture plus rapide.",
-      "references": "Les références entrantes et sortantes sont séparées pour vous permettre de suivre le fil des citations dans une seule direction à la fois.",
-      "related": "Les résultats liés sont regroupés par thème pour faire ressortir d'abord les connexions les plus fortes.",
-      "annotations": "Les annotations sont regroupées par thème pour faciliter le balayage sans perdre le contexte de la source.",
-      "structure": "Naviguer dans le plan permet de garder la lecture ancrée dans le document courant."
+      "details": "Les m\u00e9tadonn\u00e9es apparaissent d'abord, puis le corps du document pour une lecture plus rapide.",
+      "references": "Les r\u00e9f\u00e9rences entrantes et sortantes sont s\u00e9par\u00e9es pour vous permettre de suivre le fil des citations dans une seule direction \u00e0 la fois.",
+      "related": "Les r\u00e9sultats li\u00e9s sont regroup\u00e9s par th\u00e8me pour faire ressortir d'abord les connexions les plus fortes.",
+      "annotations": "Les annotations sont regroup\u00e9es par th\u00e8me pour faciliter le balayage sans perdre le contexte de la source.",
+      "structure": "Naviguer dans le plan permet de garder la lecture ancr\u00e9e dans le document courant."
     },
     "empty": {
-      "noSelection": "Aucun résultat sélectionné",
-      "label": "Détails du document",
-      "description": "Sélectionnez un résultat pour afficher les détails, les documents liés et les références.",
-      "noMetadataTitle": "Aucune métadonnée disponible",
-      "noMetadataDescription": "Les métadonnées apparaîtront ici une fois le document traité.",
-      "noDocumentDetailsTitle": "Aucun détail de document",
-      "noDocumentDetailsDescription": "Ce résultat n'expose pas encore de métadonnées ni de contenu.",
-      "noReferencesTitle": "Aucune référence",
-      "noReferencesDescription": "Les références apparaîtront ici lorsque le document citera d'autres sources ou sera lui-même cité.",
-      "noRelatedTitle": "Aucun document lié",
-      "noRelatedDescription": "Essayez un autre résultat ou pivotez depuis un match plus fort pour élargir le contexte de lecture.",
+      "noSelection": "Aucun r\u00e9sultat s\u00e9lectionn\u00e9",
+      "label": "D\u00e9tails du document",
+      "description": "S\u00e9lectionnez un r\u00e9sultat pour afficher les d\u00e9tails, les documents li\u00e9s et les r\u00e9f\u00e9rences.",
+      "noMetadataTitle": "Aucune m\u00e9tadonn\u00e9e disponible",
+      "noMetadataDescription": "Les m\u00e9tadonn\u00e9es appara\u00eetront ici une fois le document trait\u00e9.",
+      "noDocumentDetailsTitle": "Aucun d\u00e9tail de document",
+      "noDocumentDetailsDescription": "Ce r\u00e9sultat n'expose pas encore de m\u00e9tadonn\u00e9es ni de contenu.",
+      "noReferencesTitle": "Aucune r\u00e9f\u00e9rence",
+      "noReferencesDescription": "Les r\u00e9f\u00e9rences appara\u00eetront ici lorsque le document citera d'autres sources ou sera lui-m\u00eame cit\u00e9.",
+      "noRelatedTitle": "Aucun document li\u00e9",
+      "noRelatedDescription": "Essayez un autre r\u00e9sultat ou pivotez depuis un match plus fort pour \u00e9largir le contexte de lecture.",
       "noAnnotationsTitle": "Aucune annotation disponible",
-      "noAnnotationsDescription": "Les annotations apparaîtront ici lorsque le document contiendra des commentaires ou des notes de revue.",
+      "noAnnotationsDescription": "Les annotations appara\u00eetront ici lorsque le document contiendra des commentaires ou des notes de revue.",
       "noStructureTitle": "Aucune structure locale",
-      "noStructureDescription": "Ce document ne propose pas encore de plan navigable."
+      "noStructureDescription": "Ce document ne propose pas encore de plan navigable.",
+      "loadFailed": "Impossible de charger le document",
+      "loadFailedDescription": "Le document n'a pas pu \u00eatre r\u00e9cup\u00e9r\u00e9. Veuillez r\u00e9essayer.",
+      "loadFailedRetry": "R\u00e9essayer"
     },
     "fallbackTitle": "Document sans titre",
-    "fallbackSubtitle": "Aucun résumé disponible",
+    "fallbackSubtitle": "Aucun r\u00e9sum\u00e9 disponible",
     "translatedContent": "Contenu traduit",
-    "pin": "Épingler",
-    "unpin": "Détacher",
+    "pin": "\u00c9pingler",
+    "unpin": "D\u00e9tacher",
     "copyCitation": "Copier la citation",
+    "print": "Imprimer",
     "confidenceSuffix": "confiance",
     "sourcesSuffix": "sources"
   },
   "results": {
     "exactMatches": {
       "title": "Correspondances exactes",
-      "confidence": "Confiance élevée",
-      "description": "Ces résultats correspondent exactement à la requête dans le périmètre courant.",
-      "found": "{count} trouvés",
+      "confidence": "Confiance \u00e9lev\u00e9e",
+      "description": "Ces r\u00e9sultats correspondent exactement \u00e0 la requ\u00eate dans le p\u00e9rim\u00e8tre courant.",
+      "found": "{count} trouv\u00e9s",
       "openLabel": "Ouvrir la correspondance exacte {title}",
       "translatedFallback": "Traduit"
     },
     "scope": {
-      "currentScope": "Périmètre courant",
-      "previousScope": "Périmètre précédent",
+      "currentScope": "P\u00e9rim\u00e8tre courant",
+      "previousScope": "P\u00e9rim\u00e8tre pr\u00e9c\u00e9dent",
       "rootSearch": "Recherche initiale",
-      "refinedScope": "Périmètre affiné",
-      "back": "Retour au périmètre précédent",
-      "searchFor": "Recherche de « {query} »",
+      "refinedScope": "P\u00e9rim\u00e8tre affin\u00e9",
+      "back": "Retour au p\u00e9rim\u00e8tre pr\u00e9c\u00e9dent",
+      "searchFor": "Recherche de \u00ab\u00a0{query}\u00a0\u00bb",
       "reopen": "Rouvrir {scope}",
-      "pivotDescription": "Le périmètre a été resserré par rapport au jeu de résultats précédent pour garder les éléments actuels plus ciblés."
+      "pivotDescription": "Le p\u00e9rim\u00e8tre a \u00e9t\u00e9 resserr\u00e9 par rapport au jeu de r\u00e9sultats pr\u00e9c\u00e9dent pour garder les \u00e9l\u00e9ments actuels plus cibl\u00e9s."
     },
     "sourceTypes": {
       "all": "Tout",
       "law": "Lois",
-      "decision": "Arrêts",
-      "rechtssatz": "Rechtssätze",
+      "decision": "Arr\u00eats",
+      "rechtssatz": "Rechtss\u00e4tze",
       "commentary": "Commentaires"
     },
     "card": {
-      "selected": "Sélectionné",
-      "pin": "Épingler",
-      "pinned": "Épinglé",
-      "loadMore": "Charger plus de résultats",
+      "selected": "S\u00e9lectionn\u00e9",
+      "pin": "\u00c9pingler",
+      "pinned": "\u00c9pingl\u00e9",
+      "loadMore": "Charger plus de r\u00e9sultats",
       "remaining": "{count} restants",
       "openResult": "Ouvrir {title}",
-      "seeRelated": "Voir {count} {label} associés",
-      "pinResult": "Épingler le résultat",
-      "unpinResult": "Détacher le résultat"
+      "seeRelated": "Voir {count} {label} associ\u00e9s",
+      "pinResult": "\u00c9pingler le r\u00e9sultat",
+      "unpinResult": "D\u00e9tacher le r\u00e9sultat"
     },
     "list": {
       "sortedByRelevance": "Tri par pertinence",
-      "sortedByRelevanceHelp": "Les résultats sont classés par pertinence algorithmique (aucune validation manuelle de chaque résultat)."
+      "sortedByRelevanceHelp": "Les r\u00e9sultats sont class\u00e9s par pertinence algorithmique (aucune validation manuelle de chaque r\u00e9sultat).",
+      "resultCount": "{count, plural, one {# r\u00e9sultat} other {# r\u00e9sultats}}",
+      "resultCountPartial": "{visible} sur {total, plural, one {# r\u00e9sultat} other {# r\u00e9sultats}} affich\u00e9s",
+      "searchingScope": "Recherche dans le p\u00e9rim\u00e8tre courant\u2026",
+      "loadMore": "Charger plus de r\u00e9sultats",
+      "remaining": "({count} restants)",
+      "scopeSearch": "Recherche de \u00ab\u00a0{query}\u00a0\u00bb",
+      "exportCsv": "Exporter en CSV"
     },
     "empty": {
-      "pivotNoResults": "Aucun résultat dans ce pivot",
-      "pivotHint": "Revenez au périmètre précédent ou essayez une autre connexion.",
-      "noResults": "Aucun résultat pour \"{query}\"",
-      "noResultsHint": "Essayez d'élargir la requête ou d'ajuster les filtres.",
-      "startTitle": "Démarrer la recherche",
-      "startHint": "Saisissez une requête pour explorer les lois, arrêts et commentaires."
+      "pivotNoResults": "Aucun r\u00e9sultat dans ce pivot",
+      "pivotHint": "Revenez au p\u00e9rim\u00e8tre pr\u00e9c\u00e9dent ou essayez une autre connexion.",
+      "noResults": "Aucun r\u00e9sultat pour \"{query}\"",
+      "noResultsHint": "Essayez d'\u00e9largir la requ\u00eate ou d'ajuster les filtres.",
+      "startTitle": "D\u00e9marrer la recherche",
+      "startHint": "Saisissez une requ\u00eate pour explorer les lois, arr\u00eats et commentaires.",
+      "searchFailed": "La recherche a \u00e9chou\u00e9",
+      "searchFailedDescription": "Impossible de charger les r\u00e9sultats pour cette requ\u00eate. Veuillez r\u00e9essayer.",
+      "searchFailedRetry": "R\u00e9essayer"
     }
   },
+  "theme": {
+    "switchToLight": "Passer au mode clair",
+    "switchToDark": "Passer au mode sombre"
+  },
+  "share": {
+    "copyLink": "Copier le lien",
+    "linkCopied": "Lien copi\u00e9"
+  },
+  "error": {
+    "title": "Une erreur est survenue",
+    "fallbackMessage": "Une erreur inattendue est survenue lors du chargement de l'espace de travail.",
+    "errorId": "ID d'erreur\u00a0: {digest}",
+    "tryAgain": "R\u00e9essayer"
+  },
   "workspace": {
-    "detailLoadFailed": "Impossible de charger les détails du document.",
-    "resultsControlRegion": "Résultats de recherche et commandes"
+    "detailLoadFailed": "Impossible de charger les d\u00e9tails du document.",
+    "resultsControlRegion": "R\u00e9sultats de recherche et commandes"
   }
 }

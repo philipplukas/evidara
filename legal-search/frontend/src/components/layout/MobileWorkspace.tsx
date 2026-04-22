@@ -30,6 +30,8 @@ interface MobileWorkspaceProps {
   onSearch: (query: string) => Promise<void>;
   showControlPlaneEntry?: boolean;
   controlPanelUrl?: string;
+  isSearchError?: boolean;
+  onSearchRetry?: () => void;
 }
 
 export function MobileWorkspace({
@@ -46,6 +48,8 @@ export function MobileWorkspace({
   onSearch,
   showControlPlaneEntry = true,
   controlPanelUrl,
+  isSearchError,
+  onSearchRetry,
 }: MobileWorkspaceProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -59,7 +63,8 @@ export function MobileWorkspace({
       />
       <ContextBar context={searchContext} />
 
-      <div className="flex-1 min-h-0 overflow-y-auto bg-surface-page">
+      <main id="main-content" className="flex-1 min-h-0 overflow-y-auto bg-surface-page">
+        <h1 className="sr-only">Evidara Rechtsrecherche</h1>
         <div className="mobile-workspace__sheet">
           <ResultsControlRegion>
             <ResultSetScopeBar />
@@ -76,10 +81,12 @@ export function MobileWorkspace({
               onPivot={onPivot}
               onPin={onPin}
               pinnedIds={pinnedIds}
+              isError={isSearchError}
+              onRetry={onSearchRetry}
             />
           </ResultsControlRegion>
         </div>
-      </div>
+      </main>
 
       <FiltersSheet open={filtersOpen} onOpenChange={setFiltersOpen} filters={filters} />
 

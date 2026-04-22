@@ -27,7 +27,7 @@ describe("FilterBar invariant", () => {
       },
     });
 
-    expect(screen.getByText(/1 active filter/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 aktiver Filter/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /verfeinerungen löschen|clear all|effacer les filtres/i }),
     ).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe("FilterBar invariant", () => {
       },
     });
 
-    const remove = screen.getByRole("button", { name: /remove legal area filter/i });
+    const remove = screen.getByRole("button", { name: /Legal area Filter entfernen/i });
     fireEvent.click(remove);
 
     expect(container.firstChild).toBeNull();

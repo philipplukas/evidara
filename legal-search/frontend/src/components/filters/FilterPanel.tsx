@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, Info, Search, SlidersHorizontal } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { getFlagAlt, getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel } from "@/lib/types";
 import { SectionLabel } from "../primitives";
@@ -35,26 +36,28 @@ export function FilterPanel({ filters }: FilterPanelProps) {
   }
 
   return (
-    <div className="space-y-2 py-3">
-      <FilterBar filters={filters} />
-      <div className="px-4 pb-2">
-        <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[--shadow-inset-surface]">
-          <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "RESET_ALL" })}
-              className="inline-flex items-center rounded-full border border-border/70 bg-surface-panel px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {t("filter.resetAll")}
-            </button>
+    <TooltipProvider>
+      <div className="space-y-2 py-3">
+        <FilterBar filters={filters} />
+        <div className="px-4 pb-2">
+          <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[--shadow-inset-surface]">
+            <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "RESET_ALL" })}
+                className="inline-flex items-center rounded-full border border-border/70 bg-surface-panel px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {t("filter.resetAll")}
+              </button>
+            </div>
           </div>
         </div>
+        {filters.map((filter) => (
+          <FilterGroup key={filter.key} filter={filter} />
+        ))}
       </div>
-      {filters.map((filter) => (
-        <FilterGroup key={filter.key} filter={filter} />
-      ))}
-    </div>
+    </TooltipProvider>
   );
 }
 
@@ -111,32 +114,52 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border/70 bg-surface-shell/35 shadow-[--shadow-inset-surface]">
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3.5 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-interactive-accent-subtle/70"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate">{filter.label}</span>
-          {selectedCount > 0 && (
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-core/10 px-1.5 text-tiny font-semibold text-accent-core">
-              {selectedCount}
-            </span>
+      <div className="flex min-h-11 w-full items-center gap-1 px-3.5 py-3">
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left text-sm font-medium text-foreground transition-colors hover:text-accent-core"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate">{filter.label}</span>
+            {selectedCount > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-core/10 px-1.5 text-tiny font-semibold text-accent-core">
+                {selectedCount}
+              </span>
+            )}
+          </span>
+          {expanded ? (
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           )}
-        </span>
-        {expanded ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        )}
-      </button>
+        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={t(`filter.tooltip.${filter.type}`)}
+              className="inline-flex shrink-0 rounded p-1 text-muted-foreground/60 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            >
+              <Info className="h-3 w-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-[200px] text-xs">
+            {t(`filter.tooltip.${filter.type}`)}
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
       {expanded && (
         <div className="border-t border-border/60 px-3.5 pb-3 pt-3">
           {filter.type === "checkbox" && filter.options.length > 5 && (
             <div className="relative mb-2.5">
               <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+              <label htmlFor={`filter-search-${filter.key}`} className="sr-only">
+                {filter.label} durchsuchen
+              </label>
               <input
+                id={`filter-search-${filter.key}`}
                 type="text"
                 placeholder={t("filter.searchPlaceholder")}
                 value={searchQuery}
@@ -282,7 +305,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                         setSelected(selected.length > 0 ? [] : ["true"]);
                       }
                     }}
-                    className={`relative h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
+                    className={`relative min-h-11 sm:min-h-0 h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
                       selected.length > 0 ? "bg-accent-core" : "bg-muted-foreground/20"
                     }`}
                   >

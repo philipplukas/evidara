@@ -20,7 +20,10 @@ import {
 } from "@/components/ui/resizable-panels";
 import { useDesktop } from "@/hooks/use-desktop";
 import { useDetail } from "@/hooks/use-detail";
+import { usePageView } from "@/hooks/use-page-view";
+import { usePreferences } from "@/hooks/use-preferences";
 import { runSearch } from "@/hooks/use-search";
+import { AnalyticsEvent, track } from "@/lib/analytics";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel, SearchContextViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
@@ -39,10 +42,13 @@ export default function WorkspaceClient({
   controlPanelUrl,
 }: WorkspaceClientProps) {
   const t = useTranslations();
+  usePageView();
   const isDesktop = useDesktop();
+  const { preferences } = usePreferences();
   const { state, dispatch } = useWorkspace();
   const { state: constraints } = useSearchConstraints();
   const [activeFilters, setActiveFilters] = useState(filters);
+  const [searchError, setSearchError] = useState(false);
 
   useEffect(() => {
     setActiveFilters(filters);
@@ -78,6 +84,11 @@ export default function WorkspaceClient({
           timestamp: Date.now(),
         },
       });
+      track(AnalyticsEvent.RESULT_SELECTED, {
+        resultId: id,
+        resultType: item?.type,
+        position: state.resultSet.items.findIndex((r) => r.id === id),
+      });
     },
     [setSelectedId, dispatch, state.resultSet.items],
   );
@@ -99,23 +110,39 @@ export default function WorkspaceClient({
     async (query: string) => {
       const requestId = ++searchRequestIdRef.current;
       const signature = createSearchSignature(query);
-      const { results, filters: nextFilters } = await runSearch(query, constraints);
-      if (requestId !== searchRequestIdRef.current) {
-        // Ignore stale responses when newer searches have already started.
-        return;
+      try {
+        const { results, filters: nextFilters } = await runSearch(query, constraints, {
+          pageSize: preferences.resultsPerPage,
+        });
+        if (requestId !== searchRequestIdRef.current) {
+          // Ignore stale responses when newer searches have already started.
+          return;
+        }
+        lastSearchSignatureRef.current = signature;
+        setActiveFilters(nextFilters);
+        dispatch({ type: "SEARCH", query, results });
+        setSearchError(false);
+        track(AnalyticsEvent.SEARCH_EXECUTED, {
+          query,
+          resultCount: results.length,
+          jurisdictions: constraints.context.jurisdictions.join(","),
+          languages: constraints.context.languages.join(","),
+        });
+      } catch {
+        setSearchError(true);
       }
-      lastSearchSignatureRef.current = signature;
-      setActiveFilters(nextFilters);
-      dispatch({ type: "SEARCH", query, results });
     },
-    [constraints, dispatch, createSearchSignature],
+    [constraints, dispatch, createSearchSignature, preferences.resultsPerPage],
   );
 
   const handlePivot = useCallback(
     async (label: string, sourceId: string) => {
+      track(AnalyticsEvent.RESULT_PIVOTED, { sourceId, label });
       const sourceResult = state.resultSet.items.find((r) => r.id === sourceId);
       const pivotQuery = sourceResult?.title ?? label;
-      const { results, filters: nextFilters } = await runSearch(pivotQuery, constraints);
+      const { results, filters: nextFilters } = await runSearch(pivotQuery, constraints, {
+        pageSize: preferences.resultsPerPage,
+      });
       setActiveFilters(nextFilters);
       dispatch({
         type: "PIVOT",
@@ -128,7 +155,7 @@ export default function WorkspaceClient({
         scopeLabel: `${label} for ${state.resultSet.items.find((r) => r.id === sourceId)?.title ?? sourceId}`,
       });
     },
-    [dispatch, state.resultSet, constraints],
+    [dispatch, state.resultSet, constraints, preferences.resultsPerPage],
   );
 
   const handleSearch = executeSearch;
@@ -137,8 +164,10 @@ export default function WorkspaceClient({
     (id: string, title: string, type: string) => {
       if (state.pinned.some((p) => p.id === id)) {
         dispatch({ type: "UNPIN", id });
+        track(AnalyticsEvent.PIN_REMOVED, { itemId: id });
       } else {
         dispatch({ type: "PIN", item: { id, title, type } });
+        track(AnalyticsEvent.PIN_ADDED, { itemId: id, itemType: type });
       }
     },
     [dispatch, state.pinned],
@@ -224,6 +253,10 @@ export default function WorkspaceClient({
         onSearch={handleSearch}
         showControlPlaneEntry={showControlPlaneEntry}
         controlPanelUrl={controlPanelUrl}
+        isSearchError={searchError}
+        onSearchRetry={() => {
+          if (urlQuery) void executeSearch(urlQuery);
+        }}
       />
     );
   }
@@ -238,7 +271,8 @@ export default function WorkspaceClient({
       />
       <ContextBar context={searchContext} />
 
-      <div className="min-h-0 flex-1 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
+      <main id="main-content" className="min-h-0 flex-1 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
+        <h1 className="sr-only">Evidara Rechtsrecherche</h1>
         <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left: Filters */}
           <ResizablePanel
@@ -278,6 +312,12 @@ export default function WorkspaceClient({
                   onPivot={handlePivot}
                   onPin={handlePin}
                   pinnedIds={pinnedIds}
+                  isError={searchError}
+                  onRetry={() => {
+                    if (urlQuery) void executeSearch(urlQuery);
+                  }}
+                  onSearch={handleSearch}
+                  query={urlQuery}
                 />
               </ResultsControlRegion>
             </div>
@@ -305,7 +345,7 @@ export default function WorkspaceClient({
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
-      </div>
+      </main>
     </div>
   );
 }
