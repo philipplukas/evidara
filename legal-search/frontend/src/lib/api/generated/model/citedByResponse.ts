@@ -15,15 +15,9 @@ Document body reads use the Document Service (`contracts/api/document-intelligen
 
  * OpenAPI spec version: 0.3.4
  */
+import type { CitationLink } from './citationLink';
 
-export type FilterFacetViewType = typeof FilterFacetViewType[keyof typeof FilterFacetViewType];
-
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const FilterFacetViewType = {
-  checkbox: 'checkbox',
-  chip: 'chip',
-  dropdown: 'dropdown',
-  date: 'date',
-  toggle: 'toggle',
-} as const;
+export interface CitedByResponse {
+  data: CitationLink[];
+  total: number;
+}
