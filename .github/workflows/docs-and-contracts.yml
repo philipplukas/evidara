@@ -8,9 +8,7 @@ on:
 
 jobs:
   contract-validation:
-    # This job bootstraps both Python and Node; keep it on GitHub-hosted Linux
-    # until the self-hosted Nix runner path has a runner-native toolchain setup.
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
 
     steps:
       - name: Checkout

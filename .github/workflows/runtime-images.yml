@@ -27,10 +27,10 @@ permissions:
   id-token: write   # for Workload Identity Federation to Artifact Registry
 
 jobs:
-  # Cheap job on GitHub-hosted runners; drives which image builds run (cuts self-hosted load and wall time).
+  # Cheap job on the light pool; drives which image builds run.
   changes:
     name: Detect changed paths
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     timeout-minutes: 5
     outputs:
       platform_control: ${{ steps.filter.outputs.platform_control }}
@@ -78,7 +78,7 @@ jobs:
     name: Build platform-control image
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.platform_control == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: dev
 
     steps:
@@ -143,7 +143,7 @@ jobs:
     name: Build legal-search API image
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.legal_search_api == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: dev
 
     steps:
@@ -208,7 +208,7 @@ jobs:
     name: Build legal-search frontend image
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.legal_search_frontend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: dev
 
     steps:
@@ -273,7 +273,7 @@ jobs:
     name: Build platform-control admin image
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.platform_control_admin == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: dev
 
     steps:
@@ -338,7 +338,7 @@ jobs:
     name: Build platform-control worker image
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.platform_control_worker == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: dev
 
     steps:
@@ -403,7 +403,7 @@ jobs:
     name: Build document-intelligence consumer image
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.document_intelligence_consumer == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: dev
 
     steps:
@@ -468,7 +468,7 @@ jobs:
     name: Build document-intelligence document-service image
     needs: changes
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.document_intelligence_consumer == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
     environment: dev
 
     steps:
