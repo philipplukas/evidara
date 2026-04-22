@@ -44,7 +44,7 @@ jobs:
           if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
             extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
           fi
-          databricks bundle validate --target dev --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
+          databricks bundle validate --target dev "${extra[@]}"
 
       - name: Deploy Databricks bundle (dev)
         working-directory: document-intelligence
@@ -56,7 +56,7 @@ jobs:
           if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
             extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
           fi
-          databricks bundle deploy --target dev --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
+          databricks bundle deploy --target dev "${extra[@]}"
 
   deploy-staging:
     name: Deploy bundle to staging
@@ -83,7 +83,7 @@ jobs:
           if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
             extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
           fi
-          databricks bundle validate --target staging --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
+          databricks bundle validate --target staging "${extra[@]}"
 
       - name: Deploy Databricks bundle (staging)
         working-directory: document-intelligence
@@ -95,7 +95,7 @@ jobs:
           if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
             extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
           fi
-          databricks bundle deploy --target staging --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
+          databricks bundle deploy --target staging "${extra[@]}"
 
   deploy-prod:
     name: Deploy bundle to prod
@@ -124,7 +124,7 @@ jobs:
           if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
             extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
           fi
-          databricks bundle validate --target prod --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
+          databricks bundle validate --target prod "${extra[@]}"
 
       - name: Deploy Databricks bundle (prod)
         working-directory: document-intelligence
@@ -136,4 +136,4 @@ jobs:
           if [ -n "${COMPUTE_GUARDRAILS_POLICY_ID:-}" ]; then
             extra+=(--var "compute_guardrails_policy_id=${COMPUTE_GUARDRAILS_POLICY_ID}")
           fi
-          databricks bundle deploy --target prod --var "workspace_host=${DATABRICKS_HOST}" "${extra[@]}"
+          databricks bundle deploy --target prod "${extra[@]}"

@@ -11,8 +11,6 @@ artifacts:
     build: python3 -m pip wheel --no-deps --wheel-dir dist .
 
 variables:
-  workspace_host:
-    description: Databricks workspace host for the target environment.
   workspace_root_path:
     description: Databricks workspace root path for bundle artifacts.
     default: /Shared/evidara/.bundle/document-intelligence
@@ -79,27 +77,21 @@ targets:
     default: true
     mode: development
     variables:
-      workspace_host: https://dbc-0000000000000000.cloud.databricks.com
       surfaces_root_uri: gs://evidara-document-intelligence-surfaces-dev/published
       workspace_root_path: /Shared/evidara/.bundle/document-intelligence/dev
     workspace:
-      host: ${var.workspace_host}
       root_path: ${var.workspace_root_path}
   staging:
     mode: production
     variables:
-      workspace_host: https://dbc-0000000000000000.cloud.databricks.com
       surfaces_root_uri: gs://evidara-document-intelligence-surfaces-staging/published
       workspace_root_path: /Shared/evidara/.bundle/document-intelligence/staging
     workspace:
-      host: ${var.workspace_host}
       root_path: ${var.workspace_root_path}
   prod:
     mode: production
     variables:
-      workspace_host: https://dbc-0000000000000000.cloud.databricks.com
       surfaces_root_uri: gs://evidara-document-intelligence-surfaces-prod/published
       workspace_root_path: /Shared/evidara/.bundle/document-intelligence/prod
     workspace:
-      host: ${var.workspace_host}
       root_path: ${var.workspace_root_path}
