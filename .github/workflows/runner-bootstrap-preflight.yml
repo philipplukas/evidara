@@ -112,7 +112,7 @@ jobs:
       - name: Install Playwright Chromium
         if: ${{ inputs.frontend_playwright_smoke }}
         working-directory: legal-search/frontend
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Verify Playwright browser smoke
         if: ${{ inputs.frontend_playwright_smoke }}
