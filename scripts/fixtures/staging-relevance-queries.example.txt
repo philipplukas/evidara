@@ -3,6 +3,8 @@
 # Replace with 5–10 queries representative of your staging corpus; see
 # docs/runbooks/staging-relevance-query-pack-suggestions.md
 
-Bundesgericht
-Art. 8 EMRK
-BVGE
+*
+Bundesverfassung
+RIS Dokument
+Produktdeklaration
+BGBl. Nr. 43/1975

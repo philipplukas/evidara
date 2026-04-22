@@ -123,6 +123,14 @@ if [[ -n "${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}" ]]; then
 fi
 log ""
 
+MVP_ACCEPTANCE_QUERIES=(
+  "Bundesverfassung"
+  "RIS Dokument"
+  "Produktdeklaration"
+  "BGBl. Nr. 43/1975"
+)
+MVP_ACCEPTANCE_DETAIL_QUERY="${MVP_ACCEPTANCE_QUERIES[0]}"
+
 if [[ -n "${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}" ]] && command -v gcloud >/dev/null 2>&1; then
   probe_pc="$(token_for_url "${PC_API}")"
   if [[ -z "${probe_pc}" ]]; then
@@ -148,7 +156,7 @@ log "GET /v1/sources -> ${c2}"
 # Scenario 2
 log "--- Scenario 2: Search query pack ---"
 declare -a query_rows=()
-for q in "art 754" "haftung" "obligationenrecht" "switzerland"; do
+for q in "${MVP_ACCEPTANCE_QUERIES[@]}"; do
   enc="$(printf %s "${q}" | jq -sRr @uri)"
   body="$(json_body "${LS_API}/v1/search?q=${enc}")"
   code="$(http_code "${LS_API}/v1/search?q=${enc}")"
@@ -159,7 +167,7 @@ done
 
 # Scenario 3
 log "--- Scenario 3: Document detail ---"
-search_json="$(json_body "${LS_API}/v1/search?q=$(printf %s "art 754" | jq -sRr @uri)")"
+search_json="$(json_body "${LS_API}/v1/search?q=$(printf %s "${MVP_ACCEPTANCE_DETAIL_QUERY}" | jq -sRr @uri)")"
 doc_id="$(echo "${search_json}" | jq -r '.results[0].id // .hits[0].id // empty' 2>/dev/null || true)"
 if [[ -z "${doc_id}" || "${doc_id}" == "null" ]]; then
   doc_id="$(echo "${search_json}" | jq -r '.items[0].id // empty' 2>/dev/null || true)"
@@ -178,7 +186,7 @@ else
   detail_has_id="$(echo "${detail}" | jq -e --arg id "${doc_id}" '.id == $id' >/dev/null 2>&1 && echo yes || echo no)"
   detail_has_title="$(echo "${detail}" | jq -e '.title | strings | length > 0' >/dev/null 2>&1 && echo yes || echo no)"
   detail_has_subtitle="$(echo "${detail}" | jq -e '.subtitle | strings | length > 0' >/dev/null 2>&1 && echo yes || echo no)"
-  detail_has_metadata="$(echo "${detail}" | jq -e '.metadata | arrays' >/dev/null 2>&1 && echo yes || echo no)"
+  detail_has_metadata="$(echo "${detail}" | jq -e 'if has("metadataRows") then .metadataRows else .metadata end | arrays' >/dev/null 2>&1 && echo yes || echo no)"
   detail_has_tabs="$(echo "${detail}" | jq -e '.tabs | arrays' >/dev/null 2>&1 && echo yes || echo no)"
   log "GET /v1/documents/${doc_id} -> HTTP ${detail_http_code} (id:${detail_has_id} title:${detail_has_title} subtitle:${detail_has_subtitle} metadata:${detail_has_metadata} tabs:${detail_has_tabs})"
 fi
@@ -186,7 +194,8 @@ fi
 # Scenario 4
 log "--- Scenario 4: Website proxies ---"
 ls_ui_root_code="$(http_code "${LS_UI}/")"
-ls_ui_search_code="$(http_code "${LS_UI}/v1/search?q=$(printf %s "art%20754")")"
+ls_ui_search_query="$(printf %s "${MVP_ACCEPTANCE_DETAIL_QUERY}" | jq -sRr @uri)"
+ls_ui_search_code="$(http_code "${LS_UI}/v1/search?q=${ls_ui_search_query}")"
 admin_ui_root_code="$(http_code "${ADMIN_UI}/")"
 admin_ui_sources_code="$(http_code "${ADMIN_UI}/api/platform-control/v1/sources")"
 log "legal-search UI / -> ${ls_ui_root_code}"
@@ -231,6 +240,21 @@ summary_json="$(
     --argjson admin_ui_root "${admin_ui_root_code}" \
     --argjson admin_ui_sources "${admin_ui_sources_code}" \
     '{
+      ok: (
+        $platform_health == 200
+        and $platform_sources == 200
+        and all($query_results[]; (.http_code == 200 and (.total_results | type == "number") and .total_results >= 1))
+        and (($detail_http_code | tonumber? // $detail_http_code) == 200)
+        and ($detail_has_id == "yes")
+        and ($detail_has_title == "yes")
+        and ($detail_has_subtitle == "yes")
+        and ($detail_has_metadata == "yes")
+        and ($detail_has_tabs == "yes")
+        and $ls_ui_root == 200
+        and $ls_ui_search == 200
+        and $admin_ui_root == 200
+        and $admin_ui_sources == 200
+      ),
       environment: $environment,
       surfaces: {
         platform_control_api: $pc_api,

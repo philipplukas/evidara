@@ -53,7 +53,12 @@ ls = typer.Typer(
 app.add_typer(pc, name="platform-control")
 app.add_typer(ls, name="legal-search")
 
-MVP_ACCEPTANCE_QUERIES = ("art 754", "haftung", "obligationenrecht", "switzerland")
+MVP_ACCEPTANCE_QUERIES = (
+    "Bundesverfassung",
+    "RIS Dokument",
+    "Produktdeklaration",
+    "BGBl. Nr. 43/1975",
+)
 
 
 def _emit(data: Any, *, human: bool) -> None:
@@ -108,11 +113,14 @@ def _detail_checks(payload: Any, *, document_id: str) -> dict[str, bool]:
         }
     title = payload.get("title")
     subtitle = payload.get("subtitle")
+    metadata_rows = (
+        payload["metadataRows"] if "metadataRows" in payload else payload.get("metadata")
+    )
     return {
         "id_matches_request": payload.get("id") == document_id,
         "title_present": isinstance(title, str) and len(title.strip()) > 0,
         "subtitle_present": isinstance(subtitle, str) and len(subtitle.strip()) > 0,
-        "metadata_is_array": isinstance(payload.get("metadata"), list),
+        "metadata_is_array": isinstance(metadata_rows, list),
         "tabs_is_array": isinstance(payload.get("tabs"), list),
     }
 
@@ -386,12 +394,12 @@ def workflow_mvp_acceptance(
                     client=client,
                 ),
                 "legal_search_ui_search_http_code": request_status(
-                    "GET",
-                    join_url(ls_ui_base, "/v1/search"),
-                    headers=ui_headers,
-                    params={"q": "art 754"},
-                    client=client,
-                ),
+                "GET",
+                join_url(ls_ui_base, "/v1/search"),
+                headers=ui_headers,
+                params={"q": "Bundesverfassung"},
+                client=client,
+            ),
                 "admin_ui_root_http_code": request_status(
                     "GET",
                     join_url(admin_base, "/"),
@@ -406,7 +414,12 @@ def workflow_mvp_acceptance(
                 ),
             }
 
-        query_ok = all(result["http_code"] == 200 for result in query_results)
+        query_ok = all(
+            result["http_code"] == 200
+            and isinstance(result["total_results"], int)
+            and result["total_results"] >= 1
+            for result in query_results
+        )
         detail_ok = (
             bool(document_id)
             and all(scenario_3["checks"].values())

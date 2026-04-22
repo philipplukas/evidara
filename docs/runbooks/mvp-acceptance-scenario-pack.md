@@ -1,8 +1,8 @@
 # MVP Acceptance Scenario Pack (dev-first; optional staging)
 
 Owner: Platform team
-Last reviewed: 2026-04-11  
-Last verified: 2026-04-11  
+Last reviewed: 2026-04-22
+Last verified: 2026-04-22
 Applies to: dev, staging
 
 ## Automation
@@ -91,21 +91,22 @@ This runbook is intentionally limited to API and proxy-path confidence. It does 
 ### Scenario 2: Search surface returns stable query results
 
 - Call `GET /v1/search?q=<query>` on `legal-search-api-{env}` -> expected `200`
+- Each query must return at least one result.
 - Run query pack:
-  - `art 754`
-  - `haftung`
-  - `obligationenrecht`
-  - `switzerland`
+  - `Bundesverfassung`
+  - `RIS Dokument`
+  - `Produktdeklaration`
+  - `BGBl. Nr. 43/1975`
 
 ### Scenario 3: Search result can open detail
 
-- Take first result `id` from scenario 2
+- Take first result `id` from the `Bundesverfassung` query in scenario 2.
 - Call `GET /v1/documents/{id}` on `legal-search-api-{env}` -> expected `200`
 - Verify response includes:
   - `id` matching the requested document id
   - non-empty `title`
   - non-empty `subtitle`
-  - `metadata[]`
+  - `metadataRows[]` or legacy `metadata[]`
   - `tabs[]`
 
 ### Scenario 4: Website surfaces proxy correctly
@@ -129,7 +130,7 @@ Evidence produced by `./scripts/mvp-acceptance-scenario-pack.sh` (dev + staging)
 
 - `tools/evidara-cli` contract test for the `mvp-acceptance` workflow payload:  
   `cd tools/evidara-cli && uv run pytest tests/test_workflow_cmd.py -q`
-- **Staging refresh:** with `EVIDARA_PLATFORM_CONTROL_URL`, `EVIDARA_LEGAL_SEARCH_URL`, `EVIDARA_LEGAL_SEARCH_FRONTEND_URL`, `EVIDARA_PLATFORM_CONTROL_ADMIN_URL`, and auth vars (`EVIDARA_PLATFORM_CONTROL_TOKEN`, `EVIDARA_LEGAL_SEARCH_TOKEN`, optional API keys) pointed at **staging**, run `uv run evidara workflow mvp-acceptance --human` and attach the summary (or `--json` output) to Linear **TAR-85**.
+- **Remote refresh:** with `EVIDARA_PLATFORM_CONTROL_URL`, `EVIDARA_LEGAL_SEARCH_URL`, `EVIDARA_LEGAL_SEARCH_FRONTEND_URL`, `EVIDARA_PLATFORM_CONTROL_ADMIN_URL`, and auth vars (`EVIDARA_PLATFORM_CONTROL_TOKEN`, `EVIDARA_LEGAL_SEARCH_TOKEN`, optional API keys) pointed at **dev** or **staging**, run `uv run evidara workflow mvp-acceptance --human` and attach the summary or default JSON output to Linear **TAR-85**.
 
 ### Environment health
 
@@ -142,17 +143,18 @@ Evidence produced by `./scripts/mvp-acceptance-scenario-pack.sh` (dev + staging)
 
 | Query | dev totalResults | staging totalResults |
 |---|---:|---:|
-| `art 754` | 13 | 6 |
-| `haftung` | 13 | 6 |
-| `obligationenrecht` | 13 | 6 |
-| `switzerland` | 13 | 6 |
+| `Bundesverfassung` | 8 | expected >=1 |
+| `RIS Dokument` | 41 | expected >=1 |
+| `Produktdeklaration` | 17 | expected >=1 |
+| `BGBl. Nr. 43/1975` | 17 | expected >=1 |
 
 ### Detail fetch validation
 
-| Environment | Document ID | `/v1/documents/{id}` | id match, title, subtitle, metadata[], tabs[] |
+| Environment | Document ID | `/v1/documents/{id}` | id match, title, subtitle, metadataRows[]/metadata[], tabs[] |
 |---|---|---|---|
-| dev | `doc_1gb582v3a8y213hvg3p0n0zk01` | 200 | present |
-| staging | `doc_49n3ksesast1e2gbw1b7zev9q7` | 200 | present |
+| dev | `doc_1wxstrwdxtwh0zaxag6x37hya2` | 200 | present |
+| dev | `doc_7m5fzs4ksj057ft0sgzqaecpyh` | 200 | present |
+| staging | Retarget to staging CH/AT proof docs before sign-off | TBD | TBD |
 
 ### Website proxy validation
 

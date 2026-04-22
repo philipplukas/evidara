@@ -41,7 +41,7 @@ Work top-down; the script fails when **both** `canonical_ready` processing-statu
 1. Point CLI at **dev** Cloud Run base URLs by default (`EVIDARA_PLATFORM_CONTROL_URL`, `EVIDARA_LEGAL_SEARCH_URL`, frontend/admin URLs per [MVP acceptance scenario pack](mvp-acceptance-scenario-pack.md)). Use **staging** URLs only if your org operates a staging GCP project.
 2. Mint tokens: `eval "$(… ./scripts/mint-cloud-run-tokens.sh)"` or manual `gcloud auth print-identity-token --impersonate-service-account=… --audiences=…` for **each** API host (see [`scripts/evidara-cloud-run-operator-session.sh`](../../scripts/evidara-cloud-run-operator-session.sh) for an automated path).
 3. Add app-layer keys if the deployment requires them (`EVIDARA_PLATFORM_CONTROL_API_KEY`, etc.).
-4. Run: `cd tools/evidara-cli && uv run evidara workflow mvp-acceptance --human` (or `--json`).
+4. Run: `cd tools/evidara-cli && uv run evidara workflow mvp-acceptance --human` (or omit `--human` for compact JSON).
 5. Attach stdout / JSON to TAR-85.
 
 ## Related docs
