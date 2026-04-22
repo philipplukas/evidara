@@ -394,12 +394,12 @@ def workflow_mvp_acceptance(
                     client=client,
                 ),
                 "legal_search_ui_search_http_code": request_status(
-                "GET",
-                join_url(ls_ui_base, "/v1/search"),
-                headers=ui_headers,
-                params={"q": "Bundesverfassung"},
-                client=client,
-            ),
+                    "GET",
+                    join_url(ls_ui_base, "/v1/search"),
+                    headers=ui_headers,
+                    params={"q": "Bundesverfassung"},
+                    client=client,
+                ),
                 "admin_ui_root_http_code": request_status(
                     "GET",
                     join_url(admin_base, "/"),
