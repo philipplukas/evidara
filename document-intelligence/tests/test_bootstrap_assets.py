@@ -322,9 +322,12 @@ class TerraformModuleShapeTests(unittest.TestCase):
                 tfvars_body = tfvars_file.read()
 
             self.assertIn(f'environment = "{environment}"', tfvars_body)
-            self.assertIn("workspace_host =", tfvars_body)
-            self.assertIn("external_location_url =", tfvars_body)
-            self.assertIn("storage_credential_name =", tfvars_body)
+            for field_name in (
+                "workspace_host",
+                "external_location_url",
+                "storage_credential_name",
+            ):
+                self.assertRegex(tfvars_body, rf"(?m)^\s*{field_name}\s*=")
 
 
 if __name__ == "__main__":

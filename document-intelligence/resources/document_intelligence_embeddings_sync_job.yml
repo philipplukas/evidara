@@ -24,7 +24,7 @@ resources:
       tasks:
         - task_key: vector_index_sync
           notebook_task:
-            notebook_path: ./databricks/notebooks/03_vector_index_sync.py
+            notebook_path: ../databricks/notebooks/03_vector_index_sync.py
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
               vector_endpoint_name: "{{job.parameters.vector_endpoint_name}}"

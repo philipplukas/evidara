@@ -7,7 +7,7 @@ resources:
       tasks:
         - task_key: dbt_run
           dbt_task:
-            project_directory: ./dbt
+            project_directory: ../dbt
             commands:
               - dbt deps
               - dbt source freshness --target ${bundle.target}

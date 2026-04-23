@@ -16,7 +16,7 @@ resources:
       tasks:
         - task_key: bootstrap_ddl
           notebook_task:
-            notebook_path: ./databricks/notebooks/01_bootstrap_ddl.py
+            notebook_path: ../databricks/notebooks/01_bootstrap_ddl.py
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
               surfaces_root_uri: "{{job.parameters.surfaces_root_uri}}"
