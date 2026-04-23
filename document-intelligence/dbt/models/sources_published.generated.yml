@@ -232,3 +232,89 @@ sources:
               - not_null
           - name: failure
             description: "Failure payload for failed processing."
+      - name: published_commentary_insights
+        description: "Non-canonical extractive commentary insights published by document-intelligence."
+        tests:
+          - dbt_expectations.expect_table_columns_to_match_set:
+              column_list:
+                - insight_id
+                - document_id
+                - document_revision
+                - processing_manifest_id
+                - section_id
+                - citation_id
+                - insight_type
+                - claim
+                - display_text
+                - support
+                - referenced_authorities
+                - language
+                - jurisdiction_id
+                - confidence
+                - review_state
+                - generator
+                - scores
+                - metadata
+        columns:
+          - name: insight_id
+            description: "Stable commentary insight ID."
+            tests:
+              - not_null
+          - name: document_id
+            description: "Parent document ID."
+            tests:
+              - not_null
+          - name: document_revision
+            description: "Parent document revision."
+            tests:
+              - not_null
+          - name: processing_manifest_id
+            description: "Processing result that produced the insight."
+            tests:
+              - not_null
+          - name: section_id
+            description: "Section containing the support passage."
+          - name: citation_id
+            description: "Citation row anchoring the insight when available."
+          - name: insight_type
+            description: "Commentary insight taxonomy value."
+            tests:
+              - not_null
+          - name: claim
+            description: "Short extractive proposition or normalized label."
+            tests:
+              - not_null
+          - name: display_text
+            description: "Source passage snippet for UI rendering."
+            tests:
+              - not_null
+          - name: support
+            description: "Evidence references supporting the insight."
+            tests:
+              - not_null
+          - name: referenced_authorities
+            description: "Citations or provisions found in the passage."
+            tests:
+              - not_null
+          - name: language
+            description: "Primary source passage language."
+          - name: jurisdiction_id
+            description: "Resolved jurisdiction reference."
+          - name: confidence
+            description: "Deterministic confidence score."
+            tests:
+              - not_null
+          - name: review_state
+            description: "Review lifecycle state."
+            tests:
+              - not_null
+          - name: generator
+            description: "Extractor or model metadata."
+            tests:
+              - not_null
+          - name: scores
+            description: "Deterministic validator scores."
+            tests:
+              - not_null
+          - name: metadata
+            description: "Additional non-canonical metadata."

@@ -8,6 +8,7 @@ from typing import Any
 from document_intelligence.persist.sinks import DeltaSinkConfig
 from document_intelligence.persist.surfaces import (
     PROCESSING_MANIFESTS,
+    PUBLISHED_COMMENTARY_INSIGHTS,
     PUBLISHED_DOCUMENTS,
     PUBLISHED_SECTIONS,
 )
@@ -18,12 +19,14 @@ class SurfaceUris:
     published_documents_uri: str
     published_sections_uri: str
     processing_manifests_uri: str
+    published_commentary_insights_uri: str | None = None
 
     def to_delta_sink_config(self) -> DeltaSinkConfig:
         return DeltaSinkConfig(
             published_documents_uri=self.published_documents_uri,
             published_sections_uri=self.published_sections_uri,
             processing_manifests_uri=self.processing_manifests_uri,
+            published_commentary_insights_uri=self.published_commentary_insights_uri,
         )
 
     @classmethod
@@ -33,6 +36,10 @@ class SurfaceUris:
             published_documents_uri=_join_uri(normalized_root, PUBLISHED_DOCUMENTS.surface_name),
             published_sections_uri=_join_uri(normalized_root, PUBLISHED_SECTIONS.surface_name),
             processing_manifests_uri=_join_uri(normalized_root, PROCESSING_MANIFESTS.surface_name),
+            published_commentary_insights_uri=_join_uri(
+                normalized_root,
+                PUBLISHED_COMMENTARY_INSIGHTS.surface_name,
+            ),
         )
 
 
@@ -47,6 +54,8 @@ class RuntimeSettings:
     spacy_batch_size: int = 32
     enable_llm_extractor: bool = False
     llm_confidence_threshold: float = 0.7
+    enable_commentary_insights: bool = False
+    commentary_insight_min_confidence: float = 0.7
     use_spark_delta: bool = False
 
     @classmethod
@@ -66,6 +75,8 @@ class RuntimeSettings:
         spacy_batch_size: Any | None = None,
         enable_llm_extractor: Any | None = None,
         llm_confidence_threshold: Any | None = None,
+        enable_commentary_insights: Any | None = None,
+        commentary_insight_min_confidence: Any | None = None,
         use_spark_delta: Any | None = None,
     ) -> "RuntimeSettings":
         effective_processing_version = processing_version or mapping.get("DI_PROCESSING_VERSION") or "0.1.0-dev"
@@ -103,6 +114,19 @@ class RuntimeSettings:
             minimum=0.0,
             maximum=1.0,
         )
+        effective_enable_commentary_insights = (
+            _coerce_bool(enable_commentary_insights)
+            if enable_commentary_insights is not None
+            else _parse_bool(mapping.get("DI_ENABLE_COMMENTARY_INSIGHTS", "false"))
+        )
+        effective_commentary_insight_min_confidence = _coerce_float(
+            commentary_insight_min_confidence
+            if commentary_insight_min_confidence is not None
+            else mapping.get("DI_COMMENTARY_INSIGHT_MIN_CONFIDENCE", "0.7"),
+            name="DI_COMMENTARY_INSIGHT_MIN_CONFIDENCE",
+            minimum=0.0,
+            maximum=1.0,
+        )
         effective_use_spark_delta = (
             _coerce_bool(use_spark_delta)
             if use_spark_delta is not None
@@ -112,6 +136,7 @@ class RuntimeSettings:
         direct_documents_uri = published_documents_uri or mapping.get("DI_PUBLISHED_DOCUMENTS_URI")
         direct_sections_uri = published_sections_uri or mapping.get("DI_PUBLISHED_SECTIONS_URI")
         direct_manifests_uri = processing_manifests_uri or mapping.get("DI_PROCESSING_MANIFESTS_URI")
+        direct_commentary_insights_uri = mapping.get("DI_PUBLISHED_COMMENTARY_INSIGHTS_URI")
         root_uri = surfaces_root_uri or mapping.get("DI_SURFACES_ROOT_URI")
 
         if any([direct_documents_uri, direct_sections_uri, direct_manifests_uri]):
@@ -121,6 +146,7 @@ class RuntimeSettings:
                 published_documents_uri=direct_documents_uri or "",
                 published_sections_uri=direct_sections_uri or "",
                 processing_manifests_uri=direct_manifests_uri or "",
+                published_commentary_insights_uri=direct_commentary_insights_uri,
             )
         elif root_uri:
             surface_uris = SurfaceUris.from_root_uri(root_uri)
@@ -137,6 +163,8 @@ class RuntimeSettings:
             spacy_batch_size=effective_spacy_batch_size,
             enable_llm_extractor=effective_enable_llm_extractor,
             llm_confidence_threshold=effective_llm_confidence_threshold,
+            enable_commentary_insights=effective_enable_commentary_insights,
+            commentary_insight_min_confidence=effective_commentary_insight_min_confidence,
             use_spark_delta=effective_use_spark_delta,
         )
 

@@ -4,6 +4,8 @@
 
 Turn immutable artifact bundles into canonical structured document intelligence. Document-intelligence transforms heterogeneous upstream content into stable `Document` and `Section` outputs, processing manifests, and published downstream surfaces.
 
+It also owns non-canonical enrichment surfaces that are derived from published documents but are not canonical legal truth. The first such enrichment is extractive commentary insights: source-backed commentary anchors with evidence refs, confidence, review state, and deterministic validation scores.
+
 ## Current state
 
 Initial implementation scaffolding now exists under `document-intelligence/`. The component now has a Python package skeleton, tolerant inbound event parsing, bundle-manifest and artifact loading for local files and `gs://`, minimal HTML and XML normalization with shared-IR section extraction, explicit published-surface definitions, an in-memory sink plus a Delta-backed sink, offline JSON Schema validation helpers, a Databricks runtime entrypoint, Databricks Asset Bundle files, a reusable Terraform module plus top-level Databricks stack and `dev` / `staging` / `prod` tfvars for Unity Catalog scaffolding, SQL/bootstrap assets for published-surface registration, and bundle/adapter/CLI tests for the first processing path.
@@ -17,10 +19,12 @@ See [Document Intelligence Implementation Plan](document-intelligence-implementa
 ## Source of truth
 
 - Delta tables for canonical documents, sections, and processing manifests
+- Delta tables for non-canonical enrichment surfaces, starting with `published_commentary_insights`
 - Published DI surfaces for downstream consumers
 - Unity Catalog lineage for DI-internal job, table, and published-surface lineage
 - Processing logic in Databricks workflows
 - `contracts/schemas/document.schema.json`, `contracts/schemas/section.schema.json`, and `contracts/schemas/processing-manifest.schema.json`
+- `contracts/schemas/commentary-insight.schema.json` for extractive commentary insight records
 
 ## Responsibilities
 
@@ -37,6 +41,7 @@ Document-intelligence should lean on Databricks-native lineage for internal trac
 ### Boundary
 
 - **Does own:** normalization, parsing, profile selection, canonical entities, document revisions, published surfaces, Databricks pipelines
+- **Also owns:** non-canonical extractive enrichment generation and scoring, including commentary insight surfaces
 - **Does NOT own:** source lifecycle, approvals, acquisition checkpoints, search projection logic
 
 ### HTML normalization (v1)
@@ -70,6 +75,8 @@ One bundle can be transformed into:
 2. Canonical sections from day one
 3. Processing manifests with exact published refs
 4. `document.processed` events emitted per document revision
+
+When `DI_ENABLE_COMMENTARY_INSIGHTS=true`, commentary documents can also produce non-canonical `published_commentary_insights` rows. These rows are extractive only and must carry evidence refs; they are not embedded into canonical `Document` truth.
 
 ## Later expansion
 
@@ -118,6 +125,7 @@ Phase 1 may implement this as a Databricks SQL REST gateway or a thin FastAPI se
 - **Planned next:** `document.withdrawn`
 - **Exposes (sync):** Document Service OpenAPI for published document bodies
 - **Schemas:** `Document`, `Section`, `ProcessingManifest`
+- **Enrichment schema:** `CommentaryInsight`
 
 ## Testing
 
@@ -127,6 +135,7 @@ Key tests:
 
 - Unit tests for parsing helpers and section construction
 - Offline JSON Schema validation for `Document`, `Section`, `ProcessingManifest`, and current event contracts
+- Offline JSON Schema validation for `CommentaryInsight`
 - Golden document tests with representative bundles
 - GCS loader tests with stubbed storage client behavior
 - Delta sink tests with real local Delta tables

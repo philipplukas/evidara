@@ -9,6 +9,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
 
+from document_intelligence.canonical.models import CommentaryInsight
 from document_intelligence.contracts.envelope import ManifestRef
 from document_intelligence.ingest.loaders import GcsBundleLoader
 from document_intelligence.persist.sinks import DeltaCanonicalSink, DeltaSinkConfig
@@ -198,6 +199,33 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             self.assertEqual(len(document_rows), 2)
             self.assertEqual(len(manifest_rows), 2)
 
+    def test_writes_commentary_insights_to_delta_table(self) -> None:
+        import deltalake
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                    published_commentary_insights_uri=os.path.join(
+                        temp_dir,
+                        "published_commentary_insights",
+                    ),
+                )
+            )
+
+            sink.persist_commentary_insights([build_commentary_insight()])
+
+            insight_rows = (
+                deltalake.DeltaTable(os.path.join(temp_dir, "published_commentary_insights"))
+                .to_pyarrow_table()
+                .to_pylist()
+            )
+
+            self.assertEqual(len(insight_rows), 1)
+            self.assertEqual(insight_rows[0]["insight_id"], "ins_01jq7c1ny0ffv8qdr1xwbejqb6")
+
     def test_schema_merge_allows_extensions_to_appear_after_non_citation_rows(self) -> None:
         import deltalake
 
@@ -257,6 +285,54 @@ def build_processing_result(
     finally:
         os.unlink(artifact_path)
         os.unlink(manifest_path)
+
+
+def build_commentary_insight() -> CommentaryInsight:
+    return CommentaryInsight(
+        insight_id="ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+        document_id="doc_01jq7bdptzqv3xs0c41xpw1ybg",
+        document_revision=1,
+        processing_manifest_id="pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+        section_id="sec_01jq7bprm7p1ef4rwr7s2j1bt3",
+        citation_id=None,
+        insight_type="referenced_provision",
+        claim="References Art. 754 OR",
+        display_text="Art. 754 OR wird in der Lehre erlaeutert.",
+        support=[
+            {
+                "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+                "section_id": "sec_01jq7bprm7p1ef4rwr7s2j1bt3",
+                "citation_id": None,
+                "ref_type": "passage",
+                "passage": "Art. 754 OR wird in der Lehre erlaeutert.",
+                "confidence": 0.78,
+                "metadata": {"source": "test"},
+            }
+        ],
+        referenced_authorities=[
+            {
+                "text": "Art. 754 OR",
+                "citation_type": "article",
+                "metadata": {},
+            }
+        ],
+        language="de",
+        jurisdiction_id="jur_ch_federal",
+        confidence=0.78,
+        review_state="machine_verified",
+        generator={
+            "name": "commentary-insight-extractor",
+            "version": "v1",
+            "model": None,
+            "prompt_version": None,
+        },
+        scores={
+            "passage_present": 1.0,
+            "citation_parseable": 1.0,
+            "section_anchor_resolved": 1.0,
+        },
+        metadata={"extractive": True},
+    )
 
 
 class FakeStorageClient:

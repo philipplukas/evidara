@@ -18,6 +18,7 @@ from document_intelligence.contracts.envelope import (
     ArtifactBundleManifestArtifact,
     Provenance,
 )
+from document_intelligence.enrichment.commentary_insights import extract_commentary_insights
 from document_intelligence.errors import ProcessingError
 from document_intelligence.events.document_processed import (
     build_document_processed_event,
@@ -48,6 +49,7 @@ from document_intelligence.sectionize.html import (
     build_sections_from_ir,
 )
 from document_intelligence.validate.validator import (
+    validate_commentary_insights,
     validate_document,
     validate_event,
     validate_processing_manifest,
@@ -93,11 +95,15 @@ class ProcessingPipeline:
         enable_llm_extractor: bool = False,
         llm_confidence_threshold: float = 0.7,
         llm_metadata_extractor: MetadataExtractor | None = None,
+        enable_commentary_insights: bool = False,
+        commentary_insight_min_confidence: float = 0.7,
     ) -> None:
         if parser_backend not in {"legacy", "docling"}:
             raise ValueError("parser_backend must be one of: legacy, docling")
         if not 0.0 <= llm_confidence_threshold <= 1.0:
             raise ValueError("llm_confidence_threshold must be between 0.0 and 1.0")
+        if not 0.0 <= commentary_insight_min_confidence <= 1.0:
+            raise ValueError("commentary_insight_min_confidence must be between 0.0 and 1.0")
         self._bundle_loader = bundle_loader or DispatchingBundleLoader()
         self._sink = sink or InMemoryCanonicalSink()
         self._processing_version = processing_version
@@ -109,6 +115,8 @@ class ProcessingPipeline:
         self._enable_llm_extractor = enable_llm_extractor
         self._llm_confidence_threshold = llm_confidence_threshold
         self._llm_metadata_extractor = llm_metadata_extractor
+        self._enable_commentary_insights = enable_commentary_insights
+        self._commentary_insight_min_confidence = commentary_insight_min_confidence
 
     def process_event(self, event_data: dict[str, Any]) -> ProcessingResult:
         event = ArtifactBundleAvailableEvent.from_dict(event_data)
@@ -208,6 +216,24 @@ class ProcessingPipeline:
                 citation_dicts.append(d)
             document.extensions["citations"] = citation_dicts
 
+        commentary_insights = []
+        if self._enable_commentary_insights and _should_extract_commentary_insights(
+            document=document,
+            manifest=selected_bundle.manifest,
+            normalized_document=normalized_document,
+        ):
+            commentary_insights = extract_commentary_insights(
+                document=document,
+                sections=sections,
+                min_confidence=self._commentary_insight_min_confidence,
+            )
+        if self._enable_commentary_insights:
+            document.metadata["commentary_insights"] = {
+                "enabled": True,
+                "emitted_count": len(commentary_insights),
+                "min_confidence": self._commentary_insight_min_confidence,
+            }
+
         manifest = _build_processing_manifest(
             manifest=selected_bundle.manifest,
             provenance=provenance,
@@ -243,18 +269,21 @@ class ProcessingPipeline:
         validate_document_and_sections(document, sections)
         validate_document(document)
         validate_sections(sections)
+        validate_commentary_insights(commentary_insights)
         validate_processing_manifest(manifest)
         for status_event in status_events:
             validate_event(status_event)
         validate_event(document_processed_event)
 
         self._sink.persist(document, sections, manifest)
+        self._sink.persist_commentary_insights(commentary_insights)
         self._sink.record_status_events(status_events)
         self._sink.record_document_processed_event(document_processed_event)
 
         return ProcessingResult(
             document=document,
             sections=sections,
+            commentary_insights=commentary_insights,
             manifest=manifest,
             status_events=status_events,
             document_processed_event=document_processed_event,
@@ -746,6 +775,26 @@ def _needs_llm_extraction(
         or (hint_doc_type and hint_doc_type.strip())
     )
     return not (has_title and has_doc_type)
+
+
+def _should_extract_commentary_insights(
+    *,
+    document: Document,
+    manifest: ArtifactBundleManifest,
+    normalized_document: NormalizedDocumentIR,
+) -> bool:
+    if document.document_type == "commentary":
+        return True
+    hint = manifest.source_defaults.get("document_type_hint")
+    if isinstance(hint, str) and _normalize_document_type_token(hint) == "commentary":
+        return True
+    hints = normalized_document.metadata.get("extraction_hints")
+    if isinstance(hints, dict):
+        hint = hints.get("document_type_hint")
+        if isinstance(hint, str) and _normalize_document_type_token(hint) == "commentary":
+            return True
+    source_family = normalized_document.metadata.get("source_family")
+    return isinstance(source_family, str) and _normalize_document_type_token(source_family) == "commentary"
 
 
 def _normalized_content_type(content_type: str) -> str:
