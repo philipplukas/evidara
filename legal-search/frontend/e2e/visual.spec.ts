@@ -9,6 +9,12 @@ test.describe("Visual regressions", () => {
     await expect(page.getByRole("banner")).toBeVisible();
     await expect(page.locator("article").first()).toBeVisible();
 
+    // Anti-duplicate assertion: one scope-bar and one result title.
+    // Pixel-diff tolerance (maxDiffPixelRatio) can hide structural regressions
+    // like double-mounted components; this DOM-level check can't.
+    await expect(page.getByText("Ausgangssuche", { exact: true })).toHaveCount(1);
+    await expect(page.getByText(/Results for "Art\. 754/)).toHaveCount(1);
+
     await expect(page).toHaveScreenshot("workspace-desktop.png", {
       fullPage: true,
     });
@@ -20,6 +26,9 @@ test.describe("Visual regressions", () => {
     await page.goto("/");
     await expect(page.getByRole("banner")).toBeVisible();
     await expect(page.locator("article").first()).toBeVisible();
+
+    await expect(page.getByText("Ausgangssuche", { exact: true })).toHaveCount(1);
+    await expect(page.getByText(/Results for "Art\. 754/)).toHaveCount(1);
 
     await expect(page).toHaveScreenshot("workspace-mobile.png", {
       fullPage: true,
