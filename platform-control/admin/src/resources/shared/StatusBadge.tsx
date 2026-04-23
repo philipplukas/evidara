@@ -19,33 +19,33 @@ const LEVEL_META: Record<
 > = {
   healthy: {
     Icon: CheckCircleOutlineIcon,
-    border: "rgba(46, 125, 50, 0.35)",
-    bg: "rgba(46, 125, 50, 0.08)",
-    color: "#1b5e20",
+    border: "color-mix(in srgb, var(--status-healthy) 35%, transparent)",
+    bg: "var(--status-healthy-subtle)",
+    color: "var(--status-healthy)",
   },
   degraded: {
     Icon: WarningAmberIcon,
-    border: "rgba(237, 108, 2, 0.4)",
-    bg: "rgba(237, 108, 2, 0.1)",
-    color: "#e65100",
+    border: "color-mix(in srgb, var(--status-degraded) 40%, transparent)",
+    bg: "var(--status-degraded-subtle)",
+    color: "var(--status-degraded)",
   },
   critical: {
     Icon: ErrorOutlineIcon,
-    border: "rgba(198, 40, 40, 0.4)",
-    bg: "rgba(198, 40, 40, 0.08)",
-    color: "#b71c1c",
+    border: "color-mix(in srgb, var(--status-critical) 40%, transparent)",
+    bg: "var(--status-critical-subtle)",
+    color: "var(--status-critical)",
   },
   neutral: {
     Icon: RemoveCircleOutlineIcon,
     border: "var(--border-strong)",
-    bg: "color-mix(in srgb, var(--foreground) 6%, transparent)",
-    color: "var(--foreground-muted)",
+    bg: "var(--status-neutral-subtle)",
+    color: "var(--status-neutral)",
   },
   info: {
     Icon: InfoOutlinedIcon,
-    border: "rgba(2, 136, 209, 0.35)",
-    bg: "rgba(2, 136, 209, 0.08)",
-    color: "#01579b",
+    border: "color-mix(in srgb, var(--status-info) 35%, transparent)",
+    bg: "var(--status-info-subtle)",
+    color: "var(--status-info)",
   },
 };
 
