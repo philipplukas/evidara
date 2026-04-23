@@ -39,7 +39,7 @@ const REPO_ROOT = resolve(__dirname, "../../../..");
 const SCHEMA_PATH = resolve(REPO_ROOT, "contracts/events/legal-search.events.json");
 
 type EventDef = {
-  properties?: Record<string, unknown>;
+  properties?: Record<string, { const?: string }>;
 };
 
 type Schema = {
@@ -110,15 +110,40 @@ describe("analytics.ts ↔ legal-search.events.json drift guard", () => {
   });
 
   /**
-   * WHY: The oneOf union should reference every $defs entry — otherwise
-   * consumers validating a payload against the top-level schema would
-   * silently reject a valid event.
+   * WHY: The oneOf union must reference every $defs entry exactly once.
+   * Missing refs silently reject valid events at validation time; duplicate
+   * refs make payloads match more than one branch and fail oneOf semantics;
+   * stale refs to non-existent $defs keys break consumer validation without
+   * tripping the "missing" direction of this check. Compare as an exact
+   * sorted equality so all three failure modes surface.
    */
-  it("schema oneOf covers every $defs key", () => {
+  it("schema oneOf is an exact one-to-one cover of $defs", () => {
     const schema = loadSchema();
-    const referenced = new Set(schema.oneOf.map((entry) => entry.$ref.replace(/^#\/\$defs\//, "")));
-    const missing = Object.keys(schema.$defs).filter((key) => !referenced.has(key));
-    expect(missing, `Schema $defs entries missing from oneOf: ${missing.join(", ")}`).toEqual([]);
+    const refs = schema.oneOf.map((entry) => entry.$ref.replace(/^#\/\$defs\//, ""));
+    const defKeys = Object.keys(schema.$defs).sort();
+    expect(refs.slice().sort()).toEqual(defKeys);
+    // Separate assertion for duplicates to give a clearer error message.
+    expect(refs.length, `oneOf has duplicate $defs refs: ${refs.join(", ")}`).toBe(
+      new Set(refs).size,
+    );
+  });
+
+  /**
+   * WHY: Each $defs entry carries a `name` const that serves as the
+   * discriminator for `oneOf` matching. If the const drifts from the
+   * $defs key, the event-name check above still passes but runtime
+   * validation would reject real payloads emitted under that key.
+   */
+  it("each $defs entry's properties.name.const equals its $defs key", () => {
+    const schema = loadSchema();
+    const mismatches: string[] = [];
+    for (const [key, def] of Object.entries(schema.$defs)) {
+      const constValue = def.properties?.name?.const;
+      if (constValue !== key) {
+        mismatches.push(`${key}: name.const=${JSON.stringify(constValue)}`);
+      }
+    }
+    expect(mismatches, mismatches.join("\n")).toEqual([]);
   });
 
   /**
@@ -137,7 +162,7 @@ describe("analytics.ts ↔ legal-search.events.json drift guard", () => {
 
     for (const [eventName, tsKeys] of Object.entries(TS_EVENT_PROPERTIES)) {
       const def = schema.$defs[eventName];
-      if (!def || !def.properties) {
+      if (!def?.properties) {
         mismatches.push(`${eventName}: schema $defs entry missing properties`);
         continue;
       }
