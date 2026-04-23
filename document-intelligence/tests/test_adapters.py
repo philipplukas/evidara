@@ -226,11 +226,7 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             self.assertEqual(len(document_rows), 2)
             self.assertEqual(sum(1 for row in document_rows if row.get("extensions") is None), 1)
             self.assertEqual(
-                sum(
-                    1
-                    for row in document_rows
-                    if len((row.get("extensions") or {}).get("citations") or []) > 0
-                ),
+                sum(1 for row in document_rows if len((row.get("extensions") or {}).get("citations") or []) > 0),
                 1,
             )
 
