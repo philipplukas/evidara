@@ -62,8 +62,8 @@ export function ResultCard({
         transition-motion-medium focus-within:ring-2 focus-within:ring-focus-ring sm:px-5
         ${
           isSelected
-            ? "border-l-2 border-l-accent-core bg-accent-core/[0.06] shadow-[inset_0_0_0_1px_rgba(98,70,217,0.18)]"
-            : "border-l-2 border-l-transparent hover:-translate-y-px hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]"
+            ? "border-l-2 border-l-accent-core bg-interactive-accent-subtle shadow-ring-accent"
+            : "border-l-2 border-l-transparent hover:-translate-y-px hover:bg-muted/30 hover:shadow-ring-subtle"
         }`}
     >
       {result.structuralContext && (

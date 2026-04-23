@@ -51,7 +51,7 @@ export function StructureTab({ items, onFocus }: StructureTabProps) {
             className={`flex w-full items-center gap-3 rounded-xl border-l-2 px-3 py-2.5 text-left text-xs transition-all
               ${
                 item.active
-                  ? "border-l-accent-core bg-accent-core-subtle text-accent-core font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+                  ? "border-l-accent-core bg-accent-core-subtle text-accent-core font-semibold shadow-inset-surface"
                   : "border-l-transparent text-foreground/75 hover:bg-muted/50 hover:text-foreground"
               }`}
           >

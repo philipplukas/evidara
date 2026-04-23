@@ -21,7 +21,7 @@ export function FilterPanel({ filters }: FilterPanelProps) {
   if (filters.length === 0) {
     return (
       <div className="px-4 py-4">
-        <div className="rounded-2xl border border-dashed border-border/70 bg-surface-shell/45 px-4 py-5 text-center shadow-[--shadow-inset-surface]">
+        <div className="rounded-2xl border border-dashed border-border/70 bg-surface-shell/45 px-4 py-5 text-center shadow-inset-surface">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-interactive-accent-subtle text-accent-core">
             <SlidersHorizontal className="h-4 w-4" />
           </div>
@@ -40,7 +40,7 @@ export function FilterPanel({ filters }: FilterPanelProps) {
       <div className="space-y-2 py-3">
         <FilterBar filters={filters} />
         <div className="px-4 pb-2">
-          <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-[--shadow-inset-surface]">
+          <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-surface-shell/45 px-3.5 py-3 shadow-inset-surface">
             <SectionLabel>{t("filter.filtersTitle")}</SectionLabel>
             <div className="flex items-center gap-2 text-xs">
               <button
@@ -113,7 +113,7 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
   );
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/70 bg-surface-shell/35 shadow-[--shadow-inset-surface]">
+    <div className="overflow-hidden rounded-2xl border border-border/70 bg-surface-shell/35 shadow-inset-surface">
       <div className="flex min-h-11 w-full items-center gap-1 px-3.5 py-3">
         <button
           type="button"

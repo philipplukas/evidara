@@ -127,7 +127,7 @@ export function ContextBar({ context }: ContextBarProps) {
             </span>
           )}
           <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform duration-200 ${mobileExpanded ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 transition-transform transition-motion-medium ${mobileExpanded ? "rotate-180" : ""}`}
           />
         </button>
 
