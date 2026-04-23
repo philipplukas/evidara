@@ -67,7 +67,7 @@ export function ResultCard({
         }`}
     >
       {result.structuralContext && (
-        <div className="mb-1 text-tiny font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+        <div className="mb-1 text-tiny font-semibold uppercase tracking-[0.14em] text-text-meta">
           {result.structuralContext}
         </div>
       )}
@@ -103,7 +103,7 @@ export function ResultCard({
       </div>
 
       {/* Subtitle */}
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-meta">
         <span className="min-w-0">{result.subtitle}</span>
         {result.contentLanguage?.isTranslation && (
           <span className="inline-flex items-center gap-0.5 rounded bg-attention-subtle px-1.5 py-0.5 text-tiny font-medium text-attention">
@@ -122,12 +122,9 @@ export function ResultCard({
       {result.metadataRows.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1">
           {result.metadataRows.map((row, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
-            >
-              <IconCell iconKey={row.iconKey} className="text-xs text-muted-foreground/80" />
-              <span className="font-medium text-foreground/60">{row.label}:</span>
+            <span key={i} className="inline-flex items-center gap-1 text-[11px] text-text-meta">
+              <IconCell iconKey={row.iconKey} className="text-xs text-text-meta" />
+              <span className="font-medium text-text-meta">{row.label}:</span>
               <span className="text-foreground/80">{row.value}</span>
             </span>
           ))}
@@ -147,10 +144,10 @@ export function ResultCard({
                 onPivot?.(rc.label, result.id);
               }}
               className="inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 rounded-full border border-border/70
-                bg-muted/20 px-2.5 py-2 sm:py-1 text-[11px] font-medium text-muted-foreground transition-colors
+                bg-muted/20 px-2.5 py-2 sm:py-1 text-[11px] font-medium text-text-meta transition-colors
                 hover:border-accent-core/30 hover:bg-accent-core/5 hover:text-accent-core"
             >
-              <span className="font-semibold text-foreground/60">{rc.count}</span>
+              <span className="font-semibold text-text-meta">{rc.count}</span>
               {rc.label}
             </button>
           ))}

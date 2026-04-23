@@ -38,6 +38,9 @@ export const FOCUS_RING = "rgba(98, 70, 217, 0.24)";
 export const FOREGROUND = "#1d293d";
 export const FOREGROUND_MUTED = "rgba(29, 41, 61, 0.72)";
 export const FOREGROUND_SUBTLE = "rgba(29, 41, 61, 0.56)";
+// Secondary metadata text; WCAG AA on SURFACE_PAGE (6.03) + SURFACE_PANEL (7.04).
+export const TEXT_META = "#46595e";
+export const TEXT_META_DARK = "#b7b7b7";
 export const BORDER = "rgba(29, 41, 61, 0.12)";
 export const BORDER_STRONG = "rgba(29, 41, 61, 0.20)";
 

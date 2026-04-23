@@ -31,7 +31,7 @@ export function MetadataList({
     return (
       <div className="rounded-2xl border border-dashed border-border/70 bg-muted/25 px-4 py-5 text-center">
         <p className="text-xs font-medium text-foreground/75">{t("empty.noMetadataTitle")}</p>
-        <p className="mt-1 text-tiny text-muted-foreground">{t("empty.noMetadataDescription")}</p>
+        <p className="mt-1 text-tiny text-text-meta">{t("empty.noMetadataDescription")}</p>
       </div>
     );
   }
@@ -49,7 +49,7 @@ export function MetadataList({
           type="button"
           aria-expanded={!canExpand}
           onClick={() => setDensity(canExpand ? "expanded" : initialDensity)}
-          className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-tiny font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-tiny font-medium text-text-meta transition-colors hover:text-foreground"
         >
           {canExpand ? (
             <>
@@ -74,7 +74,7 @@ function MetadataRow({ field, compact }: { field: MetadataField; compact: boolea
 
   return (
     <div className={`flex items-baseline gap-2 ${compact ? "text-tiny" : "text-xs"}`}>
-      <dt className="text-muted-foreground w-28 shrink-0 font-medium">{field.label}</dt>
+      <dt className="text-text-meta w-28 shrink-0 font-medium">{field.label}</dt>
       <dd
         className={
           hasValue
