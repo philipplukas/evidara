@@ -23,7 +23,7 @@ resources:
               bronze_schema: "{{job.parameters.bronze_schema}}"
               published_schema: "{{job.parameters.published_schema}}"
           libraries:
-            - whl: ./dist/*.whl
+            - whl: ../dist/*.whl
           new_cluster:
             spark_version: ${var.spark_version}
             node_type_id: ${var.node_type_id}

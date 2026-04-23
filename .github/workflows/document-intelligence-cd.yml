@@ -38,6 +38,8 @@ jobs:
 
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
+        with:
+          version: 0.297.2
 
       - name: Validate Databricks bundle (dev)
         working-directory: document-intelligence
@@ -82,6 +84,8 @@ jobs:
 
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
+        with:
+          version: 0.297.2
 
       - name: Validate Databricks bundle (staging)
         working-directory: document-intelligence
@@ -128,6 +132,8 @@ jobs:
 
       - name: Install Databricks CLI
         uses: databricks/setup-cli@main
+        with:
+          version: 0.297.2
 
       - name: Validate Databricks bundle (prod)
         working-directory: document-intelligence

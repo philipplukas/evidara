@@ -39,7 +39,7 @@ resources:
               spacy_batch_size: "{{job.parameters.spacy_batch_size}}"
               use_spark_delta: "{{job.parameters.use_spark_delta}}"
           libraries:
-            - whl: ./dist/*.whl
+            - whl: ../dist/*.whl
           new_cluster:
             spark_version: ${var.spark_version}
             node_type_id: ${var.node_type_id}
