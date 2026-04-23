@@ -16,7 +16,7 @@ resources:
       tasks:
         - task_key: governance
           notebook_task:
-            notebook_path: ./databricks/notebooks/02_bootstrap_governance.py
+            notebook_path: ../databricks/notebooks/02_bootstrap_governance.py
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
               mode: "{{job.parameters.mode}}"

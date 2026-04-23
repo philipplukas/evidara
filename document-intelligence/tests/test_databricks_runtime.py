@@ -121,11 +121,20 @@ class DatabricksBundleConfigTests(unittest.TestCase):
                     tfvars_body = tfvars_file.read()
 
                 target = bundle_config["targets"][environment]
+                target_variables = target["variables"]
                 self.assertEqual(
-                    target["variables"]["surfaces_root_uri"],
+                    target_variables["catalog"],
+                    f"evidara_document_intelligence_{environment}",
+                )
+                self.assertEqual(
+                    target_variables["gcs_processed_bucket"],
+                    f"gs://evidara-document-intelligence-surfaces-{environment}/processed",
+                )
+                self.assertEqual(
+                    target_variables["surfaces_root_uri"],
                     _read_tfvars_string(tfvars_body, "external_location_url"),
                 )
-                self.assertNotIn("workspace_host", target["variables"])
+                self.assertNotIn("workspace_host", target_variables)
                 self.assertNotIn("host", target["workspace"])
 
 

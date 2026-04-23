@@ -21,7 +21,7 @@ resources:
       tasks:
         - task_key: autoloader_bronze
           notebook_task:
-            notebook_path: ./databricks/notebooks/00_autoloader_bronze.py
+            notebook_path: ../databricks/notebooks/00_autoloader_bronze.py
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
               gcs_processed_bucket: "{{job.parameters.gcs_processed_bucket}}"
@@ -41,7 +41,7 @@ resources:
           depends_on:
             - task_key: autoloader_bronze
           dbt_task:
-            project_directory: ./dbt
+            project_directory: ../dbt
             commands:
               - dbt deps
               - dbt source freshness --target ${bundle.target}

@@ -20,7 +20,7 @@ resources:
       tasks:
         - task_key: maintenance
           notebook_task:
-            notebook_path: ./databricks/notebooks/90_maintenance.py
+            notebook_path: ../databricks/notebooks/90_maintenance.py
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
               vacuum_retention_hours: "{{job.parameters.vacuum_retention_hours}}"

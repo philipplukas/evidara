@@ -2,7 +2,7 @@ environment = "prod"
 
 workspace_host = "https://dbc-0000000000000000.cloud.databricks.com"
 
-external_location_url = "gs://evidara-document-intelligence-surfaces-prod/published"
+external_location_url   = "gs://evidara-document-intelligence-surfaces-prod/published"
 storage_credential_name = "evidara_document_intelligence_prod"
 
 catalog_grants = [

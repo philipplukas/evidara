@@ -10,7 +10,7 @@ resources:
       tasks:
         - task_key: smoke_test
           notebook_task:
-            notebook_path: ./databricks/notebooks/99_smoke_test.py
+            notebook_path: ../databricks/notebooks/99_smoke_test.py
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
           new_cluster:

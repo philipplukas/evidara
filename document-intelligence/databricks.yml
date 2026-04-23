@@ -75,8 +75,10 @@ variables:
 targets:
   dev:
     default: true
-    mode: development
+    mode: production
     variables:
+      catalog: evidara_document_intelligence_dev
+      gcs_processed_bucket: gs://evidara-document-intelligence-surfaces-dev/processed
       surfaces_root_uri: gs://evidara-document-intelligence-surfaces-dev/published
       workspace_root_path: /Shared/evidara/.bundle/document-intelligence/dev
     workspace:
@@ -84,6 +86,8 @@ targets:
   staging:
     mode: production
     variables:
+      catalog: evidara_document_intelligence_staging
+      gcs_processed_bucket: gs://evidara-document-intelligence-surfaces-staging/processed
       surfaces_root_uri: gs://evidara-document-intelligence-surfaces-staging/published
       workspace_root_path: /Shared/evidara/.bundle/document-intelligence/staging
     workspace:
@@ -91,6 +95,8 @@ targets:
   prod:
     mode: production
     variables:
+      catalog: evidara_document_intelligence_prod
+      gcs_processed_bucket: gs://evidara-document-intelligence-surfaces-prod/processed
       surfaces_root_uri: gs://evidara-document-intelligence-surfaces-prod/published
       workspace_root_path: /Shared/evidara/.bundle/document-intelligence/prod
     workspace:

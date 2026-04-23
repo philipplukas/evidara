@@ -12,7 +12,7 @@ resources:
       tasks:
         - task_key: run_autoloader
           notebook_task:
-            notebook_path: ./databricks/notebooks/00_autoloader_bronze.py
+            notebook_path: ../databricks/notebooks/00_autoloader_bronze.py
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
               gcs_processed_bucket: "{{job.parameters.gcs_processed_bucket}}"
