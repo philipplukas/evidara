@@ -187,7 +187,7 @@ export function ResultList({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span
-            className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80"
+            className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
             title={tList("sortedByRelevanceHelp")}
           >
             {tList("sortedByRelevance")}
@@ -195,7 +195,7 @@ export function ResultList({
           <button
             type="button"
             onClick={handleExportCsv}
-            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80 transition-colors hover:border-accent-core/20 hover:bg-muted/40 hover:text-foreground"
+            className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:border-accent-core/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
             <Download className="h-3 w-3" />
             {tList("exportCsv")}
