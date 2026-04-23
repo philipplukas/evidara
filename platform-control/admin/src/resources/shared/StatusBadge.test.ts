@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminLevelBorder, type AdminStatusLevel } from "./StatusBadge";
+import { type AdminStatusLevel, adminLevelBorder } from "./StatusBadge";
 
 describe("adminLevelBorder", () => {
   it("derives every status border from the shared --status-* / --border-strong tokens", () => {
