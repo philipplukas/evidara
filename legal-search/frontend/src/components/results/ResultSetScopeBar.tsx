@@ -36,7 +36,7 @@ export function ResultSetScopeBar() {
         </button>
       )}
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="inline-flex shrink-0 items-center rounded-full border border-border/70 bg-muted/45 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="inline-flex shrink-0 items-center rounded-full border border-border/70 bg-muted/45 px-2 py-0.5 text-tiny font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {sourceKindLabel}
         </span>
         <span className="truncate text-sm font-semibold text-foreground">
@@ -44,7 +44,7 @@ export function ResultSetScopeBar() {
         </span>
       </div>
       {currentSource.type === "pivot" && (
-        <span className="hidden text-[11px] text-muted-foreground/80 sm:block">
+        <span className="hidden text-micro text-muted-foreground/80 sm:block">
           {describeScopeTrail(currentSource, (q) => t("searchFor", { query: q }))}
         </span>
       )}

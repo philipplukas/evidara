@@ -33,7 +33,7 @@ export function AnnotationTab({ annotations }: AnnotationTabProps) {
       {annotations.map((ann, i) => (
         <div
           key={i}
-          className="rounded-2xl border border-brand/10 bg-brand/[0.025] px-4 py-4 shadow-[--shadow-inset-surface]"
+          className="rounded-2xl border border-brand/10 bg-brand/[0.025] px-4 py-4 shadow-inset-surface"
         >
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">

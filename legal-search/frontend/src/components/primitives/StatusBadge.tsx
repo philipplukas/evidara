@@ -21,7 +21,7 @@ export function StatusBadge({ status, label, size = "sm", className }: StatusBad
         tokens.subtleBg,
         tokens.color,
         size === "sm"
-          ? "px-2 py-0.5 text-[10px] border-current/15"
+          ? "px-2 py-0.5 text-tiny border-current/15"
           : "px-2.5 py-1 text-xs border-current/15",
         className,
       )}

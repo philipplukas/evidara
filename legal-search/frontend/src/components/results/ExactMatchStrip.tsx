@@ -16,7 +16,7 @@ export function ExactMatchStrip({ matches, onSelect }: ExactMatchStripProps) {
   if (matches.length === 0) return null;
 
   return (
-    <div className="mb-4 rounded-xl border border-brand/15 bg-brand/[0.04] px-4 py-3 shadow-[--shadow-inset-surface]">
+    <div className="mb-4 rounded-xl border border-brand/15 bg-brand/[0.04] px-4 py-3 shadow-inset-surface">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

@@ -318,7 +318,7 @@ export function AppHeader({
               {recentQueries.length > 0 && (
                 <fieldset
                   id="app-header-search-recent"
-                  className="flex flex-wrap items-center gap-1.5 px-1 text-[11px] text-muted-foreground/80"
+                  className="flex flex-wrap items-center gap-1.5 px-1 text-micro text-muted-foreground/80"
                 >
                   <legend className="sr-only">{t("header.recentSearches")}</legend>
                   <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
@@ -336,7 +336,7 @@ export function AppHeader({
               )}
 
               {savedSearches.length > 0 && (
-                <fieldset className="flex flex-wrap items-center gap-1.5 px-1 text-[11px] text-muted-foreground/80">
+                <fieldset className="flex flex-wrap items-center gap-1.5 px-1 text-micro text-muted-foreground/80">
                   <legend className="sr-only">{t("header.savedSearches")}</legend>
                   <BookmarkCheck className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                   {savedSearches.map((saved) => (

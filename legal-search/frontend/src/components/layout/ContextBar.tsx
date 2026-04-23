@@ -122,12 +122,12 @@ export function ContextBar({ context }: ContextBarProps) {
         >
           {t("filter.filtersTitle")}
           {activeCount > 0 && (
-            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-core px-1 text-[10px] font-semibold text-white">
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-core px-1 text-tiny font-semibold text-white">
               {activeCount}
             </span>
           )}
           <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform duration-200 ${mobileExpanded ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 transition-transform transition-motion-medium ${mobileExpanded ? "rotate-180" : ""}`}
           />
         </button>
 

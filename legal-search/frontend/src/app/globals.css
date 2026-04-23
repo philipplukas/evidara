@@ -47,6 +47,7 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-pill: var(--radius-pill);
 
   /* ─── Brand ─── */
   --color-brand: var(--brand);
@@ -90,9 +91,27 @@
   --color-status-info: var(--status-info);
   --color-status-info-subtle: var(--status-info-subtle);
 
-  /* ─── Typography ─── */
-  --text-micro: 0.6875rem;  /* 11px */
-  --text-tiny: 0.625rem;    /* 10px */
+  /* ─── Typography (size + leading; values in styles/tokens/tokens.css) ─── */
+  /* text-tiny / text-micro remain as manual utilities below (font-size + line-height bundled) */
+  --text-xs: var(--text-xs);         --leading-xs: var(--leading-xs);
+  --text-sm: var(--text-sm);         --leading-sm: var(--leading-sm);
+  --text-base: var(--text-base);     --leading-base: var(--leading-base);
+  --text-lg: var(--text-lg);         --leading-lg: var(--leading-lg);
+  --text-xl: var(--text-xl);         --leading-xl: var(--leading-xl);
+  --text-2xl: var(--text-2xl);       --leading-2xl: var(--leading-2xl);
+
+  /* ─── Font weights ─── */
+  --font-weight-regular: var(--font-weight-regular);
+  --font-weight-medium: var(--font-weight-medium);
+  --font-weight-semibold: var(--font-weight-semibold);
+  --font-weight-bold: var(--font-weight-bold);
+
+  /* ─── Shadows exposed as Tailwind utilities (shadow-ring-accent, shadow-ring-subtle) ─── */
+  --shadow-ring-accent: var(--shadow-ring-accent);
+  --shadow-ring-subtle: var(--shadow-ring-subtle);
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --shadow-inset-surface: var(--shadow-inset-surface);
 }
 
 @layer base {
@@ -182,9 +201,11 @@
   }
 
   .app-header__brand {
-    @apply flex shrink-0 items-center gap-2.5 rounded-2xl border border-border/60 px-3 py-2 transition-transform duration-200 hover:-translate-y-px;
+    @apply flex shrink-0 items-center gap-2.5 rounded-2xl border border-border/60 px-3 py-2 transition-transform hover:-translate-y-px;
     grid-area: brand;
     background-color: var(--surface-shell);
+    transition-duration: var(--motion-duration-medium);
+    transition-timing-function: var(--motion-easing-standard);
   }
 
   .app-header__brand-mark {
@@ -347,12 +368,12 @@
 @layer utilities {
   .text-micro {
     font-size: var(--text-micro);
-    line-height: 1.2;
+    line-height: var(--leading-micro);
   }
 
   .text-tiny {
     font-size: var(--text-tiny);
-    line-height: 1;
+    line-height: var(--leading-tiny);
   }
 
   .transition-motion-short {
