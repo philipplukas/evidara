@@ -127,6 +127,7 @@ export function RunLaunchButton({
   const [isCheckingReadiness, setIsCheckingReadiness] = useState(false);
   const [readiness, setReadiness] = useState<RunReadiness | null>(null);
   const [readinessError, setReadinessError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
   const initialMode = resolveInitialMode(defaultMode, allowedModes);
   const [formState, setFormState] = useState<RunLaunchFormState>(createInitialState(initialMode));
   const readinessCheckStartedAtRef = useRef<number | null>(null);
@@ -272,13 +273,14 @@ export function RunLaunchButton({
     [],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retryNonce bumps deliberately retrigger the effect so the retry runs under the same formState-scoped `active` guard as the initial check.
   useEffect(() => {
     let active = true;
     runPreflight(formState, () => active);
     return () => {
       active = false;
     };
-  }, [formState, runPreflight]);
+  }, [formState, runPreflight, retryNonce]);
 
   const handleRetry = () => {
     const previousError = readinessError;
@@ -288,7 +290,10 @@ export function RunLaunchButton({
       "preflight_retry",
       buildPreflightRetryPayload(formState, previousError),
     );
-    runPreflight(formState);
+    // Re-run preflight via the effect so it inherits the formState-scoped
+    // `active` guard — a direct call here would race with subsequent
+    // source/version edits and overwrite readiness for a stale pair.
+    setRetryNonce((n) => n + 1);
   };
 
   const failingChecks = useMemo(
