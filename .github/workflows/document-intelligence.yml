@@ -33,6 +33,10 @@ on:
       - "infra/terraform/databricks/document_intelligence_stack/**"
       - "infra/env/*/document_intelligence.databricks.tfvars"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   document-intelligence-check:
     runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}

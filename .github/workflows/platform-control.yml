@@ -13,6 +13,10 @@ on:
       - "contracts/api/platform-control.openapi.yaml"
       - "scripts/check-platform-control.sh"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     # GitHub-hosted keeps setup-node/setup-python stable until Hetzner K8s

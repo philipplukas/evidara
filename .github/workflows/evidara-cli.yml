@@ -19,6 +19,10 @@ on:
       - ".github/workflows/evidara-cli.yml"
       - ".github/workflows/evidara-cli-remote-smoke.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   evidara-cli:
     # setup-python is more predictable on GitHub-hosted Linux while the

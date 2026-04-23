@@ -118,10 +118,23 @@ jobs:
             -e 's|http://security.ubuntu.com/ubuntu/|https://security.ubuntu.com/ubuntu/|g' \
             /etc/apt/sources.list /etc/apt/sources.list.d/*.sources
 
-      - name: Install Playwright Chromium
+      - name: Cache Playwright browsers
         if: ${{ inputs.frontend_playwright_smoke }}
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('legal-search/frontend/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        if: ${{ inputs.frontend_playwright_smoke && steps.playwright-cache.outputs.cache-hit != 'true' }}
         working-directory: legal-search/frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
+
+      - name: Install Playwright system deps
+        if: ${{ inputs.frontend_playwright_smoke && runner.environment == 'github-hosted' }}
+        working-directory: legal-search/frontend
+        run: npx playwright install-deps chromium
 
       - name: Verify Playwright browser smoke
         if: ${{ inputs.frontend_playwright_smoke }}

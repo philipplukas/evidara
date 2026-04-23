@@ -24,6 +24,10 @@ on:
       - 'docs/runbooks/interaction-flow-validation.md'
       - 'scripts/run-interaction-flow-local.sh'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ─── API quality gate ───
   api:
@@ -111,13 +115,20 @@ jobs:
         working-directory: platform-control/admin
         run: npm ci
 
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('legal-search/frontend/package-lock.json') }}
+
       - name: Install Playwright browser
-        run: |
-          if [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]]; then
-            npx playwright install --with-deps chromium
-          else
-            npx playwright install chromium
-          fi
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Install Playwright system deps
+        if: runner.environment == 'github-hosted'
+        run: npx playwright install-deps chromium
 
       - name: Run smoke suite
         run: npm run e2e:smoke
@@ -243,8 +254,20 @@ jobs:
         working-directory: platform-control/admin
         run: npm ci
 
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('legal-search/frontend/package-lock.json') }}
+
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Install Playwright system deps
+        if: runner.environment == 'github-hosted'
+        run: npx playwright install-deps chromium
 
       - name: Visual pixel regression
         run: npm run e2e:visual

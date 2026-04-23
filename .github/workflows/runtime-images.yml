@@ -20,6 +20,10 @@ on:
       - "document-intelligence/**"
       - "contracts/**"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: read # dorny/paths-filter compares PR head/base via the API on pull_request
