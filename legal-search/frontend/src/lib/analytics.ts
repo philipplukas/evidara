@@ -4,6 +4,12 @@
  * Provider-agnostic: logs to console in development, queues events for
  * a configurable backend (Plausible, PostHog, etc.) in production.
  * No external dependencies required.
+ *
+ * The event catalog below MUST stay in sync with
+ * `contracts/events/legal-search.events.json` — that file is the
+ * source of truth. The drift guard in
+ * `src/__tests__/analytics-schema.test.ts` fails the build if a key
+ * diverges.
  */
 
 // ─── Event Names ───
