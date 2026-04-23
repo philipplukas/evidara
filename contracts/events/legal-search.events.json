@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/events/legal-search.events",
+  "title": "LegalSearchAnalyticsEvents",
+  "description": "Source-of-truth catalog for legal-search frontend analytics (telemetry) events. These are client-side product-usage events, distinct from the CloudEvents-aligned pipeline events in this directory. Each event is defined under $defs keyed by its dotted snake_case name. The union type LegalSearchAnalyticsEvent is the discriminated shape the frontend emits via track().",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/search.executed" },
+    { "$ref": "#/$defs/result.selected" },
+    { "$ref": "#/$defs/result.pivoted" },
+    { "$ref": "#/$defs/filter.applied" },
+    { "$ref": "#/$defs/filter.removed" },
+    { "$ref": "#/$defs/detail.tab_changed" },
+    { "$ref": "#/$defs/pin.added" },
+    { "$ref": "#/$defs/pin.removed" },
+    { "$ref": "#/$defs/share.link_copied" },
+    { "$ref": "#/$defs/page.view" }
+  ],
+  "$defs": {
+    "search.executed": {
+      "type": "object",
+      "title": "SearchExecuted",
+      "description": "User ran a search query. Fires on submit, not on every keystroke.",
+      "properties": {
+        "name": { "const": "search.executed" },
+        "query": { "type": "string" },
+        "resultCount": { "type": "integer", "minimum": 0 },
+        "jurisdictions": {
+          "type": "string",
+          "description": "Comma-separated list of jurisdiction codes applied at submit time."
+        },
+        "languages": {
+          "type": "string",
+          "description": "Comma-separated list of language codes applied at submit time."
+        }
+      },
+      "required": ["name", "query", "resultCount"],
+      "additionalProperties": false
+    },
+    "result.selected": {
+      "type": "object",
+      "title": "ResultSelected",
+      "description": "User opened a search result from the result list.",
+      "properties": {
+        "name": { "const": "result.selected" },
+        "resultId": { "type": "string" },
+        "resultType": { "type": "string" },
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based index within the visible result list."
+        }
+      },
+      "required": ["name", "resultId"],
+      "additionalProperties": false
+    },
+    "result.pivoted": {
+      "type": "object",
+      "title": "ResultPivoted",
+      "description": "User navigated from one result into a related entity (e.g. clicked a citation or cited-by link).",
+      "properties": {
+        "name": { "const": "result.pivoted" },
+        "sourceId": { "type": "string" },
+        "label": { "type": "string" }
+      },
+      "required": ["name", "sourceId", "label"],
+      "additionalProperties": false
+    },
+    "filter.applied": {
+      "type": "object",
+      "title": "FilterApplied",
+      "description": "User added or toggled on a filter value.",
+      "properties": {
+        "name": { "const": "filter.applied" },
+        "filterType": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["name", "filterType", "value"],
+      "additionalProperties": false
+    },
+    "filter.removed": {
+      "type": "object",
+      "title": "FilterRemoved",
+      "description": "User cleared a filter. Missing value indicates a bulk reset of the filterType group.",
+      "properties": {
+        "name": { "const": "filter.removed" },
+        "filterType": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["name", "filterType"],
+      "additionalProperties": false
+    },
+    "detail.tab_changed": {
+      "type": "object",
+      "title": "DetailTabChanged",
+      "description": "User switched tabs in the document detail view.",
+      "properties": {
+        "name": { "const": "detail.tab_changed" },
+        "tab": { "type": "string" },
+        "previousTab": { "type": "string" }
+      },
+      "required": ["name", "tab"],
+      "additionalProperties": false
+    },
+    "pin.added": {
+      "type": "object",
+      "title": "PinAdded",
+      "description": "User pinned an item to their workspace.",
+      "properties": {
+        "name": { "const": "pin.added" },
+        "itemId": { "type": "string" },
+        "itemType": { "type": "string" }
+      },
+      "required": ["name", "itemId"],
+      "additionalProperties": false
+    },
+    "pin.removed": {
+      "type": "object",
+      "title": "PinRemoved",
+      "description": "User removed a pinned item.",
+      "properties": {
+        "name": { "const": "pin.removed" },
+        "itemId": { "type": "string" }
+      },
+      "required": ["name", "itemId"],
+      "additionalProperties": false
+    },
+    "share.link_copied": {
+      "type": "object",
+      "title": "ShareLinkCopied",
+      "description": "User copied a shareable link (document, search, or section).",
+      "properties": {
+        "name": { "const": "share.link_copied" },
+        "url": { "type": "string" },
+        "context": {
+          "type": "string",
+          "description": "Origin of the share action (e.g. 'detail-header', 'result-card')."
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "page.view": {
+      "type": "object",
+      "title": "PageView",
+      "description": "First render of a route. Fires once per navigation, not on re-render.",
+      "properties": {
+        "name": { "const": "page.view" },
+        "path": { "type": "string" },
+        "referrer": { "type": "string" }
+      },
+      "required": ["name", "path"],
+      "additionalProperties": false
+    }
+  }
+}
