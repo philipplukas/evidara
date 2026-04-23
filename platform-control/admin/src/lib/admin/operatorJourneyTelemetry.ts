@@ -1,6 +1,7 @@
 export type OperatorJourneyEventName =
   | "preflight_blocked"
   | "preflight_ready"
+  | "preflight_retry"
   | "pipeline_health_loaded"
   | "remediation_action_clicked"
   | "legal_search_verification_opened";
@@ -17,6 +18,7 @@ export type OperatorJourneyEvent = {
   stage?: "acquisition" | "document_intelligence" | "projection" | "search";
   action_label?: string;
   action_href?: string;
+  previous_error_message?: string | null;
 };
 
 declare global {

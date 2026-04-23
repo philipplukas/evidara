@@ -1,5 +1,6 @@
 "use client";
 
+import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   Alert,
   AlertTitle,
@@ -15,7 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDataProvider, useGetList, useNotify, useRedirect } from "react-admin";
 import { ResourceName } from "../../domain/resourceNames";
 import type {
@@ -89,6 +90,25 @@ const formatModeLabel = (mode: "preview" | "production"): string =>
 
 const modeChipColor = (mode: "preview" | "production"): "info" | "success" =>
   mode === "production" ? "success" : "info";
+
+export type PreflightRetryPayload = {
+  source_id: string;
+  source_version_id: string;
+  mode: "preview" | "production";
+  previous_error_message: string | null;
+};
+
+export function buildPreflightRetryPayload(
+  formState: { source_id: string; source_version_id: string; mode: "preview" | "production" },
+  readinessError: string | null,
+): PreflightRetryPayload {
+  return {
+    source_id: formState.source_id,
+    source_version_id: formState.source_version_id,
+    mode: formState.mode,
+    previous_error_message: readinessError ?? null,
+  };
+}
 
 export function RunLaunchButton({
   label,
@@ -195,64 +215,81 @@ export function RunLaunchButton({
     }
   };
 
-  useEffect(() => {
-    const canCheck = Boolean(formState.source_id && formState.source_version_id);
-    if (!canCheck) {
-      setReadiness(null);
-      setReadinessError(null);
-      setIsCheckingReadiness(false);
-      return;
-    }
-
-    let active = true;
-    setIsCheckingReadiness(true);
-    setReadinessError(null);
-    readinessCheckStartedAtRef.current = Date.now();
-
-    void controlPlaneActions
-      .getRunReadiness(formState)
-      .then((result) => {
-        if (!active) return;
-        setReadiness(result);
-        const elapsedMs =
-          readinessCheckStartedAtRef.current != null
-            ? Date.now() - readinessCheckStartedAtRef.current
-            : undefined;
-        if (result.ready) {
-          emitOperatorJourneyEvent("preflight_ready", {
-            source_id: formState.source_id,
-            source_version_id: formState.source_version_id,
-            mode: formState.mode,
-            readiness_codes: [],
-            duration_ms: elapsedMs,
-          });
-        } else {
-          const readinessCodes = normalizeReadinessCodes(result.checks);
-          emitOperatorJourneyEvent("preflight_blocked", {
-            source_id: formState.source_id,
-            source_version_id: formState.source_version_id,
-            mode: formState.mode,
-            readiness_codes: readinessCodes,
-            duration_ms: elapsedMs,
-          });
-        }
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
+  const runPreflight = useCallback(
+    (input: RunLaunchFormState, isActive: () => boolean = () => true) => {
+      const canCheck = Boolean(input.source_id && input.source_version_id);
+      if (!canCheck) {
         setReadiness(null);
-        setReadinessError(
-          error instanceof Error ? error.message : "Unable to run preflight checks.",
-        );
-      })
-      .finally(() => {
-        if (!active) return;
+        setReadinessError(null);
         setIsCheckingReadiness(false);
-      });
+        return;
+      }
 
+      setIsCheckingReadiness(true);
+      setReadinessError(null);
+      readinessCheckStartedAtRef.current = Date.now();
+
+      void controlPlaneActions
+        .getRunReadiness(input)
+        .then((result) => {
+          if (!isActive()) return;
+          setReadiness(result);
+          const elapsedMs =
+            readinessCheckStartedAtRef.current != null
+              ? Date.now() - readinessCheckStartedAtRef.current
+              : undefined;
+          if (result.ready) {
+            emitOperatorJourneyEvent("preflight_ready", {
+              source_id: input.source_id,
+              source_version_id: input.source_version_id,
+              mode: input.mode,
+              readiness_codes: [],
+              duration_ms: elapsedMs,
+            });
+          } else {
+            const readinessCodes = normalizeReadinessCodes(result.checks);
+            emitOperatorJourneyEvent("preflight_blocked", {
+              source_id: input.source_id,
+              source_version_id: input.source_version_id,
+              mode: input.mode,
+              readiness_codes: readinessCodes,
+              duration_ms: elapsedMs,
+            });
+          }
+        })
+        .catch((error: unknown) => {
+          if (!isActive()) return;
+          setReadiness(null);
+          setReadinessError(
+            error instanceof Error ? error.message : "Unable to run preflight checks.",
+          );
+        })
+        .finally(() => {
+          if (!isActive()) return;
+          setIsCheckingReadiness(false);
+        });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    let active = true;
+    runPreflight(formState, () => active);
     return () => {
       active = false;
     };
-  }, [formState]);
+  }, [formState, runPreflight]);
+
+  const handleRetry = () => {
+    const previousError = readinessError;
+    setReadiness(null);
+    setReadinessError(null);
+    emitOperatorJourneyEvent(
+      "preflight_retry",
+      buildPreflightRetryPayload(formState, previousError),
+    );
+    runPreflight(formState);
+  };
 
   const failingChecks = useMemo(
     () => readiness?.checks.filter((check) => !check.ok) ?? [],
@@ -414,7 +451,24 @@ export function RunLaunchButton({
                 The launch dialog is validating the selected source/version pair.
               </Alert>
             ) : null}
-            {readinessError ? <Alert severity="error">{readinessError}</Alert> : null}
+            {readinessError ? (
+              <Alert
+                severity="error"
+                action={
+                  <Button
+                    size="small"
+                    color="inherit"
+                    startIcon={<RefreshIcon />}
+                    onClick={handleRetry}
+                    disabled={isCheckingReadiness}
+                  >
+                    Retry
+                  </Button>
+                }
+              >
+                {readinessError}
+              </Alert>
+            ) : null}
             {readiness && !readiness.ready ? (
               <Alert severity="warning" icon={false}>
                 <Stack spacing={1.25}>
