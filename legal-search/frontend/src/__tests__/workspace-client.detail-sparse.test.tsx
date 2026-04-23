@@ -35,6 +35,7 @@ vi.mock("@/hooks/use-detail", () => ({
     data: sparseDetail,
     isLoading: false,
     isError: false,
+    refetch: vi.fn(),
   }),
 }));
 

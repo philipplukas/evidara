@@ -190,6 +190,11 @@
   },
   "workspace": {
     "detailLoadFailed": "Dokumentdetails konnten nicht geladen werden.",
+    "detailRetryHint": "Versuchen Sie es erneut oder schließen Sie das Panel, um zu den Ergebnissen zurückzukehren.",
+    "detailRetry": "Erneut laden",
+    "detailClose": "Zurück zur Ergebnisliste",
+    "detailNotFound": "Dieses Dokument ist nicht mehr verfügbar.",
+    "detailNotFoundHint": "Möglicherweise wurde es entfernt oder der Link ist veraltet.",
     "resultsControlRegion": "Suchergebnisse und Steuerelemente"
   }
 }

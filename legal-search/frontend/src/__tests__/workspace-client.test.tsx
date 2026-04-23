@@ -15,6 +15,7 @@ vi.mock("@/hooks/use-detail", () => ({
     data: null,
     isLoading: false,
     isError: false,
+    refetch: vi.fn(),
   }),
 }));
 
