@@ -52,7 +52,10 @@ class SparkDeltaCanonicalSinkTests(unittest.TestCase):
 
         from document_intelligence.pipeline import ProcessingPipeline
 
-        html = "<html><head><title>Spark Delta Doc</title></head><body><h1>Scope</h1><p>Content.</p></body></html>"
+        html = (
+            "<html><head><title>Spark Delta Doc</title></head>"
+            "<body><h1>Scope</h1><p>Content cites BGBl. Nr. 43/1975.</p></body></html>"
+        )
         config = DeltaSinkConfig(
             published_documents_uri="gs://bucket/published_documents",
             published_sections_uri="gs://bucket/published_sections",
@@ -165,8 +168,10 @@ class SparkDeltaCanonicalSinkTests(unittest.TestCase):
             "processing_manifest_id",
             "title",
             "lifecycle_status",
+            "extensions",
         ):
             self.assertIn(key, doc_row, f"Expected column '{key}' missing from published_documents row")
+        self.assertGreater(len(doc_row["extensions"]["citations"]), 0)
 
 
 if __name__ == "__main__":
