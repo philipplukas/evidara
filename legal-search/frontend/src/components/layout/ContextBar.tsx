@@ -109,14 +109,14 @@ export function ContextBar({ context }: ContextBarProps) {
     <div className="context-bar">
       <div className="context-bar__layout">
         {/* Desktop: always-visible label */}
-        <span className="hidden text-micro shrink-0 font-medium text-muted-foreground md:block">
+        <span className="hidden text-micro shrink-0 font-medium text-text-meta md:block">
           {t("filter.filtersTitle")}
         </span>
 
         {/* Mobile: collapsible toggle */}
         <button
           type="button"
-          className="flex items-center gap-1.5 text-micro font-medium text-muted-foreground md:hidden"
+          className="flex items-center gap-1.5 text-micro font-medium text-text-meta md:hidden"
           onClick={() => setMobileExpanded((v) => !v)}
           aria-expanded={mobileExpanded}
         >
@@ -139,7 +139,7 @@ export function ContextBar({ context }: ContextBarProps) {
 
         <button
           type="button"
-          className="text-micro ml-auto shrink-0 rounded-sm px-1 py-0.5 font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          className="text-micro ml-auto shrink-0 rounded-sm px-1 py-0.5 font-medium text-text-meta underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           onClick={() => dispatch({ type: "RESET_ALL" })}
         >
           {t("filter.resetAll")}
