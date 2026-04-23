@@ -190,6 +190,11 @@
   },
   "workspace": {
     "detailLoadFailed": "Impossible de charger les d\u00e9tails du document.",
+    "detailRetryHint": "R\u00e9essayez ou fermez le panneau pour revenir aux r\u00e9sultats.",
+    "detailRetry": "R\u00e9essayer",
+    "detailClose": "Retour \u00e0 la liste des r\u00e9sultats",
+    "detailNotFound": "Ce document n'est plus disponible.",
+    "detailNotFoundHint": "Il a peut-\u00eatre \u00e9t\u00e9 supprim\u00e9 ou le lien est obsol\u00e8te.",
     "resultsControlRegion": "R\u00e9sultats de recherche et commandes"
   }
 }

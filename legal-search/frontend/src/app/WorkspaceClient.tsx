@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DetailPanel } from "@/components/detail/DetailPanel";
+import { DetailUnavailableState } from "@/components/detail/DetailUnavailableState";
 import { FilterPanel } from "@/components/filters/FilterPanel";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { ContextBar } from "@/components/layout/ContextBar";
@@ -69,7 +70,17 @@ export default function WorkspaceClient({
     data: detail,
     isLoading: isDetailLoading,
     isError: isDetailError,
+    refetch: refetchDetail,
   } = useDetail(selectedId);
+  // Fetch settled successfully but the backend returned 404 (see
+  // `hooks/use-detail.ts` — 404 maps to `data: null`). Distinct from
+  // "no item selected" where the query is disabled and `data` is also null.
+  const isDetailNotFound =
+    Boolean(selectedId) && !isDetailLoading && !isDetailError && detail === null;
+
+  const handleCloseDetail = useCallback(() => {
+    void setSelectedId(null);
+  }, [setSelectedId]);
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -219,13 +230,39 @@ export default function WorkspaceClient({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isDesktop, isDetailOpen, setSelectedId]);
 
-  // Detail content — show skeleton during load, error message on failure
+  // Detail content — skeleton during load, distinct states for 5xx error vs 404,
+  // otherwise render the panel (or the panel's own "no selection" empty state
+  // when `detail === null` and no id is selected).
   const detailContent = isDetailLoading ? (
     <DetailPanelSkeleton />
   ) : isDetailError ? (
-    <div className="flex flex-col items-center justify-center h-full text-center px-6">
-      <p className="text-sm text-destructive">{t("workspace.detailLoadFailed")}</p>
-    </div>
+    <DetailUnavailableState
+      role="alert"
+      icon="error"
+      title={t("workspace.detailLoadFailed")}
+      description={t("workspace.detailRetryHint")}
+      primaryAction={{
+        label: t("workspace.detailRetry"),
+        icon: "retry",
+        onClick: () => void refetchDetail(),
+      }}
+      secondaryAction={{
+        label: t("workspace.detailClose"),
+        onClick: handleCloseDetail,
+      }}
+    />
+  ) : isDetailNotFound ? (
+    <DetailUnavailableState
+      role="status"
+      icon="notFound"
+      title={t("workspace.detailNotFound")}
+      description={t("workspace.detailNotFoundHint")}
+      primaryAction={{
+        label: t("workspace.detailClose"),
+        icon: "close",
+        onClick: handleCloseDetail,
+      }}
+    />
   ) : (
     <DetailPanel
       detail={detail ?? null}
