@@ -31,6 +31,7 @@ _PUBLISHED_DOCUMENTS_DELTA_KEYS = frozenset(
         "full_text",
         "body_text",
         "metadata",
+        "extensions",
     }
 )
 _PUBLISHED_SECTIONS_DELTA_KEYS = frozenset(
@@ -70,9 +71,8 @@ _PROCESSING_MANIFESTS_DELTA_KEYS = frozenset(
 
 
 def _document_dict_for_delta(document: Document) -> dict[str, object]:
-    """Match legacy `published_documents` Delta schemas (no extensions / effective_date)."""
+    """Match legacy `published_documents` Delta schemas while preserving extension payloads."""
     row = document.to_dict()
-    row.pop("extensions", None)
     row.pop("effective_date", None)
     return row
 

@@ -156,6 +156,7 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             self.assertEqual(len(section_rows), len(result.sections))
             self.assertEqual(len(manifest_rows), 1)
             self.assertEqual(document_rows[0]["document_id"], result.document.document_id)
+            self.assertEqual(document_rows[0]["extensions"], result.document.extensions)
             self.assertEqual(
                 manifest_rows[0]["published_document_ref"]["surface_name"],
                 "published_documents",
@@ -199,7 +200,10 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
 
 
 def build_processing_result():
-    html = "<html><head><title>Delta Doc</title></head><body><h1>One</h1><p>Body</p></body></html>"
+    html = (
+        "<html><head><title>Delta Doc</title></head>"
+        "<body><h1>One</h1><p>Body cites BGBl. Nr. 43/1975.</p></body></html>"
+    )
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
         html_handle.write(html)
         artifact_path = html_handle.name
