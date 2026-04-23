@@ -88,6 +88,7 @@ class DatabricksBundleConfigTests(unittest.TestCase):
         task = job["tasks"][0]
         self.assertEqual(task["python_wheel_task"]["entry_point"], "databricks_process_event")
         self.assertEqual(task["python_wheel_task"]["package_name"], "document-intelligence")
+        self.assertEqual(task["libraries"], [{"whl": "../dist/*.whl"}])
         self.assertIn("parser_backend", bundle_config["variables"])
         self.assertIn("enable_spacy", bundle_config["variables"])
         self.assertIn("spacy_model_name", bundle_config["variables"])
@@ -102,6 +103,27 @@ class DatabricksBundleConfigTests(unittest.TestCase):
 
         autoloader_jobs = autoloader_resource_config["resources"]["jobs"]
         self.assertIn("document_intelligence_autoloader_bronze", autoloader_jobs)
+        for resource_path in (
+            process_resource_path,
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "resources",
+                "document_intelligence_bootstrap_job.yml",
+            ),
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "resources",
+                "document_intelligence_governance_job.yml",
+            ),
+        ):
+            with self.subTest(resource_path=resource_path):
+                with open(resource_path, encoding="utf-8") as resource_file:
+                    resource_config = yaml.safe_load(resource_file)
+                jobs = resource_config["resources"]["jobs"]
+                task_config = next(iter(jobs.values()))["tasks"][0]
+                self.assertEqual(task_config["libraries"], [{"whl": "../dist/*.whl"}])
         dbt_jobs = dbt_resource_config["resources"]["jobs"]
         self.assertIn("document_intelligence_dbt_transformations", dbt_jobs)
         smoke_jobs = smoke_resource_config["resources"]["jobs"]
