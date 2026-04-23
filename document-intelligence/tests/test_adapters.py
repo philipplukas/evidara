@@ -198,12 +198,50 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             self.assertEqual(len(document_rows), 2)
             self.assertEqual(len(manifest_rows), 2)
 
+    def test_schema_merge_allows_extensions_to_appear_after_non_citation_rows(self) -> None:
+        import deltalake
 
-def build_processing_result():
-    html = (
+        with tempfile.TemporaryDirectory() as temp_dir:
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                )
+            )
+            uncited = build_processing_result(
+                html=(
+                    "<html><head><title>No Citation Doc</title></head>"
+                    "<body><h1>One</h1><p>Body without legal references.</p></body></html>"
+                )
+            )
+            sink.persist(uncited.document, uncited.sections, uncited.manifest)
+            cited = build_processing_result()
+            sink.persist(cited.document, cited.sections, cited.manifest)
+
+            document_rows = (
+                deltalake.DeltaTable(os.path.join(temp_dir, "published_documents")).to_pyarrow_table().to_pylist()
+            )
+
+            self.assertEqual(len(document_rows), 2)
+            self.assertEqual(sum(1 for row in document_rows if row.get("extensions") is None), 1)
+            self.assertEqual(
+                sum(
+                    1
+                    for row in document_rows
+                    if len((row.get("extensions") or {}).get("citations") or []) > 0
+                ),
+                1,
+            )
+
+
+def build_processing_result(
+    *,
+    html: str = (
         "<html><head><title>Delta Doc</title></head>"
         "<body><h1>One</h1><p>Body cites BGBl. Nr. 43/1975.</p></body></html>"
-    )
+    ),
+):
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
         html_handle.write(html)
         artifact_path = html_handle.name

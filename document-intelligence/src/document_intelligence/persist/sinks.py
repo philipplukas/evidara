@@ -196,7 +196,10 @@ class DeltaCanonicalSink(CanonicalSink):
         if not rows:
             return
         try:
-            ready = _delta_ready_rows(rows, always_present_keys=always_present_keys)
+            ready = _delta_ready_rows(
+                rows,
+                always_present_keys=_projection_keys_for_rows(rows, always_present_keys),
+            )
             mode = _delta_write_mode(uri)
             schema: pa.Schema | None = None
             if mode == "append":
@@ -206,10 +209,17 @@ class DeltaCanonicalSink(CanonicalSink):
                 except Exception:
                     schema = None
             if schema is not None:
+                incoming_keys = {key for row in ready for key in row.keys()}
+                if not incoming_keys.issubset(set(schema.names)):
+                    schema = None
+            if schema is not None:
                 table = pa.Table.from_pylist(ready, schema=schema)
             else:
                 table = pa.Table.from_pylist(ready)
-            self._writer(uri, table, mode=mode)
+            writer_kwargs: dict[str, object] = {"mode": mode}
+            if mode == "append":
+                writer_kwargs["schema_mode"] = "merge"
+            self._writer(uri, table, **writer_kwargs)
         except Exception as error:  # pragma: no cover - library-specific
             raise ProcessingError(
                 "delta_write_failed",
@@ -309,7 +319,10 @@ class SparkDeltaCanonicalSink(CanonicalSink):
         if not rows:
             return
         try:
-            ready = _delta_ready_rows(rows, always_present_keys=always_present_keys)
+            ready = _delta_ready_rows(
+                rows,
+                always_present_keys=_projection_keys_for_rows(rows, always_present_keys),
+            )
             spark = self._get_spark()
             json_records = [json.dumps(row, default=str) for row in ready]
             rdd = spark.sparkContext.parallelize(json_records)  # type: ignore[attr-defined]
@@ -331,6 +344,17 @@ def _delta_write_mode(uri: str) -> str:
     local_path = uri[len("file://") :] if uri.startswith("file://") else uri
     delta_log_path = os.path.join(local_path, "_delta_log")
     return "append" if os.path.exists(delta_log_path) else "overwrite"
+
+
+def _projection_keys_for_rows(
+    rows: Sequence[dict[str, object]],
+    always_present_keys: frozenset[str] | None,
+) -> frozenset[str] | None:
+    if always_present_keys != _PUBLISHED_DOCUMENTS_DELTA_KEYS:
+        return always_present_keys
+    if any(isinstance(row.get("extensions"), dict) and row["extensions"] for row in rows):
+        return always_present_keys
+    return frozenset(key for key in always_present_keys if key != "extensions")
 
 
 def _delta_ready_rows(
