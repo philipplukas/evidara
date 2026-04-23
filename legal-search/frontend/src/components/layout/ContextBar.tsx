@@ -3,8 +3,9 @@
 import { ChevronDown, Shield } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
-import { useSearchConstraints } from "@/lib/search-constraints-store";
+import { hasActiveSearchConstraints, useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
 
 interface ContextBarProps {
@@ -140,7 +141,21 @@ export function ContextBar({ context }: ContextBarProps) {
         <button
           type="button"
           className="text-micro ml-auto shrink-0 rounded-sm px-1 py-0.5 font-medium text-text-meta underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-          onClick={() => dispatch({ type: "RESET_ALL" })}
+          onClick={() => {
+            // Only offer undo when the reset actually removed something —
+            // otherwise the toast would be misleading ("resetting the default
+            // state to itself").
+            const hadActive = hasActiveSearchConstraints(constraints);
+            dispatch({ type: "RESET_ALL" });
+            if (hadActive) {
+              toast.info(t("filter.resetToast"), {
+                action: {
+                  label: t("filter.resetUndoAction"),
+                  onClick: () => dispatch({ type: "UNDO_RESET" }),
+                },
+              });
+            }
+          }}
         >
           {t("filter.resetAll")}
         </button>

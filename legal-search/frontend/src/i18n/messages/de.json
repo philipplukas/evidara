@@ -42,6 +42,8 @@
     "activeFilterSingular": "aktiver Filter",
     "activeFilterPlural": "aktive Filter",
     "resetAll": "Alles zur\u00fccksetzen",
+    "resetToast": "Filter zur\u00fcckgesetzt",
+    "resetUndoAction": "R\u00fcckg\u00e4ngig",
     "sheetDescription": "Suchergebnisse nach Gerichtsbarkeit, Sprache, Instanz und weiteren Kriterien einschr\u00e4nken.",
     "empty": {
       "title": "Keine Filter verf\u00fcgbar",

@@ -6,6 +6,14 @@ import { useCallback, useSyncExternalStore } from "react";
 
 export type ToastVariant = "success" | "error" | "info";
 
+/** Optional action affordance rendered inside a toast (e.g. "Undo"). */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+  /** Required by Radix for screen readers when an action is present. Defaults to `label`. */
+  altText?: string;
+}
+
 export interface Toast {
   id: string;
   variant: ToastVariant;
@@ -13,9 +21,17 @@ export interface Toast {
   description?: string;
   /** Auto-dismiss delay in ms. `0` means persist until dismissed. Default: 3500. */
   duration?: number;
+  action?: ToastAction;
 }
 
 export type ToastInput = Omit<Toast, "id">;
+
+/** Optional opts for the fire-and-forget helpers. */
+export interface ToastOptions {
+  description?: string;
+  duration?: number;
+  action?: ToastAction;
+}
 
 // ─── Store (module-singleton, framework-agnostic) ───
 
@@ -56,14 +72,26 @@ function dismissToast(id: string): void {
   if (toasts !== prev) emit();
 }
 
+/**
+ * Normalize the second argument of `toast.success`/`.error`/`.info`.
+ *
+ * Supports both the legacy string form (`toast.info("title", "description")`)
+ * and the extended options form (`toast.info("title", { action: … })`).
+ */
+function normalizeOpts(opts?: string | ToastOptions): ToastOptions {
+  if (typeof opts === "string") return { description: opts };
+  return opts ?? {};
+}
+
 // ─── Imperative API (for use outside React) ───
 
 export const toast = {
-  success: (title: string, description?: string) =>
-    addToast({ variant: "success", title, description }),
-  error: (title: string, description?: string) =>
-    addToast({ variant: "error", title, description }),
-  info: (title: string, description?: string) => addToast({ variant: "info", title, description }),
+  success: (title: string, opts?: string | ToastOptions) =>
+    addToast({ variant: "success", title, ...normalizeOpts(opts) }),
+  error: (title: string, opts?: string | ToastOptions) =>
+    addToast({ variant: "error", title, ...normalizeOpts(opts) }),
+  info: (title: string, opts?: string | ToastOptions) =>
+    addToast({ variant: "info", title, ...normalizeOpts(opts) }),
   custom: (input: ToastInput) => addToast(input),
   dismiss: dismissToast,
 };
@@ -77,16 +105,18 @@ export function useToast() {
     toasts: current,
     toast: {
       success: useCallback(
-        (title: string, description?: string) =>
-          addToast({ variant: "success", title, description }),
+        (title: string, opts?: string | ToastOptions) =>
+          addToast({ variant: "success", title, ...normalizeOpts(opts) }),
         [],
       ),
       error: useCallback(
-        (title: string, description?: string) => addToast({ variant: "error", title, description }),
+        (title: string, opts?: string | ToastOptions) =>
+          addToast({ variant: "error", title, ...normalizeOpts(opts) }),
         [],
       ),
       info: useCallback(
-        (title: string, description?: string) => addToast({ variant: "info", title, description }),
+        (title: string, opts?: string | ToastOptions) =>
+          addToast({ variant: "info", title, ...normalizeOpts(opts) }),
         [],
       ),
       custom: useCallback((input: ToastInput) => addToast(input), []),
