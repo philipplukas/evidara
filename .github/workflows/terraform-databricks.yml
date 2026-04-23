@@ -42,6 +42,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Ensure unzip is available
         run: |
@@ -96,6 +98,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Prepare plan output directory
         run: |
@@ -248,6 +252,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Prepare plan output directory
         run: |
@@ -402,6 +408,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Record promotion gates
         id: meta
@@ -490,6 +498,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Ensure unzip is available
         run: |
@@ -577,6 +587,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Ensure unzip is available
         run: |

@@ -50,6 +50,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -71,6 +73,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Prepare plan output directory
         run: |
@@ -196,6 +200,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Prepare plan output directory
         run: |
@@ -323,6 +329,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Record promotion gates
         id: meta
@@ -385,6 +393,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -446,6 +456,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3

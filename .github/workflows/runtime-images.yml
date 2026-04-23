@@ -89,6 +89,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -154,6 +156,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -219,6 +223,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -284,6 +290,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -349,6 +357,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -414,6 +424,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -479,6 +491,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
