@@ -144,9 +144,13 @@ further cross-surface design direction.
   primitives. Primitives are expected to render correctly under both the
   workspace and admin token regimes.
 - **Occasional cross-surface drift is still possible** (e.g. focus-ring colour
-  regressing in one surface). The mitigation is that the shared surface lives
-  in one file (`styles/tokens/tokens.css`) and is asserted by both apps'
-  accessibility tests.
+  regressing in one surface). Mitigations today: the shared surface lives in
+  a single file (`styles/tokens/tokens.css`) so drift is visible in one diff,
+  and `legal-search/frontend` has axe assertions (e.g.
+  `workspace-client.a11y.test.tsx`) that catch shared-surface regressions for
+  the workspace side. `platform-control/admin` does not yet have equivalent
+  automated a11y coverage; adding axe assertions there is an identified
+  follow-up, not a prerequisite for this ADR.
 
 ### Neutral
 
