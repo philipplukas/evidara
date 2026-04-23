@@ -166,17 +166,19 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                 The cues below translate the health snapshot into operator decisions.
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <DecisionCell label="Why this matters" value={decisionSupport.whyItMatters} />
-              <DecisionCell label="What is blocked" value={decisionSupport.whatIsBlocked} />
-              <DecisionCell
-                label="What changed recently"
-                value={decisionSupport.whatChangedRecently}
-              />
-              <DecisionCell
-                label="If you do nothing"
-                value={decisionSupport.whatHappensIfIgnored}
-              />
+            <div className="space-y-3">
+              <PrimaryDecisionCell label="Why this matters" value={decisionSupport.whyItMatters} />
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <DecisionCell label="What is blocked" value={decisionSupport.whatIsBlocked} />
+                <DecisionCell
+                  label="What changed recently"
+                  value={decisionSupport.whatChangedRecently}
+                />
+                <DecisionCell
+                  label="If you do nothing"
+                  value={decisionSupport.whatHappensIfIgnored}
+                />
+              </div>
             </div>
           </div>
 
@@ -238,6 +240,22 @@ function DecisionCell({ label, value }: { label: string; value: string }) {
         {label}
       </span>
       <p className="text-[13px] leading-snug text-[rgba(29,41,61,0.8)]">{value}</p>
+    </div>
+  );
+}
+
+/**
+ * `PrimaryDecisionCell` — elevated, full-width variant of `DecisionCell` that
+ * leads the pipeline decision-support block (issue #393). Mirrors the sibling
+ * in `RunShowV2.tsx` so the two decision-support surfaces stay visually in sync.
+ */
+function PrimaryDecisionCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1 rounded-[12px] border border-[rgba(29,41,61,0.1)] bg-white p-4 shadow-[var(--shadow-card-hover)]">
+      <span className="block text-[15px] font-semibold uppercase tracking-[0.08em] leading-[1.2] text-[rgba(29,41,61,0.8)]">
+        {label}
+      </span>
+      <p className="text-[14px] leading-snug text-[var(--foreground)]">{value}</p>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * `RunShowV2` — v2 preview of the run detail page. Largest single admin
  * page (v1's `RunShow.tsx` is 433 LoC before `RunDetailSections`). This
- * port covers header + metric band + decision-support 2×2 + 13-field
+ * port covers header + metric band + decision-support (primary + 3) + 13-field
  * metadata grid + failure alert, then delegates the lifecycle stack to
  * `<RunDetailSectionsV2>` (ADR-0026 P3 — pipeline health + 5 accordion
  * sections). All primitives come from `src/ui/primitives/`.
@@ -111,19 +111,22 @@ export default function RunShowV2() {
         </div>
         <p className="text-[14px] text-[rgba(29,41,61,0.75)]">{describeRunNextStep(run)}</p>
 
-        {/* Decision support — 2x2 on md+, stacked on mobile. */}
+        {/* Decision support — primary cue on top (full-width), three subordinate cues inline below on md+, all stacked on mobile. */}
         <div className="rounded-[14px] border border-[rgba(29,41,61,0.08)] bg-[var(--brand-wash-3)] p-4 space-y-3">
           <div>
             <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Decision support</h2>
             <p className="text-[12px] text-[rgba(29,41,61,0.65)]">
-              The four cues below answer the operator questions we use most often on active runs.
+              The primary cue leads with why this run matters; the three subordinate cues add
+              operational context.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <DecisionCell label="Why this matters" value={decision.whyItMatters} />
-            <DecisionCell label="What is blocked" value={decision.whatIsBlocked} />
-            <DecisionCell label="What changed recently" value={decision.whatChangedRecently} />
-            <DecisionCell label="If you do nothing" value={decision.whatHappensIfIgnored} />
+          <div className="space-y-3">
+            <PrimaryDecisionCell label="Why this matters" value={decision.whyItMatters} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <DecisionCell label="What is blocked" value={decision.whatIsBlocked} />
+              <DecisionCell label="What changed recently" value={decision.whatChangedRecently} />
+              <DecisionCell label="If you do nothing" value={decision.whatHappensIfIgnored} />
+            </div>
           </div>
         </div>
 
@@ -210,6 +213,24 @@ function DecisionCell({ label, value }: { label: string; value: string }) {
         {label}
       </span>
       <p className="text-[13px] text-[rgba(29,41,61,0.8)] leading-snug">{value}</p>
+    </div>
+  );
+}
+
+/**
+ * `PrimaryDecisionCell` — elevated, full-width variant of `DecisionCell` that
+ * leads the decision-support block (issue #393). Shares `DecisionCell`'s
+ * structure and token vocabulary but bumps the label scale and swaps the
+ * shadow token from `--shadow-card` to `--shadow-card-hover` so the operator's
+ * primary cue reads as the anchor rather than a co-equal quadrant.
+ */
+function PrimaryDecisionCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[12px] border border-[rgba(29,41,61,0.1)] bg-white p-4 space-y-1 shadow-[var(--shadow-card-hover)]">
+      <span className="block text-[15px] font-semibold uppercase tracking-[0.08em] text-[rgba(29,41,61,0.8)] leading-[1.2]">
+        {label}
+      </span>
+      <p className="text-[14px] text-[var(--foreground)] leading-snug">{value}</p>
     </div>
   );
 }
