@@ -201,9 +201,11 @@
   }
 
   .app-header__brand {
-    @apply flex shrink-0 items-center gap-2.5 rounded-2xl border border-border/60 px-3 py-2 transition-transform transition-motion-medium hover:-translate-y-px;
+    @apply flex shrink-0 items-center gap-2.5 rounded-2xl border border-border/60 px-3 py-2 transition-transform hover:-translate-y-px;
     grid-area: brand;
     background-color: var(--surface-shell);
+    transition-duration: var(--motion-duration-medium);
+    transition-timing-function: var(--motion-easing-standard);
   }
 
   .app-header__brand-mark {
