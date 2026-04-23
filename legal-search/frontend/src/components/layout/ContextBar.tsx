@@ -139,7 +139,7 @@ export function ContextBar({ context }: ContextBarProps) {
 
         <button
           type="button"
-          className="text-micro shrink-0 rounded-sm px-1 py-0.5 font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          className="text-micro ml-auto shrink-0 rounded-sm px-1 py-0.5 font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           onClick={() => dispatch({ type: "RESET_ALL" })}
         >
           {t("filter.resetAll")}
