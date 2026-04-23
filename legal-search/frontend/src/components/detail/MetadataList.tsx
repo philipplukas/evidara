@@ -73,7 +73,7 @@ function MetadataRow({ field, compact }: { field: MetadataField; compact: boolea
   const t = useTranslations("detail");
 
   return (
-    <div className={`flex items-baseline gap-2 ${compact ? "text-[10px]" : "text-xs"}`}>
+    <div className={`flex items-baseline gap-2 ${compact ? "text-tiny" : "text-xs"}`}>
       <dt className="text-muted-foreground w-28 shrink-0 font-medium">{field.label}</dt>
       <dd
         className={

@@ -67,7 +67,7 @@ export function ResultCard({
         }`}
     >
       {result.structuralContext && (
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+        <div className="mb-1 text-tiny font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
           {result.structuralContext}
         </div>
       )}
