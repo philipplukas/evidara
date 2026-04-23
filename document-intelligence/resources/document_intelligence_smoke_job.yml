@@ -13,8 +13,3 @@ resources:
             notebook_path: ../databricks/notebooks/99_smoke_test.py
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
-          new_cluster:
-            spark_version: ${var.spark_version}
-            node_type_id: ${var.node_type_id}
-            num_workers: "1"
-            policy_id: ${var.compute_guardrails_policy_id}

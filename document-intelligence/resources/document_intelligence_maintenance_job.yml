@@ -8,10 +8,6 @@ resources:
         with writers but Delta's concurrency model handles it.
       queue:
         enabled: true
-      email_notifications:
-        on_failure:
-          - ${var.alert_email}
-        no_alert_for_skipped_runs: true
       parameters:
         - name: catalog
           default: ${var.catalog}
@@ -26,11 +22,3 @@ resources:
               vacuum_retention_hours: "{{job.parameters.vacuum_retention_hours}}"
           max_retries: 1
           timeout_seconds: 10800
-          new_cluster:
-            spark_version: ${var.spark_version}
-            node_type_id: ${var.node_type_id}
-            num_workers: ${var.num_workers}
-            policy_id: ${var.compute_guardrails_policy_id}
-            spark_conf:
-              spark.databricks.delta.preview.enabled: "true"
-              spark.databricks.delta.retentionDurationCheck.enabled: "true"
