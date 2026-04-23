@@ -45,6 +45,7 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 | Area                                                                                             | Description                                                                      |
 | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | [Architecture](architecture/system-context.md)                                                   | System context, storage, communication                                           |
+| [Commentary insights architecture](architecture/commentary-insights-architecture.md)              | Research-backed plan for generated commentary insights, evidence, and review     |
 | [Temporal + Argilla Wizard](architecture/temporal-argilla-wizard-architecture.md)                | Hybrid discovery/extraction workflow, contracts, and SLOs                        |
 | [Wizard / Temporal / Argilla rollout](setup/platform-control-wizard-temporal-argilla-rollout.md) | Post-merge migrations, env vars, worker, smoke checks                            |
 | [Multi-country operator playbook](runbooks/platform-control-multi-country-operator-playbook.md)  | CH/AT/DE/FR/IT onboarding, approval, triage                                      |

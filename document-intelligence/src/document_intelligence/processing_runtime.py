@@ -68,6 +68,8 @@ def build_processing_pipeline(
         enable_llm_extractor=runtime_settings.enable_llm_extractor,
         llm_confidence_threshold=runtime_settings.llm_confidence_threshold,
         llm_metadata_extractor=llm_metadata_extractor,
+        enable_commentary_insights=runtime_settings.enable_commentary_insights,
+        commentary_insight_min_confidence=runtime_settings.commentary_insight_min_confidence,
     )
 
 

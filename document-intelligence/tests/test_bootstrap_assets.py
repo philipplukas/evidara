@@ -117,6 +117,14 @@ class SurfaceBootstrapSqlTests(unittest.TestCase):
             "LOCATION 'gs://evidara-di-dev/published/processing_manifests';",
             sql,
         )
+        self.assertIn(
+            "CREATE TABLE IF NOT EXISTS `document_intelligence`.`published`.`published_commentary_insights`",
+            sql,
+        )
+        self.assertIn(
+            "LOCATION 'gs://evidara-di-dev/published/published_commentary_insights';",
+            sql,
+        )
 
     def test_emits_alter_table_tblproperties_for_every_surface(self) -> None:
         sql = render_register_surfaces_sql(
@@ -125,7 +133,12 @@ class SurfaceBootstrapSqlTests(unittest.TestCase):
             surfaces_root_uri="gs://evidara-di-dev/published",
         )
 
-        for surface_name in ("published_documents", "published_sections", "processing_manifests"):
+        for surface_name in (
+            "published_documents",
+            "published_sections",
+            "processing_manifests",
+            "published_commentary_insights",
+        ):
             self.assertIn(
                 f"ALTER TABLE `document_intelligence`.`published`.`{surface_name}` SET TBLPROPERTIES",
                 sql,

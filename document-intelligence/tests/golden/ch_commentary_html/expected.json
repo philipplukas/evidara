@@ -1,0 +1,16 @@
+{
+  "title": "Kommentar zu Art. 754 OR",
+  "expected_source_family": "commentary",
+  "section_count": 1,
+  "key_headings": ["Art. 754 OR"],
+  "key_content_contains": ["Art. 754 OR", "BGE 147 III 49"],
+  "status_flow": ["accepted", "processing", "canonical_ready"],
+  "metadata_eval": {
+    "expect": {
+      "title_contains": "Kommentar zu Art. 754 OR",
+      "document_type": "commentary",
+      "source_family": "commentary",
+      "llm_invoked": false
+    }
+  }
+}

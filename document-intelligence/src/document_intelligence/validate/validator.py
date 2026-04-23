@@ -4,7 +4,7 @@ import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from document_intelligence.canonical.models import Document, ProcessingManifest, Section
+from document_intelligence.canonical.models import CommentaryInsight, Document, ProcessingManifest, Section
 from document_intelligence.contracts.envelope import (
     ManifestRef,
     Provenance,
@@ -14,7 +14,9 @@ from document_intelligence.contracts.envelope import (
 _PATTERNS = {
     "document_id": re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$"),
     "section_id": re.compile(r"^sec_[0-9a-hjkmnp-tv-z]{26}$"),
+    "citation_id": re.compile(r"^cit_[0-9a-hjkmnp-tv-z]{26}$"),
     "processing_manifest_id": re.compile(r"^pm_[0-9a-hjkmnp-tv-z]{26}$"),
+    "insight_id": re.compile(r"^ins_[0-9a-hjkmnp-tv-z]{26}$"),
     "event_id": re.compile(r"^evt_[0-9a-hjkmnp-tv-z]{26}$"),
     "artifact_id": re.compile(r"^art_[0-9a-hjkmnp-tv-z]{26}$"),
 }
@@ -76,6 +78,37 @@ def validate_processing_manifest(manifest: ProcessingManifest) -> None:
         _require_non_empty(manifest.canonical_ready_at, "canonical_ready_at")
         validate_dataset_ref(manifest.published_document_ref, expect_key=True)
         validate_dataset_ref(manifest.published_sections_ref, expect_key=False)
+
+
+def validate_commentary_insights(insights: Iterable[CommentaryInsight]) -> None:
+    allowed_types = {"commentary_anchor", "referenced_provision", "authority_link"}
+    allowed_review_states = {
+        "machine_generated_unreviewed",
+        "machine_verified",
+        "editor_approved",
+        "rejected",
+        "stale",
+    }
+    for insight in insights:
+        _require_pattern("insight_id", insight.insight_id)
+        _require_pattern("document_id", insight.document_id)
+        _require_pattern("processing_manifest_id", insight.processing_manifest_id)
+        if insight.document_revision < 1:
+            raise ValueError("commentary insight document_revision must be >= 1")
+        if insight.section_id is not None:
+            _require_pattern("section_id", insight.section_id)
+        if insight.citation_id is not None:
+            _require_pattern("citation_id", insight.citation_id)
+        if insight.insight_type not in allowed_types:
+            raise ValueError(f"unsupported commentary insight type: {insight.insight_type}")
+        if insight.review_state not in allowed_review_states:
+            raise ValueError(f"unsupported commentary insight review_state: {insight.review_state}")
+        _require_non_empty(insight.claim, "commentary insight claim")
+        _require_non_empty(insight.display_text, "commentary insight display_text")
+        if not insight.support:
+            raise ValueError("commentary insight requires support")
+        if not 0.0 <= insight.confidence <= 1.0:
+            raise ValueError("commentary insight confidence must be between 0.0 and 1.0")
 
 
 def validate_event(event: Mapping[str, Any]) -> None:

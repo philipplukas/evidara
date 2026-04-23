@@ -704,3 +704,70 @@ class SectionCitationExtractionTests(unittest.TestCase):
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)
+
+
+class CommentaryInsightPipelineTests(unittest.TestCase):
+    COMMENTARY_HTML = """
+    <html><head><title>Kommentar zu Art. 754 OR</title></head>
+    <body>
+      <h1>Art. 754 OR</h1>
+      <p>Art. 754 OR wird in der Lehre als Haftungsnorm fuer Organe erlaeutert.</p>
+      <p>BGE 147 III 49 wird als Leitentscheid zur Verantwortlichkeit diskutiert.</p>
+    </body>
+    </html>
+    """
+
+    def test_commentary_insights_are_emitted_for_commentary_documents(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(self.COMMENTARY_HTML)
+            artifact_path = html_handle.name
+
+        manifest_data = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        manifest_data["source_defaults"]["document_type_hint"] = "commentary"
+        manifest_data["source_defaults"]["authority_id"] = "auth_commentary_publisher"
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(manifest_data, manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(
+                processing_version="di_test",
+                enable_commentary_insights=True,
+            ).process_event(build_bundle_event(manifest_path))
+
+            self.assertEqual(result.document.document_type, "commentary")
+            self.assertGreaterEqual(len(result.commentary_insights), 2)
+            for insight in result.commentary_insights:
+                self.assertGreaterEqual(len(insight.support), 1)
+                self.assertIn(insight.display_text, result.document.body_text)
+            self.assertEqual(
+                result.document.metadata["commentary_insights"]["emitted_count"],
+                len(result.commentary_insights),
+            )
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_commentary_insights_are_not_emitted_for_law_documents(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
+            html_handle.write(self.COMMENTARY_HTML)
+            artifact_path = html_handle.name
+
+        manifest_data = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        manifest_data["source_defaults"]["document_type_hint"] = "statute"
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(manifest_data, manifest_handle)
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(
+                processing_version="di_test",
+                enable_commentary_insights=True,
+            ).process_event(build_bundle_event(manifest_path))
+
+            self.assertEqual(result.document.document_type, "law")
+            self.assertEqual(result.commentary_insights, [])
+            self.assertEqual(result.document.metadata["commentary_insights"]["emitted_count"], 0)
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)

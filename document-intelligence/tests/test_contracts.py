@@ -150,6 +150,7 @@ class ContractSchemaValidationTests(unittest.TestCase):
             "document-processed.json": "events/document-processed.schema.json",
             "document-processing-status-updated.json": "events/document-processing-status-updated.schema.json",
             "document-withdrawn.json": "events/document-withdrawn.schema.json",
+            "commentary-insight.json": "schemas/commentary-insight.schema.json",
             "processing-manifest.json": "schemas/processing-manifest.schema.json",
             "section.json": "schemas/section.schema.json",
         }

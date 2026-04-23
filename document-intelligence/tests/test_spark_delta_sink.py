@@ -15,6 +15,7 @@ from document_intelligence.persist.sinks import (
     SparkDeltaCanonicalSink,
 )
 from support import build_bundle_event, build_manifest_payload
+from test_adapters import build_commentary_insight
 
 
 def _make_mock_spark() -> MagicMock:
@@ -41,6 +42,7 @@ class SparkDeltaCanonicalSinkTests(unittest.TestCase):
             published_documents_uri="gs://bucket/published_documents",
             published_sections_uri="gs://bucket/published_sections",
             processing_manifests_uri="gs://bucket/processing_manifests",
+            published_commentary_insights_uri="gs://bucket/published_commentary_insights",
         )
         spark = _make_mock_spark()
         sink = SparkDeltaCanonicalSink(config, spark=spark)
@@ -60,6 +62,7 @@ class SparkDeltaCanonicalSinkTests(unittest.TestCase):
             published_documents_uri="gs://bucket/published_documents",
             published_sections_uri="gs://bucket/published_sections",
             processing_manifests_uri="gs://bucket/processing_manifests",
+            published_commentary_insights_uri="gs://bucket/published_commentary_insights",
         )
         sink = SparkDeltaCanonicalSink(config, spark=spark)
 
@@ -140,6 +143,21 @@ class SparkDeltaCanonicalSinkTests(unittest.TestCase):
 
         self.assertEqual(sink.status_events, [{"a": 1}, {"b": 2}])
         self.assertEqual(sink.document_processed_events, [{"c": 3}])
+
+    def test_persist_commentary_insights_calls_spark_write(self):
+        spark = _make_mock_spark()
+        config = DeltaSinkConfig(
+            published_documents_uri="gs://bucket/published_documents",
+            published_sections_uri="gs://bucket/published_sections",
+            processing_manifests_uri="gs://bucket/processing_manifests",
+            published_commentary_insights_uri="gs://bucket/published_commentary_insights",
+        )
+        sink = SparkDeltaCanonicalSink(config, spark=spark)
+
+        sink.persist_commentary_insights([build_commentary_insight()])
+
+        saved_uris = [c.args[0] for c in spark.read.json.return_value.write.save.call_args_list]
+        self.assertIn("gs://bucket/published_commentary_insights", saved_uris)
 
     def test_missing_pyspark_raises_processing_error(self):
         config = DeltaSinkConfig(

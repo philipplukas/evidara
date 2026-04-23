@@ -26,3 +26,4 @@ Current fixture coverage:
 - `ris_xml_decision_vwgh`: real VwGH Rechtssatz (JWR_2024190104_20260312L01)
 - `ris_html_decision_vfgh`: same VfGH decision in HTML format
 - `ris_html_decision_vwgh`: same VwGH decision in HTML format
+- `ch_commentary_html`: synthetic Swiss German commentary with provision and case-law anchors

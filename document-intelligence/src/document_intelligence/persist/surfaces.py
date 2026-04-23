@@ -160,9 +160,48 @@ PROCESSING_MANIFESTS = PublishedSurfaceDefinition(
 )
 
 
+PUBLISHED_COMMENTARY_INSIGHTS = PublishedSurfaceDefinition(
+    surface_name="published_commentary_insights",
+    surface_version=1,
+    selector_kind="record_filter",
+    selector_fields=("document_id", "processing_manifest_id"),
+    description="Non-canonical extractive commentary insights published by document-intelligence.",
+    columns=(
+        SurfaceColumn("insight_id", "string", False, "Stable commentary insight ID."),
+        SurfaceColumn("document_id", "string", False, "Parent document ID."),
+        SurfaceColumn("document_revision", "integer", False, "Parent document revision."),
+        SurfaceColumn(
+            "processing_manifest_id",
+            "string",
+            False,
+            "Processing result that produced the insight.",
+        ),
+        SurfaceColumn("section_id", "string", True, "Section containing the support passage."),
+        SurfaceColumn("citation_id", "string", True, "Citation row anchoring the insight when available."),
+        SurfaceColumn("insight_type", "string", False, "Commentary insight taxonomy value."),
+        SurfaceColumn("claim", "string", False, "Short extractive proposition or normalized label."),
+        SurfaceColumn("display_text", "string", False, "Source passage snippet for UI rendering."),
+        SurfaceColumn("support", "object", False, "Evidence references supporting the insight."),
+        SurfaceColumn("referenced_authorities", "object", False, "Citations or provisions found in the passage."),
+        SurfaceColumn("language", "string", True, "Primary source passage language."),
+        SurfaceColumn("jurisdiction_id", "string", True, "Resolved jurisdiction reference."),
+        SurfaceColumn("confidence", "float", False, "Deterministic confidence score."),
+        SurfaceColumn("review_state", "string", False, "Review lifecycle state."),
+        SurfaceColumn("generator", "object", False, "Extractor or model metadata."),
+        SurfaceColumn("scores", "object", False, "Deterministic validator scores."),
+        SurfaceColumn("metadata", "object", True, "Additional non-canonical metadata."),
+    ),
+)
+
+
 SURFACE_DEFINITIONS: dict[str, PublishedSurfaceDefinition] = {
     definition.surface_name: definition
-    for definition in (PUBLISHED_DOCUMENTS, PUBLISHED_SECTIONS, PROCESSING_MANIFESTS)
+    for definition in (
+        PUBLISHED_DOCUMENTS,
+        PUBLISHED_SECTIONS,
+        PROCESSING_MANIFESTS,
+        PUBLISHED_COMMENTARY_INSIGHTS,
+    )
 }
 
 

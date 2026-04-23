@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from document_intelligence.config.runtime import RuntimeSettings, SurfaceUris
 from document_intelligence.persist.surfaces import (
     PROCESSING_MANIFESTS,
+    PUBLISHED_COMMENTARY_INSIGHTS,
     PUBLISHED_DOCUMENTS,
     PUBLISHED_SECTIONS,
     get_surface_definition,
@@ -28,6 +29,10 @@ class RuntimeSettingsTests(unittest.TestCase):
         self.assertEqual(
             uris.processing_manifests_uri,
             "gs://bucket/di_surfaces/processing_manifests",
+        )
+        self.assertEqual(
+            uris.published_commentary_insights_uri,
+            "gs://bucket/di_surfaces/published_commentary_insights",
         )
 
     def test_builds_runtime_settings_from_environment_mapping(self) -> None:
@@ -56,6 +61,8 @@ class RuntimeSettingsTests(unittest.TestCase):
         self.assertEqual(settings.spacy_batch_size, 32)
         self.assertFalse(settings.enable_llm_extractor)
         self.assertEqual(settings.llm_confidence_threshold, 0.7)
+        self.assertFalse(settings.enable_commentary_insights)
+        self.assertEqual(settings.commentary_insight_min_confidence, 0.7)
 
     def test_parses_parser_backend_and_spacy_toggle_from_mapping(self) -> None:
         settings = RuntimeSettings.from_mapping(
@@ -67,6 +74,8 @@ class RuntimeSettingsTests(unittest.TestCase):
                 "DI_SPACY_BATCH_SIZE": "8",
                 "DI_ENABLE_LLM_EXTRACTOR": "true",
                 "DI_LLM_CONFIDENCE_THRESHOLD": "0.9",
+                "DI_ENABLE_COMMENTARY_INSIGHTS": "true",
+                "DI_COMMENTARY_INSIGHT_MIN_CONFIDENCE": "0.8",
             }
         )
         self.assertEqual(settings.parser_backend, "docling")
@@ -76,6 +85,8 @@ class RuntimeSettingsTests(unittest.TestCase):
         self.assertEqual(settings.spacy_batch_size, 8)
         self.assertTrue(settings.enable_llm_extractor)
         self.assertEqual(settings.llm_confidence_threshold, 0.9)
+        self.assertTrue(settings.enable_commentary_insights)
+        self.assertEqual(settings.commentary_insight_min_confidence, 0.8)
 
     def test_rejects_unknown_parser_backend(self) -> None:
         with self.assertRaises(ValueError):
@@ -88,6 +99,8 @@ class RuntimeSettingsTests(unittest.TestCase):
             RuntimeSettings.from_mapping({"DI_SPACY_BATCH_SIZE": "0"})
         with self.assertRaises(ValueError):
             RuntimeSettings.from_mapping({"DI_LLM_CONFIDENCE_THRESHOLD": "1.5"})
+        with self.assertRaises(ValueError):
+            RuntimeSettings.from_mapping({"DI_COMMENTARY_INSIGHT_MIN_CONFIDENCE": "1.5"})
 
     def test_build_processing_pipeline_propagates_runtime_flags(self) -> None:
         settings = RuntimeSettings.from_mapping(
@@ -106,19 +119,35 @@ class RuntimeSettingsTests(unittest.TestCase):
         self.assertTrue(pipeline._enable_llm_extractor)
         self.assertEqual(pipeline._llm_confidence_threshold, 0.85)
 
+    def test_build_processing_pipeline_propagates_commentary_insight_flags(self) -> None:
+        settings = RuntimeSettings.from_mapping(
+            {
+                "DI_ENABLE_COMMENTARY_INSIGHTS": "true",
+                "DI_COMMENTARY_INSIGHT_MIN_CONFIDENCE": "0.82",
+            }
+        )
+
+        pipeline = build_processing_pipeline(runtime_settings=settings)
+
+        self.assertTrue(pipeline._enable_commentary_insights)
+        self.assertEqual(pipeline._commentary_insight_min_confidence, 0.82)
+
 
 class SurfaceDefinitionTests(unittest.TestCase):
     def test_exposes_expected_surface_definitions(self) -> None:
         document_surface = get_surface_definition("published_documents")
         section_surface = get_surface_definition("published_sections")
         manifest_surface = get_surface_definition("processing_manifests")
+        insight_surface = get_surface_definition("published_commentary_insights")
 
         self.assertEqual(document_surface.surface_name, PUBLISHED_DOCUMENTS.surface_name)
         self.assertEqual(section_surface.surface_name, PUBLISHED_SECTIONS.surface_name)
         self.assertEqual(manifest_surface.surface_name, PROCESSING_MANIFESTS.surface_name)
+        self.assertEqual(insight_surface.surface_name, PUBLISHED_COMMENTARY_INSIGHTS.surface_name)
         self.assertIn("document_id", document_surface.column_names())
         self.assertIn("section_id", section_surface.column_names())
         self.assertIn("processing_manifest_id", manifest_surface.column_names())
+        self.assertIn("insight_id", insight_surface.column_names())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,49 @@
+{
+  "insight_id": "ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+  "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+  "document_revision": 3,
+  "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
+  "section_id": "sec_01jq7bprm7p1ef4rwr7s2j1bt3",
+  "citation_id": null,
+  "insight_type": "referenced_provision",
+  "claim": "References Art. 754 OR",
+  "display_text": "Art. 754 OR wird in der Lehre als Haftungsnorm fuer Organe erlaeutert.",
+  "support": [
+    {
+      "document_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+      "section_id": "sec_01jq7bprm7p1ef4rwr7s2j1bt3",
+      "citation_id": null,
+      "ref_type": "passage",
+      "passage": "Art. 754 OR wird in der Lehre als Haftungsnorm fuer Organe erlaeutert.",
+      "confidence": 0.95,
+      "metadata": {
+        "source": "commentary-insight-extractor-v1"
+      }
+    }
+  ],
+  "referenced_authorities": [
+    {
+      "text": "Art. 754 OR",
+      "citation_type": "article",
+      "metadata": {}
+    }
+  ],
+  "language": "de",
+  "jurisdiction_id": "jur_ch_federal",
+  "confidence": 0.78,
+  "review_state": "machine_verified",
+  "generator": {
+    "name": "commentary-insight-extractor",
+    "version": "v1",
+    "model": null,
+    "prompt_version": null
+  },
+  "scores": {
+    "passage_present": 1.0,
+    "citation_parseable": 1.0,
+    "section_anchor_resolved": 1.0
+  },
+  "metadata": {
+    "extractive": true
+  }
+}

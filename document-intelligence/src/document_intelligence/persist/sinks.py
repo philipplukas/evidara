@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 import pyarrow as pa
 
-from document_intelligence.canonical.models import Document, ProcessingManifest, Section
+from document_intelligence.canonical.models import CommentaryInsight, Document, ProcessingManifest, Section
 from document_intelligence.errors import ProcessingError
 
 # Delta append requires an Arrow schema compatible with the existing table. `_delta_ready_rows`
@@ -68,6 +68,97 @@ _PROCESSING_MANIFESTS_DELTA_KEYS = frozenset(
         "canonical_ready_at",
     }
 )
+_PUBLISHED_COMMENTARY_INSIGHTS_DELTA_KEYS = frozenset(
+    {
+        "insight_id",
+        "document_id",
+        "document_revision",
+        "processing_manifest_id",
+        "section_id",
+        "citation_id",
+        "insight_type",
+        "claim",
+        "display_text",
+        "support",
+        "referenced_authorities",
+        "language",
+        "jurisdiction_id",
+        "confidence",
+        "review_state",
+        "generator",
+        "scores",
+        "metadata",
+    }
+)
+_STRING_MAP = pa.map_(pa.string(), pa.string())
+_COMMENTARY_INSIGHTS_ARROW_SCHEMA = pa.schema(
+    [
+        pa.field("insight_id", pa.string()),
+        pa.field("document_id", pa.string()),
+        pa.field("document_revision", pa.int64()),
+        pa.field("processing_manifest_id", pa.string()),
+        pa.field("section_id", pa.string()),
+        pa.field("citation_id", pa.string()),
+        pa.field("insight_type", pa.string()),
+        pa.field("claim", pa.string()),
+        pa.field("display_text", pa.string()),
+        pa.field(
+            "support",
+            pa.list_(
+                pa.struct(
+                    [
+                        pa.field("document_id", pa.string()),
+                        pa.field("section_id", pa.string()),
+                        pa.field("citation_id", pa.string()),
+                        pa.field("ref_type", pa.string()),
+                        pa.field("passage", pa.string()),
+                        pa.field("confidence", pa.float64()),
+                        pa.field("metadata", _STRING_MAP),
+                    ]
+                )
+            ),
+        ),
+        pa.field(
+            "referenced_authorities",
+            pa.list_(
+                pa.struct(
+                    [
+                        pa.field("text", pa.string()),
+                        pa.field("citation_type", pa.string()),
+                        pa.field("normalized_reference", pa.string()),
+                        pa.field("metadata", _STRING_MAP),
+                    ]
+                )
+            ),
+        ),
+        pa.field("language", pa.string()),
+        pa.field("jurisdiction_id", pa.string()),
+        pa.field("confidence", pa.float64()),
+        pa.field("review_state", pa.string()),
+        pa.field(
+            "generator",
+            pa.struct(
+                [
+                    pa.field("name", pa.string()),
+                    pa.field("version", pa.string()),
+                    pa.field("model", pa.string()),
+                    pa.field("prompt_version", pa.string()),
+                ]
+            ),
+        ),
+        pa.field(
+            "scores",
+            pa.struct(
+                [
+                    pa.field("passage_present", pa.float64()),
+                    pa.field("citation_parseable", pa.float64()),
+                    pa.field("section_anchor_resolved", pa.float64()),
+                ]
+            ),
+        ),
+        pa.field("metadata", _STRING_MAP),
+    ]
+)
 
 
 def _document_dict_for_delta(document: Document) -> dict[str, object]:
@@ -88,6 +179,35 @@ def _manifest_dict_for_delta(manifest: ProcessingManifest) -> dict[str, object]:
     return row
 
 
+def _commentary_insight_dict_for_delta(insight: CommentaryInsight) -> dict[str, object]:
+    row = insight.to_dict()
+    row["metadata"] = _stringify_mapping_values(row.get("metadata"))
+
+    support = []
+    for item in row.get("support") or []:
+        if isinstance(item, dict):
+            support_item = dict(item)
+            support_item["metadata"] = _stringify_mapping_values(support_item.get("metadata"))
+            support.append(support_item)
+    row["support"] = support
+
+    referenced_authorities = []
+    for item in row.get("referenced_authorities") or []:
+        if isinstance(item, dict):
+            authority = dict(item)
+            authority.setdefault("normalized_reference", None)
+            authority["metadata"] = _stringify_mapping_values(authority.get("metadata"))
+            referenced_authorities.append(authority)
+    row["referenced_authorities"] = referenced_authorities
+    return row
+
+
+def _stringify_mapping_values(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): str(inner) for key, inner in value.items() if inner is not None}
+
+
 class CanonicalSink:
     """Persistence interface for canonical writes and emitted events."""
 
@@ -105,12 +225,16 @@ class CanonicalSink:
     def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
         raise NotImplementedError
 
+    def persist_commentary_insights(self, commentary_insights: list[CommentaryInsight]) -> None:
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class DeltaSinkConfig:
     published_documents_uri: str
     published_sections_uri: str
     processing_manifests_uri: str
+    published_commentary_insights_uri: str | None = None
 
 
 @dataclass
@@ -118,6 +242,7 @@ class InMemoryCanonicalSink(CanonicalSink):
     published_documents: list[Document] = field(default_factory=list)
     published_sections: list[Section] = field(default_factory=list)
     processing_manifests: list[ProcessingManifest] = field(default_factory=list)
+    published_commentary_insights: list[CommentaryInsight] = field(default_factory=list)
     status_events: list[dict[str, object]] = field(default_factory=list)
     document_processed_events: list[dict[str, object]] = field(default_factory=list)
 
@@ -136,6 +261,9 @@ class InMemoryCanonicalSink(CanonicalSink):
 
     def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
         self.document_processed_events.append(document_processed_event)
+
+    def persist_commentary_insights(self, commentary_insights: list[CommentaryInsight]) -> None:
+        self.published_commentary_insights.extend(commentary_insights)
 
 
 class DeltaCanonicalSink(CanonicalSink):
@@ -186,12 +314,28 @@ class DeltaCanonicalSink(CanonicalSink):
     def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
         self.document_processed_events.append(document_processed_event)
 
+    def persist_commentary_insights(self, commentary_insights: list[CommentaryInsight]) -> None:
+        if not commentary_insights:
+            return
+        if not self._config.published_commentary_insights_uri:
+            raise ProcessingError(
+                "missing_commentary_insights_surface",
+                "published commentary insights URI is required when commentary insights are emitted",
+            )
+        self._write_rows(
+            self._config.published_commentary_insights_uri,
+            [_commentary_insight_dict_for_delta(insight) for insight in commentary_insights],
+            always_present_keys=_PUBLISHED_COMMENTARY_INSIGHTS_DELTA_KEYS,
+            schema_override=_COMMENTARY_INSIGHTS_ARROW_SCHEMA,
+        )
+
     def _write_rows(
         self,
         uri: str,
         rows: Sequence[dict[str, object]],
         *,
         always_present_keys: frozenset[str] | None = None,
+        schema_override: pa.Schema | None = None,
     ) -> None:
         if not rows:
             return
@@ -201,13 +345,13 @@ class DeltaCanonicalSink(CanonicalSink):
                 always_present_keys=_projection_keys_for_rows(rows, always_present_keys),
             )
             mode = _delta_write_mode(uri)
-            schema: pa.Schema | None = None
+            schema: pa.Schema | None = schema_override
             if mode == "append":
                 try:
                     deltalake_mod = importlib.import_module("deltalake")
                     schema = deltalake_mod.DeltaTable(uri).to_pyarrow_dataset().schema
                 except Exception:
-                    schema = None
+                    schema = schema_override
             if schema is not None:
                 incoming_keys = {key for row in ready for key in row.keys()}
                 if not incoming_keys.issubset(set(schema.names)):
@@ -308,6 +452,20 @@ class SparkDeltaCanonicalSink(CanonicalSink):
 
     def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
         self.document_processed_events.append(document_processed_event)
+
+    def persist_commentary_insights(self, commentary_insights: list[CommentaryInsight]) -> None:
+        if not commentary_insights:
+            return
+        if not self._config.published_commentary_insights_uri:
+            raise ProcessingError(
+                "missing_commentary_insights_surface",
+                "published commentary insights URI is required when commentary insights are emitted",
+            )
+        self._write_rows(
+            self._config.published_commentary_insights_uri,
+            [_commentary_insight_dict_for_delta(insight) for insight in commentary_insights],
+            always_present_keys=_PUBLISHED_COMMENTARY_INSIGHTS_DELTA_KEYS,
+        )
 
     def _write_rows(
         self,

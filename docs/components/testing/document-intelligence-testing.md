@@ -9,6 +9,7 @@ Testing strategy for the document-intelligence component, which owns:
 - section construction
 - canonical document creation
 - processing manifests
+- non-canonical extractive enrichment surfaces
 - publication events
 - quality checks
 
@@ -54,6 +55,8 @@ The MVP test plan assumes bundle ingestion, canonical `Document`, `Section`, and
 - Repo examples under `contracts/examples/` for `Document`, `Section`, `ProcessingManifest`, and the current DI event set validate against locally resolved schemas without network access
 
 Add `Citation` schema validation once citation extraction is implemented.
+
+`CommentaryInsight` schema validation covers the extractive commentary-insights enrichment surface. Every accepted insight must include at least one evidence ref and source-backed `display_text`.
 
 ### Event-Driven Tests Before Pub/Sub Hookup
 
@@ -116,6 +119,7 @@ For **eval** jobs and minimal installs from the repo root, use `pip install -e "
 
 - GCS bundle loader tests use a stubbed storage client and verify manifest/artifact reads plus checksum enforcement
 - Delta sink tests write to temporary Delta tables and read them back to verify published rows and replay-safe appends
+- Commentary insight sink tests verify the non-canonical enrichment surface separately from canonical document/section/manifest writes
 - CLI smoke tests exercise the bundle-processing entrypoint with local fixtures
 - Event-ingest tests cover both direct `artifact_bundle.available` payloads and Pub/Sub push envelopes with base64-decoded event JSON
 - Runtime consumer HTTP tests cover successful Pub/Sub-style ingestion, invalid envelope rejection, and optional bearer protection

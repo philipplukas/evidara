@@ -25,6 +25,7 @@ IDs are designed to be:
 | `document_id` | document-intelligence | `doc_{ulid}` | `doc_01jq7bdptzqv3xs0c41xpw1ybg` |
 | `section_id` | document-intelligence | `sec_{ulid}` | `sec_01jq7bprm7p1ef4rwr7s2j1bt3` |
 | `citation_id` | document-intelligence | `cit_{ulid}` | `cit_01jq7bwpt6mjjd7c9wqgt28v87` |
+| `insight_id` | document-intelligence | `ins_{ulid}` | `ins_01jq7c1ny0ffv8qdr1xwbejqb6` |
 | `processing_manifest_id` | document-intelligence | `pm_{ulid}` | `pm_01jq7bhgy7g0pkj4f1d03f8f8c` |
 | `projection_manifest_id` | legal-search | `prm_{ulid}` | `prm_01jq7cq8m4qydv1w0fdy6jnbn5` |
 | `event_id` | event producer | `evt_{ulid}` | `evt_01jq7c61be9zmhz58mmp3jx0b2` |

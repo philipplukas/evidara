@@ -81,6 +81,50 @@ class Section:
 
 
 @dataclass(frozen=True)
+class CommentaryInsight:
+    insight_id: str
+    document_id: str
+    document_revision: int
+    processing_manifest_id: str
+    insight_type: str
+    claim: str
+    display_text: str
+    support: list[dict[str, Any]]
+    referenced_authorities: list[dict[str, Any]]
+    confidence: float
+    review_state: str
+    generator: dict[str, Any]
+    scores: dict[str, float]
+    section_id: str | None = None
+    citation_id: str | None = None
+    language: str | None = None
+    jurisdiction_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "insight_id": self.insight_id,
+            "document_id": self.document_id,
+            "document_revision": self.document_revision,
+            "processing_manifest_id": self.processing_manifest_id,
+            "section_id": self.section_id,
+            "citation_id": self.citation_id,
+            "insight_type": self.insight_type,
+            "claim": self.claim,
+            "display_text": self.display_text,
+            "support": list(self.support),
+            "referenced_authorities": list(self.referenced_authorities),
+            "language": self.language,
+            "jurisdiction_id": self.jurisdiction_id,
+            "confidence": self.confidence,
+            "review_state": self.review_state,
+            "generator": dict(self.generator),
+            "scores": dict(self.scores),
+            "metadata": dict(self.metadata),
+        }
+
+
+@dataclass(frozen=True)
 class ProcessingManifest:
     processing_manifest_id: str
     manifest_version: int
@@ -134,6 +178,7 @@ class ProcessingManifest:
 class ProcessingResult:
     document: Document
     sections: list[Section]
+    commentary_insights: list[CommentaryInsight]
     manifest: ProcessingManifest
     status_events: list[dict[str, Any]]
     document_processed_event: dict[str, Any]
