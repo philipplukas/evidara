@@ -49,6 +49,30 @@ describe("ResultList", () => {
     );
 
     expect(screen.getByText(/Keine Ergebnisse für/)).toBeInTheDocument();
+    // No reset button when constraints are at their defaults.
+    expect(screen.queryByRole("button", { name: "Filter zurücksetzen" })).not.toBeInTheDocument();
+  });
+
+  it("shows filtered empty state with a reset button when constraints are active", () => {
+    renderWithProviders(
+      <ResultList
+        results={[]}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+        query="Art. 754"
+      />,
+      // Non-default jurisdictions trigger `hasActiveSearchConstraints`.
+      { searchParams: { jurisdictions: "CH,AT" } },
+    );
+
+    expect(screen.getByText("Keine Treffer mit den aktiven Filtern.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Lockern Sie einen Filter oder setzen Sie alle Filter zurück."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter zurücksetzen" })).toBeInTheDocument();
   });
 
   it("shows start-searching state when no query", () => {

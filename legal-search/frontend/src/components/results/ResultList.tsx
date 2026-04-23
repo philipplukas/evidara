@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowRight, Download, Search } from "lucide-react";
+import { ArrowRight, Download, RotateCcw, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorState } from "@/components/ui/error-state";
 import { usePreferences } from "@/hooks/use-preferences";
+import { hasActiveSearchConstraints, useSearchConstraints } from "@/lib/search-constraints-store";
 import type { ResultSetSource, SearchResultViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 import { ResultCard } from "./ResultCard";
@@ -30,25 +31,35 @@ function escapeCsvField(value: string): string {
 function getEmptyStateCopy(
   source: ResultSetSource,
   t: (key: string, values?: Record<string, string>) => string,
-  query?: string,
+  { query, hasActiveFilters }: { query?: string; hasActiveFilters: boolean },
 ) {
   if (source.type === "pivot") {
     return {
       title: t("pivotNoResults"),
       body: t("pivotHint"),
+      showResetAction: false,
     };
   }
 
   if (query) {
+    if (hasActiveFilters) {
+      return {
+        title: t("noResultsFiltered"),
+        body: t("noResultsFilteredHint"),
+        showResetAction: true,
+      };
+    }
     return {
       title: t("noResults", { query }),
       body: t("noResultsHint"),
+      showResetAction: false,
     };
   }
 
   return {
     title: t("startTitle"),
     body: t("startHint"),
+    showResetAction: false,
   };
 }
 
@@ -88,6 +99,8 @@ export function ResultList({
   const pageSize = preferences.resultsPerPage;
   const [visibleCount, setVisibleCount] = useState<number>(pageSize);
   const { state } = useWorkspace();
+  const { state: constraints, dispatch: dispatchConstraints } = useSearchConstraints();
+  const hasActiveFilters = hasActiveSearchConstraints(constraints);
   const tList = useTranslations("results.list");
   const tEmpty = useTranslations("results.empty");
   const resultSignature = results.map((result) => result.id).join("|");
@@ -157,7 +170,7 @@ export function ResultList({
   }
 
   if (results.length === 0) {
-    const emptyState = getEmptyStateCopy(currentSource, tEmpty, query);
+    const emptyState = getEmptyStateCopy(currentSource, tEmpty, { query, hasActiveFilters });
 
     return (
       <div
@@ -170,6 +183,16 @@ export function ResultList({
         </div>
         <h3 className="mb-1 text-sm font-medium text-foreground">{emptyState.title}</h3>
         <p className="max-w-xs text-xs text-muted-foreground">{emptyState.body}</p>
+        {emptyState.showResetAction && (
+          <button
+            type="button"
+            onClick={() => dispatchConstraints({ type: "RESET_ALL" })}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-accent-core/30 hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {tEmpty("resetFiltersAction")}
+          </button>
+        )}
       </div>
     );
   }

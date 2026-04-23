@@ -136,6 +136,28 @@ export function useSearchConstraints(): SearchConstraintsContextValue {
   return ctx;
 }
 
+/**
+ * True when constraints differ from `RESET_ALL`'s target state — anything the
+ * user has set away from the `CH` / `de` defaults (jurisdictions, languages,
+ * source type, official-only toggle, or any refinement). Kept colocated with
+ * the `RESET_ALL` reducer so the two can't drift.
+ */
+export function hasActiveSearchConstraints(state: SearchConstraintsState): boolean {
+  // `normalizeJurisdictions` / `normalizeLanguages` lowercase incoming values,
+  // so compare against the normalized defaults (`"ch"` / `"de"`), not the
+  // `RESET_ALL` payload (`"CH"` / `"de"`).
+  const { context, refinements } = state;
+  return (
+    context.jurisdictions.length !== 1 ||
+    context.jurisdictions[0] !== "ch" ||
+    context.languages.length !== 1 ||
+    context.languages[0] !== "de" ||
+    context.sourceType !== null ||
+    context.officialOnly ||
+    refinements.length > 0
+  );
+}
+
 interface SearchConstraintsProviderProps {
   children: ReactNode;
 }
