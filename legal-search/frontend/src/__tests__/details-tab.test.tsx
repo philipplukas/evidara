@@ -79,6 +79,6 @@ describe("DetailsTab", () => {
 
     expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
     expect(screen.queryByText("Custom field")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /1 weitere Felder anzeigen/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1 weiteres Feld anzeigen/ })).toBeInTheDocument();
   });
 });

@@ -63,7 +63,7 @@
   },
   "detail": {
     "metadataHeading": "Metadaten",
-    "showMore": "{count} weitere Felder anzeigen",
+    "showMore": "{count, plural, one {# weiteres Feld anzeigen} other {# weitere Felder anzeigen}}",
     "showLess": "Weniger anzeigen",
     "notAvailable": "Nicht verf\u00fcgbar",
     "sheetDescription": "Detailansicht des ausgew\u00e4hlten Suchergebnisses.",

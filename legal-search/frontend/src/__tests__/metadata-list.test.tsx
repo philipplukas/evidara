@@ -53,7 +53,7 @@ describe("MetadataList", () => {
     renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
     expect(screen.queryByText("Internal")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /1 weitere Felder anzeigen/ }));
+    fireEvent.click(screen.getByRole("button", { name: /1 weiteres Feld anzeigen/ }));
     expect(screen.getByText("Internal")).toBeInTheDocument();
   });
 
@@ -66,7 +66,7 @@ describe("MetadataList", () => {
     expect(screen.queryByText("Internal")).not.toBeInTheDocument();
     expect(screen.queryByText("Metadaten")).not.toBeInTheDocument();
 
-    const toggle = screen.getByRole("button", { name: /weitere Felder anzeigen/ });
+    const toggle = screen.getByRole("button", { name: /2 weitere Felder anzeigen/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle);
 
@@ -78,7 +78,7 @@ describe("MetadataList", () => {
   it("collapses back to initial density after expanding", () => {
     renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /1 weitere Felder anzeigen/ }));
+    fireEvent.click(screen.getByRole("button", { name: /1 weiteres Feld anzeigen/ }));
     expect(screen.getByText("Internal")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /weniger/i }));
@@ -88,11 +88,34 @@ describe("MetadataList", () => {
 
   it("toggle button has aria-expanded reflecting current state", () => {
     renderMetadataList(<MetadataList fields={fieldsFixture()} initialDensity="default" />);
-    const toggle = screen.getByRole("button", { name: /weitere Felder anzeigen/ });
+    const toggle = screen.getByRole("button", { name: /1 weiteres Feld anzeigen/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(toggle);
     const collapseBtn = screen.getByRole("button", { name: /weniger/i });
     expect(collapseBtn).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("renders French singular/plural forms correctly", () => {
+    function renderFr(ui: ReactElement) {
+      return render(
+        <NextIntlClientProvider locale="fr" messages={MESSAGES.fr}>
+          {ui}
+        </NextIntlClientProvider>,
+      );
+    }
+
+    const { unmount } = renderFr(
+      <MetadataList fields={fieldsFixture()} initialDensity="default" />,
+    );
+    expect(
+      screen.getByRole("button", { name: /Afficher 1 champ supplémentaire$/ }),
+    ).toBeInTheDocument();
+    unmount();
+
+    renderFr(<MetadataList fields={fieldsFixture()} initialDensity="compact" />);
+    expect(
+      screen.getByRole("button", { name: /Afficher 2 champs supplémentaires/ }),
+    ).toBeInTheDocument();
   });
 });
