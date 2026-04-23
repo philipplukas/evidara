@@ -26,6 +26,10 @@ on:
       - ".github/workflows/scraping-qa.yml"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   scraping-qa:
     # setup-python currently belongs on GitHub-hosted Linux until the Hetzner

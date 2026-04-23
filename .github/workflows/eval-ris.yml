@@ -22,6 +22,10 @@ on:
       - "document-intelligence/src/document_intelligence/pipeline.py"
       - "eval/**"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   eval-data-check:
     name: Eval data integrity

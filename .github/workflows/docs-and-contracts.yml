@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contract-validation:
     runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
