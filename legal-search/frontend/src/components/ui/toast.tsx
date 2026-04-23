@@ -116,7 +116,24 @@ function ToastClose({ className, ...props }: React.ComponentProps<typeof ToastPr
   );
 }
 
+function ToastAction({
+  className,
+  ...props
+}: React.ComponentProps<typeof ToastPrimitive.Action>) {
+  return (
+    <ToastPrimitive.Action
+      data-slot="toast-action"
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-md px-2 py-1 text-xs font-medium text-foreground underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 export {
+  ToastAction,
   ToastClose,
   ToastDescription,
   ToastIcon,

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ToastAction,
   ToastClose,
   ToastDescription,
   ToastIcon,
@@ -26,6 +27,11 @@ export function Toaster() {
             <ToastTitle>{t.title}</ToastTitle>
             {t.description && <ToastDescription>{t.description}</ToastDescription>}
           </div>
+          {t.action && (
+            <ToastAction altText={t.action.altText ?? t.action.label} onClick={t.action.onClick}>
+              {t.action.label}
+            </ToastAction>
+          )}
           <ToastClose />
         </ToastRoot>
       ))}

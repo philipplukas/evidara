@@ -42,6 +42,8 @@
     "activeFilterSingular": "filtre actif",
     "activeFilterPlural": "filtres actifs",
     "resetAll": "R\u00e9initialiser",
+    "resetToast": "Filtres r\u00e9initialis\u00e9s",
+    "resetUndoAction": "Annuler",
     "sheetDescription": "Affiner les r\u00e9sultats par juridiction, langue, instance et autres crit\u00e8res.",
     "empty": {
       "title": "Aucun filtre disponible",
