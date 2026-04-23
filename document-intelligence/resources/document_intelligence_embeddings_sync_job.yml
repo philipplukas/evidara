@@ -8,10 +8,6 @@ resources:
         Databricks foundation-model endpoint. Idempotent.
       queue:
         enabled: true
-      email_notifications:
-        on_failure:
-          - ${var.alert_email}
-        no_alert_for_skipped_runs: true
       parameters:
         - name: catalog
           default: ${var.catalog}
@@ -33,8 +29,3 @@ resources:
           max_retries: 2
           min_retry_interval_millis: 120000
           timeout_seconds: 5400
-          new_cluster:
-            spark_version: ${var.spark_version}
-            node_type_id: ${var.node_type_id}
-            num_workers: ${var.num_workers}
-            policy_id: ${var.compute_guardrails_policy_id}

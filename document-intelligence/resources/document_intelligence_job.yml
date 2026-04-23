@@ -38,10 +38,10 @@ resources:
               spacy_max_chars_per_section: "{{job.parameters.spacy_max_chars_per_section}}"
               spacy_batch_size: "{{job.parameters.spacy_batch_size}}"
               use_spark_delta: "{{job.parameters.use_spark_delta}}"
-          libraries:
-            - whl: ../dist/*.whl
-          new_cluster:
-            spark_version: ${var.spark_version}
-            node_type_id: ${var.node_type_id}
-            num_workers: ${var.num_workers}
-            policy_id: ${var.compute_guardrails_policy_id}
+          environment_key: default
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "2"
+            dependencies:
+              - ../dist/*.whl

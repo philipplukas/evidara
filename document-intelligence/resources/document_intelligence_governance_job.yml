@@ -20,10 +20,10 @@ resources:
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
               mode: "{{job.parameters.mode}}"
-          libraries:
-            - whl: ../dist/*.whl
-          new_cluster:
-            spark_version: ${var.spark_version}
-            node_type_id: ${var.node_type_id}
-            num_workers: ${var.num_workers}
-            policy_id: ${var.compute_guardrails_policy_id}
+          environment_key: default
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "2"
+            dependencies:
+              - ../dist/*.whl

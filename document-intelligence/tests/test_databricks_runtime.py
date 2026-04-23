@@ -88,7 +88,19 @@ class DatabricksBundleConfigTests(unittest.TestCase):
         task = job["tasks"][0]
         self.assertEqual(task["python_wheel_task"]["entry_point"], "databricks_process_event")
         self.assertEqual(task["python_wheel_task"]["package_name"], "document-intelligence")
-        self.assertEqual(task["libraries"], [{"whl": "../dist/*.whl"}])
+        self.assertEqual(task["environment_key"], "default")
+        self.assertEqual(
+            job["environments"],
+            [
+                {
+                    "environment_key": "default",
+                    "spec": {
+                        "environment_version": "2",
+                        "dependencies": ["../dist/*.whl"],
+                    },
+                }
+            ],
+        )
         self.assertIn("parser_backend", bundle_config["variables"])
         self.assertIn("enable_spacy", bundle_config["variables"])
         self.assertIn("spacy_model_name", bundle_config["variables"])
@@ -123,11 +135,26 @@ class DatabricksBundleConfigTests(unittest.TestCase):
                     resource_config = yaml.safe_load(resource_file)
                 jobs = resource_config["resources"]["jobs"]
                 task_config = next(iter(jobs.values()))["tasks"][0]
-                self.assertEqual(task_config["libraries"], [{"whl": "../dist/*.whl"}])
+                self.assertEqual(task_config["environment_key"], "default")
+                self.assertNotIn("new_cluster", task_config)
         dbt_jobs = dbt_resource_config["resources"]["jobs"]
         self.assertIn("document_intelligence_dbt_transformations", dbt_jobs)
+        dbt_job = dbt_jobs["document_intelligence_dbt_transformations"]
+        self.assertEqual(dbt_job["tasks"][0]["environment_key"], "default")
         smoke_jobs = smoke_resource_config["resources"]["jobs"]
         self.assertIn("document_intelligence_smoke_test", smoke_jobs)
+        resource_root = os.path.join(os.path.dirname(__file__), "..", "resources")
+        for file_name in os.listdir(resource_root):
+            if not file_name.endswith(".yml"):
+                continue
+            with self.subTest(file_name=file_name):
+                with open(os.path.join(resource_root, file_name), encoding="utf-8") as resource_file:
+                    resource_config = yaml.safe_load(resource_file)
+                for job_config in resource_config["resources"]["jobs"].values():
+                    for task_config in job_config["tasks"]:
+                        self.assertNotIn("new_cluster", task_config)
+                        if "dbt_task" in task_config or "python_wheel_task" in task_config:
+                            self.assertEqual(task_config["environment_key"], "default")
 
     def test_bundle_targets_match_environment_tfvars(self) -> None:
         bundle_path = os.path.join(os.path.dirname(__file__), "..", "databricks.yml")

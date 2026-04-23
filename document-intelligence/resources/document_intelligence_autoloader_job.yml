@@ -16,10 +16,3 @@ resources:
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
               gcs_processed_bucket: "{{job.parameters.gcs_processed_bucket}}"
-          new_cluster:
-            spark_version: ${var.spark_version}
-            node_type_id: ${var.node_type_id}
-            num_workers: ${var.num_workers}
-            policy_id: ${var.compute_guardrails_policy_id}
-            spark_conf:
-              spark.databricks.delta.preview.enabled: "true"

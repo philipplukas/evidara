@@ -54,17 +54,11 @@ variables:
     default: "false"
   compute_guardrails_policy_id:
     description: |
-      Cluster policy ID applied to all job task new_cluster definitions.
-      Resolved by name in the target workspace; create with Terraform
-      (document_intelligence_stack, enable_databricks_compute_guardrails).
-      Override with --var when needed (for example if the policy is not provisioned yet).
+      Legacy cluster policy ID retained for compatibility with older classic
+      compute bundles. Current dev workspaces are serverless-only and job
+      resources intentionally do not attach classic new_cluster definitions.
     lookup:
       cluster_policy: "Evidara compute guardrails"
-  alert_email:
-    description: |
-      Email address to notify on job failures. Set per-target via bundle
-      variables; empty string disables notifications cleanly.
-    default: ""
   vector_endpoint_name:
     description: Mosaic AI Vector Search endpoint name.
     default: document-intelligence
