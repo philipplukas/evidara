@@ -703,7 +703,9 @@ export class ProjectionsService {
   private extractPublicationOrganText(leanDocument: unknown): string | undefined {
     if (!leanDocument || typeof leanDocument !== 'object') return undefined;
     const doc = leanDocument as Record<string, unknown>;
-    for (const section of this.asArrayOfRecords(doc.sections ?? doc.document_sections ?? doc.body_sections)) {
+    for (const section of this.asArrayOfRecords(
+      doc.sections ?? doc.document_sections ?? doc.body_sections,
+    )) {
       const title = typeof section.title === 'string' ? section.title.trim().toLowerCase() : '';
       if (
         title !== 'kundmachungsorgan' &&
