@@ -64,11 +64,20 @@ export const SHADOW_CARD_HOVER =
   "0 6px 18px rgba(15, 76, 129, 0.10), 0 2px 6px rgba(15, 76, 129, 0.06)";
 export const SHADOW_PANEL = "0 20px 48px rgba(15, 23, 42, 0.08)";
 export const SHADOW_SHELL = "0 18px 56px rgba(15, 23, 42, 0.08)";
+export const SHADOW_RING_ACCENT = "inset 0 0 0 1px rgba(98, 70, 217, 0.18)";
+export const SHADOW_RING_SUBTLE = "inset 0 0 0 1px rgba(15, 23, 42, 0.06)";
 
 // ─── Motion ───
 export const MOTION_DURATION_SHORT = "150ms";
 export const MOTION_DURATION_MEDIUM = "200ms";
 export const MOTION_EASING_STANDARD = "cubic-bezier(0.4, 0, 0.2, 1)";
 
+// ─── Font weights ───
+export const FONT_WEIGHT_REGULAR = 400;
+export const FONT_WEIGHT_MEDIUM = 500;
+export const FONT_WEIGHT_SEMIBOLD = 600;
+export const FONT_WEIGHT_BOLD = 700;
+
 // ─── Radii (base matches shadcn `--radius`; multipliers derived in CSS) ───
 export const RADIUS_BASE = "0.625rem";
+export const RADIUS_PILL = "9999px";

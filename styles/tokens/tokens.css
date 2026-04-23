@@ -38,6 +38,7 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
+  --radius-pill: 9999px;
   --sidebar: oklch(0.96 0.008 215);
   --sidebar-foreground: oklch(0.25 0.04 215);
   --sidebar-primary: oklch(0.44 0.24 284);
@@ -102,9 +103,34 @@
   --status-info: #1e40af;
   --status-info-subtle: #eff6ff;
 
+  /* ─── Typography size + leading scale ─── */
+  --text-tiny: 0.625rem;        --leading-tiny: 1;
+  --text-micro: 0.6875rem;      --leading-micro: 1.2;
+  --text-xs: 0.75rem;            --leading-xs: 1rem;
+  --text-sm: 0.875rem;           --leading-sm: 1.25rem;
+  --text-base: 1rem;             --leading-base: 1.5rem;
+  --text-lg: 1.125rem;           --leading-lg: 1.75rem;
+  --text-xl: 1.25rem;            --leading-xl: 1.75rem;
+  --text-2xl: 1.5rem;            --leading-2xl: 2rem;
+
+  /* ─── Font weights ─── */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
   /* ─── Tabs (Radix line: indicator + active weight) ─── */
   --tab-indicator-color: var(--accent-core);
-  --tab-active-font-weight: 700;
+  --tab-active-font-weight: var(--font-weight-bold);
+
+  /* ─── Z-index ladder ─── */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 40;
+  --z-overlay: 45;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-toast: 100;
 
   /* ─── Elevation ─── */
   --shadow-shell: 0 18px 56px rgb(15 23 42 / 8%);
@@ -115,6 +141,8 @@
   --shadow-sheet-top: 0 -12px 40px rgb(15 23 42 / 6%);
   --shadow-card: 0 1px 3px rgb(15 76 129 / 8%), 0 1px 2px rgb(15 76 129 / 4%);
   --shadow-card-hover: 0 6px 18px rgb(15 76 129 / 10%), 0 2px 6px rgb(15 76 129 / 6%);
+  --shadow-ring-accent: inset 0 0 0 1px rgb(98 70 217 / 18%);
+  --shadow-ring-subtle: inset 0 0 0 1px rgb(15 23 42 / 6%);
 
   /* ─── Motion ─── */
   --motion-duration-short: 150ms;
@@ -199,6 +227,8 @@
   --shadow-raised: 0 16px 36px rgb(0 0 0 / 18%);
   --shadow-inset-surface: inset 0 1px 0 rgb(255 255 255 / 6%);
   --shadow-sheet-top: 0 -12px 40px rgb(0 0 0 / 20%);
+  --shadow-ring-accent: inset 0 0 0 1px rgb(148 132 245 / 22%);
+  --shadow-ring-subtle: inset 0 0 0 1px rgb(255 255 255 / 8%);
 
   --motion-duration-short: 150ms;
   --motion-duration-medium: 200ms;
