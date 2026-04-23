@@ -73,7 +73,7 @@ export class ProjectionsService {
     const citations = await this.resolveCitations(
       this.extractCitations(event.payload.document_id, leanDocument),
     );
-    const citationTargets = this.extractCitationTargets(projection);
+    const citationTargets = this.extractCitationTargets(projection, leanDocument);
 
     await Promise.all([
       sections.length > 0
@@ -626,7 +626,10 @@ export class ProjectionsService {
    * resolve against our corpus. Identifiers include official_citation,
    * jurisdiction-specific codes (SR, CELEX, ECLI), and docket numbers.
    */
-  private extractCitationTargets(projection: SearchProjectionDocument): CitationTargetEntry[] {
+  private extractCitationTargets(
+    projection: SearchProjectionDocument,
+    leanDocument?: unknown | null,
+  ): CitationTargetEntry[] {
     const targets: CitationTargetEntry[] = [];
     const base = {
       document_id: projection.document_id,
@@ -664,7 +667,57 @@ export class ProjectionsService {
       targets.push({ ...base, identifier_type: 'ecli', identifier_value: ecliMatch[0] });
     }
 
-    return targets;
+    const atBgblRef = this.extractAustrianBgblReference(projection, leanDocument);
+    if (atBgblRef) {
+      targets.push({ ...base, identifier_type: 'at_bgbl', identifier_value: atBgblRef });
+    }
+
+    return targets.filter(
+      (target, index, all) =>
+        all.findIndex(
+          (other) =>
+            other.identifier_type === target.identifier_type &&
+            other.identifier_value === target.identifier_value,
+        ) === index,
+    );
+  }
+
+  private extractAustrianBgblReference(
+    projection: SearchProjectionDocument,
+    leanDocument?: unknown | null,
+  ): string | undefined {
+    const candidates = [
+      projection.official_citation,
+      this.extractPublicationOrganText(leanDocument),
+    ];
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const match = candidate.match(/\bBGBl\.\s*(?:[IVX]+\s+)?Nr\.\s*(\d+)\/(\d{4})\b/i);
+      if (match) {
+        return `${match[1]}/${match[2]}`;
+      }
+    }
+    return undefined;
+  }
+
+  private extractPublicationOrganText(leanDocument: unknown): string | undefined {
+    if (!leanDocument || typeof leanDocument !== 'object') return undefined;
+    const doc = leanDocument as Record<string, unknown>;
+    for (const section of this.asArrayOfRecords(doc.sections ?? doc.document_sections ?? doc.body_sections)) {
+      const title = typeof section.title === 'string' ? section.title.trim().toLowerCase() : '';
+      if (
+        title !== 'kundmachungsorgan' &&
+        title !== 'publication_organ' &&
+        title !== 'kundmachungsorgan/publikationsorgan'
+      ) {
+        continue;
+      }
+      const content = typeof section.content === 'string' ? section.content.trim() : undefined;
+      if (content) {
+        return content;
+      }
+    }
+    return undefined;
   }
 
   async resolveCitations(citations: CitationProjection[]): Promise<CitationProjection[]> {

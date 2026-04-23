@@ -182,6 +182,32 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('indexes Austrian BGBl citation targets from publication-organ sections', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: '"Produktdeklaration" - Erweiterung der Verwendung',
+      sections: [
+        {
+          section_id: 'sec_pub_1',
+          title: 'Kundmachungsorgan',
+          content: 'BGBl. Nr. 43/1975 aufgehoben durch BGBl. Nr. 825/1994',
+        },
+      ],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.bulkIndexCitationTargets).toHaveBeenCalledWith([
+      expect.objectContaining({
+        document_id: baseProcessedEvent.payload.document_id,
+        identifier_type: 'at_bgbl',
+        identifier_value: '43/1975',
+      }),
+    ]);
+  });
+
   it('maps canonical published-document lean rows into projection metadata', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
