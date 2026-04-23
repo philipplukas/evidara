@@ -300,7 +300,7 @@
   }
 
   .context-bar__layout {
-    @apply mx-auto flex max-w-[1600px] flex-col gap-3 lg:flex-row lg:items-center;
+    @apply mx-auto flex max-w-[1600px] flex-wrap items-center gap-3;
   }
 
   .context-bar__clusters {
