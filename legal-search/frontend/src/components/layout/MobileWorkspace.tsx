@@ -22,7 +22,14 @@ interface MobileWorkspaceProps {
   results: SearchResultViewModel[];
   selectedId: string | null;
   detail: DetailViewModel | null;
+  /** Focus driven from the detail surface (e.g. citation click inside DetailSheet). */
   onFocus: (id: string) => void;
+  /**
+   * Focus driven from a list surface (result list, exact-match strip). Emits
+   * RESULT_FOCUSED_FROM_LIST in addition to the base focus behavior. Falls
+   * back to `onFocus` when not supplied so callers can opt in incrementally.
+   */
+  onFocusFromList?: (id: string) => void;
   onPivot: (label: string, sourceId: string) => void;
   onPin: (id: string, title: string, type: string) => void;
   pinnedIds: Set<string>;
@@ -41,6 +48,7 @@ export function MobileWorkspace({
   selectedId,
   detail,
   onFocus,
+  onFocusFromList,
   onPivot,
   onPin,
   pinnedIds,
@@ -51,6 +59,7 @@ export function MobileWorkspace({
   isSearchError,
   onSearchRetry,
 }: MobileWorkspaceProps) {
+  const focusFromList = onFocusFromList ?? onFocus;
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   return (
@@ -70,14 +79,14 @@ export function MobileWorkspace({
             <ResultSetScopeBar />
             {searchContext.exactMatches && searchContext.exactMatches.length > 0 && (
               <div className="px-5 pt-4">
-                <ExactMatchStrip matches={searchContext.exactMatches} onSelect={onFocus} />
+                <ExactMatchStrip matches={searchContext.exactMatches} onSelect={focusFromList} />
               </div>
             )}
 
             <ResultList
               results={results}
               selectedId={selectedId}
-              onFocus={onFocus}
+              onFocus={focusFromList}
               onPivot={onPivot}
               onPin={onPin}
               pinnedIds={pinnedIds}

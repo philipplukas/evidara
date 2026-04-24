@@ -6,10 +6,13 @@
   "type": "object",
   "oneOf": [
     { "$ref": "#/$defs/search.executed" },
+    { "$ref": "#/$defs/search.refined" },
     { "$ref": "#/$defs/result.selected" },
+    { "$ref": "#/$defs/result.focused_from_list" },
     { "$ref": "#/$defs/result.pivoted" },
     { "$ref": "#/$defs/filter.applied" },
     { "$ref": "#/$defs/filter.removed" },
+    { "$ref": "#/$defs/filter.reset_all" },
     { "$ref": "#/$defs/detail.tab_changed" },
     { "$ref": "#/$defs/pin.added" },
     { "$ref": "#/$defs/pin.removed" },
@@ -37,6 +40,23 @@
       "required": ["name", "query", "resultCount"],
       "additionalProperties": false
     },
+    "search.refined": {
+      "type": "object",
+      "title": "SearchRefined",
+      "description": "User narrowed an existing search by changing constraints (filters, jurisdictions, etc.) without altering the query text. Distinct from search.executed which fires on a new query submission; here the query is unchanged but the result set was re-fetched.",
+      "properties": {
+        "name": { "const": "search.refined" },
+        "query": { "type": "string" },
+        "resultCount": { "type": "integer", "minimum": 0 },
+        "changedFilterCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of constraint dimensions that changed between the previous and new search (jurisdictions, languages, sourceType, officialOnly, refinements)."
+        }
+      },
+      "required": ["name", "query", "resultCount"],
+      "additionalProperties": false
+    },
     "result.selected": {
       "type": "object",
       "title": "ResultSelected",
@@ -49,6 +69,23 @@
           "type": "integer",
           "minimum": 0,
           "description": "Zero-based index within the visible result list."
+        }
+      },
+      "required": ["name", "resultId"],
+      "additionalProperties": false
+    },
+    "result.focused_from_list": {
+      "type": "object",
+      "title": "ResultFocusedFromList",
+      "description": "Detail view actually opened for a result that was focused from the result list (or exact-match header). Distinct from result.selected: this fires only when the focus originated in a list surface, not when the user navigates via a citation link from within an already-open detail panel.",
+      "properties": {
+        "name": { "const": "result.focused_from_list" },
+        "resultId": { "type": "string" },
+        "resultType": { "type": "string" },
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based index within the visible result list at the time of focus."
         }
       },
       "required": ["name", "resultId"],
@@ -88,6 +125,25 @@
         "value": { "type": "string" }
       },
       "required": ["name", "filterType"],
+      "additionalProperties": false
+    },
+    "filter.reset_all": {
+      "type": "object",
+      "title": "FilterResetAll",
+      "description": "User clicked the 'reset all' affordance on the context bar. Emitted regardless of whether there were active constraints to clear — hadActiveConstraints distinguishes the effective reset from a no-op click that still signals ambient confusion.",
+      "properties": {
+        "name": { "const": "filter.reset_all" },
+        "activeFilterCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of active constraint dimensions that were cleared (0 when the click was a no-op)."
+        },
+        "hadActiveConstraints": {
+          "type": "boolean",
+          "description": "Mirrors the hasActiveSearchConstraints check at click time — true when the reset actually changed state."
+        }
+      },
+      "required": ["name", "hadActiveConstraints"],
       "additionalProperties": false
     },
     "detail.tab_changed": {

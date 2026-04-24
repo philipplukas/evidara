@@ -1,7 +1,8 @@
 import { fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import WorkspaceClient from "@/app/WorkspaceClient";
+import { AnalyticsEvent, registerProvider, resetAnalytics } from "@/lib/analytics";
 import { filters, searchContext, searchResults } from "@/lib/mock-data";
 import { useWorkspace } from "@/lib/workspace-store";
 import { renderWithProviders } from "./helpers/render-with-providers";
@@ -112,5 +113,49 @@ describe("WorkspaceClient interactions", () => {
     fireEvent.keyDown(window, { key: "Escape" });
 
     expect(screen.getByText("selected-none")).toBeInTheDocument();
+  });
+});
+
+/**
+ * Lawyer-journey telemetry: #403 Slice 2.
+ *
+ * RESULT_FOCUSED_FROM_LIST is strictly narrower than RESULT_SELECTED —
+ * it fires only when focus came from a list surface (ResultList,
+ * ResultContextHeader, mobile list), NOT from a citation click inside
+ * the detail panel. We assert both events fire for the list path so a
+ * future refactor can't silently collapse them into one.
+ */
+describe("WorkspaceClient — list-focus analytics (#403)", () => {
+  const events: Array<{ event: string; properties?: Record<string, unknown> }> = [];
+
+  beforeEach(() => {
+    events.length = 0;
+    resetAnalytics();
+    registerProvider({
+      track: (event, properties) => {
+        events.push({ event, properties });
+      },
+    });
+  });
+
+  afterEach(() => {
+    resetAnalytics();
+  });
+
+  it("emits RESULT_FOCUSED_FROM_LIST alongside RESULT_SELECTED when focus originates in the list", () => {
+    renderWithProviders(<WorkspaceClient searchContext={searchContext} filters={filters} />, {
+      initialResults: searchResults,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "focus-first" }));
+
+    const focused = events.find((e) => e.event === AnalyticsEvent.RESULT_FOCUSED_FROM_LIST);
+    const selected = events.find((e) => e.event === AnalyticsEvent.RESULT_SELECTED);
+    expect(selected).toBeDefined();
+    expect(focused).toBeDefined();
+    expect(focused?.properties).toMatchObject({
+      resultId: searchResults[0].id,
+      position: 0,
+    });
   });
 });

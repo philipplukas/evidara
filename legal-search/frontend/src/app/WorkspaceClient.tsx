@@ -104,6 +104,29 @@ export default function WorkspaceClient({
     [setSelectedId, dispatch, state.resultSet.items],
   );
 
+  // Fires only when focus originated in a list surface (result list, exact-match
+  // header, mobile list). Paired with — but distinct from — RESULT_SELECTED:
+  // RESULT_SELECTED fires on every handleSelect (including citation-driven focus
+  // from within the detail panel); FOCUSED_FROM_LIST narrows that to the "user
+  // opened a detail from the list" journey step.
+  const handleSelectFromList = useCallback(
+    (id: string) => {
+      handleSelect(id);
+      const item = state.resultSet.items.find((r) => r.id === id);
+      const position = state.resultSet.items.findIndex((r) => r.id === id);
+      // Omit `position` when the focused item isn't in the current result list
+      // (e.g. exact-match strip items, which render outside resultSet.items).
+      // The schema defines `position` as a non-negative integer, so emitting -1
+      // would be out-of-contract.
+      track(AnalyticsEvent.RESULT_FOCUSED_FROM_LIST, {
+        resultId: id,
+        resultType: item?.type,
+        ...(position >= 0 ? { position } : {}),
+      });
+    },
+    [handleSelect, state.resultSet.items],
+  );
+
   const createSearchSignature = useCallback(
     (query: string) =>
       JSON.stringify({
@@ -120,7 +143,48 @@ export default function WorkspaceClient({
   const executeSearch = useCallback(
     async (query: string) => {
       const requestId = ++searchRequestIdRef.current;
+      const previousSignature = lastSearchSignatureRef.current;
       const signature = createSearchSignature(query);
+      // Classify as a refinement when the query string is unchanged from the
+      // last successful search but some constraint dimension flipped. The
+      // previous signature is a JSON blob that embeds the prior query — parse
+      // defensively so a corrupt snapshot never crashes the search path.
+      let isRefinement = false;
+      let changedFilterCount = 0;
+      if (previousSignature) {
+        try {
+          const prev = JSON.parse(previousSignature) as {
+            query?: string;
+            jurisdictions?: string[];
+            languages?: string[];
+            sourceType?: string | null;
+            officialOnly?: boolean;
+            refinements?: unknown[];
+          };
+          if (prev.query === query) {
+            const dimensions: Array<boolean> = [
+              JSON.stringify(prev.jurisdictions ?? []) !==
+                JSON.stringify(constraints.context.jurisdictions),
+              JSON.stringify(prev.languages ?? []) !==
+                JSON.stringify(constraints.context.languages),
+              (prev.sourceType ?? null) !== constraints.context.sourceType,
+              Boolean(prev.officialOnly) !== constraints.context.officialOnly,
+              JSON.stringify(prev.refinements ?? []) !== JSON.stringify(constraints.refinements),
+            ];
+            changedFilterCount = dimensions.filter(Boolean).length;
+            isRefinement = changedFilterCount > 0;
+          }
+        } catch {
+          // Malformed snapshot — fall through to treating this as a fresh execute.
+        }
+      }
+      // Update the signature ref BEFORE awaiting the request so that rapid
+      // successive searches (user submits again before the first response
+      // returns) classify against the most-recently-issued signature, not the
+      // most-recently-returned one. Otherwise on slow networks refinements
+      // get systematically misclassified as fresh executes and the journey
+      // telemetry undercounts them.
+      lastSearchSignatureRef.current = signature;
       try {
         const { results, filters: nextFilters } = await runSearch(query, constraints, {
           pageSize: preferences.resultsPerPage,
@@ -129,16 +193,23 @@ export default function WorkspaceClient({
           // Ignore stale responses when newer searches have already started.
           return;
         }
-        lastSearchSignatureRef.current = signature;
         setActiveFilters(nextFilters);
         dispatch({ type: "SEARCH", query, results });
         setSearchError(false);
-        track(AnalyticsEvent.SEARCH_EXECUTED, {
-          query,
-          resultCount: results.length,
-          jurisdictions: constraints.context.jurisdictions.join(","),
-          languages: constraints.context.languages.join(","),
-        });
+        if (isRefinement) {
+          track(AnalyticsEvent.SEARCH_REFINED, {
+            query,
+            resultCount: results.length,
+            changedFilterCount,
+          });
+        } else {
+          track(AnalyticsEvent.SEARCH_EXECUTED, {
+            query,
+            resultCount: results.length,
+            jurisdictions: constraints.context.jurisdictions.join(","),
+            languages: constraints.context.languages.join(","),
+          });
+        }
       } catch {
         setSearchError(true);
       }
@@ -283,6 +354,7 @@ export default function WorkspaceClient({
         selectedId={selectedId}
         detail={detail ?? null}
         onFocus={handleSelect}
+        onFocusFromList={handleSelectFromList}
         onPivot={handlePivot}
         onPin={handlePin}
         pinnedIds={pinnedIds}
@@ -339,13 +411,13 @@ export default function WorkspaceClient({
               <ResultsControlRegion>
                 <ResultContextHeader
                   exactMatches={searchContext.exactMatches}
-                  onSelect={handleSelect}
+                  onSelect={handleSelectFromList}
                 />
 
                 <ResultList
                   results={state.resultSet.items}
                   selectedId={selectedId}
-                  onFocus={handleSelect}
+                  onFocus={handleSelectFromList}
                   onPivot={handlePivot}
                   onPin={handlePin}
                   pinnedIds={pinnedIds}
