@@ -113,10 +113,15 @@ export default function WorkspaceClient({
     (id: string) => {
       handleSelect(id);
       const item = state.resultSet.items.find((r) => r.id === id);
+      const position = state.resultSet.items.findIndex((r) => r.id === id);
+      // Omit `position` when the focused item isn't in the current result list
+      // (e.g. exact-match strip items, which render outside resultSet.items).
+      // The schema defines `position` as a non-negative integer, so emitting -1
+      // would be out-of-contract.
       track(AnalyticsEvent.RESULT_FOCUSED_FROM_LIST, {
         resultId: id,
         resultType: item?.type,
-        position: state.resultSet.items.findIndex((r) => r.id === id),
+        ...(position >= 0 ? { position } : {}),
       });
     },
     [handleSelect, state.resultSet.items],
@@ -173,6 +178,13 @@ export default function WorkspaceClient({
           // Malformed snapshot — fall through to treating this as a fresh execute.
         }
       }
+      // Update the signature ref BEFORE awaiting the request so that rapid
+      // successive searches (user submits again before the first response
+      // returns) classify against the most-recently-issued signature, not the
+      // most-recently-returned one. Otherwise on slow networks refinements
+      // get systematically misclassified as fresh executes and the journey
+      // telemetry undercounts them.
+      lastSearchSignatureRef.current = signature;
       try {
         const { results, filters: nextFilters } = await runSearch(query, constraints, {
           pageSize: preferences.resultsPerPage,
@@ -181,7 +193,6 @@ export default function WorkspaceClient({
           // Ignore stale responses when newer searches have already started.
           return;
         }
-        lastSearchSignatureRef.current = signature;
         setActiveFilters(nextFilters);
         dispatch({ type: "SEARCH", query, results });
         setSearchError(false);
