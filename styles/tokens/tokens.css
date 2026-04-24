@@ -10,6 +10,61 @@
  *   - violet `--accent-core` = the one action color
  *   - shadcn semantic tokens (oklch) map onto the same palette for Tailwind
  *     consumers. The oklch choice gives perceptual uniformity under dark mode.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Shared vs surface-specific tokens — see ADR-0027 for the stance:
+ * two products, shared brand. This file holds only the *shared* primitives;
+ * typography display faces, density, and card-pattern tokens are
+ * surface-local.
+ *
+ * Every token currently in this file is SHARED. Both
+ * `legal-search/frontend` (workspace) and `platform-control/admin` import
+ * this file directly (see each surface's `src/app/globals.css`), so a value
+ * change here lands in both products. Shared categories today:
+ *
+ *   - shadcn semantic tokens (`--background`, `--foreground`, `--card`,
+ *     `--popover`, `--primary`, `--secondary`, `--muted`, `--accent`,
+ *     `--destructive`, `--border`, `--input`, `--ring`, `--chart-1…5`,
+ *     `--sidebar-*`, `--radius`, `--radius-pill`)
+ *   - brand palette (`--brand`, `--brand-hover`, `--brand-strong`,
+ *     `--brand-wash-3/4/6/8`, `--brand-focus-ring`)
+ *   - surfaces (`--surface-page`, `--surface-panel`, `--surface-input`,
+ *     `--surface-shell`, `--surface-shell-strong`)
+ *   - accent core (the single violet action color: `--accent-core`,
+ *     `--accent-core-foreground`, `--accent-core-subtle`,
+ *     `--accent-core-muted`, `--interactive-accent-subtle`,
+ *     `--interactive-accent-muted`)
+ *   - focus ring (`--focus-ring`) — identical affordance across surfaces
+ *     per ADR-0027
+ *   - foreground opacity + border strength (`--foreground-subtle`,
+ *     `--border-strong`, `--text-meta`)
+ *   - attention + status palette (`--attention*`, `--status-*`)
+ *   - typography size + leading scale and font weights (`--text-*`,
+ *     `--leading-*`, `--font-weight-*`) — the SCALE is shared; each
+ *     surface chooses which display face to foreground in its own
+ *     `globals.css` (workspace foregrounds Source Serif 4; admin keeps the
+ *     sans face tuned for operator density)
+ *   - tab indicator affordance (`--tab-indicator-color`,
+ *     `--tab-active-font-weight`)
+ *   - z-index ladder (`--z-*`)
+ *   - core elevation set (`--shadow-shell`, `--shadow-control-plane`,
+ *     `--shadow-panel`, `--shadow-raised`, `--shadow-inset-surface`,
+ *     `--shadow-sheet-top`, `--shadow-card`, `--shadow-card-hover`,
+ *     `--shadow-ring-accent`, `--shadow-ring-subtle`)
+ *   - motion primitives (`--motion-duration-*`, `--motion-easing-standard`)
+ *
+ * No workspace-specific or admin-specific tokens currently live in this
+ * file. Workspace-only concerns (serif-display font family, cream
+ * subsurface variants, editorial reading spacing) live in
+ * `legal-search/frontend/src/app/globals.css`. Admin-only concerns
+ * (operator-density chrome, quadrant card patterns) live in
+ * `platform-control/admin/src/app/globals.css`. Keep it that way.
+ *
+ * Contributor rule when adding a new token: ask "does the admin surface
+ * need this?" If no, put it in `legal-search/frontend/src/app/globals.css`
+ * (workspace) or `platform-control/admin/src/app/globals.css` (admin)
+ * instead of here.
+ * ─────────────────────────────────────────────────────────────────────────
  */
 
 :root {
