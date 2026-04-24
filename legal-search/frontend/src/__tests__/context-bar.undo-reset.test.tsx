@@ -16,10 +16,15 @@
  *   after that edit no longer resurrects stale state
  */
 
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ContextBar } from "@/components/layout/ContextBar";
+import { MESSAGES } from "@/i18n/messages";
+import { AnalyticsEvent, registerProvider, resetAnalytics } from "@/lib/analytics";
+import { searchContext } from "@/lib/mock-data";
 import { SearchConstraintsProvider, useSearchConstraints } from "@/lib/search-constraints-store";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -119,5 +124,75 @@ describe("SearchConstraintsProvider — UNDO_RESET", () => {
     // and the user's most recent edit is preserved.
     expect(result.current.state.context.jurisdictions).toEqual(afterEdit.context.jurisdictions);
     expect(result.current.state.context.languages).toEqual(afterEdit.context.languages);
+  });
+});
+
+/**
+ * Lawyer-journey telemetry: #403 Slice 2 — filter.reset_all.
+ *
+ * Emit unconditionally so no-op clicks still surface in analytics (ambient
+ * confusion signal). `hadActiveConstraints` distinguishes effective resets
+ * from no-ops downstream.
+ */
+describe("ContextBar — reset-all analytics (#403)", () => {
+  const events: Array<{ event: string; properties?: Record<string, unknown> }> = [];
+
+  beforeEach(() => {
+    events.length = 0;
+    resetAnalytics();
+    registerProvider({
+      track: (event, properties) => {
+        events.push({ event, properties });
+      },
+    });
+  });
+
+  afterEach(() => {
+    resetAnalytics();
+  });
+
+  function renderContextBar(searchParams: Record<string, string> = {}) {
+    return render(
+      <NuqsTestingAdapter searchParams={searchParams}>
+        <NextIntlClientProvider locale="de" messages={MESSAGES.de}>
+          <SearchConstraintsProvider>
+            <ContextBar context={searchContext} />
+          </SearchConstraintsProvider>
+        </NextIntlClientProvider>
+      </NuqsTestingAdapter>,
+    );
+  }
+
+  it("emits filter.reset_all with hadActiveConstraints=false for a no-op click on defaults", () => {
+    renderContextBar();
+
+    // Reset button label is localized; grab the rightmost "Alle zurücksetzen" button.
+    const resetButtons = screen.getAllByRole("button", { name: /zurücksetzen/i });
+    fireEvent.click(resetButtons[resetButtons.length - 1]);
+
+    const reset = events.find((e) => e.event === AnalyticsEvent.FILTER_RESET_ALL);
+    expect(reset).toBeDefined();
+    expect(reset?.properties).toMatchObject({
+      hadActiveConstraints: false,
+      activeFilterCount: 0,
+    });
+  });
+
+  it("emits filter.reset_all with hadActiveConstraints=true when constraints were off-default", () => {
+    // `?officialOnly=true` is the simplest non-default constraint — no array
+    // parsing, no refinements JSON, yet still flips hasActiveSearchConstraints.
+    renderContextBar({ officialOnly: "true" });
+
+    const resetButtons = screen.getAllByRole("button", { name: /zurücksetzen/i });
+    fireEvent.click(resetButtons[resetButtons.length - 1]);
+
+    const reset = events.find((e) => e.event === AnalyticsEvent.FILTER_RESET_ALL);
+    expect(reset).toBeDefined();
+    expect(reset?.properties).toMatchObject({
+      hadActiveConstraints: true,
+    });
+    expect((reset?.properties as { activeFilterCount: number }).activeFilterCount).toBeGreaterThan(
+      0,
+    );
   });
 });

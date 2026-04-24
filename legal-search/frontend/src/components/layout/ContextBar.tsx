@@ -4,6 +4,7 @@ import { ChevronDown, Shield } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { AnalyticsEvent, track } from "@/lib/analytics";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { hasActiveSearchConstraints, useSearchConstraints } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
@@ -146,7 +147,31 @@ export function ContextBar({ context }: ContextBarProps) {
             // otherwise the toast would be misleading ("resetting the default
             // state to itself").
             const hadActive = hasActiveSearchConstraints(constraints);
+            // Count dimensions that RESET_ALL will actually clear: anything
+            // away from the "CH" / "de" defaults plus any refinement.
+            // Intentionally stricter than the badge counter (which counts
+            // defaults too) so the telemetry number reflects real damage.
+            const activeFilterCount = hadActive
+              ? (constraints.context.jurisdictions.length !== 1 ||
+                constraints.context.jurisdictions[0] !== "ch"
+                  ? 1
+                  : 0) +
+                (constraints.context.languages.length !== 1 ||
+                constraints.context.languages[0] !== "de"
+                  ? 1
+                  : 0) +
+                (constraints.context.sourceType !== null ? 1 : 0) +
+                (constraints.context.officialOnly ? 1 : 0) +
+                constraints.refinements.length
+              : 0;
             dispatch({ type: "RESET_ALL" });
+            // Emit unconditionally so no-op clicks still surface in analytics —
+            // they're a signal the user expected something to reset, which is
+            // useful ambient-confusion telemetry even when hadActive is false.
+            track(AnalyticsEvent.FILTER_RESET_ALL, {
+              hadActiveConstraints: hadActive,
+              activeFilterCount,
+            });
             if (hadActive) {
               toast.info(t("filter.resetToast"), {
                 action: {

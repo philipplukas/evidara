@@ -63,10 +63,13 @@ function loadSchema(): Schema {
  */
 const TS_EVENT_PROPERTIES: Record<string, readonly string[]> = {
   "search.executed": ["query", "resultCount", "jurisdictions", "languages"],
+  "search.refined": ["query", "resultCount", "changedFilterCount"],
   "result.selected": ["resultId", "resultType", "position"],
+  "result.focused_from_list": ["resultId", "resultType", "position"],
   "result.pivoted": ["sourceId", "label"],
   "filter.applied": ["filterType", "value"],
   "filter.removed": ["filterType", "value"],
+  "filter.reset_all": ["hadActiveConstraints", "activeFilterCount"],
   "detail.tab_changed": ["tab", "previousTab"],
   "pin.added": ["itemId", "itemType"],
   "pin.removed": ["itemId"],

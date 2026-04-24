@@ -16,10 +16,13 @@
 
 export const AnalyticsEvent = {
   SEARCH_EXECUTED: "search.executed",
+  SEARCH_REFINED: "search.refined",
   RESULT_SELECTED: "result.selected",
+  RESULT_FOCUSED_FROM_LIST: "result.focused_from_list",
   RESULT_PIVOTED: "result.pivoted",
   FILTER_APPLIED: "filter.applied",
   FILTER_REMOVED: "filter.removed",
+  FILTER_RESET_ALL: "filter.reset_all",
   DETAIL_TAB_CHANGED: "detail.tab_changed",
   PIN_ADDED: "pin.added",
   PIN_REMOVED: "pin.removed",
@@ -38,7 +41,17 @@ export interface AnalyticsEventProperties {
     jurisdictions?: string;
     languages?: string;
   };
+  [AnalyticsEvent.SEARCH_REFINED]: {
+    query: string;
+    resultCount: number;
+    changedFilterCount?: number;
+  };
   [AnalyticsEvent.RESULT_SELECTED]: {
+    resultId: string;
+    resultType?: string;
+    position?: number;
+  };
+  [AnalyticsEvent.RESULT_FOCUSED_FROM_LIST]: {
     resultId: string;
     resultType?: string;
     position?: number;
@@ -54,6 +67,10 @@ export interface AnalyticsEventProperties {
   [AnalyticsEvent.FILTER_REMOVED]: {
     filterType: string;
     value?: string;
+  };
+  [AnalyticsEvent.FILTER_RESET_ALL]: {
+    hadActiveConstraints: boolean;
+    activeFilterCount?: number;
   };
   [AnalyticsEvent.DETAIL_TAB_CHANGED]: {
     tab: string;
