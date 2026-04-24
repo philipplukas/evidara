@@ -143,7 +143,7 @@ The pre-commit hooks and CI workflows must run the same checks. If you add a che
 | Entity shapes | `contracts/schemas/*.json` |
 | Event payloads | `contracts/events/*.json` |
 | Infra resources | `infra/terraform/` |
-| Design tokens | `legal-search/src/app/globals.css` |
+| Design tokens | `styles/tokens/tokens.css` (shared; see ADR-0027 — "two products, shared brand"). Workspace-local extensions: `legal-search/frontend/src/app/globals.css`; admin-local: `platform-control/admin/src/app/globals.css`. |
 | Tests | Test files adjacent to code |
 | Narrative docs | `docs/` |
 
