@@ -101,6 +101,30 @@ class LawyerJourneyKpisTest(unittest.TestCase):
             sys.stdout = stdout_backup
         self.assertEqual(code, 2)
 
+    def test_focus_rate_denominator_excludes_untimestamped_searches(self):
+        """Untimestamped searches can't be attributed to a later focus, so
+        counting them in the denominator would systematically underreport the
+        rate. Verify the denominator is the timestamped subset only."""
+        text = (
+            # Timestamped pair: should contribute 1/1 to the rate.
+            '{"name":"search.executed","query":"q1","resultCount":1,'
+            '"sessionId":"s","timestamp":"2026-04-24T09:00:00Z"}\n'
+            '{"name":"result.focused_from_list","resultId":"r","sessionId":"s",'
+            '"timestamp":"2026-04-24T09:01:00Z"}\n'
+            # Untimestamped search: should be excluded from the denominator.
+            '{"name":"search.executed","query":"q2","resultCount":1,"sessionId":"s"}\n'
+        )
+        events, _, _ = self._parse(text)
+        result = self.m.compute_kpis(events)
+        self.assertEqual(result.total_searches, 2)
+        self.assertEqual(result.timed_searches, 1)
+        self.assertEqual(result.focused_after_search, 1)
+        # Rate uses the timestamped subset, so 1/1 not 1/2.
+        self.assertAlmostEqual(result.focus_rate, 1.0, places=6)
+        # Reset frequency still uses total_searches (different KPI, not
+        # timestamp-dependent).
+        self.assertAlmostEqual(result.reset_per_search, 0.0, places=6)
+
     def test_no_session_id_falls_back_to_global_aggregation(self):
         text = (
             '{"name":"search.executed","query":"q","resultCount":1,'

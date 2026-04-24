@@ -68,6 +68,7 @@ class Event:
 class KpiResult:
     total_events: int
     total_searches: int
+    timed_searches: int
     focused_after_search: int
     reset_all_count: int
     refinement_count: int
@@ -78,9 +79,13 @@ class KpiResult:
 
     @property
     def focus_rate(self) -> float | None:
-        if self.total_searches == 0:
+        # Denominator is the timestamped search subset only — untimestamped
+        # searches can't be placed relative to a later focus event, so they'd
+        # inflate the denominator without any chance of contributing to the
+        # numerator.
+        if self.timed_searches == 0:
             return None
-        return self.focused_after_search / self.total_searches
+        return self.focused_after_search / self.timed_searches
 
     @property
     def reset_per_search(self) -> float | None:
@@ -232,6 +237,9 @@ def compute_kpis(events: Sequence[Event]) -> KpiResult:
     """Compute the three KPIs + window summary from parsed events."""
     total_events = len(events)
     total_searches = sum(1 for e in events if e.name == EVENT_SEARCH_EXECUTED)
+    timed_searches = sum(
+        1 for e in events if e.name == EVENT_SEARCH_EXECUTED and e.timestamp is not None
+    )
     reset_all_count = sum(1 for e in events if e.name == EVENT_FILTER_RESET_ALL)
     refinement_count = sum(1 for e in events if e.name == EVENT_SEARCH_REFINED)
     had_session_key = any(e.session_key for e in events)
@@ -264,6 +272,7 @@ def compute_kpis(events: Sequence[Event]) -> KpiResult:
     return KpiResult(
         total_events=total_events,
         total_searches=total_searches,
+        timed_searches=timed_searches,
         focused_after_search=focused_after_search,
         reset_all_count=reset_all_count,
         refinement_count=refinement_count,
@@ -316,8 +325,14 @@ def render(result: KpiResult) -> str:
     refinements = result.refinements_per_session
 
     focus_detail = (
-        f"({result.focused_after_search} of {result.total_searches} searches led "
-        f"to a {EVENT_RESULT_FOCUSED} within 5 min)"
+        f"({result.focused_after_search} of {result.timed_searches} timestamped searches "
+        f"led to a {EVENT_RESULT_FOCUSED} within 5 min"
+        + (
+            f"; {result.total_searches - result.timed_searches} untimestamped searches excluded"
+            if result.total_searches != result.timed_searches
+            else ""
+        )
+        + ")"
     )
     reset_detail = (
         f"({result.reset_all_count} {EVENT_FILTER_RESET_ALL} events / "
