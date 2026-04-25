@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.4.0
+  version: 0.5.0
   contact:
     name: Evidara Team
 
@@ -31,6 +31,11 @@ tags:
       here and reference them by ``corpus_id`` in acquisition configs.
   - name: di-events
   - name: firecrawl
+  - name: corrections
+    description: |
+      Human-in-the-loop corrections raised against upstream domain entities (source,
+      canonical document, commentary insight). Corrections are the durable audit trail
+      for HITL field edits, annotations, rejections, and rescore requests.
   - name: health
   - name: agent-discovery
     description: |
@@ -918,6 +923,141 @@ paths:
         "401":
           description: Signature verification failed
 
+  /v1/corrections:
+    get:
+      operationId: listCorrections
+      summary: List corrections raised against upstream domain entities
+      tags: [corrections, agent-discovery]
+      parameters:
+        - name: target_entity_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [source, document, commentary_insight]
+        - name: target_entity_id
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+        - name: operator_id
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^op_[a-z0-9]+$"
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, applied, rejected, superseded]
+        - name: correction_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [field_edit, annotation, reject, rescore_request]
+        - $ref: "#/components/parameters/RunScopedListLimit"
+        - $ref: "#/components/parameters/RunScopedListOffset"
+      responses:
+        "200":
+          description: Corrections matching the requested filters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorrectionListResponse"
+    post:
+      operationId: createCorrection
+      summary: Raise a correction against an upstream entity
+      tags: [corrections]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCorrectionRequest"
+            examples:
+              commentary_insight_field_edit:
+                summary: Field edit on a commentary insight
+                value:
+                  target_entity_type: commentary_insight
+                  target_entity_id: ins_01jq7c1ny0ffv8qdr1xwbejqb6
+                  correction_type: field_edit
+                  payload:
+                    field: claim
+                    value: "Article 754 OR establishes director liability toward the company."
+                  original_snapshot:
+                    claim: "References Art. 754 OR"
+                  rationale: "Editor sharpened the extracted claim to match the supporting passage."
+              document_rescore_request:
+                summary: Rescore request raised by a quality gate
+                value:
+                  target_entity_type: document
+                  target_entity_id: doc_01jq7bdptzqv3xs0c41xpw1ybg
+                  correction_type: rescore_request
+                  payload:
+                    reason_code: low_quality_extractions
+                    requested_priority: normal
+                  pipeline_run_id: run_01jq7a3s9b7j4dndd9sgv6pb9d
+                  rationale: "QA gate flagged citation parse-rate below threshold; requesting re-process."
+      responses:
+        "201":
+          description: Correction created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Correction"
+        "404":
+          description: Target entity not found
+        "409":
+          description: Target entity is not in a state that accepts this correction
+
+  /v1/corrections/{correction_id}:
+    get:
+      operationId: getCorrection
+      summary: Get a correction
+      tags: [corrections, agent-discovery]
+      parameters:
+        - $ref: "#/components/parameters/CorrectionId"
+      responses:
+        "200":
+          description: Correction detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Correction"
+        "404":
+          description: Correction not found
+    patch:
+      operationId: updateCorrectionStatus
+      summary: Transition a correction's lifecycle state
+      description: |
+        Transitions the correction status. The server enforces legal transitions
+        (`pending` → `applied` | `rejected`; `applied` → `superseded`) and returns
+        409 on illegal transitions. `applied_at` is server-stamped on `applied`.
+      tags: [corrections]
+      parameters:
+        - $ref: "#/components/parameters/CorrectionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCorrectionStatusRequest"
+      responses:
+        "200":
+          description: Correction updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Correction"
+        "404":
+          description: Correction not found
+        "409":
+          description: Illegal lifecycle transition for current status
+
   /v1/corpora:
     get:
       operationId: listCorpora
@@ -1112,6 +1252,13 @@ components:
       schema:
         type: string
         pattern: "^run_[a-z0-9]+$"
+    CorrectionId:
+      name: correction_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^cor_[a-z0-9]+$"
     RunScopedListLimit:
       name: limit
       in: query
@@ -3196,3 +3343,129 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/DependencyCheck"
+
+    Correction:
+      type: object
+      description: |
+        HITL correction record. Mirrors `contracts/schemas/corrections.json`.
+        See that schema for the canonical wire shape; this OpenAPI definition is
+        kept in sync for code-generation and Swagger UI rendering.
+      required:
+        - correction_id
+        - target_entity_type
+        - target_entity_id
+        - correction_type
+        - payload
+        - status
+        - operator_id
+        - rationale
+        - original_snapshot
+        - pipeline_run_id
+        - applied_at
+        - created_at
+      properties:
+        correction_id:
+          type: string
+          pattern: "^cor_[a-z0-9]+$"
+        target_entity_type:
+          type: string
+          enum: [source, document, commentary_insight]
+        target_entity_id:
+          type: string
+          minLength: 1
+        correction_type:
+          type: string
+          enum: [field_edit, annotation, reject, rescore_request]
+        payload:
+          type: object
+          additionalProperties: true
+        original_snapshot:
+          type: object
+          nullable: true
+          additionalProperties: true
+        operator_id:
+          type: string
+          pattern: "^op_[a-z0-9]+$"
+        pipeline_run_id:
+          type: string
+          nullable: true
+          pattern: "^run_[a-z0-9]+$"
+        rationale:
+          type: string
+          nullable: true
+          maxLength: 2000
+        status:
+          type: string
+          enum: [pending, applied, rejected, superseded]
+        created_at:
+          type: string
+          format: date-time
+        applied_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateCorrectionRequest:
+      type: object
+      required:
+        - target_entity_type
+        - target_entity_id
+        - correction_type
+        - payload
+      properties:
+        target_entity_type:
+          type: string
+          enum: [source, document, commentary_insight]
+        target_entity_id:
+          type: string
+          minLength: 1
+        correction_type:
+          type: string
+          enum: [field_edit, annotation, reject, rescore_request]
+        payload:
+          type: object
+          additionalProperties: true
+        original_snapshot:
+          type: object
+          nullable: true
+          additionalProperties: true
+        pipeline_run_id:
+          type: string
+          nullable: true
+          pattern: "^run_[a-z0-9]+$"
+        rationale:
+          type: string
+          nullable: true
+          maxLength: 2000
+
+    UpdateCorrectionStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [applied, rejected, superseded]
+          description: Target status. The server enforces legal transitions from the current status.
+        rationale:
+          type: string
+          nullable: true
+          maxLength: 2000
+          description: Operator rationale for the transition. Required by application policy when rejecting.
+
+    CorrectionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Correction"
+        total:
+          type: integer
+          nullable: true
+        limit:
+          type: integer
+          nullable: true
+        offset:
+          type: integer
+          nullable: true

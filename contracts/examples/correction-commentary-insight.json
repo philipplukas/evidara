@@ -1,0 +1,19 @@
+{
+  "correction_id": "cor_01jqs7m4dxn5e6vh7q2bzcjt8r",
+  "target_entity_type": "commentary_insight",
+  "target_entity_id": "ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+  "correction_type": "field_edit",
+  "payload": {
+    "field": "claim",
+    "value": "Article 754 OR establishes director liability toward the company."
+  },
+  "original_snapshot": {
+    "claim": "References Art. 754 OR"
+  },
+  "operator_id": "op_01jqs7p1bcvz2tw5kxh9mq80fg",
+  "pipeline_run_id": null,
+  "rationale": "Editor sharpened the extracted claim to match the supporting passage.",
+  "status": "applied",
+  "created_at": "2026-04-25T09:14:32Z",
+  "applied_at": "2026-04-25T09:15:01Z"
+}
