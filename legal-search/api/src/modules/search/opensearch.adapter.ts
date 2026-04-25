@@ -235,14 +235,14 @@ export class SearchOpenSearchAdapter implements SearchRepository {
             // Sprint 2 (#425): mixed-result fields.
             record_kind: recordKind,
             ...(sourceDocumentIds && { source_document_ids: sourceDocumentIds }),
-            ...((() => {
+            ...(() => {
               const ids = this.toStringArray(src.jurisdiction_ids);
               return ids ? { jurisdiction_ids: ids } : {};
-            })()),
-            ...((() => {
+            })(),
+            ...(() => {
               const ids = this.toStringArray(src.authority_ids);
               return ids ? { authority_ids: ids } : {};
-            })()),
+            })(),
             ...(supportCount !== undefined && { commentary_support_count: supportCount }),
           };
         });

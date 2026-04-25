@@ -599,10 +599,7 @@ describe('ProjectionsService', () => {
         document_type: 'commentary',
         jurisdiction_ids: ['jur_ch_federal'],
         authority_ids: ['auth_swisslex'],
-        source_document_ids: [
-          'doc_01jq7bhgy7g0pkj4f1d03f8f8c',
-          'doc_99jq7bhgy7g0pkj4f1d03f8f8c',
-        ],
+        source_document_ids: ['doc_01jq7bhgy7g0pkj4f1d03f8f8c', 'doc_99jq7bhgy7g0pkj4f1d03f8f8c'],
       }),
     );
   });

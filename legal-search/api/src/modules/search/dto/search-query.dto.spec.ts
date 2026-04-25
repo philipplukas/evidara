@@ -86,10 +86,7 @@ describe('SearchQueryDto', () => {
       dto.jurisdictions = 'jur_ch_federal,jur_de_05315000';
 
       expect(dto.getNormalizedJurisdictions()).toBeUndefined();
-      expect(dto.getCanonicalJurisdictionIds()).toEqual([
-        'jur_ch_federal',
-        'jur_de_05315000',
-      ]);
+      expect(dto.getCanonicalJurisdictionIds()).toEqual(['jur_ch_federal', 'jur_de_05315000']);
     });
 
     it('falls back to the singular `jurisdiction` field when `jurisdictions` is unset', () => {

@@ -305,9 +305,7 @@ describe('SearchOpenSearchAdapter', () => {
     const firstCall = search.mock.calls[0][0] as {
       body: { query: { bool: { filter: unknown[] } } };
     };
-    expect(firstCall.body.query.bool.filter).toEqual([
-      { term: { record_kind: 'commentary' } },
-    ]);
+    expect(firstCall.body.query.bool.filter).toEqual([{ term: { record_kind: 'commentary' } }]);
   });
 
   it('treats record_kind=document as "document or missing" so backfilled rows still match', async () => {
@@ -506,7 +504,7 @@ describe('SearchOpenSearchAdapter', () => {
 
     const result = await adapter.search('test');
 
-    expect(result.aggregations.commentary_support).toBeUndefined();
+    expect((result.aggregations as Record<string, unknown>).commentary_support).toBeUndefined();
     expect(result.aggregations.jurisdiction).toEqual([{ key: 'CH', doc_count: 5 }]);
   });
 
@@ -515,10 +513,13 @@ describe('SearchOpenSearchAdapter', () => {
       searchFn.mockResolvedValue({
         body: { hits: { total: { value: 0 }, hits: [] }, aggregations: {} },
       });
-      const adapter = new SearchOpenSearchAdapter({ search: searchFn } as never, {
-        get: (key: string) =>
-          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
-      } as ConfigService);
+      const adapter = new SearchOpenSearchAdapter(
+        { search: searchFn } as never,
+        {
+          get: (key: string) =>
+            key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+        } as ConfigService,
+      );
       return { adapter, searchFn };
     }
 
