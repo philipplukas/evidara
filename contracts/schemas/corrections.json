@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/corrections",
+  "title": "Correction",
+  "description": "Operator-authored correction envelope. Each correction targets a single entity (commentary insight, search projection field, etc.), captures the original snapshot for auditability, and records the operator-supplied payload that produced the change. Corrections are append-only — applying or rejecting a correction does not mutate the original envelope; it transitions `status` and stamps `applied_at`. See ADR-0011 (contract conventions) and the HITL Foundation milestone (issue #420).",
+  "type": "object",
+  "required": [
+    "correction_id",
+    "target_entity_type",
+    "target_entity_id",
+    "correction_type",
+    "payload",
+    "operator_id",
+    "rationale",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "correction_id": {
+      "type": "string",
+      "description": "Stable correction identifier issued by platform-control.",
+      "pattern": "^cor_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "target_entity_type": {
+      "type": "string",
+      "description": "Family of the entity this correction acts on. Determines how `target_entity_id` is parsed and how `payload` is interpreted by the apply handler.",
+      "enum": [
+        "commentary_insight",
+        "search_projection",
+        "document",
+        "section",
+        "citation"
+      ]
+    },
+    "target_entity_id": {
+      "type": "string",
+      "description": "ID of the targeted entity. Format depends on `target_entity_type` (e.g. `ins_*` for commentary_insight, `doc_*` for document). Validated by the platform-control apply handler against the family prefix.",
+      "minLength": 1
+    },
+    "correction_type": {
+      "type": "string",
+      "description": "Kind of correction action. Drives the apply pipeline: `field_edit` writes an overlay, `annotation` attaches operator notes, `reject` removes the entity from downstream surfaces, `rescore_request` enqueues a re-extraction or re-projection job.",
+      "enum": [
+        "field_edit",
+        "annotation",
+        "reject",
+        "rescore_request"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "description": "Correction-type-specific body. Shape MUST match `correction_type`: for `field_edit` an object of `{field_path: new_value}`; for `annotation` `{label, text, anchor?}`; for `reject` `{reason_code}`; for `rescore_request` `{requested_pipeline, parameters?}`. Validators in platform-control enforce per-type shape; this schema keeps it open so the envelope can evolve without breaking existing rows.",
+      "additionalProperties": true
+    },
+    "original_snapshot": {
+      "type": ["object", "null"],
+      "description": "Frozen pre-correction state of the targeted fields. Required for `field_edit` and `reject`; optional for `annotation` and `rescore_request`. Used for diff display and revert. Stored verbatim; not transformed by the apply handler.",
+      "additionalProperties": true
+    },
+    "operator_id": {
+      "type": "string",
+      "description": "Identity of the operator submitting the correction. Opaque string sourced from the auth token (subject claim).",
+      "minLength": 1
+    },
+    "pipeline_run_id": {
+      "type": ["string", "null"],
+      "description": "When the correction was prompted by a specific document-intelligence run (e.g. operator caught an extraction error in the run review queue), the originating run id is recorded here. Null for corrections raised from ad-hoc detail-page review.",
+      "pattern": "^run_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Free-text operator justification. Surfaced in the correction history view and exported in audit logs.",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "status": {
+      "type": "string",
+      "description": "Lifecycle state. `pending` is the freshly-submitted state awaiting an apply pass; `applied` means the overlay/job was successfully written; `rejected` means an operator or guardrail vetoed it; `superseded` means a newer correction on the same target replaced this one.",
+      "enum": [
+        "pending",
+        "applied",
+        "rejected",
+        "superseded"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp the correction envelope was persisted."
+    },
+    "applied_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp the correction transitioned to `applied`. Null while pending/rejected/superseded."
+    }
+  },
+  "additionalProperties": false
+}

@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.4.0
+  version: 0.5.0
   contact:
     name: Evidara Team
 
@@ -31,6 +31,16 @@ tags:
       here and reference them by ``corpus_id`` in acquisition configs.
   - name: di-events
   - name: firecrawl
+  - name: commentary-insights
+    description: |
+      Operator read/write surface for non-canonical commentary insights produced by document-intelligence.
+      Edits are persisted as `field_edit` corrections (see `corrections`) and applied as overlays on top of
+      the immutable DI output. See HITL Foundation milestone (#420) and Sprint 0 contract gate (#423).
+  - name: corrections
+    description: |
+      Operator queue and detail surface for the correction envelope. Corrections are append-only;
+      mutating operations live behind tag `commentary-insights` (and downstream entity-specific tags)
+      so the queue here stays a read-only worklist.
   - name: health
   - name: agent-discovery
     description: |
@@ -1049,6 +1059,268 @@ paths:
         "404":
           description: Corpus not found
 
+  /v1/commentary-insights:
+    get:
+      operationId: listCommentaryInsights
+      summary: List commentary insights for operator review
+      description: |
+        Returns commentary insights produced by document-intelligence with operator overlays applied.
+        Supports paging and the most common review filters. See ADR-0011 for envelope conventions and
+        `contracts/schemas/commentary-insight.schema.json` for the canonical entity shape.
+      tags: [commentary-insights, agent-discovery]
+      parameters:
+        - name: document_id
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+          description: Filter to insights anchored to a specific primary document.
+        - name: jurisdiction_id
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^jur_[a-z0-9_]+$"
+          description: Filter to insights resolved to a canonical jurisdiction.
+        - name: review_state
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - machine_generated_unreviewed
+              - machine_verified
+              - editor_approved
+              - rejected
+              - stale
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Page of commentary insights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentaryInsightListResponse"
+
+  /v1/commentary-insights/{insight_id}:
+    get:
+      operationId: getCommentaryInsight
+      summary: Get a single commentary insight
+      tags: [commentary-insights, agent-discovery]
+      parameters:
+        - $ref: "#/components/parameters/InsightId"
+      responses:
+        "200":
+          description: Commentary insight detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentaryInsight"
+        "404":
+          description: Commentary insight not found
+    patch:
+      operationId: editCommentaryInsight
+      summary: Apply an operator field edit to a commentary insight
+      description: |
+        Persists the operator's field changes as a `field_edit` correction (see
+        `contracts/schemas/corrections.json`) and updates the read-side overlay so the next
+        list/get reflects the edit. The full envelope is appended to the insight's history; this
+        endpoint never mutates the underlying DI output. Returns the post-overlay insight plus the
+        correction envelope that was created.
+      tags: [commentary-insights]
+      parameters:
+        - $ref: "#/components/parameters/InsightId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditCommentaryInsightRequest"
+            examples:
+              fieldEditClaim:
+                summary: Operator narrows the claim wording
+                value:
+                  rationale: "Tightened claim wording per editorial review."
+                  payload:
+                    claim: "References Art. 754 OR (board liability)"
+                    review_state: "editor_approved"
+                  original_snapshot:
+                    claim: "References Art. 754 OR"
+                    review_state: "machine_verified"
+      responses:
+        "200":
+          description: Edit accepted; overlay updated and correction recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditCommentaryInsightResponse"
+              examples:
+                fieldEditApplied:
+                  summary: Successful field_edit correction applied
+                  value:
+                    insight:
+                      insight_id: "ins_01jq7c1ny0ffv8qdr1xwbejqb6"
+                      document_id: "doc_01jq7bdptzqv3xs0c41xpw1ybg"
+                      document_revision: 3
+                      processing_manifest_id: "pm_01jq7bhgy7g0pkj4f1d03f8f8c"
+                      insight_type: "referenced_provision"
+                      claim: "References Art. 754 OR (board liability)"
+                      display_text: "Art. 754 OR wird in der Lehre als Haftungsnorm fuer Organe erlaeutert."
+                      support: []
+                      referenced_authorities: []
+                      review_state: "editor_approved"
+                      jurisdiction_id: "jur_ch_federal"
+                      jurisdiction_ids: ["jur_ch_federal"]
+                      authority_ids: ["auth_fedlex"]
+                      source_document_ids: ["doc_01jq7bdptzqv3xs0c41xpw1ybg"]
+                      last_correction_id: "cor_01jsg6n7r5kv1m3d8z9pqx2tba"
+                      confidence: 0.78
+                      generator:
+                        name: "commentary-insight-extractor"
+                        version: "v1"
+                      scores:
+                        passage_present: 1.0
+                        citation_parseable: 1.0
+                        section_anchor_resolved: 1.0
+                    correction:
+                      correction_id: "cor_01jsg6n7r5kv1m3d8z9pqx2tba"
+                      target_entity_type: "commentary_insight"
+                      target_entity_id: "ins_01jq7c1ny0ffv8qdr1xwbejqb6"
+                      correction_type: "field_edit"
+                      payload:
+                        claim: "References Art. 754 OR (board liability)"
+                        review_state: "editor_approved"
+                      original_snapshot:
+                        claim: "References Art. 754 OR"
+                        review_state: "machine_verified"
+                      operator_id: "op_anna.steiner@evidara.dev"
+                      pipeline_run_id: null
+                      rationale: "Tightened claim wording per editorial review."
+                      status: "applied"
+                      created_at: "2026-04-25T09:14:02Z"
+                      applied_at: "2026-04-25T09:14:02Z"
+        "400":
+          description: Payload shape does not match correction_type semantics
+        "404":
+          description: Commentary insight not found
+
+  /v1/commentary-insights/{insight_id}/history:
+    get:
+      operationId: getCommentaryInsightHistory
+      summary: List corrections applied to a commentary insight
+      description: |
+        Returns the ordered correction envelopes for the insight (oldest first).
+        Includes pending, applied, rejected, and superseded corrections.
+      tags: [commentary-insights, agent-discovery]
+      parameters:
+        - $ref: "#/components/parameters/InsightId"
+      responses:
+        "200":
+          description: Ordered correction envelopes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorrectionListResponse"
+        "404":
+          description: Commentary insight not found
+
+  /v1/corrections/queue:
+    get:
+      operationId: listCorrectionQueue
+      summary: List pending corrections for the operator queue
+      description: |
+        Returns the operator worklist of corrections — by default `status = pending`. Used by the
+        `platform-control/admin` review dashboards. Read-only; mutating operations are scoped to the
+        target entity tag (e.g. PATCH `/v1/commentary-insights/{id}`).
+      tags: [corrections, agent-discovery]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, applied, rejected, superseded]
+            default: pending
+        - name: target_entity_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [commentary_insight, search_projection, document, section, citation]
+        - name: correction_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [field_edit, annotation, reject, rescore_request]
+        - name: pipeline_run_id
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^run_[0-9a-hjkmnp-tv-z]{26}$"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Page of corrections matching the filters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorrectionListResponse"
+              examples:
+                rescoreRequestPending:
+                  summary: Pending rescore_request raised from a failed run
+                  value:
+                    data:
+                      - correction_id: "cor_01jsg7p3q2rm5tx0w4kdb9hf2y"
+                        target_entity_type: "commentary_insight"
+                        target_entity_id: "ins_01jq7c1ny0ffv8qdr1xwbejqb6"
+                        correction_type: "rescore_request"
+                        payload:
+                          requested_pipeline: "commentary-insight-extractor"
+                          parameters:
+                            min_confidence: 0.85
+                            include_german_subdivisions: true
+                        original_snapshot: null
+                        operator_id: "op_lukas.frei@evidara.dev"
+                        pipeline_run_id: "run_01jsg5xyab8c4dnpf8h6t2m5q7"
+                        rationale: "Confidence dropped below 0.7 across the run; request re-extraction with stricter threshold."
+                        status: "pending"
+                        created_at: "2026-04-25T08:42:11Z"
+                        applied_at: null
+                    total: 1
+                    limit: 50
+                    offset: 0
+
   /health:
     get:
       operationId: getHealth
@@ -1131,6 +1403,14 @@ components:
         type: integer
         minimum: 0
         default: 0
+    InsightId:
+      name: insight_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^ins_[0-9a-hjkmnp-tv-z]{26}$"
+      description: Stable commentary insight identifier (`ins_*`).
 
   schemas:
     CorpusResponse:
@@ -3196,3 +3476,333 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/DependencyCheck"
+
+    # ─── Commentary insights (HITL Foundation, see #420 / #423) ───
+    # The wire shape mirrors contracts/schemas/commentary-insight.schema.json.
+    # Keep the two in sync; the JSON Schema is the source of truth for downstream
+    # producers (document-intelligence) while this OpenAPI shape is what the
+    # platform-control admin UI consumes.
+    CommentaryInsight:
+      type: object
+      required:
+        - insight_id
+        - document_id
+        - document_revision
+        - processing_manifest_id
+        - insight_type
+        - claim
+        - display_text
+        - support
+        - referenced_authorities
+        - confidence
+        - review_state
+        - generator
+        - scores
+      properties:
+        insight_id:
+          type: string
+          pattern: "^ins_[0-9a-hjkmnp-tv-z]{26}$"
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        processing_manifest_id:
+          type: string
+          pattern: "^pm_[0-9a-hjkmnp-tv-z]{26}$"
+        section_id:
+          oneOf:
+            - type: string
+              pattern: "^sec_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
+        citation_id:
+          oneOf:
+            - type: string
+              pattern: "^cit_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
+        insight_type:
+          type: string
+          enum: [commentary_anchor, referenced_provision, authority_link]
+        claim:
+          type: string
+          minLength: 1
+        display_text:
+          type: string
+          minLength: 1
+          description: Source passage snippet only. Never generated legal prose.
+        support:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CommentaryInsightEvidenceRef"
+        referenced_authorities:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentaryInsightReferencedAuthority"
+        language:
+          oneOf:
+            - type: string
+              pattern: "^[a-z]{2}$"
+            - type: "null"
+        jurisdiction_id:
+          oneOf:
+            - type: string
+              pattern: "^jur_[a-z0-9_]+$"
+            - type: "null"
+        jurisdiction_ids:
+          type: array
+          items:
+            type: string
+            pattern: "^jur_[a-z0-9_]+$"
+          default: []
+        authority_ids:
+          type: array
+          items:
+            type: string
+            pattern: "^auth_[a-z0-9_]+$"
+          default: []
+        source_document_ids:
+          type: array
+          items:
+            type: string
+            pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+          default: []
+        last_correction_id:
+          oneOf:
+            - type: string
+              pattern: "^cor_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        review_state:
+          type: string
+          enum:
+            - machine_generated_unreviewed
+            - machine_verified
+            - editor_approved
+            - rejected
+            - stale
+        generator:
+          type: object
+          required: [name, version]
+          properties:
+            name:
+              type: string
+              minLength: 1
+            version:
+              type: string
+              minLength: 1
+            model:
+              oneOf:
+                - type: string
+                - type: "null"
+            prompt_version:
+              oneOf:
+                - type: string
+                - type: "null"
+        scores:
+          type: object
+          required:
+            - passage_present
+            - citation_parseable
+            - section_anchor_resolved
+          properties:
+            passage_present:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+            citation_parseable:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+            section_anchor_resolved:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CommentaryInsightEvidenceRef:
+      type: object
+      description: Mirrors `contracts/schemas/evidence-ref.schema.json`. Inlined here because the OpenAPI surface is self-contained.
+      required: [document_id, ref_type]
+      properties:
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        section_id:
+          oneOf:
+            - type: string
+              pattern: "^sec_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
+        citation_id:
+          oneOf:
+            - type: string
+              pattern: "^cit_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
+        ref_type:
+          type: string
+          enum: [passage, citation, section, authority]
+        passage:
+          type: string
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CommentaryInsightReferencedAuthority:
+      type: object
+      required: [text, citation_type]
+      properties:
+        text:
+          type: string
+          minLength: 1
+        citation_type:
+          type: string
+          minLength: 1
+        normalized_reference:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CommentaryInsightListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentaryInsight"
+        total:
+          type: integer
+          nullable: true
+        limit:
+          type: integer
+          nullable: true
+        offset:
+          type: integer
+          nullable: true
+
+    EditCommentaryInsightRequest:
+      type: object
+      required: [payload, rationale]
+      description: |
+        Request body for `PATCH /v1/commentary-insights/{insight_id}`. The server constructs a
+        `field_edit` correction envelope from these fields plus the resolved operator identity,
+        and returns the post-overlay insight together with the persisted correction.
+      properties:
+        payload:
+          type: object
+          description: |
+            Map of `field_path: new_value` representing the operator's edits. Only fields whitelisted
+            for operator overlay (e.g. `claim`, `display_text`, `review_state`, `referenced_authorities`)
+            are accepted; submissions targeting other fields return 400.
+          additionalProperties: true
+        original_snapshot:
+          type: object
+          description: Pre-edit values for the same field paths. Required for diff display and revert.
+          additionalProperties: true
+        rationale:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        pipeline_run_id:
+          oneOf:
+            - type: string
+              pattern: "^run_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
+
+    EditCommentaryInsightResponse:
+      type: object
+      required: [insight, correction]
+      properties:
+        insight:
+          $ref: "#/components/schemas/CommentaryInsight"
+        correction:
+          $ref: "#/components/schemas/Correction"
+
+    # ─── Correction envelope (HITL Foundation, see #420 / #423) ───
+    # Mirrors contracts/schemas/corrections.json. The JSON Schema is the source of truth.
+    Correction:
+      type: object
+      required:
+        - correction_id
+        - target_entity_type
+        - target_entity_id
+        - correction_type
+        - payload
+        - operator_id
+        - rationale
+        - status
+        - created_at
+      properties:
+        correction_id:
+          type: string
+          pattern: "^cor_[0-9a-hjkmnp-tv-z]{26}$"
+        target_entity_type:
+          type: string
+          enum: [commentary_insight, search_projection, document, section, citation]
+        target_entity_id:
+          type: string
+          minLength: 1
+        correction_type:
+          type: string
+          enum: [field_edit, annotation, reject, rescore_request]
+        payload:
+          type: object
+          additionalProperties: true
+        original_snapshot:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        operator_id:
+          type: string
+          minLength: 1
+        pipeline_run_id:
+          oneOf:
+            - type: string
+              pattern: "^run_[0-9a-hjkmnp-tv-z]{26}$"
+            - type: "null"
+        rationale:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        status:
+          type: string
+          enum: [pending, applied, rejected, superseded]
+        created_at:
+          type: string
+          format: date-time
+        applied_at:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+
+    CorrectionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Correction"
+        total:
+          type: integer
+          nullable: true
+        limit:
+          type: integer
+          nullable: true
+        offset:
+          type: integer
+          nullable: true

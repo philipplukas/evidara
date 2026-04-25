@@ -106,8 +106,40 @@
     },
     "jurisdiction_id": {
       "type": ["string", "null"],
-      "description": "Canonical jurisdiction reference when available.",
+      "description": "Canonical jurisdiction reference when available. Retained for backward compatibility; multi-jurisdiction commentaries should also populate `jurisdiction_ids`.",
       "pattern": "^jur_[a-z0-9_]+$"
+    },
+    "jurisdiction_ids": {
+      "type": "array",
+      "description": "Canonical jurisdiction IDs the insight resolves to. Mirrors the search-projection field of the same name; supports commentaries that span multiple jurisdictions (e.g. EU + national).",
+      "items": {
+        "type": "string",
+        "pattern": "^jur_[a-z0-9_]+$"
+      },
+      "default": []
+    },
+    "authority_ids": {
+      "type": "array",
+      "description": "Canonical authority IDs (`auth_*`) the insight is associated with. Used for filtering and badge composition in operator review surfaces.",
+      "items": {
+        "type": "string",
+        "pattern": "^auth_[a-z0-9_]+$"
+      },
+      "default": []
+    },
+    "source_document_ids": {
+      "type": "array",
+      "description": "Primary canonical documents this insight anchors to. Usually contains `document_id`, but commentaries discussing several primary acts can list more. Drives the 'discussed in' back-link from a primary doc to its commentaries.",
+      "items": {
+        "type": "string",
+        "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+      },
+      "default": []
+    },
+    "last_correction_id": {
+      "type": ["string", "null"],
+      "description": "ID of the most recently `applied` correction targeting this insight, when present. Lets read-side surfaces show 'edited by operator' provenance without re-querying the corrections store.",
+      "pattern": "^cor_[0-9a-hjkmnp-tv-z]{26}$"
     },
     "confidence": {
       "type": "number",
