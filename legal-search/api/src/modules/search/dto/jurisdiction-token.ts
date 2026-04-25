@@ -43,3 +43,57 @@ export function parseJurisdictionList(
     .map((token) => parseJurisdictionToken(token.trim()))
     .filter((parsed): parsed is ParsedJurisdictionToken => parsed !== null);
 }
+
+/**
+ * Canonical platform-id parsing.
+ *
+ * Beyond the ISO tokens above, the search API also accepts the canonical
+ * platform IDs frozen in `contracts/api/legal-search.openapi.yaml` (#423):
+ *   - `jurisdiction_id` / `jurisdiction_ids`: `^jur_[a-z0-9_]+$`
+ *     (e.g. `jur_ch_federal`, `jur_ch_zh`, `jur_ch_gemeinde_4001`,
+ *     `jur_de_gemeinde_05111000`).
+ *   - `authority_id` / `authority_ids`: `^auth_[a-z0-9_]+$`
+ *     (e.g. `auth_fedlex`, `auth_de_bgh`).
+ *
+ * These route to the canonical `jurisdiction_ids` / `authority_ids`
+ * arrays on the search projection (search-projection schema #423),
+ * unlike ISO tokens which route to the legacy `jurisdiction` /
+ * subdivision keyword fields. ISO and canonical filters are ANDed
+ * server-side when both are present.
+ *
+ * Like the ISO parser: invalid tokens return `null`; list-form parsers
+ * silently drop invalid entries.
+ */
+
+const JURISDICTION_ID_RE = /^jur_[a-z0-9_]+$/;
+const AUTHORITY_ID_RE = /^auth_[a-z0-9_]+$/;
+
+export function parseJurisdictionId(raw: string): string | null {
+  if (typeof raw !== 'string') return null;
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized || !JURISDICTION_ID_RE.test(normalized)) return null;
+  return normalized;
+}
+
+export function parseAuthorityId(raw: string): string | null {
+  if (typeof raw !== 'string') return null;
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized || !AUTHORITY_ID_RE.test(normalized)) return null;
+  return normalized;
+}
+
+export function parseJurisdictionIdList(raw: string | string[] | undefined): string[] {
+  if (raw === undefined) return [];
+  const tokens = Array.isArray(raw) ? raw : raw.split(',');
+  return tokens
+    .map((token) => parseJurisdictionId(token.trim()))
+    .filter((value): value is string => value !== null);
+}
+
+export function parseAuthorityIdList(raw: string | string[] | undefined): string[] {
+  if (raw === undefined) return [];
+  const tokens = Array.isArray(raw) ? raw : raw.split(',');
+  return tokens
+    .map((token) => parseAuthorityId(token.trim()))
+    .filter((value): value is string => value !== null);
+}

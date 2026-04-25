@@ -72,10 +72,19 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     const normalizedQuery = query.trim();
     const queryShape = this.classifyQuery(normalizedQuery);
 
-    // Build filter clauses
+    // Build filter clauses. ISO and canonical jurisdiction/authority
+    // filters are independent term clauses — they ARE ANDed by being in
+    // the same `bool.filter` array, matching the AND semantics
+    // documented on `GET /v1/search` in the OpenAPI spec.
     const filters: Record<string, unknown>[] = [];
     if (options?.jurisdictions && options.jurisdictions.length > 0) {
       filters.push({ terms: { jurisdiction: options.jurisdictions } });
+    }
+    if (options?.jurisdictionIds && options.jurisdictionIds.length > 0) {
+      filters.push({ terms: { 'jurisdiction_ids.keyword': options.jurisdictionIds } });
+    }
+    if (options?.authorityIds && options.authorityIds.length > 0) {
+      filters.push({ terms: { 'authority_ids.keyword': options.authorityIds } });
     }
     if (options?.documentTypes && options.documentTypes.length > 0) {
       filters.push({ terms: { document_type: options.documentTypes } });

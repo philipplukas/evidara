@@ -11,6 +11,18 @@ export interface SearchRepository {
 
 export interface SearchOptions {
   jurisdictions?: string[];
+  /**
+   * Canonical platform jurisdiction IDs (`jur_*`). ANDed with `jurisdictions`
+   * (ISO) when both are present. Routes to the projection's
+   * `jurisdiction_ids.keyword` field rather than the legacy `jurisdiction` /
+   * subdivision keyword fields.
+   */
+  jurisdictionIds?: string[];
+  /**
+   * Canonical platform authority IDs (`auth_*`). Routes to
+   * `authority_ids.keyword`.
+   */
+  authorityIds?: string[];
   languages?: string[];
   documentTypes?: string[];
   officialOnly?: boolean;

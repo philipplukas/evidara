@@ -122,6 +122,69 @@ describe('SearchOpenSearchAdapter', () => {
     ]);
   });
 
+  it('routes canonical jurisdiction/authority IDs to the projection keyword fields and ANDs with ISO', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    await adapter.search('arbeitsrecht', {
+      jurisdictions: ['ch'],
+      jurisdictionIds: ['jur_ch_federal', 'jur_ch_gemeinde_4001'],
+      authorityIds: ['auth_fedlex'],
+    });
+
+    const firstCall = search.mock.calls[0][0] as {
+      body: { query: { bool: { filter: unknown[] } } };
+    };
+    expect(firstCall.body.query.bool.filter).toEqual([
+      { terms: { jurisdiction: ['ch'] } },
+      {
+        terms: {
+          'jurisdiction_ids.keyword': ['jur_ch_federal', 'jur_ch_gemeinde_4001'],
+        },
+      },
+      { terms: { 'authority_ids.keyword': ['auth_fedlex'] } },
+    ]);
+  });
+
+  it('omits canonical filter clauses when the option arrays are absent or empty', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    await adapter.search('arbeitsrecht', {
+      jurisdictionIds: [],
+      authorityIds: undefined,
+    });
+
+    const firstCall = search.mock.calls[0][0] as {
+      body: { query: { bool: { filter: unknown[] } } };
+    };
+    expect(firstCall.body.query.bool.filter).toEqual([]);
+  });
+
   it('ignores invalid refinement payloads that cannot map to filters', async () => {
     const search = vi.fn().mockResolvedValue({
       body: {
