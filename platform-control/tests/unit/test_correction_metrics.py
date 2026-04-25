@@ -21,7 +21,6 @@ from platform_control.services.correction_service import (
     _floor_to_week_start,
 )
 
-
 _INSIGHT_ID = "ins_01jq7c1ny0ffv8qdr1xwbejqb6"
 
 
@@ -280,6 +279,4 @@ async def test_get_metrics_window_validation(session: AsyncSession) -> None:
     with pytest.raises(ValueError, match="window_weeks"):
         await service.get_metrics(window_weeks=0)
     with pytest.raises(ValueError, match="operator_throughput_window_days"):
-        await service.get_metrics(
-            window_weeks=4, operator_throughput_window_days=0
-        )
+        await service.get_metrics(window_weeks=4, operator_throughput_window_days=0)

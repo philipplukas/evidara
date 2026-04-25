@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -311,7 +311,7 @@ def _ensure_utc(value: datetime) -> datetime:
     """
 
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
+        return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
 
 
@@ -338,9 +338,7 @@ def _aggregate_weekly_groups(
     alphabetically for deterministic output.
     """
 
-    bucket_starts = [
-        (window_start + timedelta(weeks=i)) for i in range(window_weeks)
-    ]
+    bucket_starts = [(window_start + timedelta(weeks=i)) for i in range(window_weeks)]
     bucket_lookup = {bucket.date().isoformat(): i for i, bucket in enumerate(bucket_starts)}
     counts: dict[str, list[int]] = defaultdict(lambda: [0] * window_weeks)
 
@@ -429,11 +427,7 @@ def _aggregate_rescore_outcomes(rows: list[Any]) -> dict[str, int]:
             pending += 1
         elif row.status == "applied":
             applied_total += 1
-            outcome = (
-                row.payload.get("rescore_outcome")
-                if isinstance(row.payload, dict)
-                else None
-            )
+            outcome = row.payload.get("rescore_outcome") if isinstance(row.payload, dict) else None
             if outcome == "changed":
                 changed += 1
             elif outcome == "unchanged":
