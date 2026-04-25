@@ -25,6 +25,10 @@ import { Admin, Resource } from "react-admin";
 import { Route } from "react-router-dom";
 import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
+import { CommentaryInsightList } from "../resources/corrections/CommentaryInsightList";
+import { CommentaryInsightShow } from "../resources/corrections/CommentaryInsightShow";
+import { CorrectionShow } from "../resources/corrections/CorrectionShow";
+import { CorrectionsList } from "../resources/corrections/CorrectionsList";
 import { Dashboard } from "../resources/dashboard/Dashboard";
 import { AuthorityCreate } from "../resources/reference-data/AuthorityCreate";
 import AuthorityCreateV2 from "../resources/reference-data/AuthorityCreateV2";
@@ -99,6 +103,20 @@ export default function AdminApp() {
         list={RunList}
         show={RunShow}
         recordRepresentation="run_id"
+      />
+      <Resource
+        name={ResourceName.Corrections}
+        list={CorrectionsList}
+        show={CorrectionShow}
+        recordRepresentation="correction_id"
+        options={{ label: "Corrections" }}
+      />
+      <Resource
+        name={ResourceName.CommentaryInsights}
+        list={CommentaryInsightList}
+        show={CommentaryInsightShow}
+        recordRepresentation="insight_id"
+        options={{ label: "Commentary insights" }}
       />
       {/*
        * Tailwind + ra-core v2 previews (coexistence window, see ADR-0026).
