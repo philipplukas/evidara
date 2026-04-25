@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.5.0
+  version: 0.5.1
   contact:
     name: Evidara Team
 
@@ -1320,6 +1320,71 @@ paths:
                     total: 1
                     limit: 50
                     offset: 0
+
+  /v1/corrections/{correction_id}/rescore:
+    post:
+      operationId: requestCorrectionRescore
+      summary: Schedule a targeted rescore from a parent correction
+      description: |
+        Schedules a targeted re-extraction driven by an existing operator
+        correction. The server records a system-emitted `rescore_request`
+        correction row that links to the parent via `source_correction_id`
+        and stores the Temporal workflow / run identifiers once the workflow
+        is started.
+
+        Idempotent on the `(source_correction_id, target_entity_id)` pair —
+        repeated POSTs collapse to the same workflow execution and return
+        the same `rescore_correction_id`. Returns `202 Accepted`; the
+        targeted re-extraction runs asynchronously and the resulting
+        platform-control `Run` id (if any) is recorded on the correction
+        once the workflow completes.
+      tags: [corrections]
+      parameters:
+        - name: correction_id
+          in: path
+          required: true
+          description: Parent correction identifier (`cor_*`, ULID).
+          schema:
+            type: string
+            pattern: "^cor_[0-9a-hjkmnp-tv-z]{26}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RescoreRequest"
+            examples:
+              rescoreWithRationale:
+                summary: Operator-supplied rationale, normal (non dry-run) execution
+                value:
+                  rationale: "Confidence dropped below 0.7 across the run; re-extract with stricter threshold."
+                  dry_run: false
+              rescoreDryRun:
+                summary: Dry-run rescore — workflow runs but no projection write
+                value:
+                  rationale: "Compare candidate extractions before persisting."
+                  dry_run: true
+      responses:
+        "202":
+          description: |
+            Rescore scheduled. The `rescore_correction_id` row has been
+            created and the Temporal workflow has been started (or matched
+            to an existing execution by the idempotency key).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RescoreResponse"
+              examples:
+                rescoreAccepted:
+                  summary: New rescore_request row + Temporal workflow scheduled
+                  value:
+                    rescore_correction_id: "cor_01jsg9r4w3hpe8sx0d1f7nmkqa"
+                    workflow_id: "rescore-cor_01jsg7p3q2rm5tx0w4kdb9hf2y"
+                    run_id: "01jsg9r4w3hpe8sx0d1f7nmkqb"
+        "404":
+          description: Parent correction not found
+        "422":
+          description: Invalid request payload
 
   /health:
     get:
@@ -3806,3 +3871,62 @@ components:
         offset:
           type: integer
           nullable: true
+
+    # ─── Targeted rescore loop (HITL Foundation, see #427) ───
+    # Mirrors platform_control.schemas.correction.RescoreRequest /
+    # RescoreResponse (Pydantic v2, `extra="forbid"`).
+    RescoreRequest:
+      type: object
+      additionalProperties: false
+      description: |
+        Body for `POST /v1/corrections/{correction_id}/rescore`. Both fields
+        are optional. `rationale` is captured on the new system-emitted
+        `rescore_request` correction row. `dry_run` is forwarded to the
+        Temporal workflow so the targeted re-extraction skips the
+        persistence step (useful when an operator wants to compare
+        candidate extractions without writing them).
+      properties:
+        rationale:
+          oneOf:
+            - type: string
+              maxLength: 2000
+            - type: "null"
+          default: null
+        dry_run:
+          type: boolean
+          default: false
+
+    RescoreResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - rescore_correction_id
+        - workflow_id
+      description: |
+        Response body for `POST /v1/corrections/{correction_id}/rescore`.
+        `run_id` is the *Temporal* run id (the per-execution identifier
+        inside a workflow), not a platform-control `Run` id; the latter is
+        recorded as `resulting_run_id` on the correction once the workflow
+        completes.
+      properties:
+        rescore_correction_id:
+          type: string
+          pattern: "^cor_[0-9a-hjkmnp-tv-z]{26}$"
+          description: |
+            The system-emitted `rescore_request` correction row created by
+            this call. Idempotent on
+            `(source_correction_id, target_entity_id)`.
+        workflow_id:
+          type: string
+          minLength: 1
+          description: Temporal workflow id used to drive the targeted re-extraction.
+        run_id:
+          oneOf:
+            - type: string
+              minLength: 1
+            - type: "null"
+          default: null
+          description: |
+            Temporal run id of the started workflow execution. Null when
+            the orchestrator backend is the in-memory stub (e.g. local
+            dev / unit tests) and the workflow was not actually scheduled.

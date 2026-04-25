@@ -5,17 +5,9 @@ Combines:
 * Operator queue read endpoint (``GET /v1/corrections/queue``) from #421.
 * Targeted-rescore action endpoint (``POST /v1/corrections/{id}/rescore``) from #427.
 
-# CONTRACT-PENDING (#427): the rescore endpoint is not yet reflected in
-# ``contracts/api/platform-control.openapi.yaml``. The shape implemented:
-#
-#   POST /v1/corrections/{correction_id}/rescore
-#     requestBody: { rationale?: string<=2000, dry_run?: bool }
-#     responses:
-#       202: { rescore_correction_id: string,
-#              workflow_id: string,
-#              run_id: string|null }
-#       404: standard NotFound
-#       422: standard ValidationError
+The OpenAPI shapes for both endpoints live in
+``contracts/api/platform-control.openapi.yaml`` (see manifest
+``locked_paths``).
 """
 
 from __future__ import annotations
