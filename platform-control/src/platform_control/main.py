@@ -20,7 +20,9 @@ from platform_control.errors import (
     SignatureVerificationError,
 )
 from platform_control.routers import (
+    commentary_insights,
     compliance_policies,
+    corrections,
     di_events,
     firecrawl,
     health,
@@ -99,6 +101,8 @@ def create_app() -> FastAPI:
     app.include_router(schedules.router, dependencies=_operator_auth)
     app.include_router(corpora_router, dependencies=_operator_auth)
     app.include_router(compliance_policies.router, dependencies=_operator_auth)
+    app.include_router(commentary_insights.router, dependencies=_operator_auth)
+    app.include_router(corrections.router, dependencies=_operator_auth)
     app.include_router(firecrawl.router, dependencies=_service_auth)
     app.include_router(di_events.router, dependencies=_service_auth)
 
