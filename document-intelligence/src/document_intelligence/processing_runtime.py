@@ -141,3 +141,40 @@ def process_artifact_bundle_event(
         "processing_manifest_id": result.manifest.processing_manifest_id,
         "sections": len(result.sections),
     }
+
+
+# ─── Targeted rescore from correction (#427) ───────────────────────────────
+
+
+async def rescore_targeted(
+    *,
+    target_entity_type: str,
+    target_entity_id: str,
+    correction_id: str,
+    runtime_settings: RuntimeSettings | None = None,
+) -> tuple[str, str | None]:
+    """Re-extract a single document or commentary insight on demand.
+
+    Wired by `platform_control.temporal.activities.RescoreFromCorrectionActivities`
+    so an applied `rescore_request` correction can drive a targeted
+    re-process without rerunning the full ingestion pipeline.
+
+    Returns ``(outcome, resulting_run_id)`` where ``outcome`` is one
+    of ``changed``, ``unchanged``, ``failed``. The platform-control
+    side persists this on the correction's payload via
+    ``CorrectionService.record_rescore_outcome`` (#432 metrics surface).
+
+    For now the runtime returns ``("unchanged", None)`` as a stable
+    placeholder — selective single-target re-extraction (without
+    rerunning the full bundle ingest) lands in a follow-up. The
+    contract here is the extension point platform-control depends on.
+    """
+
+    # Resolve runtime settings so the function can dispatch into the
+    # rest of the runtime once the implementation lands. Today the
+    # call shape is fixed and the placeholder doesn't dispatch yet,
+    # but resolving keeps the wiring honest under typecheck.
+    _ = runtime_settings or RuntimeSettings.from_environment()
+    _ = (target_entity_type, target_entity_id, correction_id)
+
+    return ("unchanged", None)

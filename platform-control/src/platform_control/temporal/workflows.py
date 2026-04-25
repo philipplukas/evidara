@@ -1,19 +1,39 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import timedelta
+from typing import Any
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from platform_control.temporal.activities import (
+        RescoreFromCorrectionActivities,
         RetentionActivities,
         ReviewDrainActivities,
         ScopeShardActivities,
         WizardStateActivities,
         _sanitize_shard_key,
     )
+
+
+@dataclass(slots=True)
+class RescoreFromCorrectionInput:
+    """Input envelope for `RescoreFromCorrectionWorkflow` (#427).
+
+    Mirrors the subset of correction fields the rescore worker needs
+    to re-extract a target. The full correction row stays in the DB;
+    the workflow runs against this snapshot so retries + signal-replay
+    don't depend on point-in-time DB state.
+    """
+
+    correction_id: str
+    target_entity_type: str
+    target_entity_id: str
+    payload: dict[str, Any]
+
 
 # Maximum number of drain-poll iterations before the workflow gives up waiting.
 # At a 30-minute poll interval this caps wait time at 24 hours.
@@ -172,6 +192,41 @@ class WizardRunWorkflow:
     def reject(self, reason: str | None = None) -> None:
         del reason
         self._rejected = True
+
+
+@workflow.defn
+class RescoreFromCorrectionWorkflow:
+    """Targeted re-extraction triggered by an applied `rescore_request` correction (#427).
+
+    Idempotency: Temporal workflow IDs are derived from the correction
+    ID (`rescore-{correction_id}`), so re-firing on the same correction
+    is short-circuited at start-time by `WorkflowAlreadyStartedError`.
+    The workflow itself is a thin shell — the heavy lifting happens
+    inside the activity (`run_targeted_rescore`), which calls the DI
+    processing runtime, observes the outcome, and writes
+    `rescore_outcome` + `resulting_run_id` back onto the correction's
+    payload.
+
+    Retry policy: short backoff with 3 attempts. Beyond that the
+    correction is recorded as `failed` so the metrics dashboard counts
+    it accurately rather than retrying forever.
+    """
+
+    @workflow.run
+    async def run(self, input: RescoreFromCorrectionInput) -> dict[str, Any]:
+        retry = RetryPolicy(
+            maximum_attempts=3,
+            backoff_coefficient=2.0,
+            initial_interval=timedelta(seconds=15),
+            maximum_interval=timedelta(minutes=2),
+            non_retryable_error_types=["ConflictError", "NotFoundError"],
+        )
+        return await workflow.execute_activity_method(
+            RescoreFromCorrectionActivities.run_targeted_rescore,
+            input,
+            start_to_close_timeout=timedelta(minutes=15),
+            retry_policy=retry,
+        )
 
 
 @workflow.defn

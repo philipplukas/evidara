@@ -161,6 +161,101 @@ class CorrectionService:
         await self.session.commit()
         return row
 
+    async def trigger_rescore(
+        self,
+        correction_id: str,
+        *,
+        scheduler: Any,
+    ) -> dict[str, Any]:
+        """Schedule the rescore-from-correction workflow (#427).
+
+        Validates that the target correction is a `rescore_request` and
+        is still actionable (status `pending` or `applied`). Idempotent:
+        re-firing on a correction that already has `triggered_workflow_id`
+        in its payload returns the existing workflow handle without
+        rescheduling. After a successful schedule, the correction's
+        payload records `triggered_workflow_id` + `triggered_at` so the
+        admin queue and metrics dashboard can trace correction → run.
+
+        The actual workflow execution (and writing back
+        `resulting_run_id` / `rescore_outcome`) lives in the activity
+        (`platform_control.temporal.activities.rescore_from_correction`).
+        """
+
+        row = await self.get(correction_id)
+        if row.correction_type != CorrectionType.RESCORE_REQUEST.value:
+            raise ConflictError(
+                f"Correction {correction_id} has type {row.correction_type!r}; "
+                f"only `rescore_request` corrections can trigger a rescore."
+            )
+        if row.status not in {
+            CorrectionStatus.PENDING.value,
+            CorrectionStatus.APPLIED.value,
+        }:
+            raise ConflictError(
+                f"Correction {correction_id} status is {row.status!r}; "
+                f"rescore can only be triggered while pending or applied."
+            )
+
+        payload = dict(row.payload or {})
+        if isinstance(payload.get("triggered_workflow_id"), str):
+            # Idempotent re-fire: same correction, return the prior handle.
+            return {
+                "correction_id": correction_id,
+                "workflow_id": payload["triggered_workflow_id"],
+                "already_running": True,
+                "triggered_at": payload.get("triggered_at"),
+            }
+
+        result = await scheduler.schedule(
+            correction_id=row.correction_id,
+            target_entity_type=row.target_entity_type,
+            target_entity_id=row.target_entity_id,
+            payload=payload,
+        )
+
+        triggered_at = datetime.now(UTC).isoformat()
+        payload["triggered_workflow_id"] = result.workflow_id
+        payload["triggered_at"] = triggered_at
+        row.payload = payload
+        await self.session.commit()
+
+        return {
+            "correction_id": correction_id,
+            "workflow_id": result.workflow_id,
+            "already_running": result.already_running,
+            "triggered_at": triggered_at,
+        }
+
+    async def record_rescore_outcome(
+        self,
+        correction_id: str,
+        *,
+        outcome: str,
+        resulting_run_id: str | None = None,
+    ) -> Correction:
+        """Persist the rescore worker's outcome on the correction's payload.
+
+        Called by `platform_control.temporal.activities.rescore_from_correction`
+        once the DI re-extraction returns. Outcome is one of `changed` /
+        `unchanged` / `failed`; the correction-metrics widget (#432)
+        reads `payload.rescore_outcome` to populate the rescore counters.
+        """
+
+        if outcome not in {"changed", "unchanged", "failed"}:
+            raise ValueError(
+                f"rescore_outcome must be one of changed/unchanged/failed, got {outcome!r}."
+            )
+        row = await self.get(correction_id)
+        payload = dict(row.payload or {})
+        payload["rescore_outcome"] = outcome
+        if resulting_run_id is not None:
+            payload["resulting_run_id"] = resulting_run_id
+        payload["completed_at"] = datetime.now(UTC).isoformat()
+        row.payload = payload
+        await self.session.commit()
+        return row
+
     async def list_for_target(
         self,
         *,

@@ -518,3 +518,112 @@ class RetentionActivities:
 # pulling the full Settings object into the activity module's import graph.
 class _SettingsLike:  # pragma: no cover - typing only
     pass
+
+
+# ─── Rescore-from-correction (#427) ──────────────────────────────────────────
+
+
+@dataclass(slots=True)
+class RescoreFromCorrectionActivities:
+    """Activity that drives the targeted rescore for an applied correction.
+
+    The activity is intentionally thin: it dispatches to the DI runtime
+    via a small protocol (`TargetedRescoreRunner`) so unit tests can
+    swap a stub in. The protocol's contract: take a target identifier,
+    return one of `changed`/`unchanged`/`failed` plus the resulting
+    DI run id (when applicable). The activity then persists the
+    outcome on the correction's payload via
+    `CorrectionService.record_rescore_outcome` so the admin metrics
+    widget (#432) can count outcomes without touching the rescore
+    pipeline directly.
+    """
+
+    session_factory: async_sessionmaker[AsyncSession]
+    rescore_runner_factory: Callable[[], TargetedRescoreRunner]
+
+    @activity.defn
+    async def run_targeted_rescore(self, payload: Any) -> dict[str, Any]:
+        # Workflow imports `RescoreFromCorrectionInput` lazily via the
+        # passed-through imports block; activities receive the dataclass
+        # serialized via Temporal's data-converter so `payload` here is
+        # a dict-like / dataclass with the same shape.
+        correction_id = _extract_field(payload, "correction_id")
+        target_entity_type = _extract_field(payload, "target_entity_type")
+        target_entity_id = _extract_field(payload, "target_entity_id")
+
+        runner = self.rescore_runner_factory()
+        try:
+            outcome, resulting_run_id = await runner.run_targeted_rescore(
+                target_entity_type=target_entity_type,
+                target_entity_id=target_entity_id,
+                correction_id=correction_id,
+            )
+        except Exception as exc:
+            logger.exception(
+                "rescore_runner_failed",
+                extra={"correction_id": correction_id},
+            )
+            outcome = "failed"
+            resulting_run_id = None
+            failure_reason = str(exc)
+        else:
+            failure_reason = None
+
+        # Late-import to keep the activity module's startup time and
+        # circular-import surface small; the import is only needed
+        # when the activity actually runs.
+        from platform_control.services.correction_service import CorrectionService
+
+        async with self.session_factory() as session:
+            service = CorrectionService(session)
+            await service.record_rescore_outcome(
+                correction_id,
+                outcome=outcome,
+                resulting_run_id=resulting_run_id,
+            )
+
+        logger.info(
+            "rescore_completed",
+            extra={
+                "correction_id": correction_id,
+                "outcome": outcome,
+                "resulting_run_id": resulting_run_id,
+                "failure_reason": failure_reason,
+            },
+        )
+        return {
+            "correction_id": correction_id,
+            "outcome": outcome,
+            "resulting_run_id": resulting_run_id,
+            "failure_reason": failure_reason,
+        }
+
+
+class TargetedRescoreRunner:
+    """Protocol for the DI side of a targeted rescore (#427).
+
+    Implementations live in document-intelligence and call into the
+    processing runtime to re-extract the targeted document or
+    commentary insight. Returns the outcome plus the resulting run id.
+    """
+
+    async def run_targeted_rescore(
+        self,
+        *,
+        target_entity_type: str,
+        target_entity_id: str,
+        correction_id: str,
+    ) -> tuple[str, str | None]:  # pragma: no cover - protocol only
+        raise NotImplementedError
+
+
+def _extract_field(payload: Any, name: str) -> str:
+    """Pull a string field out of the activity payload regardless of shape."""
+
+    if isinstance(payload, dict):
+        value = payload.get(name)
+    else:
+        value = getattr(payload, name, None)
+    if not isinstance(value, str):
+        raise ValueError(f"rescore activity payload is missing field {name!r}")
+    return value
