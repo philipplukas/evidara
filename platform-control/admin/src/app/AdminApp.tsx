@@ -25,6 +25,10 @@ import { Admin, Resource } from "react-admin";
 import { Route } from "react-router-dom";
 import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
+import CommentaryInsightEdit from "../resources/commentary-insights/CommentaryInsightEdit";
+import CommentaryInsightHistory from "../resources/commentary-insights/CommentaryInsightHistory";
+import CommentaryInsightList from "../resources/commentary-insights/CommentaryInsightList";
+import CorrectionQueueList from "../resources/corrections/CorrectionQueueList";
 import { Dashboard } from "../resources/dashboard/Dashboard";
 import { AuthorityCreate } from "../resources/reference-data/AuthorityCreate";
 import AuthorityCreateV2 from "../resources/reference-data/AuthorityCreateV2";
@@ -101,11 +105,33 @@ export default function AdminApp() {
         recordRepresentation="run_id"
       />
       {/*
+       * Sprint 2 — HITL surfaces for the correction envelope and
+       * commentary insight overlay. Both resources are Tailwind +
+       * ra-core from day one (no MUI v1 page); see issue #428.
+       */}
+      <Resource
+        name={ResourceName.CommentaryInsights}
+        list={CommentaryInsightList}
+        edit={CommentaryInsightEdit}
+        recordRepresentation="insight_id"
+        options={{ label: "Commentary insights" }}
+      />
+      <Resource
+        name={ResourceName.Corrections}
+        list={CorrectionQueueList}
+        recordRepresentation="correction_id"
+        options={{ label: "Correction queue" }}
+      />
+      {/*
        * Tailwind + ra-core v2 previews (coexistence window, see ADR-0026).
        * Each pair lives alongside the MUI canonical page until the
        * corresponding v1 file is deleted.
        */}
       <CustomRoutes>
+        <Route
+          path={`/${ResourceName.CommentaryInsights}/:id/history`}
+          element={<CommentaryInsightHistory />}
+        />
         <Route path="/sources-v2" element={<SourceListV2 />} />
         <Route path="/sources-v2/create" element={<SourceCreateV2 />} />
         <Route path="/sources-v2/:id" element={<SourceShowV2 />} />

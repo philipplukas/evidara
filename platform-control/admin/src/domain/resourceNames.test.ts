@@ -10,6 +10,8 @@ describe("ResourceName", () => {
     expect(ResourceName.Sources).toBe("sources");
     expect(ResourceName.PreviewReview).toBe("preview-review");
     expect(ResourceName.Runs).toBe("runs");
+    expect(ResourceName.CommentaryInsights).toBe("commentary-insights");
+    expect(ResourceName.Corrections).toBe("corrections");
   });
 
   it("exposes every resource name as a unique value", () => {

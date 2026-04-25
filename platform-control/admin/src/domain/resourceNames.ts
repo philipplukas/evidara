@@ -16,6 +16,8 @@ export const ResourceName = {
   Sources: "sources",
   PreviewReview: "preview-review",
   Runs: "runs",
+  CommentaryInsights: "commentary-insights",
+  Corrections: "corrections",
 } as const;
 
 export type ResourceName = (typeof ResourceName)[keyof typeof ResourceName];

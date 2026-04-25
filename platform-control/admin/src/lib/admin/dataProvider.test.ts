@@ -1088,4 +1088,274 @@ describe("controlPlaneDataProvider", () => {
     expect(result.likely_decision_pages).toEqual([]);
     expect(result.drift_checks[0]?.status).toBe("ok");
   });
+
+  it("lists commentary insights with whitelisted filters and paging", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              insight_id: "ins_01",
+              document_id: "doc_01",
+              document_revision: 3,
+              processing_manifest_id: "pm_01",
+              insight_type: "referenced_provision",
+              claim: "References Art. 754 OR.",
+              display_text: "Art. 754 OR …",
+              support: [{ document_id: "doc_01", ref_type: "passage" }],
+              referenced_authorities: [],
+              jurisdiction_id: "jur_ch_federal",
+              jurisdiction_ids: ["jur_ch_federal"],
+              authority_ids: ["auth_fedlex"],
+              source_document_ids: ["doc_01"],
+              last_correction_id: null,
+              confidence: 0.78,
+              review_state: "machine_verified",
+              generator: { name: "extractor", version: "v1" },
+              scores: {
+                passage_present: 1,
+                citation_parseable: 1,
+                section_anchor_resolved: 1,
+              },
+            },
+          ],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("commentary-insights", {
+      pagination: { page: 2, perPage: 50 },
+      sort: { field: "insight_id", order: "ASC" },
+      filter: {
+        jurisdiction_id: "jur_ch_federal",
+        review_state: "machine_verified",
+        source_document_id: "__none__",
+      },
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/commentary-insights?limit=50&offset=50&jurisdiction_id=jur_ch_federal&review_state=machine_verified",
+      expect.objectContaining({
+        headers: { Accept: "application/json" },
+      }),
+    );
+    expect(result.total).toBe(1);
+    expect(result.data[0]).toMatchObject({
+      id: "ins_01",
+      insight_id: "ins_01",
+      review_state: "machine_verified",
+    });
+  });
+
+  it("loads a commentary insight through the get-one endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          insight_id: "ins_01",
+          document_id: "doc_01",
+          document_revision: 1,
+          processing_manifest_id: "pm_01",
+          insight_type: "commentary_anchor",
+          claim: "Initial claim",
+          display_text: "Source passage …",
+          support: [{ document_id: "doc_01", ref_type: "passage" }],
+          referenced_authorities: [],
+          confidence: 0.5,
+          review_state: "machine_generated_unreviewed",
+          generator: { name: "extractor", version: "v1" },
+          scores: {
+            passage_present: 1,
+            citation_parseable: 1,
+            section_anchor_resolved: 1,
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getOne("commentary-insights", { id: "ins_01" });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/commentary-insights/ins_01",
+      expect.objectContaining({
+        headers: { Accept: "application/json" },
+      }),
+    );
+    expect(result.data).toMatchObject({ id: "ins_01", insight_id: "ins_01" });
+  });
+
+  it("applies a commentary insight field edit through the patch endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          insight: {
+            insight_id: "ins_01",
+            document_id: "doc_01",
+            document_revision: 3,
+            processing_manifest_id: "pm_01",
+            insight_type: "referenced_provision",
+            claim: "Tightened claim",
+            display_text: "Source passage …",
+            support: [{ document_id: "doc_01", ref_type: "passage" }],
+            referenced_authorities: [],
+            confidence: 0.78,
+            review_state: "editor_approved",
+            generator: { name: "extractor", version: "v1" },
+            scores: {
+              passage_present: 1,
+              citation_parseable: 1,
+              section_anchor_resolved: 1,
+            },
+            last_correction_id: "cor_01",
+          },
+          correction: {
+            correction_id: "cor_01",
+            target_entity_type: "commentary_insight",
+            target_entity_id: "ins_01",
+            correction_type: "field_edit",
+            payload: {
+              claim: "Tightened claim",
+              review_state: "editor_approved",
+            },
+            original_snapshot: {
+              claim: "Original claim",
+              review_state: "machine_verified",
+            },
+            operator_id: "op_anna@evidara.dev",
+            pipeline_run_id: null,
+            rationale: "Tightened wording.",
+            status: "applied",
+            created_at: "2026-04-25T09:14:02Z",
+            applied_at: "2026-04-25T09:14:02Z",
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneActions.applyCommentaryInsightFieldEdit({
+      insightId: "ins_01",
+      payload: { claim: "Tightened claim", review_state: "editor_approved" },
+      original_snapshot: { claim: "Original claim", review_state: "machine_verified" },
+      rationale: "Tightened wording.",
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/commentary-insights/ins_01",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          payload: { claim: "Tightened claim", review_state: "editor_approved" },
+          original_snapshot: { claim: "Original claim", review_state: "machine_verified" },
+          rationale: "Tightened wording.",
+          pipeline_run_id: null,
+        }),
+      }),
+    );
+    expect(result.insight).toMatchObject({ id: "ins_01", review_state: "editor_approved" });
+    expect(result.correction).toMatchObject({
+      id: "cor_01",
+      correction_type: "field_edit",
+      status: "applied",
+    });
+  });
+
+  it("loads the commentary insight history through the history endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              correction_id: "cor_01",
+              target_entity_type: "commentary_insight",
+              target_entity_id: "ins_01",
+              correction_type: "field_edit",
+              payload: { claim: "x" },
+              original_snapshot: { claim: "y" },
+              operator_id: "op_anna@evidara.dev",
+              pipeline_run_id: null,
+              rationale: "Edit",
+              status: "applied",
+              created_at: "2026-04-25T09:14:02Z",
+              applied_at: "2026-04-25T09:14:02Z",
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneActions.getCommentaryInsightHistory("ins_01");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/commentary-insights/ins_01/history",
+      expect.objectContaining({
+        headers: { Accept: "application/json" },
+      }),
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "cor_01", correction_id: "cor_01" });
+  });
+
+  it("defaults the correction queue filter to status=pending", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [],
+          total: 0,
+          limit: 50,
+          offset: 0,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+
+    await controlPlaneDataProvider.getList("corrections", {
+      pagination: { page: 1, perPage: 50 },
+      sort: { field: "created_at", order: "DESC" },
+      filter: {},
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/corrections/queue?limit=50&offset=0&status=pending",
+      expect.objectContaining({
+        headers: { Accept: "application/json" },
+      }),
+    );
+  });
+
+  it("forwards correction queue filters when set", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [],
+          total: 0,
+          limit: 50,
+          offset: 0,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+
+    await controlPlaneDataProvider.getList("corrections", {
+      pagination: { page: 1, perPage: 50 },
+      sort: { field: "created_at", order: "DESC" },
+      filter: {
+        status: "applied",
+        target_entity_type: "commentary_insight",
+        correction_type: "field_edit",
+      },
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/corrections/queue?limit=50&offset=0&status=applied&target_entity_type=commentary_insight&correction_type=field_edit",
+      expect.objectContaining({
+        headers: { Accept: "application/json" },
+      }),
+    );
+  });
 });
