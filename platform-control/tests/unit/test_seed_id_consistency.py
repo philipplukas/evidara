@@ -248,8 +248,7 @@ class TestSeedIdConsistency(unittest.TestCase):
         self.assertFalse(
             orphans,
             msg=(
-                "Jurisdiction rows reference parent_ids missing from the same "
-                f"seed file: {orphans}"
+                f"Jurisdiction rows reference parent_ids missing from the same seed file: {orphans}"
             ),
         )
 
