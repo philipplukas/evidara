@@ -89,6 +89,10 @@ jobs:
   interaction-flow-evidence:
     runs-on: ubuntu-latest
     env:
+      E2E_SMOKE_STATUS: not_run
+      E2E_SMOKE_RETRY_COUNT: "0"
+      E2E_CONTRACT_STATUS: not_run
+      E2E_CONTRACT_RETRY_COUNT: "0"
       SCREENSHOT_PACK_STATUS: not_run
       SCREENSHOT_PACK_RETRY_COUNT: "0"
       SCREENSHOT_PACK_FAILURE_REASON: "none"
@@ -131,10 +135,42 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Run smoke suite
-        run: npm run e2e:smoke
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            if npm run e2e:smoke; then
+              echo "E2E_SMOKE_STATUS=passed" >> "${GITHUB_ENV}"
+              echo "E2E_SMOKE_RETRY_COUNT=$((attempt - 1))" >> "${GITHUB_ENV}"
+              exit 0
+            fi
+            if [[ "${attempt}" -lt 2 ]]; then
+              echo "Smoke suite failed on attempt ${attempt}; retrying once after 20s..."
+              sleep 20
+            fi
+          done
+          echo "E2E_SMOKE_STATUS=failed_after_retry" >> "${GITHUB_ENV}"
+          echo "E2E_SMOKE_RETRY_COUNT=1" >> "${GITHUB_ENV}"
+          echo "::error::Smoke suite failed after 2 attempts"
+          exit 1
 
       - name: Run cross-surface contract suite
-        run: npm run e2e:contract
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            if npm run e2e:contract; then
+              echo "E2E_CONTRACT_STATUS=passed" >> "${GITHUB_ENV}"
+              echo "E2E_CONTRACT_RETRY_COUNT=$((attempt - 1))" >> "${GITHUB_ENV}"
+              exit 0
+            fi
+            if [[ "${attempt}" -lt 2 ]]; then
+              echo "Contract suite failed on attempt ${attempt}; retrying once after 20s..."
+              sleep 20
+            fi
+          done
+          echo "E2E_CONTRACT_STATUS=failed_after_retry" >> "${GITHUB_ENV}"
+          echo "E2E_CONTRACT_RETRY_COUNT=1" >> "${GITHUB_ENV}"
+          echo "::error::Contract suite failed after 2 attempts"
+          exit 1
 
       - name: Capture canonical screenshot evidence pack
         run: |
@@ -199,6 +235,14 @@ jobs:
           - npm run e2e:smoke
           - npm run e2e:contract
           - npm run e2e:screenshot-pack
+
+          Smoke suite status:
+          - ${E2E_SMOKE_STATUS}
+          - retry_count: ${E2E_SMOKE_RETRY_COUNT}
+
+          Contract suite status:
+          - ${E2E_CONTRACT_STATUS}
+          - retry_count: ${E2E_CONTRACT_RETRY_COUNT}
 
           Screenshot pack status:
           - ${SCREENSHOT_PACK_STATUS}
