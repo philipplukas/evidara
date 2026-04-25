@@ -11,6 +11,8 @@ from platform_control.config import get_settings
 from platform_control.models import (  # noqa: F401
     authority,
     captured_resource,
+    commentary_insight,
+    correction,
     extractor_profile,
     provider_job,
     raw_artifact,

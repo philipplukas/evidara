@@ -141,3 +141,59 @@ class ReviewTaskStatus(StrEnum):
     PENDING = "pending"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class CorrectionType(StrEnum):
+    """Kinds of operator corrections recorded against a downstream entity.
+
+    ``FIELD_EDIT`` rewrites one or more fields on the target entity overlay.
+    ``ANNOTATION`` attaches a free-form note without mutating the entity.
+    ``REJECT`` flags the entity as invalid (e.g. a hallucinated commentary
+    insight). ``RESCORE_REQUEST`` asks document-intelligence to recompute
+    confidence for the entity without changing user-visible content.
+    """
+
+    FIELD_EDIT = "field_edit"
+    ANNOTATION = "annotation"
+    REJECT = "reject"
+    RESCORE_REQUEST = "rescore_request"
+
+
+class CorrectionStatus(StrEnum):
+    """Workflow status for a queued correction.
+
+    ``PENDING`` is the default for newly created rows. ``APPLIED`` is set after
+    the correction has been successfully written to the target entity overlay
+    (or otherwise resolved, e.g. for ``ANNOTATION`` / ``REJECT``).
+    ``REJECTED`` is reserved for operator review workflows that explicitly
+    reject a queued correction.
+    """
+
+    PENDING = "pending"
+    APPLIED = "applied"
+    REJECTED = "rejected"
+
+
+class CorrectionTargetEntityType(StrEnum):
+    """Entity types that can carry a correction overlay.
+
+    Sprint-1 only supports ``COMMENTARY_INSIGHT``. Adding more entity types
+    is a follow-up — the column is intentionally an open string in storage so
+    new values land without a migration, but the enum is the validated surface.
+    """
+
+    COMMENTARY_INSIGHT = "commentary_insight"
+
+
+class CommentaryInsightReviewState(StrEnum):
+    """Mirror of the contract's ``review_state`` enum.
+
+    Kept locally on the overlay row so operator edits can transition the value
+    without round-tripping the canonical document-intelligence emitter.
+    """
+
+    MACHINE_GENERATED_UNREVIEWED = "machine_generated_unreviewed"
+    MACHINE_VERIFIED = "machine_verified"
+    EDITOR_APPROVED = "editor_approved"
+    REJECTED = "rejected"
+    STALE = "stale"
