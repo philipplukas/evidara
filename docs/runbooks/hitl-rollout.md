@@ -21,12 +21,12 @@ The wire shapes consumed by every step are frozen in PR
 `contracts/schemas/corrections.json` present.
 
 This runbook is **forward-looking**: it is published ahead of the
-lane PRs (#421 platform overlay, #425 commentary search join,
-#427 targeted rescore, #428 admin queue, #429 canonical filters,
-#432 correction metrics, #431 commentary rendering) so the rollout
-shape is reviewable now. Sections that depend on unmerged work are
-marked **`Resolves on lane completion`** and will be filled in by a
-follow-up PR after the lane lands.
+lane PRs (#421 platform overlay, #425 commentary search join, #427
+targeted rescore, #428 admin queue, #429 canonical filters, #432
+correction metrics, #431 commentary rendering) so the rollout shape
+is reviewable now. Sections that depend on unmerged work are marked
+**`Resolves on lane completion`** and will be filled in by a follow-up
+PR after the lane lands.
 
 Related issues:
 [#420](https://github.com/philipplukas/evidara/issues/420) (epic),
