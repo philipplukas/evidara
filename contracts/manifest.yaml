@@ -1,4 +1,4 @@
-version: "1.7.0"
+version: "1.7.1"
 last_reviewed: "2026-04-25"
 owner: "Platform Team"
 
@@ -18,7 +18,7 @@ mvp_flow:
 apis:
   platform_control:
     file: "contracts/api/platform-control.openapi.yaml"
-    version: "0.5.0"
+    version: "0.5.1"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
@@ -34,6 +34,7 @@ apis:
       - "/v1/commentary-insights/{insight_id}"
       - "/v1/commentary-insights/{insight_id}/history"
       - "/v1/corrections/queue"
+      - "/v1/corrections/{correction_id}/rescore"
   document_intelligence:
     file: "contracts/api/document-intelligence-runtime.openapi.yaml"
     version: "0.1.0"
