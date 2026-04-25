@@ -1,9 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
+import type { SearchRecordKind } from '../entities/search.entities';
 import { type ParsedJurisdictionToken, parseJurisdictionList } from './jurisdiction-token';
 
 const REFINEMENT_TYPES = ['terms', 'date_range', 'range', 'toggle', 'text'] as const;
+const RECORD_KIND_VALUES: SearchRecordKind[] = ['document', 'commentary'];
 
 type SearchRefinementDto = {
   field: string;
@@ -103,6 +105,15 @@ export class SearchQueryDto {
   @Max(100)
   page_size?: number = 20;
 
+  /**
+   * Sprint 2 (#425): optional record_kind filter. Validated as
+   * `document|commentary`. When omitted, mixed results are returned.
+   */
+  @IsOptional()
+  @IsString()
+  @IsIn(RECORD_KIND_VALUES)
+  record_kind?: SearchRecordKind;
+
   getNormalizedJurisdictions(): string[] | undefined {
     return normalizeCsv(this.jurisdictions) ?? normalizeCsv(this.jurisdiction);
   }
@@ -143,5 +154,13 @@ export class SearchQueryDto {
 
   getRefinements(): SearchRefinementDto[] {
     return parseRefinements(this.refinements) ?? [];
+  }
+
+  /**
+   * Sprint 2 (#425): return the validated record_kind filter, or undefined
+   * when no filter was supplied (mixed results expected).
+   */
+  getRecordKind(): SearchRecordKind | undefined {
+    return this.record_kind;
   }
 }

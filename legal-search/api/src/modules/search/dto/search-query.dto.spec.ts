@@ -46,4 +46,21 @@ describe('SearchQueryDto', () => {
     dto.official_only = 'yes' as unknown as boolean;
     expect(dto.getOfficialOnly()).toBeUndefined();
   });
+
+  // ─── Sprint 2 (#425): record_kind filter ───
+
+  it('returns the validated record_kind filter when set', () => {
+    const dto = new SearchQueryDto();
+    dto.record_kind = 'commentary';
+    expect(dto.getRecordKind()).toBe('commentary');
+
+    const documentDto = new SearchQueryDto();
+    documentDto.record_kind = 'document';
+    expect(documentDto.getRecordKind()).toBe('document');
+  });
+
+  it('returns undefined when record_kind is not set (mixed results expected)', () => {
+    const dto = new SearchQueryDto();
+    expect(dto.getRecordKind()).toBeUndefined();
+  });
 });

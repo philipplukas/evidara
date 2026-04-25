@@ -2,7 +2,11 @@
  * Search repository interface.
  * Adapters implement this to abstract the search backend.
  */
-import type { ContextAggregations, SearchResultEntity } from './entities/search.entities';
+import type {
+  ContextAggregations,
+  SearchRecordKind,
+  SearchResultEntity,
+} from './entities/search.entities';
 
 export interface SearchRepository {
   search(query: string, options?: SearchOptions): Promise<SearchResultEntity>;
@@ -17,6 +21,11 @@ export interface SearchOptions {
   refinements?: SearchRefinement[];
   page?: number;
   pageSize?: number;
+  /**
+   * Sprint 2 (#425): filter results to a specific record kind. When
+   * omitted, both `document` and `commentary` hits are returned.
+   */
+  recordKind?: SearchRecordKind;
 }
 
 export interface SearchRefinement {

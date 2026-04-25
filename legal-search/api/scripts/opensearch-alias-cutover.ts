@@ -110,6 +110,21 @@ async function ensureIndex(indexName: string): Promise<void> {
         processed_at: { type: 'date' },
         document_revision: { type: 'long' },
         lifecycle_status: { type: 'keyword' },
+        // Sprint 2 (#425): commentary records + primary-document joins.
+        // `record_kind` discriminates `document` from `commentary`. Rows
+        // without it default to `document` for existing data.
+        // `source_document_ids` is the join key from a commentary back to
+        // the primary documents it annotates — used both for direct lookup
+        // and for the "commentary support count" aggregation on primary
+        // document hits. `jurisdiction_ids` and `authority_ids` carry the
+        // canonical platform-control IDs alongside the legacy facet code.
+        // TODO(#430): mapping migration for existing aliases is not
+        // trivial — re-index/replay path lives in #430. For brand-new
+        // indices the mapping is applied here automatically.
+        record_kind: { type: 'keyword' },
+        source_document_ids: { type: 'keyword' },
+        jurisdiction_ids: { type: 'keyword' },
+        authority_ids: { type: 'keyword' },
       },
     },
   };
