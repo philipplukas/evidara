@@ -1293,4 +1293,84 @@ describe("controlPlaneDataProvider", () => {
     expect(result.likely_decision_pages).toEqual([]);
     expect(result.drift_checks[0]?.status).toBe("ok");
   });
+
+  describe("getCorrectionMetrics (#432)", () => {
+    it("fetches the metrics aggregate without query params by default", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            window_weeks: 8,
+            operator_throughput_window_days: 30,
+            weekly_by_target_entity_type: [],
+            weekly_by_correction_type: [],
+            operator_throughput: [],
+            rescore_outcomes: {
+              pending: 0,
+              applied_total: 0,
+              rejected: 0,
+              changed: 0,
+              unchanged: 0,
+              failed: 0,
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const result = await controlPlaneActions.getCorrectionMetrics();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/platform-control/v1/corrections/metrics");
+      expect(result.window_weeks).toBe(8);
+    });
+
+    it("forwards window options as query parameters", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            window_weeks: 4,
+            operator_throughput_window_days: 14,
+            weekly_by_target_entity_type: [
+              {
+                key: "commentary_insight",
+                buckets: [
+                  { week_start: "2026-04-06", count: 0 },
+                  { week_start: "2026-04-13", count: 1 },
+                  { week_start: "2026-04-20", count: 2 },
+                  { week_start: "2026-04-27", count: 1 },
+                ],
+              },
+            ],
+            weekly_by_correction_type: [],
+            operator_throughput: [{ operator_id: "op_01", total: 4, applied: 3, rejected: 1 }],
+            rescore_outcomes: {
+              pending: 0,
+              applied_total: 0,
+              rejected: 0,
+              changed: 0,
+              unchanged: 0,
+              failed: 0,
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const result = await controlPlaneActions.getCorrectionMetrics({
+        windowWeeks: 4,
+        operatorThroughputWindowDays: 14,
+        operatorThroughputTopN: 5,
+      });
+
+      const url = fetchMock.mock.calls[0]?.[0] as string;
+      expect(url).toContain("/v1/corrections/metrics?");
+      expect(url).toContain("window_weeks=4");
+      expect(url).toContain("operator_throughput_window_days=14");
+      expect(url).toContain("operator_throughput_top_n=5");
+      expect(result.weekly_by_target_entity_type[0]?.buckets).toHaveLength(4);
+      expect(result.operator_throughput[0]?.total).toBe(4);
+    });
+  });
 });

@@ -24,6 +24,7 @@ import { ResourceName } from "../../domain/resourceNames";
 import type { RunPipelineHealth } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
+import { CorrectionMetricsCard } from "../corrections/CorrectionMetricsCard";
 import { RunLaunchButton } from "../runs/RunLaunchDialog";
 import { StatCard, type StatTone, statToneBorder, successRateTone } from "../shared/Stat";
 import { pipelineHealthToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
@@ -560,6 +561,8 @@ export function Dashboard() {
         </Paper>
 
         <Divider />
+
+        <CorrectionMetricsCard />
       </Stack>
     </Box>
   );
