@@ -17,8 +17,22 @@ export type ProjectionHistoryEntry = {
   notes?: string;
 };
 
+/**
+ * Discriminator separating primary legal documents from commentary
+ * insight projection rows. Mirrors `record_kind` in
+ * `contracts/schemas/search-projection.schema.json` (PR #434).
+ */
+export type RecordKind = 'legal_document' | 'commentary_insight';
+
 export type SearchProjectionDocument = {
   document_id: string;
+  /**
+   * Polymorphic discriminator for projection rows. `legal_document` is
+   * the historical default (one row per canonical DI document);
+   * `commentary_insight` rows are produced from DI commentary insights
+   * via `ProjectionsService.applyCommentaryInsight`.
+   */
+  record_kind: RecordKind;
   title: string;
   authority_name?: string;
   official_citation?: string;
@@ -35,6 +49,25 @@ export type SearchProjectionDocument = {
   lifecycle_status?: string;
   processed_at?: string;
   jurisdiction?: string;
+  /**
+   * Canonical jurisdiction IDs the row belongs to. Required by the
+   * frozen contract; legal_document rows derive from the row's primary
+   * jurisdiction, commentary_insight rows copy from the upstream
+   * commentary insight.
+   */
+  jurisdiction_ids: string[];
+  /**
+   * Canonical authority IDs attached to the row. Optional for
+   * `legal_document` rows; required and non-empty for
+   * `commentary_insight` rows per the freeze.
+   */
+  authority_ids?: string[];
+  /**
+   * Canonical primary documents this row references. Empty for
+   * `legal_document` rows; required and non-empty for
+   * `commentary_insight` rows so the UI can resolve back to source.
+   */
+  source_document_ids?: string[];
   language?: string;
   content_preview?: string;
   /** Normalized document type from canonical DI row (law, decision, …). */
@@ -43,6 +76,30 @@ export type SearchProjectionDocument = {
   effective_date?: string;
   /** Breadcrumb-style path when present in canonical metadata. */
   structural_path?: string;
+};
+
+/**
+ * Commentary-insight payload accepted by
+ * `ProjectionsService.applyCommentaryInsight`. Mirrors the subset of
+ * `contracts/schemas/commentary-insight.schema.json` (PR #434) needed
+ * to produce a search projection row.
+ */
+export type CommentaryInsightInput = {
+  insight_id: string;
+  document_id: string;
+  document_revision: number;
+  processing_manifest_id: string;
+  insight_type: string;
+  claim: string;
+  display_text: string;
+  language?: string | null;
+  jurisdiction_id?: string | null;
+  jurisdiction_ids: string[];
+  authority_ids: string[];
+  source_document_ids: string[];
+  confidence: number;
+  review_state: string;
+  occurred_at?: string;
 };
 
 export type SectionProjection = {
