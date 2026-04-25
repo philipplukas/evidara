@@ -195,6 +195,58 @@ items:
     slug: de-th
     name: Thüringen
     parent_id: jur_de
+  # ─── German pilot cities (AGS-keyed) ───
+  # Scope: this is the explicit Sprint-1 pilot scope of 10 cities — NOT
+  # full district (Kreis) coverage, NOT full municipality (Gemeinde)
+  # coverage. The complete ~11k Gemeinde universe is tracked out-of-band
+  # in country-overlays/de/municipalities.yaml; only the pilot subset is
+  # promoted to first-class seed rows here. See issue #422 and
+  # docs/components/five-country-content-rollout.md ("DE pilot scope").
+  #
+  # ID convention: jur_de_<ags> where <ags> is the 8-digit Amtlicher
+  # Gemeindeschlüssel from Destatis. Each row's parent_id points at the
+  # appropriate Land (jur_de_<iso-3166-2 subdivision>). Keep in sync with
+  # country-overlays/de/municipalities.yaml.
+  - jurisdiction_id: jur_de_05111000
+    slug: de-05111000
+    name: Düsseldorf
+    parent_id: jur_de_nw
+  - jurisdiction_id: jur_de_05315000
+    slug: de-05315000
+    name: Köln
+    parent_id: jur_de_nw
+  - jurisdiction_id: jur_de_05913000
+    slug: de-05913000
+    name: Dortmund
+    parent_id: jur_de_nw
+  - jurisdiction_id: jur_de_09162000
+    slug: de-09162000
+    name: München
+    parent_id: jur_de_by
+  - jurisdiction_id: jur_de_09564000
+    slug: de-09564000
+    name: Nürnberg
+    parent_id: jur_de_by
+  - jurisdiction_id: jur_de_08111000
+    slug: de-08111000
+    name: Stuttgart
+    parent_id: jur_de_bw
+  - jurisdiction_id: jur_de_06412000
+    slug: de-06412000
+    name: Frankfurt am Main
+    parent_id: jur_de_he
+  - jurisdiction_id: jur_de_14612000
+    slug: de-14612000
+    name: Dresden
+    parent_id: jur_de_sn
+  - jurisdiction_id: jur_de_14713000
+    slug: de-14713000
+    name: Leipzig
+    parent_id: jur_de_sn
+  - jurisdiction_id: jur_de_03241001
+    slug: de-03241001
+    name: Hannover
+    parent_id: jur_de_ni
   - jurisdiction_id: jur_fr
     slug: fr
     name: France
