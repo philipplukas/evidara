@@ -91,6 +91,26 @@ When the index mapping has changed:
 4. Verify document counts
 5. Clean up old index
 
+### Sprint 2 (#425): commentary records + primary-document joins
+
+The Sprint 2 mapping change adds four `keyword` fields used by the
+`/v1/search` endpoint to surface commentary hits and the per-query
+commentary support count:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `record_kind` | `keyword` | `document` / `commentary` discriminator. Rows without this field are treated as `document`. |
+| `source_document_ids` | `keyword` | Commentary→primary-document join key. Aggregated to compute support counts. |
+| `jurisdiction_ids` | `keyword` | Canonical platform-control IDs (e.g. `jur_ch_federal`). |
+| `authority_ids` | `keyword` | Canonical platform-control IDs (e.g. `auth_fedlex`). |
+
+For brand-new indices these fields are applied automatically by the cutover
+script. Existing aliases need a re-index pass — that is owned by **#430**
+(re-index/replay path). Until that lands, the BFF treats missing
+`record_kind` as `document` and the `commentary_support` aggregation
+returns empty buckets on legacy data, so search keeps working with
+backwards-compatible behavior.
+
 ## Procedure: Fresh Reindex (No Data Copy)
 
 When you want to start from a clean index and rebuild from events:

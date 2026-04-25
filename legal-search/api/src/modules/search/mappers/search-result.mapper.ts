@@ -74,6 +74,22 @@ export interface SearchResultView {
   relatedCounts: RelatedCountView[];
   actions: ActionView[];
   contentLanguage?: ContentLanguageView;
+  /**
+   * Sprint 2 (#425): mixed-result discriminator surfaced for the frontend
+   * (#431). Always present so the frontend can branch on `commentary` vs
+   * `document` rendering without having to defensively read `type`.
+   */
+  recordKind: 'document' | 'commentary';
+  /**
+   * Sprint 2 (#425): commentary-only — primary documents this commentary
+   * annotates. Empty/undefined for primary-document hits.
+   */
+  sourceDocumentIds?: string[];
+  /**
+   * Sprint 2 (#425): primary-document-only — number of commentary records
+   * referencing this document in the current result set.
+   */
+  commentarySupportCount?: number;
 }
 
 // ─── Document Type Rules (presentation config) ───
@@ -254,10 +270,17 @@ export function composeRelatedCounts(
 ): RelatedCountView[] {
   const counts: RelatedCountView[] = [];
 
-  if (hit.related_commentary_count && hit.related_commentary_count > 0) {
+  // Sprint 2 (#425): when the search query produced a per-result commentary
+  // support count via the `commentary_support` aggregation, prefer that
+  // (live, query-scoped) over the materialized `related_commentary_count`
+  // which is only computed at projection time. The two fields are
+  // additive: `commentary_support_count` reflects "in this query", while
+  // `related_commentary_count` reflects "in the corpus at index time".
+  const commentaryCount = hit.commentary_support_count ?? hit.related_commentary_count;
+  if (commentaryCount && commentaryCount > 0) {
     counts.push({
       label: t('counts.commentary', locale),
-      count: hit.related_commentary_count,
+      count: commentaryCount,
     });
   }
   if (hit.related_decisions_count && hit.related_decisions_count > 0) {
@@ -327,6 +350,9 @@ export function mapSearchHitToView(
   locale: SupportedLocale = DEFAULT_LOCALE,
   warn?: WarnFn,
 ): SearchResultView {
+  // Sprint 2 (#425): default record_kind to `document` for backwards
+  // compatibility with rows indexed before the mapping migration.
+  const recordKind = hit.record_kind ?? 'document';
   return {
     id: hit.document_id,
     type: hit.document_type ?? 'unknown',
@@ -337,8 +363,21 @@ export function mapSearchHitToView(
     metadataRows: composeMetadata(hit, locale),
     relatedCounts: composeRelatedCounts(hit, locale),
     actions: composeActions(hit, locale, warn),
+    recordKind,
     // Optional scalars — omit when absent (ADR-0011)
     ...(hit.structural_path && { structuralContext: hit.structural_path }),
     ...(composeLanguage(hit, locale) && { contentLanguage: composeLanguage(hit, locale) }),
+    // Sprint 2 (#425): expose commentary→primary joins on commentary hits
+    // and the live support count on primary-document hits.
+    ...(recordKind === 'commentary' &&
+      hit.source_document_ids &&
+      hit.source_document_ids.length > 0 && {
+        sourceDocumentIds: [...hit.source_document_ids],
+      }),
+    ...(recordKind === 'document' &&
+      typeof hit.commentary_support_count === 'number' &&
+      hit.commentary_support_count > 0 && {
+        commentarySupportCount: hit.commentary_support_count,
+      }),
   };
 }

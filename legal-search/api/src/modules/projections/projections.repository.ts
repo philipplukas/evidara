@@ -17,6 +17,14 @@ export type ProjectionHistoryEntry = {
   notes?: string;
 };
 
+/**
+ * Distinguishes commentary records from primary documents in the search
+ * projection (#425). Rows without a `record_kind` field are treated as
+ * `document` for backwards compatibility (see Sprint 0/1 mapping migration —
+ * #430 owns the re-index/replay path).
+ */
+export type RecordKind = 'document' | 'commentary';
+
 export type SearchProjectionDocument = {
   document_id: string;
   title: string;
@@ -43,6 +51,32 @@ export type SearchProjectionDocument = {
   effective_date?: string;
   /** Breadcrumb-style path when present in canonical metadata. */
   structural_path?: string;
+  /**
+   * Discriminator between primary documents and commentary records (#425).
+   * Defaults to `document`. Commentary projections set this to `commentary`
+   * and populate `source_document_ids` to link back to the documents they
+   * annotate.
+   */
+  record_kind?: RecordKind;
+  /**
+   * Canonical jurisdiction IDs (e.g. `jur_ch_federal`) the record applies to.
+   * Additive to the legacy `jurisdiction` country code (`CH|AT|DE|LI`) — the
+   * country-token routing in #429 uses this list when present.
+   */
+  jurisdiction_ids?: string[];
+  /**
+   * Canonical authority IDs (e.g. `auth_fedlex`) attached to the record.
+   * For commentaries this is typically the publisher; for primary documents
+   * it complements the existing `authority_name` text field.
+   */
+  authority_ids?: string[];
+  /**
+   * Commentary-only: list of primary documents this commentary annotates.
+   * Used for join/aggregation when surfacing "commentary support" counts on
+   * primary document hits and to expose primary-document references on
+   * commentary hits.
+   */
+  source_document_ids?: string[];
 };
 
 export type SectionProjection = {

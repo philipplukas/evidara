@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { SupportedLocale } from '../../core/i18n';
 import { DEFAULT_LOCALE } from '../../core/i18n';
 import type { WarnFn } from '../../core/types/warn';
+import type { SearchRecordKind } from './entities/search.entities';
 import { mapContextAggregations } from './mappers/search-context.mapper';
 import { mapAggregationsToFacets } from './mappers/search-facet.mapper';
 import { mapSearchHitToView } from './mappers/search-result.mapper';
@@ -34,6 +35,12 @@ export class SearchService {
       page?: number;
       pageSize?: number;
       locale?: SupportedLocale;
+      /**
+       * Sprint 2 (#425): when set, restricts the result set to commentary
+       * or primary-document hits. When omitted both kinds are returned and
+       * the response is mixed.
+       */
+      recordKind?: SearchRecordKind;
     },
   ) {
     const locale = options?.locale ?? DEFAULT_LOCALE;
@@ -45,6 +52,7 @@ export class SearchService {
       refinements: options?.refinements,
       page: options?.page,
       pageSize: options?.pageSize,
+      recordKind: options?.recordKind,
     });
 
     return {

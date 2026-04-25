@@ -18,6 +18,7 @@ import {
   type ProjectionHistoryQuery,
   type ProjectionHistoryStats,
   type ProjectionRepository,
+  type RecordKind,
   type SearchProjectionDocument,
   type SectionProjection,
 } from './projections.repository';
@@ -161,6 +162,30 @@ export class ProjectionsService {
     if (extracted.documentType) projection.document_type = extracted.documentType;
     if (extracted.effectiveDate) projection.effective_date = extracted.effectiveDate;
     if (extracted.structuralPath) projection.structural_path = extracted.structuralPath;
+
+    // Sprint 2 (#425): commentary indexing path. When the upstream emitter
+    // marks the lean payload as a commentary record, surface the kind and
+    // its primary-document join keys. Rows without `record_kind` default to
+    // `document` for backwards compatibility (#430 owns the re-index/replay
+    // path for the alias-target template change).
+    if (extracted.recordKind) {
+      projection.record_kind = extracted.recordKind;
+      if (extracted.recordKind === 'commentary' && extracted.documentType === undefined) {
+        // Commentary records are indexed with document_type=commentary so
+        // existing facets and document-type filters keep working.
+        projection.document_type = 'commentary';
+      }
+    }
+    if (extracted.jurisdictionIds && extracted.jurisdictionIds.length > 0) {
+      projection.jurisdiction_ids = extracted.jurisdictionIds;
+    }
+    if (extracted.authorityIds && extracted.authorityIds.length > 0) {
+      projection.authority_ids = extracted.authorityIds;
+    }
+    if (extracted.sourceDocumentIds && extracted.sourceDocumentIds.length > 0) {
+      projection.source_document_ids = extracted.sourceDocumentIds;
+    }
+
     return projection;
   }
 
@@ -178,6 +203,14 @@ export class ProjectionsService {
     effectiveDate?: string;
     structuralPath?: string;
     jurisdictionFromCanonical?: string;
+    /** Sprint 2 (#425): record_kind discriminator on the lean payload. */
+    recordKind?: RecordKind;
+    /** Sprint 2 (#425): canonical jurisdiction IDs (e.g. jur_ch_federal). */
+    jurisdictionIds?: string[];
+    /** Sprint 2 (#425): canonical authority IDs (e.g. auth_fedlex). */
+    authorityIds?: string[];
+    /** Sprint 2 (#425): commentary→primary-document join keys. */
+    sourceDocumentIds?: string[];
   } {
     if (!leanDocument || typeof leanDocument !== 'object') {
       return { sectionsCount: 0, citationsCount: 0 };
@@ -275,6 +308,26 @@ export class ProjectionsService {
         ? this.inferJurisdictionFromCanonicalId(doc.jurisdiction_id.trim())
         : undefined;
 
+    // Sprint 2 (#425): commentary support / canonical-ID join keys.
+    const recordKind = this.extractRecordKind(doc);
+    // Only fall back to the singular form when it carries the canonical
+    // platform-control prefix (`jur_*` / `auth_*`) — otherwise we would
+    // misinterpret the legacy `jurisdiction_id` (e.g. `ch_zh`) used for
+    // jurisdiction-code inference as a canonical reference data ID.
+    const jurisdictionIds = this.extractCanonicalIdList(
+      doc,
+      'jurisdiction_ids',
+      'jurisdiction_id',
+      /^jur_/,
+    );
+    const authorityIds = this.extractCanonicalIdList(
+      doc,
+      'authority_ids',
+      'authority_id',
+      /^auth_/,
+    );
+    const sourceDocumentIds = this.extractStringList(doc.source_document_ids);
+
     return {
       title: fallbackTitle,
       language,
@@ -289,7 +342,69 @@ export class ProjectionsService {
       effectiveDate,
       structuralPath,
       jurisdictionFromCanonical,
+      recordKind,
+      jurisdictionIds,
+      authorityIds,
+      sourceDocumentIds,
     };
+  }
+
+  /**
+   * Sprint 2 (#425): infer the projection's record_kind discriminator from
+   * the lean payload. Defaults to undefined (treated as `document` at index
+   * time per the `record_kind` default contract). Accepts an explicit
+   * `record_kind` field; falls back to `document_type === 'commentary'` so
+   * existing commentary corpora keep getting picked up without the upstream
+   * emitter changing first.
+   */
+  private extractRecordKind(doc: Record<string, unknown>): RecordKind | undefined {
+    const explicit = doc.record_kind;
+    if (explicit === 'commentary' || explicit === 'document') {
+      return explicit;
+    }
+    const documentType =
+      typeof doc.document_type === 'string' ? doc.document_type.toLowerCase() : undefined;
+    if (documentType === 'commentary') {
+      return 'commentary';
+    }
+    return undefined;
+  }
+
+  /**
+   * Read a list of canonical identifiers from either the array form
+   * (`<key>s`) or the singular form (`<key>`). Used for jurisdiction_ids /
+   * authority_ids so commentary projections can carry the IDs that join
+   * back to platform-control reference data without forcing every emitter
+   * to wrap a single value in an array.
+   *
+   * The optional `singularPattern` constrains which singular values are
+   * accepted — used to keep the legacy non-canonical `jurisdiction_id`
+   * (e.g. `ch_zh`) out of the canonical ID list (which expects `jur_*`).
+   */
+  private extractCanonicalIdList(
+    doc: Record<string, unknown>,
+    pluralKey: string,
+    singularKey: string,
+    singularPattern?: RegExp,
+  ): string[] | undefined {
+    const fromArray = this.extractStringList(doc[pluralKey]);
+    if (fromArray && fromArray.length > 0) return fromArray;
+    const single = doc[singularKey];
+    if (typeof single === 'string' && single.trim()) {
+      const trimmed = single.trim();
+      if (!singularPattern || singularPattern.test(trimmed)) {
+        return [trimmed];
+      }
+    }
+    return undefined;
+  }
+
+  private extractStringList(value: unknown): string[] | undefined {
+    if (!Array.isArray(value)) return undefined;
+    const cleaned = value
+      .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+      .map((entry) => entry.trim());
+    return cleaned.length > 0 ? cleaned : undefined;
   }
 
   private deriveTitle(args: {

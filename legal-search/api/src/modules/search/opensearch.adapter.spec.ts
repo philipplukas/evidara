@@ -282,6 +282,234 @@ describe('SearchOpenSearchAdapter', () => {
     expect(firstCall.body.query.bool.must[0].multi_match.fuzziness).toBeUndefined();
   });
 
+  // ─── Sprint 2 (#425): commentary records + primary-document joins ───
+
+  it('adds a record_kind=commentary filter when recordKind option is set', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    await adapter.search('Kommentar', { recordKind: 'commentary' });
+
+    const firstCall = search.mock.calls[0][0] as {
+      body: { query: { bool: { filter: unknown[] } } };
+    };
+    expect(firstCall.body.query.bool.filter).toEqual([
+      { term: { record_kind: 'commentary' } },
+    ]);
+  });
+
+  it('treats record_kind=document as "document or missing" so backfilled rows still match', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    await adapter.search('Gesetz', { recordKind: 'document' });
+
+    const firstCall = search.mock.calls[0][0] as {
+      body: { query: { bool: { filter: unknown[] } } };
+    };
+    expect(firstCall.body.query.bool.filter).toEqual([
+      {
+        bool: {
+          should: [
+            { term: { record_kind: 'document' } },
+            { bool: { must_not: { exists: { field: 'record_kind' } } } },
+          ],
+          minimum_should_match: 1,
+        },
+      },
+    ]);
+  });
+
+  it('issues a single commentary_support sub-aggregation for the support count', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    await adapter.search('Haftung');
+
+    const firstCall = search.mock.calls[0][0] as { body: { aggs: Record<string, unknown> } };
+    expect(firstCall.body.aggs.commentary_support).toEqual({
+      filter: { term: { record_kind: 'commentary' } },
+      aggs: {
+        by_source_document: {
+          terms: { field: 'source_document_ids', size: 80 },
+        },
+      },
+    });
+    // Only ONE search call — no per-hit follow-up.
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns mixed results with commentary support count on document hits and source_document_ids on commentary hits', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: {
+          total: { value: 2 },
+          hits: [
+            {
+              _source: {
+                document_id: 'doc_law_1',
+                title: 'Obligationenrecht',
+                document_type: 'law',
+                record_kind: 'document',
+              },
+            },
+            {
+              _source: {
+                document_id: 'doc_comm_1',
+                title: 'Kommentar zu Art. 41 OR',
+                document_type: 'commentary',
+                record_kind: 'commentary',
+                source_document_ids: ['doc_law_1'],
+                jurisdiction_ids: ['jur_ch_federal'],
+                authority_ids: ['auth_swisslex'],
+              },
+            },
+          ],
+        },
+        aggregations: {
+          commentary_support: {
+            doc_count: 1,
+            by_source_document: {
+              buckets: [{ key: 'doc_law_1', doc_count: 3 }],
+            },
+          },
+        },
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    const result = await adapter.search('haftung');
+
+    expect(result.hits).toHaveLength(2);
+    expect(result.hits[0]).toEqual(
+      expect.objectContaining({
+        document_id: 'doc_law_1',
+        record_kind: 'document',
+        commentary_support_count: 3,
+      }),
+    );
+    expect(result.hits[0].source_document_ids).toBeUndefined();
+    expect(result.hits[1]).toEqual(
+      expect.objectContaining({
+        document_id: 'doc_comm_1',
+        record_kind: 'commentary',
+        source_document_ids: ['doc_law_1'],
+        jurisdiction_ids: ['jur_ch_federal'],
+        authority_ids: ['auth_swisslex'],
+      }),
+    );
+    // Commentary hits don't carry a support count (it's a primary-document concept).
+    expect(result.hits[1].commentary_support_count).toBeUndefined();
+  });
+
+  it('defaults record_kind to "document" for legacy rows without the field', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: {
+          total: { value: 1 },
+          hits: [
+            {
+              _source: {
+                document_id: 'doc_legacy',
+                title: 'Legacy law',
+                document_type: 'law',
+              },
+            },
+          ],
+        },
+        aggregations: {},
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    const result = await adapter.search('legacy');
+
+    expect(result.hits[0]).toEqual(
+      expect.objectContaining({
+        document_id: 'doc_legacy',
+        record_kind: 'document',
+      }),
+    );
+  });
+
+  it('omits the commentary_support sub-aggregation from the parsed facet aggregations', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: {
+        hits: { total: { value: 0 }, hits: [] },
+        aggregations: {
+          commentary_support: {
+            doc_count: 1,
+            by_source_document: { buckets: [{ key: 'doc_a', doc_count: 1 }] },
+          },
+          jurisdiction: { buckets: [{ key: 'CH', doc_count: 5 }] },
+        },
+      },
+    });
+
+    const adapter = new SearchOpenSearchAdapter(
+      { search } as never,
+      {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService,
+    );
+
+    const result = await adapter.search('test');
+
+    expect(result.aggregations.commentary_support).toBeUndefined();
+    expect(result.aggregations.jurisdiction).toEqual([{ key: 'CH', doc_count: 5 }]);
+  });
+
   it('keeps fuzzy broad matching for longer free-text queries', async () => {
     const search = vi.fn().mockResolvedValue({
       body: {

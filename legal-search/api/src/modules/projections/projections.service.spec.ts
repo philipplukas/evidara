@@ -574,4 +574,74 @@ describe('ProjectionsService', () => {
     );
     expect(repository.appendHistory).toHaveBeenCalledTimes(1);
   });
+
+  // ─── Sprint 2 (#425): commentary records + primary-document joins ───
+
+  it('indexes commentary projections with record_kind, source_document_ids, and canonical IDs', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Anmerkung zu BGE 144 III 264',
+      record_kind: 'commentary',
+      jurisdiction_id: 'ch_federal',
+      jurisdiction_ids: ['jur_ch_federal'],
+      authority_ids: ['auth_swisslex'],
+      source_document_ids: ['doc_01jq7bhgy7g0pkj4f1d03f8f8c', 'doc_99jq7bhgy7g0pkj4f1d03f8f8c'],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Anmerkung zu BGE 144 III 264',
+        record_kind: 'commentary',
+        document_type: 'commentary',
+        jurisdiction_ids: ['jur_ch_federal'],
+        authority_ids: ['auth_swisslex'],
+        source_document_ids: [
+          'doc_01jq7bhgy7g0pkj4f1d03f8f8c',
+          'doc_99jq7bhgy7g0pkj4f1d03f8f8c',
+        ],
+      }),
+    );
+  });
+
+  it('treats projections without record_kind as documents (backwards compatibility)', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Bundesgesetz X',
+      document_type: 'law',
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const call = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.record_kind).toBeUndefined();
+    expect(call.document_type).toBe('law');
+    expect(call.source_document_ids).toBeUndefined();
+  });
+
+  it('infers commentary record_kind from document_type=commentary when not explicitly set', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Kommentar zu Art. 41 OR',
+      document_type: 'commentary',
+      source_document_ids: ['doc_01jq7bhgy7g0pkj4f1d03f8f8c'],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        record_kind: 'commentary',
+        document_type: 'commentary',
+        source_document_ids: ['doc_01jq7bhgy7g0pkj4f1d03f8f8c'],
+      }),
+    );
+  });
 });

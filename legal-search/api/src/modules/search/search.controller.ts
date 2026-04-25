@@ -26,6 +26,7 @@ export class SearchController {
       page: query.page,
       pageSize: query.page_size,
       locale,
+      recordKind: query.getRecordKind(),
     });
   }
 
