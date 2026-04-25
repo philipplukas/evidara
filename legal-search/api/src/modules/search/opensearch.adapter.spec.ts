@@ -282,6 +282,89 @@ describe('SearchOpenSearchAdapter', () => {
     expect(firstCall.body.query.bool.must[0].multi_match.fuzziness).toBeUndefined();
   });
 
+  describe('jurisdiction filter routing', () => {
+    function makeAdapter(searchFn = vi.fn()) {
+      searchFn.mockResolvedValue({
+        body: { hits: { total: { value: 0 }, hits: [] }, aggregations: {} },
+      });
+      const adapter = new SearchOpenSearchAdapter({ search: searchFn } as never, {
+        get: (key: string) =>
+          key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
+      } as ConfigService);
+      return { adapter, searchFn };
+    }
+
+    function getFilters(searchFn: ReturnType<typeof vi.fn>): unknown[] {
+      const firstCall = searchFn.mock.calls[0][0] as {
+        body: { query: { bool: { filter: unknown[] } } };
+      };
+      return firstCall.body.query.bool.filter;
+    }
+
+    it('routes ISO country tokens to the legacy jurisdiction keyword', async () => {
+      const { adapter, searchFn } = makeAdapter();
+      await adapter.search('q', { jurisdictions: ['ch', 'de'] });
+
+      expect(getFilters(searchFn)).toEqual([{ terms: { jurisdiction: ['ch', 'de'] } }]);
+    });
+
+    it('routes ISO subdivision tokens to the legacy jurisdiction keyword', async () => {
+      const { adapter, searchFn } = makeAdapter();
+      await adapter.search('q', { jurisdictions: ['ch-zh'] });
+
+      expect(getFilters(searchFn)).toEqual([{ terms: { jurisdiction: ['ch-zh'] } }]);
+    });
+
+    it('routes canonical jur_* ids to jurisdiction_ids.keyword (the field added by #425)', async () => {
+      const { adapter, searchFn } = makeAdapter();
+      await adapter.search('q', {
+        canonicalJurisdictionIds: ['jur_ch_federal', 'jur_ch_gemeinde_261'],
+      });
+
+      expect(getFilters(searchFn)).toEqual([
+        {
+          terms: {
+            'jurisdiction_ids.keyword': ['jur_ch_federal', 'jur_ch_gemeinde_261'],
+          },
+        },
+      ]);
+    });
+
+    it('OR-unions a mixed ISO + canonical list with minimum_should_match=1', async () => {
+      const { adapter, searchFn } = makeAdapter();
+      await adapter.search('q', {
+        jurisdictions: ['ch-zh'],
+        canonicalJurisdictionIds: ['jur_ch_gemeinde_261'],
+      });
+
+      expect(getFilters(searchFn)).toEqual([
+        {
+          bool: {
+            should: [
+              { terms: { jurisdiction: ['ch-zh'] } },
+              { terms: { 'jurisdiction_ids.keyword': ['jur_ch_gemeinde_261'] } },
+            ],
+            minimum_should_match: 1,
+          },
+        },
+      ]);
+    });
+
+    it('emits no jurisdiction filter when neither token list is supplied', async () => {
+      const { adapter, searchFn } = makeAdapter();
+      await adapter.search('q');
+
+      expect(getFilters(searchFn)).toEqual([]);
+    });
+
+    it('emits no jurisdiction filter when both lists are empty', async () => {
+      const { adapter, searchFn } = makeAdapter();
+      await adapter.search('q', { jurisdictions: [], canonicalJurisdictionIds: [] });
+
+      expect(getFilters(searchFn)).toEqual([]);
+    });
+  });
+
   it('keeps fuzzy broad matching for longer free-text queries', async () => {
     const search = vi.fn().mockResolvedValue({
       body: {

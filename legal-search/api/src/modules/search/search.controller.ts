@@ -19,6 +19,7 @@ export class SearchController {
     const locale = resolveLocale(acceptLanguage);
     return this.searchService.search(query.q, {
       jurisdictions: query.getNormalizedJurisdictions(),
+      canonicalJurisdictionIds: query.getCanonicalJurisdictionIds(),
       languages: query.getNormalizedLanguages(),
       documentTypes: query.getNormalizedDocumentTypes(),
       officialOnly: query.getOfficialOnly(),

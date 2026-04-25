@@ -71,6 +71,22 @@ describe('SearchService', () => {
     });
   });
 
+  it('should pass canonical jurisdiction ids through to the repository', async () => {
+    const repo = createMockRepo();
+    const service = new SearchService(repo);
+
+    await service.search('test', {
+      canonicalJurisdictionIds: ['jur_ch_gemeinde_261'],
+    });
+
+    expect(repo.search).toHaveBeenCalledWith(
+      'test',
+      expect.objectContaining({
+        canonicalJurisdictionIds: ['jur_ch_gemeinde_261'],
+      }),
+    );
+  });
+
   it('should return context from getContext', async () => {
     const repo = createMockRepo();
     const service = new SearchService(repo);
