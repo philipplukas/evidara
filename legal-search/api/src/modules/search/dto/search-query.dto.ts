@@ -1,7 +1,12 @@
 import { Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
-import { type ParsedJurisdictionToken, parseJurisdictionList } from './jurisdiction-token';
+import {
+  type ParsedJurisdictionToken,
+  parseAuthorityIdList,
+  parseJurisdictionIdList,
+  parseJurisdictionList,
+} from './jurisdiction-token';
 
 const REFINEMENT_TYPES = ['terms', 'date_range', 'range', 'toggle', 'text'] as const;
 
@@ -71,6 +76,22 @@ export class SearchQueryDto {
 
   @IsOptional()
   @IsString()
+  jurisdiction_id?: string;
+
+  @IsOptional()
+  @IsString()
+  jurisdiction_ids?: string;
+
+  @IsOptional()
+  @IsString()
+  authority_id?: string;
+
+  @IsOptional()
+  @IsString()
+  authority_ids?: string;
+
+  @IsOptional()
+  @IsString()
   languages?: string;
 
   @IsOptional()
@@ -122,6 +143,35 @@ export class SearchQueryDto {
       return parseJurisdictionList(this.jurisdiction);
     }
     return [];
+  }
+
+  /**
+   * Canonical jurisdiction IDs (`jur_*`) parsed from the request.
+   *
+   * Combines single (`jurisdiction_id`) and CSV (`jurisdiction_ids`)
+   * parameters; invalid tokens are silently dropped to match ISO
+   * filter behavior. Returns `undefined` when no canonical filter is
+   * present so the adapter can skip the OpenSearch term clause
+   * entirely (vs. an empty `terms: []` which OpenSearch rejects).
+   */
+  getCanonicalJurisdictionIds(): string[] | undefined {
+    const fromList = parseJurisdictionIdList(this.jurisdiction_ids);
+    const fromSingle = parseJurisdictionIdList(this.jurisdiction_id);
+    const merged = [...fromList, ...fromSingle];
+    if (merged.length === 0) return undefined;
+    return Array.from(new Set(merged));
+  }
+
+  /**
+   * Canonical authority IDs (`auth_*`) parsed from the request. Same
+   * shape and semantics as `getCanonicalJurisdictionIds`.
+   */
+  getCanonicalAuthorityIds(): string[] | undefined {
+    const fromList = parseAuthorityIdList(this.authority_ids);
+    const fromSingle = parseAuthorityIdList(this.authority_id);
+    const merged = [...fromList, ...fromSingle];
+    if (merged.length === 0) return undefined;
+    return Array.from(new Set(merged));
   }
 
   getNormalizedLanguages(): string[] | undefined {

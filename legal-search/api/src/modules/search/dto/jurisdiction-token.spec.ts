@@ -9,7 +9,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { parseJurisdictionList, parseJurisdictionToken } from './jurisdiction-token';
+import {
+  parseAuthorityId,
+  parseAuthorityIdList,
+  parseJurisdictionId,
+  parseJurisdictionIdList,
+  parseJurisdictionList,
+  parseJurisdictionToken,
+} from './jurisdiction-token';
 
 describe('parseJurisdictionToken', () => {
   it('parses a plain country code', () => {
@@ -84,6 +91,84 @@ describe('parseJurisdictionList', () => {
     expect(parseJurisdictionList('CH, garbage, DE-BY, ZZ-ZZ-ZZ')).toEqual([
       { country: 'CH' },
       { country: 'DE', subdivision: 'DE-BY' },
+    ]);
+  });
+});
+
+describe('parseJurisdictionId', () => {
+  it('accepts canonical platform jurisdiction IDs', () => {
+    expect(parseJurisdictionId('jur_ch_federal')).toBe('jur_ch_federal');
+    expect(parseJurisdictionId('jur_ch_zh')).toBe('jur_ch_zh');
+    expect(parseJurisdictionId('jur_ch_gemeinde_4001')).toBe('jur_ch_gemeinde_4001');
+    expect(parseJurisdictionId('jur_de_gemeinde_05111000')).toBe('jur_de_gemeinde_05111000');
+  });
+
+  it('normalizes case and trims whitespace', () => {
+    expect(parseJurisdictionId('  JUR_CH_FEDERAL  ')).toBe('jur_ch_federal');
+  });
+
+  it('rejects ISO tokens, the wrong prefix, and malformed input', () => {
+    expect(parseJurisdictionId('CH')).toBeNull();
+    expect(parseJurisdictionId('CH-ZH')).toBeNull();
+    expect(parseJurisdictionId('auth_fedlex')).toBeNull();
+    expect(parseJurisdictionId('jur_')).toBeNull();
+    expect(parseJurisdictionId('jur-ch')).toBeNull();
+    expect(parseJurisdictionId('')).toBeNull();
+    expect(parseJurisdictionId(undefined as unknown as string)).toBeNull();
+  });
+});
+
+describe('parseAuthorityId', () => {
+  it('accepts canonical platform authority IDs', () => {
+    expect(parseAuthorityId('auth_fedlex')).toBe('auth_fedlex');
+    expect(parseAuthorityId('auth_de_bgh')).toBe('auth_de_bgh');
+  });
+
+  it('normalizes case and trims whitespace', () => {
+    expect(parseAuthorityId('  AUTH_FEDLEX  ')).toBe('auth_fedlex');
+  });
+
+  it('rejects ISO tokens, the wrong prefix, and malformed input', () => {
+    expect(parseAuthorityId('jur_ch_federal')).toBeNull();
+    expect(parseAuthorityId('CH')).toBeNull();
+    expect(parseAuthorityId('auth_')).toBeNull();
+    expect(parseAuthorityId('')).toBeNull();
+  });
+});
+
+describe('parseJurisdictionIdList', () => {
+  it('accepts CSV input', () => {
+    expect(parseJurisdictionIdList('jur_ch_federal, jur_ch_zh')).toEqual([
+      'jur_ch_federal',
+      'jur_ch_zh',
+    ]);
+  });
+
+  it('accepts array input', () => {
+    expect(parseJurisdictionIdList(['jur_ch_federal', 'jur_de'])).toEqual([
+      'jur_ch_federal',
+      'jur_de',
+    ]);
+  });
+
+  it('drops invalid tokens silently', () => {
+    expect(parseJurisdictionIdList('jur_ch_federal, garbage, CH, auth_fedlex, jur_ch_zh')).toEqual([
+      'jur_ch_federal',
+      'jur_ch_zh',
+    ]);
+  });
+
+  it('returns an empty list for undefined or empty input', () => {
+    expect(parseJurisdictionIdList(undefined)).toEqual([]);
+    expect(parseJurisdictionIdList('')).toEqual([]);
+  });
+});
+
+describe('parseAuthorityIdList', () => {
+  it('parses CSV and rejects jur_/ISO mixins', () => {
+    expect(parseAuthorityIdList('auth_fedlex, jur_ch_federal, CH, auth_de_bgh')).toEqual([
+      'auth_fedlex',
+      'auth_de_bgh',
     ]);
   });
 });
