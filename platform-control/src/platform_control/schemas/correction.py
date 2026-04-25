@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -79,5 +79,57 @@ class RescoreResponse(BaseModel):
     rescore_correction_id: str
     workflow_id: str
     run_id: str | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class OperatorThroughput(BaseModel):
+    """Per-operator applied-correction count for one week."""
+
+    operator_id: str
+    applied: int
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RescoreOutcomes(BaseModel):
+    """Rescore-loop outcome counts for one week.
+
+    Counts ``rescore_request`` rows whose terminal status falls into one of
+    the three documented buckets — ``CHANGED`` / ``UNCHANGED`` / ``FAILED``.
+    Triggered-but-still-pending workflows are excluded so the dashboard
+    reads as a settled-outcome scoreboard, not a queue snapshot.
+    """
+
+    changed: int = 0
+    unchanged: int = 0
+    failed: int = 0
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CorrectionMetricsWeek(BaseModel):
+    """Aggregate read model for a single ISO week of correction activity.
+
+    ``week_start`` is the Monday of the ISO-8601 week (UTC). All counters
+    sum ``Correction`` rows whose ``created_at`` falls inside the week
+    bucket; ``operator_throughput`` and ``rescore_outcomes`` apply the same
+    per-week scope to keep the rendering trivial in the admin widget.
+    """
+
+    week_start: date
+    by_entity_type: dict[str, int] = Field(default_factory=dict)
+    by_correction_type: dict[str, int] = Field(default_factory=dict)
+    operator_throughput: list[OperatorThroughput] = Field(default_factory=list)
+    rescore_outcomes: RescoreOutcomes = Field(default_factory=RescoreOutcomes)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CorrectionMetricsResponse(BaseModel):
+    """Response envelope for ``GET /v1/corrections/metrics``."""
+
+    weeks: list[CorrectionMetricsWeek]
+    since: date
 
     model_config = ConfigDict(extra="forbid")

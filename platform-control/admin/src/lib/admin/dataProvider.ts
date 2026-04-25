@@ -413,6 +413,33 @@ type Correction = {
   applied_at: string | null;
 };
 
+/**
+ * Aggregate read model for the correction metrics dashboard widget (#432).
+ *
+ * One bucket per ISO week between `since` and the current week, inclusive.
+ * The platform-control endpoint pre-seeds empty weeks so the timeline can
+ * render gap-free without re-deriving missing buckets in the browser.
+ */
+export type CorrectionMetricsWeek = {
+  week_start: string; // ISO date (YYYY-MM-DD), Monday of the bucket.
+  by_entity_type: Record<string, number>;
+  by_correction_type: Record<string, number>;
+  operator_throughput: Array<{
+    operator_id: string;
+    applied: number;
+  }>;
+  rescore_outcomes: {
+    changed: number;
+    unchanged: number;
+    failed: number;
+  };
+};
+
+export type CorrectionMetricsResponse = {
+  weeks: CorrectionMetricsWeek[];
+  since: string;
+};
+
 type SimpleListResourceName = "jurisdictions" | "authorities" | "sources";
 type RunDetailResourceName =
   | "run-captured-resources"
@@ -914,6 +941,18 @@ export const controlPlaneActions = {
       `/v1/commentary-insights/${encodeURIComponent(insightId)}/history`,
     );
     return response.data.map((item) => toRecord(item, "correction_id"));
+  },
+
+  /**
+   * Fetch the weekly correction-metrics read model (#432).
+   *
+   * `since` is forwarded as an ISO date when supplied; otherwise the
+   * platform-control default (12 weeks back, snapped to Monday) applies.
+   * Errors propagate as `HttpError` so callers can branch on `.status`.
+   */
+  async getCorrectionMetrics(since?: string): Promise<CorrectionMetricsResponse> {
+    const query = since ? `?since=${encodeURIComponent(since)}` : "";
+    return requestJson<CorrectionMetricsResponse>(`/v1/corrections/metrics${query}`);
   },
 
   /**

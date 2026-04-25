@@ -14,7 +14,7 @@ This module covers two surfaces against the :class:`Correction` audit log:
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Protocol
 
 from sqlalchemy import select
@@ -28,7 +28,57 @@ from platform_control.domain import (
 from platform_control.errors import NotFoundError
 from platform_control.models.correction import Correction
 from platform_control.observability.event_logging import log_event
-from platform_control.schemas.correction import RescoreRequest, RescoreResponse
+from platform_control.schemas.correction import (
+    CorrectionMetricsResponse,
+    CorrectionMetricsWeek,
+    OperatorThroughput,
+    RescoreOutcomes,
+    RescoreRequest,
+    RescoreResponse,
+)
+
+DEFAULT_METRICS_LOOKBACK_WEEKS = 12
+
+
+class _WeekAccumulator:
+    """Mutable scratch buffer used while folding rows into one week bucket.
+
+    The Pydantic schema is the public shape; this helper just keeps the
+    bucketing loop readable. Counts are converted to ``dict``/``list`` when
+    the bucket is finalised so the response models receive immutable
+    snapshots.
+    """
+
+    __slots__ = (
+        "by_entity_type",
+        "by_correction_type",
+        "operator_throughput",
+        "rescore_changed",
+        "rescore_unchanged",
+        "rescore_failed",
+    )
+
+    def __init__(self) -> None:
+        self.by_entity_type: dict[str, int] = {}
+        self.by_correction_type: dict[str, int] = {}
+        self.operator_throughput: dict[str, int] = {}
+        self.rescore_changed = 0
+        self.rescore_unchanged = 0
+        self.rescore_failed = 0
+
+
+def _iso_week_start(value: datetime) -> date:
+    """Return the Monday (UTC) of the ISO week containing ``value``.
+
+    Stable input shape: callers normalise ``value`` to UTC. ``date.weekday()``
+    returns 0 for Monday, so subtracting it from the date snaps to the
+    week-start without depending on locale.
+    """
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    as_utc = value.astimezone(UTC).date()
+    return as_utc - timedelta(days=as_utc.weekday())
+
 
 LOGGER = logging.getLogger("platform_control.correction_service")
 
@@ -106,6 +156,113 @@ class CorrectionService:
         stmt = stmt.order_by(Correction.created_at.asc()).limit(limit)
         result = await self.session.scalars(stmt)
         return list(result)
+
+    async def get_metrics(
+        self,
+        *,
+        since: date | None = None,
+        now: datetime | None = None,
+    ) -> CorrectionMetricsResponse:
+        """Aggregate weekly correction metrics for the dashboard widget (#432).
+
+        ``since`` defaults to ``DEFAULT_METRICS_LOOKBACK_WEEKS`` weeks before
+        ``now`` snapped to a Monday so the boundary aligns with the bucket
+        Mondays we render. The function performs a single bulk SELECT and
+        buckets in Python; weekly aggregation in pure SQL would require
+        ``date_trunc`` (Postgres) or ``strftime`` (SQLite) and the
+        per-database divergence isn't worth the saved bandwidth at v1
+        traffic levels (see the ADR-0009 portability rule).
+
+        Returned weeks are emitted in chronological order, with empty
+        bucket rows present so the admin widget can render a stable
+        timeline without re-deriving missing weeks.
+        """
+        now_utc = (now or datetime.now(UTC)).astimezone(UTC)
+        if since is None:
+            since_monday = _iso_week_start(
+                now_utc - timedelta(weeks=DEFAULT_METRICS_LOOKBACK_WEEKS - 1)
+            )
+        else:
+            since_monday = since - timedelta(days=since.weekday())
+        since_dt = datetime.combine(since_monday, datetime.min.time(), tzinfo=UTC)
+
+        rows = list(
+            await self.session.scalars(
+                select(Correction)
+                .where(Correction.created_at >= since_dt)
+                .order_by(Correction.created_at.asc())
+            )
+        )
+
+        # Pre-seed the bucket map with every week between ``since`` and
+        # ``now`` so the response carries empty weeks instead of gaps —
+        # this is what lets the admin chart render a stable axis.
+        current_week = _iso_week_start(now_utc)
+        weeks: dict[date, _WeekAccumulator] = {}
+        cursor = since_monday
+        while cursor <= current_week:
+            weeks[cursor] = _WeekAccumulator()
+            cursor += timedelta(days=7)
+
+        for row in rows:
+            week_start = _iso_week_start(row.created_at)
+            bucket = weeks.setdefault(week_start, _WeekAccumulator())
+            entity_key = (
+                row.target_entity_type.value
+                if hasattr(row.target_entity_type, "value")
+                else str(row.target_entity_type)
+            )
+            type_key = (
+                row.correction_type.value
+                if hasattr(row.correction_type, "value")
+                else str(row.correction_type)
+            )
+            bucket.by_entity_type[entity_key] = bucket.by_entity_type.get(entity_key, 0) + 1
+            bucket.by_correction_type[type_key] = bucket.by_correction_type.get(type_key, 0) + 1
+
+            # Operator throughput counts ``applied`` operator corrections —
+            # pending rows still in the queue do not count as throughput,
+            # and platform-emitted ``rescore_request`` rows have no operator.
+            if (
+                row.status == CorrectionStatus.APPLIED
+                and row.correction_type != CorrectionType.RESCORE_REQUEST
+                and row.operator_id
+            ):
+                bucket.operator_throughput[row.operator_id] = (
+                    bucket.operator_throughput.get(row.operator_id, 0) + 1
+                )
+
+            # Rescore outcomes only consider terminal states.
+            if row.correction_type == CorrectionType.RESCORE_REQUEST:
+                if row.status == CorrectionStatus.CHANGED:
+                    bucket.rescore_changed += 1
+                elif row.status == CorrectionStatus.UNCHANGED:
+                    bucket.rescore_unchanged += 1
+                elif row.status == CorrectionStatus.FAILED:
+                    bucket.rescore_failed += 1
+
+        ordered_weeks = [
+            CorrectionMetricsWeek(
+                week_start=week_start,
+                by_entity_type=dict(bucket.by_entity_type),
+                by_correction_type=dict(bucket.by_correction_type),
+                operator_throughput=[
+                    OperatorThroughput(operator_id=operator_id, applied=applied)
+                    for operator_id, applied in sorted(
+                        bucket.operator_throughput.items(),
+                        key=lambda item: (-item[1], item[0]),
+                    )
+                ],
+                rescore_outcomes=RescoreOutcomes(
+                    changed=bucket.rescore_changed,
+                    unchanged=bucket.rescore_unchanged,
+                    failed=bucket.rescore_failed,
+                ),
+            )
+            for week_start, bucket in sorted(weeks.items())
+        ]
+
+        return CorrectionMetricsResponse(weeks=ordered_weeks, since=since_monday)
 
     async def list_history_for_entity(
         self,

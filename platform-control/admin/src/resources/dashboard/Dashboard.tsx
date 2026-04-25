@@ -27,6 +27,7 @@ import { formatSwissDateTime } from "../../lib/format/date";
 import { RunLaunchButton } from "../runs/RunLaunchDialog";
 import { StatCard, type StatTone, statToneBorder, successRateTone } from "../shared/Stat";
 import { pipelineHealthToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
+import { CorrectionMetricsCard } from "./CorrectionMetricsCard";
 import { SourceHealthCard } from "./SourceHealthCard";
 
 type DashboardStats = {
@@ -445,6 +446,8 @@ export function Dashboard() {
         </Stack>
 
         <SourceHealthCard />
+
+        <CorrectionMetricsCard />
 
         <Paper id="recent-run-health" sx={{ p: 2.5 }}>
           <Stack spacing={2}>
