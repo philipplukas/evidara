@@ -173,6 +173,27 @@ Additive rule: a country overlay's `hierarchy_paths` MUST include
 paths live on the individual provider templates and are emitted at
 discovery time, not pinned at overlay level.
 
+### CH municipality coverage (hero / demo path)
+
+CH is the hero demo path and ships **full municipality coverage** as
+first-class jurisdictions. All ~2,110 active Swiss municipalities from
+the BFS Amtliches Gemeindeverzeichnis are promoted into
+`platform-control/src/platform_control/seeds/reference/jurisdictions.yaml`
+under the `jur_ch_gemeinde_<bfs_number>` ID convention, each parented to
+its canton row (e.g. `jur_ch_gemeinde_261` → `parent_id: jur_ch_zh`).
+
+Regenerate after a BFS overlay refresh:
+
+```
+python scripts/generate_ch_municipality_jurisdictions.py
+```
+
+The script is idempotent and validates that every generated row's
+`parent_id` resolves against an existing canton row before writing. Other
+countries (AT/DE/FR/IT/EU) currently model only country + sub-federal
+tier; municipality-level rollout is deferred until those overlays
+mature. See issue #424.
+
 ## End-user content principles
 
 1. Show canonical concepts first, local naming second.

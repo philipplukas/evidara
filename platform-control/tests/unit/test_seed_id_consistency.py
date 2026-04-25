@@ -229,6 +229,67 @@ class TestSeedIdConsistency(unittest.TestCase):
             ),
         )
 
+    def test_ch_municipality_jurisdictions_present_and_parented(self) -> None:
+        """CH municipalities are first-class jurisdictions with canton parents.
+
+        Issue #424 promotes the BFS Gemeindeverzeichnis (~2110 active
+        municipalities) into the canonical jurisdiction seed file. This test
+        guards three invariants:
+
+        1. The ``jur_ch_gemeinde_<bfs>`` rows exist (we expect ~2000+).
+        2. Every municipality row's ``parent_id`` resolves against an
+           existing canton row in the same file.
+        3. ``jur_ch_federal`` is still present (the canary fast-loop script
+           hardcodes it; #264).
+        """
+        with _JURISDICTIONS_YAML.open(encoding="utf-8") as handle:
+            jurisdictions = yaml.safe_load(handle)
+
+        items = [item for item in jurisdictions.get("items", []) if isinstance(item, dict)]
+        all_ids = {item["jurisdiction_id"] for item in items}
+
+        # Federal canary stays alive.
+        self.assertIn(
+            "jur_ch_federal",
+            all_ids,
+            msg="jur_ch_federal must remain in seeds (see scripts/ch-fedlex-fast-loop.sh)",
+        )
+
+        municipalities = [
+            item for item in items if str(item["jurisdiction_id"]).startswith("jur_ch_gemeinde_")
+        ]
+        # BFS publishes ~2110 active CH municipalities; we should be in the
+        # ballpark — fail if a regen accidentally truncates the list.
+        self.assertGreater(
+            len(municipalities),
+            2000,
+            msg=(
+                f"Expected >2000 jur_ch_gemeinde_* rows, got {len(municipalities)}. "
+                "Re-run: python scripts/generate_ch_municipality_jurisdictions.py"
+            ),
+        )
+
+        # Every municipality must have a canton parent that resolves.
+        canton_ids = {
+            item["jurisdiction_id"]
+            for item in items
+            if item.get("parent_id") == "jur_ch"
+            and not str(item["jurisdiction_id"]).startswith("jur_ch_gemeinde_")
+            and item["jurisdiction_id"] != "jur_ch_federal"
+        }
+        orphans = [
+            item["jurisdiction_id"]
+            for item in municipalities
+            if item.get("parent_id") not in canton_ids
+        ]
+        self.assertFalse(
+            orphans,
+            msg=(
+                f"{len(orphans)} CH municipality rows have unresolved canton "
+                f"parents (showing first 5): {orphans[:5]}"
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
