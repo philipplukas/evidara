@@ -28,6 +28,7 @@ export class SearchService {
     query: string,
     options?: {
       jurisdictions?: string[];
+      canonicalJurisdictionIds?: string[];
       languages?: string[];
       documentTypes?: string[];
       officialOnly?: boolean;
@@ -46,6 +47,7 @@ export class SearchService {
     const locale = options?.locale ?? DEFAULT_LOCALE;
     const result = await this.repository.search(query, {
       jurisdictions: options?.jurisdictions,
+      canonicalJurisdictionIds: options?.canonicalJurisdictionIds,
       languages: options?.languages,
       documentTypes: options?.documentTypes,
       officialOnly: options?.officialOnly,

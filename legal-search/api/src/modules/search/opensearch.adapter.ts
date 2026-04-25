@@ -74,8 +74,12 @@ export class SearchOpenSearchAdapter implements SearchRepository {
 
     // Build filter clauses
     const filters: Record<string, unknown>[] = [];
-    if (options?.jurisdictions && options.jurisdictions.length > 0) {
-      filters.push({ terms: { jurisdiction: options.jurisdictions } });
+    const jurisdictionFilter = this.buildJurisdictionFilter(
+      options?.jurisdictions,
+      options?.canonicalJurisdictionIds,
+    );
+    if (jurisdictionFilter) {
+      filters.push(jurisdictionFilter);
     }
     if (options?.documentTypes && options.documentTypes.length > 0) {
       filters.push({ terms: { document_type: options.documentTypes } });
@@ -318,6 +322,49 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         fields: [...SEARCH_FIELD_WEIGHTS],
         type: 'best_fields' as const,
         fuzziness: 'AUTO',
+      },
+    };
+  }
+
+  /**
+   * Build the jurisdiction filter clause.
+   *
+   * Routing:
+   *   - ISO country / subdivision tokens (`ch`, `ch-zh`) -> existing
+   *     single-valued `jurisdiction` keyword field.
+   *   - Canonical `jur_*` ids -> the multi-valued `jurisdiction_ids`
+   *     field added by the canonical-ID projection slice (#425).
+   *
+   * Semantics: a mixed list is OR'd at the field level — a doc matches
+   * if either field hits any of its tokens. We express this as a nested
+   * `bool` with `should` clauses inside the parent's filter context, so
+   * the union still narrows results without contributing to score.
+   * When only one shape is supplied we return the simpler `terms`
+   * clause directly (no nesting overhead).
+   */
+  private buildJurisdictionFilter(
+    isoTokens: string[] | undefined,
+    canonicalIds: string[] | undefined,
+  ): Record<string, unknown> | null {
+    const haveIso = !!isoTokens && isoTokens.length > 0;
+    const haveCanonical = !!canonicalIds && canonicalIds.length > 0;
+    if (!haveIso && !haveCanonical) return null;
+
+    if (haveIso && !haveCanonical) {
+      return { terms: { jurisdiction: isoTokens } };
+    }
+    if (!haveIso && haveCanonical) {
+      return { terms: { 'jurisdiction_ids.keyword': canonicalIds } };
+    }
+
+    // Mixed list: OR-union the two field filters via a nested bool.
+    return {
+      bool: {
+        should: [
+          { terms: { jurisdiction: isoTokens } },
+          { terms: { 'jurisdiction_ids.keyword': canonicalIds } },
+        ],
+        minimum_should_match: 1,
       },
     };
   }

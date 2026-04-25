@@ -52,15 +52,58 @@ describe('SearchQueryDto', () => {
   it('returns the validated record_kind filter when set', () => {
     const dto = new SearchQueryDto();
     dto.record_kind = 'commentary';
-    expect(dto.getRecordKind()).toBe('commentary');
+    expect(dto.record_kind).toBe('commentary');
 
     const documentDto = new SearchQueryDto();
     documentDto.record_kind = 'document';
-    expect(documentDto.getRecordKind()).toBe('document');
+    expect(documentDto.record_kind).toBe('document');
   });
 
   it('returns undefined when record_kind is not set (mixed results expected)', () => {
     const dto = new SearchQueryDto();
-    expect(dto.getRecordKind()).toBeUndefined();
+    expect(dto.record_kind).toBeUndefined();
+  });
+
+  describe('canonical jurisdiction routing', () => {
+    it('splits ISO and canonical tokens into two helper outputs', () => {
+      const dto = new SearchQueryDto();
+      dto.jurisdictions = 'CH-ZH, jur_ch_gemeinde_261, DE';
+
+      expect(dto.getNormalizedJurisdictions()).toEqual(['ch-zh', 'de']);
+      expect(dto.getCanonicalJurisdictionIds()).toEqual(['jur_ch_gemeinde_261']);
+    });
+
+    it('returns undefined for canonical ids when only ISO tokens are present', () => {
+      const dto = new SearchQueryDto();
+      dto.jurisdictions = 'CH, AT';
+
+      expect(dto.getNormalizedJurisdictions()).toEqual(['ch', 'at']);
+      expect(dto.getCanonicalJurisdictionIds()).toBeUndefined();
+    });
+
+    it('returns undefined for ISO tokens when only canonical ids are present', () => {
+      const dto = new SearchQueryDto();
+      dto.jurisdictions = 'jur_ch_federal,jur_de_05315000';
+
+      expect(dto.getNormalizedJurisdictions()).toBeUndefined();
+      expect(dto.getCanonicalJurisdictionIds()).toEqual([
+        'jur_ch_federal',
+        'jur_de_05315000',
+      ]);
+    });
+
+    it('falls back to the singular `jurisdiction` field when `jurisdictions` is unset', () => {
+      const dto = new SearchQueryDto();
+      dto.jurisdiction = 'jur_ch_federal';
+
+      expect(dto.getCanonicalJurisdictionIds()).toEqual(['jur_ch_federal']);
+    });
+
+    it('returns undefined for both helpers when no jurisdiction param is set', () => {
+      const dto = new SearchQueryDto();
+
+      expect(dto.getNormalizedJurisdictions()).toBeUndefined();
+      expect(dto.getCanonicalJurisdictionIds()).toBeUndefined();
+    });
   });
 });
