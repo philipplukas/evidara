@@ -129,6 +129,10 @@ Multi-country operator scaling references:
 - `docs/architecture/temporal-argilla-wizard-architecture.md`
 - `docs/runbooks/argilla-review-routing-and-sync.md`
 
+HITL (corrections, commentary overlays, canonical filters) rollout:
+
+- `docs/runbooks/hitl-rollout.md` — sequenced rollout, replay/re-index, smoke, rollback for the M7–M10 HITL track.
+
 ## Testing
 
 See [Platform Control Testing](testing/platform-control-testing.md) for the full testing strategy.
