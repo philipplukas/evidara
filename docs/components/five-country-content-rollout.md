@@ -105,6 +105,48 @@ Without a shared model, each country rollout risks introducing inconsistent term
 | FR | centralized codes + administrative tracks | cassation + administrative courts | fr | legal family naming drift in translated UI |
 | IT | national codes with region-sensitive practice | cassation + appellate + tribunal | it | inconsistent metadata quality across decisions |
 
+## DE pilot scope
+
+The current DE rollout is an **explicit 10-city pilot**, not full
+sub-federal coverage. To be unambiguous about what ships in Sprint 1:
+
+- The DE pilot is **10 cities**.
+- It is **NOT** the ~106 German Kreise (districts).
+- It is **NOT** the ~11,000 German Gemeinden (municipalities).
+- It is **NOT** an attempt at exhaustive Land-level coverage of
+  publishing entities below the Land tier.
+
+The 10 pilot cities are seeded as first-class jurisdiction rows in
+`platform-control/src/platform_control/seeds/reference/jurisdictions.yaml`
+under the ID convention `jur_de_<ags>` (8-digit Amtlicher
+Gemeindeschlüssel from Destatis), with `parent_id` pointing at the
+appropriate Land. The same set is mirrored in
+`country-overlays/de/municipalities.yaml`, which carries optional
+publication metadata (e.g. `law_collection`) that does not belong on
+the lean seed row.
+
+| AGS | Jurisdiction ID | City | Land |
+|-----|-----------------|------|------|
+| 05111000 | `jur_de_05111000` | Düsseldorf | Nordrhein-Westfalen (`jur_de_nw`) |
+| 05315000 | `jur_de_05315000` | Köln | Nordrhein-Westfalen (`jur_de_nw`) |
+| 05913000 | `jur_de_05913000` | Dortmund | Nordrhein-Westfalen (`jur_de_nw`) |
+| 09162000 | `jur_de_09162000` | München | Bayern (`jur_de_by`) |
+| 09564000 | `jur_de_09564000` | Nürnberg | Bayern (`jur_de_by`) |
+| 08111000 | `jur_de_08111000` | Stuttgart | Baden-Württemberg (`jur_de_bw`) |
+| 06412000 | `jur_de_06412000` | Frankfurt am Main | Hessen (`jur_de_he`) |
+| 14612000 | `jur_de_14612000` | Dresden | Sachsen (`jur_de_sn`) |
+| 14713000 | `jur_de_14713000` | Leipzig | Sachsen (`jur_de_sn`) |
+| 03241001 | `jur_de_03241001` | Hannover | Niedersachsen (`jur_de_ni`) |
+
+City-states (Berlin, Hamburg, Bremen) are intentionally omitted from
+the city tier because they are already covered at Land level
+(`jur_de_be`, `jur_de_hh`, `jur_de_hb`).
+
+Expanding beyond these 10 cities — to additional Großstädte, Kreise, or
+the full Gemeindeverzeichnis — is out of scope for Sprint 1 and will be
+sequenced as a separate ingestion track from the Destatis registry,
+not by hand-editing the seed file.
+
 ## Sub-federal hierarchy paths
 
 Country overlays MUST encode sub-federal jurisdiction in `hierarchy_paths`
