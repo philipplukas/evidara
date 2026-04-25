@@ -165,6 +165,63 @@ describe("ResultList", () => {
     expect(screen.queryByText("Weitere Ergebnisse laden")).not.toBeInTheDocument();
   });
 
+  it("renders mixed document + commentary cards without regressing document hits (#431)", () => {
+    const mixed: SearchResultViewModel[] = [
+      {
+        id: "law-1",
+        title: "Art. 754 OR",
+        subtitle: "Switzerland · Federal law",
+        snippet: "Die Mitglieder des Verwaltungsrates...",
+        type: "law",
+        badges: [{ label: "Law", colorKey: "blue" }],
+        metadataRows: [],
+        relatedCounts: [],
+        actions: [],
+        commentarySupportCount: 3,
+      },
+      {
+        id: "commentary-1",
+        title: "BSK OR I — Art. 754",
+        subtitle: "Basler Kommentar",
+        snippet: "Die Verantwortlichkeitsklage…",
+        type: "commentary",
+        badges: [{ label: "Commentary", colorKey: "purple" }],
+        metadataRows: [],
+        relatedCounts: [],
+        actions: [],
+        recordKind: "commentary",
+        sourceDocumentIds: ["law-1"],
+      },
+    ];
+
+    const { container } = renderWithProviders(
+      <ResultList
+        results={mixed}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+      />,
+    );
+
+    // Both cards render.
+    expect(screen.getByText("Art. 754 OR")).toBeInTheDocument();
+    expect(screen.getByText("BSK OR I — Art. 754")).toBeInTheDocument();
+
+    // Document hit keeps its untagged data-record-kind contract.
+    const documentArticle = container.querySelector('article[data-record-kind="document"]');
+    expect(documentArticle).not.toBeNull();
+    // Commentary hit is tagged distinctly.
+    const commentaryArticle = container.querySelector('article[data-record-kind="commentary"]');
+    expect(commentaryArticle).not.toBeNull();
+
+    // Document card surfaces the support pill.
+    expect(screen.getByText("3 Kommentare")).toBeInTheDocument();
+    // Commentary card surfaces the source-document pivot strip.
+    expect(screen.getByTestId("commentary-source-links")).toBeInTheDocument();
+  });
+
   it("shows pivot-aware empty state when the current scope is empty", async () => {
     function PivotEmptyHarness() {
       const { state, dispatch } = useWorkspace();

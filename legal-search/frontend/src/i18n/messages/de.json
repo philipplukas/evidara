@@ -151,7 +151,13 @@
       "openResult": "{title} \u00f6ffnen",
       "seeRelated": "{count} verwandte {label} anzeigen",
       "pinResult": "Ergebnis anheften",
-      "unpinResult": "Ergebnis l\u00f6sen"
+      "unpinResult": "Ergebnis l\u00f6sen",
+      "commentaryBadge": "Kommentar",
+      "commentaryBadgeAria": "Kommentar zur Rechtsquelle",
+      "citedIn": "Bezieht sich auf:",
+      "openSourceDocument": "Quellendokument {id} \u00f6ffnen",
+      "commentarySupport": "{count, plural, one {# Kommentar} other {# Kommentare}}",
+      "commentarySupportAria": "{count, plural, one {# Kommentar zu diesem Dokument anzeigen} other {# Kommentare zu diesem Dokument anzeigen}}"
     },
     "list": {
       "sortedByRelevance": "Nach Relevanz sortiert",

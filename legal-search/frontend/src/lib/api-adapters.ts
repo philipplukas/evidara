@@ -3,8 +3,15 @@ import type {
   FilterFacetView,
   SearchContextView,
   SearchResponseView,
+  SearchResultView,
 } from "@/lib/api/generated/model";
-import type { DetailViewModel, FilterViewModel, SearchContextViewModel } from "@/lib/types";
+import type {
+  DetailViewModel,
+  FilterViewModel,
+  RecordKind,
+  SearchContextViewModel,
+  SearchResultViewModel,
+} from "@/lib/types";
 
 function mapFacetsToFilters(facets: FilterFacetView[]): FilterViewModel[] {
   return facets.map((facet) => ({
@@ -16,12 +23,50 @@ function mapFacetsToFilters(facets: FilterFacetView[]): FilterViewModel[] {
   }));
 }
 
+/**
+ * Pulls commentary metadata off a generated `SearchResultView`. The
+ * generated client may lag the BFF (the OpenAPI spec is regenerated
+ * separately), so we read these fields defensively at runtime and
+ * forward them onto the `SearchResultViewModel` without throwing if
+ * the spec hasn't caught up yet.
+ *
+ * Tracked by #425 (BFF) / #431 (frontend rendering).
+ */
+function readCommentaryFields(view: SearchResultView): {
+  recordKind?: RecordKind;
+  sourceDocumentIds?: string[];
+  commentarySupportCount?: number;
+} {
+  const extra = view as SearchResultView & {
+    recordKind?: RecordKind;
+    sourceDocumentIds?: string[];
+    commentarySupportCount?: number;
+  };
+
+  return {
+    recordKind: extra.recordKind,
+    sourceDocumentIds: Array.isArray(extra.sourceDocumentIds) ? extra.sourceDocumentIds : undefined,
+    commentarySupportCount:
+      typeof extra.commentarySupportCount === "number" && extra.commentarySupportCount >= 0
+        ? extra.commentarySupportCount
+        : undefined,
+  };
+}
+
+function mapSearchResultView(view: SearchResultView): SearchResultViewModel {
+  const commentary = readCommentaryFields(view);
+  return {
+    ...view,
+    ...commentary,
+  };
+}
+
 export function mapSearchResponse(response: SearchResponseView): {
-  results: SearchResponseView["results"];
+  results: SearchResultViewModel[];
   filters: FilterViewModel[];
 } {
   return {
-    results: response.results,
+    results: response.results.map(mapSearchResultView),
     filters: mapFacetsToFilters(response.facets),
   };
 }
@@ -31,7 +76,7 @@ export function mapSearchContext(context: SearchContextView): SearchContextViewM
     jurisdictions: context.jurisdictions,
     languages: context.languages,
     sourceTypes: context.sourceTypes,
-    exactMatches: context.exactMatches,
+    exactMatches: context.exactMatches?.map(mapSearchResultView),
   };
 }
 

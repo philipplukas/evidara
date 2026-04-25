@@ -41,6 +41,15 @@ export interface ActionViewModel {
   href?: string;
 }
 
+/**
+ * Discriminator for the kind of record a search hit represents.
+ *
+ * Introduced alongside #425 (commentary insights pipeline). The BFF tags
+ * each hit so the frontend can render commentary distinctly from primary
+ * legal documents (laws, decisions, rechtssätze).
+ */
+export type RecordKind = "document" | "commentary";
+
 export interface SearchResultViewModel {
   id: string;
   type: string;
@@ -53,6 +62,22 @@ export interface SearchResultViewModel {
   relatedCounts: RelatedCount[];
   actions: ActionViewModel[];
   contentLanguage?: ContentLanguage;
+  /**
+   * Whether the hit is primary legal material (`document`, default) or
+   * editorial `commentary`. Optional to keep the legacy shape valid.
+   */
+  recordKind?: RecordKind;
+  /**
+   * Source-document IDs a commentary cites. Lets operators pivot from the
+   * commentary card back to the primary document(s). Only meaningful when
+   * `recordKind === "commentary"`.
+   */
+  sourceDocumentIds?: string[];
+  /**
+   * Number of commentaries that cite this primary document. Surfaces a
+   * quiet pill on document cards when > 0. Hidden when 0 or undefined.
+   */
+  commentarySupportCount?: number;
 }
 
 export interface RelatedItem {

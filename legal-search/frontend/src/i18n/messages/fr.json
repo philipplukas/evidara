@@ -151,7 +151,13 @@
       "openResult": "Ouvrir {title}",
       "seeRelated": "Voir {count} {label} associ\u00e9s",
       "pinResult": "\u00c9pingler le r\u00e9sultat",
-      "unpinResult": "D\u00e9tacher le r\u00e9sultat"
+      "unpinResult": "D\u00e9tacher le r\u00e9sultat",
+      "commentaryBadge": "Commentaire",
+      "commentaryBadgeAria": "Commentaire sur une source juridique",
+      "citedIn": "Se r\u00e9f\u00e8re \u00e0 :",
+      "openSourceDocument": "Ouvrir le document source {id}",
+      "commentarySupport": "{count, plural, one {# commentaire} other {# commentaires}}",
+      "commentarySupportAria": "{count, plural, one {Voir # commentaire sur ce document} other {Voir # commentaires sur ce document}}"
     },
     "list": {
       "sortedByRelevance": "Tri par pertinence",
