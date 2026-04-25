@@ -20,6 +20,7 @@ Combines:
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -34,6 +35,7 @@ from platform_control.domain import (
 )
 from platform_control.schemas.correction import (
     CorrectionListResponse,
+    CorrectionMetricsResponse,
     CorrectionResponse,
     RescoreRequest,
     RescoreResponse,
@@ -114,3 +116,29 @@ async def request_rescore(
     ``(correction_id, target_entity_id)`` pair.
     """
     return await service.request_rescore(correction_id, payload)
+
+
+@router.get(
+    "/corrections/metrics",
+    response_model=CorrectionMetricsResponse,
+)
+async def get_correction_metrics(
+    session: SessionDep,
+    since: Annotated[
+        date | None,
+        Query(
+            description=(
+                "ISO date (YYYY-MM-DD). Defaults to 12 weeks before now. "
+                "Snapped to the Monday of the containing ISO week."
+            )
+        ),
+    ] = None,
+) -> CorrectionMetricsResponse:
+    """Aggregate weekly correction metrics for the dashboard widget (#432).
+
+    Returns one bucket per ISO week between ``since`` and the current week,
+    inclusive of both ends. Buckets are pre-seeded so empty weeks render as
+    zeroed cards rather than gaps.
+    """
+    service = CorrectionService(session)
+    return await service.get_metrics(since=since)
