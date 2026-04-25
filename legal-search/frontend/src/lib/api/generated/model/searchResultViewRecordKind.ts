@@ -15,8 +15,19 @@ Document body reads use the Document Service (`contracts/api/document-intelligen
 
  * OpenAPI spec version: 0.4.1
  */
-import type { LocalStructureItem } from './localStructureItem';
 
-export type DetailViewLocalStructure = {
-  items?: LocalStructureItem[];
-};
+/**
+ * Sprint 2 (#425): mixed-result discriminator. The BFF defaults
+this to `document` for rows indexed before the commentary
+mapping migration, so it is always present. Frontend (#431)
+branches on this rather than re-deriving from `type`.
+
+ */
+export type SearchResultViewRecordKind = typeof SearchResultViewRecordKind[keyof typeof SearchResultViewRecordKind];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const SearchResultViewRecordKind = {
+  document: 'document',
+  commentary: 'commentary',
+} as const;

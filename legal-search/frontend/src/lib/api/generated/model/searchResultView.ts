@@ -13,13 +13,14 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.4.0
+ * OpenAPI spec version: 0.4.1
  */
 import type { Badge } from './badge';
 import type { MetadataRow } from './metadataRow';
 import type { RelatedCount } from './relatedCount';
 import type { Action } from './action';
 import type { ContentLanguage } from './contentLanguage';
+import type { SearchResultViewRecordKind } from './searchResultViewRecordKind';
 
 export interface SearchResultView {
   id: string;
@@ -37,4 +38,25 @@ export interface SearchResultView {
   relatedCounts: RelatedCount[];
   actions: Action[];
   contentLanguage?: ContentLanguage;
+  /** Sprint 2 (#425): mixed-result discriminator. The BFF defaults
+this to `document` for rows indexed before the commentary
+mapping migration, so it is always present. Frontend (#431)
+branches on this rather than re-deriving from `type`.
+ */
+  recordKind: SearchResultViewRecordKind;
+  /** Sprint 2 (#425): commentary-only — primary documents this
+commentary annotates. Omitted on primary-document hits and on
+commentary hits that have no resolved source document.
+ */
+  sourceDocumentIds?: string[];
+  /**
+   * Sprint 2 (#425): primary-document-only — number of commentary
+records in the current query that reference this document via
+`source_document_ids`. Computed by a sub-aggregation on the
+search query, NOT a per-hit lookup. Omitted when zero or on
+commentary hits.
+
+   * @minimum 0
+   */
+  commentarySupportCount?: number;
 }
