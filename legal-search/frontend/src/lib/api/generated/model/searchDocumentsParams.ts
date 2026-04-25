@@ -13,7 +13,7 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.3.4
+ * OpenAPI spec version: 0.4.0
  */
 
 export type SearchDocumentsParams = {
@@ -41,6 +41,34 @@ subdivision code, or a mix.
 
  */
 jurisdictions?: string;
+/**
+ * Canonical jurisdiction ID filter (e.g. `jur_ch_federal`).
+Filters against the search-projection `jurisdiction_ids` array.
+ANDed with the legacy ISO `jurisdiction`/`jurisdictions` parameters
+when both are supplied.
+
+ * @pattern ^jur_[a-z0-9_]+$
+ */
+jurisdiction_id?: string;
+/**
+ * Comma-separated list of canonical jurisdiction IDs
+(each item must match `^jur_[a-z0-9_]+$`).
+
+ */
+jurisdiction_ids?: string;
+/**
+ * Canonical authority ID filter (e.g. `auth_fedlex`).
+Filters against the search-projection `authority_ids` array.
+
+ * @pattern ^auth_[a-z0-9_]+$
+ */
+authority_id?: string;
+/**
+ * Comma-separated list of canonical authority IDs
+(each item must match `^auth_[a-z0-9_]+$`).
+
+ */
+authority_ids?: string;
 /**
  * Comma-separated list of language filters
  */
