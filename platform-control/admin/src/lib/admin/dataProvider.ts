@@ -318,6 +318,101 @@ export type RunPreviewSummary = {
   drift_checks: RunPreviewSummaryDriftCheck[];
 };
 
+/**
+ * Commentary insight read-side overlay shape (mirrors
+ * `CommentaryInsight` in `contracts/api/platform-control.openapi.yaml`).
+ *
+ * Fields are kept in the same order as the schema to make manual diff
+ * audits against the contract straightforward. Only the keys the admin UI
+ * currently surfaces are typed strictly; everything else (provenance
+ * metadata, scores extras) stays loose.
+ */
+export type CommentaryInsightReviewState =
+  | "machine_generated_unreviewed"
+  | "machine_verified"
+  | "editor_approved"
+  | "rejected"
+  | "stale";
+
+export type CommentaryInsightType = "commentary_anchor" | "referenced_provision" | "authority_link";
+
+export type CommentaryInsightEvidenceRef = {
+  document_id: string;
+  section_id?: string | null;
+  citation_id?: string | null;
+  ref_type: "passage" | "citation" | "section" | "authority";
+  passage?: string;
+  confidence?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type CommentaryInsightReferencedAuthority = {
+  text: string;
+  citation_type: string;
+  normalized_reference?: string;
+  metadata?: Record<string, unknown>;
+};
+
+type CommentaryInsight = {
+  insight_id: string;
+  document_id: string;
+  document_revision: number;
+  processing_manifest_id: string;
+  section_id?: string | null;
+  citation_id?: string | null;
+  insight_type: CommentaryInsightType;
+  claim: string;
+  display_text: string;
+  support: CommentaryInsightEvidenceRef[];
+  referenced_authorities: CommentaryInsightReferencedAuthority[];
+  language?: string | null;
+  jurisdiction_id?: string | null;
+  jurisdiction_ids?: string[];
+  authority_ids?: string[];
+  source_document_ids?: string[];
+  last_correction_id?: string | null;
+  confidence: number;
+  review_state: CommentaryInsightReviewState;
+  generator: {
+    name: string;
+    version: string;
+    model?: string | null;
+    prompt_version?: string | null;
+  };
+  scores: {
+    passage_present: number;
+    citation_parseable: number;
+    section_anchor_resolved: number;
+  } & Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type CorrectionTargetEntityType =
+  | "commentary_insight"
+  | "search_projection"
+  | "document"
+  | "section"
+  | "citation";
+
+export type CorrectionType = "field_edit" | "annotation" | "reject" | "rescore_request";
+
+export type CorrectionStatus = "pending" | "applied" | "rejected" | "superseded";
+
+type Correction = {
+  correction_id: string;
+  target_entity_type: CorrectionTargetEntityType;
+  target_entity_id: string;
+  correction_type: CorrectionType;
+  payload: Record<string, unknown>;
+  original_snapshot: Record<string, unknown> | null;
+  operator_id: string;
+  pipeline_run_id: string | null;
+  rationale: string;
+  status: CorrectionStatus;
+  created_at: string;
+  applied_at: string | null;
+};
+
 type SimpleListResourceName = "jurisdictions" | "authorities" | "sources";
 type RunDetailResourceName =
   | "run-captured-resources"
@@ -367,6 +462,8 @@ export type RunRecord = RunResponse & RaRecord<Identifier>;
 export type CapturedResourceRecord = CapturedResource & RaRecord<Identifier>;
 export type RawArtifactRecord = RawArtifact & RaRecord<Identifier>;
 export type ProviderJobRecord = ProviderJob & RaRecord<Identifier>;
+export type CommentaryInsightRecord = CommentaryInsight & RaRecord<Identifier>;
+export type CorrectionRecord = Correction & RaRecord<Identifier>;
 export type ProcessingStatusRecord = ProcessingStatusUpdate & RaRecord<Identifier>;
 export type DocumentLifecycleRecord = DocumentLifecycleEvent & RaRecord<Identifier>;
 
@@ -667,6 +764,95 @@ const getRunDetailList = async <TResource extends RunDetailResourceName>(
   };
 };
 
+/**
+ * Filter shape for the commentary-insights list. Mirrors the OpenAPI
+ * `listCommentaryInsights` query parameters; we forward each value to the
+ * backend without translation. Empty/sentinel values are dropped.
+ */
+type CommentaryInsightFilter = {
+  jurisdiction_id?: string;
+  authority_id?: string;
+  source_document_id?: string;
+  review_state?: CommentaryInsightReviewState | "";
+};
+
+const buildCommentaryInsightListQuery = (params: GetListParams): string => {
+  const filter = params.filter as CommentaryInsightFilter;
+  const page = params.pagination?.page ?? 1;
+  const perPage = params.pagination?.perPage ?? 50;
+  const limit = Math.min(Math.max(perPage, 1), 200);
+  const offset = Math.max((page - 1) * limit, 0);
+  const query = new URLSearchParams();
+  query.set("limit", String(limit));
+  query.set("offset", String(offset));
+  for (const key of [
+    "jurisdiction_id",
+    "authority_id",
+    "source_document_id",
+    "review_state",
+  ] as const) {
+    const value = filter?.[key];
+    if (typeof value === "string" && !isMissingFilterValue(value)) {
+      query.set(key, value);
+    }
+  }
+  return `?${query.toString()}`;
+};
+
+type CorrectionQueueFilter = {
+  status?: CorrectionStatus;
+  target_entity_type?: CorrectionTargetEntityType | "";
+  correction_type?: CorrectionType | "";
+  pipeline_run_id?: string;
+};
+
+const buildCorrectionQueueQuery = (params: GetListParams): string => {
+  const filter = params.filter as CorrectionQueueFilter;
+  const page = params.pagination?.page ?? 1;
+  const perPage = params.pagination?.perPage ?? 50;
+  const limit = Math.min(Math.max(perPage, 1), 200);
+  const offset = Math.max((page - 1) * limit, 0);
+  const query = new URLSearchParams();
+  query.set("limit", String(limit));
+  query.set("offset", String(offset));
+  // Default `status=pending` to match the queue's primary purpose; an explicit
+  // empty filter value (the React-Admin "All" choice) suppresses the param.
+  if (filter?.status === undefined) {
+    query.set("status", "pending");
+  } else if (filter.status && !isMissingFilterValue(filter.status)) {
+    query.set("status", filter.status);
+  }
+  for (const key of ["target_entity_type", "correction_type", "pipeline_run_id"] as const) {
+    const value = filter?.[key];
+    if (typeof value === "string" && !isMissingFilterValue(value)) {
+      query.set(key, value);
+    }
+  }
+  return `?${query.toString()}`;
+};
+
+/**
+ * Payload accepted by `controlPlaneActions.applyCommentaryInsightFieldEdit`.
+ *
+ * ra-core's `update` ships a flat partial of the record; the
+ * platform-control `PATCH /v1/commentary-insights/{id}` endpoint instead
+ * expects the correction envelope (`payload` + `original_snapshot` +
+ * `rationale`). We expose a dedicated action so callers think in terms of
+ * the correction contract rather than reshaping `update` semantics.
+ */
+export type ApplyCommentaryInsightFieldEditInput = {
+  insightId: string;
+  payload: Record<string, unknown>;
+  original_snapshot: Record<string, unknown>;
+  rationale: string;
+  pipeline_run_id?: string | null;
+};
+
+export type ApplyCommentaryInsightFieldEditResult = {
+  insight: CommentaryInsightRecord;
+  correction: CorrectionRecord;
+};
+
 export const controlPlaneActions = {
   async cancelRun(runId: string): Promise<RunRecord> {
     const response = await requestJson<RunResponse>(`/v1/runs/${runId}/cancel`, {
@@ -721,6 +907,44 @@ export const controlPlaneActions = {
       "/v1/sources/blueprint-templates",
     );
     return response.data;
+  },
+
+  async getCommentaryInsightHistory(insightId: string): Promise<CorrectionRecord[]> {
+    const response = await requestJson<ListResponse<Correction>>(
+      `/v1/commentary-insights/${encodeURIComponent(insightId)}/history`,
+    );
+    return response.data.map((item) => toRecord(item, "correction_id"));
+  },
+
+  /**
+   * Apply an operator field edit to a commentary insight.
+   *
+   * ra-core's `dataProvider.update` posts a flat partial of the record, but
+   * the platform-control PATCH expects the correction envelope (`payload` +
+   * `original_snapshot` + `rationale`). Going through a custom action keeps
+   * the call sites honest about the correction shape and lets callers
+   * receive the persisted `Correction` alongside the post-overlay insight
+   * (which `update` would discard).
+   */
+  async applyCommentaryInsightFieldEdit(
+    input: ApplyCommentaryInsightFieldEditInput,
+  ): Promise<ApplyCommentaryInsightFieldEditResult> {
+    const response = await requestJson<{ insight: CommentaryInsight; correction: Correction }>(
+      `/v1/commentary-insights/${encodeURIComponent(input.insightId)}`,
+      {
+        method: "PATCH",
+        body: {
+          payload: input.payload,
+          original_snapshot: input.original_snapshot,
+          rationale: input.rationale,
+          pipeline_run_id: input.pipeline_run_id ?? null,
+        },
+      },
+    );
+    return {
+      insight: toRecord(response.insight, "insight_id"),
+      correction: toRecord(response.correction, "correction_id"),
+    };
   },
 };
 
@@ -780,6 +1004,30 @@ export const controlPlaneDataProvider: DataProvider = {
       return getRunDetailList(resource, params);
     }
 
+    if (resource === ResourceName.CommentaryInsights) {
+      const response = await requestJson<{
+        data: CommentaryInsight[];
+        total?: number | null;
+        limit?: number | null;
+        offset?: number | null;
+      }>(`/v1/commentary-insights${buildCommentaryInsightListQuery(params)}`);
+      const records = response.data.map((item) => toRecord(item, "insight_id"));
+      const total = typeof response.total === "number" ? response.total : records.length;
+      return { data: records, total };
+    }
+
+    if (resource === ResourceName.Corrections) {
+      const response = await requestJson<{
+        data: Correction[];
+        total?: number | null;
+        limit?: number | null;
+        offset?: number | null;
+      }>(`/v1/corrections/queue${buildCorrectionQueueQuery(params)}`);
+      const records = response.data.map((item) => toRecord(item, "correction_id"));
+      const total = typeof response.total === "number" ? response.total : records.length;
+      return { data: records, total };
+    }
+
     throw new Error(`Unsupported resource "${resource}".`);
   },
 
@@ -823,6 +1071,15 @@ export const controlPlaneDataProvider: DataProvider = {
       }
       return {
         data: toRecord(response, "run_id"),
+      };
+    }
+
+    if (resource === ResourceName.CommentaryInsights) {
+      const response = await requestJson<CommentaryInsight>(
+        `/v1/commentary-insights/${encodeURIComponent(String(params.id))}`,
+      );
+      return {
+        data: toRecord(response, "insight_id"),
       };
     }
 
