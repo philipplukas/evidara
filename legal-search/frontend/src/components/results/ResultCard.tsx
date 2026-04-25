@@ -1,6 +1,16 @@
 "use client";
 
-import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
+import {
+  ArrowRight,
+  Bookmark,
+  BookOpen,
+  FileText,
+  Globe,
+  Link,
+  MapPin,
+  MessageSquareQuote,
+  Scale,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
@@ -53,17 +63,32 @@ export function ResultCard({
   isPinned,
 }: ResultCardProps) {
   const t = useTranslations("results.card");
+  const isCommentary = result.recordKind === "commentary";
+  const sourceDocumentIds = isCommentary ? (result.sourceDocumentIds ?? []) : [];
+  const supportCount =
+    !isCommentary && typeof result.commentarySupportCount === "number"
+      ? result.commentarySupportCount
+      : 0;
+
+  // Commentary keeps the accent-core selection treatment, but in the idle
+  // state we surface a quiet attention-toned left rail so editorial hits
+  // read distinct from primary documents without competing with selection.
+  const idleBorderClass = isCommentary
+    ? "border-l-2 border-l-attention-border bg-attention-subtle/40 hover:-translate-y-px hover:bg-attention-subtle/60 hover:shadow-ring-subtle"
+    : "border-l-2 border-l-transparent hover:-translate-y-px hover:bg-muted/30 hover:shadow-ring-subtle";
+
   return (
     <article
       aria-current={isSelected ? "true" : undefined}
       aria-label={t("openResult", { title: result.title })}
+      data-record-kind={result.recordKind ?? "document"}
       onClick={() => onFocus(result.id)}
       className={`group cursor-pointer border-b border-border/60 px-4 py-3.5 transition-all
         transition-motion-medium focus-within:ring-2 focus-within:ring-focus-ring sm:px-5
         ${
           isSelected
             ? "border-l-2 border-l-accent-core bg-interactive-accent-subtle shadow-ring-accent"
-            : "border-l-2 border-l-transparent hover:-translate-y-px hover:bg-muted/30 hover:shadow-ring-subtle"
+            : idleBorderClass
         }`}
     >
       {result.structuralContext && (
@@ -91,6 +116,16 @@ export function ResultCard({
           {isSelected && (
             <span className="inline-flex items-center rounded-full border border-accent-core/20 bg-accent-core/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-core">
               {t("selected")}
+            </span>
+          )}
+          {isCommentary && (
+            <span
+              role="img"
+              aria-label={t("commentaryBadgeAria")}
+              className="inline-flex items-center gap-1 rounded-full border border-attention-border/60 bg-attention-subtle px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-attention"
+            >
+              <MessageSquareQuote aria-hidden className="h-2.5 w-2.5" />
+              {t("commentaryBadge")}
             </span>
           )}
           {result.badges.map((badge, i) => (
@@ -128,6 +163,51 @@ export function ResultCard({
               <span className="text-foreground/80">{row.value}</span>
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Commentary → primary-document pivot strip */}
+      {isCommentary && sourceDocumentIds.length > 0 && (
+        <div
+          className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-text-meta"
+          data-testid="commentary-source-links"
+        >
+          <span className="font-medium text-text-meta">{t("citedIn")}</span>
+          {sourceDocumentIds.map((sourceId) => (
+            <button
+              type="button"
+              key={sourceId}
+              onClick={(e) => {
+                e.stopPropagation();
+                onFocus(sourceId);
+              }}
+              aria-label={t("openSourceDocument", { id: sourceId })}
+              className="inline-flex min-h-11 sm:min-h-0 items-center rounded-full border border-border/70
+                bg-background/40 px-2.5 py-2 sm:py-0.5 text-[11px] font-medium text-accent-core
+                transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            >
+              {sourceId}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Primary-document → commentary support pill */}
+      {!isCommentary && supportCount > 0 && (
+        <div className="mb-3" data-testid="commentary-support-pill">
+          <a
+            href={`?q=${encodeURIComponent(result.title)}&filter=commentary&about=${encodeURIComponent(result.id)}`}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={t("commentarySupportAria", { count: supportCount })}
+            className="inline-flex min-h-11 sm:min-h-0 items-center gap-1.5 rounded-full border border-attention-border/60
+              bg-attention-subtle/60 px-2.5 py-2 sm:py-0.5 text-[11px] font-medium text-attention
+              transition-colors hover:bg-attention-subtle
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          >
+            <MessageSquareQuote aria-hidden className="h-3 w-3" />
+            {t("commentarySupport", { count: supportCount })}
+          </a>
         </div>
       )}
 

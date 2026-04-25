@@ -111,4 +111,166 @@ describe("ResultCard", () => {
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
+
+  // ─── Commentary record kind (#431) ─────────────────────────────────────
+
+  describe("commentary rendering", () => {
+    const commentaryResult: SearchResultViewModel = {
+      ...mockResult,
+      id: "commentary-1",
+      title: "Verantwortlichkeit der Verwaltungsräte — Kommentar",
+      type: "commentary",
+      recordKind: "commentary",
+      sourceDocumentIds: ["law-1", "law-754-or"],
+      badges: [{ label: "Commentary", colorKey: "purple" }],
+    };
+
+    it("renders the commentary badge with screen-reader label", () => {
+      renderWithProviders(
+        <ResultCard
+          result={commentaryResult}
+          isSelected={false}
+          onFocus={vi.fn()}
+          isPinned={false}
+        />,
+      );
+
+      // The visible badge text and the aria-labeled region.
+      expect(screen.getByText("Kommentar")).toBeInTheDocument();
+      expect(screen.getByLabelText("Kommentar zur Rechtsquelle")).toBeInTheDocument();
+    });
+
+    it("tags the article with data-record-kind for downstream styling", () => {
+      const { container } = renderWithProviders(
+        <ResultCard
+          result={commentaryResult}
+          isSelected={false}
+          onFocus={vi.fn()}
+          isPinned={false}
+        />,
+      );
+
+      const article = container.querySelector("article");
+      expect(article?.getAttribute("data-record-kind")).toBe("commentary");
+    });
+
+    it("renders source-document links and fires onFocus when clicked", () => {
+      const onFocus = vi.fn();
+      renderWithProviders(
+        <ResultCard
+          result={commentaryResult}
+          isSelected={false}
+          onFocus={onFocus}
+          isPinned={false}
+        />,
+      );
+
+      const sourceStrip = screen.getByTestId("commentary-source-links");
+      expect(sourceStrip).toBeInTheDocument();
+      // The "Cited in:" prefix.
+      expect(screen.getByText("Bezieht sich auf:")).toBeInTheDocument();
+
+      const law1 = screen.getByRole("button", { name: /law-1/ });
+      fireEvent.click(law1);
+      // Clicking a source link focuses the linked document, not the
+      // commentary card itself.
+      expect(onFocus).toHaveBeenLastCalledWith("law-1");
+    });
+
+    it("hides the source-link strip when sourceDocumentIds is empty", () => {
+      renderWithProviders(
+        <ResultCard
+          result={{ ...commentaryResult, sourceDocumentIds: [] }}
+          isSelected={false}
+          onFocus={vi.fn()}
+          isPinned={false}
+        />,
+      );
+
+      expect(screen.queryByTestId("commentary-source-links")).not.toBeInTheDocument();
+    });
+
+    it("does NOT render the commentary badge on document hits", () => {
+      renderWithProviders(
+        <ResultCard
+          result={{ ...mockResult, recordKind: "document" }}
+          isSelected={false}
+          onFocus={vi.fn()}
+          isPinned={false}
+        />,
+      );
+
+      expect(screen.queryByText("Kommentar")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Kommentar zur Rechtsquelle")).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Commentary support pill (#431) ────────────────────────────────────
+
+  describe("commentary support pill", () => {
+    it("renders the support pill when commentarySupportCount > 0", () => {
+      renderWithProviders(
+        <ResultCard
+          result={{ ...mockResult, commentarySupportCount: 3 }}
+          isSelected={false}
+          onFocus={vi.fn()}
+          isPinned={false}
+        />,
+      );
+
+      expect(screen.getByTestId("commentary-support-pill")).toBeInTheDocument();
+      expect(screen.getByText("3 Kommentare")).toBeInTheDocument();
+    });
+
+    it("uses the singular form when count is 1", () => {
+      renderWithProviders(
+        <ResultCard
+          result={{ ...mockResult, commentarySupportCount: 1 }}
+          isSelected={false}
+          onFocus={vi.fn()}
+          isPinned={false}
+        />,
+      );
+
+      expect(screen.getByText("1 Kommentar")).toBeInTheDocument();
+    });
+
+    it("hides the pill when commentarySupportCount is 0", () => {
+      renderWithProviders(
+        <ResultCard
+          result={{ ...mockResult, commentarySupportCount: 0 }}
+          isSelected={false}
+          onFocus={vi.fn()}
+          isPinned={false}
+        />,
+      );
+
+      expect(screen.queryByTestId("commentary-support-pill")).not.toBeInTheDocument();
+    });
+
+    it("hides the pill when commentarySupportCount is undefined", () => {
+      renderWithProviders(
+        <ResultCard result={mockResult} isSelected={false} onFocus={vi.fn()} isPinned={false} />,
+      );
+
+      expect(screen.queryByTestId("commentary-support-pill")).not.toBeInTheDocument();
+    });
+
+    it("hides the pill on commentary cards even if a count slipped through", () => {
+      renderWithProviders(
+        <ResultCard
+          result={{
+            ...mockResult,
+            recordKind: "commentary",
+            commentarySupportCount: 5,
+          }}
+          isSelected={false}
+          onFocus={vi.fn()}
+          isPinned={false}
+        />,
+      );
+
+      expect(screen.queryByTestId("commentary-support-pill")).not.toBeInTheDocument();
+    });
+  });
 });

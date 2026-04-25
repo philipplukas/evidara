@@ -30,6 +30,11 @@ export function ResultCardSkeleton() {
         <Skeleton height="0.625rem" width="4rem" />
       </div>
 
+      {/* Optional commentary support / source-link strip placeholder */}
+      <div className="mb-3">
+        <Skeleton className="rounded-full" height="1rem" width="6rem" />
+      </div>
+
       {/* Actions */}
       <div className="flex gap-2">
         <Skeleton height="0.625rem" width="4rem" />
