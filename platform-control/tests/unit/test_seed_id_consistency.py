@@ -229,6 +229,29 @@ class TestSeedIdConsistency(unittest.TestCase):
             ),
         )
 
+    def test_seed_jurisdiction_parents_resolve(self) -> None:
+        """Every jurisdiction row's parent_id must resolve to a sibling row.
+
+        Catches the failure mode where a child jurisdiction (canton,
+        Land, municipality) is added with a typo'd or stale `parent_id`
+        — silently breaking hierarchy queries with no API surface error.
+        """
+        with _JURISDICTIONS_YAML.open(encoding="utf-8") as handle:
+            jurisdictions = yaml.safe_load(handle)
+        items = [item for item in jurisdictions.get("items", []) if isinstance(item, dict)]
+        seed_ids = {item["jurisdiction_id"] for item in items if "jurisdiction_id" in item}
+        orphans = [
+            (item["jurisdiction_id"], item["parent_id"])
+            for item in items
+            if item.get("parent_id") and item["parent_id"] not in seed_ids
+        ]
+        self.assertFalse(
+            orphans,
+            msg=(
+                f"Jurisdiction rows reference parent_ids missing from the same seed file: {orphans}"
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

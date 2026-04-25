@@ -195,6 +195,54 @@ items:
     slug: de-th
     name: Thüringen
     parent_id: jur_de
+  # ─── German municipality 10-city pilot (AGS-keyed) ───
+  # Promoted from country-overlays/de/municipalities.yaml so each pilot
+  # city is queryable as a first-class jurisdiction. Scope is intentionally
+  # 10 publishing cities — not the ~11,000-entry Destatis Gemeindeverzeichnis
+  # and not the ~400 Landkreise (districts) tier. Full coverage will arrive
+  # via a Destatis ingestion job; this seed deliberately does not pretend
+  # to it. Slug is `de-gemeinde-<ags>` to mirror the cantonal/Land kebab-
+  # case convention used for `de-bw`, `de-by`, etc.
+  - jurisdiction_id: jur_de_gemeinde_05111000
+    slug: de-gemeinde-05111000
+    name: Düsseldorf
+    parent_id: jur_de_nw
+  - jurisdiction_id: jur_de_gemeinde_05315000
+    slug: de-gemeinde-05315000
+    name: Köln
+    parent_id: jur_de_nw
+  - jurisdiction_id: jur_de_gemeinde_05913000
+    slug: de-gemeinde-05913000
+    name: Dortmund
+    parent_id: jur_de_nw
+  - jurisdiction_id: jur_de_gemeinde_09162000
+    slug: de-gemeinde-09162000
+    name: München
+    parent_id: jur_de_by
+  - jurisdiction_id: jur_de_gemeinde_09564000
+    slug: de-gemeinde-09564000
+    name: Nürnberg
+    parent_id: jur_de_by
+  - jurisdiction_id: jur_de_gemeinde_08111000
+    slug: de-gemeinde-08111000
+    name: Stuttgart
+    parent_id: jur_de_bw
+  - jurisdiction_id: jur_de_gemeinde_06412000
+    slug: de-gemeinde-06412000
+    name: Frankfurt am Main
+    parent_id: jur_de_he
+  - jurisdiction_id: jur_de_gemeinde_14612000
+    slug: de-gemeinde-14612000
+    name: Dresden
+    parent_id: jur_de_sn
+  - jurisdiction_id: jur_de_gemeinde_14713000
+    slug: de-gemeinde-14713000
+    name: Leipzig
+    parent_id: jur_de_sn
+  - jurisdiction_id: jur_de_gemeinde_03241001
+    slug: de-gemeinde-03241001
+    name: Hannover
+    parent_id: jur_de_ni
   - jurisdiction_id: jur_fr
     slug: fr
     name: France
