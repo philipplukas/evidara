@@ -15,8 +15,18 @@ Document body reads use the Document Service (`contracts/api/document-intelligen
 
  * OpenAPI spec version: 0.4.1
  */
-import type { LocalStructureItem } from './localStructureItem';
 
-export type DetailViewLocalStructure = {
-  items?: LocalStructureItem[];
-};
+/**
+ * Discriminator from the search projection (PR #441). The
+frontend keys its result-card variant off this OR off
+`type === "commentary"` (back-compat fallback).
+
+ */
+export type SearchResultViewRecordKind = typeof SearchResultViewRecordKind[keyof typeof SearchResultViewRecordKind];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const SearchResultViewRecordKind = {
+  legal_document: 'legal_document',
+  commentary_insight: 'commentary_insight',
+} as const;

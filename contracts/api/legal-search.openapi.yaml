@@ -12,7 +12,7 @@ info:
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
     Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
-  version: 0.4.0
+  version: 0.4.1
   contact:
     name: Evidara Team
   license:
@@ -337,6 +337,23 @@ components:
           default: []
         contentLanguage:
           $ref: "#/components/schemas/ContentLanguage"
+        recordKind:
+          type: string
+          enum: [legal_document, commentary_insight]
+          description: |
+            Discriminator from the search projection (PR #441). The
+            frontend keys its result-card variant off this OR off
+            `type === "commentary"` (back-compat fallback).
+        sourceDocumentIds:
+          type: array
+          items:
+            type: string
+            pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+          description: |
+            Canonical primary documents this commentary references
+            (#425). Empty / undefined for `legal_document` rows. The
+            frontend renders these as source-document links on
+            commentary cards.
 
     # ─── Shared ViewModel Components ───
     Badge:
