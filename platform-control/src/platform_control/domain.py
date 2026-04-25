@@ -149,8 +149,9 @@ class CorrectionType(StrEnum):
     ``FIELD_EDIT`` rewrites one or more fields on the target entity overlay.
     ``ANNOTATION`` attaches a free-form note without mutating the entity.
     ``REJECT`` flags the entity as invalid (e.g. a hallucinated commentary
-    insight). ``RESCORE_REQUEST`` asks document-intelligence to recompute
-    confidence for the entity without changing user-visible content.
+    insight). ``RESCORE_REQUEST`` is emitted by the platform when a parent
+    correction triggers a targeted re-extraction; the row holds the workflow
+    id, run id, and outcome of the resulting rescore loop.
     """
 
     FIELD_EDIT = "field_edit"
@@ -160,18 +161,29 @@ class CorrectionType(StrEnum):
 
 
 class CorrectionStatus(StrEnum):
-    """Workflow status for a queued correction.
+    """Lifecycle status of a correction row.
 
-    ``PENDING`` is the default for newly created rows. ``APPLIED`` is set after
-    the correction has been successfully written to the target entity overlay
-    (or otherwise resolved, e.g. for ``ANNOTATION`` / ``REJECT``).
-    ``REJECTED`` is reserved for operator review workflows that explicitly
-    reject a queued correction.
+    Operator corrections (``FIELD_EDIT`` / ``ANNOTATION`` / ``REJECT``) move
+    through ``PENDING`` -> ``APPLIED`` (or ``REJECTED`` if the queue review
+    explicitly rejects them).
+
+    ``RESCORE_REQUEST`` rows piggyback on the same column to record the
+    rescore-workflow outcome reported by ``record_outcome``:
+
+    - ``PENDING`` — created, workflow not yet started
+    - ``TRIGGERED`` — workflow scheduled (idempotent return path)
+    - ``CHANGED`` — re-extraction produced a different result than baseline
+    - ``UNCHANGED`` — re-extraction produced an identical result
+    - ``FAILED`` — workflow or activity raised an unrecoverable error
     """
 
     PENDING = "pending"
     APPLIED = "applied"
     REJECTED = "rejected"
+    TRIGGERED = "triggered"
+    CHANGED = "changed"
+    UNCHANGED = "unchanged"
+    FAILED = "failed"
 
 
 class CorrectionTargetEntityType(StrEnum):

@@ -11,12 +11,14 @@ from temporalio.worker import Worker
 from platform_control.config import get_settings
 from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.temporal.activities import (
+    RescoreActivities,
     RetentionActivities,
     ReviewDrainActivities,
     ScopeShardActivities,
     WizardStateActivities,
 )
 from platform_control.temporal.workflows import (
+    RescoreCorrectionWorkflow,
     RetentionSweepWorkflow,
     ReviewDrainWorkflow,
     ScopeShardWorkflow,
@@ -53,6 +55,7 @@ async def _async_main() -> None:
         argilla_dataset_id=settings.argilla_dataset_id,
     )
     retention_acts = RetentionActivities(session_factory=session_factory)
+    rescore_acts = RescoreActivities(session_factory=session_factory)
 
     client = await Client.connect(
         settings.temporal_target,
@@ -66,6 +69,7 @@ async def _async_main() -> None:
             ScopeShardWorkflow,
             ReviewDrainWorkflow,
             RetentionSweepWorkflow,
+            RescoreCorrectionWorkflow,
         ],
         activities=[
             wizard_state_acts.persist_pilot_completed,
@@ -75,6 +79,11 @@ async def _async_main() -> None:
             review_drain_acts.enqueue_pending_reviews,
             review_drain_acts.check_review_drain_complete,
             retention_acts.run_retention_sweep,
+            rescore_acts.resolve_correction,
+            rescore_acts.load_target_entity,
+            rescore_acts.invoke_targeted_extraction,
+            rescore_acts.diff_against_baseline,
+            rescore_acts.record_outcome,
         ],
     )
     LOGGER.info(

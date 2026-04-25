@@ -74,7 +74,10 @@ class Correction(TimestampMixin, Base):
     # correction was applied, used for optimistic concurrency on field_edit
     # and to make the audit log self-contained for rollback.
     original_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
-    operator_id: Mapped[str] = mapped_column(nullable=False)
+    # ``operator_id`` is nullable because system-emitted ``rescore_request``
+    # rows (#427) carry no operator — the row is created by the platform in
+    # response to a parent operator correction.
+    operator_id: Mapped[str | None] = mapped_column(nullable=True)
     pipeline_run_id: Mapped[str | None] = mapped_column(nullable=True)
     rationale: Mapped[str | None] = mapped_column(nullable=True)
     status: Mapped[CorrectionStatus] = mapped_column(
@@ -87,4 +90,14 @@ class Correction(TimestampMixin, Base):
         server_default=CorrectionStatus.PENDING.value,
         nullable=False,
     )
+    # Rescore-loop columns (#427). For ``rescore_request`` rows these capture
+    # the Temporal workflow handle and the eventual extraction outcome. They
+    # remain NULL on operator corrections (``field_edit`` / ``annotation`` /
+    # ``reject``).
+    source_correction_id: Mapped[str | None] = mapped_column(nullable=True)
+    workflow_id: Mapped[str | None] = mapped_column(nullable=True)
+    workflow_run_id: Mapped[str | None] = mapped_column(nullable=True)
+    resulting_run_id: Mapped[str | None] = mapped_column(nullable=True)
+    resulting_extraction_id: Mapped[str | None] = mapped_column(nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

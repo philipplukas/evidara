@@ -8,6 +8,7 @@ from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from platform_control.temporal.activities import (
+        RescoreActivities,
         RetentionActivities,
         ReviewDrainActivities,
         ScopeShardActivities,
@@ -172,6 +173,103 @@ class WizardRunWorkflow:
     def reject(self, reason: str | None = None) -> None:
         del reason
         self._rejected = True
+
+
+@workflow.defn
+class RescoreCorrectionWorkflow:
+    """Targeted re-extraction triggered by a correction (issue #427).
+
+    The workflow is idempotent on ``(source_correction_id, target_entity_id)``
+    — see ``rescore_workflow_id`` in ``correction_service`` for the id
+    derivation. Repeated calls with the same arguments collapse to the same
+    Temporal workflow execution.
+
+    Activities run sequentially:
+
+    1. ``resolve_correction`` — load the rescore + source rows.
+    2. ``load_target_entity`` — fetch the baseline snapshot.
+    3. ``invoke_targeted_extraction`` — call into document-intelligence.
+    4. ``diff_against_baseline`` — classify the outcome.
+    5. ``record_outcome`` — persist + log + emit metric.
+    """
+
+    @workflow.run
+    async def run(self, rescore_correction_id: str) -> str:
+        retry = RetryPolicy(
+            maximum_attempts=3,
+            backoff_coefficient=2.0,
+            initial_interval=timedelta(seconds=10),
+            maximum_interval=timedelta(minutes=2),
+        )
+        try:
+            resolved: dict = await workflow.execute_activity_method(
+                RescoreActivities.resolve_correction,
+                rescore_correction_id,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=retry,
+            )
+            target_entity_type = resolved["target_entity_type"]
+            target_entity_id = resolved["target_entity_id"]
+            source_payload = resolved.get("source_payload") or {}
+            dry_run = bool(resolved.get("dry_run", False))
+
+            baseline_result: dict = await workflow.execute_activity_method(
+                RescoreActivities.load_target_entity,
+                args=[target_entity_type, target_entity_id, source_payload],
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=retry,
+            )
+            baseline = baseline_result.get("baseline") or {}
+
+            extraction_result: dict = await workflow.execute_activity_method(
+                RescoreActivities.invoke_targeted_extraction,
+                args=[
+                    target_entity_type,
+                    target_entity_id,
+                    baseline,
+                    source_payload,
+                    dry_run,
+                ],
+                start_to_close_timeout=timedelta(minutes=15),
+                retry_policy=retry,
+            )
+
+            diffed: dict = await workflow.execute_activity_method(
+                RescoreActivities.diff_against_baseline,
+                extraction_result,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+            outcome = str(diffed.get("outcome", "failed"))
+            await workflow.execute_activity_method(
+                RescoreActivities.record_outcome,
+                args=[
+                    rescore_correction_id,
+                    outcome,
+                    diffed.get("diff", {}),
+                    diffed.get("extraction_id"),
+                    None,  # resulting_run_id is set when DI exposes it
+                    diffed.get("error"),
+                ],
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+            return outcome
+        except Exception as exc:  # noqa: BLE001 — final-attempt failure
+            await workflow.execute_activity_method(
+                RescoreActivities.record_outcome,
+                args=[
+                    rescore_correction_id,
+                    "failed",
+                    {},
+                    None,
+                    None,
+                    str(exc),
+                ],
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+            raise
 
 
 @workflow.defn

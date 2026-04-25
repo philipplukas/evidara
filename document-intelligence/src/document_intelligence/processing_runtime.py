@@ -141,3 +141,114 @@ def process_artifact_bundle_event(
         "processing_manifest_id": result.manifest.processing_manifest_id,
         "sections": len(result.sections),
     }
+
+
+def targeted_re_extract(
+    *,
+    target_entity_type: str,
+    target_entity_id: str,
+    baseline: Mapping[str, Any] | None = None,
+    correction_payload: Mapping[str, Any] | None = None,
+    runtime_settings: RuntimeSettings | None = None,
+    extractor: Any | None = None,
+) -> dict[str, Any]:
+    """Run a targeted re-extraction for a single corrected entity.
+
+    This is the document-intelligence-side entry point invoked by
+    ``RescoreCorrectionWorkflow`` (platform-control, issue #427). It is
+    deliberately small and side-effect-free at this stage: the production
+    pipeline-replay path will be wired through here once issue #425 lands the
+    projection re-emission contract. Until then this entry point exists so:
+
+    1. Platform-control's rescore workflow has a stable callable to invoke,
+       and contract changes here are detected by tests rather than at deploy
+       time.
+    2. Operators can run the full loop end-to-end against a fake / dry
+       extractor and still observe the ``triggered`` / ``changed`` /
+       ``unchanged`` / ``failed`` outcomes.
+
+    Parameters
+    ----------
+    target_entity_type, target_entity_id:
+        Identify the entity to re-score. The workflow loads the baseline
+        snapshot upstream and passes it here; this function only diffs.
+    baseline:
+        Last-known canonical extraction values. Compared field-by-field
+        against the new extraction to decide ``changed`` vs ``unchanged``.
+    correction_payload:
+        The operator-supplied payload from the *source* correction. Forwarded
+        to the extractor so prompt scaffolding can incorporate the hint
+        (e.g. "operator says jurisdiction should be CH").
+    runtime_settings:
+        Honoured for parity with the bundle entrypoint; unused for now.
+    extractor:
+        Test seam: any callable accepting
+        ``(target_entity_type, target_entity_id, correction_payload)`` and
+        returning a mapping of new field values.
+
+    Returns
+    -------
+    dict
+        ``{"target_entity_type", "target_entity_id", "extraction_id",
+        "fields", "diff", "outcome"}``. ``outcome`` is one of
+        ``"changed"``, ``"unchanged"``, ``"failed"``.
+    """
+
+    del runtime_settings  # Reserved for the full pipeline-replay path.
+
+    extractor_callable = extractor or _default_targeted_extractor
+    try:
+        new_fields = extractor_callable(
+            target_entity_type=target_entity_type,
+            target_entity_id=target_entity_id,
+            correction_payload=dict(correction_payload or {}),
+        )
+    except Exception as exc:  # noqa: BLE001 — surface to workflow as failed
+        return {
+            "target_entity_type": target_entity_type,
+            "target_entity_id": target_entity_id,
+            "extraction_id": None,
+            "fields": {},
+            "diff": {},
+            "outcome": "failed",
+            "error": str(exc),
+        }
+
+    baseline_dict = dict(baseline or {})
+    diff = {
+        key: {"before": baseline_dict.get(key), "after": value}
+        for key, value in new_fields.items()
+        if baseline_dict.get(key) != value
+    }
+    extraction_id = f"ext_{target_entity_type}_{target_entity_id}_rescore" if new_fields else None
+    return {
+        "target_entity_type": target_entity_type,
+        "target_entity_id": target_entity_id,
+        "extraction_id": extraction_id,
+        "fields": dict(new_fields),
+        "diff": diff,
+        "outcome": "changed" if diff else "unchanged",
+    }
+
+
+def _default_targeted_extractor(
+    *,
+    target_entity_type: str,
+    target_entity_id: str,
+    correction_payload: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Conservative default extractor that echoes the correction payload.
+
+    The production extractor will replace this with a profile-driven LLM /
+    deterministic re-extraction once #425 lands the projection plumbing. The
+    echo behaviour ensures the rescore workflow always observes a sensible
+    diff in tests and demos.
+    """
+
+    del target_entity_type, target_entity_id
+    after = correction_payload.get("after")
+    if isinstance(after, Mapping):
+        return dict(after)
+    if isinstance(after, dict):
+        return after
+    return {}

@@ -10,7 +10,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio import activity
 
-from platform_control.domain import ReviewTaskStatus, RunMode, RunStatus, WizardRunState
+from platform_control.domain import (
+    CorrectionStatus,
+    CorrectionType,
+    ReviewTaskStatus,
+    RunMode,
+    RunStatus,
+    WizardRunState,
+)
+from platform_control.models.correction import Correction
 from platform_control.models.review_task import ReviewTask
 from platform_control.models.run import Run
 from platform_control.models.source import Source
@@ -18,6 +26,8 @@ from platform_control.models.source_version import SourceVersion
 from platform_control.models.wizard_project import WizardProject
 from platform_control.models.wizard_run import WizardRun
 from platform_control.models.wizard_run_ledger import WizardRunLedger
+from platform_control.observability.event_logging import log_event
+from platform_control.services.correction_service import CorrectionService
 from platform_control.services.provider_registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
@@ -518,3 +528,211 @@ class RetentionActivities:
 # pulling the full Settings object into the activity module's import graph.
 class _SettingsLike:  # pragma: no cover - typing only
     pass
+
+
+# ---------------------------------------------------------------------------
+# RescoreActivities — targeted re-extraction loop (issue #427)
+# ---------------------------------------------------------------------------
+
+
+_RESCORE_LOGGER_NAME = "platform_control.rescore"
+
+
+# Type alias for the targeted-extractor seam. Kept as a Callable so the
+# Temporal worker can be booted without importing document-intelligence.
+TargetedExtractor = Callable[..., dict[str, Any]]
+
+
+@dataclass
+class RescoreActivities:
+    """Activities executed inside ``RescoreCorrectionWorkflow``.
+
+    The activity set is intentionally small:
+
+    - ``resolve_correction`` — load the rescore correction + its source
+      correction and surface enough fields for the workflow to drive the
+      remaining activities.
+    - ``load_target_entity`` — fetch the baseline snapshot to diff against.
+      Until the projection landing in #425 the baseline is read straight off
+      the source correction's payload (``payload['before']``); the activity
+      keeps a stable name so #425 can swap the implementation without a
+      workflow signature change.
+    - ``invoke_targeted_extraction`` — call into document-intelligence's
+      ``targeted_re_extract``. The DI module is imported lazily so a stripped
+      worker (e.g. integration test) can register the activity without
+      pulling DI's full dependency closure.
+    - ``diff_against_baseline`` — pure function over the extractor result;
+      classifies the outcome as ``changed`` / ``unchanged``.
+    - ``record_outcome`` — persist the terminal status and emit structured
+      log + (when wired) Prometheus metric.
+    """
+
+    session_factory: async_sessionmaker[AsyncSession]
+    targeted_extractor: TargetedExtractor | None = field(default=None)
+    metrics_callback: Callable[[str, dict[str, Any]], None] | None = field(default=None)
+
+    @activity.defn
+    async def resolve_correction(self, rescore_correction_id: str) -> dict[str, Any]:
+        async with self.session_factory() as session:
+            rescore = await session.get(Correction, rescore_correction_id)
+            if rescore is None:
+                raise RuntimeError(f"Rescore correction not found: {rescore_correction_id}")
+            if rescore.correction_type is not CorrectionType.RESCORE_REQUEST:
+                raise RuntimeError(
+                    f"Resolved correction is not a rescore_request: {rescore_correction_id}"
+                )
+            payload = dict(rescore.payload or {})
+            source_correction_id = rescore.source_correction_id
+            source_payload: dict[str, Any] = {}
+            if source_correction_id is not None:
+                source = await session.get(Correction, source_correction_id)
+                if source is not None:
+                    source_payload = dict(source.payload or {})
+            return {
+                "rescore_correction_id": rescore.correction_id,
+                "source_correction_id": source_correction_id,
+                "target_entity_type": rescore.target_entity_type,
+                "target_entity_id": rescore.target_entity_id,
+                "dry_run": bool(payload.get("dry_run", False)),
+                "source_payload": source_payload,
+            }
+
+    @activity.defn
+    async def load_target_entity(
+        self,
+        target_entity_type: str,
+        target_entity_id: str,
+        source_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        del target_entity_type, target_entity_id
+        # Bridge implementation: until #425 lands the projection-replay
+        # contract the baseline is the operator's "before" snapshot.
+        baseline = source_payload.get("before") if isinstance(source_payload, dict) else None
+        if not isinstance(baseline, dict):
+            baseline = {}
+        return {"baseline": baseline}
+
+    @activity.defn
+    async def invoke_targeted_extraction(
+        self,
+        target_entity_type: str,
+        target_entity_id: str,
+        baseline: dict[str, Any],
+        source_payload: dict[str, Any],
+        dry_run: bool,
+    ) -> dict[str, Any]:
+        del dry_run  # Reserved: a future implementation will skip persistence.
+        if self.targeted_extractor is not None:
+            return self.targeted_extractor(
+                target_entity_type=target_entity_type,
+                target_entity_id=target_entity_id,
+                baseline=baseline,
+                correction_payload=source_payload,
+            )
+        # Lazy DI import keeps the worker startable without document-intelligence
+        # on the path (e.g. minimal CI smoke).
+        try:
+            from document_intelligence.processing_runtime import (  # type: ignore[import-not-found]
+                targeted_re_extract,
+            )
+        except Exception as exc:  # noqa: BLE001 — surface as failed outcome
+            return {
+                "target_entity_type": target_entity_type,
+                "target_entity_id": target_entity_id,
+                "extraction_id": None,
+                "fields": {},
+                "diff": {},
+                "outcome": "failed",
+                "error": f"document-intelligence not importable: {exc}",
+            }
+        return targeted_re_extract(
+            target_entity_type=target_entity_type,
+            target_entity_id=target_entity_id,
+            baseline=baseline,
+            correction_payload=source_payload,
+        )
+
+    @activity.defn
+    async def diff_against_baseline(
+        self,
+        extraction_result: dict[str, Any],
+    ) -> dict[str, Any]:
+        # The extractor does the diff today; this activity normalises the
+        # outcome string and is the natural place to plug in field-level
+        # severity once #425 lands.
+        outcome = str(extraction_result.get("outcome", "failed"))
+        if outcome not in {"changed", "unchanged", "failed"}:
+            outcome = "failed"
+        return {
+            "outcome": outcome,
+            "diff": dict(extraction_result.get("diff") or {}),
+            "extraction_id": extraction_result.get("extraction_id"),
+            "fields": dict(extraction_result.get("fields") or {}),
+            "error": extraction_result.get("error"),
+        }
+
+    @activity.defn
+    async def record_outcome(
+        self,
+        rescore_correction_id: str,
+        outcome: str,
+        diff: dict[str, Any],
+        extraction_id: str | None,
+        resulting_run_id: str | None,
+        error: str | None,
+    ) -> dict[str, Any]:
+        try:
+            status = CorrectionStatus(outcome)
+        except ValueError:
+            status = CorrectionStatus.FAILED
+        if status not in {
+            CorrectionStatus.CHANGED,
+            CorrectionStatus.UNCHANGED,
+            CorrectionStatus.FAILED,
+        }:
+            status = CorrectionStatus.FAILED
+
+        async with self.session_factory() as session:
+            service = CorrectionService(session)
+            rescore = await service.record_outcome(
+                rescore_correction_id,
+                outcome=status,
+                resulting_run_id=resulting_run_id,
+                resulting_extraction_id=extraction_id,
+                diff=diff,
+                error=error,
+            )
+            target_entity_type = rescore.target_entity_type
+            target_entity_id = rescore.target_entity_id
+            source_correction_id = rescore.source_correction_id
+
+        # Structured workflow-side log (already mirrored inside
+        # CorrectionService.record_outcome — emitted again here so a
+        # log-shipper grepping the temporal worker stream sees the event
+        # without joining streams).
+        log_event(
+            logging.getLogger(_RESCORE_LOGGER_NAME),
+            logging.INFO if status is not CorrectionStatus.FAILED else logging.WARNING,
+            f"correction.rescore.{status.value}",
+            event_type="correction.rescore",
+            status=status.value,
+            rescore_correction_id=rescore_correction_id,
+            source_correction_id=source_correction_id,
+            target_entity_type=target_entity_type,
+            target_entity_id=target_entity_id,
+            resulting_run_id=resulting_run_id,
+            resulting_extraction_id=extraction_id,
+            error_message=error,
+        )
+        if self.metrics_callback is not None:
+            self.metrics_callback(
+                "correction.rescore",
+                {
+                    "outcome": status.value,
+                    "target_entity_type": target_entity_type,
+                    "target_entity_id": target_entity_id,
+                    "resulting_run_id": resulting_run_id,
+                    "extraction_id": extraction_id,
+                },
+            )
+        return {"status": status.value}

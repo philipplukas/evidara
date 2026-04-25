@@ -11,6 +11,7 @@ from platform_control.domain import WizardRunState
 from platform_control.errors import InvalidStateTransitionError, OrchestrationError
 from platform_control.models.wizard_run import WizardRun
 from platform_control.temporal.workflows import (
+    RescoreCorrectionWorkflow,
     ReviewDrainWorkflow,
     ScopeShardWorkflow,
     WizardRunWorkflow,
@@ -46,6 +47,26 @@ class Orchestrator(Protocol):
 
 
 class InMemoryOrchestrator:
+    async def start_rescore_workflow(
+        self,
+        *,
+        rescore_correction_id: str,
+        source_correction_id: str,
+        target_entity_type: str,
+        target_entity_id: str,
+        dry_run: bool,
+    ) -> tuple[str, str | None]:
+        """Synchronous-style stub used in dev / unit tests.
+
+        Returns a deterministic in-memory workflow id and ``None`` for the
+        Temporal run id. The corrections router relies on this stub so
+        ``request_rescore`` can be exercised without a Temporal cluster.
+        """
+        del rescore_correction_id, target_entity_type, dry_run
+        from platform_control.services.correction_service import rescore_workflow_id
+
+        return rescore_workflow_id(source_correction_id, target_entity_id), None
+
     async def start_pilot_run(self, wizard_run: WizardRun) -> OrchestrationResult:
         if wizard_run.state is not WizardRunState.DISCOVERY_PLAN:
             raise InvalidStateTransitionError(
@@ -226,3 +247,40 @@ class TemporalOrchestrator:
         except TemporalError as exc:
             raise OrchestrationError(f"Temporal start ReviewDrainWorkflow failed: {exc}") from exc
         return child_id
+
+    async def start_rescore_workflow(
+        self,
+        *,
+        rescore_correction_id: str,
+        source_correction_id: str,
+        target_entity_type: str,
+        target_entity_id: str,
+        dry_run: bool,
+    ) -> tuple[str, str | None]:
+        """Start ``RescoreCorrectionWorkflow`` for a rescore-request correction.
+
+        The workflow id is derived from ``(source_correction_id,
+        target_entity_id)`` so repeated calls collide on Temporal's
+        ``WorkflowAlreadyStartedError`` rather than spawning duplicate
+        executions.
+        """
+        del target_entity_type, dry_run  # carried on the row + payload
+        from platform_control.services.correction_service import rescore_workflow_id
+
+        workflow_id = rescore_workflow_id(source_correction_id, target_entity_id)
+        client = await self._get_client()
+        try:
+            handle = await client.start_workflow(
+                RescoreCorrectionWorkflow.run,
+                rescore_correction_id,
+                id=workflow_id,
+                task_queue=self.task_queue,
+            )
+        except WorkflowAlreadyStartedError:
+            handle = client.get_workflow_handle(workflow_id)
+        except TemporalError as exc:
+            raise OrchestrationError(
+                f"Temporal start RescoreCorrectionWorkflow failed: {exc}"
+            ) from exc
+        run_id = getattr(handle, "first_execution_run_id", None) or getattr(handle, "run_id", None)
+        return workflow_id, run_id
