@@ -16,8 +16,11 @@ Document body reads use the Document Service (`contracts/api/document-intelligen
  * OpenAPI spec version: 0.4.0
  */
 
-export interface TabView {
-  key: string;
-  label: string;
-  count?: number;
-}
+export type SearchDocumentsRecordKind = typeof SearchDocumentsRecordKind[keyof typeof SearchDocumentsRecordKind];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const SearchDocumentsRecordKind = {
+  document: 'document',
+  commentary: 'commentary',
+} as const;

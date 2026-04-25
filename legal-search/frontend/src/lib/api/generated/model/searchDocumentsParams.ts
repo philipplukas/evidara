@@ -13,8 +13,9 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.3.4
+ * OpenAPI spec version: 0.4.0
  */
+import type { SearchDocumentsRecordKind } from './searchDocumentsRecordKind';
 
 export type SearchDocumentsParams = {
 /**
@@ -25,22 +26,38 @@ q: string;
  * Filter by jurisdiction. Accepts either:
 - ISO 3166-1 alpha-2 country code (e.g. `CH`, `DE`, `EU`)
 - ISO 3166-2 subdivision code (e.g. `CH-ZH`, `DE-BY`, `IT-25`)
+- Canonical `jur_*` ID owned by platform-control (e.g.
+  `jur_ch_federal`, `jur_ch_zh`, `jur_ch_gemeinde_zurich`,
+  `jur_de_federal`, `jur_de_by`).
 
-The BFF normalizes both forms and filters against country +
-subdivision columns. See
-`contracts/vocabularies/subdivisions.json` for the full
-subdivision registry.
+The BFF normalizes all three forms and filters against the
+canonical `jurisdiction_ids` field on the search projection
+(see `contracts/schemas/search-projection.schema.json`),
+falling back to the legacy ISO `jurisdiction` field for
+backward compatibility. ISO tokens (`CH`, `CH-ZH`) continue
+to work unchanged. See `contracts/ids/README.md` for the
+`jur_*` family and `contracts/vocabularies/subdivisions.json`
+for the ISO subdivision registry.
 
- * @pattern ^[A-Z]{2}(-[A-Z0-9]{1,3})?$
+ * @pattern ^([A-Z]{2}(-[A-Z0-9]{1,3})?|jur_[a-z0-9_]+)$
  */
 jurisdiction?: string;
 /**
  * Comma-separated list of jurisdiction filters. Each element
-follows the same shape as `jurisdiction` — country code,
-subdivision code, or a mix.
+follows the same shape as `jurisdiction` — ISO country code,
+ISO subdivision code, canonical `jur_*` ID, or a mix.
 
  */
 jurisdictions?: string;
+/**
+ * Restrict results to a single projection record kind. `document`
+returns primary canonical documents only; `commentary` returns
+commentary insights projected into search (see
+`record_kind` on `contracts/schemas/search-projection.schema.json`).
+Omit to return both kinds, ranked together.
+
+ */
+record_kind?: SearchDocumentsRecordKind;
 /**
  * Comma-separated list of language filters
  */

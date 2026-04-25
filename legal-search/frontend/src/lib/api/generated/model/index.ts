@@ -13,7 +13,7 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.3.4
+ * OpenAPI spec version: 0.4.0
  */
 
 export * from './acceptLanguageParameter';
@@ -42,6 +42,7 @@ export * from './relatedGroup';
 export * from './relatedItem';
 export * from './searchContextView';
 export * from './searchDocumentsParams';
+export * from './searchDocumentsRecordKind';
 export * from './searchResponseView';
 export * from './searchResultView';
 export * from './sectionSummary';
