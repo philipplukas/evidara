@@ -76,9 +76,7 @@ class TestChMunicipalitySeeds(unittest.TestCase):
             and item["jurisdiction_id"] != "jur_ch"
         }
         gemeinde_rows = [
-            item
-            for item in items
-            if item.get("jurisdiction_id", "").startswith("jur_ch_gemeinde_")
+            item for item in items if item.get("jurisdiction_id", "").startswith("jur_ch_gemeinde_")
         ]
         # Sanity: 2110 known active municipalities per BFS 01.01.2026.
         self.assertEqual(
