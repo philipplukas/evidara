@@ -118,6 +118,40 @@
       "type": "string",
       "format": "date-time",
       "description": "Timestamp when the canonical document was processed."
+    },
+
+    "record_kind": {
+      "type": "string",
+      "description": "Discriminator distinguishing primary documents from commentary insights inside the search projection. Defaults to `document` for legacy rows; commentary insights are projected with `commentary` so the BFF can branch on rendering, ranking, and filter handling.",
+      "enum": ["document", "commentary"],
+      "default": "document"
+    },
+    "jurisdiction_ids": {
+      "type": "array",
+      "description": "Canonical jurisdiction IDs linked to this record (multi-jurisdiction documents and commentaries can resolve to several). Distinct from the legacy `jurisdiction` ISO field, which remains for backward compatibility. See `contracts/ids/README.md` for the `jur_*` family.",
+      "items": {
+        "type": "string",
+        "pattern": "^jur_[a-z0-9_]+$"
+      },
+      "default": []
+    },
+    "authority_ids": {
+      "type": "array",
+      "description": "Canonical authority IDs linked to this record. Mirrors `jurisdiction_ids` but for issuing/publishing bodies. See `contracts/ids/README.md` for the `auth_*` family.",
+      "items": {
+        "type": "string",
+        "pattern": "^auth_[a-z0-9_]+$"
+      },
+      "default": []
+    },
+    "source_document_ids": {
+      "type": "array",
+      "description": "For commentary records (`record_kind = commentary`), the primary canonical documents the commentary anchors to. Empty for `record_kind = document`. Drives the 'cited from' reverse lookup and the back-link from a commentary detail to the underlying law/decision.",
+      "items": {
+        "type": "string",
+        "pattern": "^doc_[a-zA-Z0-9]+$"
+      },
+      "default": []
     }
   },
   "additionalProperties": false
