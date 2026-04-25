@@ -131,6 +131,27 @@ Additive rule: a country overlay's `hierarchy_paths` MUST include
 paths live on the individual provider templates and are emitted at
 discovery time, not pinned at overlay level.
 
+## Per-country municipality scope
+
+Sub-Land municipality coverage is not uniform across the rollout. Each
+country has its own pilot scope and ingestion path; the registry is
+deliberately not claimed to be exhaustive where it isn't.
+
+| Country | Municipality scope | Source of truth | Notes |
+|---|---|---|---|
+| CH | Full Gemeinden registry (target) | BFS Gemeindeverzeichnis | Demo path; full coverage tracked under #424 |
+| DE | **10-city pilot** | `country-overlays/de/municipalities.yaml` (AGS-keyed) | NOT the ~11,000-entry Destatis Gemeindeverzeichnis. NOT the ~400 Landkreise (district) tier. Full Gemeindeverzeichnis import would require a separate Destatis ingestion job. |
+| AT | Federal + Bundesland only | seeds | No municipality tier in scope today. |
+| FR | National only | seeds | Régions/départements/communes not yet modelled. |
+| IT | National only | seeds | Regioni/province/comuni not yet modelled. |
+
+The DE 10 pilot cities currently seeded as first-class jurisdictions
+(`jur_de_gemeinde_<ags>` parented to their Land) are: Düsseldorf, Köln,
+Dortmund (NW); München, Nürnberg (BY); Stuttgart (BW); Frankfurt am
+Main (HE); Dresden, Leipzig (SN); Hannover (NI). City-states (Berlin,
+Hamburg, Bremen) are intentionally omitted — they are already covered
+at Land level.
+
 ## End-user content principles
 
 1. Show canonical concepts first, local naming second.
