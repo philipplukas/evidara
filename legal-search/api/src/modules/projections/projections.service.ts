@@ -12,6 +12,7 @@ import {
   type CitationProjection,
   type CitationTargetEntry,
   type CitationTargetMatch,
+  type CommentaryInsightInput,
   PROJECTION_REPOSITORY,
   type ProjectionHistoryEntry,
   type ProjectionHistoryPage,
@@ -75,6 +76,12 @@ export class ProjectionsService {
     );
     const citationTargets = this.extractCitationTargets(projection, leanDocument);
 
+    // Forward-compatible: when DI's lean document carries a
+    // `commentary_insights` array, project each entry as a first-class
+    // commentary_insight record. Until DI emits these, the array is
+    // absent and the loop is a no-op — no API contract change.
+    const commentaryInsights = this.extractCommentaryInsights(leanDocument, event.occurred_at);
+
     await Promise.all([
       sections.length > 0
         ? this.repository
@@ -89,6 +96,7 @@ export class ProjectionsService {
       citationTargets.length > 0
         ? this.repository.bulkIndexCitationTargets(citationTargets)
         : Promise.resolve(),
+      ...commentaryInsights.map((insight) => this.applyCommentaryInsight(insight)),
     ]);
 
     await this.appendHistory(event, 'applied');
@@ -116,6 +124,28 @@ export class ProjectionsService {
     return { eventId: event.event_id, status: 'applied' };
   }
 
+  /**
+   * Project a commentary insight as a first-class search record.
+   *
+   * Idempotent on `insight_id` (used as the row's `document_id` in the
+   * projection index — different namespace from primary documents
+   * because `ins_*` and `doc_*` ID families don't collide). The
+   * resulting row carries `record_kind=commentary_insight` so the
+   * search adapter and the frontend renderer can pivot on it.
+   *
+   * Trigger wiring is deferred: this method is currently invoked from
+   * `applyDocumentProcessed` when the lean document carries a
+   * `commentary_insights` array. A dedicated commentary-insight event
+   * topic can call this method directly when DI starts emitting one.
+   */
+  async applyCommentaryInsight(
+    insight: CommentaryInsightInput,
+  ): Promise<{ insightId: string; status: 'applied' }> {
+    const projection = this.buildCommentaryProjection(insight);
+    await this.repository.upsertProjection(projection);
+    return { insightId: insight.insight_id, status: 'applied' };
+  }
+
   async queryHistory(query: ProjectionHistoryQuery): Promise<ProjectionHistoryPage> {
     return this.repository.queryHistory(query);
   }
@@ -137,8 +167,10 @@ export class ProjectionsService {
       event.payload.processing_version;
     const jurisdiction =
       extracted.jurisdictionFromCanonical ?? this.inferJurisdiction(provenance.corpus_id);
+    const jurisdictionIds = extracted.canonicalJurisdictionIds ?? [];
     const projection: SearchProjectionDocument = {
       document_id: event.payload.document_id,
+      record_kind: 'legal_document',
       title,
       authority_name: event.payload.authority_name,
       official_citation: extracted.officialCitation,
@@ -155,12 +187,58 @@ export class ProjectionsService {
       lifecycle_status: event.payload.lifecycle_status,
       processed_at: event.occurred_at,
       jurisdiction,
+      jurisdiction_ids: jurisdictionIds,
       language: extracted.language ?? this.inferLanguage(provenance.corpus_id),
       content_preview: preview,
     };
     if (extracted.documentType) projection.document_type = extracted.documentType;
     if (extracted.effectiveDate) projection.effective_date = extracted.effectiveDate;
     if (extracted.structuralPath) projection.structural_path = extracted.structuralPath;
+    if (extracted.canonicalAuthorityIds && extracted.canonicalAuthorityIds.length > 0) {
+      projection.authority_ids = extracted.canonicalAuthorityIds;
+    }
+    return projection;
+  }
+
+  /**
+   * Map a commentary insight payload to a `commentary_insight`
+   * projection row. The row's `document_id` is the upstream
+   * `insight_id` so the search projection can be reverse-joined back
+   * to the originating commentary record. `source_document_ids`
+   * carries the primary documents the commentary points at — the UI
+   * resolves these for "explain why" / source-doc panels.
+   */
+  private buildCommentaryProjection(insight: CommentaryInsightInput): SearchProjectionDocument {
+    // Insight `jurisdiction_id` is the platform canonical form
+    // (`jur_ch_federal`); the helper expects the DI internal form
+    // (`ch_federal`) — strip the `jur_` prefix to bridge the two.
+    const canonicalForInfer = insight.jurisdiction_id?.startsWith('jur_')
+      ? insight.jurisdiction_id.slice('jur_'.length)
+      : (insight.jurisdiction_id ?? undefined);
+    const jurisdiction = canonicalForInfer
+      ? this.inferJurisdictionFromCanonicalId(canonicalForInfer)
+      : undefined;
+    const projection: SearchProjectionDocument = {
+      document_id: insight.insight_id,
+      record_kind: 'commentary_insight',
+      title: insight.claim,
+      sections_count: 0,
+      citations_count: 0,
+      processing_manifest_id: insight.processing_manifest_id,
+      document_revision: insight.document_revision,
+      processed_at: insight.occurred_at,
+      jurisdiction,
+      jurisdiction_ids: insight.jurisdiction_ids,
+      authority_ids: insight.authority_ids,
+      source_document_ids: insight.source_document_ids,
+      content_preview: insight.display_text,
+      document_type: 'commentary',
+    };
+    if (insight.language) {
+      projection.language = insight.language;
+      projection.original_language = insight.language;
+      projection.translation_status = 'original';
+    }
     return projection;
   }
 
@@ -178,6 +256,8 @@ export class ProjectionsService {
     effectiveDate?: string;
     structuralPath?: string;
     jurisdictionFromCanonical?: string;
+    canonicalJurisdictionIds?: string[];
+    canonicalAuthorityIds?: string[];
   } {
     if (!leanDocument || typeof leanDocument !== 'object') {
       return { sectionsCount: 0, citationsCount: 0 };
@@ -275,6 +355,28 @@ export class ProjectionsService {
         ? this.inferJurisdictionFromCanonicalId(doc.jurisdiction_id.trim())
         : undefined;
 
+    // Canonical id-list fields per the contract freeze (#434).
+    // The lean document either carries these directly (when DI extends
+    // its output) or the legacy path falls back to a single-element
+    // array derived from `jurisdiction_id`. Empty arrays are valid for
+    // legal_document rows; the OpenAPI conditional only requires
+    // non-empty for `record_kind == commentary_insight`.
+    const canonicalJurisdictionIds = this.extractCanonicalIdList(
+      doc.jurisdiction_ids,
+      /^jur_[a-z0-9_]+$/,
+    );
+    let resolvedJurisdictionIds = canonicalJurisdictionIds;
+    if (resolvedJurisdictionIds.length === 0 && typeof doc.jurisdiction_id === 'string') {
+      const trimmed = doc.jurisdiction_id.trim();
+      if (/^jur_[a-z0-9_]+$/.test(trimmed)) {
+        resolvedJurisdictionIds = [trimmed];
+      }
+    }
+    const canonicalAuthorityIds = this.extractCanonicalIdList(
+      doc.authority_ids,
+      /^auth_[a-z0-9_]+$/,
+    );
+
     return {
       title: fallbackTitle,
       language,
@@ -289,7 +391,21 @@ export class ProjectionsService {
       effectiveDate,
       structuralPath,
       jurisdictionFromCanonical,
+      canonicalJurisdictionIds: resolvedJurisdictionIds,
+      canonicalAuthorityIds,
     };
+  }
+
+  /** Best-effort parse of a canonical id-list field from the lean document. */
+  private extractCanonicalIdList(value: unknown, pattern: RegExp): string[] {
+    if (!Array.isArray(value)) return [];
+    const ids: string[] = [];
+    for (const entry of value) {
+      if (typeof entry !== 'string') continue;
+      const trimmed = entry.trim().toLowerCase();
+      if (pattern.test(trimmed)) ids.push(trimmed);
+    }
+    return Array.from(new Set(ids));
   }
 
   private deriveTitle(args: {
@@ -593,6 +709,106 @@ export class ProjectionsService {
             : undefined,
       };
     });
+  }
+
+  /**
+   * Extract commentary insights carried by the lean document, if present.
+   *
+   * Forward-compatible: if DI's lean document doesn't yet emit
+   * `commentary_insights`, returns an empty list and the
+   * `applyDocumentProcessed` flow runs unchanged. Each entry is
+   * validated against the minimum fields needed to project — entries
+   * missing `insight_id`, `jurisdiction_ids`, `authority_ids`, or
+   * `source_document_ids` are skipped (the freeze requires these on
+   * commentary records).
+   */
+  private extractCommentaryInsights(
+    leanDocument: unknown,
+    occurredAt: string,
+  ): CommentaryInsightInput[] {
+    if (!leanDocument || typeof leanDocument !== 'object') return [];
+    const doc = leanDocument as Record<string, unknown>;
+    const extensions = this.asRecord(doc.extensions);
+    const candidates = [
+      ...this.asArrayOfRecords(doc.commentary_insights),
+      ...this.asArrayOfRecords(extensions?.commentary_insights),
+    ];
+    const insights: CommentaryInsightInput[] = [];
+    for (const raw of candidates) {
+      const insightId = typeof raw.insight_id === 'string' ? raw.insight_id.trim() : '';
+      const documentId = typeof raw.document_id === 'string' ? raw.document_id.trim() : '';
+      const documentRevision =
+        typeof raw.document_revision === 'number' ? raw.document_revision : undefined;
+      const processingManifestId =
+        typeof raw.processing_manifest_id === 'string'
+          ? raw.processing_manifest_id.trim()
+          : undefined;
+      const insightType = typeof raw.insight_type === 'string' ? raw.insight_type : undefined;
+      const claim = typeof raw.claim === 'string' ? raw.claim : undefined;
+      const displayText = typeof raw.display_text === 'string' ? raw.display_text : undefined;
+      const confidence = typeof raw.confidence === 'number' ? raw.confidence : undefined;
+      const reviewState = typeof raw.review_state === 'string' ? raw.review_state : undefined;
+      const jurisdictionIds = this.extractCanonicalIdList(raw.jurisdiction_ids, /^jur_[a-z0-9_]+$/);
+      const authorityIds = this.extractCanonicalIdList(raw.authority_ids, /^auth_[a-z0-9_]+$/);
+      const sourceDocumentIds = this.extractDocumentIdList(raw.source_document_ids);
+
+      if (
+        !insightId ||
+        !documentId ||
+        documentRevision === undefined ||
+        !processingManifestId ||
+        !insightType ||
+        !claim ||
+        !displayText ||
+        confidence === undefined ||
+        !reviewState ||
+        jurisdictionIds.length === 0 ||
+        authorityIds.length === 0 ||
+        sourceDocumentIds.length === 0
+      ) {
+        // Skip malformed entries silently — the freeze requires the
+        // minimum field set, and a partial commentary record is worse
+        // than none in the search index.
+        this.logger.warn('commentary_insight_skipped_missing_fields', {
+          insight_id: insightId || '<missing>',
+          document_id: documentId || '<missing>',
+        });
+        continue;
+      }
+
+      insights.push({
+        insight_id: insightId,
+        document_id: documentId,
+        document_revision: documentRevision,
+        processing_manifest_id: processingManifestId,
+        insight_type: insightType,
+        claim,
+        display_text: displayText,
+        language: typeof raw.language === 'string' ? raw.language : null,
+        jurisdiction_id:
+          typeof raw.jurisdiction_id === 'string' && raw.jurisdiction_id.trim()
+            ? raw.jurisdiction_id.trim()
+            : null,
+        jurisdiction_ids: jurisdictionIds,
+        authority_ids: authorityIds,
+        source_document_ids: sourceDocumentIds,
+        confidence,
+        review_state: reviewState,
+        occurred_at: occurredAt,
+      });
+    }
+    return insights;
+  }
+
+  private extractDocumentIdList(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    const ids: string[] = [];
+    for (const entry of value) {
+      if (typeof entry !== 'string') continue;
+      const trimmed = entry.trim().toLowerCase();
+      if (/^doc_[0-9a-hjkmnp-tv-z]{26}$/.test(trimmed)) ids.push(trimmed);
+    }
+    return Array.from(new Set(ids));
   }
 
   private extractSectionCitationRecords(doc: Record<string, unknown>): Record<string, unknown>[] {

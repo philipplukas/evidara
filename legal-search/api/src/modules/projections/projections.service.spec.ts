@@ -574,4 +574,152 @@ describe('ProjectionsService', () => {
     );
     expect(repository.appendHistory).toHaveBeenCalledTimes(1);
   });
+
+  describe('record_kind discriminator (#425)', () => {
+    it('tags primary-document projections with record_kind=legal_document', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Some Document',
+        jurisdiction_id: 'ch_federal',
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(baseProcessedEvent);
+
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          record_kind: 'legal_document',
+        }),
+      );
+    });
+
+    it('derives jurisdiction_ids from canonical jurisdiction_id when array form is absent', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'A',
+        jurisdiction_id: 'jur_ch_federal',
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(baseProcessedEvent);
+
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          record_kind: 'legal_document',
+          jurisdiction_ids: ['jur_ch_federal'],
+        }),
+      );
+    });
+
+    it('passes through canonical jurisdiction_ids + authority_ids arrays from the lean doc', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'A',
+        jurisdiction_ids: ['jur_ch_federal', 'jur_ch_zh', 'GARBAGE'],
+        authority_ids: ['auth_fedlex'],
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(baseProcessedEvent);
+
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jurisdiction_ids: ['jur_ch_federal', 'jur_ch_zh'],
+          authority_ids: ['auth_fedlex'],
+        }),
+      );
+    });
+  });
+
+  describe('commentary insight projection (#425)', () => {
+    const validInsight = {
+      insight_id: 'ins_01jq7c1ny0ffv8qdr1xwbejqb6',
+      document_id: 'doc_01jq7bdptzqv3xs0c41xpw1ybg',
+      document_revision: 3,
+      processing_manifest_id: 'pm_01jq7bhgy7g0pkj4f1d03f8f8c',
+      insight_type: 'referenced_provision',
+      claim: 'References Art. 754 OR',
+      display_text: 'Lehre als Haftungsnorm fuer Organe.',
+      language: 'de',
+      jurisdiction_id: 'jur_ch_federal',
+      jurisdiction_ids: ['jur_ch_federal'],
+      authority_ids: ['auth_fedlex'],
+      source_document_ids: ['doc_01jq7bdptzqv3xs0c41xpw1ybg'],
+      confidence: 0.78,
+      review_state: 'machine_verified',
+    };
+
+    it('projects a commentary insight as record_kind=commentary_insight using insight_id as document_id', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyCommentaryInsight(validInsight);
+
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          document_id: 'ins_01jq7c1ny0ffv8qdr1xwbejqb6',
+          record_kind: 'commentary_insight',
+          title: 'References Art. 754 OR',
+          document_type: 'commentary',
+          jurisdiction: 'CH',
+          jurisdiction_ids: ['jur_ch_federal'],
+          authority_ids: ['auth_fedlex'],
+          source_document_ids: ['doc_01jq7bdptzqv3xs0c41xpw1ybg'],
+          content_preview: 'Lehre als Haftungsnorm fuer Organe.',
+          language: 'de',
+        }),
+      );
+    });
+
+    it('extracts commentary insights carried by the lean document during applyDocumentProcessed', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Primary doc',
+        jurisdiction_id: 'jur_ch_federal',
+        commentary_insights: [validInsight],
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(baseProcessedEvent);
+
+      // upsertProjection called twice: once for the primary document,
+      // once for the commentary insight.
+      expect(repository.upsertProjection).toHaveBeenCalledTimes(2);
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({ record_kind: 'legal_document' }),
+      );
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          record_kind: 'commentary_insight',
+          document_id: 'ins_01jq7c1ny0ffv8qdr1xwbejqb6',
+        }),
+      );
+    });
+
+    it('skips commentary insights missing required canonical id-list fields', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      const incomplete = { ...validInsight, source_document_ids: [] };
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Primary',
+        jurisdiction_id: 'jur_ch_federal',
+        commentary_insights: [incomplete],
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(baseProcessedEvent);
+
+      // Only the primary document is projected; the malformed
+      // commentary insight is dropped.
+      expect(repository.upsertProjection).toHaveBeenCalledTimes(1);
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({ record_kind: 'legal_document' }),
+      );
+    });
+  });
 });
