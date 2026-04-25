@@ -356,6 +356,8 @@ type SourceCreateWithVersionMutationData = {
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH";
   body?: unknown;
+  /** Additional request headers (e.g. `X-Operator-Id` for corrections). */
+  headers?: Record<string, string>;
 };
 
 export type JurisdictionRecord = Jurisdiction & RaRecord<Identifier>;
@@ -434,6 +436,10 @@ const requestJson = async <T>(path: string, options: RequestOptions = {}): Promi
   if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(options.body);
+  }
+
+  if (options.headers) {
+    Object.assign(headers, options.headers);
   }
 
   const response = await fetch(`${API_PREFIX}${path}`, init);
@@ -625,6 +631,184 @@ const toSourceVersionPayload = (
   return payload;
 };
 
+// ─── Corrections + CommentaryInsights (M7 HITL track) ───
+//
+// Wire shapes mirror `contracts/schemas/corrections.json` and
+// `contracts/schemas/commentary-insight.schema.json` (PR #434). The
+// admin app calls these through React Admin's `dataProvider`, which
+// the page-level components consume via the standard hooks
+// (`useGetList`, `useGetOne`, `useCreate`, `useUpdate`).
+
+export type CorrectionResponseRecord = {
+  correction_id: string;
+  target_entity_type: "source" | "document" | "commentary_insight";
+  target_entity_id: string;
+  correction_type: "field_edit" | "annotation" | "reject" | "rescore_request";
+  payload: Record<string, unknown>;
+  original_snapshot: Record<string, unknown> | null;
+  operator_id: string;
+  pipeline_run_id: string | null;
+  rationale: string | null;
+  status: "pending" | "applied" | "rejected" | "superseded";
+  created_at: string;
+  applied_at: string | null;
+};
+
+export type CorrectionRecord = CorrectionResponseRecord & RaRecord<Identifier>;
+
+export type CorrectionListResponse = {
+  data: CorrectionResponseRecord[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+};
+
+export type CommentaryInsightRecord = {
+  insight_id: string;
+  document_id: string;
+  document_revision: number;
+  processing_manifest_id: string;
+  section_id: string | null;
+  citation_id: string | null;
+  record_kind: "commentary_insight";
+  insight_type: string;
+  claim: string;
+  display_text: string;
+  support: Array<Record<string, unknown>>;
+  referenced_authorities: Array<Record<string, unknown>>;
+  language: string | null;
+  jurisdiction_id: string | null;
+  jurisdiction_ids: string[];
+  authority_ids: string[];
+  source_document_ids: string[];
+  confidence: number;
+  review_state: string;
+  generator: Record<string, unknown>;
+  scores: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
+  overlay_revision: number;
+  last_correction_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CommentaryInsightListResponse = {
+  data: CommentaryInsightRecord[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+};
+
+export type CreateCorrectionMutationData = {
+  target_entity_type: "source" | "document" | "commentary_insight";
+  target_entity_id: string;
+  correction_type: "field_edit" | "annotation" | "reject" | "rescore_request";
+  payload: Record<string, unknown>;
+  original_snapshot?: Record<string, unknown> | null;
+  pipeline_run_id?: string | null;
+  rationale?: string | null;
+  /**
+   * Operator identity for the request — sent as `X-Operator-Id` header,
+   * not in the request body, per PR #440. Optional during scaffold;
+   * the API has a documented sentinel fallback.
+   */
+  operator_id?: string;
+};
+
+export type UpdateCorrectionStatusMutationData = {
+  status: "applied" | "rejected" | "superseded";
+  rationale?: string | null;
+};
+
+const toCreateCorrectionPayload = (data: Partial<CreateCorrectionMutationData>) => {
+  const payload: Record<string, unknown> = {
+    target_entity_type: data.target_entity_type,
+    target_entity_id: data.target_entity_id,
+    correction_type: data.correction_type,
+    payload: data.payload ?? {},
+  };
+  if (data.original_snapshot !== undefined) {
+    payload.original_snapshot = data.original_snapshot;
+  }
+  if (data.pipeline_run_id !== undefined) {
+    payload.pipeline_run_id = data.pipeline_run_id;
+  }
+  if (data.rationale !== undefined) {
+    payload.rationale = data.rationale;
+  }
+  return payload;
+};
+
+const toCorrectionStatusPayload = (data: Partial<UpdateCorrectionStatusMutationData>) => {
+  const payload: Record<string, unknown> = {
+    status: data.status,
+  };
+  if (data.rationale !== undefined) {
+    payload.rationale = data.rationale;
+  }
+  return payload;
+};
+
+const readOperatorId = (data: Partial<CreateCorrectionMutationData>): string | undefined => {
+  if (typeof data.operator_id === "string" && data.operator_id.trim().length > 0) {
+    return data.operator_id.trim();
+  }
+  return undefined;
+};
+
+const toCorrectionsQueryString = (params: GetListParams): string => {
+  const query = new URLSearchParams();
+  const { filter, pagination } = params;
+  if (typeof filter.target_entity_type === "string" && filter.target_entity_type.length > 0) {
+    query.set("target_entity_type", filter.target_entity_type);
+  }
+  if (typeof filter.target_entity_id === "string" && filter.target_entity_id.length > 0) {
+    query.set("target_entity_id", filter.target_entity_id);
+  }
+  if (typeof filter.operator_id === "string" && filter.operator_id.length > 0) {
+    query.set("operator_id", filter.operator_id);
+  }
+  if (typeof filter.status === "string" && filter.status.length > 0) {
+    query.set("status", filter.status);
+  }
+  if (typeof filter.correction_type === "string" && filter.correction_type.length > 0) {
+    query.set("correction_type", filter.correction_type);
+  }
+  if (pagination?.perPage) {
+    query.set("limit", String(pagination.perPage));
+  }
+  if (pagination?.page && pagination.perPage) {
+    const offset = (pagination.page - 1) * pagination.perPage;
+    if (offset > 0) {
+      query.set("offset", String(offset));
+    }
+  }
+  const queryString = query.toString();
+  return queryString.length > 0 ? `?${queryString}` : "";
+};
+
+const toCommentaryInsightsQueryString = (params: GetListParams): string => {
+  const query = new URLSearchParams();
+  const { filter, pagination } = params;
+  if (typeof filter.document_id === "string" && filter.document_id.length > 0) {
+    query.set("document_id", filter.document_id);
+  }
+  if (typeof filter.review_state === "string" && filter.review_state.length > 0) {
+    query.set("review_state", filter.review_state);
+  }
+  if (pagination?.perPage) {
+    query.set("limit", String(pagination.perPage));
+  }
+  if (pagination?.page && pagination.perPage) {
+    const offset = (pagination.page - 1) * pagination.perPage;
+    if (offset > 0) {
+      query.set("offset", String(offset));
+    }
+  }
+  const queryString = query.toString();
+  return queryString.length > 0 ? `?${queryString}` : "";
+};
+
 const getSimpleListResult = async <TResource extends SimpleListResourceName>(
   resource: TResource,
   idField: keyof ResourceRecordMap[TResource],
@@ -780,6 +964,28 @@ export const controlPlaneDataProvider: DataProvider = {
       return getRunDetailList(resource, params);
     }
 
+    if (resource === ResourceName.Corrections) {
+      const query = toCorrectionsQueryString(params);
+      const response = await requestJson<CorrectionListResponse>(`/v1/corrections${query}`);
+      const records = response.data.map((item) => toRecord(item, "correction_id"));
+      return {
+        data: records,
+        total: response.total ?? records.length,
+      };
+    }
+
+    if (resource === ResourceName.CommentaryInsights) {
+      const query = toCommentaryInsightsQueryString(params);
+      const response = await requestJson<CommentaryInsightListResponse>(
+        `/v1/commentary-insights${query}`,
+      );
+      const records = response.data.map((item) => toRecord(item, "insight_id"));
+      return {
+        data: records,
+        total: response.total ?? records.length,
+      };
+    }
+
     throw new Error(`Unsupported resource "${resource}".`);
   },
 
@@ -824,6 +1030,18 @@ export const controlPlaneDataProvider: DataProvider = {
       return {
         data: toRecord(response, "run_id"),
       };
+    }
+
+    if (resource === ResourceName.Corrections) {
+      const response = await requestJson<CorrectionResponseRecord>(`/v1/corrections/${params.id}`);
+      return { data: toRecord(response, "correction_id") };
+    }
+
+    if (resource === ResourceName.CommentaryInsights) {
+      const response = await requestJson<CommentaryInsightRecord>(
+        `/v1/commentary-insights/${params.id}`,
+      );
+      return { data: toRecord(response, "insight_id") };
     }
 
     return unsupported(resource, "getOne");
@@ -895,6 +1113,19 @@ export const controlPlaneDataProvider: DataProvider = {
       });
       return {
         data: toRecord(response, "source_version_id"),
+      };
+    }
+
+    if (resource === ResourceName.Corrections) {
+      // PATCH /v1/corrections/{id} is the lifecycle-transition endpoint
+      // (see PR #434). The dataProvider passes through `status` and
+      // optional `rationale`; the server enforces legal transitions.
+      const response = await requestJson<CorrectionResponseRecord>(`/v1/corrections/${params.id}`, {
+        method: "PATCH",
+        body: toCorrectionStatusPayload(params.data),
+      });
+      return {
+        data: toRecord(response, "correction_id"),
       };
     }
 
@@ -977,6 +1208,26 @@ export const controlPlaneDataProvider: DataProvider = {
       });
       return {
         data: toRecord(response, "run_id"),
+      };
+    }
+
+    if (resource === ResourceName.Corrections) {
+      // POST /v1/corrections is the canonical write surface. The
+      // CommentaryInsight editor submits a `field_edit` correction
+      // through this entry point; admin code never PATCHes the insight
+      // directly. See PR #440 for the design rationale.
+      const operatorId = readOperatorId(params.data);
+      const headers: Record<string, string> = {};
+      if (operatorId) {
+        headers["X-Operator-Id"] = operatorId;
+      }
+      const response = await requestJson<CorrectionResponseRecord>("/v1/corrections", {
+        method: "POST",
+        body: toCreateCorrectionPayload(params.data),
+        headers,
+      });
+      return {
+        data: toRecord(response, "correction_id"),
       };
     }
 

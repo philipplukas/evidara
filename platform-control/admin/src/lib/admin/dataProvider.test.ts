@@ -1059,6 +1059,211 @@ describe("controlPlaneDataProvider", () => {
     expect(result[2]?.provider).toBe("fedlex_sparql");
   });
 
+  describe("corrections + commentary-insights (#428)", () => {
+    it("filters corrections list query by status, type, and target", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                correction_id: "cor_01",
+                target_entity_type: "commentary_insight",
+                target_entity_id: "ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+                correction_type: "field_edit",
+                payload: { field: "claim", value: "x" },
+                original_snapshot: null,
+                operator_id: "op_01",
+                pipeline_run_id: null,
+                rationale: null,
+                status: "pending",
+                created_at: "2026-04-25T09:00:00Z",
+                applied_at: null,
+              },
+            ],
+            total: 1,
+            limit: 25,
+            offset: 0,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const result = await controlPlaneDataProvider.getList("corrections", {
+        pagination: { page: 1, perPage: 25 },
+        sort: { field: "created_at", order: "DESC" },
+        filter: {
+          status: "pending",
+          correction_type: "field_edit",
+          target_entity_type: "commentary_insight",
+        },
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const url = fetchMock.mock.calls[0]?.[0] as string;
+      expect(url).toContain("/v1/corrections?");
+      expect(url).toContain("status=pending");
+      expect(url).toContain("correction_type=field_edit");
+      expect(url).toContain("target_entity_type=commentary_insight");
+      expect(url).toContain("limit=25");
+      expect(result.total).toBe(1);
+      expect(result.data[0]?.id).toBe("cor_01");
+    });
+
+    it("creates a correction via POST /v1/corrections and forwards X-Operator-Id when supplied", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            correction_id: "cor_99",
+            target_entity_type: "commentary_insight",
+            target_entity_id: "ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+            correction_type: "field_edit",
+            payload: { field: "claim", value: "Sharper claim" },
+            original_snapshot: { claim: "Old claim" },
+            operator_id: "op_01jqs7p1bcvz2tw5kxh9mq80fg",
+            pipeline_run_id: null,
+            rationale: "Editor sharpened it.",
+            status: "pending",
+            created_at: "2026-04-25T09:00:00Z",
+            applied_at: null,
+          }),
+          { status: 201, headers: { "content-type": "application/json" } },
+        ),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const result = await controlPlaneDataProvider.create("corrections", {
+        data: {
+          target_entity_type: "commentary_insight",
+          target_entity_id: "ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+          correction_type: "field_edit",
+          payload: { field: "claim", value: "Sharper claim" },
+          original_snapshot: { claim: "Old claim" },
+          rationale: "Editor sharpened it.",
+          operator_id: "op_01jqs7p1bcvz2tw5kxh9mq80fg",
+        },
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      expect(init.method).toBe("POST");
+      const headers = init.headers as Record<string, string>;
+      expect(headers["X-Operator-Id"]).toBe("op_01jqs7p1bcvz2tw5kxh9mq80fg");
+      expect(JSON.parse(init.body as string)).toEqual({
+        target_entity_type: "commentary_insight",
+        target_entity_id: "ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+        correction_type: "field_edit",
+        payload: { field: "claim", value: "Sharper claim" },
+        original_snapshot: { claim: "Old claim" },
+        rationale: "Editor sharpened it.",
+      });
+      expect(result.data.id).toBe("cor_99");
+    });
+
+    it("transitions correction status via PATCH /v1/corrections/{id}", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            correction_id: "cor_99",
+            target_entity_type: "commentary_insight",
+            target_entity_id: "ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+            correction_type: "field_edit",
+            payload: {},
+            original_snapshot: null,
+            operator_id: "op_01",
+            pipeline_run_id: null,
+            rationale: "OK",
+            status: "applied",
+            created_at: "2026-04-25T09:00:00Z",
+            applied_at: "2026-04-25T09:01:00Z",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const result = await controlPlaneDataProvider.update("corrections", {
+        id: "cor_99",
+        data: { status: "applied", rationale: "OK" },
+        previousData: { id: "cor_99", correction_id: "cor_99", status: "pending" },
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0]?.[0]).toContain("/v1/corrections/cor_99");
+      const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      expect(init.method).toBe("PATCH");
+      expect(JSON.parse(init.body as string)).toEqual({ status: "applied", rationale: "OK" });
+      expect(result.data.status).toBe("applied");
+    });
+
+    it("filters commentary-insights list query by review_state and document_id", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: [], total: 0, limit: 25, offset: 0 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      await controlPlaneDataProvider.getList("commentary-insights", {
+        pagination: { page: 2, perPage: 25 },
+        sort: { field: "updated_at", order: "DESC" },
+        filter: { review_state: "machine_verified", document_id: "doc_01" },
+      });
+
+      const url = fetchMock.mock.calls[0]?.[0] as string;
+      expect(url).toContain("/v1/commentary-insights?");
+      expect(url).toContain("review_state=machine_verified");
+      expect(url).toContain("document_id=doc_01");
+      expect(url).toContain("limit=25");
+      expect(url).toContain("offset=25");
+    });
+
+    it("fetches a single commentary insight by id", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            insight_id: "ins_01",
+            document_id: "doc_01",
+            document_revision: 1,
+            processing_manifest_id: "pm_01",
+            section_id: null,
+            citation_id: null,
+            record_kind: "commentary_insight",
+            insight_type: "referenced_provision",
+            claim: "x",
+            display_text: "x",
+            support: [],
+            referenced_authorities: [],
+            language: "de",
+            jurisdiction_id: "jur_ch_federal",
+            jurisdiction_ids: ["jur_ch_federal"],
+            authority_ids: ["auth_fedlex"],
+            source_document_ids: ["doc_01"],
+            confidence: 0.5,
+            review_state: "machine_verified",
+            generator: { name: "x", version: "v1" },
+            scores: {},
+            metadata: null,
+            overlay_revision: 1,
+            last_correction_id: null,
+            created_at: "2026-04-25T09:00:00Z",
+            updated_at: "2026-04-25T09:00:00Z",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const result = await controlPlaneDataProvider.getOne("commentary-insights", {
+        id: "ins_01",
+      });
+
+      expect(fetchMock.mock.calls[0]?.[0]).toContain("/v1/commentary-insights/ins_01");
+      expect(result.data.id).toBe("ins_01");
+    });
+  });
+
   it("fills missing preview summary collections and normalizes drift status", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(
