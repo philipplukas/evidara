@@ -153,6 +153,11 @@
       "pinResult": "Ergebnis anheften",
       "unpinResult": "Ergebnis l\u00f6sen"
     },
+    "commentaryCard": {
+      "kindLabel": "Kommentar",
+      "commentaryOn": "Kommentar zu",
+      "sourceDocumentsAriaLabel": "{count, plural, one {# Quelldokument} other {# Quelldokumente}}"
+    },
     "list": {
       "sortedByRelevance": "Nach Relevanz sortiert",
       "sortedByRelevanceHelp": "Treffer sind nach algorithmischer Relevanz geordnet (keine manuelle Pr\u00fcfung jedes Ergebnisses).",
