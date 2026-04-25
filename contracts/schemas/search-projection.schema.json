@@ -7,10 +7,17 @@
   "required": [
     "document_id",
     "title",
+    "record_kind",
+    "jurisdiction_ids",
     "sections_count",
     "citations_count"
   ],
   "properties": {
+    "record_kind": {
+      "type": "string",
+      "description": "Discriminator selecting which logical record this projection row carries. Drives client-side rendering and join policy.",
+      "enum": ["legal_document", "commentary_insight"]
+    },
     "document_id": {
       "type": "string",
       "description": "Canonical document ID. Copied from canonical output.",
@@ -22,8 +29,36 @@
     },
     "jurisdiction": {
       "type": "string",
-      "description": "Normalized jurisdiction code. Copied from canonical output. MUST match contracts/vocabularies/jurisdiction.json.",
+      "description": "Back-compat ISO 3166 jurisdiction code copied from canonical output. New consumers should prefer `jurisdiction_ids` for canonical filtering. MUST match contracts/vocabularies/jurisdiction.json.",
       "enum": ["CH", "AT", "DE", "LI"]
+    },
+    "jurisdiction_ids": {
+      "type": "array",
+      "description": "Canonical jurisdiction IDs this row belongs to. Drives the canonical `jur_*` search filters; ISO `jurisdiction` remains for back-compat and is ANDed with this when both are present.",
+      "items": {
+        "type": "string",
+        "pattern": "^jur_[a-z0-9_]+$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "authority_ids": {
+      "type": "array",
+      "description": "Canonical authority IDs attached to this row. Optional for `legal_document` rows (primary statutes are commonly attributed by jurisdiction alone); required for `commentary_insight` rows via the conditional below.",
+      "items": {
+        "type": "string",
+        "pattern": "^auth_[a-z0-9_]+$"
+      },
+      "uniqueItems": true
+    },
+    "source_document_ids": {
+      "type": "array",
+      "description": "Canonical primary documents referenced by this row. Empty for `legal_document` rows; required and non-empty for `commentary_insight` rows so the UI can resolve back to source.",
+      "items": {
+        "type": "string",
+        "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+      },
+      "uniqueItems": true
     },
     "document_type": {
       "type": "string",
@@ -120,5 +155,22 @@
       "description": "Timestamp when the canonical document was processed."
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "record_kind": { "const": "commentary_insight" }
+        },
+        "required": ["record_kind"]
+      },
+      "then": {
+        "required": ["authority_ids", "source_document_ids"],
+        "properties": {
+          "source_document_ids": { "minItems": 1 },
+          "authority_ids": { "minItems": 1 }
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }

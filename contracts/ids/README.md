@@ -31,6 +31,8 @@ IDs are designed to be:
 | `event_id` | event producer | `evt_{ulid}` | `evt_01jq7c61be9zmhz58mmp3jx0b2` |
 | `jurisdiction_id` | platform-control | `jur_{slug}` | `jur_ch_federal` |
 | `authority_id` | platform-control | `auth_{slug}` | `auth_fedlex` |
+| `correction_id` | platform-control | `cor_{ulid}` | `cor_01jqs7m4dxn5e6vh7q2bzcjt8r` |
+| `operator_id` | platform-control | `op_{ulid}` | `op_01jqs7p1bcvz2tw5kxh9mq80fg` |
 
 ## Format Rules
 

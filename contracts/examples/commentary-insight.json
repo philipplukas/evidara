@@ -5,6 +5,7 @@
   "processing_manifest_id": "pm_01jq7bhgy7g0pkj4f1d03f8f8c",
   "section_id": "sec_01jq7bprm7p1ef4rwr7s2j1bt3",
   "citation_id": null,
+  "record_kind": "commentary_insight",
   "insight_type": "referenced_provision",
   "claim": "References Art. 754 OR",
   "display_text": "Art. 754 OR wird in der Lehre als Haftungsnorm fuer Organe erlaeutert.",
@@ -30,6 +31,9 @@
   ],
   "language": "de",
   "jurisdiction_id": "jur_ch_federal",
+  "jurisdiction_ids": ["jur_ch_federal"],
+  "authority_ids": ["auth_fedlex"],
+  "source_document_ids": ["doc_01jq7bdptzqv3xs0c41xpw1ybg"],
   "confidence": 0.78,
   "review_state": "machine_verified",
   "generator": {

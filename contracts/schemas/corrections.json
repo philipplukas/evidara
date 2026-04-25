@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/schemas/correction",
+  "title": "Correction",
+  "description": "Structured human-in-the-loop correction raised against an upstream domain entity (source, canonical document, or commentary insight). Corrections are the durable audit trail for HITL edits, annotations, rejections, and rescore requests; downstream projections rebuild from upstream entities and do not carry their own corrections.",
+  "type": "object",
+  "required": [
+    "correction_id",
+    "target_entity_type",
+    "target_entity_id",
+    "correction_type",
+    "payload",
+    "status",
+    "operator_id",
+    "rationale",
+    "original_snapshot",
+    "pipeline_run_id",
+    "applied_at",
+    "created_at"
+  ],
+  "properties": {
+    "correction_id": {
+      "type": "string",
+      "description": "Stable correction identifier.",
+      "pattern": "^cor_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "target_entity_type": {
+      "type": "string",
+      "description": "Domain entity family this correction targets. Search projections are derived/rebuildable and are not a valid target — corrections target the upstream entity and the projection rebuilds.",
+      "enum": ["source", "document", "commentary_insight"]
+    },
+    "target_entity_id": {
+      "type": "string",
+      "description": "Identifier of the targeted entity. Must match the family implied by target_entity_type (src_*, doc_*, ins_*).",
+      "minLength": 1
+    },
+    "correction_type": {
+      "type": "string",
+      "description": "Kind of correction. field_edit replaces field values; annotation attaches operator notes; reject marks the entity unfit; rescore_request asks the pipeline to re-process or re-rank.",
+      "enum": ["field_edit", "annotation", "reject", "rescore_request"]
+    },
+    "payload": {
+      "type": "object",
+      "description": "Free-form correction payload. The shape is intentionally open in v1 of the contract; per-correction_type schemas may be tightened in a follow-up minor once admin and pipeline consumers stabilize.",
+      "additionalProperties": true
+    },
+    "original_snapshot": {
+      "type": ["object", "null"],
+      "description": "Snapshot of the targeted fields prior to the correction, when applicable. Null for corrections that do not modify existing fields (e.g. rescore_request, pure annotation).",
+      "additionalProperties": true
+    },
+    "operator_id": {
+      "type": "string",
+      "description": "Operator who raised the correction.",
+      "pattern": "^op_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "pipeline_run_id": {
+      "type": ["string", "null"],
+      "description": "Pipeline run that produced the correction, when raised by an automated quality gate. Null for human-raised corrections.",
+      "pattern": "^run_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "rationale": {
+      "type": ["string", "null"],
+      "description": "Human-readable rationale for the correction. Optional but strongly encouraged; required by review policy at the application layer for `reject` and `field_edit`.",
+      "maxLength": 2000
+    },
+    "status": {
+      "type": "string",
+      "description": "Lifecycle state. The application layer enforces legal transitions: pending → applied | rejected; applied → superseded.",
+      "enum": ["pending", "applied", "rejected", "superseded"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Wall-clock timestamp when the correction was raised."
+    },
+    "applied_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Wall-clock timestamp when status transitioned to `applied`. Null for pending, rejected, or superseded corrections."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "target_entity_type": { "const": "source" }
+        },
+        "required": ["target_entity_type"]
+      },
+      "then": {
+        "properties": {
+          "target_entity_id": { "pattern": "^src_[0-9a-hjkmnp-tv-z]{26}$" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "target_entity_type": { "const": "document" }
+        },
+        "required": ["target_entity_type"]
+      },
+      "then": {
+        "properties": {
+          "target_entity_id": { "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "target_entity_type": { "const": "commentary_insight" }
+        },
+        "required": ["target_entity_type"]
+      },
+      "then": {
+        "properties": {
+          "target_entity_id": { "pattern": "^ins_[0-9a-hjkmnp-tv-z]{26}$" }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

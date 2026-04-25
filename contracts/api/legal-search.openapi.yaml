@@ -12,7 +12,7 @@ info:
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
     Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
-  version: 0.3.4
+  version: 0.4.0
   contact:
     name: Evidara Team
   license:
@@ -77,6 +77,38 @@ paths:
             Comma-separated list of jurisdiction filters. Each element
             follows the same shape as `jurisdiction` — country code,
             subdivision code, or a mix.
+        - name: jurisdiction_id
+          in: query
+          schema:
+            type: string
+            pattern: '^jur_[a-z0-9_]+$'
+          description: |
+            Canonical jurisdiction ID filter (e.g. `jur_ch_federal`).
+            Filters against the search-projection `jurisdiction_ids` array.
+            ANDed with the legacy ISO `jurisdiction`/`jurisdictions` parameters
+            when both are supplied.
+        - name: jurisdiction_ids
+          in: query
+          schema:
+            type: string
+          description: |
+            Comma-separated list of canonical jurisdiction IDs
+            (each item must match `^jur_[a-z0-9_]+$`).
+        - name: authority_id
+          in: query
+          schema:
+            type: string
+            pattern: '^auth_[a-z0-9_]+$'
+          description: |
+            Canonical authority ID filter (e.g. `auth_fedlex`).
+            Filters against the search-projection `authority_ids` array.
+        - name: authority_ids
+          in: query
+          schema:
+            type: string
+          description: |
+            Comma-separated list of canonical authority IDs
+            (each item must match `^auth_[a-z0-9_]+$`).
         - name: languages
           in: query
           schema:

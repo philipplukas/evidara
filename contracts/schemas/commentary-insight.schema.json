@@ -9,17 +9,26 @@
     "document_id",
     "document_revision",
     "processing_manifest_id",
+    "record_kind",
     "insight_type",
     "claim",
     "display_text",
     "support",
     "referenced_authorities",
+    "jurisdiction_ids",
+    "authority_ids",
+    "source_document_ids",
     "confidence",
     "review_state",
     "generator",
     "scores"
   ],
   "properties": {
+    "record_kind": {
+      "type": "string",
+      "description": "Discriminator marking this record as a commentary insight when joined into the legal-search projection.",
+      "const": "commentary_insight"
+    },
     "insight_id": {
       "type": "string",
       "description": "Stable commentary insight identifier.",
@@ -106,8 +115,38 @@
     },
     "jurisdiction_id": {
       "type": ["string", "null"],
-      "description": "Canonical jurisdiction reference when available.",
+      "description": "Canonical primary jurisdiction reference when available. The full facet set lives in `jurisdiction_ids`.",
       "pattern": "^jur_[a-z0-9_]+$"
+    },
+    "jurisdiction_ids": {
+      "type": "array",
+      "description": "Canonical jurisdictions this insight applies to. Drives search-projection facets and overlay routing.",
+      "items": {
+        "type": "string",
+        "pattern": "^jur_[a-z0-9_]+$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "authority_ids": {
+      "type": "array",
+      "description": "Canonical authorities (publishing or authoring) attached to this insight. Required for commentary insights.",
+      "items": {
+        "type": "string",
+        "pattern": "^auth_[a-z0-9_]+$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "source_document_ids": {
+      "type": "array",
+      "description": "Canonical primary documents this insight comments on. Required and non-empty for commentary insights so search joins can resolve back to source.",
+      "items": {
+        "type": "string",
+        "pattern": "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
     },
     "confidence": {
       "type": "number",

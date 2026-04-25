@@ -1,0 +1,17 @@
+{
+  "correction_id": "cor_01jqs7t9k7m4hbpvg3rzx2eq5n",
+  "target_entity_type": "document",
+  "target_entity_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+  "correction_type": "rescore_request",
+  "payload": {
+    "reason_code": "low_quality_extractions",
+    "requested_priority": "normal"
+  },
+  "original_snapshot": null,
+  "operator_id": "op_01jqs7p1bcvz2tw5kxh9mq80fg",
+  "pipeline_run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+  "rationale": "QA gate flagged citation parse-rate below threshold; requesting re-process.",
+  "status": "pending",
+  "created_at": "2026-04-25T10:02:11Z",
+  "applied_at": null
+}
