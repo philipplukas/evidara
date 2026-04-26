@@ -102,10 +102,12 @@ class TemporalRescoreScheduler:
         if self._injected_client is not None:
             return self._injected_client
         if self._connected_client is None:
-            from temporalio.client import Client
+            from platform_control.config import get_settings
+            from platform_control.temporal.client import connect_temporal
 
-            self._connected_client = await Client.connect(
-                self.target,
+            self._connected_client = await connect_temporal(
+                get_settings(),
+                target=self.target,
                 namespace=self.namespace,
             )
         return self._connected_client

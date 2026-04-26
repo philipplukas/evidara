@@ -18,7 +18,6 @@ import logging
 from datetime import timedelta
 
 from temporalio.client import (
-    Client,
     Schedule,
     ScheduleActionStartWorkflow,
     ScheduleAlreadyRunningError,
@@ -29,6 +28,7 @@ from temporalio.client import (
 )
 
 from platform_control.config import get_settings
+from platform_control.temporal.client import connect_temporal
 
 LOGGER = logging.getLogger("platform_control.schedule_retention")
 
@@ -95,10 +95,7 @@ def build_schedule(
 
 async def _async_main(args: argparse.Namespace) -> None:
     settings = get_settings()
-    client = await Client.connect(
-        settings.temporal_target,
-        namespace=settings.temporal_namespace,
-    )
+    client = await connect_temporal(settings)
 
     schedule = build_schedule(
         task_queue=settings.temporal_task_queue,

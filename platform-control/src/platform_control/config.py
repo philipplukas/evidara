@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     temporal_namespace: str = "default"
     temporal_task_queue: str = "platform-control-wizard"
     temporal_target: str = "localhost:7233"
+    temporal_tls_ca_path: Path | None = None
+    temporal_tls_cert_path: Path | None = None
+    temporal_tls_key_path: Path | None = None
+    temporal_tls_server_name: str | None = None
     rescore_runner_backend: Literal["document_intelligence", "in_memory"] = Field(
         default="document_intelligence",
         description=(
@@ -106,6 +110,18 @@ class Settings(BaseSettings):
         if value is None or value == "":
             return None
         return str(value)
+
+    @field_validator(
+        "temporal_tls_ca_path",
+        "temporal_tls_cert_path",
+        "temporal_tls_key_path",
+        mode="before",
+    )
+    @classmethod
+    def _empty_path_to_none(cls, value: object) -> object | None:
+        if value is None or value == "":
+            return None
+        return value
 
 
 @lru_cache
