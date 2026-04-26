@@ -100,6 +100,12 @@ These replace the need for custom index-lifecycle semantics in shared contracts.
 - **API:** `contracts/api/legal-search.openapi.yaml`
 - **Reads:** published DI surfaces referenced by event refs
 
+## Operator references
+
+- `docs/runbooks/projection-reindex-backfill.md` — alias-cutover reindex pattern.
+- `docs/runbooks/staging-projection-replay.md` — projection replay against staging.
+- `docs/runbooks/hitl-rollout.md` — HITL rollout (canonical `jur_*`/`auth_*` filters, commentary records, mapping change + replay).
+
 ## Testing
 
 See [Legal Search Testing](testing/legal-search-testing.md) for the full testing strategy.
