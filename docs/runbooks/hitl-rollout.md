@@ -169,17 +169,29 @@ by the projection builder in #425. Resolves on lane completion (#425).
 
 **Rollback (alias revert):**
 
+The cutover script (`legal-search/api/scripts/opensearch-alias-cutover.ts`)
+does not yet have a `--revert` flag — point the read+write aliases at the
+previous index by issuing the OpenSearch `_aliases` swap directly:
+
 ```bash
-# Point the read+write aliases back at the previous index.
-npx tsx scripts/opensearch-alias-cutover.ts --revert
-# (--revert flag mirrors the cutover idiom; if the script doesn't support it
-#  yet, the manual fallback is documented in projection-reindex-backfill.md
-#  § Manual alias revert.)
+# Substitute OLD_INDEX with the index name held under the read alias before
+# the cutover (the script logs it during dry-run, and the previous
+# alias targets are also visible via `_alias/<read-alias>`).
+curl -X POST "$OPENSEARCH_NODE/_aliases" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "actions": [
+      {"remove": {"index": "evidara-documents-read-dev-NEW", "alias": "evidara-documents-read-dev"}},
+      {"remove": {"index": "evidara-documents-read-dev-NEW", "alias": "evidara-documents-write-dev"}},
+      {"add":    {"index": "evidara-documents-read-dev-OLD", "alias": "evidara-documents-read-dev"}},
+      {"add":    {"index": "evidara-documents-read-dev-OLD", "alias": "evidara-documents-write-dev"}}
+    ]
+  }'
 ```
 
-If the new mapping silently drops a doc, prefer revert + investigate
-over re-running the reindex; reindex twice without alias revert
-double-writes.
+If the new mapping silently drops a doc, prefer the alias revert above
++ investigate over re-running the reindex; reindex twice without alias
+revert double-writes.
 
 ### Step 6 — Deploy `platform-control/admin`
 
@@ -278,7 +290,7 @@ curl -s -X POST http://<opensearch-host>/<new_index>/_search \
 | `legal-search/frontend` | Cloud Run revision pin / static-host previous build | Safe. |
 | `platform-control/admin` | Cloud Run revision pin / static-host previous build | Safe. |
 | Alembic migration | `alembic downgrade <pre_corrections_head>` | Only safe **before** corrections rows exist. After, see Method B below. |
-| OpenSearch index | `opensearch-alias-cutover.ts --revert` | Atomic alias swap back. Hold old index for ≥ 24h. |
+| OpenSearch index | Direct `POST /_aliases` swap (see Step 5 § "Rollback (alias revert)") | Atomic alias swap back. Hold old index for ≥ 24h. |
 
 **Method B — partial rollback when corrections rows exist:**
 
@@ -339,6 +351,6 @@ The placeholders below resolve as their lane PRs land:
 - Final OpenSearch mapping diff for the projection (#425).
 - Admin nav path / URL for the corrections queue (#428).
 - `evidara` CLI subcommand surface for `corrections` (#421).
-- `--revert` flag on `opensearch-alias-cutover.ts` if the lane introduces it; otherwise keep the manual fallback link.
+- `--revert` flag on `opensearch-alias-cutover.ts` if a lane introduces it; until then the rollback uses the direct `POST /_aliases` swap documented in Step 5.
 
 A follow-up PR (or the merging lane PR itself) should remove each "Resolves on lane completion" sentinel as the value lands.
