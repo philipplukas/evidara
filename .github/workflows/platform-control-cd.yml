@@ -24,8 +24,21 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
+  gcp-cloud-run-disabled:
+    name: GCP Cloud Run CD disabled
+    if: ${{ vars.ENABLE_GCP_CLOUD_RUN_CD != 'true' }}
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    steps:
+      - name: Explain skipped deployment
+        run: |
+          echo "### Runtime Cloud Run CD skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Reason: \`ENABLE_GCP_CLOUD_RUN_CD\` is not set to \`true\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "- GCP billing is optional for the current low-cost Hetzner path." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Images continue to publish to GHCR via \`Runtime Images\`." >> "$GITHUB_STEP_SUMMARY"
+
   deploy-dev:
     name: Deploy runtime services to dev
+    if: ${{ vars.ENABLE_GCP_CLOUD_RUN_CD == 'true' }}
     runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     environment: dev
     env:
@@ -319,6 +332,7 @@ jobs:
 
   deploy-prod:
     name: Deploy runtime services to prod
+    if: ${{ vars.ENABLE_GCP_CLOUD_RUN_CD == 'true' }}
     runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
     needs: deploy-dev
     environment: prod

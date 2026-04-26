@@ -13,6 +13,9 @@ repository_variables = {
   GCP_PROJECT_ID_PROD                  = "data-platform-prod-492214"
   GCP_ARTIFACT_PROJECT_ID              = "data-platform-dev-492214"
   ARTIFACT_REGISTRY_REPOSITORY         = "runtime"
+  # GCP runtime publication/deploy is opt-in while the low-cost Hetzner path is active.
+  ENABLE_GCP_ARTIFACT_REGISTRY         = "false"
+  ENABLE_GCP_CLOUD_RUN_CD              = "false"
   # Cloud Run resource name prefix before -dev / -prod (see runtime.gcp.tfvars keys, e.g. platform-control-api).
   PLATFORM_CONTROL_SERVICE_NAME        = "platform-control-api"
   PLATFORM_CONTROL_WORKER_SERVICE_NAME = "platform-control-worker"

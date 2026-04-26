@@ -107,7 +107,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -115,7 +115,7 @@ jobs:
           token_format: access_token
 
       - name: Login to Artifact Registry
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
@@ -128,7 +128,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-platform-control
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/platform-control
+            ${{ vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && format('{0}-docker.pkg.dev/{1}/{2}/platform-control', vars.GCP_REGION, vars.GCP_ARTIFACT_PROJECT_ID, vars.ARTIFACT_REGISTRY_REPOSITORY) || '' }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
@@ -174,7 +174,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -182,7 +182,7 @@ jobs:
           token_format: access_token
 
       - name: Login to Artifact Registry
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
@@ -195,7 +195,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-legal-search-api
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/legal-search-api
+            ${{ vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && format('{0}-docker.pkg.dev/{1}/{2}/legal-search-api', vars.GCP_REGION, vars.GCP_ARTIFACT_PROJECT_ID, vars.ARTIFACT_REGISTRY_REPOSITORY) || '' }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
@@ -241,7 +241,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -249,7 +249,7 @@ jobs:
           token_format: access_token
 
       - name: Login to Artifact Registry
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
@@ -262,7 +262,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-legal-search-frontend
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/legal-search-frontend
+            ${{ vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && format('{0}-docker.pkg.dev/{1}/{2}/legal-search-frontend', vars.GCP_REGION, vars.GCP_ARTIFACT_PROJECT_ID, vars.ARTIFACT_REGISTRY_REPOSITORY) || '' }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
@@ -308,7 +308,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -316,7 +316,7 @@ jobs:
           token_format: access_token
 
       - name: Login to Artifact Registry
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
@@ -329,7 +329,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-platform-control-admin
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/platform-control-admin
+            ${{ vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && format('{0}-docker.pkg.dev/{1}/{2}/platform-control-admin', vars.GCP_REGION, vars.GCP_ARTIFACT_PROJECT_ID, vars.ARTIFACT_REGISTRY_REPOSITORY) || '' }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
@@ -375,7 +375,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -383,7 +383,7 @@ jobs:
           token_format: access_token
 
       - name: Login to Artifact Registry
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
@@ -396,7 +396,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-platform-control-worker
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/platform-control-worker
+            ${{ vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && format('{0}-docker.pkg.dev/{1}/{2}/platform-control-worker', vars.GCP_REGION, vars.GCP_ARTIFACT_PROJECT_ID, vars.ARTIFACT_REGISTRY_REPOSITORY) || '' }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
@@ -442,7 +442,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -450,7 +450,7 @@ jobs:
           token_format: access_token
 
       - name: Login to Artifact Registry
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
@@ -463,7 +463,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-document-intelligence-consumer
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/di-consumer
+            ${{ vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && format('{0}-docker.pkg.dev/{1}/{2}/di-consumer', vars.GCP_REGION, vars.GCP_ARTIFACT_PROJECT_ID, vars.ARTIFACT_REGISTRY_REPOSITORY) || '' }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
@@ -509,7 +509,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -517,7 +517,7 @@ jobs:
           token_format: access_token
 
       - name: Login to Artifact Registry
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
@@ -530,7 +530,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/evidara-document-intelligence-document-service
-            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_ARTIFACT_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}/document-intelligence-document-service
+            ${{ vars.ENABLE_GCP_ARTIFACT_REGISTRY == 'true' && format('{0}-docker.pkg.dev/{1}/{2}/document-intelligence-document-service', vars.GCP_REGION, vars.GCP_ARTIFACT_PROJECT_ID, vars.ARTIFACT_REGISTRY_REPOSITORY) || '' }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=sha,prefix=sha-
