@@ -177,9 +177,22 @@ For each issue, **paste a checklist comment** if the issue body is stale; **clos
 | [TAR-62](https://linear.app/tart-baozi/issue/TAR-62) | ```markdown\n## Agent handoff — promotion automation\n- [ ] Document current dev→(staging)→prod steps in runbook.\n- [ ] List gaps: Databricks bundle, Terraform, GitHub Environments.\n- [ ] Create child issues per gap (one PR-sized task each).\n``` |
 | [TAR-63](https://linear.app/tart-baozi/issue/TAR-63) | ```markdown\n## Agent handoff — replay checkpoints\n- [ ] Verify `GET /v1/runs/{id}` replay_checkpoint meets operator needs; file issues for gaps.\n``` |
 | [TAR-67](https://linear.app/tart-baozi/issue/TAR-67) | ```markdown\n## Operator execution — drills\nRunbooks merged ≠ drills executed.\n- [ ] Withdrawal drill — evidence: workflow URL + artifact per phase-5-go-no-go §2.1\n- [ ] DLQ triage drill — same\n- [ ] Alias rollback drill — same\n``` |
-| [TAR-139](https://linear.app/tart-baozi/issue/TAR-139) | ```markdown\n## Agent handoff — discovery vs mutating APIs\n- [ ] Inventory OpenAPI `agent-discovery` coverage vs desired CLI verbs.\n- [ ] File child issues for each missing read surface.\n``` |
+| [TAR-139](https://linear.app/tart-baozi/issue/TAR-139) | ```markdown\n## Agent handoff — discovery vs mutating APIs\n- [x] Inventory OpenAPI `agent-discovery` coverage vs desired CLI verbs (2026-04-25 snapshot).\n- [ ] File child issues for each missing read surface.\n\n### Coverage snapshot (2026-04-25)\nCurrent `agent-discovery` operations:\n- `contracts/api/platform-control.openapi.yaml` — 9 operations (sources list + runs/wizard read surfaces)\n- `contracts/api/legal-search.openapi.yaml` — 5 operations (search + document detail/read surfaces)\n\nCurrent `evidara workflow` verbs:\n- source: `inspect`, `propose`, `apply`, `verify`, `compensate`\n- search: `inspect`, `verify`\n- run: `status`, `evidence`\n\n### Gap map for child issues\n1. `workflow run resume` read + action support (CLI + contract-backed endpoint if required).\n2. `workflow run cancel` read + action support (CLI + contract-backed endpoint if required).\n3. Source approval/preview explicit read models to avoid overloading generic run lookups.\n4. Optional document-processing discovery surface if `workflow document *` is kept in TAR-139 scope.\n``` |
 
 ---
+
+### TAR-139 inventory notes (agent prep, 2026-04-25)
+
+This snapshot is intended to be pasted into TAR-139 before creating child issues.
+
+| Area | Current coverage | Remaining work item |
+|---|---|---|
+| `workflow source inspect` | Partially covered by `agent-discovery` (`GET /v1/sources`). Current source-detail endpoint (`GET /v1/sources/{source_id}`) is not tagged `agent-discovery`. | Decide whether source detail should be tagged `agent-discovery` or avoided in agent-mode commands. |
+| `workflow search inspect` and `workflow search verify` | Covered by `agent-discovery` (`GET /v1/search`, document detail/read paths in legal-search OpenAPI). | Keep as-is; file issue only if query-pack specific summaries are required server-side. |
+| `workflow run status` and `workflow run evidence` | Covered by `agent-discovery` run read endpoints in platform-control OpenAPI. | Keep as-is; add schema-level evidence summary if operators need stronger guarantees. |
+| Planned `workflow run resume` | Not yet represented as a CLI command; corresponding durable endpoint/contract is not tagged as `agent-discovery`. | Create child issue: contract-first endpoint + CLI wrapper + tests. |
+| Planned `workflow run cancel` | Not yet represented as a CLI command; corresponding durable endpoint/contract is not tagged as `agent-discovery`. | Create child issue: contract-first endpoint + CLI wrapper + tests. |
+| Proposed `workflow document *` family | Mentioned in architecture docs, not implemented in CLI command tree. | Create child issue only if still in TAR-139 scope after roadmap check. |
 
 ## Tier C — Metadata + relevance (parallel to M5; required for “demo truth”)
 
