@@ -50,11 +50,9 @@ async def slack_interaction(request: Request) -> dict[str, Any]:
     settings = get_settings()
 
     if settings.wizard_orchestrator_backend == "temporal":
-        from temporalio.client import Client as TemporalClient
+        from platform_control.temporal.client import connect_temporal
 
-        client = await TemporalClient.connect(
-            settings.temporal_target, namespace=settings.temporal_namespace
-        )
+        client = await connect_temporal(settings)
         handle = client.get_workflow_handle(workflow_id)
 
         if action_id == "gate_approve":

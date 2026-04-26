@@ -5,7 +5,6 @@ import logging
 import sys
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from temporalio.client import Client
 from temporalio.worker import Worker
 
 from platform_control.config import get_settings
@@ -17,6 +16,7 @@ from platform_control.temporal.activities import (
     ScopeShardActivities,
     WizardStateActivities,
 )
+from platform_control.temporal.client import connect_temporal
 from platform_control.temporal.runners import build_rescore_runner_factory
 from platform_control.temporal.workflows import (
     RescoreFromCorrectionWorkflow,
@@ -61,10 +61,7 @@ async def _async_main() -> None:
         rescore_runner_factory=build_rescore_runner_factory(settings.rescore_runner_backend),
     )
 
-    client = await Client.connect(
-        settings.temporal_target,
-        namespace=settings.temporal_namespace,
-    )
+    client = await connect_temporal(settings)
     worker = Worker(
         client,
         task_queue=settings.temporal_task_queue,

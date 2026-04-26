@@ -7,9 +7,11 @@ from typing import Protocol
 from temporalio.client import Client
 from temporalio.exceptions import TemporalError, WorkflowAlreadyStartedError
 
+from platform_control.config import get_settings
 from platform_control.domain import WizardRunState
 from platform_control.errors import InvalidStateTransitionError, OrchestrationError
 from platform_control.models.wizard_run import WizardRun
+from platform_control.temporal.client import connect_temporal
 from platform_control.temporal.workflows import (
     ReviewDrainWorkflow,
     ScopeShardWorkflow,
@@ -105,8 +107,10 @@ class TemporalOrchestrator:
             return self._injected_client
         if self._connected_client is None:
             try:
-                self._connected_client = await Client.connect(
-                    self.target,
+                settings = get_settings()
+                self._connected_client = await connect_temporal(
+                    settings,
+                    target=self.target,
                     namespace=self.namespace,
                 )
             except Exception as exc:  # noqa: BLE001 — surface as domain error
