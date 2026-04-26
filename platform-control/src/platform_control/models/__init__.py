@@ -6,6 +6,7 @@ from platform_control.models.corpus import Corpus
 from platform_control.models.correction import Correction
 from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
 from platform_control.models.extractor_profile import ExtractorProfile
+from platform_control.models.operator import Operator
 from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
@@ -29,6 +30,7 @@ __all__ = [
     "DocumentLifecycleEvent",
     "ExtractorProfile",
     "Jurisdiction",
+    "Operator",
     "ProcessingStatusUpdate",
     "ProviderJob",
     "RawArtifact",

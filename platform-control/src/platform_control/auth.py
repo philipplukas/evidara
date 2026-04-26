@@ -15,16 +15,29 @@ route accepts that key (same behavior as before scoped keys existed).
   legacy full-access key.
 
 Health endpoints stay unauthenticated (see ``main.create_app``).
+
+**Principal resolution (#452, M11/B1)** — :func:`get_current_principal` is the
+new dependency that returns a typed :class:`Principal` for the
+authenticated caller, looking up the durable ``op_*`` ID via the
+``operators`` table. Until B2 (#453) lands, callers still use
+``Depends(require_control_plane_operator)`` purely for gating; new code
+that needs the operator's identity should depend on
+``get_current_principal`` instead.
 """
 
 from __future__ import annotations
 
 import hmac
 
-from fastapi import HTTPException, Security, status
+from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.config import Settings, get_settings
+from platform_control.database import get_session
+from platform_control.models.operator import Operator
 
 _API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -131,4 +144,91 @@ def _unauthorized() -> HTTPException:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or missing API key",
         headers={"WWW-Authenticate": "ApiKey"},
+    )
+
+
+# ─── Principal resolution (M11/B1, #452) ─────────────────────────────────────
+
+
+class Principal(BaseModel):
+    """Authenticated control-plane operator identity.
+
+    Returned by :func:`get_current_principal` so write-action routes can
+    attribute durable audit references (``operator_id``) without reading
+    the legacy ``X-Operator-Id`` header. ``auth_principal`` is the
+    identifier the auth layer used to resolve this operator (a constant
+    string per scoped key today; an OIDC sub or IAP claim later).
+    """
+
+    operator_id: str
+    auth_principal: str
+    display_name: str
+
+    model_config = ConfigDict(frozen=True)
+
+
+_LOCAL_DEV_PRINCIPAL = Principal(
+    operator_id="op_local_dev",
+    auth_principal="local_dev",
+    display_name="Local Dev",
+)
+
+
+def _resolve_auth_principal(settings: Settings, api_key: str) -> str | None:
+    """Map a presented API key to the constant ``auth_principal`` string.
+
+    Returns ``None`` when the key matches no configured slot. Multiple
+    slots can match (legacy + scoped operator); we prefer the most
+    specific name so audit records stay legible.
+    """
+    if settings.operator_api_key and _timing_safe_equal(settings.operator_api_key, api_key):
+        return "scoped_operator_key"
+    if settings.api_key and _timing_safe_equal(settings.api_key, api_key):
+        return "legacy_full_access"
+    return None
+
+
+async def get_current_principal(
+    api_key: str | None = Security(_API_KEY_HEADER),  # noqa: B008
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> Principal:
+    """Resolve the authenticated caller to an :class:`Operator` row.
+
+    Local-dev mode (no API keys configured) returns the static
+    ``op_local_dev`` principal without a DB lookup. Configured mode
+    requires the presented key to map to an enabled operator row;
+    unmapped principals raise 403 (fail-closed).
+    """
+    settings = get_settings()
+    if not _auth_configured(settings):
+        return _LOCAL_DEV_PRINCIPAL
+
+    if api_key is None:
+        raise _unauthorized()
+    if not _matches_operator(settings, api_key):
+        if _matches_service_only(settings, api_key):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key is not permitted for this control-plane operation",
+            )
+        raise _unauthorized()
+
+    auth_principal = _resolve_auth_principal(settings, api_key)
+    if auth_principal is None:  # pragma: no cover — defensive
+        raise _unauthorized()
+
+    stmt = select(Operator).where(
+        Operator.auth_principal == auth_principal,
+        Operator.disabled_at.is_(None),
+    )
+    operator = (await session.execute(stmt)).scalar_one_or_none()
+    if operator is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"No enabled operator mapped to auth principal {auth_principal!r}",
+        )
+    return Principal(
+        operator_id=operator.operator_id,
+        auth_principal=operator.auth_principal,
+        display_name=operator.display_name,
     )
