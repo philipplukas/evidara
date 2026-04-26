@@ -215,6 +215,13 @@ class CorrectionService:
         )
 
         triggered_at = datetime.now(UTC).isoformat()
+        for stale_key in (
+            "rescore_outcome",
+            "resulting_run_id",
+            "completed_at",
+            "rescore_failure_reason",
+        ):
+            payload.pop(stale_key, None)
         payload["triggered_workflow_id"] = result.workflow_id
         payload["triggered_at"] = triggered_at
         row.payload = payload
@@ -233,6 +240,7 @@ class CorrectionService:
         *,
         outcome: str,
         resulting_run_id: str | None = None,
+        failure_reason: str | None = None,
     ) -> Correction:
         """Persist the rescore worker's outcome on the correction's payload.
 
@@ -251,6 +259,12 @@ class CorrectionService:
         payload["rescore_outcome"] = outcome
         if resulting_run_id is not None:
             payload["resulting_run_id"] = resulting_run_id
+        elif outcome != "failed":
+            payload.pop("resulting_run_id", None)
+        if outcome == "failed" and failure_reason:
+            payload["rescore_failure_reason"] = failure_reason
+        else:
+            payload.pop("rescore_failure_reason", None)
         payload["completed_at"] = datetime.now(UTC).isoformat()
         row.payload = payload
         await self.session.commit()

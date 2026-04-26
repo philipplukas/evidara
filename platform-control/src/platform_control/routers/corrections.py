@@ -11,6 +11,7 @@ read is gone; any caller still passing it is silently ignored.
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -39,6 +40,7 @@ from platform_control.services.rescore_scheduler import (
 router = APIRouter(prefix="/v1", tags=["corrections"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 PrincipalDep = Annotated[Principal, Depends(get_current_principal)]
+logger = logging.getLogger(__name__)
 
 
 _OPERATOR_ID_PATTERN = r"^op_[a-z0-9]+$"
@@ -177,7 +179,18 @@ async def update_correction_status(
         request.status is CorrectionStatus.APPLIED
         and row.correction_type == CorrectionType.RESCORE_REQUEST.value
     ):
-        await service.trigger_rescore(row.correction_id, scheduler=scheduler)
+        try:
+            await service.trigger_rescore(row.correction_id, scheduler=scheduler)
+        except Exception as exc:
+            logger.exception(
+                "rescore_schedule_failed",
+                extra={"correction_id": row.correction_id},
+            )
+            await service.record_rescore_outcome(
+                row.correction_id,
+                outcome="failed",
+                failure_reason=str(exc),
+            )
         row = await service.get(row.correction_id)
     return CorrectionResponse.model_validate(row, from_attributes=True)
 
