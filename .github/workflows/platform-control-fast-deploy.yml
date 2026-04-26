@@ -40,8 +40,20 @@ env:
   IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
 
 jobs:
+  skip-disabled:
+    name: GCP Cloud Run fast deploy disabled
+    if: ${{ vars.ENABLE_GCP_CLOUD_RUN_CD != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain skipped deployment
+        run: |
+          echo "### Platform Control Fast Deploy skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Reason: \`ENABLE_GCP_CLOUD_RUN_CD\` is not set to \`true\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "- This keeps billing-disabled GCP from failing \`main\`." >> "$GITHUB_STEP_SUMMARY"
+
   deploy-platform-control:
     name: Deploy platform-control to ${{ inputs.environment || 'dev' }}
+    if: ${{ vars.ENABLE_GCP_CLOUD_RUN_CD == 'true' }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment || 'dev' }}
     env:
