@@ -156,9 +156,12 @@ export function CommentaryResultCard({
           <ul className="flex flex-wrap gap-x-2 gap-y-1">
             {sourceDocumentIds.map((docId) => (
               <li key={docId} className="inline-flex">
-                <a
-                  href={`/documents/${docId}`}
-                  onClick={(e) => e.stopPropagation()}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFocus(docId);
+                  }}
                   className="inline-flex items-center gap-1 rounded-full border border-attention/30
                     bg-background px-2 py-0.5 text-[11px] font-medium text-attention
                     hover:border-attention/60 hover:bg-attention/10
@@ -166,7 +169,7 @@ export function CommentaryResultCard({
                 >
                   <FileText className="h-2.5 w-2.5" />
                   {docId}
-                </a>
+                </button>
               </li>
             ))}
           </ul>

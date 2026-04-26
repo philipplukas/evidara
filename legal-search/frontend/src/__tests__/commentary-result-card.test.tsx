@@ -99,12 +99,17 @@ describe("CommentaryResultCard", () => {
     expect(screen.getByText("Article 754 OR — director liability.")).toBeInTheDocument();
     expect(screen.getByText("Lehre als Haftungsnorm fuer Organe.")).toBeInTheDocument();
 
-    // Source-document links rendered with /documents/{id} hrefs so the
-    // operator can pivot to the primary statute.
-    const link1 = screen.getByRole("link", { name: /doc_01jq7bdptzqv3xs0c41xpw1ybg/ });
-    expect(link1).toHaveAttribute("href", "/documents/doc_01jq7bdptzqv3xs0c41xpw1ybg");
-    const link2 = screen.getByRole("link", { name: /doc_01jq7bdptzqv3xs0c41xpw1ybh/ });
-    expect(link2).toHaveAttribute("href", "/documents/doc_01jq7bdptzqv3xs0c41xpw1ybh");
+    // Source-document buttons fire onFocus(docId) so the workspace
+    // opens the primary statute in-app — matches how the rest of the
+    // card navigates (no /documents/{id} route exists in the frontend).
+    const onFocus = baseProps.onFocus as ReturnType<typeof vi.fn>;
+    onFocus.mockClear();
+    const button1 = screen.getByRole("button", { name: /doc_01jq7bdptzqv3xs0c41xpw1ybg/ });
+    button1.click();
+    expect(onFocus).toHaveBeenCalledWith("doc_01jq7bdptzqv3xs0c41xpw1ybg");
+    const button2 = screen.getByRole("button", { name: /doc_01jq7bdptzqv3xs0c41xpw1ybh/ });
+    button2.click();
+    expect(onFocus).toHaveBeenCalledWith("doc_01jq7bdptzqv3xs0c41xpw1ybh");
   });
 
   it("omits the source-document block when sourceDocumentIds is empty", () => {
@@ -115,7 +120,13 @@ describe("CommentaryResultCard", () => {
       />,
     );
 
-    expect(screen.queryByRole("link")).toBeNull();
+    // Source-doc pivots are buttons (not anchors) — they fire onFocus
+    // through the workspace store. With an empty list, none render.
+    expect(
+      screen
+        .queryAllByRole("button")
+        .filter((b) => /^doc_/.test(b.textContent ?? "")),
+    ).toHaveLength(0);
   });
 
   it("carries the data-record-kind attribute so visual regression tests can pin the variant", () => {
