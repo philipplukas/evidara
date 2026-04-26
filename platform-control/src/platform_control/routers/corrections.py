@@ -22,6 +22,7 @@ from platform_control.database import get_session
 from platform_control.errors import ConflictError
 from platform_control.schemas.correction import (
     CorrectionListResponse,
+    CorrectionMetricsResponse,
     CorrectionResponse,
     CorrectionStatus,
     CorrectionType,
@@ -108,6 +109,33 @@ async def list_corrections(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get(
+    "/corrections/metrics",
+    response_model=CorrectionMetricsResponse,
+)
+async def get_correction_metrics(
+    session: SessionDep,
+    window_weeks: Annotated[int, Query(ge=1, le=52)] = 8,
+    operator_throughput_window_days: Annotated[int, Query(ge=1, le=365)] = 30,
+    operator_throughput_top_n: Annotated[int, Query(ge=1, le=100)] = 10,
+) -> CorrectionMetricsResponse:
+    """Aggregate read model for the admin dashboard (#432).
+
+    Computed entirely from the corrections audit log — no new
+    telemetry store. The route MUST sit above
+    `/corrections/{correction_id}` so FastAPI's path-matching doesn't
+    treat `metrics` as a correction ID.
+    """
+
+    service = CorrectionService(session)
+    payload = await service.get_metrics(
+        window_weeks=window_weeks,
+        operator_throughput_window_days=operator_throughput_window_days,
+        operator_throughput_top_n=operator_throughput_top_n,
+    )
+    return CorrectionMetricsResponse.model_validate(payload)
 
 
 @router.get(

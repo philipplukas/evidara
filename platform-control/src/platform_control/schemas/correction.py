@@ -127,3 +127,59 @@ class CorrectionListResponse(BaseModel):
     total: int | None = None
     limit: int | None = None
     offset: int | None = None
+
+
+class WeeklyBucket(BaseModel):
+    """A single week aggregation bucket. `week_start` is the ISO date of
+    the Monday of the bucket; `count` is the number of matching rows."""
+
+    week_start: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    count: int = Field(ge=0)
+
+
+class GroupedWeeklySeries(BaseModel):
+    """Weekly series for one group key (target_entity_type or correction_type)."""
+
+    key: str
+    buckets: list[WeeklyBucket]
+
+
+class OperatorThroughputEntry(BaseModel):
+    operator_id: str = Field(pattern=_OPERATOR_ID_RE)
+    total: int = Field(ge=0)
+    applied: int = Field(ge=0)
+    rejected: int = Field(ge=0)
+
+
+class RescoreOutcomeCounts(BaseModel):
+    """Outcome counts for `rescore_request` corrections.
+
+    Until the rescore lane (#427) lands, `changed` / `unchanged` / `failed`
+    are populated from the correction status alone (`applied` → counted in
+    aggregate, no per-outcome data yet). `pending` and `rejected` are
+    always live from the corrections audit log.
+    """
+
+    pending: int = Field(ge=0)
+    applied_total: int = Field(ge=0)
+    rejected: int = Field(ge=0)
+    # Forward-looking: populated by #427 when the rescore worker writes
+    # back the run outcome on the correction's payload. Zero until then.
+    changed: int = Field(ge=0)
+    unchanged: int = Field(ge=0)
+    failed: int = Field(ge=0)
+
+
+class CorrectionMetricsResponse(BaseModel):
+    """Aggregate read model for the admin dashboard (#432).
+
+    Computed entirely from the `corrections` audit log — no new
+    telemetry store required for v1.
+    """
+
+    window_weeks: int = Field(ge=1, le=52)
+    operator_throughput_window_days: int = Field(ge=1, le=365)
+    weekly_by_target_entity_type: list[GroupedWeeklySeries]
+    weekly_by_correction_type: list[GroupedWeeklySeries]
+    operator_throughput: list[OperatorThroughputEntry]
+    rescore_outcomes: RescoreOutcomeCounts

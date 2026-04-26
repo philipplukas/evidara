@@ -699,6 +699,41 @@ export type CommentaryInsightListResponse = {
   offset?: number;
 };
 
+export type CorrectionMetricsWeeklyBucket = {
+  week_start: string;
+  count: number;
+};
+
+export type CorrectionMetricsGroupedSeries = {
+  key: string;
+  buckets: CorrectionMetricsWeeklyBucket[];
+};
+
+export type CorrectionMetricsOperatorThroughput = {
+  operator_id: string;
+  total: number;
+  applied: number;
+  rejected: number;
+};
+
+export type CorrectionMetricsRescoreOutcomes = {
+  pending: number;
+  applied_total: number;
+  rejected: number;
+  changed: number;
+  unchanged: number;
+  failed: number;
+};
+
+export type CorrectionMetricsResponseRecord = {
+  window_weeks: number;
+  operator_throughput_window_days: number;
+  weekly_by_target_entity_type: CorrectionMetricsGroupedSeries[];
+  weekly_by_correction_type: CorrectionMetricsGroupedSeries[];
+  operator_throughput: CorrectionMetricsOperatorThroughput[];
+  rescore_outcomes: CorrectionMetricsRescoreOutcomes;
+};
+
 export type CreateCorrectionMutationData = {
   target_entity_type: "source" | "document" | "commentary_insight";
   target_entity_id: string;
@@ -905,6 +940,36 @@ export const controlPlaneActions = {
       "/v1/sources/blueprint-templates",
     );
     return response.data;
+  },
+
+  /**
+   * Fetch the correction metrics aggregate for the admin dashboard (#432).
+   *
+   * Backed by `GET /v1/corrections/metrics`. Caller controls the
+   * weekly window + operator-throughput window via the optional args;
+   * defaults match the server defaults (8 weeks, 30 days).
+   */
+  async getCorrectionMetrics(
+    options: {
+      windowWeeks?: number;
+      operatorThroughputWindowDays?: number;
+      operatorThroughputTopN?: number;
+    } = {},
+  ): Promise<CorrectionMetricsResponseRecord> {
+    const query = new URLSearchParams();
+    if (options.windowWeeks !== undefined) {
+      query.set("window_weeks", String(options.windowWeeks));
+    }
+    if (options.operatorThroughputWindowDays !== undefined) {
+      query.set("operator_throughput_window_days", String(options.operatorThroughputWindowDays));
+    }
+    if (options.operatorThroughputTopN !== undefined) {
+      query.set("operator_throughput_top_n", String(options.operatorThroughputTopN));
+    }
+    const queryString = query.toString();
+    const path =
+      queryString.length > 0 ? `/v1/corrections/metrics?${queryString}` : "/v1/corrections/metrics";
+    return requestJson<CorrectionMetricsResponseRecord>(path);
   },
 };
 
