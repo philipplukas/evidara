@@ -30,7 +30,7 @@ async def test_local_dev_returns_static_local_dev_principal(session: AsyncSessio
     principal = await get_current_principal(api_key=None, session=session)
 
     assert isinstance(principal, Principal)
-    assert principal.operator_id == "op_local_dev"
+    assert principal.operator_id == "op_00000000000000000000000001"
     assert principal.auth_principal == "local_dev"
     assert principal.display_name == "Local Dev"
 
