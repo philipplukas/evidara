@@ -62,6 +62,7 @@ jobs:
               - 'platform-control/README.md'
               - 'platform-control/src/**'
               - 'platform-control/Dockerfile.worker'
+              - 'document-intelligence/**'
               - '.github/workflows/runtime-images.yml'
             platform_control_admin:
               - 'platform-control/admin/**'
@@ -395,7 +396,7 @@ jobs:
       - name: Build and optionally push
         uses: docker/build-push-action@v6
         with:
-          context: ./platform-control
+          context: .
           file: ./platform-control/Dockerfile.worker
           push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}

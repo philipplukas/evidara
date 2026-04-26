@@ -5,9 +5,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
-COPY src ./src
+COPY platform-control/ ./platform-control/
+COPY document-intelligence/ ./document-intelligence/
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir ./document-intelligence \
+    && pip install --no-cache-dir ./platform-control
 
 CMD ["platform-control-connector-worker"]

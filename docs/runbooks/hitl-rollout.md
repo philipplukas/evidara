@@ -311,9 +311,29 @@ scenarios this rollout introduces:
    alias cutover. Already covered.
 2. **Targeted rescore replay** — when an operator raises a `rescore_request`
    correction, the platform-control worker (#427) emits a `rescore`
-   workflow that re-processes the targeted document and the projection
-   builder picks up the change incrementally. No global reindex needed.
-   Resolves on lane completion (#427).
+   workflow that re-processes the targeted document via the
+   document-intelligence runtime and the projection builder picks up the
+   change incrementally. No global reindex needed.
+
+### Debug a failed targeted rescore
+
+If `/v1/corrections/metrics` shows `rescore_outcomes.failed` increasing,
+start with the correction payload:
+
+```bash
+evidara corrections get <correction_id> \
+  | jq '.payload | {rescore_outcome, resulting_run_id, completed_at}'
+```
+
+Then inspect platform-control worker logs for `targeted_rescore_failed`
+or `rescore_runner_failed` with the same `correction_id`. The common
+configuration failure is a worker running the real
+`document_intelligence` runner without `DI_SURFACES_ROOT_URI` (or the
+three explicit `DI_PUBLISHED_*` surface URIs). If configuration is
+correct, verify the target document still has a processing manifest with
+`input_bundle_manifest_ref`; missing bundle refs mean the runtime cannot
+replay the original artifact bundle and the correction should remain
+failed until the source is reprocessed.
 
 If replay diverges from doc count or mapping shape mid-rollout, abort
 the cutover, hold the read alias on the old index, and triage via

@@ -164,17 +164,15 @@ async def rescore_targeted(
     side persists this on the correction's payload via
     ``CorrectionService.record_rescore_outcome`` (#432 metrics surface).
 
-    For now the runtime returns ``("unchanged", None)`` as a stable
-    placeholder — selective single-target re-extraction (without
-    rerunning the full bundle ingest) lands in a follow-up. The
-    contract here is the extension point platform-control depends on.
+    The implementation lives in :mod:`document_intelligence.rescore` so
+    the target lookup/comparison logic stays owned by the DI runtime.
     """
 
-    # Resolve runtime settings so the function can dispatch into the
-    # rest of the runtime once the implementation lands. Today the
-    # call shape is fixed and the placeholder doesn't dispatch yet,
-    # but resolving keeps the wiring honest under typecheck.
-    _ = runtime_settings or RuntimeSettings.from_environment()
-    _ = (target_entity_type, target_entity_id, correction_id)
+    from document_intelligence.rescore import rescore_targeted as _rescore_targeted
 
-    return ("unchanged", None)
+    return await _rescore_targeted(
+        target_entity_type=target_entity_type,
+        target_entity_id=target_entity_id,
+        correction_id=correction_id,
+        runtime_settings=runtime_settings,
+    )

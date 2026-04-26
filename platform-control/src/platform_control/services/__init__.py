@@ -1,25 +1,8 @@
-from platform_control.services.argilla_enqueue_service import ArgillaEnqueueService
-from platform_control.services.artifact_store import LocalArtifactStore
-from platform_control.services.firecrawl_provider import FirecrawlProvider
-from platform_control.services.firecrawl_webhook_service import FirecrawlWebhookService
-from platform_control.services.orchestrator import (
-    InMemoryOrchestrator,
-    TemporalOrchestrator,
-    wizard_run_workflow_id,
-)
-from platform_control.services.run_service import RunService
-from platform_control.services.source_service import SourceService
-from platform_control.services.wizard_service import WizardService
+"""Service package namespace.
 
-__all__ = [
-    "ArgillaEnqueueService",
-    "FirecrawlProvider",
-    "FirecrawlWebhookService",
-    "InMemoryOrchestrator",
-    "LocalArtifactStore",
-    "RunService",
-    "SourceService",
-    "TemporalOrchestrator",
-    "WizardService",
-    "wizard_run_workflow_id",
-]
+Keep this initializer side-effect free. Temporal activities import individual
+service submodules during worker startup, and eager convenience exports here
+can create cycles through the workflow modules.
+"""
+
+__all__: list[str] = []
