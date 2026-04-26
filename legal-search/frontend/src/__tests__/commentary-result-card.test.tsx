@@ -123,9 +123,7 @@ describe("CommentaryResultCard", () => {
     // Source-doc pivots are buttons (not anchors) — they fire onFocus
     // through the workspace store. With an empty list, none render.
     expect(
-      screen
-        .queryAllByRole("button")
-        .filter((b) => /^doc_/.test(b.textContent ?? "")),
+      screen.queryAllByRole("button").filter((b) => /^doc_/.test(b.textContent ?? "")),
     ).toHaveLength(0);
   });
 
