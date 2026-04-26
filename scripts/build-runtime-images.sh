@@ -34,7 +34,7 @@ build_image() {
 pids=()
 build_image "." "platform-control/Dockerfile" "platform-control" &
 pids+=($!)
-build_image "platform-control" "platform-control/Dockerfile.worker" "platform-control-worker" &
+build_image "." "platform-control/Dockerfile.worker" "platform-control-worker" &
 pids+=($!)
 build_image "." "legal-search/api/Dockerfile" "legal-search-api" &
 pids+=($!)

@@ -1,6 +1,7 @@
 # Platform Control worker image — mirrors .github/workflows/runtime-images.yml (platform-control-worker job).
 #
-# Context is platform-control/ (same as CI).
+# Context is the repo root so the worker image can install both platform-control
+# and document-intelligence for in-process targeted rescore.
 #
 #   export CLOUDSDK_PYTHON=/usr/bin/python3   # if gcloud fails on a missing venv python
 #   TAG="$(git rev-parse HEAD)"
@@ -20,10 +21,9 @@ steps:
       - "--platform"
       - "linux/amd64"
       - "-f"
-      - "Dockerfile.worker"
+      - "platform-control/Dockerfile.worker"
       - "-t"
       - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/platform-control-worker:${_TAG}"
       - "."
-    dir: platform-control
 images:
   - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/platform-control-worker:${_TAG}"

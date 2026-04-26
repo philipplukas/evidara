@@ -17,7 +17,7 @@ from platform_control.temporal.activities import (
     ScopeShardActivities,
     WizardStateActivities,
 )
-from platform_control.temporal.runners import InMemoryRescoreRunner
+from platform_control.temporal.runners import build_rescore_runner_factory
 from platform_control.temporal.workflows import (
     RescoreFromCorrectionWorkflow,
     RetentionSweepWorkflow,
@@ -58,7 +58,7 @@ async def _async_main() -> None:
     retention_acts = RetentionActivities(session_factory=session_factory)
     rescore_acts = RescoreFromCorrectionActivities(
         session_factory=session_factory,
-        rescore_runner_factory=InMemoryRescoreRunner,
+        rescore_runner_factory=build_rescore_runner_factory(settings.rescore_runner_backend),
     )
 
     client = await Client.connect(

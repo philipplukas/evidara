@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     temporal_namespace: str = "default"
     temporal_task_queue: str = "platform-control-wizard"
     temporal_target: str = "localhost:7233"
+    rescore_runner_backend: Literal["document_intelligence", "in_memory"] = Field(
+        default="document_intelligence",
+        description=(
+            "Targeted-rescore runner used by the Temporal worker. Use 'in_memory' only "
+            "for explicit local/test fallback; production uses document_intelligence."
+        ),
+    )
 
     legifrance_client_id: str | None = None
     legifrance_client_secret: str | None = None

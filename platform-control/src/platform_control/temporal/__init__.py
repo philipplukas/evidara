@@ -1,9 +1,8 @@
-"""Temporal workflow and worker entrypoints for wizard orchestration."""
+"""Temporal workflow and worker entrypoints for wizard orchestration.
 
-from platform_control.temporal.workflows import (
-    ReviewDrainWorkflow,
-    ScopeShardWorkflow,
-    WizardRunWorkflow,
-)
+Import workflow/activity modules directly from their leaf modules. Keeping
+this package initializer side-effect free avoids circular imports during
+installed-wheel startup.
+"""
 
-__all__ = ["ReviewDrainWorkflow", "ScopeShardWorkflow", "WizardRunWorkflow"]
+__all__: list[str] = []

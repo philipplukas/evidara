@@ -1,17 +1,18 @@
-"""Activity-level smoke for the rescore worker wire-up (#450, M11/A1).
+"""Activity-level smoke for the rescore worker wire-up (#450/#451, M11).
 
 Covers the contract A1 introduces:
 - `InMemoryRescoreRunner` returns the deterministic "unchanged" outcome.
 - `RescoreFromCorrectionActivities` invokes the runner factory and
   persists the outcome on the correction payload.
 - The temporal worker module exposes the activity + workflow registration
-  alongside the in-memory runner factory (asserted by inspecting the
+  alongside the configured runner factory (asserted by inspecting the
   imports — full Temporal worker boot needs a real server).
-
-A2 (#451) replaces `InMemoryRescoreRunner` with the real DI-side impl.
 """
 
 from __future__ import annotations
+
+import sys
+import types
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -23,7 +24,10 @@ from platform_control.schemas.correction import (
 )
 from platform_control.services.correction_service import CorrectionService
 from platform_control.temporal.activities import RescoreFromCorrectionActivities
-from platform_control.temporal.runners import InMemoryRescoreRunner
+from platform_control.temporal.runners import (
+    InMemoryRescoreRunner,
+    build_rescore_runner_factory,
+)
 
 _DOCUMENT_ID = "doc_01jq7bdptzqv3xs0c41xpw1ybg"
 _OPERATOR = "op_01jqs7p1bcvz2tw5kxh9mq80fg"
@@ -96,5 +100,38 @@ def test_temporal_worker_registers_rescore_activity_and_workflow() -> None:
     )
     assert "RescoreFromCorrectionActivities" in source
     assert "RescoreFromCorrectionWorkflow" in source
-    assert "InMemoryRescoreRunner" in source
+    assert "build_rescore_runner_factory" in source
     assert "rescore_acts.run_targeted_rescore" in source
+
+
+def test_runner_factory_keeps_explicit_in_memory_fallback() -> None:
+    assert build_rescore_runner_factory("in_memory") is InMemoryRescoreRunner
+
+
+def test_runner_factory_fails_fast_without_di_surface_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_runtime = types.ModuleType("document_intelligence.config.runtime")
+
+    class RuntimeSettings:
+        surface_uris = None
+
+        @classmethod
+        def from_environment(cls):
+            return cls()
+
+    fake_runtime.RuntimeSettings = RuntimeSettings
+    monkeypatch.setitem(
+        sys.modules,
+        "document_intelligence",
+        types.ModuleType("document_intelligence"),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "document_intelligence.config",
+        types.ModuleType("document_intelligence.config"),
+    )
+    monkeypatch.setitem(sys.modules, "document_intelligence.config.runtime", fake_runtime)
+
+    with pytest.raises(RuntimeError, match="requires DI_SURFACES_ROOT_URI"):
+        build_rescore_runner_factory("document_intelligence")
