@@ -1,8 +1,8 @@
 # MVP Demo Package and Release Recommendation
 
 Owner: Platform team
-Last reviewed: 2026-04-11
-Last verified: 2026-04-11
+Last reviewed: 2026-04-26
+Last verified: 2026-04-26
 Applies to: **dev** (primary remote surface for small teams), **staging** when operated, **prod** sign-off gates
 
 ## Objective
@@ -35,6 +35,7 @@ Attach one packet per release candidate or demo handoff:
 | --- | --- | --- |
 | Release sign-off report | `Release Readiness` strict workflow + `docs/runbooks/runtime-stack.md` | Latest strict `GO` report (strict GO required), workflow run URL, and GitHub Actions artifact **release-readiness-&lt;run_id&gt;** (JSON gate snapshots uploaded with the run). |
 | API acceptance evidence | `docs/runbooks/mvp-acceptance-scenario-pack.md` | Latest **dev** (and staging if operated) API/proxy evidence from `uv run evidara workflow mvp-acceptance` or the shell helper; JSON includes **evidence_pack_version** for auditability. |
+| Hetzner HITL rescore evidence | `scripts/smoke-hetzner-hitl-rescore.sh` + `docs/runbooks/hitl-rollout.md` | Latest internal staging smoke JSON showing correction id, triggered workflow id, `rescore_outcome` of `changed` or `unchanged`, and metrics bucket increment. |
 | E2E smoke drill JSON | `.github/workflows/e2e-smoke-dev.yml` (and `e2e-smoke-staging.yml` if you run staging) | Artifact **e2e-smoke-*-drill-&lt;run_id&gt;** (pairs `platform_control_run_id` with `legal_search_document_id` for Gate D narratives). |
 | Browser interaction evidence | `docs/runbooks/interaction-flow-validation.md` | Latest **dev** or staging interaction-flow workflow run URL + GCS bundle prefix; manifest includes **TAR-67 / TAR-69** drill filing bullets when applicable. |
 | Narrative walkthrough note | `docs/runbooks/mvp-website-walkthrough.md` | Short operator note covering what was shown, what still feels rough, and any open follow-up issues. |
@@ -53,12 +54,14 @@ Use this order when preparing a demo or release recommendation:
 
 ## Current Recommendation
 
-Decision: **Conditional GO (technical + website surface availability)**.
+Decision: **Conditional GO (technical + Hetzner staging HITL verified)**.
 
 Rationale:
 
 - Technical readiness signal is green (`Release Readiness` strict `GO`).
 - API-level MVP flow evidence is present in **dev** (and staging when operated).
+- Hetzner staging has a seeded DI surface and a passing HITL rescore smoke
+  (`rescore_outcome=unchanged`, metrics updated, no new failed bucket).
 - Browser interaction evidence is owned by the interaction-flow runbook and parity workflows.
 - Website surfaces are published and reachable in **dev** (and staging when operated):
   - legal-search frontend

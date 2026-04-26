@@ -1,8 +1,8 @@
 # HITL Rollout, Migration & Re-index Runbook
 
 Owner: Platform team
-Last reviewed: 2026-04-25
-Last verified: Not yet verified
+Last reviewed: 2026-04-26
+Last verified: 2026-04-26
 Applies to: staging, prod
 
 ## Scope
@@ -32,6 +32,18 @@ Related issues:
 [#420](https://github.com/philipplukas/evidara/issues/420) (epic),
 [#423](https://github.com/philipplukas/evidara/issues/423) (contracts freeze),
 [#430](https://github.com/philipplukas/evidara/issues/430) (this runbook).
+
+## Current Hetzner staging status
+
+The internal Hetzner staging loop is operational through the `rocky-agents`
+runtime while GCP billing is disabled or intentionally avoided:
+
+- `rocky-agents-staging` is the Argo application for the current dev/staging runtime.
+- DI surfaces are seeded by the GitOps-managed `evidara-di-seed` job.
+- The canonical smoke target is seeded document `doc_2adgt1ejqzhjj24tn8svn54h08`.
+- `scripts/smoke-hetzner-hitl-rescore.sh` creates and applies a `rescore_request`
+  correction, waits for the Temporal rescore workflow, and verifies correction metrics.
+- Latest live result on 2026-04-26: `rescore_outcome=unchanged`.
 
 ## Ownership
 
@@ -207,6 +219,20 @@ Commentary result rendering (#431) ships as part of the frontend deploy. No spec
 ## Smoke checklist
 
 Run after **each** deploy step, top to bottom. All checks should pass before proceeding.
+
+### Hetzner staging HITL rescore smoke
+
+Use this when the target runtime is the Hetzner k3s staging slice rather than
+Cloud Run:
+
+```bash
+./scripts/smoke-hetzner-hitl-rescore.sh
+```
+
+Expected result: single JSON object with `status: "ok"`, a new
+`correction_id`, a `triggered_workflow_id`, and `rescore_outcome` equal to
+`changed` or `unchanged`. The script also asserts that the matching metrics
+bucket increments and that the `failed` bucket does not.
 
 ### Platform-control corrections — `evidara` CLI or curl
 
