@@ -6,9 +6,16 @@ This page describes the target-state infrastructure plan for Evidara. The repo i
 
 Evidara targets three cloud/platform providers:
 
-- **Google Cloud Platform (GCP)** — target primary cloud provider for runtime services
+- **Hetzner k3s (`rocky-agents`)** — current low-cost dev/staging runtime while GCP billing is disabled
+- **Google Cloud Platform (GCP)** — opt-in Cloud Run / managed runtime path
 - **Databricks** — target document-intelligence processing and published canonical surfaces
 - **GitHub** — current source control and CI/CD system
+
+Runtime images publish to GHCR by default. Artifact Registry publishing and
+Cloud Run CD are opt-in fallback paths controlled by GitHub variables
+`ENABLE_GCP_ARTIFACT_REGISTRY=true` and `ENABLE_GCP_CLOUD_RUN_CD=true`.
+When those variables are unset, GCP deployment workflows skip rather than
+failing because billing is unavailable.
 
 ## Local Runtime Stack
 
@@ -134,7 +141,7 @@ Recommended lifecycle pattern:
 
 | Component | Deployment Target | Notes |
 |-----------|-------------------|-------|
-| platform-control | Cloud Run | Connects to Cloud SQL, GCS, Pub/Sub |
+| platform-control | Hetzner k3s dev/staging; Cloud Run optional | Hetzner uses CNPG Postgres and local artifact PVCs first |
 | document-intelligence | Databricks | Triggered by Pub/Sub and reads bundle manifests + artifacts |
-| legal-search (BFF) | Cloud Run | Connects to OpenSearch |
-| legal-search (frontend) | Cloud Run or CDN | Static assets + server components |
+| legal-search (BFF) | Hetzner k3s dev/staging; Cloud Run optional | Hetzner uses in-cluster OpenSearch first |
+| legal-search (frontend) | Hetzner k3s dev/staging; Cloud Run/CDN optional | Static assets + server components |

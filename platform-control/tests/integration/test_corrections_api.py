@@ -15,6 +15,8 @@ import pytest
 from platform_control.database import get_session
 from platform_control.main import create_app
 from platform_control.models.commentary_insight import CommentaryInsight
+from platform_control.routers.corrections import _default_rescore_scheduler
+from platform_control.services.rescore_scheduler import InMemoryRescoreScheduler
 
 _INSIGHT_ID = "ins_01jq7c1ny0ffv8qdr1xwbejqb6"
 # Local-dev principal returned by `get_current_principal` when no API keys
@@ -174,3 +176,47 @@ async def test_create_correction_against_missing_target_returns_404(
             },
         )
         assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_apply_rescore_request_records_failed_outcome_when_scheduling_fails(
+    session_maker,
+) -> None:
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[_default_rescore_scheduler] = lambda: InMemoryRescoreScheduler(
+        fail_with=TimeoutError("temporal unavailable")
+    )
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        create = await client.post(
+            "/v1/corrections",
+            json={
+                "target_entity_type": "document",
+                "target_entity_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+                "correction_type": "rescore_request",
+                "payload": {"reason_code": "low_quality_extractions"},
+                "rationale": "Operator requested a targeted rescore.",
+            },
+        )
+        assert create.status_code == 201, create.text
+        correction_id = create.json()["correction_id"]
+
+        applied = await client.patch(
+            f"/v1/corrections/{correction_id}",
+            json={"status": "applied", "rationale": "Approved on review."},
+        )
+
+        assert applied.status_code == 200, applied.text
+        body = applied.json()
+        assert body["status"] == "applied"
+        assert body["applied_at"] is not None
+        assert body["payload"]["rescore_outcome"] == "failed"
+        assert "temporal unavailable" in body["payload"]["rescore_failure_reason"]
+        assert "triggered_workflow_id" not in body["payload"]
