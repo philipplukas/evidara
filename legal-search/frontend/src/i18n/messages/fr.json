@@ -188,6 +188,14 @@
     "switchToLight": "Passer au mode clair",
     "switchToDark": "Passer au mode sombre"
   },
+  "userMenu": {
+    "title": "Préférences utilisateur",
+    "themeLabel": "Apparence",
+    "themeLight": "Clair",
+    "themeDark": "Sombre",
+    "languageLabel": "Langue",
+    "shareLabel": "Partager"
+  },
   "share": {
     "copyLink": "Copier le lien",
     "linkCopied": "Lien copi\u00e9"

@@ -12,7 +12,6 @@ import {
   Settings2,
   SlidersHorizontal,
   Trash2,
-  User,
   X,
 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -22,6 +21,7 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } 
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
 import { PreferencesDialog } from "@/components/layout/PreferencesDialog";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { buildControlPanelHref } from "@/lib/control-plane-entry";
@@ -424,69 +424,69 @@ export function AppHeader({
           </nav>
 
           <div className="app-header__utility-strip">
-            <div className="app-header__status">
-              <span>{t("header.profileLabel")}:</span>
-              <span className={hasControlPanelAccess ? "text-brand" : "text-foreground/70"}>
-                {hasControlPanelAccess ? t("header.profileOperator") : t("header.profileStandard")}
-              </span>
-            </div>
+            {/* Inline strip — desktop only. On mobile these collapse into UserMenu (#391). */}
+            <div className="hidden sm:contents">
+              <div className="app-header__status">
+                <span>{t("header.profileLabel")}:</span>
+                <span className={hasControlPanelAccess ? "text-brand" : "text-foreground/70"}>
+                  {hasControlPanelAccess
+                    ? t("header.profileOperator")
+                    : t("header.profileStandard")}
+                </span>
+              </div>
 
-            <ThemeToggle />
-            <ShareButton size="sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" />
-            <PreferencesDialog>
-              <button
-                type="button"
-                aria-label={t("header.openSettings")}
-                title={t("header.openSettings")}
-                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <Settings2 className="h-4 w-4" />
-              </button>
-            </PreferencesDialog>
-            <button
-              type="button"
-              onClick={() => setShowShortcuts(true)}
-              aria-label={t("header.openKeyboardShortcuts")}
-              title={t("header.openKeyboardShortcuts")}
-              className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <HelpCircle className="h-4 w-4" />
-            </button>
-
-            {/* Locale Switcher */}
-            {/* biome-ignore lint/a11y/useSemanticElements: fieldset would break flex layout styling */}
-            <div
-              className="flex shrink-0 items-center"
-              role="group"
-              aria-label={t("header.languageGroup")}
-            >
-              {SUPPORTED_LOCALES.map((loc) => (
+              <ThemeToggle />
+              <ShareButton size="sm" />
+              <PreferencesDialog>
                 <button
-                  key={loc}
                   type="button"
-                  aria-pressed={locale === loc}
-                  onClick={() => setLocale(loc)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wider transition-colors
-                  ${
-                    locale === loc
-                      ? "bg-accent-core text-white"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
+                  aria-label={t("header.openSettings")}
+                  title={t("header.openSettings")}
+                  className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  {loc}
+                  <Settings2 className="h-4 w-4" />
                 </button>
-              ))}
-            </div>
-
-            {/* User */}
-            <div className="flex shrink-0 items-center gap-2 border-l border-border/60 pl-2">
+              </PreferencesDialog>
               <button
                 type="button"
-                aria-label={t("header.openUserMenu")}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-interactive-accent-muted transition-colors hover:bg-accent-core/20"
+                onClick={() => setShowShortcuts(true)}
+                aria-label={t("header.openKeyboardShortcuts")}
+                title={t("header.openKeyboardShortcuts")}
+                className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                <User className="h-4 w-4 text-accent-core" />
+                <HelpCircle className="h-4 w-4" />
               </button>
+
+              {/* Locale Switcher */}
+              {/* biome-ignore lint/a11y/useSemanticElements: fieldset would break flex layout styling */}
+              <div
+                className="flex shrink-0 items-center"
+                role="group"
+                aria-label={t("header.languageGroup")}
+              >
+                {SUPPORTED_LOCALES.map((loc) => (
+                  <button
+                    key={loc}
+                    type="button"
+                    aria-pressed={locale === loc}
+                    onClick={() => setLocale(loc)}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wider transition-colors
+                    ${
+                      locale === loc
+                        ? "bg-accent-core text-white"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Avatar + dropdown — present on every breakpoint so theme + language
+                stay reachable on mobile (#390 symmetry, #391 mobile collapse). */}
+            <div className="flex shrink-0 items-center gap-2 sm:border-l sm:border-border/60 sm:pl-2">
+              <UserMenu hasControlPanelAccess={hasControlPanelAccess} />
             </div>
           </div>
         </div>
