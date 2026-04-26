@@ -19,7 +19,6 @@ from platform_control.services.rescore_scheduler import (
 )
 
 _DOCUMENT_ID = "doc_01jq7bdptzqv3xs0c41xpw1ybg"
-_OPERATOR = "op_01jqs7p1bcvz2tw5kxh9mq80fg"
 
 
 @pytest.mark.asyncio
@@ -42,7 +41,6 @@ async def test_rescore_endpoint_returns_202_and_records_workflow_handle(
         # Create a rescore_request correction first.
         create = await client.post(
             "/v1/corrections",
-            headers={"X-Operator-Id": _OPERATOR},
             json={
                 "target_entity_type": "document",
                 "target_entity_id": _DOCUMENT_ID,
@@ -89,7 +87,6 @@ async def test_rescore_endpoint_409_when_correction_is_not_rescore_request(
         # Create an annotation correction (not rescore).
         create = await client.post(
             "/v1/corrections",
-            headers={"X-Operator-Id": _OPERATOR},
             json={
                 "target_entity_type": "document",
                 "target_entity_id": _DOCUMENT_ID,

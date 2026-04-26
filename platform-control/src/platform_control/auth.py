@@ -168,7 +168,8 @@ class Principal(BaseModel):
 
 
 _LOCAL_DEV_PRINCIPAL = Principal(
-    operator_id="op_local_dev",
+    # Reserved system ULID; mirrors migration 20260426_0017's seed.
+    operator_id="op_00000000000000000000000001",
     auth_principal="local_dev",
     display_name="Local Dev",
 )

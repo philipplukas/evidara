@@ -17,7 +17,9 @@ from platform_control.main import create_app
 from platform_control.models.commentary_insight import CommentaryInsight
 
 _INSIGHT_ID = "ins_01jq7c1ny0ffv8qdr1xwbejqb6"
-_OPERATOR = "op_01jqs7p1bcvz2tw5kxh9mq80fg"
+# Local-dev principal returned by `get_current_principal` when no API keys
+# are configured (default in the test fixture). Resolved via `auth.py`.
+_LOCAL_DEV_OPERATOR = "op_00000000000000000000000001"
 
 
 def _make_insight() -> CommentaryInsight:
@@ -72,7 +74,6 @@ async def test_corrections_happy_path(session_maker) -> None:
         # --- Create a field_edit correction targeting the insight ---
         create = await client.post(
             "/v1/corrections",
-            headers={"X-Operator-Id": _OPERATOR},
             json={
                 "target_entity_type": "commentary_insight",
                 "target_entity_id": _INSIGHT_ID,
@@ -89,7 +90,9 @@ async def test_corrections_happy_path(session_maker) -> None:
         body = create.json()
         correction_id = body["correction_id"]
         assert body["status"] == "pending"
-        assert body["operator_id"] == _OPERATOR
+        # operator_id now comes from the auth-resolved Principal (#453 / M11/B2).
+        # Local-dev mode (no API keys) returns the static op_local_dev.
+        assert body["operator_id"] == _LOCAL_DEV_OPERATOR
 
         # --- List filtered by status=pending ---
         listing = await client.get(
@@ -163,7 +166,6 @@ async def test_create_correction_against_missing_target_returns_404(
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         resp = await client.post(
             "/v1/corrections",
-            headers={"X-Operator-Id": _OPERATOR},
             json={
                 "target_entity_type": "commentary_insight",
                 "target_entity_id": "ins_01zz0z0z0z0z0z0z0z0z0z0z00",
