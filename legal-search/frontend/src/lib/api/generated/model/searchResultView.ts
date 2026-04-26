@@ -13,13 +13,14 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.4.0
+ * OpenAPI spec version: 0.4.1
  */
 import type { Badge } from './badge';
 import type { MetadataRow } from './metadataRow';
 import type { RelatedCount } from './relatedCount';
 import type { Action } from './action';
 import type { ContentLanguage } from './contentLanguage';
+import type { SearchResultViewRecordKind } from './searchResultViewRecordKind';
 
 export interface SearchResultView {
   id: string;
@@ -37,4 +38,15 @@ export interface SearchResultView {
   relatedCounts: RelatedCount[];
   actions: Action[];
   contentLanguage?: ContentLanguage;
+  /** Discriminator from the search projection (PR #441). The
+frontend keys its result-card variant off this OR off
+`type === "commentary"` (back-compat fallback).
+ */
+  recordKind?: SearchResultViewRecordKind;
+  /** Canonical primary documents this commentary references
+(#425). Empty / undefined for `legal_document` rows. The
+frontend renders these as source-document links on
+commentary cards.
+ */
+  sourceDocumentIds?: string[];
 }
