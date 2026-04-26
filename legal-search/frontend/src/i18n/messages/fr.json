@@ -153,6 +153,11 @@
       "pinResult": "\u00c9pingler le r\u00e9sultat",
       "unpinResult": "D\u00e9tacher le r\u00e9sultat"
     },
+    "commentaryCard": {
+      "kindLabel": "Commentaire",
+      "commentaryOn": "Commentaire sur",
+      "sourceDocumentsAriaLabel": "{count, plural, one {# document source} other {# documents sources}}"
+    },
     "list": {
       "sortedByRelevance": "Tri par pertinence",
       "sortedByRelevanceHelp": "Les r\u00e9sultats sont class\u00e9s par pertinence algorithmique (aucune validation manuelle de chaque r\u00e9sultat).",

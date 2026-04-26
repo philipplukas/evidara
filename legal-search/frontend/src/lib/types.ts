@@ -53,6 +53,23 @@ export interface SearchResultViewModel {
   relatedCounts: RelatedCount[];
   actions: ActionViewModel[];
   contentLanguage?: ContentLanguage;
+  /**
+   * Discriminator from the search projection (PR #441). Drives the
+   * commentary-vs-document card variant — `commentary_insight` rows
+   * render via `CommentaryResultCard`. `legal_document` and
+   * `undefined` route to the default `ResultCard`.
+   *
+   * Note: the BFF emits this field on `SearchResultView`; the orval-
+   * generated client may not pick it up until the OpenAPI spec is
+   * bumped. The fallback discriminator is `type === "commentary"`.
+   */
+  recordKind?: "legal_document" | "commentary_insight";
+  /**
+   * Canonical primary documents this commentary references. Rendered
+   * as source-document links on commentary cards. Empty / undefined
+   * for legal_document rows.
+   */
+  sourceDocumentIds?: string[];
 }
 
 export interface RelatedItem {

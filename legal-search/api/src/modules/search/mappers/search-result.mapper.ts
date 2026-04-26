@@ -74,6 +74,18 @@ export interface SearchResultView {
   relatedCounts: RelatedCountView[];
   actions: ActionView[];
   contentLanguage?: ContentLanguageView;
+  /**
+   * Discriminator from the search projection (PR #441). Mirrors
+   * `record_kind` on the projection. The frontend keys its result-card
+   * variant off this OR off `type === "commentary"`.
+   */
+  recordKind?: 'legal_document' | 'commentary_insight';
+  /**
+   * Canonical primary documents this commentary references (#425).
+   * Empty / undefined for legal_document rows. The frontend renders
+   * these as source-document links on commentary cards.
+   */
+  sourceDocumentIds?: string[];
 }
 
 // ─── Document Type Rules (presentation config) ───
@@ -340,5 +352,8 @@ export function mapSearchHitToView(
     // Optional scalars — omit when absent (ADR-0011)
     ...(hit.structural_path && { structuralContext: hit.structural_path }),
     ...(composeLanguage(hit, locale) && { contentLanguage: composeLanguage(hit, locale) }),
+    ...(hit.record_kind && { recordKind: hit.record_kind }),
+    ...(hit.source_document_ids &&
+      hit.source_document_ids.length > 0 && { sourceDocumentIds: hit.source_document_ids }),
   };
 }

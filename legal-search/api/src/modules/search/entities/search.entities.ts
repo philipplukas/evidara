@@ -26,6 +26,19 @@ export interface SearchHitEntity {
   citations_count?: number;
   related_decisions_count?: number;
   related_commentary_count?: number;
+  /**
+   * Discriminator from the search projection (PR #434). `legal_document`
+   * is the historical default; `commentary_insight` rows are produced
+   * from DI commentary insights via the projection's commentary path
+   * (PR #441).
+   */
+  record_kind?: 'legal_document' | 'commentary_insight';
+  /**
+   * Canonical primary documents this commentary references. Empty /
+   * undefined for legal_document rows; non-empty for commentary_insight
+   * rows so the frontend can render explain-why source links.
+   */
+  source_document_ids?: string[];
 }
 
 export interface AggregationBucket {

@@ -8,6 +8,7 @@ import { usePreferences } from "@/hooks/use-preferences";
 import { hasActiveSearchConstraints, useSearchConstraints } from "@/lib/search-constraints-store";
 import type { ResultSetSource, SearchResultViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
+import { CommentaryResultCard, isCommentaryResult } from "./CommentaryResultCard";
 import { ResultCard } from "./ResultCard";
 
 function describeScopeTrail(
@@ -226,18 +227,23 @@ export function ResultList({
         </div>
       </div>
 
-      {/* Results */}
-      {visibleResults.map((result) => (
-        <ResultCard
-          key={result.id}
-          result={result}
-          isSelected={selectedId === result.id}
-          onFocus={onFocus}
-          onPivot={onPivot}
-          onPin={onPin}
-          isPinned={pinnedIds.has(result.id)}
-        />
-      ))}
+      {/* Results — dispatch to the commentary variant when the row is a
+          commentary insight, otherwise render the default ResultCard.
+          Mixed result lists keep both variants visually distinct. */}
+      {visibleResults.map((result) => {
+        const Card = isCommentaryResult(result) ? CommentaryResultCard : ResultCard;
+        return (
+          <Card
+            key={result.id}
+            result={result}
+            isSelected={selectedId === result.id}
+            onFocus={onFocus}
+            onPivot={onPivot}
+            onPin={onPin}
+            isPinned={pinnedIds.has(result.id)}
+          />
+        );
+      })}
 
       {/* Load more */}
       {hasMore && (

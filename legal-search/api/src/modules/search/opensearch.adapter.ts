@@ -189,6 +189,10 @@ export class SearchOpenSearchAdapter implements SearchRepository {
             citations_count: src.citations_count as number | undefined,
             related_decisions_count: src.related_decisions_count as number | undefined,
             related_commentary_count: src.related_commentary_count as number | undefined,
+            record_kind: src.record_kind as 'legal_document' | 'commentary_insight' | undefined,
+            source_document_ids: Array.isArray(src.source_document_ids)
+              ? (src.source_document_ids as string[])
+              : undefined,
           };
         });
 
