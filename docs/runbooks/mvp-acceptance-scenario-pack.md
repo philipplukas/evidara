@@ -1,8 +1,8 @@
 # MVP Acceptance Scenario Pack (dev-first; optional staging)
 
 Owner: Platform team
-Last reviewed: 2026-04-22
-Last verified: 2026-04-22
+Last reviewed: 2026-04-26
+Last verified: 2026-04-26
 Applies to: dev, staging
 
 ## Automation
@@ -15,6 +15,7 @@ uv run evidara workflow mvp-acceptance --human
 ./scripts/mvp-acceptance-scenario-pack.sh dev
 ./scripts/mvp-acceptance-scenario-pack.sh staging
 ./scripts/mvp-acceptance-scenario-pack.sh dev --json
+./scripts/smoke-hetzner-hitl-rescore.sh
 ```
 
 Preferred surface: [`tools/evidara-cli`](../../tools/evidara-cli/README.md) via `evidara workflow mvp-acceptance`.
@@ -22,6 +23,22 @@ Preferred surface: [`tools/evidara-cli`](../../tools/evidara-cli/README.md) via 
 Lower-level helper: `scripts/mvp-acceptance-scenario-pack.sh` remains available when you want a shell-only version of the same API-oriented checks.
 
 The shell helper requires `curl`, `jq`, and `gcloud`. For **private** Cloud Run APIs, see [Cloud Run auth](#cloud-run-auth-local-and-cli) below.
+
+Hetzner staging HITL helper: `scripts/smoke-hetzner-hitl-rescore.sh` verifies the current
+internal staging loop through the rocky-agents cluster:
+
+`seeded DI document -> create rescore_request correction -> apply -> Temporal rescore -> metrics`
+
+By default it:
+
+- port-forwards `svc/platform-control-api` in namespace `evidare-staging`
+- reads `PLATFORM_CONTROL_OPERATOR_API_KEY` from `evidara-platform-control-api-keys`
+- targets seeded document `doc_2adgt1ejqzhjj24tn8svn54h08`
+- fails unless the final `rescore_outcome` is `changed` or `unchanged`
+- fails unless `rescore_outcomes.applied_total` and the matching outcome bucket increment
+
+Override `PLATFORM_CONTROL_BASE_URL` and `PLATFORM_CONTROL_API_KEY` to run against an already
+reachable platform-control API without `kubectl`.
 
 ### CLI output modes (`evidara workflow mvp-acceptance`)
 
@@ -63,7 +80,7 @@ Provide a repeatable acceptance pack for the locked MVP flow:
 
 `ingest source -> version approve -> run -> DI outputs -> searchable detail`
 
-This pack is designed to be executed in **dev** first. Teams with a staging GCP project repeat there for parity evidence; **dev-first** teams attach the **dev** run as the remote acceptance record (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)).
+This pack is designed to be executed in **dev** first. Teams with a staging GCP project repeat there for parity evidence; **dev-first** teams attach the **dev** run as the remote acceptance record (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)). While GCP billing is disabled, Hetzner staging is the internal runtime evidence path for HITL/rescore confidence.
 
 ## Preconditions
 
@@ -182,6 +199,23 @@ Historical reference:
 
 - Strict `GO`: [run 24028370655](https://github.com/philipplukas/evidara/actions/runs/24028370655)
 - Investigation `GO`: [run 24028371278](https://github.com/philipplukas/evidara/actions/runs/24028371278)
+
+## Hetzner Staging HITL Evidence (2026-04-26)
+
+Latest live staging smoke:
+
+- Argo app `rocky-agents-staging`: `Synced Healthy Succeeded`
+- Seed job `evidara-di-seed`: `Complete`
+- Delta surfaces readable from `platform-control-worker`:
+  - `published_documents`: 1 row
+  - `published_sections`: 2 rows
+  - `processing_manifests`: 1 row
+- Seeded document: `doc_2adgt1ejqzhjj24tn8svn54h08`
+- Smoke correction: `cor_01kq5g5ddxa1y3yb443e868xtq`
+- Triggered workflow: `rescore-cor_01kq5g5ddxa1y3yb443e868xtq`
+- Final outcome: `unchanged`
+- Metrics: `applied_total` moved `5 -> 6`, `unchanged` moved `1 -> 2`,
+  and `failed` stayed `4`
 
 ## Exit Criteria
 
