@@ -242,6 +242,62 @@ PR. If the CLI doesn't yet expose `corrections`, the same calls are
 straightforward `curl` invocations against the OpenAPI spec frozen in
 PR #434. Resolves on lane completion (#421).)
 
+### Verify the correction-rescore loop
+
+Run after the platform-control API and worker for the rescore lane are
+deployed. This proves the operator identity, correction lifecycle,
+Temporal rescore workflow, payload write-back, and metrics bucket all
+agree on one correction.
+
+```bash
+PC_BASE=https://platform-control-staging.<project>.run.app
+OPERATOR_TOKEN=<staging operator api key>
+DOC_ID=doc_01jq7bdptzqv3xs0c41xpw1ybg
+
+# 1. Create a rescore_request as an authenticated operator.
+CORRECTION_ID="$(
+  curl -fsS -X POST "$PC_BASE/v1/corrections" \
+    -H "X-API-Key: $OPERATOR_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"target_entity_type\":\"document\",
+      \"target_entity_id\":\"$DOC_ID\",
+      \"correction_type\":\"rescore_request\",
+      \"payload\":{\"reason_code\":\"smoke_check\"},
+      \"rationale\":\"verify HITL rescore loop\"
+    }" | jq -r '.correction_id'
+)"
+
+# Expect an op_* operator_id resolved by auth, not a caller-supplied header.
+curl -fsS -H "X-API-Key: $OPERATOR_TOKEN" \
+  "$PC_BASE/v1/corrections/$CORRECTION_ID" \
+  | jq '{correction_id, operator_id, status, correction_type}'
+
+# 2. Apply it. Applying a rescore_request starts the Temporal workflow.
+curl -fsS -X PATCH "$PC_BASE/v1/corrections/$CORRECTION_ID" \
+  -H "X-API-Key: $OPERATOR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"applied","rationale":"smoke approved"}' \
+  | jq '.payload | {triggered_workflow_id, triggered_at}'
+# Expect: triggered_workflow_id like "rescore-cor_*".
+
+# 3. Poll until the worker records the DI outcome on the payload.
+watch -n 5 "curl -fsS -H 'X-API-Key: $OPERATOR_TOKEN' \
+  '$PC_BASE/v1/corrections/$CORRECTION_ID' \
+  | jq '.payload | {rescore_outcome, resulting_run_id, completed_at}'"
+# Expect: rescore_outcome is changed, unchanged, or failed; completed_at is set.
+
+# 4. Confirm metrics count the same outcome bucket.
+curl -fsS -H "X-API-Key: $OPERATOR_TOKEN" \
+  "$PC_BASE/v1/corrections/metrics" \
+  | jq '.rescore_outcomes'
+```
+
+If step 2 returns 200 but no `triggered_workflow_id`, verify the API
+revision includes #454. If step 3 remains empty, inspect the
+platform-control worker for `rescore_runner_failed` or
+`rescore_completed` with the same `correction_id`.
+
 ### Legal-search canonical filters
 
 ```bash

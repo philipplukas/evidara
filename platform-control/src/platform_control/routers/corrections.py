@@ -11,6 +11,7 @@ read is gone; any caller still passing it is silently ignored.
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -39,6 +40,7 @@ from platform_control.services.rescore_scheduler import (
 router = APIRouter(prefix="/v1", tags=["corrections"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 PrincipalDep = Annotated[Principal, Depends(get_current_principal)]
+logger = logging.getLogger(__name__)
 
 
 _OPERATOR_ID_PATTERN = r"^op_[a-z0-9]+$"
@@ -131,20 +133,6 @@ async def get_correction(
     return CorrectionResponse.model_validate(row, from_attributes=True)
 
 
-@router.patch(
-    "/corrections/{correction_id}",
-    response_model=CorrectionResponse,
-)
-async def update_correction_status(
-    correction_id: str,
-    request: UpdateCorrectionStatusRequest,
-    session: SessionDep,
-) -> CorrectionResponse:
-    service = CorrectionService(session)
-    row = await service.update_status(correction_id, request)
-    return CorrectionResponse.model_validate(row, from_attributes=True)
-
-
 # ─── Rescore-from-correction (#427) ───────────────────────────────────────────
 
 
@@ -173,6 +161,38 @@ def _default_rescore_scheduler() -> RescoreScheduler:
 
 
 RescoreSchedulerDep = Annotated[RescoreScheduler, Depends(_default_rescore_scheduler)]
+
+
+@router.patch(
+    "/corrections/{correction_id}",
+    response_model=CorrectionResponse,
+)
+async def update_correction_status(
+    correction_id: str,
+    request: UpdateCorrectionStatusRequest,
+    session: SessionDep,
+    scheduler: RescoreSchedulerDep,
+) -> CorrectionResponse:
+    service = CorrectionService(session)
+    row = await service.update_status(correction_id, request)
+    if (
+        request.status is CorrectionStatus.APPLIED
+        and row.correction_type == CorrectionType.RESCORE_REQUEST.value
+    ):
+        try:
+            await service.trigger_rescore(row.correction_id, scheduler=scheduler)
+        except Exception as exc:
+            logger.exception(
+                "rescore_schedule_failed",
+                extra={"correction_id": row.correction_id},
+            )
+            await service.record_rescore_outcome(
+                row.correction_id,
+                outcome="failed",
+                failure_reason=str(exc),
+            )
+        row = await service.get(row.correction_id)
+    return CorrectionResponse.model_validate(row, from_attributes=True)
 
 
 @router.post(
