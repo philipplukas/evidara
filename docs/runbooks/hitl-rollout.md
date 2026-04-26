@@ -189,9 +189,9 @@ curl -X POST "$OPENSEARCH_NODE/_aliases" \
   }'
 ```
 
-If the new mapping silently drops a doc, prefer the alias revert above
-+ investigate over re-running the reindex; reindex twice without alias
-revert double-writes.
+If the new mapping silently drops a doc, prefer the alias revert
+above plus investigation over re-running the reindex — reindex twice
+without alias revert double-writes.
 
 ### Step 6 — Deploy `platform-control/admin`
 
