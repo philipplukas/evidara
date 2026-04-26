@@ -131,20 +131,6 @@ async def get_correction(
     return CorrectionResponse.model_validate(row, from_attributes=True)
 
 
-@router.patch(
-    "/corrections/{correction_id}",
-    response_model=CorrectionResponse,
-)
-async def update_correction_status(
-    correction_id: str,
-    request: UpdateCorrectionStatusRequest,
-    session: SessionDep,
-) -> CorrectionResponse:
-    service = CorrectionService(session)
-    row = await service.update_status(correction_id, request)
-    return CorrectionResponse.model_validate(row, from_attributes=True)
-
-
 # ─── Rescore-from-correction (#427) ───────────────────────────────────────────
 
 
@@ -173,6 +159,27 @@ def _default_rescore_scheduler() -> RescoreScheduler:
 
 
 RescoreSchedulerDep = Annotated[RescoreScheduler, Depends(_default_rescore_scheduler)]
+
+
+@router.patch(
+    "/corrections/{correction_id}",
+    response_model=CorrectionResponse,
+)
+async def update_correction_status(
+    correction_id: str,
+    request: UpdateCorrectionStatusRequest,
+    session: SessionDep,
+    scheduler: RescoreSchedulerDep,
+) -> CorrectionResponse:
+    service = CorrectionService(session)
+    row = await service.update_status(correction_id, request)
+    if (
+        request.status is CorrectionStatus.APPLIED
+        and row.correction_type == CorrectionType.RESCORE_REQUEST.value
+    ):
+        await service.trigger_rescore(row.correction_id, scheduler=scheduler)
+        row = await service.get(row.correction_id)
+    return CorrectionResponse.model_validate(row, from_attributes=True)
 
 
 @router.post(
