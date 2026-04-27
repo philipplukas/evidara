@@ -107,12 +107,22 @@ Kubernetes Secret values.
 
 2026-04-27 live check:
 
-- Planned source-derived upgrade: Rocky PR #249 replaces the older synthetic
-  corpus with the four Fedlex source-derived documents listed above and removes
-  the synthetic projection rows from legal-search.
-- Before marking this section verified again, Argo must sync the Rocky PR
-  revision and this packet must be rerun end to end.
+- Argo: `Synced Healthy Succeeded` at
+  `4ad26f26ca071eb5ef72c1caa765ba2b1e825e0b`.
+- `evidara-di-seed`: complete, `corpus_size=4`, all four legacy synthetic
+  projection withdrawals applied.
+- Delta rows: `published_documents=8`, `published_sections=16`,
+  `processing_manifests=8`. The extra four rows are preserved historical DI
+  surface rows; legal-search visibility is controlled by withdrawal events.
+- Query gate: [`scripts/check-internal-beta-query-pack.sh`](../../scripts/check-internal-beta-query-pack.sh)
+  passed; `q=*` returned exactly the four source-derived documents.
+- Legacy synthetic details: old document IDs return `404` from legal-search.
+- Detail trust: all four source-derived documents have non-placeholder titles,
+  controlled `law` type, Fedlex subtitles, four metadata rows, and
+  content/sections/citations/details tabs.
+- HITL smoke: correction `cor_01kq7g3gxv88pag6mzsynejshk`, workflow
+  `rescore-cor_01kq7g3gxv88pag6mzsynejshk`, outcome `unchanged`; metrics moved
+  `applied_total 8 -> 9`, `unchanged 4 -> 5`, and `failed` stayed `4`.
 
-Open follow-up: after this source-derived corpus is live and verified, broaden
-from deterministic source snapshots to normal source-ingestion replay for the
-same IDs.
+Open follow-up: broaden from deterministic source snapshots to normal
+source-ingestion replay for the same IDs.
