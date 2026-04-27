@@ -54,10 +54,13 @@ Kubernetes Secret values.
 
    ```bash
    kubectl -n evidare-staging exec deploy/platform-control-worker -- sh -lc 'python - <<PY
+   import os, sys
    from deltalake import DeltaTable
    for name in ["published_documents", "published_sections", "processing_manifests"]:
        table = DeltaTable(f"file:///var/lib/evidara/surfaces/{name}").to_pyarrow_table()
        print(f"{name}: {table.num_rows} rows")
+   sys.stdout.flush()
+   os._exit(0)
    PY'
    ```
 
@@ -68,7 +71,7 @@ Kubernetes Secret values.
    EVIDARA_LEGAL_SEARCH_URL=http://127.0.0.1:18080 \
      ./scripts/check-internal-beta-query-pack.sh
    EVIDARA_LEGAL_SEARCH_URL=http://127.0.0.1:18080 \
-   EVIDARA_LEGAL_SEARCH_TOKEN=dummy \
+     EVIDARA_LEGAL_SEARCH_TOKEN=dummy \
      ./scripts/run-staging-relevance-query-pack.sh \
      scripts/fixtures/internal-beta-staging-queries.txt
    curl -fsS http://127.0.0.1:18080/v1/documents/doc_2adgt1ejqzhjj24tn8svn54h08 |
@@ -104,13 +107,19 @@ Kubernetes Secret values.
 
 2026-04-27 live check:
 
-- `q=*`: `totalResults=1`
-- seeded document title: `Evidara staging seed document`
-- seeded document type: `law`
-- detail metadata: `Dokumenttyp`, `Behorde`, `Zustandigkeit`, `Sprache`
-- tabs: `Inhalt`, `Abschnitte`, `Details`
+- Argo: `Synced Healthy Succeeded` at
+  `71bb2a7ce8b476562e258df6f1514a4668900acb`.
+- `evidara-di-seed`: complete, `corpus_size=4`.
+- Delta rows: `published_documents=4`, `published_sections=8`,
+  `processing_manifests=4`.
+- Query gate: [`scripts/check-internal-beta-query-pack.sh`](../../scripts/check-internal-beta-query-pack.sh)
+  passed; `q=*` returned all four seeded documents.
+- Detail trust: all four documents have non-placeholder titles, controlled
+  types (`law`, `decision`, `commentary`), subtitles, four metadata rows, and
+  content/sections/details tabs.
+- HITL smoke: correction `cor_01kq7dmek7n2gekddzmtbvkgjj`, workflow
+  `rescore-cor_01kq7dmek7n2gekddzmtbvkgjj`, outcome `unchanged`; metrics moved
+  `applied_total 7 -> 8`, `unchanged 3 -> 4`, and `failed` stayed `4`.
 
-Open follow-up: expand from one deterministic seed document to a 3-5 document
-trusted beta corpus before making broader relevance claims. Rocky PR #246 moves
-that follow-up from plan to implementation; rerun this packet after Argo sync to
-replace the one-document live evidence above.
+Open follow-up: replace the synthetic deterministic corpus with 3-5
+source-derived documents before making broader relevance claims.
