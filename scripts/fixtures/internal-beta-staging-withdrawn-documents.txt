@@ -1,0 +1,6 @@
+# Retired synthetic document IDs from the pre-source-derived Hetzner beta seed.
+# document_id	notes
+doc_2adgt1ejqzhjj24tn8svn54h08	Old synthetic staging seed document; must be withdrawn from legal-search and return 404.
+doc_76v36gavcnq3sfs52fbsbvzs81	Old synthetic Swiss Code of Obligations staging excerpt; must return 404.
+doc_2dg03eb27dws3g13j19t1f94ax	Old synthetic Federal Supreme Court staging decision; must return 404.
+doc_6qkdbsn4jan80qg7fs09qj7dc5	Old synthetic commentary document; must return 404.

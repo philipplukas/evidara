@@ -1,5 +1,5 @@
-# query	expected_doc_id	notes
-*	__nonempty__	Control query: any seeded document is acceptable.
+# query	expected_doc_ids	notes
+*	__exact_beta_corpus__	Control query: totalResults must be 4 and the visible set must be exactly the source-derived Fedlex beta corpus.
 Federal Constitution	doc_6vfta1cd5xy642g7eb59j8wkfm	Fedlex SR 101 source-derived snapshot.
 Art. 8 BV equality	doc_6vfta1cd5xy642g7eb59j8wkfm	Federal Constitution rights anchor.
 Code of Obligations	doc_67b9202dsxm52sa36dsfvcm6bt	Fedlex SR 220 source-derived snapshot.
@@ -8,3 +8,4 @@ Civil Procedure Code	doc_20djzpnf2yytwg9k74zyzjdeta	Fedlex SR 272 source-derived
 conciliation authorities	doc_20djzpnf2yytwg9k74zyzjdeta	Civil Procedure Code procedure anchor.
 Federal Act on Data Protection	doc_2em3ky37mw9tm7hxh5nkw0zkh7	Fedlex SR 235.1 source-derived snapshot.
 personal data processing principles	doc_2em3ky37mw9tm7hxh5nkw0zkh7	Data protection processing anchor.
+Fedlex	doc_6vfta1cd5xy642g7eb59j8wkfm,doc_67b9202dsxm52sa36dsfvcm6bt,doc_20djzpnf2yytwg9k74zyzjdeta,doc_2em3ky37mw9tm7hxh5nkw0zkh7	Broad source query should keep all four beta documents in top 5.

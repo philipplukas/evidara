@@ -1,0 +1,5 @@
+# document_id	title_contains	expected_type	subtitle_contains	min_metadata_rows	expected_tabs	notes
+doc_6vfta1cd5xy642g7eb59j8wkfm	Federal Constitution of the Swiss Confederation	law	Fedlex	4	content,sections,citations,details	Fedlex SR 101 source-derived snapshot.
+doc_67b9202dsxm52sa36dsfvcm6bt	Code of Obligations	law	Fedlex	4	content,sections,citations,details	Fedlex SR 220 source-derived snapshot.
+doc_20djzpnf2yytwg9k74zyzjdeta	Civil Procedure Code	law	Fedlex	4	content,sections,citations,details	Fedlex SR 272 source-derived snapshot.
+doc_2em3ky37mw9tm7hxh5nkw0zkh7	Federal Act on Data Protection	law	Fedlex	4	content,sections,citations,details	Fedlex SR 235.1 source-derived snapshot.

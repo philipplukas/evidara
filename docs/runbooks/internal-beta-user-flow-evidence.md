@@ -7,8 +7,8 @@ Applies to: Hetzner `evidare-staging` internal beta
 
 ## Purpose
 
-This is the canonical one-week internal beta packet while GCP billing is
-disabled. It proves the smallest useful user promise:
+This is the canonical one-week internal beta query/evidence packet while GCP
+billing is disabled. It proves the smallest useful user promise:
 
 `seeded document -> searchable result -> trusted detail -> HITL correction/rescore -> metrics -> recoverable staging state`
 
@@ -28,9 +28,19 @@ Query pack:
 
 - [`scripts/fixtures/internal-beta-staging-queries.txt`](../../scripts/fixtures/internal-beta-staging-queries.txt)
 - [`scripts/fixtures/internal-beta-staging-expected.tsv`](../../scripts/fixtures/internal-beta-staging-expected.tsv)
-- Expected result: every non-control query returns its named expected document
+- [`scripts/fixtures/internal-beta-staging-documents.tsv`](../../scripts/fixtures/internal-beta-staging-documents.tsv)
+- [`scripts/fixtures/internal-beta-staging-withdrawn-documents.txt`](../../scripts/fixtures/internal-beta-staging-withdrawn-documents.txt)
+- Expected result: the nine beta queries return their named source-derived
+  document(s) in top 5. The broad `Fedlex` row expects all four beta documents
   in top 5.
-- `q=*` must return at least one result.
+- `q=*` is the corpus-health control. It must return `totalResults=4`, and the
+  visible document set must be exactly the four source-derived Fedlex documents
+  listed above.
+- The old synthetic beta document IDs are tombstones: detail reads must return
+  `404` from legal-search.
+- Detail reads for the four source-derived documents must show a
+  non-placeholder title, controlled `law` type, Fedlex subtitle, at least four
+  metadata rows, and `content`, `sections`, `citations`, and `details` tabs.
 
 This corpus is enough for the internal beta trust loop. It is not evidence that
 broader legal relevance is solved.
@@ -70,6 +80,7 @@ Kubernetes Secret values.
    kubectl -n evidare-staging port-forward svc/legal-search-api 18080:8080
    EVIDARA_LEGAL_SEARCH_URL=http://127.0.0.1:18080 \
      ./scripts/check-internal-beta-query-pack.sh
+   # Optional Markdown top-3 table for a Linear comment or release note:
    EVIDARA_LEGAL_SEARCH_URL=http://127.0.0.1:18080 \
      EVIDARA_LEGAL_SEARCH_TOKEN=dummy \
      ./scripts/run-staging-relevance-query-pack.sh \
@@ -94,10 +105,11 @@ Kubernetes Secret values.
 
 - `rocky-agents-staging` is `Synced` and `Healthy`.
 - `evidara-di-seed` is complete and Delta surfaces are readable.
-- The expected-query pack returns each named document in top 5 for its target
-  queries and `q=*` returns at least one result.
-- Detail shows a non-placeholder title, controlled type, subtitle, metadata, and
-  content/sections tabs.
+- The expected-query pack returns each named source-derived document in top 5,
+  and `q=*` returns exactly the four-document beta corpus.
+- Old synthetic document IDs return `404` from legal-search detail.
+- Detail shows a non-placeholder title, controlled `law` type, Fedlex subtitle,
+  at least four metadata rows, and content/sections/citations/details tabs.
 - HITL rescore ends `changed` or `unchanged`; metrics increment the matching
   bucket.
 - CNPG restore drill evidence exists, or the packet is marked blocked on backup
