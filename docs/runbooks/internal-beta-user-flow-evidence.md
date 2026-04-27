@@ -20,11 +20,16 @@ is intentionally small and deterministic.
 | Document ID | Source | Expected user-facing evidence |
 | --- | --- | --- |
 | `doc_2adgt1ejqzhjj24tn8svn54h08` | Rocky GitOps `evidara-di-seed` | Searchable title `Evidara staging seed document`, `type=law`, Fedlex subtitle, detail metadata, two sections |
+| `doc_76v36gavcnq3sfs52fbsbvzs81` | Rocky GitOps `evidara-di-seed` | Searchable title `Swiss Code of Obligations staging excerpt`, `type=law`, Fedlex subtitle, useful metadata |
+| `doc_2dg03eb27dws3g13j19t1f94ax` | Rocky GitOps `evidara-di-seed` | Searchable title `Federal Supreme Court staging decision on contract notice`, `type=decision`, Bundesgericht subtitle, useful metadata |
+| `doc_6qkdbsn4jan80qg7fs09qj7dc5` | Rocky GitOps `evidara-di-seed` | Searchable title `Staging commentary on proportionality and notice periods`, `type=commentary`, commentary subtitle, useful metadata |
 
 Query pack:
 
 - [`scripts/fixtures/internal-beta-staging-queries.txt`](../../scripts/fixtures/internal-beta-staging-queries.txt)
-- Expected result: every non-control query returns the seeded document in top 5.
+- [`scripts/fixtures/internal-beta-staging-expected.tsv`](../../scripts/fixtures/internal-beta-staging-expected.tsv)
+- Expected result: every non-control query returns its named expected document
+  in top 5.
 - `q=*` must return at least one result.
 
 This corpus is enough for the internal beta trust loop. It is not evidence that
@@ -61,6 +66,9 @@ Kubernetes Secret values.
    ```bash
    kubectl -n evidare-staging port-forward svc/legal-search-api 18080:8080
    EVIDARA_LEGAL_SEARCH_URL=http://127.0.0.1:18080 \
+     ./scripts/check-internal-beta-query-pack.sh
+   EVIDARA_LEGAL_SEARCH_URL=http://127.0.0.1:18080 \
+   EVIDARA_LEGAL_SEARCH_TOKEN=dummy \
      ./scripts/run-staging-relevance-query-pack.sh \
      scripts/fixtures/internal-beta-staging-queries.txt
    curl -fsS http://127.0.0.1:18080/v1/documents/doc_2adgt1ejqzhjj24tn8svn54h08 |
@@ -83,8 +91,8 @@ Kubernetes Secret values.
 
 - `rocky-agents-staging` is `Synced` and `Healthy`.
 - `evidara-di-seed` is complete and Delta surfaces are readable.
-- The query pack returns `doc_2adgt1ejqzhjj24tn8svn54h08` in top 5 for every
-  non-control query.
+- The expected-query pack returns each named document in top 5 for its target
+  queries and `q=*` returns at least one result.
 - Detail shows a non-placeholder title, controlled type, subtitle, metadata, and
   content/sections tabs.
 - HITL rescore ends `changed` or `unchanged`; metrics increment the matching
@@ -103,4 +111,6 @@ Kubernetes Secret values.
 - tabs: `Inhalt`, `Abschnitte`, `Details`
 
 Open follow-up: expand from one deterministic seed document to a 3-5 document
-trusted beta corpus before making broader relevance claims.
+trusted beta corpus before making broader relevance claims. Rocky PR #246 moves
+that follow-up from plan to implementation; rerun this packet after Argo sync to
+replace the one-document live evidence above.
