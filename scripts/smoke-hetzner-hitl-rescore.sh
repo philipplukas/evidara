@@ -7,7 +7,7 @@
 #   PLATFORM_CONTROL_API_KEY=...
 set -euo pipefail
 
-DEFAULT_DOCUMENT_ID="doc_2adgt1ejqzhjj24tn8svn54h08"
+DEFAULT_DOCUMENT_ID="doc_6vfta1cd5xy642g7eb59j8wkfm"
 
 K8S_NAMESPACE="${K8S_NAMESPACE:-evidare-staging}"
 K8S_SERVICE="${K8S_SERVICE:-platform-control-api}"

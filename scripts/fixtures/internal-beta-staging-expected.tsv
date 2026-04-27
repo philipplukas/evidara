@@ -1,10 +1,10 @@
 # query	expected_doc_id	notes
 *	__nonempty__	Control query: any seeded document is acceptable.
-Evidara staging seed document	doc_2adgt1ejqzhjj24tn8svn54h08	Stable HITL smoke target.
-Rescore smoke section	doc_2adgt1ejqzhjj24tn8svn54h08	Stable HITL smoke target section text.
-Swiss Code of Obligations	doc_76v36gavcnq3sfs52fbsbvzs81	Fedlex law excerpt.
-Kuendigungsfrist employer liability	doc_76v36gavcnq3sfs52fbsbvzs81	Fedlex law excerpt metadata/content anchor.
-contract notice	doc_2dg03eb27dws3g13j19t1f94ax	BGer decision should appear in top 5.
-Federal Supreme Court staging decision	doc_2dg03eb27dws3g13j19t1f94ax	BGer decision title anchor.
-proportionality notice periods	doc_6qkdbsn4jan80qg7fs09qj7dc5	Commentary document title/content anchor.
-legal commentary	doc_6qkdbsn4jan80qg7fs09qj7dc5	Commentary document type/content anchor.
+Federal Constitution	doc_6vfta1cd5xy642g7eb59j8wkfm	Fedlex SR 101 source-derived snapshot.
+Art. 8 BV equality	doc_6vfta1cd5xy642g7eb59j8wkfm	Federal Constitution rights anchor.
+Code of Obligations	doc_67b9202dsxm52sa36dsfvcm6bt	Fedlex SR 220 source-derived snapshot.
+Art. 97 OR liability	doc_67b9202dsxm52sa36dsfvcm6bt	Code of Obligations liability anchor.
+Civil Procedure Code	doc_20djzpnf2yytwg9k74zyzjdeta	Fedlex SR 272 source-derived snapshot.
+conciliation authorities	doc_20djzpnf2yytwg9k74zyzjdeta	Civil Procedure Code procedure anchor.
+Federal Act on Data Protection	doc_2em3ky37mw9tm7hxh5nkw0zkh7	Fedlex SR 235.1 source-derived snapshot.
+personal data processing principles	doc_2em3ky37mw9tm7hxh5nkw0zkh7	Data protection processing anchor.

@@ -19,10 +19,10 @@ is intentionally small and deterministic.
 
 | Document ID | Source | Expected user-facing evidence |
 | --- | --- | --- |
-| `doc_2adgt1ejqzhjj24tn8svn54h08` | Rocky GitOps `evidara-di-seed` | Searchable title `Evidara staging seed document`, `type=law`, Fedlex subtitle, detail metadata, two sections |
-| `doc_76v36gavcnq3sfs52fbsbvzs81` | Rocky GitOps `evidara-di-seed` | Searchable title `Swiss Code of Obligations staging excerpt`, `type=law`, Fedlex subtitle, useful metadata |
-| `doc_2dg03eb27dws3g13j19t1f94ax` | Rocky GitOps `evidara-di-seed` | Searchable title `Federal Supreme Court staging decision on contract notice`, `type=decision`, Bundesgericht subtitle, useful metadata |
-| `doc_6qkdbsn4jan80qg7fs09qj7dc5` | Rocky GitOps `evidara-di-seed` | Searchable title `Staging commentary on proportionality and notice periods`, `type=commentary`, commentary subtitle, useful metadata |
+| `doc_6vfta1cd5xy642g7eb59j8wkfm` | Rocky GitOps `evidara-di-seed` | Source-derived Fedlex SR 101 snapshot; searchable title `Federal Constitution of the Swiss Confederation`, `type=law`, Fedlex subtitle, useful metadata |
+| `doc_67b9202dsxm52sa36dsfvcm6bt` | Rocky GitOps `evidara-di-seed` | Source-derived Fedlex SR 220 snapshot; searchable title `Code of Obligations`, `type=law`, Fedlex subtitle, useful metadata |
+| `doc_20djzpnf2yytwg9k74zyzjdeta` | Rocky GitOps `evidara-di-seed` | Source-derived Fedlex SR 272 snapshot; searchable title `Civil Procedure Code`, `type=law`, Fedlex subtitle, useful metadata |
+| `doc_2em3ky37mw9tm7hxh5nkw0zkh7` | Rocky GitOps `evidara-di-seed` | Source-derived Fedlex SR 235.1 snapshot; searchable title `Federal Act on Data Protection`, `type=law`, Fedlex subtitle, useful metadata |
 
 Query pack:
 
@@ -74,7 +74,7 @@ Kubernetes Secret values.
      EVIDARA_LEGAL_SEARCH_TOKEN=dummy \
      ./scripts/run-staging-relevance-query-pack.sh \
      scripts/fixtures/internal-beta-staging-queries.txt
-   curl -fsS http://127.0.0.1:18080/v1/documents/doc_2adgt1ejqzhjj24tn8svn54h08 |
+   curl -fsS http://127.0.0.1:18080/v1/documents/doc_6vfta1cd5xy642g7eb59j8wkfm |
      jq '{id, title, type, subtitle, metadata, tabs}'
    ```
 
@@ -107,19 +107,12 @@ Kubernetes Secret values.
 
 2026-04-27 live check:
 
-- Argo: `Synced Healthy Succeeded` at
-  `71bb2a7ce8b476562e258df6f1514a4668900acb`.
-- `evidara-di-seed`: complete, `corpus_size=4`.
-- Delta rows: `published_documents=4`, `published_sections=8`,
-  `processing_manifests=4`.
-- Query gate: [`scripts/check-internal-beta-query-pack.sh`](../../scripts/check-internal-beta-query-pack.sh)
-  passed; `q=*` returned all four seeded documents.
-- Detail trust: all four documents have non-placeholder titles, controlled
-  types (`law`, `decision`, `commentary`), subtitles, four metadata rows, and
-  content/sections/details tabs.
-- HITL smoke: correction `cor_01kq7dmek7n2gekddzmtbvkgjj`, workflow
-  `rescore-cor_01kq7dmek7n2gekddzmtbvkgjj`, outcome `unchanged`; metrics moved
-  `applied_total 7 -> 8`, `unchanged 3 -> 4`, and `failed` stayed `4`.
+- Planned source-derived upgrade: Rocky PR #249 replaces the older synthetic
+  corpus with the four Fedlex source-derived documents listed above and removes
+  the synthetic projection rows from legal-search.
+- Before marking this section verified again, Argo must sync the Rocky PR
+  revision and this packet must be rerun end to end.
 
-Open follow-up: replace the synthetic deterministic corpus with 3-5
-source-derived documents before making broader relevance claims.
+Open follow-up: after this source-derived corpus is live and verified, broaden
+from deterministic source snapshots to normal source-ingestion replay for the
+same IDs.

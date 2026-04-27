@@ -147,12 +147,16 @@ From [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) an
 ### 3.5.2 Remote / extended corpus (product-owned; historically “staging”)
 
 **Current Hetzner internal beta corpus (2026-04-27):** the active low-cost
-staging path uses the Rocky GitOps seed and validates the seeded document through
+staging path uses the Rocky GitOps seed and validates the source-derived Fedlex
+beta corpus through
 [`internal-beta-user-flow-evidence.md`](internal-beta-user-flow-evidence.md).
 
 | Document ID | Environment URL (legal-search API or UI) | Notes |
 | ----------- | ------------------------------------------ | ----- |
-| `doc_2adgt1ejqzhjj24tn8svn54h08` | Hetzner `evidare-staging` via port-forward or internal ingress | Deterministic DI seed; search/detail must show non-placeholder title, `law` type, Fedlex subtitle, metadata rows, and two sections |
+| `doc_6vfta1cd5xy642g7eb59j8wkfm` | Hetzner `evidare-staging` via port-forward or internal ingress | Fedlex SR 101 source-derived snapshot; search/detail must show non-placeholder title, `law` type, Fedlex subtitle, metadata rows, and sections |
+| `doc_67b9202dsxm52sa36dsfvcm6bt` | same | Fedlex SR 220 source-derived snapshot; search/detail trust criteria as above |
+| `doc_20djzpnf2yytwg9k74zyzjdeta` | same | Fedlex SR 272 source-derived snapshot; search/detail trust criteria as above |
+| `doc_2em3ky37mw9tm7hxh5nkw0zkh7` | same | Fedlex SR 235.1 source-derived snapshot; search/detail trust criteria as above |
 
 **Dev-first posture:** if your org has **no** staging GCP project, maintain the same style of table for **dev** legal-search URLs (from your deployed `legal-search-api` Cloud Run host) and treat **3.5.1** (local) + **dev** inventory as the live acceptance surfaces until staging is added. Re-evaluate when to provision staging per [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project).
 
