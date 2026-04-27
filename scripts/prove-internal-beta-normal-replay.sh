@@ -110,7 +110,7 @@ print(json.dumps({
         "request_timeout_seconds": int(${REQUEST_TIMEOUT_SECONDS@Q}),
         "tenant_id": "tenant_public",
         "corpus_id": "corpus_public_ch_federal_law",
-        "scope_type": "internal_staging",
+        "scope_type": "global_public",
         "source_origin_kind": "official_primary",
         "trust_tier": "authoritative",
         "language_codes": ["en"],
