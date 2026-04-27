@@ -149,6 +149,7 @@
       "loadMore": "Charger plus de r\u00e9sultats",
       "remaining": "{count} restants",
       "openResult": "Ouvrir {title}",
+      "shareResult": "Copier le lien du r\u00e9sultat",
       "seeRelated": "Voir {count} {label} associ\u00e9s",
       "pinResult": "\u00c9pingler le r\u00e9sultat",
       "unpinResult": "D\u00e9tacher le r\u00e9sultat"

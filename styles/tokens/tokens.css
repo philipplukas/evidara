@@ -159,6 +159,22 @@
   --status-info: #1e40af;
   --status-info-subtle: #eff6ff;
 
+  /* ─── Badge palette ─── */
+  --badge-blue-bg: oklch(0.94 0.04 245);
+  --badge-blue-text: oklch(0.4 0.12 245);
+  --badge-pink-bg: oklch(0.96 0.025 230);
+  --badge-pink-text: oklch(0.45 0.1 230);
+  --badge-indigo-bg: oklch(0.94 0.04 275);
+  --badge-indigo-text: oklch(0.38 0.12 275);
+  --badge-green-bg: oklch(0.94 0.04 155);
+  --badge-green-text: oklch(0.42 0.1 155);
+  --badge-amber-bg: oklch(0.95 0.05 85);
+  --badge-amber-text: oklch(0.45 0.12 85);
+  --badge-slate-bg: oklch(0.96 0.01 245);
+  --badge-slate-text: oklch(0.42 0.03 245);
+  --badge-fallback-bg: oklch(0.96 0 0);
+  --badge-fallback-text: oklch(0.4 0 0);
+
   /* ─── Typography size + leading scale ─── */
   --text-tiny: 0.625rem;        --leading-tiny: 1;
   --text-micro: 0.6875rem;      --leading-micro: 1.2;
@@ -269,6 +285,21 @@
   --status-neutral-subtle: rgba(163, 163, 163, 0.1);
   --status-info: #60a5fa;
   --status-info-subtle: rgba(96, 165, 250, 0.1);
+
+  --badge-blue-bg: oklch(0.3 0.06 245);
+  --badge-blue-text: oklch(0.85 0.08 245);
+  --badge-pink-bg: oklch(0.3 0.06 230);
+  --badge-pink-text: oklch(0.85 0.08 230);
+  --badge-indigo-bg: oklch(0.3 0.06 275);
+  --badge-indigo-text: oklch(0.85 0.08 275);
+  --badge-green-bg: oklch(0.3 0.06 155);
+  --badge-green-text: oklch(0.85 0.07 155);
+  --badge-amber-bg: oklch(0.32 0.06 85);
+  --badge-amber-text: oklch(0.86 0.09 85);
+  --badge-slate-bg: oklch(0.3 0.02 245);
+  --badge-slate-text: oklch(0.85 0.02 245);
+  --badge-fallback-bg: oklch(0.3 0 0);
+  --badge-fallback-text: oklch(0.85 0 0);
 
   --accent-core: #9484f5;
   --accent-core-foreground: oklch(0.15 0 0);

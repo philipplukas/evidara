@@ -8,9 +8,9 @@
  * Palette keys are visual aliases, not semantic:
  *   "blue", "pink", "indigo", "green" — not "law", "decision", etc.
  *
- * Values resolve to CSS custom properties defined in
- * `contracts/design-tokens/evidara-tokens.css` so swatches stay in sync
- * across apps and pick up dark-mode overrides automatically.
+ * Values resolve to CSS custom properties defined in `styles/tokens/tokens.css`
+ * so swatches stay in sync across apps and pick up dark-mode overrides
+ * automatically.
  *
  * Note: the `pink` key is tuned to a neutral sky-blue hue (UX-7) in the
  * shared tokens file because the former pink/fuchsia hue combined with

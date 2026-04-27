@@ -86,7 +86,6 @@ export function ResultCard({
             {result.title}
           </button>
         </h3>
-        <ShareButton size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
           {isSelected && (
             <span className="inline-flex items-center rounded-full border border-accent-core/20 bg-accent-core/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-core">
@@ -114,18 +113,21 @@ export function ResultCard({
       </div>
 
       {/* Snippet */}
-      <p className="mb-3 line-clamp-3 text-[13px] leading-6 text-foreground/80 font-document">
+      <p className="mb-3 mt-3 line-clamp-3 text-[13px] leading-6 text-foreground/80 font-document">
         {result.snippet}
       </p>
 
       {/* Metadata rows */}
       {result.metadataRows.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1">
+        <div className="mb-3 grid gap-1.5 rounded-lg border border-border/60 bg-muted/25 px-3 py-2 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
           {result.metadataRows.map((row, i) => (
-            <span key={i} className="inline-flex items-center gap-1 text-[11px] text-text-meta">
-              <IconCell iconKey={row.iconKey} className="text-xs text-text-meta" />
-              <span className="font-medium text-text-meta">{row.label}:</span>
-              <span className="text-foreground/80">{row.value}</span>
+            <span
+              key={i}
+              className="inline-flex min-w-0 items-center gap-1 text-[11px] text-text-meta"
+            >
+              <IconCell iconKey={row.iconKey} className="shrink-0 text-xs text-text-meta" />
+              <span className="shrink-0 font-medium text-text-meta">{row.label}:</span>
+              <span className="min-w-0 truncate text-foreground/80">{row.value}</span>
             </span>
           ))}
         </div>
@@ -153,6 +155,11 @@ export function ResultCard({
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-1">
+          <ShareButton
+            size="sm"
+            className="border border-border/70 bg-background shadow-sm"
+            label={t("shareResult")}
+          />
           {onPin && (
             <AccentButton
               onClick={(e) => {

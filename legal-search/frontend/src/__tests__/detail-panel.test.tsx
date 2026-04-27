@@ -103,6 +103,29 @@ describe("DetailPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("copies a citation-like title and subtitle when detail has source context", () => {
+    const writeText = vi.fn();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderWithProviders(
+      <DetailPanel
+        detail={articleDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle("Zitat kopieren"));
+    expect(writeText).toHaveBeenCalledWith(
+      "Art. 754 OR - Verantwortlichkeit — Haftung der Verwaltung und der Geschäftsführung",
+    );
+  });
+
   it("renders tab labels", () => {
     renderWithProviders(
       <DetailPanel

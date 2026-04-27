@@ -72,7 +72,7 @@ describe("High-impact interaction controls", () => {
     const copyButton = document.querySelector('button[title="Zitat kopieren"]');
     expect(copyButton).toBeTruthy();
     fireEvent.click(copyButton!);
-    expect(writeText).toHaveBeenCalledWith(articleDetail.title);
+    expect(writeText).toHaveBeenCalledWith(`${articleDetail.title} - ${articleDetail.subtitle}`);
   });
 
   it("supports exact match selection", () => {

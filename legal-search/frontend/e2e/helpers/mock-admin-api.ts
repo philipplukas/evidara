@@ -239,6 +239,25 @@ export async function mockAdminRunFlowApi(page: Page) {
       return;
     }
 
+    if (apiPath === "/v1/corrections/metrics") {
+      await fulfillJson(route, {
+        window_weeks: 8,
+        operator_throughput_window_days: 30,
+        weekly_by_target_entity_type: [],
+        weekly_by_correction_type: [],
+        operator_throughput: [],
+        rescore_outcomes: {
+          pending: 0,
+          applied_total: 9,
+          rejected: 0,
+          changed: 0,
+          unchanged: 5,
+          failed: 4,
+        },
+      });
+      return;
+    }
+
     if (apiPath === "/v1/reference-data/jurisdictions") {
       await fulfillJson(route, {
         data: [

@@ -21,6 +21,8 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
   const t = useTranslations("detail");
   const safeTitle = detail.title.trim().length > 0 ? detail.title : t("fallbackTitle");
   const safeSubtitle = detail.subtitle.trim().length > 0 ? detail.subtitle : t("fallbackSubtitle");
+  const citationText =
+    detail.subtitle.trim().length > 0 ? `${safeTitle} - ${safeSubtitle}` : safeTitle;
   const translationLabel =
     detail.contentLanguage?.label && detail.contentLanguage.label.trim().length > 0
       ? detail.contentLanguage.label
@@ -32,8 +34,12 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
 
       <div className="mt-2 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold leading-snug text-foreground">{safeTitle}</h2>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{safeSubtitle}</p>
+          <h2 className="max-w-[72ch] text-base font-semibold leading-snug text-foreground">
+            {safeTitle}
+          </h2>
+          <p className="mt-1 max-w-[72ch] text-xs leading-5 text-muted-foreground">
+            {safeSubtitle}
+          </p>
 
           {detail.contentLanguage?.isTranslation && (
             <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-attention-border bg-attention-subtle px-2.5 py-1 text-tiny font-medium text-attention">
@@ -42,7 +48,7 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
           )}
 
           {detail.metadata.length > 0 ? (
-            <div className="mt-3 border-t border-border/50 pt-3">
+            <div className="mt-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
               <MetadataList
                 showHeading={false}
                 fields={enrichMetadataRows(detail.metadata, detail.type)}
@@ -73,7 +79,7 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
           </AccentButton>
           <AccentButton
             onClick={() => {
-              navigator.clipboard.writeText(safeTitle);
+              navigator.clipboard.writeText(citationText);
               toast.success(t("copyCitation"));
               track(AnalyticsEvent.SHARE_LINK_COPIED, {});
             }}
