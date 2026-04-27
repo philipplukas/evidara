@@ -9,6 +9,6 @@ docker run --rm \
   -v "${ROOT}:/work" \
   -w /work/legal-search/frontend \
   "${IMAGE}" \
-  bash -lc "npm ci && npx playwright install --with-deps chromium && npm run e2e:visual:update"
+  bash -lc "cd /work/platform-control/admin && npm ci && cd /work/legal-search/frontend && npm ci && npx playwright install --with-deps chromium && npm run e2e:visual:update"
 
 echo "Commit updated files under legal-search/frontend/e2e/visual.spec.ts-snapshots/ (expect *-linux.png on Linux)."
