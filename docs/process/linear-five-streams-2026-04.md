@@ -6,15 +6,16 @@ Paste the block below as a **comment** on your parent epic, or create **five sub
 
 ## Stream 1 — Visual regression CI gate
 
-**Status:** In progress — workflow scaffold + Docker helper added; **enable CI job after `*-linux.png` baselines exist.**
+**Status:** Ready — Linux baselines exist and the `frontend-visual-regression`
+job is enabled in `.github/workflows/legal-search.yml`.
 
 **Done when:**
 
-- `npm run e2e:visual` passes on `ubuntu-latest` in CI.
+- `npm run e2e:visual` passes locally and on `ubuntu-latest` in CI.
 - `scripts/playwright-visual-update-docker.sh` documented in `legal-search/frontend/docs/testing-matrix.md` (or runbook).
 - Baseline updates are a deliberate PR step (`npm run e2e:visual:update`).
 
-**Links:** `legal-search/frontend/e2e/visual.spec.ts`, `.github/workflows/legal-search.yml` (job `frontend-visual-regression`, flip `if: false` → `true` when ready).
+**Links:** `legal-search/frontend/e2e/visual.spec.ts`, `.github/workflows/legal-search.yml` (job `frontend-visual-regression`).
 
 ---
 

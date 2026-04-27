@@ -89,7 +89,7 @@ It maps each UX journey to the narrowest automated test layer that should own it
 3. Open a PR whose description states *why* pixels changed (e.g. “Kontrollbereich: reduce mobile weight — visual baselines updated”).
 4. Keep mocks and routes stable (`mockSearchApi`, etc.); avoid snapshotting clocks, random IDs, or live network without masks.
 
-**Cross-OS CI:** GitHub Actions runners are Linux. Baselines generated on macOS (`*-darwin.png`) are not reused on Linux. Run `scripts/playwright-visual-update-docker.sh` from the repo root (Playwright Docker image) to regenerate `*-linux.png`, commit them, then enable job `frontend-visual-regression` in `.github/workflows/legal-search.yml` (`if: true`). Until then, the workflow job stays disabled (`if: false`).
+**Cross-OS CI:** GitHub Actions runners are Linux. Baselines generated on macOS (`*-darwin.png`) are not reused on Linux. Run `scripts/playwright-visual-update-docker.sh` from the repo root (Playwright Docker image) to regenerate `*-linux.png`, commit them, and confirm job `frontend-visual-regression` in `.github/workflows/legal-search.yml` stays enabled.
 
 **Determinism:** Wait for stable DOM (e.g. first `article` card) before `toHaveScreenshot`. Playwright waits for fonts during the screenshot capture. Global defaults live in `playwright.config.ts` under `expect.toHaveScreenshot` (including `maxDiffPixelRatio` for full-page Next dev drift). Do not rely on `networkidle` with `next dev` — long-lived HMR sockets keep it from settling.
 
