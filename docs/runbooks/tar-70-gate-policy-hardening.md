@@ -1,7 +1,7 @@
 # TAR-70 gate policy hardening
 
 Owner: Platform / release  
-Last reviewed: 2026-04-13  
+Last reviewed: 2026-04-27
 Last verified: 2026-04-13  
 Applies to: GitHub branch protection, PR-required checks, release-lane gating
 
@@ -10,8 +10,11 @@ Applies to: GitHub branch protection, PR-required checks, release-lane gating
 This runbook captures the steady-state required-check model after the merge-wave branch-protection drift that blocked `main` during the TAR-89 / release-evidence stack. The live GitHub state we want to preserve is:
 
 - `main` stays strict (`strict: true`)
-- universal required checks are always-on checks only
+- universal required checks stay limited to the always-on `check-title` and
+  `contract-validation` contexts
 - `Release Readiness` and `scraping-qa` stay release gates unless we add an always-on aggregator workflow
+- GCP-disabled paths skip rather than fail when the corresponding opt-in repo
+  variables or staging project are intentionally absent
 
 It is intentionally narrow: it documents the required-check model we want going forward and the rollout/validation steps, without changing live branch protection itself.
 
@@ -53,6 +56,18 @@ Use three layers instead of one overloaded branch-protection rule:
    - Use them for go/no-go, Linear evidence, and mainline release posture.
    - Do not treat them as universal PR-required checks unless they are redesigned to emit on every PR.
 
+4. **Solo-maintainer override path**
+   - Keep the always-on required checks in branch protection.
+   - Allow a documented admin override only for owner-authored infra or hotfix
+     PRs where waiting would prolong an outage, block recovery, or leave `main`
+     stuck behind a non-applicable runtime condition.
+   - Record the reason, reviewed checks, skipped or failing contexts, and
+     follow-up in the PR comment or merge note.
+   - Do not require a fresh external review for mechanical rebases, conflict
+     resolution, docs wording, or CI skip clarifications when the risk profile
+     is unchanged. Request fresh review for behavior, contracts, migrations,
+     Terraform resources, IAM/security, or workflow semantics.
+
 If we want a stricter future state, the safest end-state is a single always-on merge-gate workflow that fans out to the relevant subchecks but always publishes one stable required context. Until that exists, the conservative model is to keep branch protection minimal and stable.
 
 For a concrete operator matrix of PR types versus emitted checks, see
@@ -64,9 +79,12 @@ For a concrete operator matrix of PR types versus emitted checks, see
 2. Keep the universal required-check list limited to checks that always emit.
 3. Keep release-only and path-filtered contexts out of universal branch protection unless they are wrapped by an always-on aggregator.
 4. Keep `Release Readiness` and `scraping-qa` as release evidence gates, not generic PR blockers.
-5. Align `docs/setup/branch-rules.md`, `docs/runbooks/runtime-stack.md`, and the release memo after the policy is finalized.
-6. If we decide to add an aggregator, implement it as a new workflow that always runs on PRs and emits one stable required context.
-7. Use the emitted-check matrix to verify each PR archetype before changing branch protection.
+5. Ensure opt-in GCP publishing/deploy workflows skip with a clear summary when
+   `ENABLE_GCP_ARTIFACT_REGISTRY`, `ENABLE_GCP_CLOUD_RUN_CD`, or staging GCP
+   configuration is intentionally absent.
+6. Align `docs/setup/branch-rules.md`, `docs/runbooks/runtime-stack.md`, and the release memo after the policy is finalized.
+7. If we decide to add an aggregator, implement it as a new workflow that always runs on PRs and emits one stable required context.
+8. Use the emitted-check matrix to verify each PR archetype before changing branch protection.
 
 ## 4. Validation plan
 
@@ -78,10 +96,12 @@ For a concrete operator matrix of PR types versus emitted checks, see
    - infra / Terraform PR
 2. Confirm that the universal required checks appear on every PR.
 3. Confirm that path-filtered checks only gate the PRs that actually trigger them.
-4. Re-run release-lane evidence on `main`:
+4. Confirm disabled GCP paths report skipped/success instead of failing when the
+   relevant repo variables or staging project are intentionally absent.
+5. Re-run release-lane evidence on `main`:
    - `Release Readiness`
    - `scraping-qa` where relevant
-5. Recheck a merge wave against a docs-only PR and a code PR to confirm there is no branch-protection drift.
+6. Recheck a merge wave against a docs-only PR and a code PR to confirm there is no branch-protection drift.
 
 ## 5. Files and tickets touched
 
@@ -104,3 +124,4 @@ For a concrete operator matrix of PR types versus emitted checks, see
 
 - This runbook is a recovery plan, not a live branch-protection change.
 - The branch-protection rule should only be updated once the chosen required-check model is agreed and validated against a representative PR matrix.
+- Any admin override should be treated as audit evidence, not as the steady-state merge path.

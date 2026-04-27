@@ -59,6 +59,14 @@ Branches that are **many commits behind `origin/main`** often show a **large `gi
 
 Until refreshed, **do not** assume two stale branches can merge cleanly in either order.
 
+## Review freshness for solo-maintainer work
+
+When a stale branch is refreshed by the owner, avoid review loops that do not reduce risk:
+
+- Mechanical rebases, conflict resolution, docs wording, and CI skip clarifications can keep the prior review posture if required checks pass and the risk profile is unchanged.
+- Behavior changes, contracts, migrations, Terraform resources, IAM/security, and workflow semantics need fresh review before merge.
+- Required checks still apply. Admin override and GCP-disabled skip policy live in [Branch rules](../setup/branch-rules.md#solo-maintainer-policy).
+
 ## Contract-first batching
 
 When multiple lanes need the same API or event shape:
