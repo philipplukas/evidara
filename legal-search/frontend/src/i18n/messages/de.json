@@ -149,6 +149,7 @@
       "loadMore": "Weitere Ergebnisse laden",
       "remaining": "{count} verbleibend",
       "openResult": "{title} \u00f6ffnen",
+      "shareResult": "Ergebnislink kopieren",
       "seeRelated": "{count} verwandte {label} anzeigen",
       "pinResult": "Ergebnis anheften",
       "unpinResult": "Ergebnis l\u00f6sen"
