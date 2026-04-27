@@ -19,7 +19,7 @@ Operator-focused entry points (from repo root unless noted).
 | [`check-internal-beta-query-pack.sh`](check-internal-beta-query-pack.sh) | Hetzner internal-beta assertion gate: top-5 query expectations, exact `q=*` source-derived corpus, detail metadata/tabs, and retired synthetic `404`s. |
 | [`fixtures/internal-beta-staging-queries.txt`](fixtures/internal-beta-staging-queries.txt) | Hetzner internal-beta query pack for the deterministic seeded corpus. |
 | [`fixtures/internal-beta-staging-expected.tsv`](fixtures/internal-beta-staging-expected.tsv) | Expected top-5 document IDs for the internal-beta seeded corpus. |
-| [`fixtures/internal-beta-staging-documents.tsv`](fixtures/internal-beta-staging-documents.tsv) | Detail metadata expectations for the four source-derived Fedlex beta documents. |
+| [`fixtures/internal-beta-staging-documents.tsv`](fixtures/internal-beta-staging-documents.tsv) | Detail metadata expectations for the source-derived Fedlex beta corpus. |
 | [`fixtures/internal-beta-staging-withdrawn-documents.txt`](fixtures/internal-beta-staging-withdrawn-documents.txt) | Retired synthetic beta document IDs that must return `404` from legal-search detail. |
 | [`preflight-cross-surface-live.sh`](preflight-cross-surface-live.sh) | Local readiness check for the legal-search frontend, control-panel admin, legal-search API, and supporting search stack. |
 | [`dev-cross-surface-live.sh`](dev-cross-surface-live.sh) | One-command live local workflow: lean backend stack + legal-search frontend + control-panel admin, with preflight wait. |
