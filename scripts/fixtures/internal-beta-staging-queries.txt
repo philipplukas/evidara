@@ -1,6 +1,7 @@
 # Internal beta Hetzner staging query pack.
 # One query per line. Empty lines and comments are ignored by
-# scripts/run-staging-relevance-query-pack.sh.
+# scripts/run-staging-relevance-query-pack.sh. The executable
+# expectations live in internal-beta-staging-expected.tsv.
 *
 Federal Constitution
 Art. 8 BV equality
