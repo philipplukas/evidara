@@ -412,7 +412,9 @@ def _is_placeholder_title(title: str | None) -> bool:
     if not t:
         return True
     lower = t.lower()
-    if lower in {"untitled document", "ris dokument"}:
+    if lower in {"untitled document", "ris dokument", "fedlex"}:
+        return True
+    if lower in {"input-de", "input-en", "input-fr", "input-it", "input-rm"}:
         return True
     if lower.startswith("ris —") or lower.startswith("ris -"):
         return True

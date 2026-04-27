@@ -89,6 +89,37 @@ class TestExtractionHintsInPipeline(unittest.TestCase):
             os.unlink(artifact_path)
             os.unlink(manifest_path)
 
+    def test_title_hint_replaces_fedlex_shell_titles(self):
+        for placeholder in ("Fedlex", "input-en", "input-de"):
+            with self.subTest(placeholder=placeholder):
+                html = f"""<html><head><title>{placeholder}</title></head><body>
+                <p>Body.</p></body></html>"""
+                with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
+                    f.write(html)
+                    artifact_path = f.name
+
+                payload = build_manifest_payload(artifact_path, artifact_role="primary_document")
+                payload["bundle_metadata"] = {
+                    "extraction_hints": {
+                        "title_hint": "Federal Act on Value Added Tax",
+                        "document_type_hint": "legislation",
+                    }
+                }
+                with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as mf:
+                    json.dump(payload, mf)
+                    manifest_path = mf.name
+
+                try:
+                    result = ProcessingPipeline(processing_version="di_hints_test").process_event(
+                        build_bundle_event(manifest_path)
+                    )
+                    self.assertEqual(result.document.title, "Federal Act on Value Added Tax")
+                    fp = result.document.metadata.get("field_provenance", {})
+                    self.assertEqual(fp.get("title", {}).get("source"), "manifest")
+                finally:
+                    os.unlink(artifact_path)
+                    os.unlink(manifest_path)
+
     def test_placeholder_title_hint_does_not_win_over_structured_heading(self):
         html = """<html><head><title>RIS Dokument</title></head><body>
         <h1>VfGH — G 1/2026 zu Beispiel</h1><p>Body.</p></body></html>"""

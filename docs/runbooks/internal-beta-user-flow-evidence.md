@@ -131,6 +131,22 @@ Kubernetes Secret values.
    projections, then reruns the exact seeded-corpus query gate. Do not leave
    replay projections visible unless collecting screenshots intentionally.
 
+7. Verify the source-derived expansion replay pack:
+
+   ```bash
+   export INTERNAL_BETA_REPLAY_TARGETS_FILE=scripts/fixtures/internal-beta-expansion-normal-replay-targets.tsv
+   export EVIDARA_REPLAY_REQUIRE_SOURCE_TITLES=1
+   ./scripts/prove-internal-beta-normal-replay.sh
+   ```
+
+   The expansion pack intentionally uses `fedlex_sparql` targets, not raw
+   `www.fedlex.admin.ch` pages. The raw public pages are SPA shells and are
+   only useful for plumbing checks; the SPARQL route carries source-derived
+   titles and expression metadata. Acceptance requires replay records for every
+   expansion target, source URLs matching the Fedlex work URI, non-`Fedlex`
+   document titles matching the expected statute title, projection withdrawal,
+   and the canonical seeded query gate still passing afterward.
+
 ## Acceptance
 
 - `rocky-agents-staging` is `Synced` and `Healthy`.
@@ -146,6 +162,9 @@ Kubernetes Secret values.
   proof.
 - Normal replay proof creates outbox events for the same 12 targets, applies
   temporary projections, withdraws them, and leaves `q=* totalResults=12`.
+- Expansion replay proof creates source-derived Fedlex SPARQL projections beyond
+  the canonical 12, validates source/title evidence, withdraws them, and leaves
+  `q=* totalResults=12`.
 
 ## Current Evidence
 
@@ -169,5 +188,6 @@ Kubernetes Secret values.
   `rescore-cor_01kq7wyp4h2t2m31gsgfe9m44d`, outcome `unchanged`; metrics moved
   `applied_total 10 -> 11`, `unchanged 6 -> 7`, and `failed` stayed `4`.
 
-Open follow-up: broaden from deterministic source snapshots to normal
-source-ingestion replay for the same IDs.
+Open follow-up: promote the SPARQL expansion pack into the next seeded corpus
+only after the replay evidence shows acceptable title, source, and projection
+quality.

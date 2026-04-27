@@ -20,6 +20,7 @@ Operator-focused entry points (from repo root unless noted).
 | [`prove-internal-beta-normal-replay.sh`](prove-internal-beta-normal-replay.sh) | Operator proof for platform-control local outbox → DI replay → legal-search projection cleanup while preserving the exact internal-beta corpus. |
 | [`fixtures/internal-beta-staging-queries.txt`](fixtures/internal-beta-staging-queries.txt) | Hetzner internal-beta query pack for the deterministic seeded corpus. |
 | [`fixtures/internal-beta-normal-replay-targets.tsv`](fixtures/internal-beta-normal-replay-targets.tsv) | Fedlex URLs used by the normal replay proof for the same 12 beta documents. |
+| [`fixtures/internal-beta-expansion-normal-replay-targets.tsv`](fixtures/internal-beta-expansion-normal-replay-targets.tsv) | Fedlex SPARQL source-derived expansion targets used to test normal replay beyond the canonical 12-document corpus. |
 | [`fixtures/internal-beta-staging-expected.tsv`](fixtures/internal-beta-staging-expected.tsv) | Expected top-5 document IDs for the internal-beta seeded corpus. |
 | [`fixtures/internal-beta-staging-documents.tsv`](fixtures/internal-beta-staging-documents.tsv) | Detail metadata expectations for the source-derived Fedlex beta corpus. |
 | [`fixtures/internal-beta-staging-withdrawn-documents.txt`](fixtures/internal-beta-staging-withdrawn-documents.txt) | Retired synthetic beta document IDs that must return `404` from legal-search detail. |
