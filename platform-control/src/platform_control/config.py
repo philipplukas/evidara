@@ -46,7 +46,7 @@ class Settings(BaseSettings):
             "(shadow-mode + fixture-driven runs)."
         ),
     )
-    event_publisher_backend: Literal["noop", "pubsub"] = "noop"
+    event_publisher_backend: Literal["noop", "pubsub", "local_outbox"] = "noop"
     raw_artifact_pubsub_topic: str = "raw-artifact-available"
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
     run_dispatch_backend: Literal["inline", "worker"] = "inline"

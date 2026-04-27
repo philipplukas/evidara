@@ -112,6 +112,25 @@ Kubernetes Secret values.
    completed CNPG backup plus a restore drill result that does not expose secret
    values.
 
+6. Verify normal replay evidence after staging is configured with
+   `PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=local_outbox`:
+
+   ```bash
+   kubectl -n evidare-staging port-forward svc/platform-control-api 18079:8080
+   kubectl -n evidare-staging port-forward svc/legal-search-api 18080:8080
+   export EVIDARA_PLATFORM_CONTROL_URL=http://127.0.0.1:18079
+   export EVIDARA_LEGAL_SEARCH_URL=http://127.0.0.1:18080
+   export EVIDARA_REPLAY_COMMAND='kubectl -n evidare-staging exec deploy/document-intelligence-consumer -- document_intelligence_replay_local_outbox --outbox-dir /var/lib/evidara/raw-artifacts/event-outbox --legal-search-api-url http://legal-search-api:8080 --keep-projections'
+   export EVIDARA_REPLAY_WITHDRAW_COMMAND='kubectl -n evidare-staging exec deploy/document-intelligence-consumer -- document_intelligence_replay_local_outbox --outbox-dir /var/lib/evidara/raw-artifacts/event-outbox --legal-search-api-url http://legal-search-api:8080 --withdraw-only'
+   ./scripts/prove-internal-beta-normal-replay.sh
+   ```
+
+   This creates normal platform-control runs for the 12 Fedlex targets, replays
+   local outbox `artifact_bundle.available` events through DI, verifies applied
+   legal-search projection history for each run, withdraws the replay
+   projections, then reruns the exact seeded-corpus query gate. Do not leave
+   replay projections visible unless collecting screenshots intentionally.
+
 ## Acceptance
 
 - `rocky-agents-staging` is `Synced` and `Healthy`.
@@ -125,6 +144,8 @@ Kubernetes Secret values.
   bucket.
 - CNPG restore drill evidence exists, or the packet is marked blocked on backup
   proof.
+- Normal replay proof creates outbox events for the same 12 targets, applies
+  temporary projections, withdraws them, and leaves `q=* totalResults=12`.
 
 ## Current Evidence
 

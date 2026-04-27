@@ -119,8 +119,33 @@ def process_artifact_bundle_event(
     bundle_loader: BundleLoader | None = None,
     require_surface_uris: bool = False,
 ) -> dict[str, Any]:
+    result = process_artifact_bundle_event_result(
+        event_payload,
+        runtime_settings=runtime_settings,
+        bundle_loader=bundle_loader,
+        require_surface_uris=require_surface_uris,
+    )
+    event = ArtifactBundleAvailableEvent.from_dict(resolve_artifact_bundle_event(event_payload))
+    return {
+        "status": "processed",
+        "event_id": event.event_id,
+        "bundle_manifest_id": event.payload.bundle_manifest_id,
+        "document_id": result.document.document_id,
+        "document_revision": result.document.document_revision,
+        "processing_manifest_id": result.manifest.processing_manifest_id,
+        "sections": len(result.sections),
+    }
+
+
+def process_artifact_bundle_event_result(
+    event_payload: Mapping[str, Any],
+    *,
+    runtime_settings: RuntimeSettings | None = None,
+    bundle_loader: BundleLoader | None = None,
+    require_surface_uris: bool = False,
+) -> ProcessingResult:
     resolved_event_payload = resolve_artifact_bundle_event(event_payload)
-    event = ArtifactBundleAvailableEvent.from_dict(resolved_event_payload)
+    ArtifactBundleAvailableEvent.from_dict(resolved_event_payload)
     effective_settings = runtime_settings or RuntimeSettings.from_environment()
     if require_surface_uris and effective_settings.surface_uris is None:
         raise ProcessingError(
@@ -132,15 +157,7 @@ def process_artifact_bundle_event(
         bundle_loader=bundle_loader,
     ).process_event(dict(resolved_event_payload))
     publish_processing_result_to_pubsub(result)
-    return {
-        "status": "processed",
-        "event_id": event.event_id,
-        "bundle_manifest_id": event.payload.bundle_manifest_id,
-        "document_id": result.document.document_id,
-        "document_revision": result.document.document_revision,
-        "processing_manifest_id": result.manifest.processing_manifest_id,
-        "sections": len(result.sections),
-    }
+    return result
 
 
 # ─── Targeted rescore from correction (#427) ───────────────────────────────

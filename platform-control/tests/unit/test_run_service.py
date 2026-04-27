@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 import pytest
@@ -7,6 +8,7 @@ from sqlalchemy import select
 
 from platform_control.domain import ProcessingStatus, ProviderJobStatus, RunMode, RunStatus
 from platform_control.errors import InvalidStateTransitionError
+from platform_control.events.publisher import LocalOutboxRawArtifactPublisher
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
@@ -20,6 +22,7 @@ from platform_control.schemas.source import (
     FirecrawlAcquisitionSpec,
 )
 from platform_control.services.acquisition_provider import ProviderResource, ProviderStartResult
+from platform_control.services.artifact_store import LocalArtifactStore
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.run_service import RunService
 from platform_control.services.source_service import SourceService
@@ -999,6 +1002,47 @@ async def test_provider_registry_dispatches_deterministic_inline_runs(session) -
     manifest = next(iter(artifact_store.stored_manifests.values()))
     assert manifest["bundle_metadata"]["extraction_hints"]["authority_display_hint"] == (
         "Zurich Administrative Court"
+    )
+
+
+@pytest.mark.asyncio
+async def test_inline_run_can_publish_bundle_events_to_local_outbox(session, tmp_path) -> None:
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "deterministic_http",
+        "seed_url": "https://example.com/decisions/2026-01?utm_source=test",
+        "mode": "crawl",
+    }
+    await session.commit()
+
+    registry = ProviderRegistry()
+    registry.register(InlineDeterministicProvider())
+    run_service = RunService(
+        session,
+        provider_registry=registry,
+        artifact_store=LocalArtifactStore(tmp_path),
+        publisher=LocalOutboxRawArtifactPublisher(base_dir=tmp_path),
+    )
+
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+
+    raw_events = list((tmp_path / "event-outbox" / "raw-artifact-available").glob("*.json"))
+    bundle_events = list((tmp_path / "event-outbox" / "artifact-bundle-available").glob("*.json"))
+    assert run.status is RunStatus.COMPLETED
+    assert len(raw_events) == 1
+    assert len(bundle_events) == 1
+    bundle_event = json.loads(bundle_events[0].read_text(encoding="utf-8"))
+    assert bundle_event["event_type"] == "artifact_bundle.available"
+    assert bundle_event["payload"]["provenance"]["run_id"] == run.run_id
+    assert bundle_event["payload"]["bundle_manifest_ref"]["storage_ref"]["uri"].startswith(
+        "file://"
     )
 
 
