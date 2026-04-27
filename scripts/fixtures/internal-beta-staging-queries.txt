@@ -2,14 +2,12 @@
 # One query per line. Empty lines and comments are ignored by
 # scripts/run-staging-relevance-query-pack.sh.
 *
-Evidara staging seed document
-Rescore smoke section
-Swiss Code of Obligations
-Kuendigungsfrist employer liability
-contract notice
-Federal Supreme Court staging decision
-proportionality notice periods
-legal commentary
-Hetzner staging surfaces
-runtime-local rescoring
+Federal Constitution
+Art. 8 BV equality
+Code of Obligations
+Art. 97 OR liability
+Civil Procedure Code
+conciliation authorities
+Federal Act on Data Protection
+personal data processing principles
 Fedlex
