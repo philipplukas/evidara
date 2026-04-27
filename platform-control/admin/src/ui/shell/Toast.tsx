@@ -22,11 +22,12 @@ import type { NotificationType } from "./ToastAdapter";
 
 const LEVEL_CLASS: Record<NotificationType, string> = {
   success:
-    "bg-[#f0fdf4] text-[#166534] border-[rgba(22,101,52,0.35)] [&_.toast-accent]:bg-[#166534]",
-  info: "bg-[#eff6ff] text-[#1e40af] border-[rgba(30,64,175,0.35)] [&_.toast-accent]:bg-[#1e40af]",
+    "bg-[var(--status-healthy-subtle)] text-[var(--status-healthy)] border-[var(--status-healthy)]/25 [&_.toast-accent]:bg-[var(--status-healthy)]",
+  info: "bg-[var(--status-info-subtle)] text-[var(--status-info)] border-[var(--status-info)]/25 [&_.toast-accent]:bg-[var(--status-info)]",
   warning:
-    "bg-[#fffbeb] text-[#92400e] border-[rgba(146,64,14,0.4)] [&_.toast-accent]:bg-[#92400e]",
-  error: "bg-[#fef2f2] text-[#991b1b] border-[rgba(153,27,27,0.4)] [&_.toast-accent]:bg-[#991b1b]",
+    "bg-[var(--status-degraded-subtle)] text-[var(--status-degraded)] border-[var(--status-degraded)]/30 [&_.toast-accent]:bg-[var(--status-degraded)]",
+  error:
+    "bg-[var(--status-critical-subtle)] text-[var(--status-critical)] border-[var(--status-critical)]/30 [&_.toast-accent]:bg-[var(--status-critical)]",
 };
 
 interface ToastProps {
@@ -45,15 +46,15 @@ export function Toast({ type, message, duration = 5000, open, onOpenChange }: To
       onOpenChange={onOpenChange}
       duration={duration == null ? Number.POSITIVE_INFINITY : duration}
       type={type === "error" ? "foreground" : "background"}
-      className={`pointer-events-auto relative flex items-start gap-3 min-w-[280px] max-w-[420px] pl-4 pr-10 py-3 rounded-2xl border shadow-[var(--shadow-panel)] backdrop-blur-[10px] motion-safe:animate-[evidara-toast-in_180ms_cubic-bezier(0.4,0,0.2,1)] data-[state=closed]:motion-safe:animate-[evidara-toast-out_140ms_cubic-bezier(0.4,0,0.2,1)] ${LEVEL_CLASS[type]}`}
+      className={`pointer-events-auto relative flex min-w-[280px] max-w-[420px] items-start gap-3 rounded-lg border py-3 pl-4 pr-10 shadow-[var(--shadow-panel)] motion-safe:animate-[evidara-toast-in_180ms_cubic-bezier(0.4,0,0.2,1)] data-[state=closed]:motion-safe:animate-[evidara-toast-out_140ms_cubic-bezier(0.4,0,0.2,1)] ${LEVEL_CLASS[type]}`}
     >
-      <span aria-hidden className="toast-accent absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl" />
+      <span aria-hidden className="toast-accent absolute bottom-0 left-0 top-0 w-1 rounded-l-lg" />
       <ToastPrimitive.Description asChild>
         <div className="min-w-0 flex-1 text-[13px] leading-snug font-medium">{message}</div>
       </ToastPrimitive.Description>
       <ToastPrimitive.Close
         aria-label="Dismiss notification"
-        className="absolute right-2 top-2 inline-flex items-center justify-center w-7 h-7 rounded-full text-current/70 hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--brand-focus-ring)]"
+        className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-lg text-current/70 hover:bg-[var(--interactive-accent-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
       >
         <CloseIcon size={14} strokeWidth={2.2} aria-hidden />
       </ToastPrimitive.Close>

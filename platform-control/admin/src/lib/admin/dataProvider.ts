@@ -1090,7 +1090,7 @@ export const controlPlaneDataProvider: DataProvider = {
     if (resource === ResourceName.PreviewReview) {
       const response = await requestJson<RunResponse>(`/v1/runs/${params.id}`);
       if (response.mode !== "preview") {
-        throw new HttpError("Preview review run not found", 404);
+        throw new HttpError("Preview approval run not found", 404);
       }
       return {
         data: toRecord(response, "run_id"),

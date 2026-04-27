@@ -1,0 +1,69 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const globalsCss = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+const shellChromeSource = [
+  globalsCss,
+  readFileSync(join(process.cwd(), "src/ui/shell/AppShell.tsx"), "utf8"),
+  readFileSync(join(process.cwd(), "src/ui/shell/AppBar.tsx"), "utf8"),
+  readFileSync(join(process.cwd(), "src/ui/shell/SidebarMenu.tsx"), "utf8"),
+].join("\n");
+const shellComponentSource = [
+  readFileSync(join(process.cwd(), "src/ui/shell/AppShell.tsx"), "utf8"),
+  readFileSync(join(process.cwd(), "src/ui/shell/AppBar.tsx"), "utf8"),
+  readFileSync(join(process.cwd(), "src/ui/shell/SidebarMenu.tsx"), "utf8"),
+].join("\n");
+
+describe("admin shell brand tokens", () => {
+  it("keeps decorative shell colors behind admin-local CSS variables", () => {
+    for (const token of [
+      "--admin-page-glow-brand",
+      "--admin-page-glow-neutral",
+      "--admin-page-top",
+      "--admin-page-bottom",
+      "--admin-page-sheen-brand",
+      "--admin-page-sheen-light",
+      "--admin-panel-bg",
+      "--admin-on-brand",
+      "--admin-header-bg",
+      "--admin-header-border",
+      "--admin-header-shadow",
+      "--admin-shell-header-start",
+      "--admin-shell-header-end",
+      "--admin-sidebar-bg",
+      "--admin-sidebar-bg-strong",
+      "--admin-sidebar-footer-bg",
+    ]) {
+      expect(globalsCss).toContain(`${token}:`);
+      expect(shellChromeSource).toContain(`var(${token})`);
+    }
+  });
+
+  it("does not reintroduce pre-tokenized shell color literals", () => {
+    for (const literal of [
+      "rgb(15 76 129 / 10%)",
+      "rgb(92 107 126 / 8%)",
+      "#fbfcfe",
+      "#e8eef4",
+      "rgb(255 255 255 / 45%)",
+      "rgba(255, 253, 248, 0.92)",
+      "rgb(15 76 129 / 98%)",
+      "rgb(11 61 104 / 94%)",
+      "#fffdf8",
+      "rgba(13, 58, 98, 0.98)",
+      "rgba(9, 48, 83, 0.95)",
+      "rgba(29,41,61,0.08)",
+      "rgba(255,253,248,0.98)",
+      "rgba(248,243,235,0.92)",
+      "rgba(98,70,217,0.22)",
+    ]) {
+      expect(shellChromeSource).not.toContain(literal);
+    }
+  });
+
+  it("uses the shared focus ring token for shell controls", () => {
+    expect(shellComponentSource).toContain("var(--focus-ring)");
+    expect(shellComponentSource).not.toContain("var(--brand-focus-ring)");
+  });
+});

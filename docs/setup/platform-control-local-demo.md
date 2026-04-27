@@ -132,7 +132,7 @@ Today the code-managed admin covers the main operator slice:
 - `Sources`
 - embedded `Source Versions` create/edit/approve/reject actions
 - preview and production run creation from source-version rows
-- dedicated `Preview Review` page for preview-run triage
+- dedicated `Preview approvals` page for preview-run triage
 - `Runs` list
 - direct run creation from the `Runs` page
 - run cancellation
@@ -154,7 +154,7 @@ retiring the old workflow, the archived artifacts remain under:
 
 ## Demo Script
 
-### Preview review
+### Preview approvals
 
 1. Create or select reference data in `Jurisdictions` and `Authorities` if needed.
 2. Create a source in `Sources`.

@@ -41,20 +41,21 @@ export default function AdminShell() {
   const [isRoleResolved, setIsRoleResolved] = useState(false);
   const allowedRoles = publicConfig.adminAllowedRoles;
   const effectiveAllowedRoles = allowedRoles.length > 0 ? [...allowedRoles] : ["admin"];
-  const legalSearchUrl = publicConfig.legalSearchBaseUrl;
-  const [handoff, setHandoff] = useState(() => resolveLegalSearchHandoff(null, legalSearchUrl));
+  const [handoff, setHandoff] = useState(() =>
+    resolveLegalSearchHandoff(null, publicConfig.legalSearchBaseUrl),
+  );
 
   useEffect(() => {
     setUserRole(resolveUserRole(fallbackRole));
     setIsRoleResolved(true);
   }, [fallbackRole]);
 
-  // legalSearchUrl is a module-scope constant (publicConfig), so the effect
-  // only needs to run once on mount to read window.location.search.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: legalSearchUrl is stable across renders
   useEffect(() => {
     setHandoff(
-      resolveLegalSearchHandoff(new URLSearchParams(window.location.search), legalSearchUrl),
+      resolveLegalSearchHandoff(
+        new URLSearchParams(window.location.search),
+        publicConfig.legalSearchBaseUrl,
+      ),
     );
   }, []);
 

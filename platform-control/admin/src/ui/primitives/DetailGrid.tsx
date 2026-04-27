@@ -13,7 +13,7 @@ export function DetailGrid({ children, className }: { children: ReactNode; class
   return (
     <div
       className={cn(
-        "rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 p-5 sm:p-6",
+        "rounded-[18px] border border-[var(--border)] bg-[var(--surface-panel)] p-5 sm:p-6",
         "shadow-[var(--shadow-card)] backdrop-blur-[12px]",
         "grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5",
         className,
@@ -36,7 +36,7 @@ export function FieldCell({
 }) {
   return (
     <div className={cn("flex flex-col gap-1", span === "full" && "md:col-span-2")}>
-      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[rgba(29,41,61,0.6)] leading-[1.2]">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-meta)] leading-[1.2]">
         {label}
       </span>
       <div className="text-sm text-[var(--foreground)]">{children}</div>

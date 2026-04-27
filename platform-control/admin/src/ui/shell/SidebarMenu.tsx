@@ -15,7 +15,7 @@ import { FlaskConical } from "lucide-react";
 import { useResourceDefinitions } from "ra-core";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
@@ -31,6 +31,10 @@ export interface SidebarMenuExtraItem {
   icon?: ReactNode;
   /** `"preview"` marks v2-preview entries; we render a FlaskConical icon. */
   kind?: "preview" | "custom";
+  /** Match only the exact route. Useful for create/setup entries. */
+  exact?: boolean;
+  /** Prefixes that should not activate this broader nav item. */
+  inactiveOnPrefixes?: string[];
 }
 
 interface SidebarMenuProps {
@@ -39,11 +43,11 @@ interface SidebarMenuProps {
 
 function navItemClass(isActive: boolean): string {
   const base =
-    "flex items-center gap-3 mx-[10px] my-1 px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold leading-tight transition-[background-color,transform] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-focus-ring)]";
+    "flex items-center gap-3 mx-[10px] my-1 px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold leading-tight no-underline transition-[background-color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2";
   if (isActive) {
     // Violet (ACCENT_CORE_SUBTLE) background + violet text matches the v1 MUI
     // Mui-selected state. Operators recognise this as the "current page" cue.
-    return `${base} bg-[var(--accent-core-subtle)] text-[var(--accent-core)] shadow-[inset_0_0_0_1px_rgba(98,70,217,0.22)] hover:bg-[var(--accent-core-muted)]`;
+    return `${base} bg-[var(--accent-core-subtle)] text-[var(--accent-core)] shadow-[var(--shadow-ring-accent)] hover:bg-[var(--accent-core-muted)]`;
   }
   return `${base} text-[var(--foreground)] hover:bg-[var(--interactive-accent-subtle)]`;
 }
@@ -56,6 +60,7 @@ function labelForResource(name: string, options: { label?: string } | undefined)
 
 export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
   const definitions = useResourceDefinitions();
+  const location = useLocation();
   const [handoff, setHandoff] = useState<LegalSearchHandoff>(() =>
     resolveLegalSearchHandoff(null, LEGAL_SEARCH_URL),
   );
@@ -90,14 +95,25 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
         ))}
         {extraItems.length > 0 ? (
           <li className="mx-[10px] my-2">
-            <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[rgba(29,41,61,0.5)] px-[14px]">
-              Previews
+            <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--text-meta)] px-[14px]">
+              Workflows
             </div>
           </li>
         ) : null}
         {extraItems.map((item) => (
           <li key={item.to}>
-            <NavLink to={item.to} className={({ isActive }) => navItemClass(isActive)}>
+            <NavLink
+              to={item.to}
+              end={item.exact}
+              className={({ isActive }) =>
+                navItemClass(
+                  isActive &&
+                    !item.inactiveOnPrefixes?.some((prefix) =>
+                      location.pathname.startsWith(prefix),
+                    ),
+                )
+              }
+            >
               <span className="text-[var(--accent-core)] flex items-center" aria-hidden>
                 {item.icon ?? <FlaskConical size={16} strokeWidth={2} />}
               </span>
@@ -112,15 +128,14 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
         <div
           className="py-2"
           style={{
-            background:
-              "linear-gradient(180deg, rgba(248,243,235,0), rgba(248,243,235,0.92) 40%, rgba(248,243,235,0.98))",
+            background: "var(--admin-sidebar-footer-bg)",
             backdropFilter: "blur(8px)",
           }}
         >
           <div className="mx-4 mb-2 border-t border-[var(--border)]" />
           <a
             href={handoff.returnToUrl}
-            className="flex items-center gap-3 mx-[10px] px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold text-[var(--brand)] hover:bg-[var(--interactive-accent-subtle)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-focus-ring)]"
+            className="flex items-center gap-3 mx-[10px] px-[14px] py-[10px] min-h-[44px] rounded-[14px] text-sm font-semibold text-[var(--brand)] no-underline hover:bg-[var(--interactive-accent-subtle)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
           >
             {/* lucide ArrowLeft lives in AppBar; keep sidebar dep-light */}
             <span aria-hidden className="text-[var(--brand)]">
@@ -128,7 +143,7 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
             </span>
             <span className="flex flex-col min-w-0">
               <span className="leading-tight">{footerLabel}</span>
-              <span className="text-[11px] font-normal text-[rgba(29,41,61,0.62)] truncate">
+              <span className="text-[11px] font-normal text-[var(--text-meta)] truncate">
                 {footerSecondary}
               </span>
             </span>

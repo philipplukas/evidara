@@ -54,6 +54,15 @@ type SourceHealthRow = {
 type StatusDotLevel = "healthy" | "degraded" | "critical" | "neutral";
 
 const API_PREFIX = "/api/platform-control";
+const healthPanelSx = {
+  p: 2.5,
+  border: "1px solid var(--border)",
+  backgroundColor: "var(--admin-panel-bg)",
+} as const;
+const healthHeadingSx = {
+  fontFamily: "var(--font-admin-sans), system-ui, sans-serif",
+  fontWeight: 700,
+} as const;
 
 function deriveStatusLevel(successRate: number | null): StatusDotLevel {
   if (successRate === null) return "neutral";
@@ -235,11 +244,11 @@ export function SourceHealthCard() {
 
   if (loading) {
     return (
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={healthPanelSx}>
         <Stack spacing={1.5}>
           <Box>
-            <Typography variant="h6" sx={{ mb: 0.5 }}>
-              Source Health
+            <Typography variant="h6" sx={{ ...healthHeadingSx, mb: 0.5 }}>
+              Source health
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Loading source health scorecard...
@@ -258,9 +267,11 @@ export function SourceHealthCard() {
 
   if (error) {
     return (
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={healthPanelSx}>
         <Stack spacing={1.5}>
-          <Typography variant="h6">Source Health</Typography>
+          <Typography variant="h6" sx={healthHeadingSx}>
+            Source health
+          </Typography>
           <Alert severity="warning" variant="outlined">
             {error}
           </Alert>
@@ -270,11 +281,11 @@ export function SourceHealthCard() {
   }
 
   return (
-    <Paper sx={{ p: 2.5 }}>
+    <Paper sx={healthPanelSx}>
       <Stack spacing={2}>
         <Box>
-          <Typography variant="h6" sx={{ mb: 0.5 }}>
-            Source Health
+          <Typography variant="h6" sx={{ ...healthHeadingSx, mb: 0.5 }}>
+            Source health
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Per-source success rates from runs in the last 7 days. Click a row to inspect the
@@ -298,7 +309,7 @@ export function SourceHealthCard() {
           >
             <TableHead>
               <TableRow>
-                <TableCell>Source Name</TableCell>
+                <TableCell>Source name</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Success Rate</TableCell>
                 <TableCell>Last Run</TableCell>

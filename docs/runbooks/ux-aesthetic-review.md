@@ -1,7 +1,7 @@
 # UX / Aesthetic review runbook
 
 Owner: Design / frontend
-Last reviewed: 2026-04-16
+Last reviewed: 2026-04-27
 Last verified: 2026-04-16 (Pass 3, commit 78ee96b)
 Applies to: legal-search/frontend, platform-control/admin
 
@@ -184,6 +184,27 @@ none are architectural.
 | UX-12.3 | Normal | Runs list v2 drops the gradient hero panel that v1 uses to onboard operators ("Task-led run operations" + keyboard-shortcut hint). | **Open** — design call, not a defect: re-add as a compact banner component if operator onboarding matters; keep dropped for power-user density. |
 | UX-12.4 | Low | "Active" status pill appeared twice on v2 source-show (header + lifecycle card). | **Fixed (2026-04-18).** Dropped the pill from the lifecycle card; kept it in the header. Card keeps its heading, description, and status-detail copy so the contextual meaning isn't lost. |
 | UX-12.5 | Normal | MUI shell chrome is subtitle-mismatched on v2 pages (`Source lifecycle, approval state, and run operations.` shows on `/runs-v2` and `/authorities-v2/*`). | **Open** — pre-existing chrome bug exposed by v2; fixes when the shell migrates. Track here so it's not silently carried forward. |
+
+#### Stream G kickoff — UI/UX aesthetics, styling, and brand consistency (2026-04-27)
+
+This pass is the evidence log for
+[Stream G](../process/design-system-parallel-plan.md#stream-g-uiux-aesthetics-styling-and-brand-consistency)
+under TAR-243. Treat it as a visual-quality lane, not a contract or backend
+lane.
+
+| ID | Sev | Finding / scope | Action |
+|----|-----|-----------------|--------|
+| UX-13 | Normal | Legal-search shell polish needs a token hygiene pass before deeper layout work. Hardcoded workspace-shell color literals make the page chrome harder to align with ADR-0027 shared brand tokens. | **Started (2026-04-27).** Move workspace shell color treatments into local `globals.css` variables, then continue with header / results / detail / filters polish in surface-scoped PRs. |
+| UX-14 | Normal | The older five visual Linear streams overlap TAR-243 but are not yet explicitly folded into the design-system plan. | Fold into Stream G as implementation lanes: visual regression, Kontrollbereich hierarchy, result scope/relevance copy, detail/filter/loading parity, and admin readiness/version actions. |
+| UX-15 | Low | Screenshot baseline updates can become noisy if mixed with unrelated style fixes. | Keep screenshot-pack or visual-baseline refreshes in a dedicated follow-up PR unless a changed baseline is the direct acceptance evidence for the same styling PR. |
+| UX-16 | Normal | Admin must look like the same Evidara product as legal-search without copying the research workspace's document-reading density. | **Started (2026-04-27).** Stream G3 now covers shell tokenization, primitive token parity, and first screen-polish pass. Shared semantics: navy identity chrome, violet action/active states, matching focus rings, status colors, pill semantics, and elevation tokens. Intentional difference: admin keeps denser tables, task-first headers, and operator scanning layouts. |
+
+##### Stream G3 admin PR slices
+
+1. **Shell tokenization.** `globals.css`, `AppBar`, `AppShell`, `SidebarMenu`, shell token tests. Serializes on `platform-control/admin/src/app/globals.css`. Completed for the admin shell in this pass, including a guard against returning shell controls to the older brand-specific focus token. Follow-up visual review removed default link underlines, renamed the operator surface to `Preview approvals`, and fixed v2 create-route title / active-nav matching.
+2. **Primitive parity.** `Button`, `Pill`, `Toast`, `DataTable`, `TextInput` / `Select`; add token/class tests. Serializes on shared admin primitives. Completed first pass using shared accent, focus, status, surface, and border tokens.
+3. **Screen polish.** Dashboard/source-health plus v2 source/run/reference-data screens; remove prototype copy, keep admin headings sans-first, normalize table/header/form surfaces. Completed first pass for dashboard, source health, source v2, run v2, source-create, authority-create/edit, and jurisdiction-create/edit screens.
+4. **Evidence/docs.** Screenshot-pack refresh and TAR-243 runbook update. Screenshot pack passed locally on 2026-04-27; screenshot files are generated evidence artifacts and are not tracked in this repo state.
 
 ## 7. Linear sync — roadmap and templates
 

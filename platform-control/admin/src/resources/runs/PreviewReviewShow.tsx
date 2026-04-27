@@ -11,7 +11,7 @@ export function PreviewReviewShow() {
   return (
     <Show
       resource={ResourceName.PreviewReview}
-      title="Preview Review"
+      title="Preview approvals"
       queryOptions={{ meta: { mode: "preview" } }}
     >
       <SimpleShowLayout>

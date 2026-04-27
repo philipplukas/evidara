@@ -71,9 +71,9 @@ export default function SourceShowV2() {
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-6">
       <header className="space-y-3">
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
-          Preview · Tailwind + ra-core · Show
+          Source detail
         </p>
-        <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+        <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
           {source.name}
         </h1>
         <div className="font-mono text-[12px] text-[rgba(29,41,61,0.6)]">{source.source_id}</div>
@@ -90,7 +90,7 @@ export default function SourceShowV2() {
        * the right. The card keeps its heading + description copy which
        * give context the header pills alone can't.
        */}
-      <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-1.5">
+      <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-[var(--admin-panel-bg)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-1.5">
         <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Source lifecycle</h2>
         <p className="text-[13px] text-[rgba(29,41,61,0.65)]">
           Status, operating posture, and the main attention cue for this source.
@@ -133,24 +133,6 @@ export default function SourceShowV2() {
         <FieldCell label="Created">{formatSwissDateTime(source.created_at)}</FieldCell>
         <FieldCell label="Updated">{formatSwissDateTime(source.updated_at)}</FieldCell>
       </DetailGrid>
-
-      {/*
-       * Deferred-panel markers. Keeping these visible during the spike so a
-       * reviewer comparing `/sources/:id/show` and `/sources-v2/:id` knows
-       * exactly which panels are *intentionally* absent from v2.
-       */}
-      {/* UX-12.2: softened. Kept as a quiet footnote, not a prominent card. */}
-      <aside className="rounded-[10px] border border-dashed border-[rgba(29,41,61,0.1)] px-3 py-2.5 text-[11px] text-[rgba(29,41,61,0.55)] space-y-1">
-        <p className="font-semibold text-[rgba(29,41,61,0.7)] text-[11px] uppercase tracking-[0.06em]">
-          Deferred in this spike
-        </p>
-        <p>
-          Handoff panel (stateful query-param read) and source-versions section (mutations, dialogs,
-          tables) are intentionally absent — open{" "}
-          <code className="font-mono">/sources/{source.source_id}/show</code> for the complete MUI
-          view.
-        </p>
-      </aside>
     </div>
   );
 }

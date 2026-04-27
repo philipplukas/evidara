@@ -39,7 +39,7 @@ export function PreviewReviewList() {
   return (
     <List
       resource={ResourceName.PreviewReview}
-      title="Preview Review"
+      title="Preview approvals"
       perPage={25}
       sort={{ field: "created_at", order: "DESC" }}
       filter={{ mode: "preview" }}

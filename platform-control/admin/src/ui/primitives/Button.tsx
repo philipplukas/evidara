@@ -21,22 +21,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-full font-semibold " +
+  "inline-flex items-center justify-center gap-2 rounded-lg font-semibold " +
   "transition-[background-color,border-color,transform,box-shadow] duration-150 " +
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-[var(--brand-focus-ring)] " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 const VARIANT: Record<Variant, string> = {
   primary:
-    "bg-[var(--brand)] text-[#fffdf8] border border-transparent shadow-[0_10px_24px_rgba(15,76,129,0.18)] " +
-    "hover:bg-[var(--brand-hover)] hover:shadow-[0_14px_28px_rgba(15,76,129,0.24)]",
+    "bg-[var(--accent-core)] text-[var(--accent-core-foreground)] border border-transparent shadow-[var(--shadow-card)] " +
+    "hover:bg-[color-mix(in_oklab,var(--accent-core)_88%,black)] hover:shadow-[var(--shadow-card-hover)]",
   secondary:
-    "bg-white/80 text-[var(--foreground)] border border-[var(--border)] " +
-    "hover:bg-white hover:border-[var(--border-strong)]",
+    "bg-[var(--surface-panel)] text-[var(--foreground)] border border-[var(--border)] shadow-[var(--shadow-ring-subtle)] " +
+    "hover:bg-[var(--surface-input)] hover:border-[var(--accent-core)]/30",
   ghost:
-    "bg-transparent text-[var(--brand)] border border-transparent " +
-    "hover:bg-[var(--brand-wash-8)]",
+    "bg-transparent text-[var(--accent-core)] border border-transparent " +
+    "hover:bg-[var(--interactive-accent-subtle)]",
 };
 
 const SIZE: Record<Size, string> = {

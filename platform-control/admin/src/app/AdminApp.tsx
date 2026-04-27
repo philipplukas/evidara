@@ -96,7 +96,7 @@ export default function AdminApp() {
         list={PreviewReviewList}
         show={PreviewReviewShow}
         recordRepresentation="run_id"
-        options={{ label: "Preview Review" }}
+        options={{ label: "Preview approvals" }}
       />
       <Resource
         name={ResourceName.Runs}

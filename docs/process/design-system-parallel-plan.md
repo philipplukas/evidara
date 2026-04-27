@@ -37,9 +37,9 @@ flowchart TD
 Blue = shared foundation (must land first).  
 Green = independent roots (can start immediately, no dependencies on each other).
 
-## Six parallel streams
+## Seven parallel streams
 
-The 8 contracts decompose into 6 streams. Streams A–E can all start simultaneously. Stream F starts after A's foundation PR lands.
+The 8 contracts decompose into 6 component-contract streams plus one visual-quality stream. Streams A–E and G can all start simultaneously when they do not touch the same files. Stream F starts after A's foundation PR lands.
 
 ### Stream A: Status system (shared foundation)
 
@@ -142,26 +142,49 @@ The 8 contracts decompose into 6 streams. Streams A–E can all start simultaneo
 
 ---
 
+### Stream G: UI/UX aesthetics, styling, and brand consistency
+
+**Surface:** Both, with PRs split by surface where possible
+**Serialization gate:** Shared token/style files and screenshot baselines
+
+Owns visual polish and cross-surface brand consistency for `legal-search/frontend` and `platform-control/admin` without changing API contracts, business behavior, or data semantics. The stream may adjust design tokens, component styling, responsive layout, screenshot evidence, and copy-level presentation where needed for credibility, hierarchy, accessibility, and demo readiness.
+
+| Step | Task | Files | Depends on |
+|---|---|---|---|
+| G1 | Run a visual audit pass and update the TAR-243 findings log | `docs/runbooks/ux-aesthetic-review.md`, screenshot pack evidence | — |
+| G2 | Legal-search polish: header hierarchy, result scope, detail tabs, filters, loading parity | `legal-search/frontend/src/**`, `legal-search/frontend/docs/**` as needed | G1; serialize with B/C on shared files |
+| G3 | Admin brand consistency: same Evidara brand language as legal-search, with operator-first density; readiness/status presentation, source/version actions, v2 shell parity | `platform-control/admin/src/**`, admin docs as needed | G1; serialize with E/F on shared files |
+| G4 | Visual regression follow-up: update or extend screenshot baselines deliberately | `legal-search/frontend/e2e/**`, screenshot baselines, testing docs | G2/G3 as applicable |
+
+**Suggested PR split:** `design/tar-243-visual-audit-pass`, `style/tar-243-legal-search-polish`, `style/tar-243-admin-brand-consistency`, `test/tar-243-visual-regression-followup`.
+
+**G3 same-brand rule:** Admin should feel like the control plane of the same Evidara product, not a clone of the legal-search workspace. Keep the shared semantics identical: navy is identity/environment chrome, violet is action and active state, status colors mean the same thing, focus rings match, and pill/status/elevation tokens come from the shared system. Keep the admin intentionally different where it serves operators: denser tables, faster scanning, task-first page headers, and less document-reading/editorial whitespace.
+
+---
+
 ## Parallelism map (what can run at the same time)
 
 ```
-Week 1:  A1 ──→ A2+A3    B1-B4 (single PR)    C1    D1 ──→ D2+D3    E1+E2
-Week 2:  A4+A5+A6         (done)                C2-C4 D4+D5           E3+E4+E5
-Week 3:  A7               —                     C5    —               —
+Week 1:  A1 ──→ A2+A3    B1-B4 (single PR)    C1    D1 ──→ D2+D3    E1+E2    G1
+Week 2:  A4+A5+A6         (done)                C2-C4 D4+D5           E3+E4+E5 G2+G3
+Week 3:  A7               —                     C5    —               —        G4
 Week 3:  F1+F2+F3 (after A lands)
 ```
 
-**Max concurrency at any point:** 5 streams (A + B + C + D + E), collapsing to 3 by week 2 as B and D complete.
+**Max concurrency at any point:** 6 streams (A + B + C + D + E + G), collapsing as isolated streams complete.
 
 ## Serialization gates (where streams must NOT overlap)
 
 | Gate | Streams | Rule |
 |---|---|---|
 | `globals.css` | A + C | A1 (status tokens) lands first; C coordinates on rebase |
+| `legal-search/frontend/src/app/globals.css` | B + C + G | One owner for legal-search shell/token styling at a time |
+| `platform-control/admin/src/app/globals.css` | E + F + G | One owner for admin shell/token styling at a time |
 | `Dashboard.tsx` | A + F | A4 lands first; F starts after |
 | `ui/button.tsx` | E only | No other stream touches this file |
 | `ContextBar.tsx` | C only | Already changed by ad-hoc fix; C formalizes |
 | `DetailTabs.tsx` | B only | Isolated migration |
+| Screenshot baselines | G + any visual PR | Baseline update PRs serialize so diffs stay reviewable |
 
 ## What each stream delivers independently
 
@@ -173,9 +196,11 @@ Week 3:  F1+F2+F3 (after A lands)
 | D | Detail panel shows more metadata by default; density is configurable per document type |
 | E | Production Run requires confirmation; Preview/Production visually distinguished |
 | F | Dashboard health turns red/amber automatically; operators read status, not numbers |
+| G | Visual credibility, brand coherence, and demo-readiness issues are triaged into surface-scoped PRs with screenshot evidence |
 
 ## Related
 
 - [ADR-0016: Design-system component contracts](../adr/adr-0016-design-system-component-contracts.md)
 - [Parallel work streams (by component)](parallel-work-streams.md)
 - [Max parallel execution](max-parallel-execution.md)
+- [UX / Aesthetic review runbook](../runbooks/ux-aesthetic-review.md)

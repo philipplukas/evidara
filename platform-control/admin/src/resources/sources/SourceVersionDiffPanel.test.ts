@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { SourceVersionRecord } from "../../lib/admin/dataProvider";
 
 /**
  * Unit tests for the diff logic extracted from SourceVersionDiffPanel.

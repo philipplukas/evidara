@@ -45,28 +45,28 @@ export default function AuthorityEditV2() {
   });
 
   if (controller.isPending) {
-    return (
-      <div className="px-4 py-10 text-center text-[rgba(29,41,61,0.6)]">Loading authority…</div>
-    );
+    return <div className="px-4 py-10 text-center text-[var(--text-meta)]">Loading authority…</div>;
   }
   if (controller.error || !controller.record) {
-    return <div className="px-4 py-10 text-center text-[#b71c1c]">Failed to load authority.</div>;
+    return (
+      <div className="px-4 py-10 text-center text-[var(--status-critical)]">
+        Failed to load authority.
+      </div>
+    );
   }
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-3xl mx-auto space-y-6">
       <header className="space-y-2">
-        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
-          Preview · Tailwind + ra-core · Form path
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--text-meta)]">
+          Reference data
         </p>
-        <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
-          Edit {controller.record.name}{" "}
-          <span className="text-[rgba(29,41,61,0.5)]">(v2 preview)</span>
+        <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          Edit {controller.record.name}
         </h1>
-        <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[72ch]">
-          Jurisdiction stays at its current value (deferred); `authority_id` is immutable. On
-          success you'll be redirected to the MUI list at{" "}
-          <code className="font-mono text-[12px]">/authorities</code>.
+        <p className="text-[14px] text-[var(--text-meta)] max-w-[72ch]">
+          Update the authority display name and slug. The authority ID remains immutable for linked
+          records.
         </p>
       </header>
 
@@ -76,10 +76,10 @@ export default function AuthorityEditV2() {
         sanitizeEmptyValues
         warnWhenUnsavedChanges
       >
-        <div className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-6">
+        <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface-panel)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-6">
           <AuthorityFormBodyV2 idDisabled />
 
-          <footer className="flex items-center justify-end gap-2 pt-2 border-t border-[rgba(29,41,61,0.06)]">
+          <footer className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
             <Button variant="ghost" onClick={() => navigate("/authorities")} type="button">
               Cancel
             </Button>

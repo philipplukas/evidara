@@ -46,30 +46,29 @@ interface SelectProps {
 }
 
 const BASE_TRIGGER =
-  "inline-flex w-full items-center justify-between gap-2 rounded-xl border bg-white/85 " +
+  "inline-flex w-full items-center justify-between gap-2 rounded-lg border bg-[var(--surface-input)] " +
   "px-3 py-2.5 text-sm text-[var(--foreground)] " +
-  "transition-[border-color,box-shadow] " +
-  "focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-[var(--brand-focus-ring)] " +
+  "shadow-[var(--shadow-inset-surface)] transition-[border-color,box-shadow] " +
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] " +
   "disabled:opacity-50 disabled:cursor-not-allowed " +
   // `[&>span]:truncate` keeps long choice labels from blowing past the trigger width.
   "[&>span:first-child]:truncate [&>span:first-child]:text-left [&>span:first-child]:flex-1";
 
-const BORDER_OK = "border-[rgba(29,41,61,0.16)] hover:border-[rgba(29,41,61,0.28)]";
-const BORDER_ERROR = "border-[#b71c1c] hover:border-[#b71c1c]";
+const BORDER_OK = "border-[var(--border)] hover:border-[var(--accent-core)]/30";
+const BORDER_ERROR = "border-[var(--status-critical)] hover:border-[var(--status-critical)]";
 
 const CONTENT_CLASS =
   "z-50 min-w-[var(--radix-select-trigger-width)] max-h-[320px] overflow-hidden " +
-  "rounded-xl border border-[var(--border)] bg-white/98 text-[var(--foreground)] " +
-  "shadow-[var(--shadow-card)] backdrop-blur-[12px] " +
+  "rounded-lg border border-[var(--border)] bg-[var(--surface-panel)] text-[var(--foreground)] " +
+  "shadow-[var(--shadow-card)] " +
   "data-[state=open]:animate-in data-[state=closed]:animate-out " +
   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0";
 
 const ITEM_CLASS =
   "relative flex w-full cursor-pointer select-none items-center gap-2 " +
   "rounded-lg px-2.5 py-2 text-sm text-[var(--foreground)] outline-none " +
-  "data-[highlighted]:bg-[var(--brand-wash-8)] data-[highlighted]:text-[var(--brand)] " +
-  "data-[state=checked]:font-semibold data-[state=checked]:text-[var(--brand)] " +
+  "data-[highlighted]:bg-[var(--interactive-accent-subtle)] data-[highlighted]:text-[var(--accent-core)] " +
+  "data-[state=checked]:font-semibold data-[state=checked]:text-[var(--accent-core)] " +
   "data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed";
 
 // Radix forbids the empty string as an item value. We round-trip the
@@ -109,7 +108,9 @@ export function Select({
 
   const radixValue =
     field.value === null || field.value === undefined || field.value === ""
-      ? undefined
+      ? allowEmpty
+        ? EMPTY_SENTINEL
+        : ""
       : String(field.value);
 
   return (
@@ -137,7 +138,7 @@ export function Select({
         >
           <SelectPrimitive.Value placeholder={placeholder} />
           <SelectPrimitive.Icon aria-hidden>
-            <ChevronDown size={16} className="text-[rgba(29,41,61,0.55)]" />
+            <ChevronDown size={16} className="text-[var(--foreground-subtle)]" />
           </SelectPrimitive.Icon>
         </SelectPrimitive.Trigger>
         <SelectPrimitive.Portal>
@@ -146,7 +147,7 @@ export function Select({
               {allowEmpty ? (
                 <SelectPrimitive.Item value={EMPTY_SENTINEL} className={ITEM_CLASS}>
                   <SelectPrimitive.ItemText>
-                    <span className="text-[rgba(29,41,61,0.6)]">{emptyLabel}</span>
+                    <span className="text-[var(--text-meta)]">{emptyLabel}</span>
                   </SelectPrimitive.ItemText>
                   <SelectPrimitive.ItemIndicator className="ml-auto">
                     <Check size={14} aria-hidden />

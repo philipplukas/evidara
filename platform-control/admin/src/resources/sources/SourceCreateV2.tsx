@@ -125,24 +125,20 @@ export default function SourceCreateV2() {
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-3xl mx-auto space-y-6">
       <header className="space-y-2">
-        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
-          Preview · Tailwind + ra-core · Form path
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--text-meta)]">
+          Source setup
         </p>
-        <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
-          Create source <span className="text-[rgba(29,41,61,0.5)]">(v2 preview)</span>
+        <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          Create source
         </h1>
-        <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[72ch]">
-          Jurisdiction + authority pickers use the new Tailwind{" "}
-          <code className="font-mono text-[12px]">Select</code> primitive (radix-ui under the hood).
-          Acquisition-spec blueprint preview is deferred — open{" "}
-          <code className="font-mono text-[12px]">/sources/create</code> for the full MUI wizard. On
-          success you'll be redirected to the MUI list at{" "}
-          <code className="font-mono text-[12px]">/sources</code>.
+        <p className="text-[14px] text-[var(--text-meta)] max-w-[72ch]">
+          Register an operator-reviewed source with its jurisdiction, authority, and document
+          family. Successful creation returns to the source list.
         </p>
       </header>
 
       <Form onSubmit={controller.save} defaultValues={CREATE_DEFAULTS} sanitizeEmptyValues>
-        <div className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-5">
+        <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface-panel)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-5">
           <TextInput
             source="name"
             label="Name"
@@ -181,7 +177,7 @@ export default function SourceCreateV2() {
           />
           <AuthoritySelectField authorities={authorities.data ?? []} />
 
-          <footer className="flex items-center justify-end gap-2 pt-2 border-t border-[rgba(29,41,61,0.06)]">
+          <footer className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
             <Button variant="ghost" onClick={() => navigate("/sources")} type="button">
               Cancel
             </Button>
@@ -192,21 +188,11 @@ export default function SourceCreateV2() {
         </div>
       </Form>
 
-      {/*
-       * UX-12.2 style: keep deferred-scope notice as a quiet footnote, not
-       * a prominent card, so the v2 page still reads as intentional
-       * coexistence rather than immaturity.
-       */}
-      <aside className="rounded-[10px] border border-dashed border-[rgba(29,41,61,0.1)] px-3 py-2.5 text-[11px] text-[rgba(29,41,61,0.55)] space-y-1">
-        <p className="font-semibold text-[rgba(29,41,61,0.7)] text-[11px] uppercase tracking-[0.06em]">
-          Deferred in this preview
+      <aside className="rounded-[10px] border border-dashed border-[var(--border)] px-3 py-2.5 text-[11px] text-[var(--text-meta)] space-y-1">
+        <p className="font-semibold text-[var(--foreground)] text-[11px] uppercase tracking-[0.06em]">
+          Operator note
         </p>
-        <p>
-          Acquisition-spec blueprint preview (country overlay + provider template + server-side
-          preview panel) is intentionally absent. Use{" "}
-          <code className="font-mono">/sources/create</code> for the complete MUI wizard until
-          parity lands in a later increment.
-        </p>
+        <p>Use the acquisition configuration fields after creation to complete provider setup.</p>
       </aside>
     </div>
   );
