@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
+from pathlib import Path
 from typing import Any, Protocol
 
 from google.cloud import pubsub_v1
@@ -22,6 +24,41 @@ class NoopRawArtifactPublisher:
 
     async def publish_artifact_bundle_available(self, event: dict[str, Any]) -> None:
         del event
+
+
+class LocalOutboxRawArtifactPublisher:
+    """Persist outbound events to a local outbox for GCP-free staging replay."""
+
+    def __init__(self, *, base_dir: Path) -> None:
+        self.outbox_dir = base_dir / "event-outbox"
+
+    async def publish_raw_artifact_available(self, artifact: RawArtifact) -> None:
+        event = build_raw_artifact_event(artifact)
+        await self._write_event(stream="raw-artifact-available", event=event)
+
+    async def publish_artifact_bundle_available(self, event: dict[str, Any]) -> None:
+        await self._write_event(stream="artifact-bundle-available", event=event)
+
+    async def _write_event(self, *, stream: str, event: dict[str, Any]) -> None:
+        await asyncio.to_thread(self._write_event_sync, stream=stream, event=event)
+
+    def _write_event_sync(self, *, stream: str, event: dict[str, Any]) -> None:
+        event_id = event.get("event_id")
+        if not isinstance(event_id, str) or not event_id:
+            raise ValueError("outbox event must include a non-empty event_id")
+        if "/" in event_id or "\\" in event_id or event_id in {".", ".."}:
+            raise ValueError(f"unsafe outbox event_id: {event_id!r}")
+
+        root = self.outbox_dir.resolve(strict=False)
+        stream_dir = (root / stream).resolve(strict=False)
+        event_path = (stream_dir / f"{event_id}.json").resolve(strict=False)
+        if root != event_path and root not in event_path.parents:
+            raise ValueError(f"unsafe outbox path for event_id: {event_id!r}")
+
+        stream_dir.mkdir(parents=True, exist_ok=True)
+        tmp_path = stream_dir / f".{event_id}.{uuid.uuid4().hex}.tmp"
+        tmp_path.write_text(json.dumps(event, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        tmp_path.replace(event_path)
 
 
 class PubSubRawArtifactPublisher:

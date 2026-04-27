@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from platform_control.config import Settings, get_settings
 from platform_control.events.publisher import (
+    LocalOutboxRawArtifactPublisher,
     NoopRawArtifactPublisher,
     PubSubRawArtifactPublisher,
     RawArtifactPublisher,
@@ -32,4 +33,6 @@ def get_raw_artifact_publisher(settings: Settings | None = None) -> RawArtifactP
             bundle_topic_name=active_settings.artifact_bundle_pubsub_topic,
             project_id=active_settings.gcp_project_id,
         )
+    if active_settings.event_publisher_backend == "local_outbox":
+        return LocalOutboxRawArtifactPublisher(base_dir=active_settings.raw_artifact_local_dir)
     return NoopRawArtifactPublisher()

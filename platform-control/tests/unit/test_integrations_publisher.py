@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+import json
+from datetime import UTC, datetime
+
 import pytest
 
 from platform_control.config import Settings
 from platform_control.errors import IntegrationConfigurationError
-from platform_control.events.publisher import NoopRawArtifactPublisher, PubSubRawArtifactPublisher
+from platform_control.events.publisher import (
+    LocalOutboxRawArtifactPublisher,
+    NoopRawArtifactPublisher,
+    PubSubRawArtifactPublisher,
+)
 from platform_control.integrations import get_raw_artifact_publisher
+from platform_control.models.raw_artifact import RawArtifact
 
 
 class FakePublisherClient:
@@ -20,6 +29,75 @@ def test_get_raw_artifact_publisher_defaults_to_noop() -> None:
     publisher = get_raw_artifact_publisher(settings)
 
     assert isinstance(publisher, NoopRawArtifactPublisher)
+
+
+def test_get_raw_artifact_publisher_can_use_local_outbox(tmp_path) -> None:
+    settings = Settings(event_publisher_backend="local_outbox", raw_artifact_local_dir=tmp_path)
+
+    publisher = get_raw_artifact_publisher(settings)
+
+    assert isinstance(publisher, LocalOutboxRawArtifactPublisher)
+    assert publisher.outbox_dir == tmp_path / "event-outbox"
+
+
+def test_local_outbox_writes_raw_artifact_and_bundle_events(tmp_path) -> None:
+    publisher = LocalOutboxRawArtifactPublisher(base_dir=tmp_path)
+    created_at = datetime(2026, 4, 27, tzinfo=UTC)
+    artifact = RawArtifact(
+        artifact_id="art_01kq8000000000000000000000",
+        source_id="src_01kq8000000000000000000000",
+        source_version_id="sv_01kq8000000000000000000000",
+        run_id="run_01kq8000000000000000000000",
+        storage_path="file:///tmp/doc.html",
+        content_type="text/html",
+        artifact_metadata={"title": "Replay proof"},
+        created_at=created_at,
+    )
+    bundle_event = {
+        "event_type": "artifact_bundle.available",
+        "event_version": 1,
+        "event_id": "evt_01kq8000000000000000000001",
+        "occurred_at": created_at.isoformat(),
+        "producer": "platform-control",
+        "payload": {
+            "bundle_manifest_id": "abm_01kq8000000000000000000000",
+            "source_snapshot_id": "snap_01kq8000000000000000000000",
+            "provenance": {
+                "run_id": artifact.run_id,
+                "source_id": artifact.source_id,
+                "source_version_id": artifact.source_version_id,
+            },
+        },
+    }
+
+    asyncio.run(publisher.publish_raw_artifact_available(artifact))
+    asyncio.run(publisher.publish_artifact_bundle_available(bundle_event))
+
+    raw_files = list((tmp_path / "event-outbox" / "raw-artifact-available").glob("*.json"))
+    bundle_path = (
+        tmp_path
+        / "event-outbox"
+        / "artifact-bundle-available"
+        / "evt_01kq8000000000000000000001.json"
+    )
+    assert len(raw_files) == 1
+    raw_event = json.loads(raw_files[0].read_text(encoding="utf-8"))
+    assert raw_event["payload"]["artifact_id"] == artifact.artifact_id
+    assert json.loads(bundle_path.read_text(encoding="utf-8")) == bundle_event
+
+
+def test_local_outbox_rejects_unsafe_event_ids(tmp_path) -> None:
+    publisher = LocalOutboxRawArtifactPublisher(base_dir=tmp_path)
+
+    with pytest.raises(ValueError, match="unsafe outbox event_id"):
+        asyncio.run(
+            publisher.publish_artifact_bundle_available(
+                {
+                    "event_type": "artifact_bundle.available",
+                    "event_id": "../evt_01kq8000000000000000000000",
+                }
+            )
+        )
 
 
 def test_get_raw_artifact_publisher_requires_project_for_short_topic_names(monkeypatch) -> None:

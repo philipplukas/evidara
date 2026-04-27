@@ -42,6 +42,7 @@ if [[ -z "$source_doc_ids" ]]; then
   echo "No source document IDs found in: $DETAIL_EXPECTATIONS_FILE" >&2
   exit 2
 fi
+source_doc_count="$(awk -F $'\t' 'NF && $1 !~ /^[[:space:]]*#/ && $1 !~ /^[[:space:]]*$/ {count++} END {print count + 0}' "$DETAIL_EXPECTATIONS_FILE")"
 
 curl_json() {
   local url="$1"
@@ -67,7 +68,7 @@ curl_code() {
 
 echo "## Internal beta query pack"
 echo ""
-echo "| # | Query | Expected top-5 | Top 5 | totalResults | Status | Notes |"
+echo "| # | Query | Expected | Returned IDs | totalResults | Status | Notes |"
 echo "|---|-------|----------------|-------|-------------:|--------|-------|"
 
 while IFS=$'\t' read -r query expected notes || [[ -n "${query:-}" ]]; do
@@ -79,7 +80,11 @@ while IFS=$'\t' read -r query expected notes || [[ -n "${query:-}" ]]; do
   row=$((row + 1))
 
   enc="$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$query")"
-  url="${BASE_URL}/v1/search?q=${enc}&page_size=5"
+  page_size=5
+  if [[ "$expected" == "__exact_beta_corpus__" ]]; then
+    page_size="$source_doc_count"
+  fi
+  url="${BASE_URL}/v1/search?q=${enc}&page_size=${page_size}"
   body="$(curl_json "$url")"
 
   export BETA_QUERY="$query"
@@ -98,19 +103,22 @@ notes = os.environ["BETA_NOTES"]
 source_ids = [x for x in os.environ["BETA_SOURCE_DOC_IDS"].split(",") if x]
 body = json.loads(os.environ["BETA_BODY"])
 results = body.get("results") or []
-ids = [str(row.get("id") or row.get("document_id") or "") for row in results[:5]]
+all_ids = [str(row.get("id") or row.get("document_id") or "") for row in results]
 total = int(body.get("totalResults") or body.get("total_results") or len(results))
 
 def cell(value: object) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
 
 if expected == "__exact_beta_corpus__":
+    ids = all_ids
     ok = total == len(source_ids) and set(ids) == set(source_ids)
     expected_cell = ", ".join(source_ids)
 elif expected == "__nonempty__":
+    ids = all_ids[:5]
     ok = total > 0
     expected_cell = "__nonempty__"
 else:
+    ids = all_ids[:5]
     expected_ids = [x.strip() for x in expected.split(",") if x.strip()]
     ok = bool(expected_ids) and all(doc_id in ids for doc_id in expected_ids)
     expected_cell = ", ".join(expected_ids)
