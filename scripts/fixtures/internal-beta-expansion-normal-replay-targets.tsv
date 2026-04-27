@@ -1,0 +1,10 @@
+# key	title	source_url	provider
+# Source-derived expansion pack for the normal replay proof.
+# These targets use the Fedlex SPARQL provider because raw www.fedlex.admin.ch
+# pages are SPA shells and do not carry trustworthy document titles.
+environmental-protection-act	Federal Act on the Protection of the Environment	https://fedlex.data.admin.ch/eli/cc/1984/1122_1122_1122	fedlex_sparql
+foreign-nationals-act	Federal Act on Foreign Nationals	https://fedlex.data.admin.ch/eli/cc/2007/758	fedlex_sparql
+asylum-act	Asylum Act	https://fedlex.data.admin.ch/eli/cc/1999/358	fedlex_sparql
+value-added-tax-act	Value Added Tax Act	https://fedlex.data.admin.ch/eli/cc/2009/615	fedlex_sparql
+gender-equality-act	Gender Equality Act	https://fedlex.data.admin.ch/eli/cc/1996/1498_1498_1498	fedlex_sparql
+unfair-competition-act	Unfair Competition Act	https://fedlex.data.admin.ch/eli/cc/1988/223_223_223	fedlex_sparql
