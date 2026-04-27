@@ -1,0 +1,9 @@
+# Internal beta Hetzner staging query pack.
+# One query per line. Empty lines and comments are ignored by
+# scripts/run-staging-relevance-query-pack.sh.
+*
+Evidara staging seed document
+Rescore smoke section
+Hetzner staging surfaces
+runtime-local rescoring
+Fedlex

@@ -61,6 +61,7 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 | [Phase 5 evidence checklist](runbooks/phase-5-evidence-checklist.md)                         | Single-page TAR-64 / TAR-77 / TAR-85 entry for TAR-69 |
 | [Linear M5 / Phase 5 handoff pack](runbooks/linear-milestone5-handoff-pack.md)               | Copy-paste issue bodies, child-issue map, agent prompts (Linear UI) |
 | [TAR-89 workstreams](runbooks/tar-89-workstreams.md)                                           | Child-issue split: data / serving / staging metadata credibility |
+| [Internal beta user-flow evidence](runbooks/internal-beta-user-flow-evidence.md)                | Hetzner staging packet for seeded search/detail, HITL rescore, and recovery evidence |
 | [Post-MVP engineering workstreams](runbooks/post-mvp-engineering-workstreams.md)               | TAR-66 → TAR-62 → TAR-63 → TAR-67 after TAR-64 green |
 | [Hetzner runner secret capture](runbooks/hetzner-runner-secret-capture.md)                    | Preserve-before-wipe checklist for the old Hetzner runner host secrets |
 | [Hetzner runner secret capture checklist](runbooks/hetzner-runner-secret-capture-checklist.md) | Step-by-step archive and classification checklist for the legacy runner host |
