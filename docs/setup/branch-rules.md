@@ -2,16 +2,25 @@
 
 ## Status
 
-Enforced by GitHub branch protection on `main` and team discipline. Current live state: `strict: true` with no universal required checks; only always-on checks belong in the universal list.
+Enforced by GitHub branch protection on `main` and team discipline. Current live state: `strict: true` with universal required checks limited to the always-on `check-title` and `contract-validation` contexts.
 
 ## Rules for `main`
 
 1. **No direct pushes to main.** All changes go through pull requests.
 2. **Squash-merge only.** Every merge to main produces one clean commit.
 3. **Semantic PR title required.** The PR title must use a conventional commit prefix. CI validates this automatically.
-4. **CI must pass.** Do not merge with failing checks.
-5. **Review before merge.** At least one review (human or AI) before merging.
-6. **Stale reviews dismissed.** When new commits are pushed, previous approvals are considered stale.
+4. **CI must pass.** Do not merge with failing required checks; triggered path-scoped checks must pass or intentionally skip.
+5. **Review before merge.** Normal code, contract, infra, and pipeline PRs get at least one human or AI review before merging.
+6. **Refresh stale reviews by risk.** New commits that change behavior, contracts, migrations, Terraform resources, IAM/security, or workflow semantics need fresh review. Mechanical rebases, conflict resolution, docs wording, and CI skip clarifications can proceed with maintainer self-review when the risk profile has not changed.
+
+## Solo-maintainer policy
+
+For owner-authored PRs, keep the required checks and make any maintainer override explicit:
+
+- `check-title` and `contract-validation` stay required on every PR. Do not remove them to speed up a merge.
+- Admin override is allowed only for owner-authored infra or hotfix cases where waiting would prolong an outage, block recovery, or leave `main` stuck behind a non-applicable CI/runtime condition. Leave a PR comment or merge note with the reason, the checks reviewed, any skipped or failing contexts, and the follow-up needed.
+- Do not use admin override to hide ordinary code/test failures. Fix the failure, narrow the change, or move an unavailable path-scoped gate out of universal branch protection.
+- If GCP billing, Artifact Registry, Cloud Run CD, or a staging GCP project is intentionally disabled, those paths must skip with a clear summary instead of failing. A disabled GCP path is not a reason to fail branch protection or start a stale review loop.
 
 ## Allowed PR title prefixes
 
@@ -97,8 +106,10 @@ Keep the required-check model aligned to the TAR-70 emitted-check matrix:
 Current steady state on `main`:
 
 - `strict: true`
-- no universal required checks beyond always-on contexts
+- universal required checks: `check-title`, `contract-validation`
 - `release-readiness` and `scraping-qa` are release gates, not generic PR gates
+- opt-in GCP deployment / publishing paths skip instead of failing when their
+  enabling repo variables are unset
 
 For the current operator view of which PR types emit which checks, see
 [TAR-70 emitted-check matrix](../runbooks/tar-70-emitted-check-matrix.md).
@@ -110,5 +121,5 @@ These rules are enforced by:
 - **Branch protection** — keep live required checks aligned with the TAR-70 matrix and
   avoid requiring release-only checks universally
 - **CI** — the `pr-title` workflow blocks merge if the title format is wrong
-- **Team discipline** — every team member follows these rules
+- **Team discipline** — every team member follows these rules; admin overrides are documented on the PR
 - **CodeRabbit** — AI review catches rule violations
