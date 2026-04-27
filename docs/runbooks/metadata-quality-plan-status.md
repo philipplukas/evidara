@@ -146,6 +146,14 @@ From [mvp-demo-release-recommendation.md](mvp-demo-release-recommendation.md) an
 
 ### 3.5.2 Remote / extended corpus (product-owned; historically “staging”)
 
+**Current Hetzner internal beta corpus (2026-04-27):** the active low-cost
+staging path uses the Rocky GitOps seed and validates the seeded document through
+[`internal-beta-user-flow-evidence.md`](internal-beta-user-flow-evidence.md).
+
+| Document ID | Environment URL (legal-search API or UI) | Notes |
+| ----------- | ------------------------------------------ | ----- |
+| `doc_2adgt1ejqzhjj24tn8svn54h08` | Hetzner `evidare-staging` via port-forward or internal ingress | Deterministic DI seed; search/detail must show non-placeholder title, `law` type, Fedlex subtitle, metadata rows, and two sections |
+
 **Dev-first posture:** if your org has **no** staging GCP project, maintain the same style of table for **dev** legal-search URLs (from your deployed `legal-search-api` Cloud Run host) and treat **3.5.1** (local) + **dev** inventory as the live acceptance surfaces until staging is added. Re-evaluate when to provision staging per [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project).
 
 **Example staging BFF (2026-04-09 snapshot):** `https://legal-search-api-staging-kxc5agexna-oa.a.run.app` (see [`infra/env/staging/runtime.gcp.tfvars.example`](../../infra/env/staging/runtime.gcp.tfvars.example)). Hostnames may drift with deploys — re-verify URLs before release.

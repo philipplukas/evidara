@@ -40,6 +40,11 @@ By default it:
 Override `PLATFORM_CONTROL_BASE_URL` and `PLATFORM_CONTROL_API_KEY` to run against an already
 reachable platform-control API without `kubectl`.
 
+Internal beta evidence packet: use
+[`internal-beta-user-flow-evidence.md`](internal-beta-user-flow-evidence.md)
+when the target is Hetzner staging and the goal is the full seeded
+search/detail + HITL + recovery loop rather than API-only MVP acceptance.
+
 ### CLI output modes (`evidara workflow mvp-acceptance`)
 
 - default: single-line JSON for agents, CI notes, or follow-on tooling
@@ -80,7 +85,7 @@ Provide a repeatable acceptance pack for the locked MVP flow:
 
 `ingest source -> version approve -> run -> DI outputs -> searchable detail`
 
-This pack is designed to be executed in **dev** first. Teams with a staging GCP project repeat there for parity evidence; **dev-first** teams attach the **dev** run as the remote acceptance record (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)). While GCP billing is disabled, Hetzner staging is the internal runtime evidence path for HITL/rescore confidence.
+This pack is designed to be executed in **dev** first. Teams with a staging GCP project repeat there for parity evidence; **dev-first** teams attach the **dev** run as the remote acceptance record (see [Environment strategy](../setup/environment-strategy.md#operator-posture-dev-first-no-staging-gcp-project)). While GCP billing is disabled, Hetzner staging is the internal runtime evidence path for HITL/rescore confidence. For the internal beta user-flow promise, Hetzner staging is also the canonical seeded search/detail evidence path; see [`internal-beta-user-flow-evidence.md`](internal-beta-user-flow-evidence.md).
 
 ## Preconditions
 
