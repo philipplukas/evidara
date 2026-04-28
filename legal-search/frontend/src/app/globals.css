@@ -5,6 +5,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+:root {
+  --workspace-page-glow-brand: color-mix(in oklab, var(--brand) 10%, transparent);
+  --workspace-page-glow-neutral: color-mix(in oklab, var(--brand-strong) 8%, transparent);
+  --workspace-page-top: var(--surface-panel);
+  --workspace-page-bottom: color-mix(in oklab, var(--surface-page) 92%, var(--brand) 8%);
+  --workspace-page-sheen-brand: color-mix(in oklab, var(--brand) 8%, transparent);
+  --workspace-page-sheen-light: color-mix(in oklab, var(--surface-panel) 45%, transparent);
+  --workspace-input-highlight: color-mix(in oklab, var(--surface-panel) 60%, transparent);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -122,9 +132,14 @@
   body {
     @apply text-foreground;
     background:
-      radial-gradient(circle at top left, rgb(15 76 129 / 10%), transparent 30%),
-      radial-gradient(circle at top right, rgb(92 107 126 / 8%), transparent 26%),
-      linear-gradient(180deg, #fbfcfe 0%, var(--surface-page) 44%, #e8eef4 100%);
+      radial-gradient(circle at top left, var(--workspace-page-glow-brand), transparent 30%),
+      radial-gradient(circle at top right, var(--workspace-page-glow-neutral), transparent 26%),
+      linear-gradient(
+        180deg,
+        var(--workspace-page-top) 0%,
+        var(--surface-page) 44%,
+        var(--workspace-page-bottom) 100%
+      );
     background-attachment: fixed;
   }
 
@@ -134,8 +149,8 @@
     inset: 0;
     pointer-events: none;
     background:
-      linear-gradient(135deg, rgb(15 76 129 / 8%), transparent 35%),
-      radial-gradient(circle at 50% -10%, rgb(255 255 255 / 45%), transparent 28%);
+      linear-gradient(135deg, var(--workspace-page-sheen-brand), transparent 35%),
+      radial-gradient(circle at 50% -10%, var(--workspace-page-sheen-light), transparent 28%);
     opacity: 0.7;
   }
 
@@ -224,7 +239,7 @@
 
   .app-header__search-shell {
     @apply relative rounded-2xl transition-shadow focus-within:shadow-[0_0_0_1px_var(--focus-ring)];
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 60%);
+    box-shadow: inset 0 1px 0 var(--workspace-input-highlight);
   }
 
   .app-header__search-input {

@@ -28,15 +28,14 @@ interface TextInputProps {
 }
 
 const BASE_INPUT =
-  "w-full rounded-xl border bg-white/85 px-3 py-2.5 text-sm text-[var(--foreground)] " +
-  "placeholder:text-[rgba(29,41,61,0.35)] " +
+  "w-full rounded-lg border bg-[var(--surface-input)] px-3 py-2.5 text-sm text-[var(--foreground)] " +
+  "placeholder:text-[var(--foreground-subtle)] shadow-[var(--shadow-inset-surface)] " +
   "transition-[border-color,box-shadow] " +
-  "focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-[var(--brand-focus-ring)] " +
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
-const BORDER_OK = "border-[rgba(29,41,61,0.16)] hover:border-[rgba(29,41,61,0.28)]";
-const BORDER_ERROR = "border-[#b71c1c] hover:border-[#b71c1c]";
+const BORDER_OK = "border-[var(--border)] hover:border-[var(--accent-core)]/30";
+const BORDER_ERROR = "border-[var(--status-critical)] hover:border-[var(--status-critical)]";
 
 export function TextInput({
   source,

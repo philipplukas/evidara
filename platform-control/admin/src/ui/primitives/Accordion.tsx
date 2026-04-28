@@ -56,7 +56,7 @@ export const AccordionItem = forwardRef<
       ref={ref}
       {...rest}
       className={cn(
-        "rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85",
+        "rounded-[18px] border border-[var(--border)] bg-[var(--surface-panel)]",
         "shadow-[var(--shadow-card)] backdrop-blur-[12px] overflow-hidden",
         className,
       )}
@@ -83,8 +83,8 @@ export const AccordionTrigger = forwardRef<
         className={cn(
           "group flex w-full items-center justify-between gap-3 px-5 py-4 text-left",
           "text-[15px] font-semibold text-[var(--foreground)] leading-tight",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]",
-          "focus-visible:outline-[var(--brand-focus-ring)]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
+          "focus-visible:ring-inset",
           "hover:bg-[var(--brand-wash-3)] transition-colors",
           className,
         )}
@@ -95,7 +95,7 @@ export const AccordionTrigger = forwardRef<
           strokeWidth={2.5}
           aria-hidden
           className={cn(
-            "shrink-0 text-[rgba(29,41,61,0.6)]",
+            "shrink-0 text-[var(--text-meta)]",
             "transition-transform duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]",
             "group-data-[state=open]:rotate-180",
             "motion-reduce:transition-none",
@@ -120,7 +120,7 @@ export const AccordionContent = forwardRef<
         // animate from 0 → content-height on open. The keyframes live
         // in `globals.css` so they ship once and respect the global
         // `prefers-reduced-motion` media query.
-        "overflow-hidden border-t border-[rgba(29,41,61,0.06)]",
+        "overflow-hidden border-t border-[var(--border)]",
         "data-[state=open]:animate-[accordion-open_200ms_cubic-bezier(0.4,0,0.2,1)]",
         "data-[state=closed]:animate-[accordion-closed_200ms_cubic-bezier(0.4,0,0.2,1)]",
         "motion-reduce:!animate-none",

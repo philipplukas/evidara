@@ -49,27 +49,30 @@ export function FormField({
       <div className="inline-flex items-baseline gap-1">
         <label
           htmlFor={id}
-          className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[rgba(29,41,61,0.7)] leading-[1.2]"
+          className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-meta)] leading-[1.2]"
         >
           {label}
         </label>
         {required ? (
-          <span aria-hidden className="text-[#b71c1c] text-[11px] font-semibold leading-[1.2]">
+          <span
+            aria-hidden
+            className="text-[var(--status-critical)] text-[11px] font-semibold leading-[1.2]"
+          >
             *
           </span>
         ) : null}
       </div>
       {description ? (
-        <p className="text-[12px] text-[rgba(29,41,61,0.65)] leading-snug">{description}</p>
+        <p className="text-[12px] text-[var(--text-meta)] leading-snug">{description}</p>
       ) : null}
       <div data-described-by={describedBy.join(" ") || undefined}>{children}</div>
       {error ? (
-        <p id={`${id}-error`} className="text-[12px] text-[#b71c1c] font-medium">
+        <p id={`${id}-error`} className="text-[12px] text-[var(--status-critical)] font-medium">
           {error}
         </p>
       ) : null}
       {helperText && !error ? (
-        <p id={`${id}-helper`} className="text-[12px] text-[rgba(29,41,61,0.55)]">
+        <p id={`${id}-helper`} className="text-[12px] text-[var(--muted-foreground)]">
           {helperText}
         </p>
       ) : null}

@@ -13,19 +13,21 @@ All colors are defined as CSS custom properties in `[globals.css](../src/app/glo
 
 | Token            | Value     | Tailwind Classes                             |
 | ---------------- | --------- | -------------------------------------------- |
-| `--brand`        | `#2563eb` | `text-brand`, `bg-brand`, `border-brand`     |
-| `--brand-hover`  | `#1d4ed8` | `text-brand-hover`, `hover:text-brand-hover` |
-| `--brand-strong` | `#1a2332` | `bg-brand-strong`, `text-brand-strong`       |
+| `--brand`        | `#0f4c81` | `text-brand`, `bg-brand`, `border-brand`     |
+| `--brand-hover`  | `#0b3d68` | `text-brand-hover`, `hover:text-brand-hover` |
+| `--brand-strong` | `#1d293d` | `bg-brand-strong`, `text-brand-strong`       |
 
 
 ### Surface Tokens
 
 
-| Token             | Value     | Tailwind Class     | Usage                         |
-| ----------------- | --------- | ------------------ | ----------------------------- |
-| `--surface-page`  | `#fafafa` | `bg-surface-page`  | Workspace shell, mobile shell |
-| `--surface-panel` | `#ffffff` | `bg-surface-panel` | Panels, cards, sheets, header |
-| `--surface-input` | `#f8f9fa` | `bg-surface-input` | Search input background       |
+| Token                     | Value / source | Tailwind Class              | Usage                         |
+| ------------------------- | -------------- | --------------------------- | ----------------------------- |
+| `--surface-page`          | `#e4e9ef`      | `bg-surface-page`           | Workspace shell, mobile shell |
+| `--surface-panel`         | `#f8fafc`      | `bg-surface-panel`          | Panels, cards, sheets, header |
+| `--surface-input`         | `#f1f5f9`      | `bg-surface-input`          | Search input background       |
+| `--surface-shell`         | shared token   | `bg-surface-shell`          | Header/chip shell surfaces    |
+| `--surface-shell-strong`  | shared token   | `bg-surface-shell-strong`   | Emphasized shell surfaces     |
 
 
 ### Interactive Tokens
@@ -49,7 +51,7 @@ All colors are defined as CSS custom properties in `[globals.css](../src/app/glo
 
 ### Accent-core token family (Sprint 1 — TAR-244)
 
-The Evidara violet accent — used wherever the UI needs to **signal a transient state** on non-destructive elements (active tab, active filter, count badge). Never used for primary CTAs (those stay `--brand`) and never for destructive state (that's `--destructive`).
+The Evidara violet accent — used wherever the UI needs to **signal an action or transient state** on non-destructive elements (primary actions, active tab, active filter, count badge). Never use it for destructive state (that's `--destructive`) or for identity-only chrome (that's navy `--brand`).
 
 | Token | Value | Tailwind Class | Usage |
 |-------|-------|----------------|-------|

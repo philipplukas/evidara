@@ -35,7 +35,7 @@ the API for stateful actions.
 
 ## Control-panel pages
 
-Retool pages remain useful for comparison, but `Preview Review`, `Runs`, and `Run Detail` are no
+Retool pages remain useful for comparison, but `Preview approvals`, `Runs`, and `Run Detail` are no
 longer the primary documented operator path.
 
 ### Reference Data
@@ -49,7 +49,7 @@ longer the primary documented operator path.
 - Uses API actions to create sources, create versions, and edit draft or rejected versions
 - Source-version detail shows `extractor_profile_id` and acquisition config for operator review
 
-### Preview Review
+### Preview approvals
 
 - Lists captured resources directly from Postgres
 - Calls `GET /v1/runs/{run_id}/preview-summary` for operator-facing heuristics and drift checks
@@ -81,11 +81,11 @@ and summarize output, but it cannot approve versions or launch production runs.
 Prefer the React-admin app for these flows. Use the following only when comparing behavior against
 the transitional Retool implementation.
 
-### Preview review
+### Preview approvals
 
 1. Open `Sources` and create or select a source plus draft source version.
 2. Confirm the source-version detail includes the selected `extractor_profile_id` and acquisition config.
-3. Trigger a preview run from `Preview Review`.
+3. Trigger a preview run from `Preview approvals`.
 4. Review preview heuristics and drift checks.
 5. Open `Run Detail` and inspect captured resources, raw artifacts, and provider-job status.
 

@@ -203,22 +203,19 @@ export default function RunListV2() {
       <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-4">
         <header className="space-y-2">
           <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
-            Preview · Tailwind + ra-core · Runs
+            Run queue
           </p>
-          <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
-            Run queue <span className="text-[rgba(29,41,61,0.5)]">(v2 preview)</span>
+          <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+            Runs
           </h1>
           <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[72ch]">
-            Same data + semantics as <code className="font-mono text-[12px]">/runs</code>. Keyboard
-            shortcuts, <code className="font-mono text-[12px]">CancelRunButton</code>, and{" "}
-            <code className="font-mono text-[12px]">RunLaunchButton</code> are intentionally
-            deferred — see the header comment of{" "}
-            <code className="font-mono text-[12px]">RunListV2.tsx</code>.
+            Triage active, failed, and completed acquisition runs. Use presets to narrow the
+            operator queue without leaving the list.
           </p>
         </header>
 
         {/* Preset bar (replaces the MUI RunQueueHeader presets). */}
-        <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/70 p-4 space-y-3 shadow-[0_10px_28px_rgba(29,41,61,0.04)]">
+        <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-[var(--admin-panel-bg)] p-4 space-y-3 shadow-[var(--shadow-card)] backdrop-blur-[12px]">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex flex-wrap items-center gap-1.5">
               <PresetButton isActive={!hasActiveFilters} onClick={clearFilters}>

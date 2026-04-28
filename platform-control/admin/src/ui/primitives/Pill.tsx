@@ -30,24 +30,28 @@ interface LevelStyle {
 const LEVELS: Record<PillLevel, LevelStyle> = {
   healthy: {
     Icon: CheckCircle2,
-    className: "bg-[rgba(46,125,50,0.08)] text-[#1b5e20] border-[rgba(46,125,50,0.35)]",
+    className:
+      "bg-[var(--status-healthy-subtle)] text-[var(--status-healthy)] border-[var(--status-healthy)]/25",
   },
   degraded: {
     Icon: AlertTriangle,
-    className: "bg-[rgba(237,108,2,0.1)] text-[#e65100] border-[rgba(237,108,2,0.4)]",
+    className:
+      "bg-[var(--status-degraded-subtle)] text-[var(--status-degraded)] border-[var(--status-degraded)]/30",
   },
   critical: {
     Icon: XCircle,
-    className: "bg-[rgba(198,40,40,0.08)] text-[#b71c1c] border-[rgba(198,40,40,0.4)]",
+    className:
+      "bg-[var(--status-critical-subtle)] text-[var(--status-critical)] border-[var(--status-critical)]/30",
   },
   neutral: {
     Icon: MinusCircle,
     className:
-      "bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] text-[var(--foreground-muted)] border-[var(--border-strong)]",
+      "bg-[var(--status-neutral-subtle)] text-[var(--status-neutral)] border-[var(--status-neutral)]/20",
   },
   info: {
     Icon: Info,
-    className: "bg-[rgba(2,136,209,0.08)] text-[#01579b] border-[rgba(2,136,209,0.35)]",
+    className:
+      "bg-[var(--status-info-subtle)] text-[var(--status-info)] border-[var(--status-info)]/25",
   },
 };
 
@@ -69,7 +73,7 @@ export function Pill({ level = "neutral", children, variant = "status", classNam
         "inline-flex items-center gap-1 rounded-full border font-semibold",
         "h-6 px-2 text-[11px] leading-none",
         isMeta
-          ? "bg-white/60 text-[rgba(29,41,61,0.7)] border-[rgba(29,41,61,0.16)]"
+          ? "bg-[var(--surface-panel)] text-[var(--text-meta)] border-[var(--border)]"
           : levelClassName,
         className,
       )}

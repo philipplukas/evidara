@@ -35,22 +35,30 @@ interface AppShellProps {
  * Tailwind ports until they graduate and replace the v1 MUI resources.
  */
 const DEFAULT_EXTRA_ITEMS: SidebarMenuExtraItem[] = [
-  { to: "/sources-v2", label: "Sources (v2 preview)", kind: "preview" },
-  { to: "/runs-v2", label: "Runs (v2 preview)", kind: "preview" },
+  {
+    to: "/sources-v2",
+    label: "Sources workspace",
+    kind: "preview",
+    inactiveOnPrefixes: ["/sources-v2/create"],
+  },
+  { to: "/runs-v2", label: "Run queue", kind: "preview" },
   {
     to: "/sources-v2/create",
-    label: "Source form (v2 preview)",
+    label: "Source setup",
     kind: "preview",
+    exact: true,
   },
   {
     to: "/authorities-v2/create",
-    label: "Authority form (v2 preview)",
+    label: "Authority setup",
     kind: "preview",
+    exact: true,
   },
   {
     to: "/jurisdictions-v2/create",
-    label: "Jurisdiction form (v2 preview)",
+    label: "Jurisdiction setup",
     kind: "preview",
+    exact: true,
   },
 ];
 
@@ -84,7 +92,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
       {/* Header row (spans the main-content column on desktop) */}
       <div
         style={{ gridArea: "header" }}
-        className="relative z-20 flex items-stretch border-b border-white/10"
+        className="relative z-20 flex items-stretch border-b border-[var(--admin-header-border)]"
       >
         {/* Mobile hamburger — hidden on md+. Sits inside the header so the
             header still spans full width on narrow viewports. */}
@@ -93,9 +101,9 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
           onClick={openMobile}
           aria-label="Open navigation"
           aria-expanded={isMobileOpen}
-          className="md:hidden inline-flex items-center justify-center w-12 self-stretch text-white/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[rgba(255,253,248,0.6)]"
+          className="md:hidden inline-flex items-center justify-center w-12 self-stretch text-[var(--admin-on-brand-muted)] hover:text-[var(--admin-on-brand)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[var(--admin-on-brand-muted)]"
           style={{
-            background: "linear-gradient(120deg, rgba(13, 58, 98, 0.98), rgba(9, 48, 83, 0.95))",
+            background: "var(--admin-header-bg)",
           }}
         >
           <MenuIcon size={22} strokeWidth={2} aria-hidden />
@@ -108,7 +116,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
       {/* Desktop sidebar */}
       <aside
         style={{ gridArea: "sidebar" }}
-        className="hidden md:block row-span-2 border-r border-[rgba(29,41,61,0.08)] bg-[linear-gradient(180deg,rgba(255,253,248,0.98),rgba(248,243,235,0.92))] backdrop-blur-[14px]"
+        className="hidden md:block row-span-2 border-r border-[var(--admin-sidebar-border)] bg-[image:var(--admin-sidebar-bg)] backdrop-blur-[14px]"
       >
         <SidebarMenu extraItems={extraSidebarItems} />
       </aside>
@@ -133,7 +141,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
             tabIndex={-1}
           />
           <aside
-            className="md:hidden fixed inset-y-0 left-0 z-50 w-[288px] border-r border-[rgba(29,41,61,0.08)] bg-[linear-gradient(180deg,rgba(255,253,248,0.98),rgba(248,243,235,0.98))] backdrop-blur-[14px]"
+            className="md:hidden fixed inset-y-0 left-0 z-50 w-[288px] border-r border-[var(--admin-sidebar-border)] bg-[image:var(--admin-sidebar-bg-strong)] backdrop-blur-[14px]"
             aria-label="Primary navigation"
           >
             <div className="flex items-center justify-end p-2">
@@ -141,7 +149,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
                 type="button"
                 onClick={closeMobile}
                 aria-label="Close navigation"
-                className="inline-flex items-center justify-center w-10 h-10 rounded-full text-[var(--foreground)] hover:bg-[var(--brand-wash-8)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-focus-ring)]"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-full text-[var(--foreground)] hover:bg-[var(--brand-wash-8)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
               >
                 <CloseIcon size={18} strokeWidth={2} aria-hidden />
               </button>

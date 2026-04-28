@@ -164,18 +164,14 @@ export default function SourceListV2() {
         <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-4">
           <header className="space-y-1">
             <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
-              Preview · Tailwind + ra-core
+              Source registry
             </p>
-            <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
-              Sources <span className="text-[rgba(29,41,61,0.5)]">(v2 preview)</span>
+            <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+              Sources
             </h1>
             <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[68ch]">
-              Same data as <code className="font-mono text-[12px]">/sources</code>, rendered with
-              Tailwind primitives from{" "}
-              <code className="font-mono text-[12px]">src/ui/primitives/</code> and{" "}
-              <code className="font-mono text-[12px]">ra-core</code> hooks instead of MUI. Replaces
-              the MUI page at <code className="font-mono text-[12px]">/sources</code> once it
-              reaches parity (see ADR-0026).
+              Track source ownership, authority mapping, family, and lifecycle state in one dense
+              operator list.
             </p>
           </header>
 

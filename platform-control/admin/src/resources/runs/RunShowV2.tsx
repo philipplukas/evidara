@@ -81,9 +81,9 @@ export default function RunShowV2() {
       {/* Header — parity with v1 `RunPageContextBar`, minus the action stack. */}
       <header className="space-y-3">
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
-          Preview · Tailwind + ra-core · Run detail
+          Run detail
         </p>
-        <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+        <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
           Run <span className="font-mono text-[22px]">{run.run_id}</span>
         </h1>
         <div className="text-[13px] text-[rgba(29,41,61,0.7)] font-mono">
@@ -104,7 +104,7 @@ export default function RunShowV2() {
       </header>
 
       {/* Overview band — metric chips + next-step narrative. */}
-      <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-gradient-to-b from-[var(--brand-wash-4)] to-white/95 p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-4">
+      <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-gradient-to-b from-[var(--brand-wash-4)] to-[var(--admin-panel-bg)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill variant="meta">{`Captured ${run.captured_resources_count}`}</Pill>
           <Pill variant="meta">{`Artifacts ${run.artifacts_count}`}</Pill>
@@ -191,18 +191,6 @@ export default function RunShowV2() {
       <RecordContextProvider value={run}>
         <RunDetailSectionsV2 />
       </RecordContextProvider>
-
-      {/* UX-12.2: softened footnote — remaining deferred items only. */}
-      <aside className="rounded-[10px] border border-dashed border-[rgba(29,41,61,0.1)] px-3 py-2.5 text-[11px] text-[rgba(29,41,61,0.55)] space-y-1">
-        <p className="font-semibold text-[rgba(29,41,61,0.7)] text-[11px] uppercase tracking-[0.06em]">
-          Deferred in this spike
-        </p>
-        <p>
-          The legal-search handoff card (stateful URL-param read) and the run action stack (cancel
-          mutation) are intentionally absent — open{" "}
-          <code className="font-mono">/runs/{run.run_id}/show</code> for the complete MUI view.
-        </p>
-      </aside>
     </div>
   );
 }

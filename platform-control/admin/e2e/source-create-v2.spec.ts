@@ -156,10 +156,10 @@ test.describe("SourceCreateV2 wizard", () => {
     });
   });
 
-  test("full v2 preview flow: fill form and submit source payload", async ({ page }) => {
+  test("full source setup flow: fill form and submit source payload", async ({ page }) => {
     const mocks = await mockPlatformControlApi(page);
 
-    // Navigate to the v2 create page
+    // Navigate to the Tailwind + ra-core create page.
     // react-admin uses hash routing by default
     await page.goto("/#/sources-v2/create");
 
@@ -226,16 +226,17 @@ test.describe("SourceCreateV2 wizard", () => {
     await expect(page.getByRole("option", { name: "Fedlex (fedlex)" })).toBeHidden();
   });
 
-  test("shows the deferred blueprint-preview scope notice", async ({ page }) => {
+  test("shows the operator provider-setup note", async ({ page }) => {
     await mockPlatformControlApi(page);
     await page.goto("/#/sources-v2/create");
     await expect(page.locator("h1")).toContainText("Create source");
 
-    await expect(page.getByText("Deferred in this preview")).toBeVisible();
     const notice = page.locator("aside");
+    await expect(notice.getByText("Operator note")).toBeVisible();
     await expect(
-      notice.getByText("Acquisition-spec blueprint preview", { exact: false }),
+      notice.getByText(
+        "Use the acquisition configuration fields after creation to complete provider setup.",
+      ),
     ).toBeVisible();
-    await expect(notice.getByText("/sources/create")).toBeVisible();
   });
 });

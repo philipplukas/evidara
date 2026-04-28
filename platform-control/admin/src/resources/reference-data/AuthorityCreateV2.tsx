@@ -57,26 +57,23 @@ export default function AuthorityCreateV2() {
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-3xl mx-auto space-y-6">
       <header className="space-y-2">
-        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
-          Preview · Tailwind + ra-core · Form path
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--text-meta)]">
+          Reference data
         </p>
-        <h1 className="font-serif text-[28px] font-semibold text-[var(--foreground)] leading-tight">
-          Create authority <span className="text-[rgba(29,41,61,0.5)]">(v2 preview)</span>
+        <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          Create authority
         </h1>
-        <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[72ch]">
-          Jurisdiction select, scope-change alert, and slug-change alert are deferred — see the
-          header comment of <code className="font-mono text-[12px]">AuthorityFormV2.tsx</code>.
-          Every authority created here is saved as a global (null jurisdiction) authority. On
-          success you'll be redirected to the MUI list at{" "}
-          <code className="font-mono text-[12px]">/authorities</code>.
+        <p className="text-[14px] text-[var(--text-meta)] max-w-[72ch]">
+          Add a global authority used by source setup and operator review flows. Successful creation
+          returns to the authority list.
         </p>
       </header>
 
       <Form onSubmit={controller.save} defaultValues={CREATE_DEFAULTS} sanitizeEmptyValues>
-        <div className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-6">
+        <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface-panel)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-6">
           <AuthorityFormBodyV2 />
 
-          <footer className="flex items-center justify-end gap-2 pt-2 border-t border-[rgba(29,41,61,0.06)]">
+          <footer className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
             <Button variant="ghost" onClick={() => navigate("/authorities")} type="button">
               Cancel
             </Button>

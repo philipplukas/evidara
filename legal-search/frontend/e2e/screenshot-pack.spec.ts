@@ -226,13 +226,11 @@ test.describe("Canonical screenshot evidence pack", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Pass 4 spike — Tailwind + ra-core port of the sources list and show pages.
-  // Captures render side-by-side with the MUI versions above so the UX review
-  // can diff them. Delete these two captures (and the corresponding entries in
-  // `docs/runbooks/ux-aesthetic-review.md`) when the spike is graduated into
-  // `@evidara/ui` or rejected.
+  // Tailwind + ra-core migration capture for the sources list and show pages.
+  // Captures render side-by-side with the canonical admin pages above so the
+  // UX review can compare route families while the admin migration continues.
   // ---------------------------------------------------------------------------
-  test("@screenshots captures admin sources-v2 spike (list + detail)", async ({ page }) => {
+  test("@screenshots captures admin sources-v2 list and detail", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await setupAdmin(page);
@@ -250,13 +248,13 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-source-detail-v2.png");
   });
 
-  test("@screenshots captures admin runs-v2 spike (list + detail)", async ({ page }) => {
+  test("@screenshots captures admin runs-v2 list and detail", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await setupAdmin(page);
 
     await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs-v2`);
-    await expect(page.getByRole("heading", { name: /Run queue/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Runs" })).toBeVisible();
     // Wait for the first row to render so the preset count pills are
     // populated (otherwise the bar shows zeros for all statuses).
     await expect(page.locator("table tbody tr").first()).toBeVisible();
@@ -274,9 +272,7 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-run-detail-v2.png");
   });
 
-  test("@screenshots captures admin authority form v2 spike (create + edit)", async ({
-    page,
-  }) => {
+  test("@screenshots captures admin authority form v2 (create + edit)", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await setupAdmin(page);

@@ -119,7 +119,7 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
   );
 
   return (
-    <section className="space-y-4 rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 p-5 shadow-[var(--shadow-card)] backdrop-blur-[12px] sm:p-6">
+    <section className="space-y-4 rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-[var(--admin-panel-bg)] p-5 shadow-[var(--shadow-card)] backdrop-blur-[12px] sm:p-6">
       <header className="space-y-1">
         <h2 className="text-[16px] font-semibold text-[var(--foreground)]">Pipeline Health</h2>
         <p className="text-[13px] text-[rgba(29,41,61,0.65)]">

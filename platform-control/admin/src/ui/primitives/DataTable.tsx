@@ -73,9 +73,9 @@ export function DataTable<T>({
   const totalPages = total && perPage ? Math.max(1, Math.ceil(total / perPage)) : undefined;
 
   return (
-    <div className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-white/85 shadow-[var(--shadow-card)] backdrop-blur-[12px] overflow-hidden">
+    <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-panel)] shadow-[var(--shadow-card)]">
       {caption ? (
-        <div className="px-5 py-3 border-b border-[rgba(29,41,61,0.06)] text-[12px] uppercase tracking-[0.08em] text-[rgba(29,41,61,0.6)] font-semibold">
+        <div className="border-b border-[var(--border)] px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--text-meta)]">
           {caption}
         </div>
       ) : null}
@@ -83,7 +83,7 @@ export function DataTable<T>({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm text-[var(--foreground)]">
           <thead>
-            <tr className="bg-[rgba(244,239,231,0.72)]">
+            <tr className="bg-[var(--surface-input)]">
               {columns.map((col) => {
                 const isSorted = sort && col.sortField && sort.field === col.sortField;
                 const canSort = !!col.sortField && !!onSort;
@@ -97,9 +97,9 @@ export function DataTable<T>({
                     key={col.key}
                     scope="col"
                     className={cn(
-                      "text-left px-4 py-3 border-b border-[rgba(29,41,61,0.08)]",
-                      "text-[12px] font-bold uppercase tracking-[0.08em] text-[rgba(29,41,61,0.7)]",
-                      canSort && "cursor-pointer select-none hover:text-[var(--foreground)]",
+                      "text-left px-4 py-3 border-b border-[var(--border)]",
+                      "text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-meta)]",
+                      canSort && "cursor-pointer select-none hover:text-[var(--accent-core)]",
                       col.headerClassName,
                     )}
                     onClick={
@@ -139,14 +139,17 @@ export function DataTable<T>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-10 text-center text-[rgba(29,41,61,0.6)]"
+                  className="px-4 py-10 text-center text-[var(--text-meta)]"
                 >
                   Loading…
                 </td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-[#b71c1c]">
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-10 text-center text-[var(--status-critical)]"
+                >
                   Failed to load records.
                 </td>
               </tr>
@@ -154,7 +157,7 @@ export function DataTable<T>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-10 text-center text-[rgba(29,41,61,0.6)]"
+                  className="px-4 py-10 text-center text-[var(--text-meta)]"
                 >
                   {empty ?? "No records."}
                 </td>
@@ -165,8 +168,8 @@ export function DataTable<T>({
                   key={getRowId(record)}
                   onClick={onRowClick ? () => onRowClick(record) : undefined}
                   className={cn(
-                    "border-b border-[rgba(29,41,61,0.06)] last:border-b-0 align-top",
-                    onRowClick && "cursor-pointer hover:bg-[var(--brand-wash-4)]",
+                    "border-b border-[var(--border)] last:border-b-0 align-top",
+                    onRowClick && "cursor-pointer hover:bg-[var(--interactive-accent-subtle)]",
                   )}
                 >
                   {columns.map((col) => (
@@ -182,7 +185,7 @@ export function DataTable<T>({
       </div>
 
       {totalPages && totalPages > 1 && onPageChange && page !== undefined ? (
-        <div className="flex items-center justify-between px-5 py-3 border-t border-[rgba(29,41,61,0.06)] text-[12px] text-[rgba(29,41,61,0.7)]">
+        <div className="flex items-center justify-between border-t border-[var(--border)] px-5 py-3 text-[12px] text-[var(--text-meta)]">
           <span>
             Page {page} of {totalPages} · {total} total
           </span>
@@ -191,7 +194,7 @@ export function DataTable<T>({
               type="button"
               onClick={() => onPageChange(Math.max(1, page - 1))}
               disabled={page <= 1}
-              className="px-3 h-8 rounded-full border border-[var(--border)] bg-white/70 disabled:opacity-40 hover:bg-white"
+              className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface-panel)] px-3 transition-colors hover:border-[var(--accent-core)]/30 hover:bg-[var(--surface-input)] disabled:opacity-40"
             >
               Previous
             </button>
@@ -199,7 +202,7 @@ export function DataTable<T>({
               type="button"
               onClick={() => onPageChange(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages}
-              className="px-3 h-8 rounded-full border border-[var(--border)] bg-white/70 disabled:opacity-40 hover:bg-white"
+              className="h-8 rounded-lg border border-[var(--border)] bg-[var(--surface-panel)] px-3 transition-colors hover:border-[var(--accent-core)]/30 hover:bg-[var(--surface-input)] disabled:opacity-40"
             >
               Next
             </button>

@@ -1,5 +1,12 @@
 # Linear update — five parallel streams (started)
 
+> 2026-04-27 update: these five started streams are now folded into
+> [TAR-243 Stream G](design-system-parallel-plan.md#stream-g-uiux-aesthetics-styling-and-brand-consistency)
+> as visual-quality implementation lanes. Keep this file as historical
+> kickoff context; use the design-system parallel plan and
+> [UX / Aesthetic review runbook](../runbooks/ux-aesthetic-review.md) as the
+> active planning and evidence surfaces.
+
 Paste the block below as a **comment** on your parent epic, or create **five sub-issues** (one title + description each).
 
 ---

@@ -64,6 +64,14 @@ type AttentionRun = {
 };
 
 const MAX_HEALTH_PROBES = 5;
+const adminHeadingSx = {
+  fontFamily: "var(--font-admin-sans), system-ui, sans-serif",
+  fontWeight: 700,
+} as const;
+const adminPanelSx = {
+  border: "1px solid var(--border)",
+  backgroundColor: "var(--admin-panel-bg)",
+} as const;
 
 const formatDuration = (start: string | null, end: string | null): string => {
   if (!start || !end) return "-";
@@ -150,6 +158,7 @@ function ActionCard({
       sx={{
         flex: 1,
         minWidth: 240,
+        ...adminPanelSx,
         borderTop: "4px solid",
         borderTopColor: statToneBorder(tone),
       }}
@@ -165,7 +174,7 @@ function ActionCard({
         >
           {eyebrow}
         </Typography>
-        <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.15 }}>
+        <Typography variant="h6" sx={{ ...adminHeadingSx, lineHeight: 1.15 }}>
           {title}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
@@ -273,8 +282,8 @@ export function Dashboard() {
             p: { xs: 2.25, md: 3 },
             overflow: "hidden",
             position: "relative",
-            background:
-              "linear-gradient(145deg, var(--brand-wash-6), rgba(154, 122, 74, 0.05) 60%, rgba(255, 253, 248, 0.92))",
+            border: "1px solid var(--border)",
+            background: "linear-gradient(145deg, var(--brand-wash-6), var(--admin-panel-bg))",
           }}
         >
           <Stack spacing={2.25}>
@@ -289,8 +298,8 @@ export function Dashboard() {
               >
                 Operator command center
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5 }}>
-                Control Plane Overview
+              <Typography variant="h5" sx={{ ...adminHeadingSx, mt: 0.5 }}>
+                Control plane overview
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 760, mt: 0.75 }}>
                 Launch work, pick up the newest blocked run, and keep the recent pipeline health in
@@ -363,11 +372,11 @@ export function Dashboard() {
         </Paper>
 
         <Stack direction={{ xs: "column", xl: "row" }} spacing={2}>
-          <Paper sx={{ flex: 1, p: 2.5 }}>
+          <Paper sx={{ flex: 1, p: 2.5, ...adminPanelSx }}>
             <Stack spacing={1.5}>
               <Box>
-                <Typography variant="h6" sx={{ mb: 0.5 }}>
-                  Runs by Status
+                <Typography variant="h6" sx={{ ...adminHeadingSx, mb: 0.5 }}>
+                  Runs by status
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Quick filter cues for the operational queue.
@@ -391,10 +400,10 @@ export function Dashboard() {
             </Stack>
           </Paper>
 
-          <Paper sx={{ flex: 1, p: 2.5 }}>
+          <Paper sx={{ flex: 1, p: 2.5, ...adminPanelSx }}>
             <Stack spacing={1.5}>
               <Box>
-                <Typography variant="h6" sx={{ mb: 0.5 }}>
+                <Typography variant="h6" sx={{ ...adminHeadingSx, mb: 0.5 }}>
                   Recent health snapshot
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -447,11 +456,11 @@ export function Dashboard() {
 
         <SourceHealthCard />
 
-        <Paper id="recent-run-health" sx={{ p: 2.5 }}>
+        <Paper id="recent-run-health" sx={{ p: 2.5, ...adminPanelSx }}>
           <Stack spacing={2}>
             <Box>
-              <Typography variant="h6" sx={{ mb: 0.5 }}>
-                Recent Runs
+              <Typography variant="h6" sx={{ ...adminHeadingSx, mb: 0.5 }}>
+                Recent runs
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Newest runs stay in view here. Click a row to inspect the full run, or use the
