@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandHeader, BrandLockup } from "@evidara/brand-shell";
 import {
   Bookmark,
   BookmarkCheck,
@@ -245,252 +246,243 @@ export function AppHeader({
 
   return (
     <>
-      <header className="app-header">
-        <div className="app-header__inner">
-          {/* Wordmark */}
-          <div className="app-header__brand">
-            <div className="app-header__brand-mark">
-              <span className="text-white font-bold text-sm">E</span>
-            </div>
-            <span className="app-header__brand-name">Evidara</span>
-          </div>
+      <BrandHeader className="app-header" innerClassName="app-header__inner">
+        {/* Wordmark — shared `<BrandLockup>` from `@evidara/brand-shell`. */}
+        <div className="app-header__brand">
+          <BrandLockup size="compact" />
+        </div>
 
-          {/* Search Bar */}
-          <form onSubmit={handleSubmit} className="app-header__search">
-            <div className="app-header__search-shell flex flex-col gap-2 rounded-3xl border border-border/70 bg-surface-input/95 p-2.5 shadow-inner transition-shadow focus-within:ring-2 focus-within:ring-focus-ring">
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <label htmlFor="evidara-search" className="sr-only">
-                  Rechtsdokumente durchsuchen
-                </label>
-                <input
-                  ref={searchInputRef}
-                  id="evidara-search"
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={t("header.searchPlaceholder")}
-                  aria-describedby={
-                    recentQueries.length > 0 ? "app-header-search-recent" : undefined
-                  }
-                  aria-keyshortcuts="/"
-                  className="h-10 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-0"
-                />
-                {hasSearchText && (
-                  <button
-                    type="button"
-                    onClick={() => setInputValue("")}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
-                    aria-label={t("header.clearSearch")}
-                    title={t("header.clearSearch")}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  disabled={!hasSearchText || isSearching}
-                  aria-busy={isSearching}
-                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-primary px-3.5 text-sm font-semibold text-white transition-colors hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
-                >
-                  {isSearching ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                  <span className="sr-only sm:not-sr-only">
-                    {isSearching ? t("header.searchingAction") : t("header.searchAction")}
-                  </span>
-                </button>
-                {hasSearchText && (
-                  <button
-                    type="button"
-                    onClick={handleSaveSearch}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 text-muted-foreground transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle hover:text-accent-core"
-                    aria-label={t("header.saveSearch")}
-                    title={t("header.saveSearch")}
-                  >
-                    <Bookmark className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {recentQueries.length > 0 && (
-                <fieldset
-                  id="app-header-search-recent"
-                  className="flex flex-wrap items-center gap-1.5 px-1 text-micro text-muted-foreground/80"
-                >
-                  <legend className="sr-only">{t("header.recentSearches")}</legend>
-                  <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-                  {recentQueries.map((query) => (
-                    <button
-                      type="button"
-                      key={query}
-                      onClick={() => void handleRecentSearch(query)}
-                      className="inline-flex items-center rounded-full border border-border/60 bg-surface-panel px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle hover:text-accent-core"
-                    >
-                      {query}
-                    </button>
-                  ))}
-                </fieldset>
-              )}
-
-              {savedSearches.length > 0 && (
-                <fieldset className="flex flex-wrap items-center gap-1.5 px-1 text-micro text-muted-foreground/80">
-                  <legend className="sr-only">{t("header.savedSearches")}</legend>
-                  <BookmarkCheck className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-                  {savedSearches.map((saved) => (
-                    <span
-                      key={saved.id}
-                      className="inline-flex items-center rounded-full border border-border/60 bg-surface-panel text-xs font-medium text-foreground transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => void handleRestoreSavedSearch(saved.query)}
-                        className="inline-flex items-center gap-1 py-1 pl-2.5 pr-1 hover:text-accent-core"
-                        title={t("header.restoreSavedSearch")}
-                      >
-                        <Bookmark className="h-3 w-3 shrink-0" />
-                        {saved.name}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeSearch(saved.id)}
-                        className="inline-flex items-center justify-center rounded-r-full py-1 pl-0.5 pr-2 text-muted-foreground hover:text-destructive"
-                        aria-label={t("header.removeSavedSearch")}
-                        title={t("header.removeSavedSearch")}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </fieldset>
-              )}
-            </div>
-          </form>
-
-          {/* Navigation */}
-          <nav className="app-header__nav">
-            {onOpenFilters && (
-              <button
-                type="button"
-                onClick={onOpenFilters}
-                className="app-header__nav-button app-header__nav-button--idle lg:hidden"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                {t("header.filters")}
-              </button>
-            )}
-            <NavLink
-              icon={<Clock className="h-4 w-4" />}
-              label={t("header.trail")}
-              count={state.trail.length > 0 ? state.trail.length : undefined}
-            />
-            <NavLink
-              icon={<MapPin className="h-4 w-4" />}
-              label={t("header.pinned")}
-              count={state.pinned.length > 0 ? state.pinned.length : undefined}
-            />
-            {hasControlPanelAccess ? (
-              <a href={controlPlaneHref} className="app-header__control-plane">
-                <span className="app-header__control-plane-icon">
-                  <Settings2 className="h-3.5 w-3.5" />
-                </span>
-                <span className="app-header__control-plane-copy">
-                  <span className="app-header__control-plane-text">{t("header.controlPanel")}</span>
-                </span>
-              </a>
-            ) : hasControlPanelUrl ? (
-              <button
-                type="button"
-                disabled
-                title={t("header.controlPanelRestricted")}
-                className="app-header__nav-button cursor-not-allowed border border-border/60 bg-muted/30 text-muted-foreground/80"
-              >
-                <Lock className="h-4 w-4" />
-                {t("header.controlPanel")}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled
-                title={t("header.controlPanelUnavailable")}
-                className="app-header__nav-button cursor-not-allowed border border-dashed border-border/70 bg-surface-panel text-muted-foreground/80"
-              >
-                <Settings2 className="h-4 w-4" />
-                {t("header.controlPanel")}
-              </button>
-            )}
-          </nav>
-
-          <div className="app-header__utility-strip">
-            {/* Inline strip — desktop only. On mobile these collapse into UserMenu (#391). */}
-            <div className="hidden sm:contents">
-              <div className="app-header__status">
-                <span>{t("header.profileLabel")}:</span>
-                <span className={hasControlPanelAccess ? "text-brand" : "text-foreground/70"}>
-                  {hasControlPanelAccess
-                    ? t("header.profileOperator")
-                    : t("header.profileStandard")}
-                </span>
-              </div>
-
-              <ThemeToggle />
-              <ShareButton size="sm" />
-              <PreferencesDialog>
+        {/* Search Bar */}
+        <form onSubmit={handleSubmit} className="app-header__search">
+          <div className="app-header__search-shell flex flex-col gap-2 rounded-3xl border border-border/70 bg-surface-input/95 p-2.5 shadow-inner transition-shadow focus-within:ring-2 focus-within:ring-focus-ring">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <label htmlFor="evidara-search" className="sr-only">
+                Rechtsdokumente durchsuchen
+              </label>
+              <input
+                ref={searchInputRef}
+                id="evidara-search"
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={t("header.searchPlaceholder")}
+                aria-describedby={recentQueries.length > 0 ? "app-header-search-recent" : undefined}
+                aria-keyshortcuts="/"
+                className="h-10 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-0"
+              />
+              {hasSearchText && (
                 <button
                   type="button"
-                  aria-label={t("header.openSettings")}
-                  title={t("header.openSettings")}
-                  className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  onClick={() => setInputValue("")}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                  aria-label={t("header.clearSearch")}
+                  title={t("header.clearSearch")}
                 >
-                  <Settings2 className="h-4 w-4" />
+                  <X className="h-4 w-4" />
                 </button>
-              </PreferencesDialog>
+              )}
+              <button
+                type="submit"
+                disabled={!hasSearchText || isSearching}
+                aria-busy={isSearching}
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-primary px-3.5 text-sm font-semibold text-white transition-colors hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+              >
+                {isSearching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                <span className="sr-only sm:not-sr-only">
+                  {isSearching ? t("header.searchingAction") : t("header.searchAction")}
+                </span>
+              </button>
+              {hasSearchText && (
+                <button
+                  type="button"
+                  onClick={handleSaveSearch}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 text-muted-foreground transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle hover:text-accent-core"
+                  aria-label={t("header.saveSearch")}
+                  title={t("header.saveSearch")}
+                >
+                  <Bookmark className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {recentQueries.length > 0 && (
+              <fieldset
+                id="app-header-search-recent"
+                className="flex flex-wrap items-center gap-1.5 px-1 text-micro text-muted-foreground/80"
+              >
+                <legend className="sr-only">{t("header.recentSearches")}</legend>
+                <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                {recentQueries.map((query) => (
+                  <button
+                    type="button"
+                    key={query}
+                    onClick={() => void handleRecentSearch(query)}
+                    className="inline-flex items-center rounded-full border border-border/60 bg-surface-panel px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle hover:text-accent-core"
+                  >
+                    {query}
+                  </button>
+                ))}
+              </fieldset>
+            )}
+
+            {savedSearches.length > 0 && (
+              <fieldset className="flex flex-wrap items-center gap-1.5 px-1 text-micro text-muted-foreground/80">
+                <legend className="sr-only">{t("header.savedSearches")}</legend>
+                <BookmarkCheck className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                {savedSearches.map((saved) => (
+                  <span
+                    key={saved.id}
+                    className="inline-flex items-center rounded-full border border-border/60 bg-surface-panel text-xs font-medium text-foreground transition-colors hover:border-accent-core/30 hover:bg-interactive-accent-subtle"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => void handleRestoreSavedSearch(saved.query)}
+                      className="inline-flex items-center gap-1 py-1 pl-2.5 pr-1 hover:text-accent-core"
+                      title={t("header.restoreSavedSearch")}
+                    >
+                      <Bookmark className="h-3 w-3 shrink-0" />
+                      {saved.name}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeSearch(saved.id)}
+                      className="inline-flex items-center justify-center rounded-r-full py-1 pl-0.5 pr-2 text-muted-foreground hover:text-destructive"
+                      aria-label={t("header.removeSavedSearch")}
+                      title={t("header.removeSavedSearch")}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </fieldset>
+            )}
+          </div>
+        </form>
+
+        {/* Navigation */}
+        <nav className="app-header__nav">
+          {onOpenFilters && (
+            <button
+              type="button"
+              onClick={onOpenFilters}
+              className="app-header__nav-button app-header__nav-button--idle lg:hidden"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {t("header.filters")}
+            </button>
+          )}
+          <NavLink
+            icon={<Clock className="h-4 w-4" />}
+            label={t("header.trail")}
+            count={state.trail.length > 0 ? state.trail.length : undefined}
+          />
+          <NavLink
+            icon={<MapPin className="h-4 w-4" />}
+            label={t("header.pinned")}
+            count={state.pinned.length > 0 ? state.pinned.length : undefined}
+          />
+          {hasControlPanelAccess ? (
+            <a href={controlPlaneHref} className="app-header__control-plane">
+              <span className="app-header__control-plane-icon">
+                <Settings2 className="h-3.5 w-3.5" />
+              </span>
+              <span className="app-header__control-plane-copy">
+                <span className="app-header__control-plane-text">{t("header.controlPanel")}</span>
+              </span>
+            </a>
+          ) : hasControlPanelUrl ? (
+            <button
+              type="button"
+              disabled
+              title={t("header.controlPanelRestricted")}
+              className="app-header__nav-button cursor-not-allowed border border-border/60 bg-muted/30 text-muted-foreground/80"
+            >
+              <Lock className="h-4 w-4" />
+              {t("header.controlPanel")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title={t("header.controlPanelUnavailable")}
+              className="app-header__nav-button cursor-not-allowed border border-dashed border-border/70 bg-surface-panel text-muted-foreground/80"
+            >
+              <Settings2 className="h-4 w-4" />
+              {t("header.controlPanel")}
+            </button>
+          )}
+        </nav>
+
+        <div className="app-header__utility-strip">
+          {/* Inline strip — desktop only. On mobile these collapse into UserMenu (#391). */}
+          <div className="hidden sm:contents">
+            <div className="app-header__status">
+              <span>{t("header.profileLabel")}:</span>
+              <span className={hasControlPanelAccess ? "text-brand" : "text-foreground/70"}>
+                {hasControlPanelAccess ? t("header.profileOperator") : t("header.profileStandard")}
+              </span>
+            </div>
+
+            <ThemeToggle />
+            <ShareButton size="sm" />
+            <PreferencesDialog>
               <button
                 type="button"
-                onClick={() => setShowShortcuts(true)}
-                aria-label={t("header.openKeyboardShortcuts")}
-                title={t("header.openKeyboardShortcuts")}
+                aria-label={t("header.openSettings")}
+                title={t("header.openSettings")}
                 className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                <HelpCircle className="h-4 w-4" />
+                <Settings2 className="h-4 w-4" />
               </button>
+            </PreferencesDialog>
+            <button
+              type="button"
+              onClick={() => setShowShortcuts(true)}
+              aria-label={t("header.openKeyboardShortcuts")}
+              title={t("header.openKeyboardShortcuts")}
+              className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </button>
 
-              {/* Locale Switcher */}
-              {/* biome-ignore lint/a11y/useSemanticElements: fieldset would break flex layout styling */}
-              <div
-                className="flex shrink-0 items-center"
-                role="group"
-                aria-label={t("header.languageGroup")}
-              >
-                {SUPPORTED_LOCALES.map((loc) => (
-                  <button
-                    key={loc}
-                    type="button"
-                    aria-pressed={locale === loc}
-                    onClick={() => setLocale(loc)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wider transition-colors
+            {/* Locale Switcher */}
+            {/* biome-ignore lint/a11y/useSemanticElements: fieldset would break flex layout styling */}
+            <div
+              className="flex shrink-0 items-center"
+              role="group"
+              aria-label={t("header.languageGroup")}
+            >
+              {SUPPORTED_LOCALES.map((loc) => (
+                <button
+                  key={loc}
+                  type="button"
+                  aria-pressed={locale === loc}
+                  onClick={() => setLocale(loc)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wider transition-colors
                     ${
                       locale === loc
                         ? "bg-accent-core text-white"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
-                  >
-                    {loc}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Avatar + dropdown — present on every breakpoint so theme + language
-                stay reachable on mobile (#390 symmetry, #391 mobile collapse). */}
-            <div className="flex shrink-0 items-center gap-2 sm:border-l sm:border-border/60 sm:pl-2">
-              <UserMenu hasControlPanelAccess={hasControlPanelAccess} />
+                >
+                  {loc}
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Avatar + dropdown — present on every breakpoint so theme + language
+                stay reachable on mobile (#390 symmetry, #391 mobile collapse). */}
+          <div className="flex shrink-0 items-center gap-2 sm:border-l sm:border-border/60 sm:pl-2">
+            <UserMenu hasControlPanelAccess={hasControlPanelAccess} />
+          </div>
         </div>
-      </header>
+      </BrandHeader>
       <KeyboardShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
     </>
   );

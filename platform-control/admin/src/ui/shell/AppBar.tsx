@@ -12,6 +12,7 @@
  */
 "use client";
 
+import { BrandHeader, BrandLockup } from "@evidara/brand-shell";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -86,90 +87,70 @@ export function AppBar() {
   const ctaLabel = handoff.query ? "Return to active search" : "Back to legal search";
 
   return (
-    <header
+    <BrandHeader
       className="w-full min-h-[80px] flex items-stretch text-[var(--admin-on-brand)] border-b border-[var(--admin-header-border)] shadow-[var(--admin-header-shadow)] backdrop-blur-[16px]"
-      style={{
-        background: "var(--admin-header-bg)",
-      }}
+      innerClassName="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-4 w-full px-3 sm:px-6 py-2 md:py-3 min-w-0"
+      style={{ background: "var(--admin-header-bg)" }}
     >
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-4 w-full px-3 sm:px-6 py-2 md:py-3 min-w-0">
-        {/* Brand mark + product */}
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div
-            aria-hidden
-            className="w-[42px] h-[42px] rounded-2xl grid place-items-center text-[18px] font-bold leading-none border border-[var(--admin-on-brand-border-subtle)] shadow-[var(--admin-brand-mark-shadow)]"
-            style={{
-              background: "linear-gradient(135deg, var(--brand), var(--brand-hover))",
-              fontFamily: "var(--font-admin-serif), Georgia, serif",
-            }}
-          >
-            E
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold tracking-[0.16em] text-[var(--admin-on-brand-muted)] uppercase leading-[1.15]">
-              Evidara
-            </div>
-            <div className="text-sm text-[var(--admin-on-brand-muted)] font-medium leading-tight">
-              Control plane
-            </div>
-          </div>
-        </div>
-
-        {/* Title block (route-aware) */}
-        <div className="flex flex-col items-start md:items-center text-left md:text-center min-w-0 flex-1 gap-[2px]">
-          <span className="inline-flex items-center h-[22px] px-2 rounded-full text-[10px] font-semibold tracking-[0.06em] text-[var(--admin-on-brand-faint)] bg-[var(--admin-on-brand-wash)] border border-[var(--admin-header-border)]">
-            Operator · Control plane
-          </span>
-          {/*
-           * Rendered as a styled <p>, not a heading, so each page's own
-           * <h1> in the main content area remains the sole h1 — keeps
-           * screen readers and role-based tests (getByRole("heading"))
-           * unambiguous. The title portal is visual wayfinding, not
-           * document structure.
-           */}
-          <p
-            className="text-base font-semibold leading-tight text-[var(--admin-on-brand)] m-0"
-            style={{ fontFamily: "var(--font-admin-serif), Georgia, serif" }}
-          >
-            {title}
-          </p>
-          <p className="text-[13px] leading-snug text-[var(--admin-on-brand-muted)] m-0">
-            {subtitle}
-          </p>
-          {handoff.hasOrigin ? (
-            <div className="flex flex-wrap justify-start md:justify-center gap-[6px] pt-[4px]">
-              {handoff.query ? (
-                <span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] text-[var(--admin-on-brand)] bg-[var(--admin-on-brand-subtle)] border border-[var(--admin-on-brand-border)]">
-                  Search: {handoff.query}
-                </span>
-              ) : null}
-              {handoff.selectedId ? (
-                <span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] text-[var(--admin-on-brand)] bg-[var(--admin-on-brand-wash-hover)] border border-[var(--admin-on-brand-border)]">
-                  Selected item: {handoff.selectedId}
-                </span>
-              ) : null}
-              {handoff.scopeLabel ? (
-                <span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] text-[var(--admin-on-brand-muted)] bg-[var(--admin-on-brand-wash)] border border-[var(--admin-on-brand-border-subtle)]">
-                  {handoff.scopeLabel}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Back-to-legal-search CTA */}
-        <div className="flex md:items-center self-stretch md:self-auto">
-          <a
-            href={handoff.returnToUrl}
-            className="inline-flex items-center justify-center gap-2 rounded-full font-semibold no-underline transition-[background-color,border-color,transform,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 px-4 min-h-11 sm:h-10 text-sm bg-[var(--admin-on-brand-wash)] border border-[var(--admin-on-brand-border)] text-[var(--admin-on-brand)] hover:bg-[var(--admin-on-brand-wash-hover)] hover:border-[var(--admin-on-brand-border-hover)] whitespace-nowrap self-stretch md:self-auto w-full md:w-auto"
-          >
-            <span aria-hidden>
-              <ArrowLeft size={14} strokeWidth={2.2} />
-            </span>
-            <span>{ctaLabel}</span>
-          </a>
-        </div>
+      {/* Brand mark + product — shared `<BrandLockup>` from `@evidara/brand-shell`. */}
+      <div className="flex items-center gap-3 min-w-0 flex-1 text-[var(--admin-on-brand)]">
+        <BrandLockup size="prominent" tone="dark" subLabel="Control plane" />
       </div>
-    </header>
+
+      {/* Title block (route-aware) */}
+      <div className="flex flex-col items-start md:items-center text-left md:text-center min-w-0 flex-1 gap-[2px]">
+        <span className="inline-flex items-center h-[22px] px-2 rounded-full text-[10px] font-semibold tracking-[0.06em] text-[var(--admin-on-brand-faint)] bg-[var(--admin-on-brand-wash)] border border-[var(--admin-header-border)]">
+          Operator · Control plane
+        </span>
+        {/*
+         * Rendered as a styled <p>, not a heading, so each page's own
+         * <h1> in the main content area remains the sole h1 — keeps
+         * screen readers and role-based tests (getByRole("heading"))
+         * unambiguous. The title portal is visual wayfinding, not
+         * document structure.
+         */}
+        <p
+          className="text-base font-semibold leading-tight text-[var(--admin-on-brand)] m-0"
+          style={{ fontFamily: "var(--font-admin-serif), Georgia, serif" }}
+        >
+          {title}
+        </p>
+        <p className="text-[13px] leading-snug text-[var(--admin-on-brand-muted)] m-0">
+          {subtitle}
+        </p>
+        {handoff.hasOrigin ? (
+          <div className="flex flex-wrap justify-start md:justify-center gap-[6px] pt-[4px]">
+            {handoff.query ? (
+              <span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] text-[var(--admin-on-brand)] bg-[var(--admin-on-brand-subtle)] border border-[var(--admin-on-brand-border)]">
+                Search: {handoff.query}
+              </span>
+            ) : null}
+            {handoff.selectedId ? (
+              <span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] text-[var(--admin-on-brand)] bg-[var(--admin-on-brand-wash-hover)] border border-[var(--admin-on-brand-border)]">
+                Selected item: {handoff.selectedId}
+              </span>
+            ) : null}
+            {handoff.scopeLabel ? (
+              <span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] text-[var(--admin-on-brand-muted)] bg-[var(--admin-on-brand-wash)] border border-[var(--admin-on-brand-border-subtle)]">
+                {handoff.scopeLabel}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Back-to-legal-search CTA */}
+      <div className="flex md:items-center self-stretch md:self-auto">
+        <a
+          href={handoff.returnToUrl}
+          className="inline-flex items-center justify-center gap-2 rounded-full font-semibold no-underline transition-[background-color,border-color,transform,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 px-4 min-h-11 sm:h-10 text-sm bg-[var(--admin-on-brand-wash)] border border-[var(--admin-on-brand-border)] text-[var(--admin-on-brand)] hover:bg-[var(--admin-on-brand-wash-hover)] hover:border-[var(--admin-on-brand-border-hover)] whitespace-nowrap self-stretch md:self-auto w-full md:w-auto"
+        >
+          <span aria-hidden>
+            <ArrowLeft size={14} strokeWidth={2.2} />
+          </span>
+          <span>{ctaLabel}</span>
+        </a>
+      </div>
+    </BrandHeader>
   );
 }

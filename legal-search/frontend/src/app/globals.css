@@ -216,20 +216,19 @@
       "nav nav";
   }
 
+  /*
+   * `.app-header__brand` — outer container for the shared
+   * `<BrandLockup>` (see `@evidara/brand-shell`). The mark + wordmark
+   * styling now lives in the shared package; this rule keeps the
+   * surface-specific framing (rounded-2xl pill on a panel surface
+   * with the lift-on-hover micro-interaction) that's workspace-only.
+   */
   .app-header__brand {
     @apply flex shrink-0 items-center gap-2.5 rounded-2xl border border-border/60 px-3 py-2 transition-transform hover:-translate-y-px;
     grid-area: brand;
     background-color: var(--surface-shell);
     transition-duration: var(--motion-duration-medium);
     transition-timing-function: var(--motion-easing-standard);
-  }
-
-  .app-header__brand-mark {
-    @apply flex h-8 w-8 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white shadow-sm;
-  }
-
-  .app-header__brand-name {
-    @apply text-lg font-semibold tracking-tight text-brand-strong;
   }
 
   .app-header__search {

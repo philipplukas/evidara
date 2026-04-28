@@ -144,6 +144,7 @@ The pre-commit hooks and CI workflows must run the same checks. If you add a che
 | Event payloads | `contracts/events/*.json` |
 | Infra resources | `infra/terraform/` |
 | Design tokens | `styles/tokens/tokens.css` (shared; see ADR-0027 — "two products, shared brand"). Workspace-local extensions: `legal-search/frontend/src/app/globals.css`; admin-local: `platform-control/admin/src/app/globals.css`. |
+| Brand chrome | `packages/brand-shell/` — `@evidara/brand-shell` exports `<BrandHeader>`, `<BrandLockup>`, `<BrandMark>`. Consumed by both surfaces via the tsconfig path alias `@evidara/brand-shell` → `../../packages/brand-shell/src` (no npm install — pattern matches `@evidara/tokens`). |
 | Tests | Test files adjacent to code |
 | Narrative docs | `docs/` |
 
