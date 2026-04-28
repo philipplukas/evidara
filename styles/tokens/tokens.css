@@ -28,6 +28,10 @@
  *     `--sidebar-*`, `--radius`, `--radius-pill`)
  *   - brand palette (`--brand`, `--brand-hover`, `--brand-strong`,
  *     `--brand-wash-3/4/6/8`, `--brand-focus-ring`)
+ *   - brand-mark contract (`--brand-mark-gradient`, `--font-brand-mark`) —
+ *     the gradient fill and display-letter typeface for the cross-surface
+ *     "Evidara" tile; each surface maps `--font-brand-mark` to its loaded
+ *     serif face in its local globals.css
  *   - surfaces (`--surface-page`, `--surface-panel`, `--surface-input`,
  *     `--surface-shell`, `--surface-shell-strong`)
  *   - accent core (the single violet action color: `--accent-core`,
