@@ -8,7 +8,7 @@ Status: **Scaffolding only — content TBD.** Three documents in this folder sup
 | [`detail-view-audit.md`](detail-view-audit.md) | Per-document trust-signal checklist; run before T-7 against the deep-dive doc | Demo engineer |
 | [`failover.md`](failover.md) | Recorded-webm fallback + failover triggers | Demo engineer |
 
-Engineering scaffold — see [`legal-search/frontend/e2e/demo-queries.spec.ts`](../../legal-search/frontend/e2e/demo-queries.spec.ts) (separate PR) — pins the rehearsed queries with assertions so they cannot silently regress before the demo.
+Engineering scaffold — see [`legal-search/frontend/e2e/demo-queries.spec.ts`](https://github.com/philipplukas/evidara/blob/main/legal-search/frontend/e2e/demo-queries.spec.ts) (companion PR [#495](https://github.com/philipplukas/evidara/pull/495)) — pins the rehearsed queries with assertions so they cannot silently regress before the demo.
 
 ## Why these exist
 

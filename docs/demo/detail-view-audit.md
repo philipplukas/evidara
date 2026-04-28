@@ -123,11 +123,11 @@ These are the changes most likely to be triggered by running the audit. Listed s
    - Cycle through tabs B1–B3 / C1–C4 / D1–D4.
    - Note any ❌ in the per-document row.
 3. Triage ❌ rows: blocker (referenced by [`script.md`](script.md)) vs deferrable.
-4. Re-run the smoke ([`demo-queries.spec.ts`](../../legal-search/frontend/e2e/demo-queries.spec.ts)) after any fix lands.
+4. Re-run the smoke ([`demo-queries.spec.ts`](https://github.com/philipplukas/evidara/blob/main/legal-search/frontend/e2e/demo-queries.spec.ts)) after any fix lands.
 
 ## Out of scope for this audit
 
-- Search ranking quality — covered by [`demo-queries.spec.ts`](../../legal-search/frontend/e2e/demo-queries.spec.ts) and the smoke runbooks
+- Search ranking quality — covered by [`demo-queries.spec.ts`](https://github.com/philipplukas/evidara/blob/main/legal-search/frontend/e2e/demo-queries.spec.ts) and the smoke runbooks
 - Visual regression — covered by `legal-search/frontend/e2e/visual.spec.ts`
 - Accessibility — covered by [#484](https://github.com/philipplukas/evidara/pull/484) (axe a11y)
 - Contracts / wire-level field changes — explicitly anti-scope per the demo plan

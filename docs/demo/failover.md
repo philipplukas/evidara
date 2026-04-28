@@ -22,7 +22,7 @@ The wrapper [`scripts/run-interaction-flow-local.sh`](../../scripts/run-interact
 
 ## What we will record
 
-A run of [`legal-search/frontend/e2e/demo-queries.spec.ts`](../../legal-search/frontend/e2e/demo-queries.spec.ts) against prod, executing the **same flow** as the live demo:
+A run of [`legal-search/frontend/e2e/demo-queries.spec.ts`](https://github.com/philipplukas/evidara/blob/main/legal-search/frontend/e2e/demo-queries.spec.ts) against prod, executing the **same flow** as the live demo:
 
 1. Hero query (`Art. 754 OR Verantwortlichkeit`)
 2. Click into the top result

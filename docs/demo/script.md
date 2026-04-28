@@ -4,7 +4,7 @@ Owner: TBD (presenter)
 Last reviewed: 2026-04-28
 Status: **Skeleton — content TBD by presenter.** Engineering scaffolding is in place; the actual narrative copy, query selection, and deep-dive document choices belong to the demo presenter, not Claude.
 
-This file exists so the [demo-queries smoke spec](../../legal-search/frontend/e2e/demo-queries.spec.ts) and the [detail-view audit](detail-view-audit.md) have a single source of truth to bind to. Fill in `TBD` blocks before T-7.
+This file exists so the [demo-queries smoke spec](https://github.com/philipplukas/evidara/blob/main/legal-search/frontend/e2e/demo-queries.spec.ts) and the [detail-view audit](detail-view-audit.md) have a single source of truth to bind to. Fill in `TBD` blocks before T-7.
 
 ## Demo target
 
@@ -73,7 +73,7 @@ Pin the final list in this table:
 | 4 | _TBD_ | _TBD_ | _TBD_ |  |
 | 5 | _TBD_ | _TBD_ | _TBD_ |  |
 
-Once filled in, mirror this table into [`demo-queries.spec.ts`](../../legal-search/frontend/e2e/demo-queries.spec.ts) so the smoke pins the same expectations.
+Once filled in, mirror this table into [`demo-queries.spec.ts`](https://github.com/philipplukas/evidara/blob/main/legal-search/frontend/e2e/demo-queries.spec.ts) so the smoke pins the same expectations.
 
 ## Deep-dive document
 
@@ -133,7 +133,7 @@ If the room contains multiple types, lead with the most decision-making seat and
 
 - [ ] All TBD blocks filled in
 - [ ] [Detail-view audit](detail-view-audit.md) green for the deep-dive document
-- [ ] [`demo-queries.spec.ts`](../../legal-search/frontend/e2e/demo-queries.spec.ts) updated to match the final query table and passing on prod
+- [ ] [`demo-queries.spec.ts`](https://github.com/philipplukas/evidara/blob/main/legal-search/frontend/e2e/demo-queries.spec.ts) updated to match the final query table and passing on prod
 - [ ] [Failover recording](failover.md) captured and playable on the presentation laptop
 - [ ] One full T-7 dry run on prod with stopwatch
 - [ ] T-1 hour smoke run
