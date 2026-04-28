@@ -58,8 +58,8 @@ interface PresetButtonProps {
 function PresetButton({ isActive, onClick, children, tone = "accent" }: PresetButtonProps) {
   const toneActive =
     tone === "warning"
-      ? "bg-[rgba(237,108,2,0.1)] border-[rgba(237,108,2,0.4)] text-[#e65100]"
-      : "bg-[var(--brand-wash-8)] border-[rgba(15,76,129,0.5)] text-[var(--brand)]";
+      ? "bg-[var(--status-degraded-subtle)] border-[var(--status-degraded)]/40 text-[var(--status-degraded)]"
+      : "bg-[var(--brand-wash-8)] border-[var(--brand)]/50 text-[var(--brand)]";
   return (
     <button
       type="button"
@@ -153,7 +153,10 @@ export default function RunListV2() {
           <Pill level={runRecordStatusToLevel(record.status)}>{record.status}</Pill>
           <span className="text-[12px] text-[rgba(29,41,61,0.65)]">{describeRunState(record)}</span>
           {record.status === "failed" && record.failure_reason ? (
-            <span className="text-[12px] text-[#b71c1c] truncate" title={record.failure_reason}>
+            <span
+              className="text-[12px] text-[var(--status-critical)] truncate"
+              title={record.failure_reason}
+            >
               Failure: {record.failure_reason}
             </span>
           ) : null}
@@ -245,7 +248,7 @@ export default function RunListV2() {
               <button
                 type="button"
                 onClick={() => navigate(`/runs-v2/${encodeURIComponent(attentionRun.run_id)}`)}
-                className="inline-flex items-center rounded-full border border-[rgba(237,108,2,0.4)] bg-[rgba(237,108,2,0.08)] px-3 h-9 text-[12px] font-semibold text-[#e65100] hover:bg-[rgba(237,108,2,0.14)]"
+                className="inline-flex items-center rounded-full border border-[var(--status-degraded)]/40 bg-[var(--status-degraded-subtle)] px-3 h-9 text-[12px] font-semibold text-[var(--status-degraded)] hover:bg-[var(--status-degraded-subtle)]/80"
               >
                 Open attention run · {attentionRun.source_name}
               </button>

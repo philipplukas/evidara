@@ -70,7 +70,11 @@ export default function RunShowV2() {
     return <div className="px-4 py-10 text-center text-[rgba(29,41,61,0.6)]">Loading run…</div>;
   }
   if (controller.error || !run) {
-    return <div className="px-4 py-10 text-center text-[#b71c1c]">Failed to load run.</div>;
+    return (
+      <div className="px-4 py-10 text-center text-[var(--status-critical)]">
+        Failed to load run.
+      </div>
+    );
   }
 
   const decision = buildRunDecisionSupport(run);
@@ -136,8 +140,8 @@ export default function RunShowV2() {
             role="alert"
             className={`rounded-[12px] border p-3 ${
               run.status === "failed"
-                ? "border-[rgba(198,40,40,0.4)] bg-[rgba(198,40,40,0.06)] text-[#b71c1c]"
-                : "border-[rgba(237,108,2,0.4)] bg-[rgba(237,108,2,0.08)] text-[#e65100]"
+                ? "border-[var(--status-critical)]/40 bg-[var(--status-critical-subtle)] text-[var(--status-critical)]"
+                : "border-[var(--status-degraded)]/40 bg-[var(--status-degraded-subtle)] text-[var(--status-degraded)]"
             }`}
           >
             <p className="text-[13px] font-semibold">Failure reason</p>

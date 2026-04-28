@@ -25,6 +25,7 @@ import { Admin, Resource } from "react-admin";
 import { Route } from "react-router-dom";
 import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
+import { adminMuiTheme } from "../lib/admin/muiTheme";
 import { CommentaryInsightList } from "../resources/corrections/CommentaryInsightList";
 import { CommentaryInsightShow } from "../resources/corrections/CommentaryInsightShow";
 import { CorrectionShow } from "../resources/corrections/CorrectionShow";
@@ -66,6 +67,7 @@ export default function AdminApp() {
       dashboard={Dashboard}
       disableTelemetry
       layout={AdminLayout}
+      theme={adminMuiTheme}
     >
       <Resource
         name={ResourceName.Jurisdictions}

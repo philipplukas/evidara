@@ -62,16 +62,18 @@ function diffSpecs(previous: AcquisitionSpec, current: AcquisitionSpec): DiffEnt
 
 const KIND_STYLES: Record<DiffKind, { row: string; label: string }> = {
   added: {
-    row: "bg-[rgba(46,125,50,0.06)]",
-    label: "text-[#166534] bg-[rgba(46,125,50,0.12)] border-[rgba(46,125,50,0.3)]",
+    row: "bg-[var(--status-healthy-subtle)]",
+    label:
+      "text-[var(--status-healthy)] bg-[var(--status-healthy-subtle)] border-[var(--status-healthy)]/30",
   },
   removed: {
-    row: "bg-[rgba(198,40,40,0.05)]",
-    label: "text-[#991b1b] bg-[rgba(198,40,40,0.1)] border-[rgba(198,40,40,0.3)]",
+    row: "bg-[var(--status-critical-subtle)]",
+    label:
+      "text-[var(--status-critical)] bg-[var(--status-critical-subtle)] border-[var(--status-critical)]/30",
   },
   changed: {
-    row: "bg-[rgba(180,130,10,0.06)]",
-    label: "text-[#92400e] bg-[var(--attention-subtle)] border-[var(--attention-border)]",
+    row: "bg-[var(--attention-subtle)]/40",
+    label: "text-[var(--attention)] bg-[var(--attention-subtle)] border-[var(--attention-border)]",
   },
   unchanged: {
     row: "",
