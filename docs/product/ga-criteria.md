@@ -9,7 +9,7 @@ Status: **Draft** — converts the milestone roadmap, the legal-search "Later ex
 There is **no single source of truth today** for what "GA" means at Evidara. Two different things share the name:
 
 1. **Phase-5 / vertical-slice GA** — the engineering release-readiness gate. Already signed off on **2026-04-21** per [`phase-5-go-no-go-memo.md` §1](../runbooks/phase-5-go-no-go-memo.md). Scope: one Firecrawl source family, one HTML artifact per bundle, Swiss content as the working reference ([first-vertical-slice.md:11](../components/first-vertical-slice.md)).
-2. **Product GA** — broad external availability for the [legal end-user persona (P1)](personas.md). **Not yet defined.** This page proposes that definition.
+2. **Product GA** — broad external availability for the [legal end-user persona (P1)](https://github.com/philipplukas/evidara/blob/main/docs/product/personas.md). **Not yet defined.** This page proposes that definition.
 
 This page covers **product GA**. For phase-5 release-readiness, keep using [phase-5-go-no-go-memo.md](../runbooks/phase-5-go-no-go-memo.md).
 
@@ -40,7 +40,7 @@ What the end user can actually do.
 | | State |
 |---|---|
 | **Today** | Text query, faceted filters (jurisdiction / type / language), highlighted snippets, document detail with `content` / `sections` / `citations` / `details` tabs ([legal-search.md:13](../components/legal-search.md)) |
-| **Required for GA** | Section-level navigation in detail view; citation-aware search; ranking that survives the chosen wedge persona's queries (see [personas.md P1](personas.md)). Semantic search and per-language analyzers may stay post-GA. |
+| **Required for GA** | Section-level navigation in detail view; citation-aware search; ranking that survives the chosen wedge persona's queries (see [personas.md P1](https://github.com/philipplukas/evidara/blob/main/docs/product/personas.md)). Semantic search and per-language analyzers may stay post-GA. |
 | **Source** | [legal-search.md:61](../components/legal-search.md) "Later expansion"; section-level / citation-aware / semantic / per-language analyzers all listed there |
 
 **Decision needed:** which "Next" capabilities are GA-blocking vs nice-to-have.
@@ -131,7 +131,7 @@ Commercial readiness.
 
 ## Open decisions (must close before this page leaves draft)
 
-1. **Wedge persona** — which P1 sub-persona from [personas.md](personas.md) is the GA target?
+1. **Wedge persona** — which P1 sub-persona from [personas.md](https://github.com/philipplukas/evidara/blob/main/docs/product/personas.md) is the GA target?
 2. **Content lanes** — CH-only or CH + one peer country at GA?
 3. **Tenancy** — single-tenant or multi-tenant at GA?
 4. **Search depth** — is citation-aware search GA-blocking, or post-GA?
