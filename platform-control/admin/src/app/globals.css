@@ -63,6 +63,14 @@
   );
   --admin-cta-shadow: 0 16px 30px color-mix(in oklab, var(--brand) 22%, transparent);
   --admin-cta-shadow-hover: 0 18px 34px color-mix(in oklab, var(--brand) 28%, transparent);
+
+  /*
+   * Map the cross-surface brand-mark serif onto admin's loaded Source Serif
+   * face. Defined as a shared token in `styles/tokens/tokens.css` with a
+   * Georgia fallback; this override picks up the variable font that's
+   * already loaded for the AppBar wordmark.
+   */
+  --font-brand-mark: var(--font-admin-serif), Georgia, serif;
 }
 
 html,
