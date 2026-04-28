@@ -11,8 +11,8 @@ Proposed
 ## Context
 
 [ADR-0027](0027-workspace-admin-visual-language.md) committed Evidara to "two
-products, shared brand". The brand-parity track (PRs #477, #486, #487, #488,
-#491) widened the *shared* half — Source Serif 4 display type, the
+products, shared brand". The brand-parity track
+(PRs #477, #486, #487, #488, #491) widened the *shared* half — Source Serif 4 display type, the
 `--accent-core` interactive rule, and the foreground / border ladder now apply
 on both `legal-search/frontend` and `platform-control/admin`. The amendment in
 PR #492 records that convergence and explicitly names the cross-surface header
