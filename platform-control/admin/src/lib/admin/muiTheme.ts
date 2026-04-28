@@ -18,8 +18,12 @@
  * not a CSS variable, so we read the literals here. Dark-mode variants
  * exist in tokens.css; admin doesn't switch to dark mode today, so the
  * light values are sufficient.
+ *
+ * Exported as a `RaThemeOptions` (plain options object, not the result of
+ * `createTheme`). React-admin's `<Admin theme={…}>` calls `createTheme`
+ * internally; pre-calling it caused a runtime page-load failure on the
+ * admin shell when the e2e test navigated to `/runs-v2/run_01`.
  */
-
 import {
   ACCENT_CORE,
   ACCENT_CORE_FOREGROUND,
@@ -27,9 +31,9 @@ import {
   STATUS_DEGRADED,
   STATUS_INFO,
 } from "@evidara/tokens";
-import { createTheme } from "@mui/material/styles";
+import type { RaThemeOptions } from "ra-ui-materialui";
 
-export const adminMuiTheme = createTheme({
+export const adminMuiTheme: RaThemeOptions = {
   palette: {
     primary: { main: ACCENT_CORE, contrastText: ACCENT_CORE_FOREGROUND },
     success: { main: ACCENT_CORE, contrastText: ACCENT_CORE_FOREGROUND },
@@ -37,4 +41,4 @@ export const adminMuiTheme = createTheme({
     warning: { main: STATUS_DEGRADED },
     info: { main: STATUS_INFO },
   },
-});
+};
