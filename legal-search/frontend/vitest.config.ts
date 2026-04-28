@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@evidara/tokens": path.resolve(__dirname, "../../styles/tokens/tokens"),
+      "@evidara/shell": path.resolve(__dirname, "../../styles/shell"),
     },
   },
   test: {
