@@ -205,7 +205,7 @@ export default function RunListV2() {
           <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
             Run queue
           </p>
-          <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
             Runs
           </h1>
           <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[72ch]">
