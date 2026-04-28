@@ -21,6 +21,9 @@ export {
 } from "./DataTable";
 export { DetailGrid, FieldCell } from "./DetailGrid";
 export { FormField } from "./FormField";
+export { InlineAlert } from "./InlineAlert";
+export { Panel } from "./Panel";
 export { Pill, type PillLevel } from "./Pill";
 export { Select, type SelectChoice } from "./Select";
+export { Spinner } from "./Spinner";
 export { TextInput } from "./TextInput";

@@ -8,8 +8,11 @@ const primitiveFiles = [
   "src/ui/primitives/DataTable.tsx",
   "src/ui/primitives/FormField.tsx",
   "src/ui/primitives/DetailGrid.tsx",
+  "src/ui/primitives/InlineAlert.tsx",
+  "src/ui/primitives/Panel.tsx",
   "src/ui/primitives/Accordion.tsx",
   "src/ui/primitives/Select.tsx",
+  "src/ui/primitives/Spinner.tsx",
   "src/ui/primitives/TextInput.tsx",
   "src/ui/shell/Toast.tsx",
 ];

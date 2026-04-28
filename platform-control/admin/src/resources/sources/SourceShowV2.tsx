@@ -22,7 +22,7 @@ import type {
 } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DetailGrid, FieldCell, Pill } from "../../ui/primitives";
-import { sourceStatusToLevel } from "../shared/StatusBadge";
+import { sourceStatusToLevel } from "../shared/statusLevels";
 
 const SOURCE_STATUS_META: Record<SourceRecord["status"], { label: string; detail: string }> = {
   active: {

@@ -20,7 +20,7 @@ import { useParams } from "react-router-dom";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DetailGrid, FieldCell, Pill } from "../../ui/primitives";
-import { runModeToLevel, runRecordStatusToLevel } from "../shared/StatusBadge";
+import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
 import { PrimaryDecisionCell } from "./PrimaryDecisionCell";
 import { canPromoteRunToProduction, PromoteToProductionButton } from "./RunActions";
 import RunDetailSectionsV2 from "./RunDetailSectionsV2";

@@ -1,33 +1,24 @@
 "use client";
 
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  CircularProgress,
-  Divider,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Typography,
-} from "@mui/material";
-import { type ReactNode, useEffect, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { useRedirect } from "react-admin";
 import { ResourceName } from "../../domain/resourceNames";
 import type { RunPipelineHealth } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
+import {
+  Button,
+  DataTable,
+  type DataTableColumn,
+  InlineAlert,
+  Panel,
+  Pill,
+  Spinner,
+} from "../../ui/primitives";
 import { CorrectionMetricsCard } from "../corrections/CorrectionMetricsCard";
 import { RunLaunchButton } from "../runs/RunLaunchDialog";
 import { StatCard, type StatTone, statToneBorder, successRateTone } from "../shared/Stat";
-import { pipelineHealthToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
+import { pipelineHealthToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
 import { SourceHealthCard } from "./SourceHealthCard";
 
 type DashboardStats = {
@@ -64,14 +55,6 @@ type AttentionRun = {
 };
 
 const MAX_HEALTH_PROBES = 5;
-const adminHeadingSx = {
-  fontFamily: "var(--font-admin-sans), system-ui, sans-serif",
-  fontWeight: 700,
-} as const;
-const adminPanelSx = {
-  border: "1px solid var(--border)",
-  backgroundColor: "var(--admin-panel-bg)",
-} as const;
 
 const formatDuration = (start: string | null, end: string | null): string => {
   if (!start || !end) return "-";
@@ -154,35 +137,19 @@ function ActionCard({
   tone?: StatTone;
 }) {
   return (
-    <Card
-      sx={{
-        flex: 1,
-        minWidth: 240,
-        ...adminPanelSx,
-        borderTop: "4px solid",
-        borderTopColor: statToneBorder(tone),
-      }}
+    <Panel
+      className="flex min-w-60 flex-1 flex-col border-t-4 p-5"
+      style={{ borderTopColor: statToneBorder(tone) } as CSSProperties}
     >
-      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1.1, minHeight: 176 }}>
-        <Typography
-          variant="overline"
-          sx={{
-            letterSpacing: "0.14em",
-            color: "text.secondary",
-            lineHeight: 1.15,
-          }}
-        >
+      <div className="flex min-h-44 flex-1 flex-col gap-3">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] leading-[1.15] text-[var(--text-meta)]">
           {eyebrow}
-        </Typography>
-        <Typography variant="h6" sx={{ ...adminHeadingSx, lineHeight: 1.15 }}>
-          {title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-          {description}
-        </Typography>
-        <CardActions sx={{ px: 0, pb: 0 }}>{action}</CardActions>
-      </CardContent>
-    </Card>
+        </span>
+        <h3 className="text-xl font-bold leading-tight text-[var(--foreground)]">{title}</h3>
+        <p className="flex-1 text-sm leading-snug text-[var(--text-muted)]">{description}</p>
+        <div>{action}</div>
+      </div>
+    </Panel>
   );
 }
 
@@ -253,17 +220,17 @@ export function Dashboard() {
 
   if (loading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center py-8">
+        <Spinner label="Loading dashboard..." />
+      </div>
     );
   }
 
   if (!stats) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Typography color="error">Unable to load dashboard stats.</Typography>
-      </Box>
+      <div className="p-6">
+        <InlineAlert tone="error">Unable to load dashboard stats.</InlineAlert>
+      </div>
     );
   }
 
@@ -273,41 +240,93 @@ export function Dashboard() {
     completed + failed > 0 ? `${Math.round((completed / (completed + failed)) * 100)}%` : "-";
   const recentHealthSummary = summarizeRecentHealth(recentHealth);
   const attentionRun = selectDashboardAttentionRun(recentHealth, stats.recent_runs);
-
-  return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack spacing={2.5}>
-        <Paper
-          sx={{
-            p: { xs: 2.25, md: 3 },
-            overflow: "hidden",
-            position: "relative",
-            border: "1px solid var(--border)",
-            background: "linear-gradient(145deg, var(--brand-wash-6), var(--admin-panel-bg))",
+  const recentRunColumns: DataTableColumn<DashboardStats["recent_runs"][number]>[] = [
+    {
+      key: "run",
+      header: "Run",
+      render: (run) => {
+        const health = recentHealth.find((entry) => entry.run_id === run.run_id)?.health;
+        return (
+          <div className="space-y-0.5">
+            <span className="block font-mono text-sm">{run.run_id}</span>
+            <span className="block text-xs text-[var(--text-meta)]">
+              {health?.overall_status ?? "pipeline health unavailable"}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (run) => {
+        const health = recentHealth.find((entry) => entry.run_id === run.run_id)?.health;
+        return (
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill level={runRecordStatusToLevel(run.status)}>{run.status}</Pill>
+            {health ? (
+              <Pill level={pipelineHealthToLevel(health.overall_status)}>
+                {health.overall_status}
+              </Pill>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      key: "artifacts",
+      header: "Artifacts",
+      render: (run) => <span className="tabular-nums">{run.artifacts_count}</span>,
+    },
+    {
+      key: "created",
+      header: "Created",
+      render: (run) => formatTime(run.created_at),
+    },
+    {
+      key: "duration",
+      header: "Duration",
+      render: (run) => formatDuration(run.created_at, run.completed_at),
+    },
+    {
+      key: "inspect",
+      header: "Inspect",
+      headerClassName: "text-right",
+      className: "text-right",
+      render: (run) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={(event) => {
+            event.stopPropagation();
+            redirect("show", ResourceName.Runs, run.run_id);
           }}
         >
-          <Stack spacing={2.25}>
-            <Box>
-              <Typography
-                variant="overline"
-                sx={{
-                  letterSpacing: "0.18em",
-                  color: "text.secondary",
-                  lineHeight: 1.15,
-                }}
-              >
+          Inspect
+        </Button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="p-4 md:p-6">
+      <div className="space-y-6">
+        <Panel className="overflow-hidden bg-[linear-gradient(145deg,var(--brand-wash-6),var(--admin-panel-bg))] p-5 md:p-6">
+          <div className="space-y-6">
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] leading-[1.15] text-[var(--text-meta)]">
                 Operator command center
-              </Typography>
-              <Typography variant="h5" sx={{ ...adminHeadingSx, mt: 0.5 }}>
+              </span>
+              <h1 className="mt-2 text-2xl font-bold leading-tight text-[var(--foreground)]">
                 Control plane overview
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 760, mt: 0.75 }}>
+              </h1>
+              <p className="mt-2 max-w-[760px] text-sm leading-snug text-[var(--text-muted)]">
                 Launch work, pick up the newest blocked run, and keep the recent pipeline health in
                 view without leaving the overview.
-              </Typography>
-            </Box>
+              </p>
+            </div>
 
-            <Stack direction={{ xs: "column", lg: "row" }} spacing={2}>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <ActionCard
                 eyebrow="Primary action"
                 title="Create a run"
@@ -332,8 +351,7 @@ export function Dashboard() {
                 tone={attentionRun ? "warning" : "default"}
                 action={
                   <Button
-                    variant="outlined"
-                    color="warning"
+                    variant="secondary"
                     disabled={!attentionRun}
                     onClick={() => {
                       if (attentionRun) {
@@ -351,14 +369,14 @@ export function Dashboard() {
                 description="Switch to the list view when you want the full operator queue, then filter by state to clear the next item."
                 tone="info"
                 action={
-                  <Button variant="outlined" onClick={() => redirect("list", ResourceName.Runs)}>
+                  <Button variant="secondary" onClick={() => redirect("list", ResourceName.Runs)}>
                     Open queue
                   </Button>
                 }
               />
-            </Stack>
+            </div>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} flexWrap="wrap">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard label="Sources" value={stats.source_count} />
               <StatCard label="Total Runs" value={stats.total_runs} />
               <StatCard label="Total Artifacts" value={stats.total_artifacts} />
@@ -367,212 +385,95 @@ export function Dashboard() {
                 value={successRate}
                 tone={successRateTone(successRate)}
               />
-            </Stack>
-          </Stack>
-        </Paper>
+            </div>
+          </div>
+        </Panel>
 
-        <Stack direction={{ xs: "column", xl: "row" }} spacing={2}>
-          <Paper sx={{ flex: 1, p: 2.5, ...adminPanelSx }}>
-            <Stack spacing={1.5}>
-              <Box>
-                <Typography variant="h6" sx={{ ...adminHeadingSx, mb: 0.5 }}>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <Panel className="p-5">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-xl font-bold leading-tight text-[var(--foreground)]">
                   Runs by status
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Quick filter cues for the operational queue.
-                </Typography>
-              </Box>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {Object.entries(stats.run_by_status).map(([status, count]) => (
-                  <StatusBadge
-                    key={status}
-                    level={runRecordStatusToLevel(status)}
-                    label={`${status}: ${count}`}
-                    emphasis="subtle"
-                  />
+                  <Pill key={status} level={runRecordStatusToLevel(status)}>
+                    {status}: {count}
+                  </Pill>
                 ))}
                 {Object.keys(stats.run_by_status).length === 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    No runs yet.
-                  </Typography>
+                  <p className="text-sm text-[var(--text-muted)]">No runs yet.</p>
                 )}
-              </Stack>
-            </Stack>
-          </Paper>
+              </div>
+            </div>
+          </Panel>
 
-          <Paper sx={{ flex: 1, p: 2.5, ...adminPanelSx }}>
-            <Stack spacing={1.5}>
-              <Box>
-                <Typography variant="h6" sx={{ ...adminHeadingSx, mb: 0.5 }}>
+          <Panel className="p-5">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-xl font-bold leading-tight text-[var(--foreground)]">
                   Recent health snapshot
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Pipeline health probes from the newest runs.
-                </Typography>
-              </Box>
+                </p>
+              </div>
               {healthLoading ? (
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <CircularProgress size={18} />
-                  <Typography variant="body2" color="text.secondary">
-                    Loading pipeline health...
-                  </Typography>
-                </Stack>
+                <Spinner label="Loading pipeline health..." />
               ) : healthError ? (
-                <Alert severity="warning" variant="outlined">
-                  {healthError}
-                </Alert>
+                <InlineAlert tone="warning">{healthError}</InlineAlert>
               ) : (
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  <StatusBadge
-                    level={pipelineHealthToLevel("ok")}
-                    label={`ok: ${recentHealthSummary.ok}`}
-                    emphasis="subtle"
-                  />
-                  <StatusBadge
-                    level={pipelineHealthToLevel("blocked")}
-                    label={`blocked: ${recentHealthSummary.blocked}`}
-                    emphasis="subtle"
-                  />
-                  <StatusBadge
-                    level={pipelineHealthToLevel("failed")}
-                    label={`failed: ${recentHealthSummary.failed}`}
-                    emphasis="subtle"
-                  />
-                  <StatusBadge
-                    level={pipelineHealthToLevel("in_progress")}
-                    label={`in progress: ${recentHealthSummary.in_progress}`}
-                    emphasis="subtle"
-                  />
-                  <StatusBadge
-                    level="neutral"
-                    label={`unavailable: ${recentHealthSummary.unavailable}`}
-                    emphasis="subtle"
-                  />
-                </Stack>
+                <div className="flex flex-wrap gap-2">
+                  <Pill level={pipelineHealthToLevel("ok")}>ok: {recentHealthSummary.ok}</Pill>
+                  <Pill level={pipelineHealthToLevel("blocked")}>
+                    blocked: {recentHealthSummary.blocked}
+                  </Pill>
+                  <Pill level={pipelineHealthToLevel("failed")}>
+                    failed: {recentHealthSummary.failed}
+                  </Pill>
+                  <Pill level={pipelineHealthToLevel("in_progress")}>
+                    in progress: {recentHealthSummary.in_progress}
+                  </Pill>
+                  <Pill level="neutral">unavailable: {recentHealthSummary.unavailable}</Pill>
+                </div>
               )}
-            </Stack>
-          </Paper>
-        </Stack>
+            </div>
+          </Panel>
+        </div>
 
         <SourceHealthCard />
 
-        <Paper id="recent-run-health" sx={{ p: 2.5, ...adminPanelSx }}>
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="h6" sx={{ ...adminHeadingSx, mb: 0.5 }}>
+        <Panel id="recent-run-health" className="p-5">
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-xl font-bold leading-tight text-[var(--foreground)]">
                 Recent runs
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
+              </h2>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
                 Newest runs stay in view here. Click a row to inspect the full run, or use the
                 status chips above to prioritize the queue.
-              </Typography>
-            </Box>
+              </p>
+            </div>
 
-            {stats.recent_runs.length > 0 ? (
-              <Table
-                size="small"
-                stickyHeader
-                sx={{
-                  "& .MuiTableCell-head": {
-                    backgroundColor: "rgba(244, 239, 231, 0.92)",
-                    backdropFilter: "blur(10px)",
-                  },
-                  "& .MuiTableRow-root:hover": {
-                    backgroundColor: "var(--brand-wash-3)",
-                  },
-                }}
-              >
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Run</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Artifacts</TableCell>
-                    <TableCell>Created</TableCell>
-                    <TableCell>Duration</TableCell>
-                    <TableCell align="right">Inspect</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {stats.recent_runs.map((run) => {
-                    const health = recentHealth.find(
-                      (entry) => entry.run_id === run.run_id,
-                    )?.health;
-                    const healthTone =
-                      health?.overall_status === "ok"
-                        ? "success"
-                        : health?.overall_status === "blocked"
-                          ? "warning"
-                          : health?.overall_status === "failed"
-                            ? "error"
-                            : health?.overall_status === "in_progress"
-                              ? "info"
-                              : "default";
+            <DataTable
+              records={stats.recent_runs}
+              columns={recentRunColumns}
+              getRowId={(run) => run.run_id}
+              onRowClick={(run) => redirect("show", ResourceName.Runs, run.run_id)}
+              empty="No runs found. Create a source and trigger a run to get started."
+            />
+          </div>
+        </Panel>
 
-                    return (
-                      <TableRow
-                        key={run.run_id}
-                        hover
-                        sx={{ cursor: "pointer" }}
-                        onClick={() => redirect("show", ResourceName.Runs, run.run_id)}
-                      >
-                        <TableCell>
-                          <Stack spacing={0.25}>
-                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                              {run.run_id}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {health?.overall_status ?? "pipeline health unavailable"}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
-                        <TableCell>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <StatusBadge
-                              level={runRecordStatusToLevel(run.status)}
-                              label={run.status}
-                            />
-                            {health ? (
-                              <StatusBadge
-                                level={pipelineHealthToLevel(health.overall_status)}
-                                label={health.overall_status}
-                                emphasis="subtle"
-                              />
-                            ) : null}
-                          </Stack>
-                        </TableCell>
-                        <TableCell>{run.artifacts_count}</TableCell>
-                        <TableCell>{formatTime(run.created_at)}</TableCell>
-                        <TableCell>{formatDuration(run.created_at, run.completed_at)}</TableCell>
-                        <TableCell align="right">
-                          <Button
-                            size="small"
-                            variant="text"
-                            color={healthTone === "warning" ? "warning" : "inherit"}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              redirect("show", ResourceName.Runs, run.run_id);
-                            }}
-                          >
-                            Inspect
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                No runs found. Create a source and trigger a run to get started.
-              </Typography>
-            )}
-          </Stack>
-        </Paper>
-
-        <Divider />
-
-        <CorrectionMetricsCard />
-      </Stack>
-    </Box>
+        <div className="border-t border-[var(--border)] pt-6">
+          <CorrectionMetricsCard />
+        </div>
+      </div>
+    </div>
   );
 }

@@ -4,13 +4,13 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   Alert,
   AlertTitle,
-  Button,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   MenuItem,
+  Button as MuiButton,
   Paper,
   Stack,
   TextField,
@@ -29,6 +29,7 @@ import type {
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
 import { describeReadinessDetail } from "../../lib/admin/readiness-messages";
+import { Button } from "../../ui/primitives";
 import { ConfirmButton } from "../shared/ConfirmButton";
 
 const LIST_PARAMS = {
@@ -316,10 +317,16 @@ export function RunLaunchButton({
     !isCheckingReadiness &&
     !readinessError &&
     !!readiness?.ready;
+  const triggerVariant =
+    buttonVariant === "text"
+      ? "ghost"
+      : buttonVariant === "outlined" || buttonColor === "secondary"
+        ? "secondary"
+        : "primary";
 
   return (
     <>
-      <Button variant={buttonVariant} color={buttonColor} onClick={() => setOpen(true)}>
+      <Button variant={triggerVariant} onClick={() => setOpen(true)}>
         {label}
       </Button>
 
@@ -460,7 +467,7 @@ export function RunLaunchButton({
               <Alert
                 severity="error"
                 action={
-                  <Button
+                  <MuiButton
                     size="small"
                     color="inherit"
                     startIcon={<RefreshIcon />}
@@ -468,7 +475,7 @@ export function RunLaunchButton({
                     disabled={isCheckingReadiness}
                   >
                     Retry
-                  </Button>
+                  </MuiButton>
                 }
               >
                 {readinessError}
@@ -523,9 +530,9 @@ export function RunLaunchButton({
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeDialog} disabled={isSubmitting}>
+          <MuiButton onClick={closeDialog} disabled={isSubmitting}>
             Cancel
-          </Button>
+          </MuiButton>
           {formState.mode === "production" ? (
             <ConfirmButton
               tier="notable"
@@ -541,9 +548,9 @@ export function RunLaunchButton({
               {isSubmitting ? "Creating..." : "Create Run"}
             </ConfirmButton>
           ) : (
-            <Button variant="contained" onClick={submit} disabled={!isReadyToCreate}>
+            <MuiButton variant="contained" onClick={submit} disabled={!isReadyToCreate}>
               {isSubmitting ? "Creating..." : "Create Run"}
-            </Button>
+            </MuiButton>
           )}
         </DialogActions>
       </Dialog>

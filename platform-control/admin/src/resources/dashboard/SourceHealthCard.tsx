@@ -1,22 +1,10 @@
 "use client";
 
-import {
-  Alert,
-  Box,
-  CircularProgress,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Typography,
-} from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { useRedirect } from "react-admin";
 import { ResourceName } from "../../domain/resourceNames";
 import { formatSwissDateTime } from "../../lib/format/date";
+import { DataTable, type DataTableColumn, InlineAlert, Panel, Spinner } from "../../ui/primitives";
 
 type SourceItem = {
   source_id: string;
@@ -54,16 +42,6 @@ type SourceHealthRow = {
 type StatusDotLevel = "healthy" | "degraded" | "critical" | "neutral";
 
 const API_PREFIX = "/api/platform-control";
-const healthPanelSx = {
-  p: 2.5,
-  border: "1px solid var(--border)",
-  backgroundColor: "var(--admin-panel-bg)",
-} as const;
-const healthHeadingSx = {
-  fontFamily: "var(--font-admin-sans), system-ui, sans-serif",
-  fontWeight: 700,
-} as const;
-
 function deriveStatusLevel(successRate: number | null): StatusDotLevel {
   if (successRate === null) return "neutral";
   if (successRate > 80) return "healthy";
@@ -71,11 +49,11 @@ function deriveStatusLevel(successRate: number | null): StatusDotLevel {
   return "critical";
 }
 
-const STATUS_DOT_COLORS: Record<StatusDotLevel, string> = {
-  healthy: "var(--status-healthy)",
-  degraded: "var(--status-degraded)",
-  critical: "var(--status-critical)",
-  neutral: "var(--status-neutral)",
+const STATUS_DOT_CLASS: Record<StatusDotLevel, string> = {
+  healthy: "bg-[var(--status-healthy)]",
+  degraded: "bg-[var(--status-degraded)]",
+  critical: "bg-[var(--status-critical)]",
+  neutral: "bg-[var(--status-neutral)]",
 };
 
 const STATUS_DOT_LABELS: Record<StatusDotLevel, string> = {
@@ -244,133 +222,86 @@ export function SourceHealthCard() {
 
   if (loading) {
     return (
-      <Paper sx={healthPanelSx}>
-        <Stack spacing={1.5}>
-          <Box>
-            <Typography variant="h6" sx={{ ...healthHeadingSx, mb: 0.5 }}>
-              Source health
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Loading source health scorecard...
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <CircularProgress size={18} />
-            <Typography variant="body2" color="text.secondary">
-              Fetching sources and recent runs...
-            </Typography>
-          </Stack>
-        </Stack>
-      </Paper>
+      <Panel className="p-5">
+        <SourceHealthHeader description="Loading source health scorecard..." />
+        <div className="mt-4">
+          <Spinner label="Fetching sources and recent runs..." />
+        </div>
+      </Panel>
     );
   }
 
   if (error) {
     return (
-      <Paper sx={healthPanelSx}>
-        <Stack spacing={1.5}>
-          <Typography variant="h6" sx={healthHeadingSx}>
-            Source health
-          </Typography>
-          <Alert severity="warning" variant="outlined">
-            {error}
-          </Alert>
-        </Stack>
-      </Paper>
+      <Panel className="p-5">
+        <SourceHealthHeader />
+        <InlineAlert tone="warning" className="mt-4">
+          {error}
+        </InlineAlert>
+      </Panel>
     );
   }
 
-  return (
-    <Paper sx={healthPanelSx}>
-      <Stack spacing={2}>
-        <Box>
-          <Typography variant="h6" sx={{ ...healthHeadingSx, mb: 0.5 }}>
-            Source health
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Per-source success rates from runs in the last 7 days. Click a row to inspect the
-            source.
-          </Typography>
-        </Box>
+  const columns: DataTableColumn<SourceHealthRow>[] = [
+    {
+      key: "name",
+      header: "Source name",
+      render: (row) => <span className="font-semibold">{row.name}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (row) => {
+        const level = deriveStatusLevel(row.successRate);
+        return (
+          <span className="inline-flex items-center gap-2">
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT_CLASS[level]}`}
+              aria-hidden
+            />
+            <span>{STATUS_DOT_LABELS[level]}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "successRate",
+      header: "Success rate",
+      render: (row) => formatSuccessRate(row.totalRuns, row.failedRuns, row.successRate),
+    },
+    {
+      key: "lastRun",
+      header: "Last run",
+      render: (row) => formatRelativeTime(row.lastRunDate),
+    },
+    {
+      key: "version",
+      header: "Version",
+      render: (row) => formatVersionInfo(row.versionLabel, row.versionStatus),
+    },
+  ];
 
-        {healthRows.length > 0 ? (
-          <Table
-            size="small"
-            stickyHeader
-            sx={{
-              "& .MuiTableCell-head": {
-                backgroundColor: "rgba(244, 239, 231, 0.92)",
-                backdropFilter: "blur(10px)",
-              },
-              "& .MuiTableRow-root:hover": {
-                backgroundColor: "var(--brand-wash-3)",
-              },
-            }}
-          >
-            <TableHead>
-              <TableRow>
-                <TableCell>Source name</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Success Rate</TableCell>
-                <TableCell>Last Run</TableCell>
-                <TableCell>Version</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {healthRows.map((row) => {
-                const level = deriveStatusLevel(row.successRate);
-                return (
-                  <TableRow
-                    key={row.source_id}
-                    hover
-                    sx={{ cursor: "pointer" }}
-                    onClick={() => redirect("show", ResourceName.Sources, row.source_id)}
-                  >
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {row.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={0.75} alignItems="center">
-                        <Box
-                          component="span"
-                          sx={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            backgroundColor: STATUS_DOT_COLORS[level],
-                            display: "inline-block",
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Typography variant="body2">{STATUS_DOT_LABELS[level]}</Typography>
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatSuccessRate(row.totalRuns, row.failedRuns, row.successRate)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{formatRelativeTime(row.lastRunDate)}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatVersionInfo(row.versionLabel, row.versionStatus)}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            No sources found. Create a source to see health data here.
-          </Typography>
-        )}
-      </Stack>
-    </Paper>
+  return (
+    <Panel className="p-5">
+      <SourceHealthHeader description="Per-source success rates from runs in the last 7 days. Click a row to inspect the source." />
+      <div className="mt-4">
+        <DataTable
+          records={healthRows}
+          columns={columns}
+          getRowId={(row) => row.source_id}
+          onRowClick={(row) => redirect("show", ResourceName.Sources, row.source_id)}
+          empty="No sources found. Create a source to see health data here."
+        />
+      </div>
+    </Panel>
+  );
+}
+
+function SourceHealthHeader({ description }: { description?: string }) {
+  return (
+    <div>
+      <h2 className="text-xl font-bold leading-tight text-[var(--foreground)]">Source health</h2>
+      {description ? <p className="mt-1 text-sm text-[var(--text-muted)]">{description}</p> : null}
+    </div>
   );
 }

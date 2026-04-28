@@ -7,11 +7,12 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { Chip } from "@mui/material";
+import type { AdminStatusLevel } from "./statusLevels";
 
 /**
  * Semantic status levels aligned with legal-search `StatusLevel` / ADR-0016 (MUI implementation).
  */
-export type AdminStatusLevel = "healthy" | "degraded" | "critical" | "neutral" | "info";
+export type { AdminStatusLevel } from "./statusLevels";
 
 const LEVEL_META: Record<
   AdminStatusLevel,
@@ -49,74 +50,14 @@ const LEVEL_META: Record<
   },
 };
 
-/** Border color aligned with `StatusBadge` (for cards, rails, and other non-chip accents). */
-export function adminLevelBorder(level: AdminStatusLevel): string {
-  return LEVEL_META[level].border;
-}
-
-export function runRecordStatusToLevel(status: string): AdminStatusLevel {
-  switch (status) {
-    case "completed":
-      return "healthy";
-    case "failed":
-      return "critical";
-    case "running":
-      return "info";
-    case "pending":
-      return "degraded";
-    default:
-      return "neutral";
-  }
-}
-
-export function runModeToLevel(mode: string): AdminStatusLevel {
-  return mode === "production" ? "healthy" : "info";
-}
-
-export function pipelineHealthToLevel(status: string): AdminStatusLevel {
-  switch (status) {
-    case "ok":
-      return "healthy";
-    case "blocked":
-      return "degraded";
-    case "failed":
-      return "critical";
-    case "in_progress":
-      return "info";
-    default:
-      return "neutral";
-  }
-}
-
-export function sourceVersionStatusToLevel(status: string): AdminStatusLevel {
-  switch (status) {
-    case "approved":
-      return "healthy";
-    case "pending_approval":
-      return "info";
-    case "draft":
-      return "neutral";
-    case "rejected":
-      return "critical";
-    case "superseded":
-      return "neutral";
-    default:
-      return "neutral";
-  }
-}
-
-export function sourceStatusToLevel(status: string): AdminStatusLevel {
-  switch (status) {
-    case "active":
-      return "healthy";
-    case "inactive":
-      return "degraded";
-    case "archived":
-      return "neutral";
-    default:
-      return "neutral";
-  }
-}
+export {
+  adminLevelBorder,
+  pipelineHealthToLevel,
+  runModeToLevel,
+  runRecordStatusToLevel,
+  sourceStatusToLevel,
+  sourceVersionStatusToLevel,
+} from "./statusLevels";
 
 interface StatusBadgeProps {
   level: AdminStatusLevel;

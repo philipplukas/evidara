@@ -1,7 +1,8 @@
 "use client";
 
-import { Card, CardContent, Typography } from "@mui/material";
-import { type AdminStatusLevel, adminLevelBorder } from "./StatusBadge";
+import type { CSSProperties } from "react";
+import { Panel } from "../../ui/primitives";
+import { type AdminStatusLevel, adminLevelBorder } from "./statusLevels";
 
 export type StatTone = "success" | "error" | "warning" | "info" | "default";
 
@@ -48,36 +49,19 @@ export function StatCard({
   tone?: StatTone;
 }) {
   return (
-    <Card
-      sx={{
-        flex: 1,
-        minWidth: 160,
-        borderTop: "4px solid",
-        borderTopColor: statToneBorder(tone),
-      }}
+    <Panel
+      className="min-w-40 flex-1 border-t-4 p-5"
+      style={{ borderTopColor: statToneBorder(tone) } as CSSProperties}
     >
-      <CardContent
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
-          gap: 0.75,
-          py: 2.5,
-        }}
-      >
-        <Typography
-          variant="overline"
-          sx={{ letterSpacing: "0.14em", color: "text.secondary", lineHeight: 1.1 }}
-        >
+      <div className="flex flex-col items-start gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] leading-[1.1] text-[var(--text-meta)]">
           {label}
-        </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1 }}>
+        </span>
+        <strong className="text-[34px] font-bold leading-none text-[var(--foreground)]">
           {value}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.45 }}>
-          At a glance
-        </Typography>
-      </CardContent>
-    </Card>
+        </strong>
+        <span className="text-sm leading-snug text-[var(--text-muted)]">At a glance</span>
+      </div>
+    </Panel>
   );
 }
