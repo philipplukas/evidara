@@ -6,7 +6,7 @@ Repo-wide conventions live in `AGENTS.md` (imported above). This file only adds 
 
 ### Planning anchor
 
-Active roadmap: see issue **#279** (proposed milestones M1–M6 for the 12 currently-open issues). Prefer `/issue-execute <number>` when working a ticket off that roadmap.
+The original M1–M6 roadmap (issue #279) ran its course by 2026-04-28 and is closed; every M1–M6 issue closed with it. **There is no current roadmap anchor.** Until a successor planning issue lands, source the next-action list from `gh pr list --state open` and `gh issue list --state open` directly. When opening new work, prefer `/issue-execute <number>` if a ticket exists; otherwise scope inline.
 
 ### Per-surface quality gates
 
