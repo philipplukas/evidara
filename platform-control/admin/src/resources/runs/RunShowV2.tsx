@@ -67,10 +67,16 @@ export default function RunShowV2() {
   const run = controller.record;
 
   if (controller.isPending) {
-    return <div className="px-4 py-10 text-center text-[rgba(29,41,61,0.6)]">Loading run…</div>;
+    return (
+      <div className="px-4 py-10 text-center text-[var(--foreground-subtle)]">Loading run…</div>
+    );
   }
   if (controller.error || !run) {
-    return <div className="px-4 py-10 text-center text-[#b71c1c]">Failed to load run.</div>;
+    return (
+      <div className="px-4 py-10 text-center text-[var(--status-critical)]">
+        Failed to load run.
+      </div>
+    );
   }
 
   const decision = buildRunDecisionSupport(run);
@@ -80,13 +86,13 @@ export default function RunShowV2() {
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-6">
       {/* Header — parity with v1 `RunPageContextBar`, minus the action stack. */}
       <header className="space-y-3">
-        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
           Run detail
         </p>
-        <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+        <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
           Run <span className="font-mono text-[22px]">{run.run_id}</span>
         </h1>
-        <div className="text-[13px] text-[rgba(29,41,61,0.7)] font-mono">
+        <div className="text-[13px] text-[var(--foreground-muted)] font-mono">
           {run.source_id} · {run.source_version_id}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -104,19 +110,19 @@ export default function RunShowV2() {
       </header>
 
       {/* Overview band — metric chips + next-step narrative. */}
-      <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-gradient-to-b from-[var(--brand-wash-4)] to-[var(--admin-panel-bg)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-4">
+      <section className="rounded-[18px] border border-[var(--border-faint)] bg-gradient-to-b from-[var(--brand-wash-4)] to-[var(--admin-panel-bg)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill variant="meta">{`Captured ${run.captured_resources_count}`}</Pill>
           <Pill variant="meta">{`Artifacts ${run.artifacts_count}`}</Pill>
           <Pill variant="meta">{`Duration ${duration}`}</Pill>
         </div>
-        <p className="text-[14px] text-[rgba(29,41,61,0.75)]">{describeRunNextStep(run)}</p>
+        <p className="text-[14px] text-[var(--foreground-muted)]">{describeRunNextStep(run)}</p>
 
         {/* Decision support — primary cue on top (full-width), three subordinate cues inline below on md+, all stacked on mobile. */}
-        <div className="rounded-[14px] border border-[rgba(29,41,61,0.08)] bg-[var(--brand-wash-3)] p-4 space-y-3">
+        <div className="rounded-[14px] border border-[var(--border-faint)] bg-[var(--brand-wash-3)] p-4 space-y-3">
           <div>
             <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Decision support</h2>
-            <p className="text-[12px] text-[rgba(29,41,61,0.65)]">
+            <p className="text-[12px] text-[var(--foreground-subtle)]">
               The primary cue leads with why this run matters; the three subordinate cues add
               operational context.
             </p>
@@ -136,12 +142,14 @@ export default function RunShowV2() {
             role="alert"
             className={`rounded-[12px] border p-3 ${
               run.status === "failed"
-                ? "border-[rgba(198,40,40,0.4)] bg-[rgba(198,40,40,0.06)] text-[#b71c1c]"
-                : "border-[rgba(237,108,2,0.4)] bg-[rgba(237,108,2,0.08)] text-[#e65100]"
+                ? "border-[var(--status-critical)]/40 bg-[var(--status-critical-subtle)] text-[var(--status-critical)]"
+                : "border-[var(--status-degraded)]/40 bg-[var(--status-degraded-subtle)] text-[var(--status-degraded)]"
             }`}
           >
             <p className="text-[13px] font-semibold">Failure reason</p>
-            <p className="text-[13px] mt-0.5 text-[rgba(29,41,61,0.8)]">{run.failure_reason}</p>
+            <p className="text-[13px] mt-0.5 text-[var(--foreground-muted)]">
+              {run.failure_reason}
+            </p>
           </div>
         ) : null}
       </section>
@@ -166,20 +174,20 @@ export default function RunShowV2() {
           <span className="tabular-nums">{run.artifacts_count}</span>
         </FieldCell>
         <FieldCell label="Failure reason">
-          {run.failure_reason ?? <span className="text-[rgba(29,41,61,0.4)]">—</span>}
+          {run.failure_reason ?? <span className="text-[var(--foreground-faint)]">—</span>}
         </FieldCell>
         <FieldCell label="Started">
           {run.started_at ? (
             formatSwissDateTime(run.started_at)
           ) : (
-            <span className="text-[rgba(29,41,61,0.4)]">—</span>
+            <span className="text-[var(--foreground-faint)]">—</span>
           )}
         </FieldCell>
         <FieldCell label="Completed">
           {run.completed_at ? (
             formatSwissDateTime(run.completed_at)
           ) : (
-            <span className="text-[rgba(29,41,61,0.4)]">—</span>
+            <span className="text-[var(--foreground-faint)]">—</span>
           )}
         </FieldCell>
         <FieldCell label="Duration">{duration}</FieldCell>
@@ -197,11 +205,11 @@ export default function RunShowV2() {
 
 function DecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[10px] border border-[rgba(29,41,61,0.08)] bg-white/80 p-3 space-y-0.5">
-      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[rgba(29,41,61,0.6)] leading-[1.2]">
+    <div className="rounded-[10px] border border-[var(--border-faint)] bg-white/80 p-3 space-y-0.5">
+      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--foreground-subtle)] leading-[1.2]">
         {label}
       </span>
-      <p className="text-[13px] text-[rgba(29,41,61,0.8)] leading-snug">{value}</p>
+      <p className="text-[13px] text-[var(--foreground-muted)] leading-snug">{value}</p>
     </div>
   );
 }

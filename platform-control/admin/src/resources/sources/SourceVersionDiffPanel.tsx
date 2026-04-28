@@ -62,16 +62,18 @@ function diffSpecs(previous: AcquisitionSpec, current: AcquisitionSpec): DiffEnt
 
 const KIND_STYLES: Record<DiffKind, { row: string; label: string }> = {
   added: {
-    row: "bg-[rgba(46,125,50,0.06)]",
-    label: "text-[#166534] bg-[rgba(46,125,50,0.12)] border-[rgba(46,125,50,0.3)]",
+    row: "bg-[var(--status-healthy-subtle)]",
+    label:
+      "text-[var(--status-healthy)] bg-[var(--status-healthy-subtle)] border-[var(--status-healthy)]/30",
   },
   removed: {
-    row: "bg-[rgba(198,40,40,0.05)]",
-    label: "text-[#991b1b] bg-[rgba(198,40,40,0.1)] border-[rgba(198,40,40,0.3)]",
+    row: "bg-[var(--status-critical-subtle)]",
+    label:
+      "text-[var(--status-critical)] bg-[var(--status-critical-subtle)] border-[var(--status-critical)]/30",
   },
   changed: {
-    row: "bg-[rgba(180,130,10,0.06)]",
-    label: "text-[#92400e] bg-[var(--attention-subtle)] border-[var(--attention-border)]",
+    row: "bg-[var(--attention-subtle)]/40",
+    label: "text-[var(--attention)] bg-[var(--attention-subtle)] border-[var(--attention-border)]",
   },
   unchanged: {
     row: "",
@@ -113,7 +115,7 @@ export function SourceVersionDiffPanel({
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           <span>
             Compare with previous
-            <span className="ml-1.5 text-[11px] font-normal text-[rgba(29,41,61,0.55)]">
+            <span className="ml-1.5 text-[11px] font-normal text-[var(--foreground-subtle)]">
               {previous.version_label} vs {current.version_label}
             </span>
           </span>
@@ -123,7 +125,7 @@ export function SourceVersionDiffPanel({
             {changedCount} {changedCount === 1 ? "change" : "changes"}
           </span>
         ) : (
-          <span className="text-[11px] text-[rgba(29,41,61,0.45)]">No changes</span>
+          <span className="text-[11px] text-[var(--foreground-faint)]">No changes</span>
         )}
       </button>
 
@@ -131,16 +133,16 @@ export function SourceVersionDiffPanel({
         <div className="border-t border-[var(--border)]">
           {/* Column headers */}
           <div className="grid grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,2fr)_80px] gap-px bg-[var(--brand-wash-6)]">
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[rgba(29,41,61,0.5)] bg-[var(--brand-wash-6)]">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--foreground-faint)] bg-[var(--brand-wash-6)]">
               Field
             </div>
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[rgba(29,41,61,0.5)] bg-[var(--brand-wash-6)]">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--foreground-faint)] bg-[var(--brand-wash-6)]">
               Previous ({previous.version_label})
             </div>
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[rgba(29,41,61,0.5)] bg-[var(--brand-wash-6)]">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--foreground-faint)] bg-[var(--brand-wash-6)]">
               Current ({current.version_label})
             </div>
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[rgba(29,41,61,0.5)] bg-[var(--brand-wash-6)]">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--foreground-faint)] bg-[var(--brand-wash-6)]">
               Status
             </div>
           </div>
@@ -153,16 +155,20 @@ export function SourceVersionDiffPanel({
             return (
               <div
                 key={entry.key}
-                className={`grid grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,2fr)_80px] gap-px border-t border-[rgba(29,41,61,0.06)] ${style.row}`}
+                className={`grid grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,2fr)_80px] gap-px border-t border-[var(--border-faint)] ${style.row}`}
               >
                 <div className="px-3 py-1.5 text-[12px] font-mono font-medium text-[var(--foreground)] truncate">
                   {entry.key}
                 </div>
-                <div className="px-3 py-1.5 text-[12px] font-mono text-[rgba(29,41,61,0.7)] break-words">
-                  {entry.previous ?? <span className="text-[rgba(29,41,61,0.3)] italic">--</span>}
+                <div className="px-3 py-1.5 text-[12px] font-mono text-[var(--foreground-muted)] break-words">
+                  {entry.previous ?? (
+                    <span className="text-[var(--foreground-ghost)] italic">--</span>
+                  )}
                 </div>
-                <div className="px-3 py-1.5 text-[12px] font-mono text-[rgba(29,41,61,0.7)] break-words">
-                  {entry.current ?? <span className="text-[rgba(29,41,61,0.3)] italic">--</span>}
+                <div className="px-3 py-1.5 text-[12px] font-mono text-[var(--foreground-muted)] break-words">
+                  {entry.current ?? (
+                    <span className="text-[var(--foreground-ghost)] italic">--</span>
+                  )}
                 </div>
                 <div className="px-3 py-1.5 flex items-start">
                   {label ? (
@@ -178,7 +184,7 @@ export function SourceVersionDiffPanel({
           })}
 
           {entries.length === 0 ? (
-            <div className="px-4 py-3 text-[12px] text-[rgba(29,41,61,0.5)]">
+            <div className="px-4 py-3 text-[12px] text-[var(--foreground-faint)]">
               Both versions have empty acquisition specs.
             </div>
           ) : null}

@@ -94,7 +94,7 @@ export default function SourceListV2() {
       render: (record) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-semibold text-[var(--foreground)]">{record.name}</span>
-          <span className="text-[12px] text-[rgba(29,41,61,0.6)]">{record.source_id}</span>
+          <span className="text-[12px] text-[var(--foreground-subtle)]">{record.source_id}</span>
         </div>
       ),
     },
@@ -117,10 +117,10 @@ export default function SourceListV2() {
         const j = jurisdictionById.get(record.jurisdiction_id);
         return j ? (
           <span>
-            {j.name} <span className="text-[rgba(29,41,61,0.55)]">({j.slug})</span>
+            {j.name} <span className="text-[var(--foreground-subtle)]">({j.slug})</span>
           </span>
         ) : (
-          <span className="text-[rgba(29,41,61,0.4)]">—</span>
+          <span className="text-[var(--foreground-faint)]">—</span>
         );
       },
     },
@@ -131,10 +131,10 @@ export default function SourceListV2() {
         const a = authorityById.get(record.authority_id);
         return a ? (
           <span>
-            {a.name} <span className="text-[rgba(29,41,61,0.55)]">({a.slug})</span>
+            {a.name} <span className="text-[var(--foreground-subtle)]">({a.slug})</span>
           </span>
         ) : (
-          <span className="text-[rgba(29,41,61,0.4)]">—</span>
+          <span className="text-[var(--foreground-faint)]">—</span>
         );
       },
     },
@@ -143,7 +143,7 @@ export default function SourceListV2() {
       header: "Family",
       sortField: "document_family",
       render: (record) => (
-        <span className="text-[rgba(29,41,61,0.85)]">{record.document_family ?? "—"}</span>
+        <span className="text-[var(--foreground-muted)]">{record.document_family ?? "—"}</span>
       ),
     },
     {
@@ -151,7 +151,7 @@ export default function SourceListV2() {
       header: "Updated",
       sortField: "updated_at",
       render: (record) => (
-        <span className="text-[rgba(29,41,61,0.75)] whitespace-nowrap">
+        <span className="text-[var(--foreground-muted)] whitespace-nowrap">
           {formatSwissDateTime(record.updated_at)}
         </span>
       ),
@@ -163,13 +163,13 @@ export default function SourceListV2() {
       <ListContextProvider value={controller}>
         <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-4">
           <header className="space-y-1">
-            <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
+            <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
               Source registry
             </p>
-            <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+            <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
               Sources
             </h1>
-            <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[68ch]">
+            <p className="text-[14px] text-[var(--foreground-muted)] max-w-[68ch]">
               Track source ownership, authority mapping, family, and lifecycle state in one dense
               operator list.
             </p>
