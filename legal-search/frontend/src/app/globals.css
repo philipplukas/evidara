@@ -209,7 +209,7 @@
   }
 
   .app-header__inner {
-    @apply mx-auto grid max-w-[1600px] items-center gap-3 px-4 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:gap-4 lg:px-6;
+    @apply mx-auto grid max-w-[var(--container-max)] items-center gap-3 px-4 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:gap-4 lg:px-6;
     grid-template-areas:
       "brand utility"
       "search search"
@@ -316,7 +316,7 @@
   }
 
   .context-bar__layout {
-    @apply mx-auto flex max-w-[1600px] flex-wrap items-center gap-3;
+    @apply mx-auto flex max-w-[var(--container-max)] flex-wrap items-center gap-3;
   }
 
   .context-bar__clusters {

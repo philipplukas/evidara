@@ -200,7 +200,7 @@ export default function RunListV2() {
 
   return (
     <ListContextProvider value={controller}>
-      <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-4">
+      <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[var(--container-max)] mx-auto space-y-4">
         <header className="space-y-2">
           <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
             Run queue

@@ -95,6 +95,9 @@
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
   --radius-pill: 9999px;
+
+  /* ─── Layout ─── */
+  --container-max: 1600px; /* shared content max-width; both surfaces converged here */
   --sidebar: oklch(0.96 0.008 215);
   --sidebar-foreground: oklch(0.25 0.04 215);
   --sidebar-primary: oklch(0.44 0.24 284);
