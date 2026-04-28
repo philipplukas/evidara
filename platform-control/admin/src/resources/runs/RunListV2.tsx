@@ -22,7 +22,7 @@ import { useNavigate } from "react-router-dom";
 import type { RunListRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DataTable, type DataTableColumn, Pill, type PillLevel } from "../../ui/primitives";
-import { runModeToLevel, runRecordStatusToLevel } from "../shared/StatusBadge";
+import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
 import { describeRunState, summarizeRunFilters } from "./RunList";
 
 type RunStatus = RunListRecord["status"];

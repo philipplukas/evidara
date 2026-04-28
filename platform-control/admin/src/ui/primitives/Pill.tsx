@@ -1,7 +1,7 @@
 /**
  * `Pill` — semantic status badge + neutral metadata chip, zero MUI.
  *
- * `level` aligns with `AdminStatusLevel` (see `resources/shared/StatusBadge.tsx`)
+ * `level` aligns with `AdminStatusLevel` (see `resources/shared/statusLevels.ts`)
  * so the existing status mapping helpers (`sourceStatusToLevel`,
  * `runRecordStatusToLevel`, …) transfer unchanged. UX-4 pill contract:
  * full-pill radius, 11px text, weight 600, 24px at `size="small"` — matches

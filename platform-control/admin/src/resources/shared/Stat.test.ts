@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { statToneBorder, successRateTone } from "./Stat";
-import { adminLevelBorder } from "./StatusBadge";
+import { adminLevelBorder } from "./statusLevels";
 
 describe("statToneBorder", () => {
   it("matches StatusBadge border tokens for stat tones", () => {

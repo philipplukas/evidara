@@ -39,7 +39,7 @@ import {
   Pill,
   type PillLevel,
 } from "../../ui/primitives";
-import { pipelineHealthToLevel } from "../shared/StatusBadge";
+import { pipelineHealthToLevel } from "../shared/statusLevels";
 import {
   buildPipelineDecisionSupport,
   overallSummaryByStatus,

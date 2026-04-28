@@ -28,7 +28,7 @@ import type {
 } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DataTable, type DataTableColumn, Pill } from "../../ui/primitives";
-import { sourceStatusToLevel } from "../shared/StatusBadge";
+import { sourceStatusToLevel } from "../shared/statusLevels";
 
 const SOURCE_STATUS_LABEL: Record<SourceRecord["status"], string> = {
   active: "Active",

@@ -206,6 +206,16 @@ lane.
 3. **Screen polish.** Dashboard/source-health plus v2 source/run/reference-data screens; remove prototype copy, keep admin headings sans-first, normalize table/header/form surfaces. Completed first pass for dashboard, source health, source v2, run v2, source-create, authority-create/edit, and jurisdiction-create/edit screens.
 4. **Evidence/docs.** Screenshot-pack refresh and TAR-243 runbook update. Screenshot pack passed locally on 2026-04-27; screenshot files are generated evidence artifacts and are not tracked in this repo state.
 
+##### Stream G4 Tailwind migration checkpoint
+
+The first post-merge MUI-reduction slice ports the admin dashboard's read-only
+chrome to Tailwind primitives: command cards, stat cards, source health,
+recent runs, and correction metrics now render via `Panel`, `DataTable`,
+`Pill`, `InlineAlert`, and `Spinner`. Shared status-level helpers moved out of
+the MUI `StatusBadge` module so v2 Tailwind pages can consume status semantics
+without importing MUI chip/icon code. The run-launch dialog internals remain
+MUI for now, but the dashboard trigger uses the shared Tailwind `Button`.
+
 ## 7. Linear sync — roadmap and templates
 
 Parent epic: **[TAR-243](https://linear.app/tart-baozi/issue/TAR-243)** — _Evidara — Design system & UX (ADR-0016)_.
