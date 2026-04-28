@@ -2,7 +2,7 @@
   "name": "@evidara/brand-shell",
   "version": "0.0.0",
   "private": true,
-  "description": "Shared brand chrome (mark + wordmark + header lockup) consumed by legal-search/frontend and platform-control/admin via tsconfig path alias.",
+  "description": "Shared brand chrome (mark + wordmark + header lockup) consumed by legal-search/frontend and platform-control/admin via a `file:` dependency.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -11,9 +11,5 @@
   "types": "./src/index.ts",
   "peerDependencies": {
     "react": ">=19"
-  },
-  "devDependencies": {
-    "@types/react": "^19",
-    "react": "^19"
   }
 }

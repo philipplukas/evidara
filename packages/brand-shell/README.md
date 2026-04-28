@@ -6,36 +6,33 @@ This package exists because the two surfaces had been re-implementing the brand 
 
 ## Scope (and what stays out)
 
-- **In scope:** `<BrandMark>` (the gradient "E"), `<BrandLockup>` (mark + wordmark + optional sub-label), `<BrandHeader>` (a slot-based wrapper around `<header>` for the brand/primary/utility regions).
+- **In scope:** `<BrandMark>` (the gradient "E"), `<BrandLockup>` (mark + wordmark + optional sub-label), `<BrandHeader>` (a thin wrapper around `<header>` for shared semantics; each surface supplies its own className/style for surface-specific chrome).
 - **Not in scope:** buttons, inputs, focus rings, pills, badges, narrative cards, operator cards. Those primitives stay in their respective apps under ADR-0016 and ADR-0027 ("two products, shared brand"). This package is specifically about the lockup that crosses both surfaces.
 
 ## How both apps consume it
 
-There is no npm install step. The package is a path-aliased TS source under `packages/brand-shell`. Both apps already pull shared TS source from the monorepo root via the same pattern (`@evidara/tokens` → `styles/tokens/tokens.ts`).
+Each consuming app declares a local `file:` dependency:
 
-In each consuming app's `tsconfig.json`:
-
-```json
+```jsonc
+// legal-search/frontend/package.json
+// platform-control/admin/package.json
 {
-  "compilerOptions": {
-    "paths": {
-      "@evidara/brand-shell": ["../../packages/brand-shell/src"]
-    }
+  "dependencies": {
+    "@evidara/brand-shell": "file:../../packages/brand-shell"
   }
 }
 ```
 
-In each consuming app's `vitest.config.ts` (so RTL tests that mount AppHeader / AppBar resolve the alias):
+`npm install` creates `node_modules/@evidara/brand-shell` as a symlink to this directory, so changes here are picked up immediately without a re-install. React (the package's only runtime dependency) is satisfied by the consuming app's own `react` install via the `peerDependencies` declaration.
 
-```ts
-resolve: {
-  alias: {
-    "@evidara/brand-shell": path.resolve(__dirname, "../../packages/brand-shell/src"),
-  },
-},
-```
+### `preserveSymlinks: true` is required
 
-Next.js (turbopack) already widens its `root` to the monorepo root for the existing token import, so it picks up the brand-shell source without further config.
+The package is a symlink under each app's `node_modules`. By default both TypeScript and Vite follow the symlink to its real path (`packages/brand-shell/src/*`) and walk up *from there* looking for `react` — which fails because `packages/brand-shell` has no `node_modules`. Both apps therefore set `preserveSymlinks: true`:
+
+- `tsconfig.json` → `compilerOptions.preserveSymlinks: true`
+- `vitest.config.ts` → `resolve.preserveSymlinks: true`
+
+With that flag set, the resolver walks up from the symlinked location (`<app>/node_modules/@evidara/brand-shell/src/`) and finds `<app>/node_modules/react`. Next.js / Turbopack handle this correctly out of the box without extra config.
 
 ## Why no Tailwind utility classes
 
@@ -44,10 +41,6 @@ The components ship inline styles only and reach colour through CSS custom prope
 ## Tone
 
 `<BrandLockup tone="light" />` (default) renders the wordmark in `--brand-strong` for surfaces with a light background (workspace). `<BrandLockup tone="dark" />` renders it in `currentColor` so dark/branded surfaces (admin's gradient header) can colour the wordmark via the parent's `color` value.
-
-## Editor experience
-
-The package keeps its own `node_modules` (just `react` + `@types/react` as devDependencies, installed via `npm install` inside `packages/brand-shell/`) so editors browsing this directory find React types. Real type-checking happens in each consuming app's `tsc --noEmit` run — the consumer's tsconfig pulls in this source via the path alias above.
 
 ## Tests and parity
 

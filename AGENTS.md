@@ -144,7 +144,7 @@ The pre-commit hooks and CI workflows must run the same checks. If you add a che
 | Event payloads | `contracts/events/*.json` |
 | Infra resources | `infra/terraform/` |
 | Design tokens | `styles/tokens/tokens.css` (shared; see ADR-0027 — "two products, shared brand"). Workspace-local extensions: `legal-search/frontend/src/app/globals.css`; admin-local: `platform-control/admin/src/app/globals.css`. |
-| Brand chrome | `packages/brand-shell/` — `@evidara/brand-shell` exports `<BrandHeader>`, `<BrandLockup>`, `<BrandMark>`. Consumed by both surfaces via the tsconfig path alias `@evidara/brand-shell` → `../../packages/brand-shell/src` (no npm install — pattern matches `@evidara/tokens`). |
+| Brand chrome | `packages/brand-shell/` — `@evidara/brand-shell` exports `<BrandHeader>`, `<BrandLockup>`, `<BrandMark>`. Both surfaces depend on it via `"@evidara/brand-shell": "file:../../packages/brand-shell"`; both also set `preserveSymlinks: true` in `tsconfig.json` and `vitest.config.ts` so React resolution walks up from the symlinked location to the consumer's own `react`. |
 | Tests | Test files adjacent to code |
 | Narrative docs | `docs/` |
 

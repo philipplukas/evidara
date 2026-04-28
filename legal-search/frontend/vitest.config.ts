@@ -8,8 +8,13 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@evidara/tokens": path.resolve(__dirname, "../../styles/tokens/tokens"),
-      "@evidara/brand-shell": path.resolve(__dirname, "../../packages/brand-shell/src"),
     },
+    // Mirrors `preserveSymlinks: true` in tsconfig.json. The shared
+    // `@evidara/brand-shell` package is installed as a `file:` symlink
+    // at `node_modules/@evidara/brand-shell`; without preserving the
+    // symlink path, Vite resolves to `packages/brand-shell/src/*` and
+    // walks up from there looking for `react`, missing this app's copy.
+    preserveSymlinks: true,
   },
   test: {
     environment: "jsdom",

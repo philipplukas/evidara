@@ -11,6 +11,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "preserveSymlinks": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
@@ -20,8 +21,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@evidara/tokens": ["../../styles/tokens/tokens"],
-      "@evidara/brand-shell": ["../../packages/brand-shell/src"]
+      "@evidara/tokens": ["../../styles/tokens/tokens"]
     }
   },
   "include": [
