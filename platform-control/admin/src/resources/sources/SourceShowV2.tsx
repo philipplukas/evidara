@@ -62,7 +62,11 @@ export default function SourceShowV2() {
     return <div className="px-4 py-10 text-center text-[rgba(29,41,61,0.6)]">Loading source…</div>;
   }
   if (controller.error || !source) {
-    return <div className="px-4 py-10 text-center text-[#b71c1c]">Failed to load source.</div>;
+    return (
+      <div className="px-4 py-10 text-center text-[var(--status-critical)]">
+        Failed to load source.
+      </div>
+    );
   }
 
   const statusMeta = SOURCE_STATUS_META[source.status];

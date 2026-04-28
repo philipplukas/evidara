@@ -135,7 +135,7 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
       {!isPending && error ? (
         <div
           role="alert"
-          className="rounded-[12px] border border-[rgba(198,40,40,0.4)] bg-[rgba(198,40,40,0.06)] p-3 text-[13px] text-[#b71c1c]"
+          className="rounded-[12px] border border-[var(--status-critical)]/40 bg-[var(--status-critical-subtle)] p-3 text-[13px] text-[var(--status-critical)]"
         >
           {error instanceof Error ? error.message : "Unable to load pipeline health."}
         </div>
@@ -209,7 +209,7 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                   </div>
                   <p className="mt-1.5 text-[13px] text-[rgba(29,41,61,0.75)]">{stage.detail}</p>
                   {!isHealthy ? (
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[rgba(237,108,2,0.2)] bg-[rgba(237,108,2,0.06)] p-2.5">
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[var(--status-degraded)]/20 bg-[var(--status-degraded-subtle)] p-2.5">
                       <p className="text-[12px] font-semibold text-[var(--foreground)]">
                         Next action: {stageNextAction(stage)}
                       </p>
@@ -309,7 +309,7 @@ function RunAccordionSection<TRecord extends { id: Identifier }>({
           ) : error ? (
             <div
               role="alert"
-              className="rounded-[12px] border border-[rgba(198,40,40,0.4)] bg-[rgba(198,40,40,0.06)] p-3 text-[13px] text-[#b71c1c]"
+              className="rounded-[12px] border border-[var(--status-critical)]/40 bg-[var(--status-critical-subtle)] p-3 text-[13px] text-[var(--status-critical)]"
             >
               {error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.`}
             </div>
