@@ -60,7 +60,7 @@ export default function AuthorityCreateV2() {
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--text-meta)]">
           Reference data
         </p>
-        <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+        <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
           Create authority
         </h1>
         <p className="text-[14px] text-[var(--text-meta)] max-w-[72ch]">

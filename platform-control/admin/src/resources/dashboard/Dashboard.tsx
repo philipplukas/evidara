@@ -317,7 +317,7 @@ export function Dashboard() {
               <span className="text-[11px] font-semibold uppercase tracking-[0.18em] leading-[1.15] text-[var(--text-meta)]">
                 Operator command center
               </span>
-              <h1 className="mt-2 text-2xl font-bold leading-tight text-[var(--foreground)]">
+              <h1 className="mt-2 font-[family:var(--font-admin-serif)] text-2xl font-semibold leading-tight text-[var(--foreground)]">
                 Control plane overview
               </h1>
               <p className="mt-2 max-w-[760px] text-sm leading-snug text-[var(--text-muted)]">

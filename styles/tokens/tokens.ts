@@ -35,12 +35,19 @@ export const INTERACTIVE_ACCENT_MUTED = "rgba(98, 70, 217, 0.14)";
 export const FOCUS_RING = "rgba(98, 70, 217, 0.24)";
 
 // ─── Foreground / border (neutral text + dividers) ───
+//
+// Foreground ladder: --foreground (1.0) > MUTED (0.72) > SUBTLE (0.56) >
+// FAINT (0.40) > GHOST (0.30). Pick by role, not exact opacity.
+// Border ladder: BORDER_FAINT (0.08) < BORDER (0.12) < BORDER_STRONG (0.20).
 export const FOREGROUND = "#1d293d";
 export const FOREGROUND_MUTED = "rgba(29, 41, 61, 0.72)";
 export const FOREGROUND_SUBTLE = "rgba(29, 41, 61, 0.56)";
+export const FOREGROUND_FAINT = "rgba(29, 41, 61, 0.40)";
+export const FOREGROUND_GHOST = "rgba(29, 41, 61, 0.30)";
 // Secondary metadata text; WCAG AA on SURFACE_PAGE (6.03) + SURFACE_PANEL (7.04).
 export const TEXT_META = "#46595e";
 export const TEXT_META_DARK = "#b7b7b7";
+export const BORDER_FAINT = "rgba(29, 41, 61, 0.08)";
 export const BORDER = "rgba(29, 41, 61, 0.12)";
 export const BORDER_STRONG = "rgba(29, 41, 61, 0.20)";
 
