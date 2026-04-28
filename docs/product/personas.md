@@ -22,7 +22,7 @@ Each persona has a **Grounded** block (what the repo / journeys actually demand 
 | Platform / SRE operator | platform-control API, infra, runbooks | [phase-5-go-no-go-memo.md](../runbooks/phase-5-go-no-go-memo.md), [DLQ triage](../runbooks/dlq-triage-and-replay.md), [release/rollback](../runbooks/release-rollback.md) |
 | Agent / CLI operator | `tools/evidara-cli`, MCP-style scripted access | [evidara-cli README](../../tools/evidara-cli/README.md), [mvp-acceptance-scenario-pack.md](../runbooks/mvp-acceptance-scenario-pack.md) |
 
-The first three are external; the last two are internal. GA criteria should distinguish them — see [ga-criteria.md](ga-criteria.md) once landed.
+The first three are external; the last two are internal. GA criteria should distinguish them — see [ga-criteria.md](https://github.com/philipplukas/evidara/blob/main/docs/product/ga-criteria.md) once landed (companion PR [#490](https://github.com/philipplukas/evidara/pull/490)).
 
 ---
 
@@ -121,7 +121,7 @@ This persona is internal today (CI, smokes, evidence packets). Whether it become
 
 - Not a marketing audience deck — no ICP, segment sizing, or pricing
 - Not user research — none of the sub-segmentation under P1 has been interview-validated
-- Not a commitment that all five personas are GA-targets — see [ga-criteria.md](ga-criteria.md) for which lanes need to be ready for which GA gate
+- Not a commitment that all five personas are GA-targets — see [ga-criteria.md](https://github.com/philipplukas/evidara/blob/main/docs/product/ga-criteria.md) for which lanes need to be ready for which GA gate (companion PR [#490](https://github.com/philipplukas/evidara/pull/490))
 
 ## Next steps
 
