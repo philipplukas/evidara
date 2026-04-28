@@ -58,8 +58,8 @@ interface PresetButtonProps {
 function PresetButton({ isActive, onClick, children, tone = "accent" }: PresetButtonProps) {
   const toneActive =
     tone === "warning"
-      ? "bg-[rgba(237,108,2,0.1)] border-[rgba(237,108,2,0.4)] text-[#e65100]"
-      : "bg-[var(--brand-wash-8)] border-[rgba(15,76,129,0.5)] text-[var(--brand)]";
+      ? "bg-[var(--status-degraded-subtle)] border-[var(--status-degraded)]/40 text-[var(--status-degraded)]"
+      : "bg-[var(--brand-wash-8)] border-[var(--brand)]/50 text-[var(--brand)]";
   return (
     <button
       type="button"
@@ -67,7 +67,7 @@ function PresetButton({ isActive, onClick, children, tone = "accent" }: PresetBu
       className={`inline-flex items-center rounded-full border px-3 h-8 text-[12px] font-semibold transition-colors ${
         isActive
           ? toneActive
-          : "bg-white/60 border-[rgba(29,41,61,0.16)] text-[rgba(29,41,61,0.75)] hover:border-[rgba(29,41,61,0.3)]"
+          : "bg-white/60 border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-strong)]"
       }`}
     >
       {children}
@@ -140,7 +140,9 @@ export default function RunListV2() {
       render: (record) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-semibold">{record.source_name}</span>
-          <span className="text-[12px] text-[rgba(29,41,61,0.6)]">{record.version_label}</span>
+          <span className="text-[12px] text-[var(--foreground-subtle)]">
+            {record.version_label}
+          </span>
         </div>
       ),
     },
@@ -151,9 +153,14 @@ export default function RunListV2() {
       render: (record) => (
         <div className="flex flex-col gap-1 max-w-[32ch]">
           <Pill level={runRecordStatusToLevel(record.status)}>{record.status}</Pill>
-          <span className="text-[12px] text-[rgba(29,41,61,0.65)]">{describeRunState(record)}</span>
+          <span className="text-[12px] text-[var(--foreground-subtle)]">
+            {describeRunState(record)}
+          </span>
           {record.status === "failed" && record.failure_reason ? (
-            <span className="text-[12px] text-[#b71c1c] truncate" title={record.failure_reason}>
+            <span
+              className="text-[12px] text-[var(--status-critical)] truncate"
+              title={record.failure_reason}
+            >
               Failure: {record.failure_reason}
             </span>
           ) : null}
@@ -181,7 +188,7 @@ export default function RunListV2() {
       header: "Created",
       sortField: "created_at",
       render: (record) => (
-        <span className="text-[rgba(29,41,61,0.75)] whitespace-nowrap">
+        <span className="text-[var(--foreground-muted)] whitespace-nowrap">
           {formatSwissDateTime(record.created_at)}
         </span>
       ),
@@ -191,7 +198,7 @@ export default function RunListV2() {
       header: "Updated",
       sortField: "updated_at",
       render: (record) => (
-        <span className="text-[rgba(29,41,61,0.75)] whitespace-nowrap">
+        <span className="text-[var(--foreground-muted)] whitespace-nowrap">
           {formatSwissDateTime(record.updated_at)}
         </span>
       ),
@@ -202,20 +209,20 @@ export default function RunListV2() {
     <ListContextProvider value={controller}>
       <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-4">
         <header className="space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
+          <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
             Run queue
           </p>
-          <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
             Runs
           </h1>
-          <p className="text-[14px] text-[rgba(29,41,61,0.7)] max-w-[72ch]">
+          <p className="text-[14px] text-[var(--foreground-muted)] max-w-[72ch]">
             Triage active, failed, and completed acquisition runs. Use presets to narrow the
             operator queue without leaving the list.
           </p>
         </header>
 
         {/* Preset bar (replaces the MUI RunQueueHeader presets). */}
-        <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-[var(--admin-panel-bg)] p-4 space-y-3 shadow-[var(--shadow-card)] backdrop-blur-[12px]">
+        <section className="rounded-[18px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-4 space-y-3 shadow-[var(--shadow-card)] backdrop-blur-[12px]">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex flex-wrap items-center gap-1.5">
               <PresetButton isActive={!hasActiveFilters} onClick={clearFilters}>
@@ -245,13 +252,13 @@ export default function RunListV2() {
               <button
                 type="button"
                 onClick={() => navigate(`/runs-v2/${encodeURIComponent(attentionRun.run_id)}`)}
-                className="inline-flex items-center rounded-full border border-[rgba(237,108,2,0.4)] bg-[rgba(237,108,2,0.08)] px-3 h-9 text-[12px] font-semibold text-[#e65100] hover:bg-[rgba(237,108,2,0.14)]"
+                className="inline-flex items-center rounded-full border border-[var(--status-degraded)]/40 bg-[var(--status-degraded-subtle)] px-3 h-9 text-[12px] font-semibold text-[var(--status-degraded)] hover:bg-[var(--status-degraded-subtle)]/80"
               >
                 Open attention run · {attentionRun.source_name}
               </button>
             ) : null}
           </div>
-          <p className="text-[12px] text-[rgba(29,41,61,0.6)]">
+          <p className="text-[12px] text-[var(--foreground-subtle)]">
             {hasActiveFilters
               ? `Filtering ${filterSummary} · ${runs.length} of ${controller.total ?? runs.length}`
               : `${runs.length} run${runs.length === 1 ? "" : "s"} in view`}

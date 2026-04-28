@@ -58,7 +58,7 @@ const formatDateTime = (value: string | null | undefined): string =>
 const formatJson = (value: unknown): string => JSON.stringify(value, null, 2);
 
 const renderInlineValue = (value: string | number | null | undefined) =>
-  value ?? <span className="text-[rgba(29,41,61,0.4)]">—</span>;
+  value ?? <span className="text-[var(--foreground-faint)]">—</span>;
 
 function rowFailureLevel(isFailed: boolean): PillLevel {
   return isFailed ? "critical" : "neutral";
@@ -119,23 +119,23 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
   );
 
   return (
-    <section className="space-y-4 rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-[var(--admin-panel-bg)] p-5 shadow-[var(--shadow-card)] backdrop-blur-[12px] sm:p-6">
+    <section className="space-y-4 rounded-[18px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-5 shadow-[var(--shadow-card)] backdrop-blur-[12px] sm:p-6">
       <header className="space-y-1">
         <h2 className="text-[16px] font-semibold text-[var(--foreground)]">Pipeline Health</h2>
-        <p className="text-[13px] text-[rgba(29,41,61,0.65)]">
+        <p className="text-[13px] text-[var(--foreground-subtle)]">
           Expanded by default so the overall signal is visible without a click; drill into the stage
           sections below for row-level detail.
         </p>
       </header>
 
       {isPending ? (
-        <p className="text-[13px] text-[rgba(29,41,61,0.6)]">Loading pipeline health…</p>
+        <p className="text-[13px] text-[var(--foreground-subtle)]">Loading pipeline health…</p>
       ) : null}
 
       {!isPending && error ? (
         <div
           role="alert"
-          className="rounded-[12px] border border-[rgba(198,40,40,0.4)] bg-[rgba(198,40,40,0.06)] p-3 text-[13px] text-[#b71c1c]"
+          className="rounded-[12px] border border-[var(--status-critical)]/40 bg-[var(--status-critical-subtle)] p-3 text-[13px] text-[var(--status-critical)]"
         >
           {error instanceof Error ? error.message : "Unable to load pipeline health."}
         </div>
@@ -157,12 +157,12 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
             {overallSummaryByStatus(health.overall_status)}
           </p>
 
-          <div className="rounded-[14px] border border-[rgba(29,41,61,0.08)] bg-[var(--brand-wash-3)] p-4">
+          <div className="rounded-[14px] border border-[var(--border-faint)] bg-[var(--brand-wash-3)] p-4">
             <div className="mb-3">
               <h3 className="text-[14px] font-semibold text-[var(--foreground)]">
                 Pipeline decision support
               </h3>
-              <p className="text-[12px] text-[rgba(29,41,61,0.65)]">
+              <p className="text-[12px] text-[var(--foreground-subtle)]">
                 The cues below translate the health snapshot into operator decisions.
               </p>
             </div>
@@ -194,22 +194,24 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
               return (
                 <div
                   key={stage.stage}
-                  className="rounded-[12px] border border-[rgba(29,41,61,0.08)] bg-white/70 p-3"
+                  className="rounded-[12px] border border-[var(--border-faint)] bg-white/70 p-3"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold capitalize text-[var(--foreground)]">
                         {stage.stage.replaceAll("_", " ")}
                       </p>
-                      <p className="text-[11px] text-[rgba(29,41,61,0.6)]">
+                      <p className="text-[11px] text-[var(--foreground-subtle)]">
                         {formatDateTime(stage.updated_at)}
                       </p>
                     </div>
                     <Pill level={level}>{stage.status.replaceAll("_", " ")}</Pill>
                   </div>
-                  <p className="mt-1.5 text-[13px] text-[rgba(29,41,61,0.75)]">{stage.detail}</p>
+                  <p className="mt-1.5 text-[13px] text-[var(--foreground-muted)]">
+                    {stage.detail}
+                  </p>
                   {!isHealthy ? (
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[rgba(237,108,2,0.2)] bg-[rgba(237,108,2,0.06)] p-2.5">
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[var(--status-degraded)]/20 bg-[var(--status-degraded-subtle)] p-2.5">
                       <p className="text-[12px] font-semibold text-[var(--foreground)]">
                         Next action: {stageNextAction(stage)}
                       </p>
@@ -235,11 +237,11 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
 
 function DecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-0.5 rounded-[10px] border border-[rgba(29,41,61,0.08)] bg-white/80 p-3">
-      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] leading-[1.2] text-[rgba(29,41,61,0.6)]">
+    <div className="space-y-0.5 rounded-[10px] border border-[var(--border-faint)] bg-white/80 p-3">
+      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] leading-[1.2] text-[var(--foreground-subtle)]">
         {label}
       </span>
-      <p className="text-[13px] leading-snug text-[rgba(29,41,61,0.8)]">{value}</p>
+      <p className="text-[13px] leading-snug text-[var(--foreground-muted)]">{value}</p>
     </div>
   );
 }
@@ -251,8 +253,8 @@ function DecisionCell({ label, value }: { label: string; value: string }) {
  */
 function PrimaryDecisionCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1 rounded-[12px] border border-[rgba(29,41,61,0.1)] bg-white p-4 shadow-[var(--shadow-card-hover)]">
-      <span className="block text-[15px] font-semibold uppercase tracking-[0.08em] leading-[1.2] text-[rgba(29,41,61,0.8)]">
+    <div className="space-y-1 rounded-[12px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-card-hover)]">
+      <span className="block text-[15px] font-semibold uppercase tracking-[0.08em] leading-[1.2] text-[var(--foreground-muted)]">
         {label}
       </span>
       <p className="text-[14px] leading-snug text-[var(--foreground)]">{value}</p>
@@ -302,19 +304,21 @@ function RunAccordionSection<TRecord extends { id: Identifier }>({
       </AccordionTrigger>
       <AccordionContent>
         <div className="space-y-3">
-          <p className="text-[13px] text-[rgba(29,41,61,0.65)]">{description}</p>
+          <p className="text-[13px] text-[var(--foreground-subtle)]">{description}</p>
 
           {isPending ? (
-            <p className="text-[13px] text-[rgba(29,41,61,0.6)]">Loading {title.toLowerCase()}…</p>
+            <p className="text-[13px] text-[var(--foreground-subtle)]">
+              Loading {title.toLowerCase()}…
+            </p>
           ) : error ? (
             <div
               role="alert"
-              className="rounded-[12px] border border-[rgba(198,40,40,0.4)] bg-[rgba(198,40,40,0.06)] p-3 text-[13px] text-[#b71c1c]"
+              className="rounded-[12px] border border-[var(--status-critical)]/40 bg-[var(--status-critical-subtle)] p-3 text-[13px] text-[var(--status-critical)]"
             >
               {error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.`}
             </div>
           ) : count === 0 ? (
-            <p className="text-[13px] text-[rgba(29,41,61,0.55)]">{emptyMessage}</p>
+            <p className="text-[13px] text-[var(--foreground-subtle)]">{emptyMessage}</p>
           ) : (
             <DataTable<TRecord>
               records={rows}
@@ -356,11 +360,11 @@ const providerJobColumns: DataTableColumn<ProviderJobRecord>[] = [
     header: "Payloads",
     render: (job) => (
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[rgba(29,41,61,0.6)]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--foreground-subtle)]">
           Request
         </p>
         <CodeBlock value={job.request_payload} />
-        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-[rgba(29,41,61,0.6)]">
+        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--foreground-subtle)]">
           Response
         </p>
         <CodeBlock value={job.response_payload} />

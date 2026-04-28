@@ -59,10 +59,16 @@ export default function SourceShowV2() {
   );
 
   if (controller.isPending) {
-    return <div className="px-4 py-10 text-center text-[rgba(29,41,61,0.6)]">Loading source…</div>;
+    return (
+      <div className="px-4 py-10 text-center text-[var(--foreground-subtle)]">Loading source…</div>
+    );
   }
   if (controller.error || !source) {
-    return <div className="px-4 py-10 text-center text-[#b71c1c]">Failed to load source.</div>;
+    return (
+      <div className="px-4 py-10 text-center text-[var(--status-critical)]">
+        Failed to load source.
+      </div>
+    );
   }
 
   const statusMeta = SOURCE_STATUS_META[source.status];
@@ -70,13 +76,15 @@ export default function SourceShowV2() {
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-6">
       <header className="space-y-3">
-        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[rgba(29,41,61,0.6)]">
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
           Source detail
         </p>
-        <h1 className="font-sans text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+        <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
           {source.name}
         </h1>
-        <div className="font-mono text-[12px] text-[rgba(29,41,61,0.6)]">{source.source_id}</div>
+        <div className="font-mono text-[12px] text-[var(--foreground-subtle)]">
+          {source.source_id}
+        </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill level={sourceStatusToLevel(source.status)}>{statusMeta.label}</Pill>
           <Pill variant="meta">{`Type: ${source.source_type}`}</Pill>
@@ -90,12 +98,12 @@ export default function SourceShowV2() {
        * the right. The card keeps its heading + description copy which
        * give context the header pills alone can't.
        */}
-      <section className="rounded-[18px] border border-[rgba(29,41,61,0.08)] bg-[var(--admin-panel-bg)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-1.5">
+      <section className="rounded-[18px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-1.5">
         <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Source lifecycle</h2>
-        <p className="text-[13px] text-[rgba(29,41,61,0.65)]">
+        <p className="text-[13px] text-[var(--foreground-subtle)]">
           Status, operating posture, and the main attention cue for this source.
         </p>
-        <p className="text-sm text-[rgba(29,41,61,0.75)] pt-1">{statusMeta.detail}</p>
+        <p className="text-sm text-[var(--foreground-muted)] pt-1">{statusMeta.detail}</p>
       </section>
 
       <DetailGrid>
@@ -104,30 +112,30 @@ export default function SourceShowV2() {
         </FieldCell>
         <FieldCell label="Name">{source.name}</FieldCell>
         <FieldCell label="Description" span="full">
-          {source.description ?? <span className="text-[rgba(29,41,61,0.4)]">—</span>}
+          {source.description ?? <span className="text-[var(--foreground-faint)]">—</span>}
         </FieldCell>
         <FieldCell label="Jurisdiction">
           {jurisdiction ? (
             <>
               {jurisdiction.name}{" "}
-              <span className="text-[rgba(29,41,61,0.55)]">({jurisdiction.slug})</span>
+              <span className="text-[var(--foreground-subtle)]">({jurisdiction.slug})</span>
             </>
           ) : (
-            <span className="text-[rgba(29,41,61,0.4)]">—</span>
+            <span className="text-[var(--foreground-faint)]">—</span>
           )}
         </FieldCell>
         <FieldCell label="Authority">
           {authority ? (
             <>
               {authority.name}{" "}
-              <span className="text-[rgba(29,41,61,0.55)]">({authority.slug})</span>
+              <span className="text-[var(--foreground-subtle)]">({authority.slug})</span>
             </>
           ) : (
-            <span className="text-[rgba(29,41,61,0.4)]">—</span>
+            <span className="text-[var(--foreground-faint)]">—</span>
           )}
         </FieldCell>
         <FieldCell label="Document family">
-          {source.document_family ?? <span className="text-[rgba(29,41,61,0.4)]">—</span>}
+          {source.document_family ?? <span className="text-[var(--foreground-faint)]">—</span>}
         </FieldCell>
         <FieldCell label="Source type">{source.source_type}</FieldCell>
         <FieldCell label="Created">{formatSwissDateTime(source.created_at)}</FieldCell>

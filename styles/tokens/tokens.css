@@ -28,6 +28,10 @@
  *     `--sidebar-*`, `--radius`, `--radius-pill`)
  *   - brand palette (`--brand`, `--brand-hover`, `--brand-strong`,
  *     `--brand-wash-3/4/6/8`, `--brand-focus-ring`)
+ *   - brand-mark contract (`--brand-mark-gradient`, `--font-brand-mark`) —
+ *     the gradient fill and display-letter typeface for the cross-surface
+ *     "Evidara" tile; each surface maps `--font-brand-mark` to its loaded
+ *     serif face in its local globals.css
  *   - surfaces (`--surface-page`, `--surface-panel`, `--surface-input`,
  *     `--surface-shell`, `--surface-shell-strong`)
  *   - accent core (the single violet action color: `--accent-core`,
@@ -36,8 +40,10 @@
  *     `--interactive-accent-muted`)
  *   - focus ring (`--focus-ring`) — identical affordance across surfaces
  *     per ADR-0027
- *   - foreground opacity + border strength (`--foreground-subtle`,
- *     `--border-strong`, `--text-meta`)
+ *   - foreground opacity ladder (`--foreground-muted`,
+ *     `--foreground-subtle`, `--foreground-faint`, `--foreground-ghost`,
+ *     `--text-meta`) and border ladder (`--border-faint`,
+ *     `--border-strong`)
  *   - attention + status palette (`--attention*`, `--status-*`)
  *   - typography size + leading scale and font weights (`--text-*`,
  *     `--leading-*`, `--font-weight-*`) — the SCALE is shared; each
@@ -109,6 +115,31 @@
   --brand-hover: #0b3d68;
   --brand-strong: #1d293d;
 
+  /*
+   * ─── Brand mark (cross-surface; consumed by both `AppHeader` and `AppBar`) ───
+   *
+   * The "Evidara" wordmark tile (gradient navy square with a serif "E")
+   * appears in workspace's `AppHeader` *and* admin's `AppBar`. Tile
+   * dimensions, corner radius, and surrounding chrome stay surface-local
+   * (workspace ships a 32px tile; admin ships a 42px tile with a darker
+   * shadow on its cool-blue gradient header). The *fill* and the
+   * *display-letter typeface* are the shared brand contract — those live
+   * here.
+   *
+   * `--font-brand-mark` is intentionally a fallback only. Each surface
+   * overrides it in its local globals.css to point at the actual loaded
+   * serif face (`var(--font-serif)` in workspace, `var(--font-admin-serif)`
+   * in admin). The Georgia fallback prevents the mark from rendering in
+   * the body sans if a surface forgets to map it.
+   *
+   * Drift on either token (e.g. one surface re-inlining the
+   * gradient literal) is caught by the brand-mark parity tests on both
+   * surfaces — see `legal-search/frontend/src/__tests__/brand-mark-parity.test.ts`
+   * and `platform-control/admin/src/ui/shell/brand-mark-parity.test.ts`.
+   */
+  --brand-mark-gradient: linear-gradient(135deg, var(--brand), var(--brand-hover));
+  --font-brand-mark: Georgia, serif;
+
   /* ─── Surfaces ─── */
   --surface-page: #e4e9ef;
   --surface-panel: #f8fafc;
@@ -122,8 +153,25 @@
   --brand-wash-6: rgb(15 76 129 / 6%);
   --brand-wash-8: rgb(15 76 129 / 8%);
 
-  /* ─── Foreground opacity variants ─── */
+  /* ─── Foreground opacity ladder (brand-strong tinted) ─── */
+  /*
+   * Hierarchy used across surfaces. Pick the rung that matches the role,
+   * not the exact opacity — the values are tuned to keep WCAG AA on
+   * --surface-page and --surface-panel.
+   *
+   *   --foreground          full strength (1.0)   — primary copy
+   *   --foreground-muted    72% — scanning body text, helper paragraphs
+   *   --foreground-subtle   56% — secondary metadata, captions, meta labels
+   *   --foreground-faint    40% — em-dash empty values, low-emphasis chrome
+   *   --foreground-ghost    30% — italic placeholders, ghost states
+   */
+  --foreground-muted: rgb(29 41 61 / 72%);
   --foreground-subtle: rgb(29 41 61 / 56%);
+  --foreground-faint: rgb(29 41 61 / 40%);
+  --foreground-ghost: rgb(29 41 61 / 30%);
+
+  /* ─── Border ladder (brand-strong tinted) ─── */
+  --border-faint: rgb(29 41 61 / 8%);
   --border-strong: rgb(29 41 61 / 20%);
 
   /* ─── Brand focus ring ─── */
@@ -270,6 +318,14 @@
   --interactive-accent-muted: rgb(148 132 245 / 18%);
 
   --focus-ring: rgb(148 132 245 / 30%);
+
+  /* Foreground / border ladders track the dark brand-strong (#c7dff0). */
+  --foreground-muted: rgb(199 223 240 / 72%);
+  --foreground-subtle: rgb(199 223 240 / 56%);
+  --foreground-faint: rgb(199 223 240 / 40%);
+  --foreground-ghost: rgb(199 223 240 / 30%);
+  --border-faint: rgb(199 223 240 / 10%);
+  --border-strong: rgb(199 223 240 / 22%);
 
   --attention: #fbbf24;
   --attention-subtle: rgba(251, 191, 36, 0.1);
