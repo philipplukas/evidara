@@ -8,6 +8,12 @@ WORKDIR /workspace
 # token layer (and vice versa).
 COPY styles/tokens ./styles/tokens
 
+# Copy the shared `@evidara/brand-shell` package — it is declared as a
+# `file:../../packages/brand-shell` dependency in the admin's package.json,
+# so `npm ci` needs the directory present before it can symlink it under
+# `node_modules/@evidara/brand-shell`.
+COPY packages/brand-shell ./packages/brand-shell
+
 COPY platform-control/admin/package*.json ./platform-control/admin/
 WORKDIR /workspace/platform-control/admin
 RUN npm ci
