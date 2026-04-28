@@ -111,6 +111,31 @@
   --brand-hover: #0b3d68;
   --brand-strong: #1d293d;
 
+  /*
+   * ─── Brand mark (cross-surface; consumed by both `AppHeader` and `AppBar`) ───
+   *
+   * The "Evidara" wordmark tile (gradient navy square with a serif "E")
+   * appears in workspace's `AppHeader` *and* admin's `AppBar`. Tile
+   * dimensions, corner radius, and surrounding chrome stay surface-local
+   * (workspace ships a 32px tile; admin ships a 42px tile with a darker
+   * shadow on its cool-blue gradient header). The *fill* and the
+   * *display-letter typeface* are the shared brand contract — those live
+   * here.
+   *
+   * `--font-brand-mark` is intentionally a fallback only. Each surface
+   * overrides it in its local globals.css to point at the actual loaded
+   * serif face (`var(--font-serif)` in workspace, `var(--font-admin-serif)`
+   * in admin). The Georgia fallback prevents the mark from rendering in
+   * the body sans if a surface forgets to map it.
+   *
+   * Drift on either token (e.g. one surface re-inlining the
+   * gradient literal) is caught by the brand-mark parity tests on both
+   * surfaces — see `legal-search/frontend/src/__tests__/brand-mark-parity.test.ts`
+   * and `platform-control/admin/src/ui/shell/brand-mark-parity.test.ts`.
+   */
+  --brand-mark-gradient: linear-gradient(135deg, var(--brand), var(--brand-hover));
+  --font-brand-mark: Georgia, serif;
+
   /* ─── Surfaces ─── */
   --surface-page: #e4e9ef;
   --surface-panel: #f8fafc;
