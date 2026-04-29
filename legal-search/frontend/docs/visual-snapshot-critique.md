@@ -128,7 +128,7 @@ Not rendered surfaces but worth one note: per `brand-decision-playbook.md` there
 4. **German pluralization** in `"1 weitere Felder anzeigen"` — wrong plural.
 5. **Dark-mode toggle surfaces only on mobile** per the screenshot-pack capture. If it exists, put it in a single global place (profile menu).
 6. **Admin vs. workspace look drift** — palette is shared but density, card treatment, and accent usage diverge. Decide: is the control plane a *mode* of the same product, or a *separate product*? Design language should follow that decision.
-7. **Baseline coverage is thin.** Four visual baselines cover: full desktop, full mobile, header, results region. Missing: empty state, error state, detail sheet, filter panel open, multi-result page. If Playwright visual regressions are a real gate, expand the matrix.
+7. **Baseline coverage is thin.** Four visual baselines cover: full desktop, full mobile, header, results region. Missing: empty state, error state, detail sheet, filter panel open, multi-result page. If Playwright visual regressions are a real gate, expand the matrix. — _Addressed by W9 (`test/w9-extend-visual-baselines`): added `empty-state-{desktop,mobile}`, `error-state-{desktop,mobile}`, `detail-panel-desktop`, `detail-sheet-mobile`, `filter-panel-desktop`, `filter-panel-mobile`, and `multi-result-desktop` baselines in `e2e/visual.spec.ts-snapshots/`._
 8. **Mobile header density.** The right-side profile card holds role + language + avatar + toggles. Split or collapse for <480px.
 
 ---
