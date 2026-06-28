@@ -13,6 +13,7 @@ dependencies = [
   "google-cloud-pubsub>=2.31.0,<3",
   "google-cloud-storage>=2.16.0",
   "jsonschema>=4.14.0",
+  "nats-py>=2.9.0,<3",
   "pyarrow>=14.0.0",
   "PyYAML>=6.0.0",
 ]
@@ -55,6 +56,7 @@ document_intelligence_render_source_contracts = "document_intelligence.bootstrap
 document_intelligence_render_governance_sql = "document_intelligence.bootstrap.register_governance:cli"
 document_intelligence_document_service = "document_intelligence.service.main:main"
 document_intelligence_runtime_ingress = "document_intelligence.consumer.main:main"
+document_intelligence_nats_consumer = "document_intelligence.jobs.nats_consumer:main"
 document_intelligence_runtime_consumer = "document_intelligence.jobs.runtime_consumer:main"
 document_intelligence_replay_local_outbox = "document_intelligence.jobs.local_outbox_replay:main"
 

@@ -165,3 +165,20 @@ services:
         done;
         echo 'failed to create EVIDARA stream'; exit 1
     restart: "no"
+
+  # document-intelligence NATS JetStream consumer (ADR-0029 Slice 3). Subscribes to
+  # evidara.artifact-bundle-available, processes bundles, and publishes
+  # document.processed / status events back to NATS. Surfaces are unset -> in-memory
+  # sink (no Delta/Databricks). Pairs with the `nats` profile.
+  di-consumer:
+    build:
+      context: ./document-intelligence
+      dockerfile: Dockerfile.runtime-ingress
+    profiles: ["nats"]
+    command: ["document_intelligence_nats_consumer", "--servers", "nats://nats:4222"]
+    environment:
+      PORT: "8092"
+    depends_on:
+      nats-init:
+        condition: service_completed_successfully
+    mem_limit: 1024m

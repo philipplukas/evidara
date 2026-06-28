@@ -148,6 +148,20 @@ MacConfig + Argo CD GitOps path.
     stream bootstrap) for local end-to-end exercise.
   - Remaining: NATS adapter for the DI publisher (lands with Slice 3, where the async
     broker context is natural).
+- **Slice 3 — done** (2026-06-28):
+  - `jobs/nats_consumer.py`: JetStream consumer reproducing the Pub/Sub semantics —
+    ack on success, `term` (drop) on permanent/content-driven errors, `nak`+backoff on
+    transient, and app-level DLQ (`term` + republish to the DLQ subject) once
+    `max_deliver` is exhausted. Decision logic in `dispatch_message`, unit-tested for
+    all four outcomes against a fake message/broker.
+  - `NatsDocumentEventPublisher` (async) + `AsyncEventPublisher` port for DI status /
+    document.processed events, with `Nats-Msg-Id` dedup.
+  - Broker-agnostic helpers factored into `jobs/_consumer_common.py` (shared by both
+    consumers); the Pub/Sub consumer now reuses them.
+  - `di-consumer` service added to `docker-compose.local.yml` (`nats` profile) +
+    `document_intelligence_nats_consumer` console script; `nats-py` is a DI dependency.
+  - Remaining for cutover (Slice 6): retire the Pub/Sub `runtime_consumer.py`; real
+    broker integration/e2e test (testcontainers-NATS) under CI-with-Docker.
 
 ## References
 

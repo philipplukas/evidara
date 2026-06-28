@@ -54,3 +54,49 @@ class PubSubEventPublisher:
         )
         payload = json.dumps(event, sort_keys=True, separators=(",", ":")).encode("utf-8")
         self._client.publish(topic_path, payload).result()
+
+
+@runtime_checkable
+class AsyncEventPublisher(Protocol):
+    """Async counterpart to EventPublisher for broker clients that are async-native.
+
+    The NATS JetStream consumer (ADR-0029) runs in an event loop, so its publisher
+    is async rather than blocking on a future like the Pub/Sub path.
+    """
+
+    async def publish_status_event(self, event: dict[str, Any]) -> None: ...
+    async def publish_document_processed_event(self, event: dict[str, Any]) -> None: ...
+
+
+@dataclass(frozen=True)
+class NatsEventPublisherConfig:
+    status_subject: str = "evidara.document-processing-status-updated"
+    processed_subject: str = "evidara.document-processed"
+
+
+class NatsDocumentEventPublisher:
+    """Publish DI status / document.processed events to NATS JetStream (ADR-0029).
+
+    Self-hosted replacement for the Pub/Sub publisher. Dedup via the ``Nats-Msg-Id``
+    header keyed on ``event_id`` makes republish-on-retry idempotent, mirroring the
+    consumer's at-least-once delivery. The JetStream context is injected (the consumer
+    owns the connection); a stream binding the configured subjects must exist.
+    """
+
+    def __init__(self, jetstream: Any, config: NatsEventPublisherConfig | None = None) -> None:
+        self._jetstream = jetstream
+        self._config = config or NatsEventPublisherConfig()
+
+    async def publish_status_event(self, event: dict[str, Any]) -> None:
+        await self._publish(self._config.status_subject, event)
+
+    async def publish_document_processed_event(self, event: dict[str, Any]) -> None:
+        await self._publish(self._config.processed_subject, event)
+
+    async def _publish(self, subject: str, event: dict[str, Any]) -> None:
+        payload = json.dumps(event, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        headers: dict[str, str] | None = None
+        event_id = event.get("event_id")
+        if isinstance(event_id, str) and event_id:
+            headers = {"Nats-Msg-Id": event_id}
+        await self._jetstream.publish(subject, payload, headers=headers)
