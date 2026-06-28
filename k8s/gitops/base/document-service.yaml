@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: document-service
+  labels:
+    app.kubernetes.io/name: document-service
+    app.kubernetes.io/part-of: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: document-service
+  template:
+    metadata:
+      labels:
+        app: document-service
+        app.kubernetes.io/name: document-service
+        app.kubernetes.io/part-of: evidara
+    spec:
+      containers:
+        - name: document-service
+          image: ghcr.io/philipplukas/evidara-document-intelligence-document-service:latest
+          ports:
+            - containerPort: 8090
+          env:
+            - name: PORT
+              value: "8090"
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+            - secretRef:
+                name: document-intelligence-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: document-service
+  labels:
+    app.kubernetes.io/name: document-service
+    app.kubernetes.io/part-of: evidara
+spec:
+  selector:
+    app: document-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8090

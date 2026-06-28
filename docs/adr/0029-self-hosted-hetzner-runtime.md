@@ -172,6 +172,20 @@ MacConfig + Argo CD GitOps path.
     artifact-store backend parameterized (default stays `local`).
   - **GCS is now fully replaceable.** All managed-service code paths have self-hosted
     equivalents; the remaining work is infrastructure (Slice 5) and cutover (Slice 6).
+- **Slice 5 — in progress** (2026-06-28):
+  - `k8s/gitops/base/` product manifests for all 7 workloads (platform-control api /
+    admin / worker, legal-search api / frontend, document-service, di-nats-consumer):
+    Deployment + Service + Ingress + Vault-backed ExternalSecret, only contract-allowed
+    kinds. `dev/` and `staging/` overlays set namespace (`evidare-*`), image tags,
+    `evidara-config`, and ingress hosts; `prod/` stays empty until staging is proven.
+    Placeholder ConfigMaps removed.
+  - Stateful stores (Postgres, OpenSearch, NATS, MinIO) are platform-owned (MacConfig)
+    or external (OpenStack) — `StatefulSet`/`PVC`/CRDs are forbidden for product
+    manifests — and are consumed via `evidara-config` + ExternalSecrets.
+  - Remaining (needs operator input): real registry owner, ingress hostnames, store
+    service endpoints, and Vault paths; MacConfig must provide the `shared-vault`
+    ClusterSecretStore, the namespaces, and the backing stores; the Argo `Application`
+    objects live in the cluster repo, not here.
 
 ## References
 

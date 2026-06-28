@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-control-worker
+  labels:
+    app.kubernetes.io/name: platform-control-worker
+    app.kubernetes.io/part-of: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: platform-control-worker
+  template:
+    metadata:
+      labels:
+        app: platform-control-worker
+        app.kubernetes.io/name: platform-control-worker
+        app.kubernetes.io/part-of: evidara
+    spec:
+      containers:
+        - name: platform-control-worker
+          image: ghcr.io/philipplukas/evidara-platform-control-worker:latest
+          command: ["platform-control-connector-worker"]
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+            - secretRef:
+                name: platform-control-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
