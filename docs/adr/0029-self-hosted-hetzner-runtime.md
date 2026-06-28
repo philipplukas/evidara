@@ -186,6 +186,15 @@ MacConfig + Argo CD GitOps path.
     service endpoints, and Vault paths; MacConfig must provide the `shared-vault`
     ClusterSecretStore, the namespaces, and the backing stores; the Argo `Application`
     objects live in the cluster repo, not here.
+- **Slice 6 — operator-driven** (runbook ready):
+  - `docs/runbooks/hetzner-cutover.md` — end-to-end cutover checklist (stores → secrets
+    → images → migrate → Argo deploy → validate → GCP destroy), staging-first.
+  - `document-intelligence/tests/test_nats_integration.py` — opt-in real-NATS
+    (testcontainers) round-trip proving publish dedup + a real message acked through the
+    consumer adapter; gated on `EVIDARA_NATS_IT=1` + the `it` extra. Recommended before
+    trusting cutover.
+  - Still open at cutover: retire the Pub/Sub `runtime_consumer.py`; re-point/re-enable
+    the disabled nightlies at the new environment.
 
 ## References
 
@@ -193,4 +202,5 @@ MacConfig + Argo CD GitOps path.
 - `docs/migration/README.md` — MacConfig GitOps strangler migration.
 - `vendor/platform-contract.yaml` — platform contract (nginx, Let's Encrypt, External Secrets/Vault).
 - `docs/runbooks/gcp-cost-stop.md` — GCP wind-down procedure (companion to this ADR).
+- `docs/runbooks/hetzner-cutover.md` — Slice 6 cutover checklist (companion to this ADR).
 - ADR-0016 (Cloud Run services vs jobs) and ADR-0003 (storage strategy) — superseded for runtime hosting by this ADR once Accepted.

@@ -46,6 +46,12 @@ llm = [
 test = [
   "pytest>=9.0.2",
 ]
+# Integration tests requiring Docker (opt-in via EVIDARA_NATS_IT=1). See
+# tests/test_nats_integration.py and ADR-0029.
+it = [
+  "pytest>=9.0.2",
+  "testcontainers>=4.9.0,<5",
+]
 
 [project.scripts]
 document_intelligence_process_event = "document_intelligence.jobs.process_event:main"
