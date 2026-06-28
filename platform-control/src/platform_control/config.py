@@ -46,9 +46,13 @@ class Settings(BaseSettings):
             "(shadow-mode + fixture-driven runs)."
         ),
     )
-    event_publisher_backend: Literal["noop", "pubsub", "local_outbox"] = "noop"
+    event_publisher_backend: Literal["noop", "pubsub", "local_outbox", "nats"] = "noop"
     raw_artifact_pubsub_topic: str = "raw-artifact-available"
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
+    # NATS JetStream backend — self-hosted replacement for Pub/Sub (ADR-0029).
+    nats_servers: str = "nats://localhost:4222"
+    nats_raw_artifact_subject: str = "evidara.raw-artifact-available"
+    nats_artifact_bundle_subject: str = "evidara.artifact-bundle-available"
     run_dispatch_backend: Literal["inline", "worker"] = "inline"
     wizard_orchestrator_backend: Literal["in_memory", "temporal"] = "in_memory"
     temporal_namespace: str = "default"

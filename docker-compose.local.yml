@@ -27,7 +27,8 @@ services:
       PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
       PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: local
       PLATFORM_CONTROL_RAW_ARTIFACT_LOCAL_DIR: .data/raw-artifacts
-      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: noop
+      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: ${PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND:-noop}
+      PLATFORM_CONTROL_NATS_SERVERS: ${PLATFORM_CONTROL_NATS_SERVERS:-nats://nats:4222}
       PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: inline
     command:
       - uvicorn
@@ -129,3 +130,38 @@ services:
       interval: 15s
       timeout: 5s
       retries: 12
+
+  # NATS JetStream — self-hosted Pub/Sub replacement (ADR-0029). Opt-in via the `nats`
+  # profile; the default `apps` stack still runs with the noop publisher. To exercise the
+  # real publish path:
+  #   PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats \
+  #     docker compose -f docker-compose.local.yml --profile apps --profile nats up
+  nats:
+    image: nats:2.10-alpine
+    profiles: ["nats"]
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    mem_limit: 256m
+
+  # One-shot: create the EVIDARA stream binding evidara.> with a 2m dedup window
+  # (matches the Nats-Msg-Id publish dedup in NatsRawArtifactPublisher).
+  nats-init:
+    image: natsio/nats-box:latest
+    profiles: ["nats"]
+    depends_on:
+      - nats
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        for i in $$(seq 1 30); do
+          if nats --server nats://nats:4222 stream add EVIDARA
+              --subjects 'evidara.>' --storage file --retention limits
+              --discard old --dupe-window 2m --defaults >/dev/null 2>&1; then
+            echo 'EVIDARA stream ready'; exit 0;
+          fi;
+          echo "waiting for nats ($$i/30)"; sleep 2;
+        done;
+        echo 'failed to create EVIDARA stream'; exit 1
+    restart: "no"

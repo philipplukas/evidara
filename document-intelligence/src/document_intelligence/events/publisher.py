@@ -1,12 +1,27 @@
-"""Publish document-intelligence outbound events to Pub/Sub."""
+"""Publish document-intelligence outbound events (status + document.processed)."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from google.cloud import pubsub_v1
+
+
+@runtime_checkable
+class EventPublisher(Protocol):
+    """Outbound publisher port for DI status / document.processed events.
+
+    Lets the runtime depend on the capability rather than the Pub/Sub SDK, so a
+    self-hosted broker (NATS JetStream, ADR-0029) can be dropped in. The NATS
+    implementation lands with the consumer rewrite (ADR-0029 Slice 3), where the
+    async broker context is natural; the publish surface is typed against this
+    Protocol now so that change needs no call-site churn.
+    """
+
+    def publish_status_event(self, event: dict[str, Any]) -> None: ...
+    def publish_document_processed_event(self, event: dict[str, Any]) -> None: ...
 
 
 @dataclass(frozen=True)

@@ -136,6 +136,19 @@ MacConfig + Argo CD GitOps path.
   plane to operate solo, working against the "low ops / fixed cost" goal; not required to
   revive the system.
 
+## Progress
+
+- **Slice 1 — done** (2026-06-28): nightly schedules disabled; `gcp-cost-stop.md` runbook.
+- **Slice 2 — in progress** (2026-06-28):
+  - platform-control `NatsRawArtifactPublisher` (JetStream, `Nats-Msg-Id` dedup),
+    `event_publisher_backend="nats"` config + factory wiring, unit-tested.
+  - document-intelligence `EventPublisher` Protocol extracted (publish surface typed
+    against it) — unblocks the Slice 3 NATS consumer without call-site churn.
+  - `docker-compose.local.yml` gains a `nats` profile (JetStream broker + `EVIDARA`
+    stream bootstrap) for local end-to-end exercise.
+  - Remaining: NATS adapter for the DI publisher (lands with Slice 3, where the async
+    broker context is natural).
+
 ## References
 
 - Migration-surface audit, 2026-06-28 (this session).
