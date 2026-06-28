@@ -8,6 +8,7 @@ dependencies = [
   "aiosqlite>=0.21.0,<1",
   "alembic>=1.16.0,<2",
   "asyncpg>=0.30.0,<1",
+  "boto3>=1.34.0,<2",
   "croniter>=6.2.2",
   "fastapi>=0.116.0,<1",
   "google-cloud-pubsub>=2.31.0,<3",

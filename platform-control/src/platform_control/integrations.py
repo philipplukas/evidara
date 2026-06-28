@@ -12,6 +12,7 @@ from platform_control.services.artifact_store import (
     ArtifactStore,
     GcsArtifactStore,
     LocalArtifactStore,
+    S3ArtifactStore,
 )
 
 
@@ -22,6 +23,15 @@ def get_artifact_store(settings: Settings | None = None) -> ArtifactStore:
             bucket_name=active_settings.raw_artifact_bucket,
             object_prefix=active_settings.raw_artifact_prefix,
             project_id=active_settings.gcp_project_id,
+        )
+    if active_settings.artifact_store_backend == "s3":
+        return S3ArtifactStore(
+            bucket_name=active_settings.raw_artifact_bucket,
+            object_prefix=active_settings.raw_artifact_prefix,
+            endpoint_url=active_settings.s3_endpoint_url,
+            region_name=active_settings.s3_region,
+            access_key_id=active_settings.s3_access_key_id,
+            secret_access_key=active_settings.s3_secret_access_key,
         )
     return LocalArtifactStore(base_dir=active_settings.raw_artifact_local_dir)
 

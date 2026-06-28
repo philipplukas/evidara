@@ -35,9 +35,16 @@ class Settings(BaseSettings):
     )
 
     gcp_project_id: str | None = None
-    artifact_store_backend: Literal["local", "gcs"] = "local"
+    artifact_store_backend: Literal["local", "gcs", "s3"] = "local"
     raw_artifact_bucket: str = "evidara-raw-artifacts-dev"
     raw_artifact_prefix: str = "runs"
+    # S3/MinIO backend — self-hosted object storage (ADR-0029). endpoint_url set for
+    # MinIO; left unset for real AWS S3. Credentials fall back to the boto3 default
+    # chain (env / instance profile) when not provided here.
+    s3_endpoint_url: str | None = None
+    s3_region: str | None = None
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
     raw_artifact_local_dir: Path = Field(default=Path(".data/raw-artifacts"))
     cassette_dir: Path = Field(
         default=Path(".data/cassettes"),

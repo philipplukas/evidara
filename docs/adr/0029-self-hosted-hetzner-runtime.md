@@ -162,6 +162,16 @@ MacConfig + Argo CD GitOps path.
     `document_intelligence_nats_consumer` console script; `nats-py` is a DI dependency.
   - Remaining for cutover (Slice 6): retire the Pub/Sub `runtime_consumer.py`; real
     broker integration/e2e test (testcontainers-NATS) under CI-with-Docker.
+- **Slice 4 — done** (2026-06-28):
+  - platform-control `S3ArtifactStore` (boto3, path-style for MinIO) implementing the
+    `ArtifactStore` port; `artifact_store_backend="s3"` config + factory wiring; unit-tested.
+  - document-intelligence `S3BundleLoader` + `s3://` branch in `DispatchingBundleLoader`;
+    `_parse_s3_uri`; reads via boto3 with `DI_S3_*` env config; unit-tested.
+  - `boto3` is a dependency on both services.
+  - `docker-compose.local.yml` gains a `minio` profile (MinIO + bucket bootstrap); PC
+    artifact-store backend parameterized (default stays `local`).
+  - **GCS is now fully replaceable.** All managed-service code paths have self-hosted
+    equivalents; the remaining work is infrastructure (Slice 5) and cutover (Slice 6).
 
 ## References
 
