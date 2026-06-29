@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legal-search-api
+  namespace: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: legal-search-api
+  template:
+    metadata:
+      labels:
+        app: legal-search-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/philipplukas/evidara-legal-search-api
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: legal-search-api
+  namespace: evidara
+spec:
+  selector:
+    app: legal-search-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legal-search-frontend
+  namespace: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: legal-search-frontend
+  template:
+    metadata:
+      labels:
+        app: legal-search-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/philipplukas/evidara-legal-search-frontend
+          ports:
+            - containerPort: 8080
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "http://localhost:3102"
+            - name: NEXT_PUBLIC_CONTROL_PANEL_URL
+              value: "http://localhost:3100"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: legal-search-frontend
+  namespace: evidara
+spec:
+  selector:
+    app: legal-search-frontend
+  ports:
+    - port: 8080
+      targetPort: 8080

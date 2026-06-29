@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: document-service
+  namespace: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: document-service
+  template:
+    metadata:
+      labels:
+        app: document-service
+    spec:
+      containers:
+        - name: document-service
+          image: ghcr.io/philipplukas/evidara-document-intelligence-document-service
+          ports:
+            - containerPort: 8090
+          env:
+            - name: PORT
+              value: "8090"
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+            - secretRef:
+                name: evidara-app-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: document-service
+  namespace: evidara
+spec:
+  selector:
+    app: document-service
+  ports:
+    - port: 8090
+      targetPort: 8090
+---
+# DI NATS JetStream consumer. Surfaces unset -> in-memory sink for the first bring-up
+# (proves the event flow); writing canonical tables to the lakehouse (Delta/Iceberg on
+# MinIO) is the follow-up after the IcebergCanonicalSink lands.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: di-consumer
+  namespace: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: di-consumer
+  template:
+    metadata:
+      labels:
+        app: di-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: ghcr.io/philipplukas/evidara-document-intelligence-consumer
+          command: ["sh", "-c", "document_intelligence_nats_consumer --servers \"$NATS_SERVERS\""]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+            - secretRef:
+                name: evidara-app-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
