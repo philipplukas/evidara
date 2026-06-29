@@ -23,7 +23,16 @@ export function middleware(request: NextRequest) {
   const apiBase = resolveApiBase(request.nextUrl.hostname);
   const path = request.nextUrl.pathname.replace("/api/platform-control", "");
   const targetUrl = new URL(path + request.nextUrl.search, apiBase);
-  return NextResponse.rewrite(targetUrl);
+
+  // BFF auth (ADR-0020): inject the operator API key server-side so the browser
+  // never sees it and platform-control can enforce X-API-Key. No-op when unset
+  // (API stays open), so this is backward compatible.
+  const requestHeaders = new Headers(request.headers);
+  const operatorApiKey = process.env.PLATFORM_CONTROL_OPERATOR_API_KEY;
+  if (operatorApiKey) {
+    requestHeaders.set("X-API-Key", operatorApiKey);
+  }
+  return NextResponse.rewrite(targetUrl, { request: { headers: requestHeaders } });
 }
 
 export const config = {

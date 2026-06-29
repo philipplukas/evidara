@@ -16,6 +16,7 @@ spec:
       containers:
         - name: api
           image: ghcr.io/philipplukas/evidara-platform-control
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           envFrom:
@@ -23,6 +24,9 @@ spec:
                 name: evidara-config
             - secretRef:
                 name: evidara-app-secrets
+            - secretRef:
+                name: evidara-auth
+                optional: true
           readinessProbe:
             httpGet:
               path: /health
@@ -66,11 +70,15 @@ spec:
       containers:
         - name: admin
           image: ghcr.io/philipplukas/evidara-platform-control-admin
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           envFrom:
             - configMapRef:
                 name: evidara-config
+            - secretRef:
+                name: evidara-auth
+                optional: true
           readinessProbe:
             httpGet:
               path: /
