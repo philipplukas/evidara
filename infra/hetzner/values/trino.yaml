@@ -1,0 +1,28 @@
+# Trino — distributed SQL over Iceberg-on-MinIO via the Nessie catalog.
+# Chart: trino/trino. ADR-0029. Coordinator + 1 worker.
+#
+# NOTE: MinIO creds are inline here for bring-up and match infra/hetzner/values/minio.yaml.
+# Hardening TODO: create a scoped MinIO access key and inject via a Secret, not plaintext.
+server:
+  workers: 1
+
+coordinator:
+  jvm:
+    maxHeapSize: "1G"
+worker:
+  jvm:
+    maxHeapSize: "1G"
+
+catalogs:
+  iceberg: |
+    connector.name=iceberg
+    iceberg.catalog.type=nessie
+    iceberg.nessie-catalog.uri=http://nessie.evidara.svc:19120/api/v2
+    iceberg.nessie-catalog.ref=main
+    iceberg.nessie-catalog.default-warehouse-dir=s3://evidara-lakehouse
+    fs.native-s3.enabled=true
+    s3.endpoint=http://minio.evidara.svc:9000
+    s3.region=us-east-1
+    s3.path-style-access=true
+    s3.aws-access-key=evidara
+    s3.aws-secret-key=change-me-minio-root
