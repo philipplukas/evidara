@@ -6,12 +6,14 @@
 server:
   workers: 1
 
+# Heap must exceed query.max-memory-per-node (chart default 1GB) + heap headroom
+# (~0.3x heap), so keep this comfortably above ~1.5GB. 4G is ample on a 64GB box.
 coordinator:
   jvm:
-    maxHeapSize: "1G"
+    maxHeapSize: "4G"
 worker:
   jvm:
-    maxHeapSize: "1G"
+    maxHeapSize: "4G"
 
 catalogs:
   iceberg: |
