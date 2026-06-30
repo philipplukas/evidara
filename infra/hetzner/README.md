@@ -76,3 +76,24 @@ MinIO. The DI pipeline writes Iceberg via PyIceberg → Nessie. See the lakehous
 
 Adapt the `k8s/gitops` overlay to this cluster: plain k8s `Secret`s (no Vault/ESO here),
 in-cluster store endpoints, k3s `traefik` ingress (or swap to nginx).
+
+## Stage 5 — real auth (ADR-0020)
+
+`deploy-stage5.sh` puts both apps behind real auth. Idempotent; rebuild the admin and
+legal-search-frontend images first (their middleware changed), then:
+
+```sh
+BASIC_AUTH_USER=admin BASIC_AUTH_PASS='choose-a-strong-pass' bash infra/hetzner/deploy-stage5.sh
+```
+
+- **API keys** — the `evidara-auth` Secret holds a `PLATFORM_CONTROL_OPERATOR_API_KEY` and a
+  `LEGAL_SEARCH_API_KEY` (generated once, reused after). Each API enforces `X-API-Key`; the
+  matching Next.js middleware (`platform-control/admin`, `legal-search/frontend`) injects the
+  key server-side when proxying, so the browser never sees it. Both keys are wired as
+  `optional` secret refs — absent key ⇒ API stays open (backward compatible).
+- **Front door** — Traefik BasicAuth Middleware + Ingress on the `*.88-99-26-120.nip.io`
+  hostnames (admin + search). TLS is Traefik's self-signed cert for now; cert-manager +
+  Let's Encrypt + a real domain is the trusted-TLS follow-up.
+
+> The frontend reaches its API in-cluster via `NEXT_PUBLIC_API_URL=http://legal-search-api.evidara.svc:8080`
+> (the middleware rewrites `/v1/*` there). The old `localhost:3102` dev default ECONNREFUSED'd inside the pod.

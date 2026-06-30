@@ -14,13 +14,23 @@ NS=evidara
 : "${BASIC_AUTH_USER:?Set BASIC_AUTH_USER (front-door login user)}"
 : "${BASIC_AUTH_PASS:?Set BASIC_AUTH_PASS (front-door login password)}"
 
-echo "==> Operator API key (created once, reused after)"
+echo "==> Auth secret: operator key + legal-search key (each created once, reused after)"
 if ! kubectl -n "$NS" get secret evidara-auth >/dev/null 2>&1; then
   kubectl -n "$NS" create secret generic evidara-auth \
-    --from-literal=PLATFORM_CONTROL_OPERATOR_API_KEY="$(openssl rand -hex 24)"
-  echo "    generated a new operator API key"
+    --from-literal=PLATFORM_CONTROL_OPERATOR_API_KEY="$(openssl rand -hex 24)" \
+    --from-literal=LEGAL_SEARCH_API_KEY="$(openssl rand -hex 24)"
+  echo "    generated operator + legal-search API keys"
 else
-  echo "    reusing existing operator API key"
+  # Secret exists — add any missing key without disturbing existing values.
+  for key in PLATFORM_CONTROL_OPERATOR_API_KEY LEGAL_SEARCH_API_KEY; do
+    if kubectl -n "$NS" get secret evidara-auth -o "jsonpath={.data.$key}" | grep -q .; then
+      echo "    reusing existing $key"
+    else
+      kubectl -n "$NS" patch secret evidara-auth --type merge \
+        -p "{\"data\":{\"$key\":\"$(openssl rand -hex 24 | base64)\"}}"
+      echo "    added missing $key"
+    fi
+  done
 fi
 
 echo "==> BasicAuth front-door secret"
@@ -36,10 +46,13 @@ echo "==> Traefik middleware + ingress"
 kubectl apply -f "${SCRIPT_DIR}/auth/basicauth-middleware.yaml"
 kubectl apply -f "${SCRIPT_DIR}/auth/ingress.yaml"
 
-echo "==> Re-apply apps (operator key + imagePullPolicy) and restart"
+echo "==> Re-apply apps (operator + legal-search keys, imagePullPolicy) and restart"
 kubectl apply -k "${SCRIPT_DIR}/apps"
-kubectl -n "$NS" rollout restart deploy/platform-control-api deploy/platform-control-admin
+kubectl -n "$NS" rollout restart \
+  deploy/platform-control-api deploy/platform-control-admin \
+  deploy/legal-search-api deploy/legal-search-frontend
 kubectl -n "$NS" rollout status deploy/platform-control-admin --timeout 3m
+kubectl -n "$NS" rollout status deploy/legal-search-frontend --timeout 3m
 
 echo
 echo "Done. Front door (BasicAuth: ${BASIC_AUTH_USER} / your password):"
