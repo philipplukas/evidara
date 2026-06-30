@@ -27,7 +27,7 @@ else
       echo "    reusing existing $key"
     else
       kubectl -n "$NS" patch secret evidara-auth --type merge \
-        -p "{\"data\":{\"$key\":\"$(openssl rand -hex 24 | base64)\"}}"
+        -p "{\"data\":{\"$key\":\"$(printf '%s' "$(openssl rand -hex 24)" | base64)\"}}"
       echo "    added missing $key"
     fi
   done
