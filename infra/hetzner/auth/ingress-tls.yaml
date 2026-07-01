@@ -1,0 +1,67 @@
+# Trusted-TLS ingress for the Evidara UIs — cert-manager + Let's Encrypt on a real
+# domain (ADR-0029). Coexists with ingress.yaml (the nip.io hosts); once these certs
+# issue and you've verified the real hostnames, the nip.io ingress can be retired.
+#
+# PREREQ before `kubectl apply`:
+#   1. Create DNS A records at the philippguldimann.ch registrar:
+#        admin.evidara.philippguldimann.ch   A   88.99.26.120
+#        search.evidara.philippguldimann.ch  A   88.99.26.120
+#      (AAAA -> 2a01:4f8:10a:284::2 optional.) Wait until they resolve.
+#   2. Keep issuer as letsencrypt-staging for the first apply to dodge rate limits;
+#      once you see a cert issue (it'll be untrusted "STAGING"), switch both
+#      annotations + the ClusterIssuer name to letsencrypt-prod and re-apply.
+#
+# cert-manager watches the tls.secretName + cluster-issuer annotation, solves the
+# HTTP-01 challenge over Traefik (port 80 is public; only 6443 is tailnet-locked),
+# and writes the cert into the named Secret. Traefik then serves it for that host.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: admin-tls
+  namespace: evidara
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - admin.evidara.philippguldimann.ch
+      secretName: admin-evidara-tls
+  rules:
+    - host: admin.evidara.philippguldimann.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: platform-control-admin
+                port:
+                  number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: search-tls
+  namespace: evidara
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - search.evidara.philippguldimann.ch
+      secretName: search-evidara-tls
+  rules:
+    - host: search.evidara.philippguldimann.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: legal-search-frontend
+                port:
+                  number: 8080

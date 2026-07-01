@@ -98,8 +98,16 @@ BASIC_AUTH_USER=admin BASIC_AUTH_PASS='choose-a-strong-pass' bash infra/hetzner/
   key server-side when proxying, so the browser never sees it. Both keys are wired as
   `optional` secret refs — absent key ⇒ API stays open (backward compatible).
 - **Front door** — Traefik BasicAuth Middleware + Ingress on the `*.88-99-26-120.nip.io`
-  hostnames (admin + search). TLS is Traefik's self-signed cert for now; cert-manager +
-  Let's Encrypt + a real domain is the trusted-TLS follow-up.
+  hostnames (admin + search). Rotate the BasicAuth password out-of-band; `deploy-stage5.sh`
+  creates `evidara-basicauth` once and preserves it on re-runs:
+  `htpasswd -nbB admin 'new-pass' | kubectl -n evidara create secret generic evidara-basicauth --from-literal=users=/dev/stdin ...`
+- **Trusted TLS** — cert-manager (v1.20.x) is installed with Let's Encrypt `ClusterIssuer`s
+  (`letsencrypt-staging`, `letsencrypt-prod`; see `auth/letsencrypt-issuer.yaml`). To move
+  off Traefik's self-signed cert onto a real domain: create A records for
+  `admin.evidara.philippguldimann.ch` / `search.evidara.philippguldimann.ch` → `88.99.26.120`,
+  then `kubectl apply -f auth/ingress-tls.yaml` (staging first, then flip the annotations to
+  `letsencrypt-prod`). Port 80 stays public for the HTTP-01 challenge — only 6443 is
+  tailnet-locked.
 
 > The frontend reaches its API in-cluster via `NEXT_PUBLIC_API_URL=http://legal-search-api.evidara.svc:8080`
 > (the middleware rewrites `/v1/*` there). The old `localhost:3102` dev default ECONNREFUSED'd inside the pod.
