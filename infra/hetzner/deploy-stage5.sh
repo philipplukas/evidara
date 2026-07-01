@@ -2,7 +2,7 @@
 # Stage 5 for self-hosted Evidara on Hetzner k3s (ADR-0029 / ADR-0020): real auth.
 # - operator API key (Secret) -> platform-control enforces X-API-Key; the admin
 #   middleware injects it server-side (rebuild the admin image first).
-# - Traefik BasicAuth front door + ingress on nip.io hostnames.
+# - Traefik BasicAuth front door + trusted-TLS ingress on the evidara.veyo.dev hostnames.
 # Idempotent.
 #
 # Usage (laptop, KUBECONFIG set). Pick a login for the front door:
@@ -51,7 +51,7 @@ fi
 
 echo "==> Traefik middleware + ingress"
 kubectl apply -f "${SCRIPT_DIR}/auth/basicauth-middleware.yaml"
-kubectl apply -f "${SCRIPT_DIR}/auth/ingress.yaml"
+kubectl apply -f "${SCRIPT_DIR}/auth/ingress-tls.yaml"
 
 echo "==> Re-apply apps (operator + legal-search keys, imagePullPolicy) and restart"
 kubectl apply -k "${SCRIPT_DIR}/apps"
@@ -63,7 +63,7 @@ kubectl -n "$NS" rollout status deploy/legal-search-frontend --timeout 3m
 
 echo
 echo "Done. Front door (BasicAuth: user '${BASIC_AUTH_USER:-<existing>}' / your password):"
-echo "  Admin:  https://admin.88-99-26-120.nip.io"
-echo "  Search: https://search.88-99-26-120.nip.io"
-echo "(Traefik serves a self-signed cert for now -> click through the browser warning."
-echo " Swap to cert-manager + Let's Encrypt + a real domain for trusted TLS.)"
+echo "  Admin:  https://admin.evidara.veyo.dev"
+echo "  Search: https://search.evidara.veyo.dev"
+echo "(Trusted Let's Encrypt certs via cert-manager -> green padlock, no browser warning."
+echo " See auth/ingress-tls.yaml + auth/letsencrypt-issuer.yaml.)"

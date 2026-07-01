@@ -1,6 +1,6 @@
 # Trusted-TLS ingress for the Evidara UIs — cert-manager + Let's Encrypt on a real
-# domain (ADR-0029). Coexists with ingress.yaml (the nip.io hosts); once these certs
-# issue and you've verified the real hostnames, the nip.io ingress can be retired.
+# domain (ADR-0029). This is now the canonical front-door ingress — the earlier
+# nip.io ingress (auth/ingress.yaml) has been retired.
 #
 # PREREQ before `kubectl apply`:
 #   1. Create DNS A records for the veyo.dev umbrella (Evidara lives under evidara.*):

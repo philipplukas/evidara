@@ -97,18 +97,19 @@ BASIC_AUTH_USER=admin BASIC_AUTH_PASS='choose-a-strong-pass' bash infra/hetzner/
   matching Next.js middleware (`platform-control/admin`, `legal-search/frontend`) injects the
   key server-side when proxying, so the browser never sees it. Both keys are wired as
   `optional` secret refs — absent key ⇒ API stays open (backward compatible).
-- **Front door** — Traefik BasicAuth Middleware + Ingress on the `*.88-99-26-120.nip.io`
-  hostnames (admin + search). Rotate the BasicAuth password out-of-band; `deploy-stage5.sh`
-  creates `evidara-basicauth` once and preserves it on re-runs:
+- **Front door** — Traefik BasicAuth Middleware + Ingress on the real hostnames
+  `admin.evidara.veyo.dev` / `search.evidara.veyo.dev` (admin + search; the old
+  `*.88-99-26-120.nip.io` ingress has been retired). Rotate the BasicAuth password
+  out-of-band; `deploy-stage5.sh` creates `evidara-basicauth` once and preserves it on re-runs:
   `htpasswd -nbB admin 'new-pass' | kubectl -n evidara create secret generic evidara-basicauth --from-literal=users=/dev/stdin ...`
-- **Trusted TLS** — cert-manager (v1.20.x) is installed with Let's Encrypt `ClusterIssuer`s
-  (`letsencrypt-staging`, `letsencrypt-prod`; see `auth/letsencrypt-issuer.yaml`). To move
-  off Traefik's self-signed cert onto a real domain: create A records for
-  `admin.evidara.veyo.dev` / `search.evidara.veyo.dev` → `88.99.26.120` (Evidara nests under
-  the neutral `veyo.dev` umbrella), then `kubectl apply -f auth/ingress-tls.yaml`
-  (staging first, then flip the annotations to
-  `letsencrypt-prod`). Port 80 stays public for the HTTP-01 challenge — only 6443 is
-  tailnet-locked.
+- **Trusted TLS** — live. cert-manager (v1.20.x) + Let's Encrypt `ClusterIssuer`s
+  (`letsencrypt-staging`, `letsencrypt-prod`; see `auth/letsencrypt-issuer.yaml`) issue trusted
+  certs for both hosts via the HTTP-01 challenge (`auth/ingress-tls.yaml`, annotation pinned to
+  `letsencrypt-prod`). Evidara nests under the neutral `veyo.dev` umbrella; A records
+  `admin.evidara.veyo.dev` / `search.evidara.veyo.dev` → `88.99.26.120` (IPv4-only — no AAAA,
+  the node doesn't serve 443 over IPv6). To reissue on a new host, apply with the
+  `letsencrypt-staging` annotation first to dodge rate limits, then flip to `letsencrypt-prod`.
+  Port 80 stays public for the HTTP-01 challenge — only 6443 is tailnet-locked.
 
 > The frontend reaches its API in-cluster via `NEXT_PUBLIC_API_URL=http://legal-search-api.evidara.svc:8080`
 > (the middleware rewrites `/v1/*` there). The old `localhost:3102` dev default ECONNREFUSED'd inside the pod.
