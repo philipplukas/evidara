@@ -34,9 +34,15 @@ export KUBECONFIG=~/.kube/evidara-hetzner.yaml
 kubectl get nodes                # expect: evidara-k3s Ready
 ```
 
-> Security follow-up: the k8s API (6443) and, later, the app ingress are exposed on the
-> public IP. Once Tailscale (or a firewall) is back, restrict 6443 to your IP. Tracked as
-> a hardening TODO — fine for bring-up.
+> **k8s API (6443) is locked to Tailscale.** The node runs Tailscale (`tailscale up`,
+> hostname `evidara-k3s`, tailnet IP `100.122.182.54`), and an nftables rule
+> (`/etc/nftables-evidara.conf`, persisted by `evidara-fw.service`) drops 6443 on the
+> public NIC `enp0s31f6`. In-cluster (`cni0`/`flannel`), tailnet (`tailscale0`), and
+> loopback paths are unaffected. Point your kubeconfig at the tailnet IP:
+> `sed -i '' 's#88.99.26.120:6443#100.122.182.54:6443#' ~/.kube/evidara-hetzner.yaml`
+> (the API cert carries both SANs via `/etc/rancher/k3s/config.yaml` `tls-san`). SSH (22)
+> and the app ingress (80/443) remain public — a public app domain + trusted TLS is the
+> next hardening step.
 
 ## Stage 1 — foundation (storage + database)
 
