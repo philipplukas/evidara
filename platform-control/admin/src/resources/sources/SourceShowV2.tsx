@@ -74,7 +74,7 @@ export default function SourceShowV2() {
   const statusMeta = SOURCE_STATUS_META[source.status];
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[1600px] mx-auto space-y-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[var(--container-max)] mx-auto space-y-6">
       <header className="space-y-3">
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
           Source detail

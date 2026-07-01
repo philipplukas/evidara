@@ -156,9 +156,10 @@ further cross-surface design direction.
   a single file (`styles/tokens/tokens.css`) so drift is visible in one diff,
   and `legal-search/frontend` has axe assertions (e.g.
   `workspace-client.a11y.test.tsx`) that catch shared-surface regressions for
-  the workspace side. `platform-control/admin` does not yet have equivalent
-  automated a11y coverage; adding axe assertions there is an identified
-  follow-up, not a prerequisite for this ADR.
+  the workspace side. As of 2026-04-28, `platform-control/admin` has equivalent
+  axe coverage in `src/__tests__/admin-*.a11y.test.tsx` (shell-level + run
+  queue resource page), so cross-surface a11y regressions are now caught
+  symmetrically.
 
 ### Neutral
 

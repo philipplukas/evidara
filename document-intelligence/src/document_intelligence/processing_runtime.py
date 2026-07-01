@@ -10,7 +10,11 @@ from document_intelligence.canonical.models import ProcessingResult
 from document_intelligence.config.runtime import RuntimeSettings
 from document_intelligence.contracts.envelope import ArtifactBundleAvailableEvent
 from document_intelligence.errors import ProcessingError
-from document_intelligence.events.publisher import EventPublisherConfig, PubSubEventPublisher
+from document_intelligence.events.publisher import (
+    EventPublisher,
+    EventPublisherConfig,
+    PubSubEventPublisher,
+)
 from document_intelligence.ingest import resolve_artifact_bundle_event
 from document_intelligence.ingest.loaders import BundleLoader
 from document_intelligence.persist.sinks import (
@@ -91,7 +95,7 @@ def _outbound_pubsub_topic_names() -> tuple[str, str] | None:
 def publish_processing_result_to_pubsub(
     result: ProcessingResult,
     *,
-    publisher: PubSubEventPublisher | None = None,
+    publisher: EventPublisher | None = None,
 ) -> None:
     """Publish status and document.processed events (same contract as runtime_consumer)."""
     topic_names = _outbound_pubsub_topic_names()

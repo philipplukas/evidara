@@ -1,8 +1,13 @@
 name: Release Readiness
 
 on:
-  schedule:
-    - cron: "30 5 * * *"
+  # Nightly schedule disabled 2026-06-28: this gate reads the other GCP nightlies' results
+  # (so it fails by construction while they are off) and queries live GCP Pub/Sub monitoring.
+  # Retired for the self-hosted Hetzner runtime (see
+  # docs/adr/0029-self-hosted-hetzner-runtime.md). Re-enable once Hetzner is live. Still
+  # runnable via dispatch.
+  # schedule:
+  #   - cron: "30 5 * * *"
   workflow_dispatch:
     inputs:
       strict:

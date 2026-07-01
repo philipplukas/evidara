@@ -1,8 +1,12 @@
 name: E2E Smoke Staging
 
 on:
-  schedule:
-    - cron: "15 3 * * *"
+  # Nightly schedule disabled 2026-06-28: targets live GCP staging (incl. an OpenSearch
+  # alias bootstrap that mutates live infra), being retired for the self-hosted Hetzner
+  # runtime (see docs/adr/0029-self-hosted-hetzner-runtime.md). Re-enable / repoint once
+  # the Hetzner environment is live. Still runnable via dispatch.
+  # schedule:
+  #   - cron: "15 3 * * *"
   workflow_dispatch:
     inputs:
       smoke_seed_url:

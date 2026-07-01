@@ -24,7 +24,16 @@ export function middleware(request: NextRequest) {
 
   const apiBase = resolveApiBase(request.nextUrl.hostname);
   const targetUrl = new URL(request.nextUrl.pathname + request.nextUrl.search, apiBase);
-  return NextResponse.rewrite(targetUrl);
+
+  // BFF auth (ADR-0020): inject the legal-search API key server-side so the browser
+  // never sees it and the API can enforce X-API-Key. No-op when unset (API stays
+  // open), so this is backward compatible.
+  const requestHeaders = new Headers(request.headers);
+  const apiKey = process.env.LEGAL_SEARCH_API_KEY;
+  if (apiKey) {
+    requestHeaders.set("X-API-Key", apiKey);
+  }
+  return NextResponse.rewrite(targetUrl, { request: { headers: requestHeaders } });
 }
 
 export const config = {

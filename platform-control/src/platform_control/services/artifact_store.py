@@ -153,6 +153,124 @@ class GcsArtifactStore:
         return f"{run_id}/{artifact_id}.json"
 
 
+class S3ArtifactStore:
+    """S3-compatible artifact store (AWS S3 or self-hosted MinIO, ADR-0029).
+
+    Mirrors GcsArtifactStore over the boto3 S3 client. ``s3://bucket/key`` URIs are
+    persisted in storage refs. The client is injectable for tests; otherwise boto3 is
+    built lazily so importing this module never requires the dependency.
+    """
+
+    def __init__(
+        self,
+        *,
+        bucket_name: str,
+        object_prefix: str = "runs",
+        endpoint_url: str | None = None,
+        region_name: str | None = None,
+        access_key_id: str | None = None,
+        secret_access_key: str | None = None,
+        s3_client: Any | None = None,
+    ) -> None:
+        if not bucket_name:
+            raise IntegrationConfigurationError("Raw artifact bucket name must be configured.")
+        self.bucket_name = bucket_name
+        self.object_prefix = object_prefix.strip("/")
+        self.s3_client = s3_client or _build_s3_client(
+            endpoint_url=endpoint_url,
+            region_name=region_name,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+        )
+
+    async def delete_blob(self, storage_path: str) -> None:
+        prefix = f"s3://{self.bucket_name}/"
+        if not storage_path.startswith(prefix):
+            return
+        object_name = storage_path.removeprefix(prefix)
+
+        def _delete() -> None:
+            try:
+                self.s3_client.delete_object(Bucket=self.bucket_name, Key=object_name)
+            except Exception:  # pragma: no cover - S3 call is exercised in integration
+                return
+
+        await asyncio.to_thread(_delete)
+
+    async def store_page_payload(
+        self,
+        run_id: str,
+        artifact_id: str,
+        payload: dict[str, Any],
+    ) -> str:
+        object_name = self._build_object_name(run_id, artifact_id)
+        payload_bytes = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+
+        def _upload() -> str:
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=object_name,
+                Body=payload_bytes,
+                ContentType="application/json",
+            )
+            return f"s3://{self.bucket_name}/{object_name}"
+
+        return await asyncio.to_thread(_upload)
+
+    async def store_bundle_manifest(
+        self,
+        run_id: str,
+        bundle_manifest_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        object_name = self._build_object_name(run_id, bundle_manifest_id)
+        payload_bytes = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+
+        def _upload() -> dict[str, Any]:
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=object_name,
+                Body=payload_bytes,
+                ContentType="application/json",
+            )
+            uri = f"s3://{self.bucket_name}/{object_name}"
+            return _build_storage_ref(uri, "application/json", payload_bytes)
+
+        return await asyncio.to_thread(_upload)
+
+    def _build_object_name(self, run_id: str, artifact_id: str) -> str:
+        if self.object_prefix:
+            return f"{self.object_prefix}/{run_id}/{artifact_id}.json"
+        return f"{run_id}/{artifact_id}.json"
+
+
+def _build_s3_client(
+    *,
+    endpoint_url: str | None,
+    region_name: str | None,
+    access_key_id: str | None,
+    secret_access_key: str | None,
+) -> Any:
+    try:
+        import boto3
+        from botocore.config import Config
+    except ModuleNotFoundError as exc:  # pragma: no cover - dependency guard
+        raise IntegrationConfigurationError(
+            "boto3 is required for the 's3' artifact store backend."
+        ) from exc
+
+    # Path-style addressing is required for MinIO / custom endpoints.
+    kwargs: dict[str, Any] = {"config": Config(s3={"addressing_style": "path"})}
+    if endpoint_url:
+        kwargs["endpoint_url"] = endpoint_url
+    if region_name:
+        kwargs["region_name"] = region_name
+    if access_key_id and secret_access_key:
+        kwargs["aws_access_key_id"] = access_key_id
+        kwargs["aws_secret_access_key"] = secret_access_key
+    return boto3.client("s3", **kwargs)
+
+
 def _build_storage_ref(uri: str, content_type: str, payload_bytes: bytes) -> dict[str, Any]:
     return {
         "uri": uri,
