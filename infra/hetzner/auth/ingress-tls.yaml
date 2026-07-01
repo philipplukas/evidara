@@ -21,7 +21,7 @@ metadata:
   namespace: evidara
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
   tls:
@@ -47,7 +47,7 @@ metadata:
   namespace: evidara
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
   tls:
