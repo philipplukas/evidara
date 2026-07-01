@@ -1,5 +1,10 @@
 # Runbook: Hetzner cutover (GCP → self-hosted)
 
+Owner: Platform team
+Last reviewed: 2026-07-01
+Last verified: Not yet verified
+Applies to: dev, staging, prod
+
 Step-by-step for ADR-0029 **Slice 6** — bringing Evidara up on the self-hosted Hetzner
 cluster and retiring GCP. Slices 1–5 are done in-repo (NATS, MinIO/S3, k8s manifests);
 this runbook is the operator sequence that uses them.

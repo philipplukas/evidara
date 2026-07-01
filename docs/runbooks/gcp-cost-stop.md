@@ -1,5 +1,10 @@
 # Runbook: GCP cost-stop & wind-down
 
+Owner: Platform team
+Last reviewed: 2026-07-01
+Last verified: Not yet verified
+Applies to: dev, staging, prod
+
 Companion to [ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md). Purpose: stop
 usage-based GCP spend while the self-hosted Hetzner runtime is being built, **without**
 losing data we cannot cheaply reproduce. Strategy: **scale to zero first, destroy later**
