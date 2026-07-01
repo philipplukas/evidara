@@ -1,5 +1,10 @@
-# Product workloads for prod (Argo CD). Add bases/resources as manifests are split out of Terraform.
+# Product workloads for prod (Argo CD path: k8s/gitops/prod).
+# Intentionally empty until the staging Argo path is proven (see docs/migration and
+# k8s/gitops/README.md). To activate prod, mirror the dev/staging overlay: reference
+# ../base, set `namespace: evidare-prod`, pin prod image tags, and set prod hosts.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources: []
+# resources:
+#   - ../base

@@ -15,6 +15,9 @@ RUN npm ci
 COPY platform-control/admin ./
 
 ENV PLATFORM_CONTROL_API_URL=http://platform-control-api:8000
+# Default the operator role so authorized users (gated by the ingress BasicAuth /
+# SSO front door) don't need the localStorage override. NEXT_PUBLIC_* is baked at build.
+ENV NEXT_PUBLIC_USER_ROLE=admin
 RUN npm run build
 
 EXPOSE 8080

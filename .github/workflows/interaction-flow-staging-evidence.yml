@@ -16,8 +16,12 @@ on:
       - "legal-search/frontend/src/components/layout/MobileWorkspace.tsx"
       - "platform-control/admin/src/app/AdminShell.tsx"
       - "scripts/run-interaction-flow-local.sh"
-  schedule:
-    - cron: "45 4 * * *"
+  # Nightly schedule disabled 2026-06-28: resolves live GCP staging UI URLs and uploads
+  # evidence to GCS, being retired for the self-hosted Hetzner runtime (see
+  # docs/adr/0029-self-hosted-hetzner-runtime.md). The push trigger above still runs the
+  # suite on relevant changes; re-enable the nightly once Hetzner is live.
+  # schedule:
+  #   - cron: "45 4 * * *"
   workflow_dispatch:
     inputs:
       full_playwright_trace:
