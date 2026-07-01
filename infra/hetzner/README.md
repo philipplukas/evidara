@@ -113,3 +113,40 @@ BASIC_AUTH_USER=admin BASIC_AUTH_PASS='choose-a-strong-pass' bash infra/hetzner/
 
 > The frontend reaches its API in-cluster via `NEXT_PUBLIC_API_URL=http://legal-search-api.evidara.svc:8080`
 > (the middleware rewrites `/v1/*` there). The old `localhost:3102` dev default ECONNREFUSED'd inside the pod.
+
+## Stage 6 — self-hosted CI runners (ADR-0029)
+
+Heavy CI jobs exhausted the GitHub-hosted Actions credit limit, so both runner pools
+run on this (near-idle) node via GitHub's **Actions Runner Controller** (ARC /
+`gha-runner-scale-set`). The two scale sets are named to match the repo Actions
+variables and every workflow's `runs-on:`:
+
+| Pool | Scale set (= `runs-on` label) | Repo variable | Serves |
+|---|---|---|---|
+| Light | `evidara-light` | `LIGHT_RUNNER_SCALE_SET` | `check-title`, `contract-validation` (both **required checks**), terraform, CD control-plane |
+| Heavy | `evidara-heavy-v2` | `HEAVY_RUNNER_SCALE_SET` | e2e/Playwright smoke, document-intelligence heavy jobs |
+
+Docker/buildx image builds (`runtime-images.yml`) deliberately stay GitHub-hosted —
+no Docker-in-Docker on-cluster.
+
+```sh
+# One-time: create a classic PAT with the `repo` scope (ARC also accepts a GitHub App):
+#   https://github.com/settings/tokens/new?scopes=repo&description=evidara-arc-runners
+export GITHUB_RUNNER_PAT=ghp_xxx
+bash infra/hetzner/deploy-runners.sh
+```
+
+The script (idempotent) installs the ARC controller into `arc-systems`, stores the
+credential as the `evidara-runner-github` Secret in `arc-runners`, and `helm upgrade
+--install`s both scale sets from `runners/values-{light,heavy}.yaml`. Runners are
+**ephemeral, idle-to-zero** (`minRunners: 0`) so they cost nothing at rest and
+self-recycle each job. Verify:
+
+```sh
+kubectl -n arc-runners get pods          # one *-listener pod per scale set
+gh api repos/philipplukas/evidara/actions/runners --jq '.runners[].name'
+```
+
+> **These pools own the required checks.** If they are offline, no PR can merge —
+> `check-title` + `contract-validation` never start. That was the CI blocker after the
+> GKE cluster (which hosted the old ARC pools) was decommissioned.
