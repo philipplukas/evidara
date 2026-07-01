@@ -104,8 +104,9 @@ BASIC_AUTH_USER=admin BASIC_AUTH_PASS='choose-a-strong-pass' bash infra/hetzner/
 - **Trusted TLS** — cert-manager (v1.20.x) is installed with Let's Encrypt `ClusterIssuer`s
   (`letsencrypt-staging`, `letsencrypt-prod`; see `auth/letsencrypt-issuer.yaml`). To move
   off Traefik's self-signed cert onto a real domain: create A records for
-  `admin.evidara.philippguldimann.ch` / `search.evidara.philippguldimann.ch` → `88.99.26.120`,
-  then `kubectl apply -f auth/ingress-tls.yaml` (staging first, then flip the annotations to
+  `admin.evidara.veyo.dev` / `search.evidara.veyo.dev` → `88.99.26.120` (Evidara nests under
+  the neutral `veyo.dev` umbrella), then `kubectl apply -f auth/ingress-tls.yaml`
+  (staging first, then flip the annotations to
   `letsencrypt-prod`). Port 80 stays public for the HTTP-01 challenge — only 6443 is
   tailnet-locked.
 
