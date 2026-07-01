@@ -108,14 +108,14 @@ MacConfig + Argo CD GitOps path.
 
 ## Consequences
 
-**Positive**
+### Positive
 
 - Fixed, predictable monthly cost; no usage-billed surprises; no always-on Cloud Run /
   Cloud SQL / OpenSearch-VM spend with budgets disabled.
 - Consolidation onto one self-hosted, GitOps-managed cluster the owner controls.
 - Most of the app needs no code change — only config + a handful of new adapters.
 
-**Negative / costs**
+### Negative / costs
 
 - The DI consumer rewrite is real work and must faithfully reproduce DLQ/redelivery.
 - Operating the cluster (Postgres, OpenSearch, NATS, MinIO) is now self-managed —

@@ -8,7 +8,7 @@ and the [cutover runbook](../runbooks/hetzner-cutover.md).
 
 > **Steady state vs bootstrap.** The steps below are the *one-time* manual bootstrap /
 > disaster-recovery path. Once the cluster is up, move to **GitOps** (Argo CD) + a **VPN**
-> so future changes are git-driven, not hand-typed — see [§Steady state](#steady-state-codify-it).
+> so future changes are git-driven, not hand-typed — see [§Steady state](#steady-state--codify-it).
 
 Reference box: `88.99.26.120` — dedicated server, 8-core i7-6700, 64 GB RAM, 3× 512 GB NVMe.
 
@@ -25,16 +25,21 @@ When locked out (e.g. lost VPN/firewall) or starting fresh:
 1. **Robot → Rescue tab** → activate **Linux 64-bit** rescue → note the temporary password.
 2. **Robot → Reset tab** → "Execute an automatic hardware reset" → boots into rescue (~1–2 min).
 3. SSH into rescue (if your laptop cached an old host key: `ssh-keygen -R 88.99.26.120` first):
+
    ```bash
    ssh root@88.99.26.120        # rescue password
    ```
+
 4. Pre-seed your SSH key so the new system trusts it:
+
    ```bash
    mkdir -p /root/.ssh
    echo "ssh-ed25519 AAAA... you@host" >> /root/.ssh/authorized_keys
    ```
+
 5. Install Debian non-interactively (RAID 5 across the 3 NVMe, ~952 GB usable). `TERM=xterm`
    avoids "unknown terminal type" on the menu editor:
+
    ```bash
    export TERM=xterm
    installimage -a -n evidara-k3s -r yes -l 5 \
@@ -42,6 +47,7 @@ When locked out (e.g. lost VPN/firewall) or starting fresh:
      -K /root/.ssh/authorized_keys \
      -i /root/.oldroot/nfs/install/../images/Debian-1305-trixie-amd64-base.tar.zst
    ```
+
    (The image filename is whatever `installimage`'s menu lists under Debian — adjust if it differs.)
 6. `reboot`. The box comes up as fresh Debian; RAID resyncs in the background (`cat /proc/mdstat`)
    while the system is fully usable.
