@@ -11,8 +11,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NS=evidara
-: "${BASIC_AUTH_USER:?Set BASIC_AUTH_USER (front-door login user)}"
-: "${BASIC_AUTH_PASS:?Set BASIC_AUTH_PASS (front-door login password)}"
 
 echo "==> Auth secret: operator key + legal-search key (each created once, reused after)"
 if ! kubectl -n "$NS" get secret evidara-auth >/dev/null 2>&1; then
@@ -33,14 +31,23 @@ else
   done
 fi
 
-echo "==> BasicAuth front-door secret"
-if command -v htpasswd >/dev/null 2>&1; then
-  HTPASSWD_LINE="$(htpasswd -nbB "$BASIC_AUTH_USER" "$BASIC_AUTH_PASS")"
+echo "==> BasicAuth front-door secret (created once; re-runs preserve it)"
+# Create-once, like evidara-auth: a re-run must NOT clobber a password that was
+# rotated out-of-band. BASIC_AUTH_USER/PASS are only needed for first-time setup.
+# To change the password later, rotate the secret directly (htpasswd -nbB | kubectl).
+if kubectl -n "$NS" get secret evidara-basicauth >/dev/null 2>&1; then
+  echo "    reusing existing evidara-basicauth (password preserved)"
 else
-  HTPASSWD_LINE="${BASIC_AUTH_USER}:$(openssl passwd -apr1 "$BASIC_AUTH_PASS")"
+  : "${BASIC_AUTH_USER:?Set BASIC_AUTH_USER (front-door login user) for first-time setup}"
+  : "${BASIC_AUTH_PASS:?Set BASIC_AUTH_PASS (front-door login password) for first-time setup}"
+  if command -v htpasswd >/dev/null 2>&1; then
+    HTPASSWD_LINE="$(htpasswd -nbB "$BASIC_AUTH_USER" "$BASIC_AUTH_PASS")"
+  else
+    HTPASSWD_LINE="${BASIC_AUTH_USER}:$(openssl passwd -apr1 "$BASIC_AUTH_PASS")"
+  fi
+  kubectl -n "$NS" create secret generic evidara-basicauth --from-literal=users="$HTPASSWD_LINE"
+  echo "    created evidara-basicauth for user '${BASIC_AUTH_USER}'"
 fi
-kubectl -n "$NS" create secret generic evidara-basicauth \
-  --from-literal=users="$HTPASSWD_LINE" --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> Traefik middleware + ingress"
 kubectl apply -f "${SCRIPT_DIR}/auth/basicauth-middleware.yaml"
@@ -55,7 +62,7 @@ kubectl -n "$NS" rollout status deploy/platform-control-admin --timeout 3m
 kubectl -n "$NS" rollout status deploy/legal-search-frontend --timeout 3m
 
 echo
-echo "Done. Front door (BasicAuth: ${BASIC_AUTH_USER} / your password):"
+echo "Done. Front door (BasicAuth: user '${BASIC_AUTH_USER:-<existing>}' / your password):"
 echo "  Admin:  https://admin.88-99-26-120.nip.io"
 echo "  Search: https://search.88-99-26-120.nip.io"
 echo "(Traefik serves a self-signed cert for now -> click through the browser warning."
