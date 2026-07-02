@@ -83,6 +83,16 @@ test.describe("Visual regressions", () => {
   // CI without this baseline. Navigation + wait points mirror that capture so
   // the framing stays comparable.
   test("admin run-detail v2 — primary decision hierarchy matches baseline", async ({ page }) => {
+    // This is the only visual test that drives the *admin* dev server (port
+    // 3100). Next.js `dev` compiles routes lazily on first request, and since
+    // admin's `Pill` now pulls the shared `@evidara/ui` tree into the graph
+    // (PR #503), that first cold compile can exceed the default 30s test
+    // timeout — the `page.goto` below then times out on attempt 1 and the app
+    // shell is still hydrating when attempt 2's 5s `toBeVisible` fires. Give
+    // this test (and its first navigation) generous headroom so the one-time
+    // cold compile completes deterministically; the frontend-only tests are
+    // unaffected and keep the default budget.
+    test.setTimeout(120_000);
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await page.addInitScript(([key]) => {
@@ -90,13 +100,22 @@ test.describe("Visual regressions", () => {
     }, [ADMIN_LOCAL_STORAGE_ROLE_KEY]);
     await page.setViewportSize({ width: 1600, height: 900 });
 
-    await page.goto(`${ADMIN_BASE_URL}/#/runs-v2/run_01`, { waitUntil: "load" });
-    await expect(page.getByRole("heading", { name: /Decision support/ })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Run run_01/ })).toBeVisible();
+    await page.goto(`${ADMIN_BASE_URL}/#/runs-v2/run_01`, {
+      waitUntil: "load",
+      timeout: 90_000,
+    });
+    await expect(page.getByRole("heading", { name: /Decision support/ })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByRole("heading", { name: /Run run_01/ })).toBeVisible({
+      timeout: 20_000,
+    });
     // `RunDetailSectionsV2` renders collapsed accordion items below the
     // metadata grid. Wait for the `Provider Jobs` trigger so the capture
     // includes the full lifecycle stack (matches screenshot-pack framing).
-    await expect(page.getByRole("button", { name: /Provider Jobs/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Provider Jobs/ })).toBeVisible({
+      timeout: 20_000,
+    });
 
     await expect(page).toHaveScreenshot("admin-run-detail-v2.png", {
       fullPage: true,
