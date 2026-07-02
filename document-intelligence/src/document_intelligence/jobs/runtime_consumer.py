@@ -8,67 +8,28 @@ import logging
 import os
 import signal
 import sys
-import threading
 import time
 from collections.abc import Mapping
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 from google.cloud import pubsub_v1
 
 from document_intelligence.config.runtime import RuntimeSettings
-from document_intelligence.contracts.envelope import EnvelopeError
 from document_intelligence.events.publisher import (
     EventPublisherConfig,
     PubSubEventPublisher,
 )
 from document_intelligence.ingest.loaders import GcsBundleLoader
+from document_intelligence.jobs._consumer_common import (
+    PERMANENT_ERRORS,
+    extract_event_context,
+    start_health_server,
+)
 from document_intelligence.observability.event_logging import log_event
 from document_intelligence.pipeline import ProcessingPipeline
 from document_intelligence.processing_runtime import build_processing_pipeline
 
 LOGGER = logging.getLogger("document_intelligence.runtime_consumer")
-
-# Permanent failures are deterministic and message-content-driven:
-# retrying the identical payload will produce the same error.
-_PERMANENT_ERRORS = (EnvelopeError, json.JSONDecodeError, KeyError)
-
-
-# ---------------------------------------------------------------------------
-# Minimal HTTP health server for Cloud Run liveness / readiness probes.
-# Runs in a daemon thread so it doesn't block the synchronous poll loop.
-# ---------------------------------------------------------------------------
-
-
-class _HealthHandler(BaseHTTPRequestHandler):
-    """Return 200 on GET /health, 404 otherwise."""
-
-    def do_GET(self) -> None:  # noqa: N802
-        if self.path == "/health":
-            body = json.dumps({"status": "ok", "service": "document-intelligence-consumer"}).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-        else:
-            self.send_error(404)
-
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
-        """Silence default stderr logging to avoid noise."""
-
-
-def _start_health_server() -> None:
-    """Start the health HTTP server on $PORT (default 8080) in a daemon thread."""
-    port = int(os.environ.get("PORT", "8080"))
-    try:
-        server = HTTPServer(("", port), _HealthHandler)
-    except OSError as e:
-        LOGGER.error("Failed to bind health server to port %d: %s", port, e)
-        raise
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    LOGGER.info("Health server listening on port %d", port)
 
 
 def _build_pipeline(
@@ -112,26 +73,10 @@ def _process_message(
         publisher.publish_document_processed_event(result.document_processed_event)
 
 
-def _extract_event_context(data: bytes) -> dict[str, str | None]:
-    """Best-effort extraction of event context fields for logging."""
-    try:
-        payload = json.loads(data.decode("utf-8"))
-        inner = payload.get("payload", {})
-        provenance = inner.get("provenance", {}) if isinstance(inner, dict) else {}
-        return {
-            "correlation_id": payload.get("correlation_id"),
-            "event_id": payload.get("event_id"),
-            "event_type": payload.get("event_type"),
-            "run_id": provenance.get("run_id") if isinstance(provenance, dict) else None,
-        }
-    except Exception:
-        return {"correlation_id": None, "event_id": None, "event_type": None, "run_id": None}
-
-
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    _start_health_server()
+    start_health_server("document-intelligence-consumer")
 
     pipeline = _build_pipeline(os.environ)
     publisher = (
@@ -176,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         for received in response.received_messages:
             msg_id = received.message.message_id
             delivery_attempt = received.message.attributes.get("googclient_deliveryattempt", "unknown")
-            ctx = _extract_event_context(received.message.data)
+            ctx = extract_event_context(received.message.data)
             start = time.monotonic()
 
             try:
@@ -201,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
                     subscription=args.subscription_name,
                 )
 
-            except _PERMANENT_ERRORS as exc:
+            except PERMANENT_ERRORS as exc:
                 # Deterministic, message-content-driven — ack immediately,
                 # do not waste retry budget or pollute DLQ.
                 subscriber.acknowledge(

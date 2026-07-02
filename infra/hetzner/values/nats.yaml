@@ -1,0 +1,14 @@
+# NATS JetStream for self-hosted Evidara — single server with file storage.
+# Chart: nats/nats. ADR-0029. Service: nats.evidara.svc:4222
+config:
+  jetstream:
+    enabled: true
+    fileStore:
+      enabled: true
+      pvc:
+        enabled: true
+        size: 10Gi
+        storageClassName: local-path
+  # single, non-clustered server (chart default)
+  cluster:
+    enabled: false

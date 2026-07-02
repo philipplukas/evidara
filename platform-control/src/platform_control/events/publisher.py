@@ -61,6 +61,87 @@ class LocalOutboxRawArtifactPublisher:
         tmp_path.replace(event_path)
 
 
+class NatsRawArtifactPublisher:
+    """Publish raw-artifact / artifact-bundle events to NATS JetStream.
+
+    Self-hosted replacement for Pub/Sub (ADR-0029). JetStream provides at-least-once
+    delivery plus publish dedup via the ``Nats-Msg-Id`` header (keyed on ``event_id``),
+    mirroring the idempotency the Pub/Sub path relied on. The JetStream context can be
+    injected for tests; otherwise a connection is opened lazily on first publish.
+
+    A JetStream stream binding the configured subjects (e.g. ``evidara.>``) must exist
+    in the broker; stream provisioning is a deployment concern (ADR-0029 Slice 5).
+    """
+
+    def __init__(
+        self,
+        *,
+        servers: str,
+        raw_artifact_subject: str,
+        artifact_bundle_subject: str,
+        jetstream: Any | None = None,
+    ) -> None:
+        self.servers = servers
+        self.raw_artifact_subject = raw_artifact_subject
+        self.artifact_bundle_subject = artifact_bundle_subject
+        self._jetstream = jetstream
+        self._connection: Any | None = None
+
+    async def publish_raw_artifact_available(self, artifact: RawArtifact) -> None:
+        event = build_raw_artifact_event(artifact)
+        await self._publish(
+            subject=self.raw_artifact_subject,
+            event=event,
+            headers={
+                "event_type": str(event["event_type"]),
+                "artifact_id": artifact.artifact_id,
+                "run_id": artifact.run_id,
+                "source_id": artifact.source_id,
+                "source_version_id": artifact.source_version_id,
+            },
+        )
+
+    async def publish_artifact_bundle_available(self, event: dict[str, Any]) -> None:
+        payload = event["payload"]
+        provenance = payload["provenance"]
+        await self._publish(
+            subject=self.artifact_bundle_subject,
+            event=event,
+            headers={
+                "event_type": str(event["event_type"]),
+                "bundle_manifest_id": payload["bundle_manifest_id"],
+                "source_snapshot_id": payload["source_snapshot_id"],
+                "run_id": provenance["run_id"],
+                "source_id": provenance["source_id"],
+                "source_version_id": provenance["source_version_id"],
+            },
+        )
+
+    async def _publish(
+        self, *, subject: str, event: dict[str, Any], headers: dict[str, str]
+    ) -> None:
+        jetstream = await self._ensure_jetstream()
+        data = json.dumps(event, sort_keys=True).encode("utf-8")
+        event_id = event.get("event_id")
+        msg_headers = dict(headers)
+        if isinstance(event_id, str) and event_id:
+            msg_headers["Nats-Msg-Id"] = event_id
+        await jetstream.publish(subject, data, headers=msg_headers)
+
+    async def _ensure_jetstream(self) -> Any:
+        if self._jetstream is not None:
+            return self._jetstream
+        try:
+            import nats
+        except ModuleNotFoundError as exc:  # pragma: no cover - dependency guard
+            raise IntegrationConfigurationError(
+                "nats-py is required for the 'nats' event publisher backend."
+            ) from exc
+        self._connection = await nats.connect(self.servers)
+        self._jetstream = self._connection.jetstream()
+        return self._jetstream
+
+
 class PubSubRawArtifactPublisher:
     def __init__(
         self,

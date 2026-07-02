@@ -1,0 +1,23 @@
+# Non-secret app config — in-cluster store endpoints. ADR-0029 stage 4.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: evidara-config
+  namespace: evidara
+data:
+  # platform-control
+  PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: "s3"
+  PLATFORM_CONTROL_S3_ENDPOINT_URL: "http://minio.evidara.svc:9000"
+  PLATFORM_CONTROL_S3_REGION: "us-east-1"
+  PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET: "evidara-raw-artifacts"
+  PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: "nats"
+  PLATFORM_CONTROL_NATS_SERVERS: "nats://nats.evidara.svc:4222"
+  PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: "inline"
+  # document-intelligence
+  DI_S3_ENDPOINT_URL: "http://minio.evidara.svc:9000"
+  DI_S3_REGION: "us-east-1"
+  NATS_SERVERS: "nats://nats.evidara.svc:4222"
+  # legal-search
+  OPENSEARCH_NODE: "http://opensearch-cluster-master.evidara.svc:9200"
+  # cross-surface
+  PLATFORM_CONTROL_API_URL: "http://platform-control-api.evidara.svc:8080"

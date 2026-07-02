@@ -1,8 +1,12 @@
 name: Scraping Nightly Canary
 
 on:
-  schedule:
-    - cron: "15 2 * * *"
+  # Nightly schedule disabled 2026-06-28: targets live GCP dev Cloud Run, which is being
+  # retired for the self-hosted Hetzner runtime (see
+  # docs/adr/0029-self-hosted-hetzner-runtime.md). Re-enable / repoint once the Hetzner
+  # environment is live. Still runnable via dispatch.
+  # schedule:
+  #   - cron: "15 2 * * *"
   workflow_dispatch:
     inputs:
       environment:

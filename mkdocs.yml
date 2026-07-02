@@ -152,6 +152,7 @@ nav:
       - Nix dev shell: setup/nix.md
       - GCP local Cloud Run auth: setup/gcp-local-cloud-run-auth.md
       - Infrastructure Overview: setup/infrastructure-overview.md
+      - Hetzner k3s bootstrap: setup/hetzner-k3s.md
       - Branch Rules: setup/branch-rules.md
       - Zed Setup: setup/zed.md
       - Wizard Temporal Argilla Rollout: setup/platform-control-wizard-temporal-argilla-rollout.md

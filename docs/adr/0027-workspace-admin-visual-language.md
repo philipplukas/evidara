@@ -111,17 +111,25 @@ The two surfaces share, and will continue to share:
 
 The two surfaces intentionally diverge on:
 
-- **Typography** — workspace foregrounds a serif / humanist display face
-  (Source Serif 4) with generous line-height for long-form reading; admin
-  foregrounds a sans face tuned for operator density.
+- **Typography** — workspace foregrounds Source Serif 4 with editorial
+  line-heights across page titles, section heads, and body reading; admin
+  uses Source Serif 4 only at the display level (top-bar wordmark, page
+  `<h1>` titles) and stays sans for section heads, body, and table content
+  tuned for operator density. Both surfaces share the same serif face — the
+  divergence is now *which levels of the type scale render in serif*, not
+  whether serif is used at all. See the 2026-04-28 amendment below.
 - **Card and section patterns** — workspace uses soft elevation and narrative
   framing (editorial section heads, cream subsurfaces); admin uses a denser
   grid with structured labels and quadrant decision-support cards.
 - **Density** — workspace uses reading spacing (wider paddings, taller line
   boxes); admin uses scan spacing (compact rows, dense status grids).
-- **Accent usage** — workspace applies the single-accent interactive rule;
-  admin is permitted to use accent colour for status and decision support
-  where scan-velocity justifies it.
+- **Accent usage** — both surfaces now apply the workspace single-accent
+  rule to *primary action* affordances (Promote / Approve render in
+  `--accent-core`, destructive actions in `--status-critical`). Admin
+  continues to use accent and status colours in non-action contexts —
+  status pills, decision-support cards, attention CTAs — where
+  scan-velocity justifies a denser colour vocabulary than workspace
+  permits in its reading surface. See the 2026-04-28 amendment below.
 
 This is the recorded direction for future design work. #386, #387, and any
 further admin visual polish proceed under this stance without waiting on
@@ -148,9 +156,10 @@ further cross-surface design direction.
   a single file (`styles/tokens/tokens.css`) so drift is visible in one diff,
   and `legal-search/frontend` has axe assertions (e.g.
   `workspace-client.a11y.test.tsx`) that catch shared-surface regressions for
-  the workspace side. `platform-control/admin` does not yet have equivalent
-  automated a11y coverage; adding axe assertions there is an identified
-  follow-up, not a prerequisite for this ADR.
+  the workspace side. As of 2026-04-28, `platform-control/admin` has equivalent
+  axe coverage in `src/__tests__/admin-*.a11y.test.tsx` (shell-level + run
+  queue resource page), so cross-surface a11y regressions are now caught
+  symmetrically.
 
 ### Neutral
 
@@ -193,6 +202,83 @@ further cross-surface design direction.
   [#387](https://github.com/philipplukas/evidara/issues/387)** and further
   admin visual work do not require a cross-surface design sprint before
   proceeding.
+
+## Amendment — 2026-04-28 — convergence on shared typography, action palette, and foreground hierarchy
+
+Stance 2 still holds. This amendment records that, between 2026-04-27 and
+2026-04-28, five PRs implemented the "shared brand" half of the stance more
+deeply than the original ADR anticipated, narrowing (but not removing) the
+listed divergences for typography and accent usage. The "two products" half
+— density, card patterns, and structural chrome — is unchanged.
+
+### What is now shared (was divergent or under-specified at acceptance)
+
+- **Display typography.** Source Serif 4 is now the display face on both
+  surfaces. The admin top-bar wordmark adopted it as part of the foundational
+  parity sweep ([#477](https://github.com/philipplukas/evidara/pull/477)),
+  and admin page-level `<h1>` titles followed in
+  [#486](https://github.com/philipplukas/evidara/pull/486). Section heads
+  (`<h2>` / `<h3>`) inside admin decision-support, pipeline-health, and
+  resource-detail cards intentionally stay sans, so admin still reads as
+  operator-dense at the body and section level.
+- **Primary-action palette.** The workspace single-accent rule (one accent
+  per affordance — `--accent-core` for primary, `--status-critical` for
+  destructive) now applies to admin action affordances too, via the MUI
+  theme bridge in `platform-control/admin/src/lib/admin/muiTheme.ts` and
+  the targeted resource-literal sweep in
+  [#487](https://github.com/philipplukas/evidara/pull/487). Admin retains
+  accent and status colours outside the action surface (status pills,
+  quadrant decision-support cards, "Open attention run" amber CTAs).
+- **Foreground / border hierarchy.** The token ladder
+  (`--foreground-muted` / `--foreground-subtle` / `--foreground-faint` /
+  `--foreground-ghost`, plus `--border-faint` / `--border` / `--border-strong`)
+  was added in [#486](https://github.com/philipplukas/evidara/pull/486) and
+  [#488](https://github.com/philipplukas/evidara/pull/488) routed all
+  previously-handwritten `rgba(29,41,61, X)` and `rgba(15,76,129, X)`
+  literals across admin resources through it (69 replacements across 7
+  files). Admin foreground hierarchy is now expressed in the same token
+  vocabulary the workspace uses.
+
+### What remains intentionally divergent
+
+The original Stance 2 logic still applies to:
+
+- **Density.** Admin keeps scan spacing (compact rows, dense status grids)
+  and workspace keeps reading spacing.
+- **Card and section patterns.** Admin keeps quadrant decision-support
+  cards and structured operator labels; workspace keeps narrative cards
+  with editorial section heads and cream subsurfaces.
+- **Structural chrome (header, nav).** Admin keeps its cool-blue compact
+  top bar and left nav; workspace keeps its reading-surface header.
+  Cross-surface header unification (`packages/brand-shell` extraction) is
+  follow-up work tracked separately and is *not* part of this amendment.
+
+### CI guard against re-drift
+
+The convergence above is now enforced by the brand-token parity test at
+[`platform-control/admin/src/ui/primitives/admin-primitive-token-parity.test.ts`](../../platform-control/admin/src/ui/primitives/admin-primitive-token-parity.test.ts).
+The test originally scanned a hand-listed set of admin primitives;
+[#491](https://github.com/philipplukas/evidara/pull/491) extended it to walk
+`platform-control/admin/src/resources/**/*.tsx` recursively, asserting that
+the shared `FORBIDDEN_LITERALS` list (the pre-parity Material hex codes
+and the navy / brand-strong rgba opacity literals) cannot be reintroduced
+anywhere in the resource tree. Drift on the convergence above now fails
+`npm run check`, not code review.
+
+### PRs that landed this convergence
+
+- [#477](https://github.com/philipplukas/evidara/pull/477) — foundational
+  shared-token parity for admin shell, primitives, and AppBar typography;
+  introduced the primitive-scope brand-token parity test.
+- [#486](https://github.com/philipplukas/evidara/pull/486) — admin page-title
+  serif and the `--foreground-*` / `--border-*` token ladder.
+- [#487](https://github.com/philipplukas/evidara/pull/487) — admin action
+  palette aligned with workspace via MUI theme bridge and resource literal
+  sweep.
+- [#488](https://github.com/philipplukas/evidara/pull/488) — admin
+  foreground / border literal sweep onto the token ladder.
+- [#491](https://github.com/philipplukas/evidara/pull/491) — parity test
+  extended to scan admin resource components.
 
 ## References
 

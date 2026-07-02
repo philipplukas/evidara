@@ -1,0 +1,12 @@
+# Traefik BasicAuth front door for the Evidara UIs (ADR-0020 / ADR-0029).
+# References the evidara-basicauth Secret (htpasswd in the `users` key), created by
+# deploy-stage5.sh from your chosen username/password.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: evidara-basicauth
+  namespace: evidara
+spec:
+  basicAuth:
+    secret: evidara-basicauth
+    realm: Evidara

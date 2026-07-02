@@ -1,10 +1,11 @@
 import type { Page } from "@playwright/test";
 
-function buildSearchResult(query: string) {
+function buildSearchResult(query: string, index = 0) {
+  const suffix = index === 0 ? "" : ` (${index + 1})`;
   return {
-    id: "decision-1",
+    id: `decision-${index + 1}`,
     type: "decision",
-    title: `Result for ${query}`,
+    title: `Result for ${query}${suffix}`,
     subtitle: "Bundesgericht · Schweiz",
     snippet:
       "Das Bundesgericht bestätigt die Verantwortlichkeit der Verwaltungsratsmitglieder gemäss Art. 754 OR. Die Beweislastverteilung richtet sich nach den allgemeinen Grundsätzen.",
@@ -207,11 +208,18 @@ function buildRichDetail(documentId: string) {
 export interface MockSearchApiOptions {
   richFacets?: boolean;
   richDetail?: boolean;
+  /**
+   * Number of search results to fabricate per query. Defaults to 1. Set to 0
+   * to render the empty state, or to a larger number (e.g. 5) for the
+   * multi-result baseline. Visual baselines should use deterministic counts.
+   */
+  resultCount?: number;
 }
 
 export async function mockSearchApi(page: Page, options?: MockSearchApiOptions) {
   const useFacets = options?.richFacets ?? false;
   const useRichDetail = options?.richDetail ?? false;
+  const resultCount = options?.resultCount ?? 1;
 
   await page.route("**/v1/search/context", async (route) => {
     await route.fulfill({
@@ -233,15 +241,17 @@ export async function mockSearchApi(page: Page, options?: MockSearchApiOptions) 
       return;
     }
     const query = url.searchParams.get("q") || "Bundesgericht";
-    const result = buildSearchResult(query);
+    const results = Array.from({ length: resultCount }, (_, index) =>
+      buildSearchResult(query, index),
+    );
 
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        results: [result],
+        results,
         facets: useFacets ? RICH_FACETS : [],
-        totalResults: 1,
+        totalResults: resultCount,
       }),
     });
   });
