@@ -28,6 +28,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+// `StatusBadge.tsx` is intentionally absent from this list. Per ADR-0028 it
+// was promoted to `@evidara/ui` (`styles/ui/StatusBadge.tsx`); the
+// workspace-local file is now a re-export shim with no token references of
+// its own. The shared canonical source has its own token-parity test at
+// `styles/ui/status-badge-token-parity.test.ts` (run by this surface's
+// vitest via the `include` glob in `vitest.config.ts`), so coverage is
+// preserved without scanning the empty shim here.
 const primitiveFiles = [
   "src/components/primitives/AccentButton.tsx",
   "src/components/primitives/ActionTextLink.tsx",
@@ -35,7 +42,6 @@ const primitiveFiles = [
   "src/components/primitives/DateText.tsx",
   "src/components/primitives/InteractiveRow.tsx",
   "src/components/primitives/SectionLabel.tsx",
-  "src/components/primitives/StatusBadge.tsx",
   "src/components/ui/badge.tsx",
   "src/components/ui/button.tsx",
   "src/components/ui/button-variants.ts",

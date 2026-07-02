@@ -2,9 +2,16 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
+// `Pill.tsx` is intentionally absent from this list. Per ADR-0028 the
+// status-rendering portion was delegated to the shared `@evidara/ui`
+// `StatusBadge` primitive; the admin-local file is a thin adapter whose
+// only remaining inline tokens are the neutral `--surface-panel`,
+// `--text-meta`, and `--border` for the `meta` variant — already covered
+// by other primitives in this scan. The canonical shared source has its
+// own token-parity test at `styles/ui/status-badge-token-parity.test.ts`
+// (run by the workspace surface's vitest), so coverage is preserved.
 const primitiveFiles = [
   "src/ui/primitives/Button.tsx",
-  "src/ui/primitives/Pill.tsx",
   "src/ui/primitives/DataTable.tsx",
   "src/ui/primitives/FormField.tsx",
   "src/ui/primitives/DetailGrid.tsx",
@@ -49,13 +56,20 @@ const FORBIDDEN_LITERALS = [
 
 describe("admin primitive brand token parity", () => {
   it("uses shared semantic tokens for action, focus, status, and surfaces", () => {
+    // `--status-neutral` is intentionally absent from this list. The
+    // canonical neutral-status rendering moved to the shared `@evidara/ui`
+    // `StatusBadge` (per ADR-0028); the workspace and admin surfaces both
+    // reach it through Tailwind utilities (`text-status-neutral`,
+    // `bg-status-neutral-subtle`) that compile through `@theme inline` →
+    // `--status-neutral`. The shared canonical source is guarded by
+    // `styles/ui/status-badge-token-parity.test.ts`, so coverage is
+    // preserved without forcing every admin primitive to spell the var().
     for (const token of [
       "--accent-core",
       "--focus-ring",
       "--status-healthy",
       "--status-degraded",
       "--status-critical",
-      "--status-neutral",
       "--status-info",
       "--surface-panel",
       "--surface-input",

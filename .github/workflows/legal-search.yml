@@ -323,3 +323,18 @@ jobs:
 
       - name: Visual pixel regression
         run: npm run e2e:visual
+
+      # On failure, upload the Playwright test-results (actual render, diff,
+      # trace) so a baseline drift can be inspected — and, when the drift is
+      # intended, the `-actual.png` can be promoted to the committed
+      # `*-linux.png` baseline without a local Playwright/Docker run. Mirrors
+      # the interaction-flow job's evidence upload.
+      - name: Upload visual regression artifacts
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: visual-regression-results-${{ github.run_id }}
+          path: |
+            legal-search/frontend/test-results
+          retention-days: 7
+          if-no-files-found: warn
