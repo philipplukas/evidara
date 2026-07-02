@@ -1,0 +1,32 @@
+# gha-runner-scale-set values for the LIGHT pool on the self-hosted Hetzner k3s
+# cluster (ADR-0029). The scale-set name IS the `runs-on:` label — every workflow
+# resolves `runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}` to this.
+#
+# Required-check owners: `check-title` (pr-title.yml) + `contract-validation`
+# (docs-and-contracts.yml) both target this pool, so it MUST be healthy for any PR
+# to merge. Keep it lightweight: policy/lint/contract/setup-node/setup-python jobs.
+# Docker/buildx (runtime-images.yml) is deliberately kept OFF-cluster — no DinD here.
+githubConfigUrl: https://github.com/philipplukas/evidara
+
+# The controller reads the GitHub credential from this pre-created secret
+# (deploy-runners.sh creates it from $GITHUB_RUNNER_PAT). A classic PAT with the
+# `repo` scope, or a GitHub App, is accepted by ARC.
+githubConfigSecret: evidara-runner-github
+
+# Idle to zero, burst up to 3. Box is 8 vCPU / 64 GiB (~9% used at rest).
+minRunners: 0
+maxRunners: 3
+
+template:
+  spec:
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:latest
+        command: ["/home/runner/run.sh"]
+        resources:
+          requests:
+            cpu: "500m"
+            memory: 1Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi

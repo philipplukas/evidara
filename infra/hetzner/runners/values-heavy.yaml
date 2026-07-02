@@ -1,0 +1,28 @@
+# gha-runner-scale-set values for the HEAVY pool on the self-hosted Hetzner k3s
+# cluster (ADR-0029). The scale-set name IS the `runs-on:` label — workflows resolve
+# `runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy-v2' }}` to this.
+# (The repo Actions variable HEAVY_RUNNER_SCALE_SET is pinned to `evidara-heavy-v2`,
+# so the Helm release / --set runnerScaleSetName MUST also be evidara-heavy-v2.)
+#
+# Heavy = Playwright/e2e/integration work (e2e-smoke-dev.yml, document-intelligence
+# heavy jobs). Docker/buildx image builds (runtime-images.yml) stay OFF-cluster.
+githubConfigUrl: https://github.com/philipplukas/evidara
+githubConfigSecret: evidara-runner-github
+
+# Idle to zero, burst up to 2 (each pod is chunky). Plenty of headroom on 8 vCPU / 64 GiB.
+minRunners: 0
+maxRunners: 2
+
+template:
+  spec:
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:latest
+        command: ["/home/runner/run.sh"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: 3Gi
+          limits:
+            cpu: "4"
+            memory: 10Gi

@@ -11,6 +11,7 @@ export default defineConfig({
       // `styles/`; both surfaces consume them via the same alias names.
       "@evidara/tokens": path.resolve(__dirname, "../../styles/tokens/tokens"),
       "@evidara/ui": path.resolve(__dirname, "../../styles/ui"),
+      "@evidara/shell": path.resolve(__dirname, "../../styles/shell"),
       // Pin React + lucide-react to admin's own `node_modules`. Without
       // this, when `@evidara/ui`'s `StatusBadge.tsx` imports `react` or
       // `lucide-react`, Vite walks up from `styles/ui/` and finds the

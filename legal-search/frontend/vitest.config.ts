@@ -9,6 +9,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
       "@evidara/tokens": path.resolve(__dirname, "../../styles/tokens/tokens"),
       "@evidara/ui": path.resolve(__dirname, "../../styles/ui"),
+      "@evidara/shell": path.resolve(__dirname, "../../styles/shell"),
     },
   },
   // Vite's dev server only serves files from inside the project root by

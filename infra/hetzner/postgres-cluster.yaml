@@ -1,0 +1,25 @@
+# CloudNativePG Postgres cluster for Evidara (platform-control DB + Nessie catalog DB).
+# Requires the CNPG operator (see infra/hetzner/README.md Stage 1). ADR-0029.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: evidara-pg
+  namespace: evidara
+spec:
+  instances: 1
+  storage:
+    size: 20Gi
+    storageClass: local-path
+  bootstrap:
+    initdb:
+      database: platform_control
+      owner: platform_control
+  # Nessie gets its own database in the same instance (created post-bootstrap):
+  #   kubectl -n evidara exec -it evidara-pg-1 -- psql -c "CREATE DATABASE nessie OWNER platform_control;"
+  postgresql:
+    parameters:
+      max_connections: "200"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi

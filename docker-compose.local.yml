@@ -25,9 +25,15 @@ services:
     profiles: ["apps"]
     environment:
       PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
-      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: local
+      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: ${PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND:-local}
       PLATFORM_CONTROL_RAW_ARTIFACT_LOCAL_DIR: .data/raw-artifacts
-      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: noop
+      PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET: ${PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET:-evidara-raw-artifacts-dev}
+      PLATFORM_CONTROL_S3_ENDPOINT_URL: ${PLATFORM_CONTROL_S3_ENDPOINT_URL:-http://minio:9000}
+      PLATFORM_CONTROL_S3_REGION: ${PLATFORM_CONTROL_S3_REGION:-us-east-1}
+      PLATFORM_CONTROL_S3_ACCESS_KEY_ID: ${PLATFORM_CONTROL_S3_ACCESS_KEY_ID:-minioadmin}
+      PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY: ${PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY:-minioadmin}
+      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: ${PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND:-noop}
+      PLATFORM_CONTROL_NATS_SERVERS: ${PLATFORM_CONTROL_NATS_SERVERS:-nats://nats:4222}
       PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: inline
     command:
       - uvicorn
@@ -129,3 +135,94 @@ services:
       interval: 15s
       timeout: 5s
       retries: 12
+
+  # NATS JetStream — self-hosted Pub/Sub replacement (ADR-0029). Opt-in via the `nats`
+  # profile; the default `apps` stack still runs with the noop publisher. To exercise the
+  # real publish path:
+  #   PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats \
+  #     docker compose -f docker-compose.local.yml --profile apps --profile nats up
+  nats:
+    image: nats:2.10-alpine
+    profiles: ["nats"]
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    mem_limit: 256m
+
+  # One-shot: create the EVIDARA stream binding evidara.> with a 2m dedup window
+  # (matches the Nats-Msg-Id publish dedup in NatsRawArtifactPublisher).
+  nats-init:
+    image: natsio/nats-box:latest
+    profiles: ["nats"]
+    depends_on:
+      - nats
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        for i in $$(seq 1 30); do
+          if nats --server nats://nats:4222 stream add EVIDARA
+              --subjects 'evidara.>' --storage file --retention limits
+              --discard old --dupe-window 2m --defaults >/dev/null 2>&1; then
+            echo 'EVIDARA stream ready'; exit 0;
+          fi;
+          echo "waiting for nats ($$i/30)"; sleep 2;
+        done;
+        echo 'failed to create EVIDARA stream'; exit 1
+    restart: "no"
+
+  # document-intelligence NATS JetStream consumer (ADR-0029 Slice 3). Subscribes to
+  # evidara.artifact-bundle-available, processes bundles, and publishes
+  # document.processed / status events back to NATS. Surfaces are unset -> in-memory
+  # sink (no Delta/Databricks). Pairs with the `nats` profile.
+  di-consumer:
+    build:
+      context: ./document-intelligence
+      dockerfile: Dockerfile.runtime-ingress
+    profiles: ["nats"]
+    command: ["document_intelligence_nats_consumer", "--servers", "nats://nats:4222"]
+    environment:
+      PORT: "8092"
+    depends_on:
+      nats-init:
+        condition: service_completed_successfully
+    mem_limit: 1024m
+
+  # MinIO — self-hosted S3-compatible object storage (ADR-0029 Slice 4). Opt-in via the
+  # `minio` profile; the default stack still uses the local artifact store. To exercise
+  # the S3 path:
+  #   PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 \
+  #     docker compose -f docker-compose.local.yml --profile apps --profile minio up
+  minio:
+    image: minio/minio:latest
+    profiles: ["minio"]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    mem_limit: 512m
+
+  # One-shot: create the raw-artifacts bucket once MinIO is reachable.
+  minio-init:
+    image: minio/mc:latest
+    profiles: ["minio"]
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      BUCKET: ${PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET:-evidara-raw-artifacts-dev}
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        for i in $$(seq 1 30); do
+          if mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; then
+            mc mb --ignore-existing "local/$$BUCKET" && echo "bucket $$BUCKET ready" && exit 0;
+          fi;
+          echo "waiting for minio ($$i/30)"; sleep 2;
+        done;
+        echo 'failed to reach minio'; exit 1
+    restart: "no"

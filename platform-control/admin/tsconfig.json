@@ -21,7 +21,9 @@
     "paths": {
       "@evidara/tokens": ["../../styles/tokens/tokens"],
       "@evidara/ui": ["../../styles/ui"],
-      "@evidara/ui/*": ["../../styles/ui/*"]
+      "@evidara/ui/*": ["../../styles/ui/*"],
+      "@evidara/shell": ["../../styles/shell"],
+      "@evidara/shell/*": ["../../styles/shell/*"]
     }
   },
   "include": [

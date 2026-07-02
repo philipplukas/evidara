@@ -1,0 +1,34 @@
+# OpenSearch for self-hosted Evidara — single node, security plugin disabled
+# (in-cluster only; lock down before exposing). Chart: opensearch/opensearch. ADR-0029.
+# Service: opensearch-cluster-master.evidara.svc:9200
+singleNode: true
+replicas: 1
+
+opensearchJavaOpts: "-Xms512m -Xmx512m"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 1Gi
+  limits:
+    memory: 2Gi
+
+persistence:
+  enabled: true
+  size: 30Gi
+
+# OpenSearch needs vm.max_map_count=262144; the chart sets it via a privileged init.
+sysctlInit:
+  enabled: true
+
+extraEnvs:
+  - name: DISABLE_INSTALL_DEMO_CONFIG
+    value: "true"
+  - name: DISABLE_SECURITY_PLUGIN
+    value: "true"
+
+config:
+  opensearch.yml: |
+    cluster.name: evidara
+    network.host: 0.0.0.0
+    plugins.security.disabled: true

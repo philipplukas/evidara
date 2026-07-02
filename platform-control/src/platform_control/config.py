@@ -35,9 +35,16 @@ class Settings(BaseSettings):
     )
 
     gcp_project_id: str | None = None
-    artifact_store_backend: Literal["local", "gcs"] = "local"
+    artifact_store_backend: Literal["local", "gcs", "s3"] = "local"
     raw_artifact_bucket: str = "evidara-raw-artifacts-dev"
     raw_artifact_prefix: str = "runs"
+    # S3/MinIO backend — self-hosted object storage (ADR-0029). endpoint_url set for
+    # MinIO; left unset for real AWS S3. Credentials fall back to the boto3 default
+    # chain (env / instance profile) when not provided here.
+    s3_endpoint_url: str | None = None
+    s3_region: str | None = None
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
     raw_artifact_local_dir: Path = Field(default=Path(".data/raw-artifacts"))
     cassette_dir: Path = Field(
         default=Path(".data/cassettes"),
@@ -46,9 +53,13 @@ class Settings(BaseSettings):
             "(shadow-mode + fixture-driven runs)."
         ),
     )
-    event_publisher_backend: Literal["noop", "pubsub", "local_outbox"] = "noop"
+    event_publisher_backend: Literal["noop", "pubsub", "local_outbox", "nats"] = "noop"
     raw_artifact_pubsub_topic: str = "raw-artifact-available"
     artifact_bundle_pubsub_topic: str = "artifact-bundle-available"
+    # NATS JetStream backend — self-hosted replacement for Pub/Sub (ADR-0029).
+    nats_servers: str = "nats://localhost:4222"
+    nats_raw_artifact_subject: str = "evidara.raw-artifact-available"
+    nats_artifact_bundle_subject: str = "evidara.artifact-bundle-available"
     run_dispatch_backend: Literal["inline", "worker"] = "inline"
     wizard_orchestrator_backend: Literal["in_memory", "temporal"] = "in_memory"
     temporal_namespace: str = "default"

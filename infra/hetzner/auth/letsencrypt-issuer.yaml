@@ -1,0 +1,36 @@
+# Let's Encrypt ClusterIssuers for trusted TLS on the self-hosted Hetzner k3s
+# cluster (ADR-0029). HTTP-01 challenge solved via the k3s built-in Traefik
+# ingress. Use the `staging` issuer first to avoid Let's Encrypt rate limits
+# while wiring DNS, then switch the Certificate/Ingress annotation to `prod`.
+#
+# Prereq: the target hostname's DNS A record must resolve to 88.99.26.120 and
+# port 80 must be reachable (it is — only 6443 is firewalled to the tailnet).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: philipplukas99@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: philipplukas99@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik

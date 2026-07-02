@@ -1,4 +1,4 @@
-"""Bundle manifest and artifact loaders for local and GCS-backed processing."""
+"""Bundle manifest and artifact loaders for local, GCS, and S3/MinIO processing."""
 
 import hashlib
 import importlib
@@ -43,9 +43,11 @@ class DispatchingBundleLoader(BundleLoader):
         *,
         local_loader: BundleLoader | None = None,
         gcs_loader: BundleLoader | None = None,
+        s3_loader: BundleLoader | None = None,
     ) -> None:
         self._local_loader = local_loader or LocalFilesystemBundleLoader()
         self._gcs_loader = gcs_loader or GcsBundleLoader()
+        self._s3_loader = s3_loader or S3BundleLoader()
 
     def load_bundle(self, manifest_ref: ManifestRef) -> SelectedArtifactBundle:
         loader = self._loader_for_uri(_manifest_uri(manifest_ref))
@@ -58,6 +60,8 @@ class DispatchingBundleLoader(BundleLoader):
     def _loader_for_uri(self, uri: str) -> BundleLoader:
         if uri.startswith("gs://"):
             return self._gcs_loader
+        if uri.startswith("s3://"):
+            return self._s3_loader
         if uri.startswith("file://") or "://" not in uri:
             return self._local_loader
         raise BundleLoadError(
@@ -144,6 +148,69 @@ class GcsBundleLoader(BundleLoader):
                 "gcs_read_failed",
                 f"{object_kind} could not be read from {uri}",
             ) from error
+
+
+class S3BundleLoader(BundleLoader):
+    """Bundle loader backed by an S3-compatible store (AWS S3 / MinIO, ADR-0029)."""
+
+    def __init__(
+        self,
+        *,
+        client_factory: Callable[[], object] | None = None,
+    ) -> None:
+        self._client_factory = client_factory or _default_s3_client_factory
+
+    def load_bundle(self, manifest_ref: ManifestRef) -> SelectedArtifactBundle:
+        storage_ref = _require_manifest_storage_ref(manifest_ref)
+        manifest_bytes = self._download_bytes(storage_ref.uri, "bundle manifest")
+        _verify_checksum(manifest_bytes, storage_ref, "bundle manifest")
+        manifest = _parse_bundle_manifest(manifest_bytes, storage_ref.uri)
+        return _build_selected_bundle(manifest)
+
+    def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
+        artifact_bytes = self._download_bytes(artifact.storage_ref.uri, "artifact")
+        _verify_checksum(artifact_bytes, artifact.storage_ref, "artifact")
+        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+
+    def _download_bytes(self, uri: str, object_kind: str) -> bytes:
+        bucket_name, object_name = _parse_s3_uri(uri)
+        client = self._client_factory()
+        try:
+            response = client.get_object(Bucket=bucket_name, Key=object_name)
+            return response["Body"].read()
+        except Exception as error:  # pragma: no cover - client-specific
+            raise BundleLoadError(
+                "s3_read_failed",
+                f"{object_kind} could not be read from {uri}",
+            ) from error
+
+
+def _default_s3_client_factory() -> object:
+    import os
+
+    try:
+        import boto3
+        from botocore.config import Config
+    except ModuleNotFoundError as error:  # pragma: no cover - depends on env
+        raise BundleLoadError(
+            "missing_s3_dependency",
+            "boto3 is required to read s3:// bundle manifests and artifacts",
+        ) from error
+
+    # Path-style addressing is required for MinIO / custom endpoints.
+    kwargs: dict[str, object] = {"config": Config(s3={"addressing_style": "path"})}
+    endpoint = os.environ.get("DI_S3_ENDPOINT_URL")
+    if endpoint:
+        kwargs["endpoint_url"] = endpoint
+    region = os.environ.get("DI_S3_REGION")
+    if region:
+        kwargs["region_name"] = region
+    access_key_id = os.environ.get("DI_S3_ACCESS_KEY_ID")
+    secret_access_key = os.environ.get("DI_S3_SECRET_ACCESS_KEY")
+    if access_key_id and secret_access_key:
+        kwargs["aws_access_key_id"] = access_key_id
+        kwargs["aws_secret_access_key"] = secret_access_key
+    return boto3.client("s3", **kwargs)
 
 
 def _default_gcs_client_factory() -> object:
@@ -298,6 +365,22 @@ def _parse_gcs_uri(uri: str) -> tuple[str, str]:
         raise BundleLoadError(
             "invalid_gcs_uri",
             f"invalid GCS URI: {uri}",
+        )
+    return bucket_name, object_name
+
+
+def _parse_s3_uri(uri: str) -> tuple[str, str]:
+    if not uri.startswith("s3://"):
+        raise BundleLoadError(
+            "unsupported_storage_scheme",
+            "S3 loader only supports s3:// URIs",
+        )
+    without_scheme = uri[len("s3://") :]
+    bucket_name, _, object_name = without_scheme.partition("/")
+    if not bucket_name or not object_name:
+        raise BundleLoadError(
+            "invalid_s3_uri",
+            f"invalid S3 URI: {uri}",
         )
     return bucket_name, object_name
 
