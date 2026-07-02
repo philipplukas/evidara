@@ -17,24 +17,20 @@ import { useWatch } from "react-hook-form";
 import { ResourceName } from "../../domain/resourceNames";
 import {
   controlPlaneActions,
-  type FedlexSparqlAcquisitionSpec,
   type SourceBlueprintPreview,
   type SourceBlueprintTemplate,
 } from "../../lib/admin/dataProvider";
 import { AuthoritySelectInput, JurisdictionSelectInput } from "../shared/ReferenceInputs";
+import {
+  buildOverlayChoices,
+  buildTemplateChoicesByOverlay,
+  summarizePreview,
+} from "./sourceBlueprint";
 
 const SOURCE_TYPE_CHOICES = [
   { id: "website", name: "Website (crawl)" },
   { id: "api", name: "API (structured)" },
 ];
-
-const OVERLAY_NAMES: Record<string, string> = {
-  at: "Austria (AT)",
-  de: "Germany (DE)",
-  ch: "Switzerland (CH)",
-  fr: "France (FR)",
-  it: "Italy (IT)",
-};
 
 type SourceWizardFormData = {
   name: string;
@@ -47,50 +43,6 @@ type SourceWizardFormData = {
   extractor_profile_id?: string;
   overlay_id: string;
   provider_template_id: string;
-};
-
-const summarizePreview = (preview: SourceBlueprintPreview): string[] => {
-  const spec = preview.acquisition_spec;
-  if (spec.provider === "ris_ogd") {
-    return [
-      `Provider: ${spec.provider}`,
-      `Base URL: ${spec.base_url}`,
-      `Applikation: ${spec.applikation ?? "all"}`,
-      `Preferred formats: ${(spec.preferred_formats ?? []).join(", ") || "n/a"}`,
-      `Page size/max pages: ${spec.page_size ?? "n/a"} / ${spec.max_pages ?? "n/a"}`,
-    ];
-  }
-  if (spec.provider === "fedlex_sparql") {
-    const fedlex = spec as FedlexSparqlAcquisitionSpec;
-    const seeds = fedlex.seed_url
-      ? [fedlex.seed_url, ...(fedlex.seed_urls ?? [])]
-      : (fedlex.seed_urls ?? []);
-    return [
-      `Provider: ${fedlex.provider}`,
-      `Seed work URIs: ${seeds.join(", ") || "n/a"}`,
-      `SPARQL endpoint: ${fedlex.sparql_endpoint ?? "n/a"}`,
-      `Preferred languages: ${(fedlex.preferred_languages ?? []).join(", ") || "n/a"}`,
-      `Query mode/max expressions: ${fedlex.query_mode ?? "n/a"} / ${fedlex.max_expressions ?? "n/a"}`,
-    ];
-  }
-  if (spec.provider === "deterministic_http") {
-    const seeds = spec.seed_url
-      ? [spec.seed_url, ...(spec.seed_urls ?? [])]
-      : (spec.seed_urls ?? []);
-    return [
-      `Provider: ${spec.provider}`,
-      `Seeds: ${seeds.join(", ") || "n/a"}`,
-      `Tenant/corpus: ${spec.tenant_id ?? "n/a"} / ${spec.corpus_id ?? "n/a"}`,
-    ];
-  }
-  const seeds = spec.seed_url ? [spec.seed_url, ...(spec.seed_urls ?? [])] : (spec.seed_urls ?? []);
-  return [
-    `Provider: ${spec.provider}`,
-    `Mode: ${spec.mode}`,
-    `Seeds: ${seeds.join(", ") || "n/a"}`,
-    `Limit/depth: ${spec.limit ?? "n/a"} / ${spec.max_discovery_depth ?? "n/a"}`,
-    `Formats: ${(spec.scrape_formats ?? []).join(", ") || "n/a"}`,
-  ];
 };
 
 function SourceBlueprintPreviewPanel() {
@@ -210,27 +162,12 @@ export function SourceCreate() {
     };
   }, []);
 
-  const overlayChoices = useMemo(
-    () =>
-      Array.from(new Set(templates.map((template) => template.overlay_id))).map((overlayId) => ({
-        id: overlayId,
-        name: OVERLAY_NAMES[overlayId] ?? overlayId.toUpperCase(),
-      })),
+  const overlayChoices = useMemo(() => buildOverlayChoices(templates), [templates]);
+
+  const templateChoicesByOverlay = useMemo(
+    () => buildTemplateChoicesByOverlay(templates),
     [templates],
   );
-
-  const templateChoicesByOverlay = useMemo(() => {
-    const grouped: Record<string, Array<{ id: string; name: string }>> = {};
-    for (const template of templates) {
-      const list = grouped[template.overlay_id] ?? [];
-      list.push({
-        id: template.provider_template_id,
-        name: `${template.provider_template_id} (${template.provider})`,
-      });
-      grouped[template.overlay_id] = list;
-    }
-    return grouped;
-  }, [templates]);
 
   const handleSubmit = async (values: SourceWizardFormData) => {
     const result = await dataProvider.create("source-create-wizard", {
