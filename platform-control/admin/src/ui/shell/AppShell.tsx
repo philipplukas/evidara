@@ -123,7 +123,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
 
       {/* Main content area */}
       <main style={{ gridArea: "main" }} className="relative overflow-x-hidden">
-        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 pt-5 sm:pt-10 pb-8 sm:pb-10">
+        <div className="w-full max-w-[var(--container-max)] mx-auto px-4 sm:px-6 pt-5 sm:pt-10 pb-8 sm:pb-10">
           {children}
         </div>
       </main>

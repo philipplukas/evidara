@@ -1,0 +1,28 @@
+# Evidara app workloads for the self-hosted Hetzner cluster (ADR-0029 stage 4).
+# Secrets (evidara-app-secrets, ghcr-pull) are created imperatively by deploy-stage4.sh
+# because they derive from the CNPG-generated password + your GHCR token.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: evidara
+
+resources:
+  - configmap.yaml
+  - platform-control.yaml
+  - legal-search.yaml
+  - document-intelligence.yaml
+
+# Single place to pin the image tag (the build tagged images with the branch name).
+images:
+  - name: ghcr.io/philipplukas/evidara-platform-control
+    newTag: claude-repo-status-check-cdso8i
+  - name: ghcr.io/philipplukas/evidara-platform-control-admin
+    newTag: claude-repo-status-check-cdso8i
+  - name: ghcr.io/philipplukas/evidara-legal-search-api
+    newTag: claude-repo-status-check-cdso8i
+  - name: ghcr.io/philipplukas/evidara-legal-search-frontend
+    newTag: claude-repo-status-check-cdso8i
+  - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
+    newTag: claude-repo-status-check-cdso8i
+  - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
+    newTag: claude-repo-status-check-cdso8i

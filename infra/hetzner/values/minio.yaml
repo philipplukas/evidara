@@ -1,0 +1,30 @@
+# MinIO (S3 object storage) for self-hosted Evidara — single node.
+# Chart: minio/minio (https://charts.min.io/). ADR-0029.
+mode: standalone
+replicas: 1
+
+persistence:
+  enabled: true
+  size: 100Gi
+  storageClass: local-path   # k3s built-in provisioner
+
+resources:
+  requests:
+    memory: 512Mi
+
+# TODO: move these to a pre-created Secret before exposing MinIO beyond the cluster.
+rootUser: evidara
+rootPassword: change-me-minio-root
+
+# Buckets created on first start.
+buckets:
+  - name: evidara-raw-artifacts   # platform-control / DI artifact store (S3 backend)
+    policy: none
+    purge: false
+  - name: evidara-lakehouse       # Iceberg data + metadata (Nessie/Trino)
+    policy: none
+    purge: false
+
+# Disable the separate console ingress for now; reach it via port-forward.
+consoleService:
+  type: ClusterIP

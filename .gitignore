@@ -28,6 +28,10 @@ platform-control/*.db
 
 # --- Node / JavaScript / TypeScript ---
 node_modules/
+# Match the monorepo-root `node_modules` symlink created by
+# `scripts/ensure-monorepo-shared-modules.mjs` (postinstall on each
+# surface). The trailing-slash form above only matches real directories.
+/node_modules
 .next/
 out/
 *.tsbuildinfo

@@ -1,44 +1,13 @@
-import { AlertTriangle, CheckCircle, Info, MinusCircle, XCircle } from "lucide-react";
-import type { ComponentType } from "react";
-
-export type StatusLevel = "healthy" | "degraded" | "critical" | "neutral" | "info";
-
-export interface StatusTokens {
-  color: string;
-  subtleBg: string;
-  icon: ComponentType<{ className?: string }>;
-  defaultLabel: string;
-}
-
-export const STATUS_TOKEN_MAP: Record<StatusLevel, StatusTokens> = {
-  healthy: {
-    color: "text-status-healthy",
-    subtleBg: "bg-status-healthy-subtle",
-    icon: CheckCircle,
-    defaultLabel: "Healthy",
-  },
-  degraded: {
-    color: "text-status-degraded",
-    subtleBg: "bg-status-degraded-subtle",
-    icon: AlertTriangle,
-    defaultLabel: "Degraded",
-  },
-  critical: {
-    color: "text-status-critical",
-    subtleBg: "bg-status-critical-subtle",
-    icon: XCircle,
-    defaultLabel: "Critical",
-  },
-  neutral: {
-    color: "text-status-neutral",
-    subtleBg: "bg-status-neutral-subtle",
-    icon: MinusCircle,
-    defaultLabel: "Neutral",
-  },
-  info: {
-    color: "text-status-info",
-    subtleBg: "bg-status-info-subtle",
-    icon: Info,
-    defaultLabel: "Info",
-  },
-};
+/**
+ * Workspace re-export shim. Canonical status tokens live in `@evidara/ui`
+ * (`styles/ui/status-tokens.ts`) and are shared with `platform-control/admin`
+ * via the `@evidara/ui` path alias — see ADR-0028.
+ *
+ * Existing imports through `@/lib/status-tokens` continue to resolve
+ * unchanged.
+ */
+export {
+  STATUS_TOKEN_MAP,
+  type StatusLevel,
+  type StatusTokens,
+} from "@evidara/ui";

@@ -62,7 +62,7 @@ export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: H
     return (
       <div className="flex h-screen items-start justify-center bg-surface-page px-4 py-4 sm:px-6">
         <div
-          className="w-full max-w-[1600px] rounded-[2rem] border border-border/60 bg-surface-panel/90 p-4 backdrop-blur-sm sm:p-6"
+          className="w-full max-w-[var(--container-max)] rounded-[2rem] border border-border/60 bg-surface-panel/90 p-4 backdrop-blur-sm sm:p-6"
           style={{ boxShadow: "var(--shadow-shell)" }}
         >
           <div className="flex flex-col gap-4">

@@ -1,8 +1,11 @@
 name: E2E Smoke Dev
 
 on:
-  schedule:
-    - cron: "30 2 * * *"
+  # Nightly schedule disabled 2026-06-28: targets live GCP dev, which is being retired
+  # for the self-hosted Hetzner runtime (see docs/adr/0029-self-hosted-hetzner-runtime.md).
+  # Re-enable / repoint once the Hetzner environment is live. Still runnable via dispatch.
+  # schedule:
+  #   - cron: "30 2 * * *"
   workflow_dispatch:
     inputs:
       smoke_seed_url:

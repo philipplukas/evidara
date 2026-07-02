@@ -174,6 +174,17 @@ interface StatusBadgeProps {
 
 **Shared across surfaces:** This component must work in both MUI (admin) and Tailwind (legal-search) contexts. Implement as a headless contract with two renderers, or as a shared token set.
 
+**Status (2026-04-29):** Stream A migration shipped — the canonical
+`StatusBadge` source now lives in `@evidara/ui` (`styles/ui/StatusBadge.tsx`)
+and is consumed by both `legal-search/frontend` (`@/components/primitives`
+re-export shim) and `platform-control/admin` (`Pill` adapter that delegates
+the status-variant rendering to `StatusBadge` and keeps the admin-only
+`meta` chip variant local). The shared module is exposed via the
+`@evidara/ui` TypeScript path alias rather than an npm workspace package —
+see [ADR-0028](0028-shared-shell-module.md) for the pattern, which mirrors
+the existing `@evidara/tokens` precedent and defers npm workspace
+conversion per [ADR-0026 P6](adr-0026-admin-ui-tailwind-ra-core.md).
+
 ---
 
 ## Contract 6: `PageContextBar`

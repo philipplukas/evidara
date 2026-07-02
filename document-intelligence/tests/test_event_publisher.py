@@ -6,6 +6,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from document_intelligence.events.publisher import (
+    EventPublisher,
     EventPublisherConfig,
     PubSubEventPublisher,
 )
@@ -27,6 +28,17 @@ class _StubPublisherClient:
     def publish(self, topic_path: str, payload: bytes):
         self.calls.append((topic_path, payload))
         return _StubPublishFuture()
+
+
+class EventPublisherProtocolTests(unittest.TestCase):
+    def test_pubsub_publisher_satisfies_event_publisher_protocol(self) -> None:
+        publisher = PubSubEventPublisher(
+            EventPublisherConfig(project_id="evidara-dev"),
+            client=_StubPublisherClient(),  # type: ignore[arg-type]
+        )
+
+        # Guards the ADR-0029 port: a NATS publisher (Slice 3) must satisfy the same shape.
+        self.assertIsInstance(publisher, EventPublisher)
 
 
 class PubSubEventPublisherTests(unittest.TestCase):

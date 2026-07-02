@@ -1,0 +1,16 @@
+# Nessie — git-like Iceberg REST catalog, Postgres-backed. Chart: nessie/nessie. ADR-0029.
+# Service: nessie.evidara.svc:19120  (REST API /api/v2). Uses the `nessie` database in the
+# CNPG Postgres; credentials reused from the evidara-pg-app secret.
+versionStoreType: JDBC
+
+jdbc:
+  jdbcUrl: jdbc:postgresql://evidara-pg-rw.evidara.svc:5432/nessie
+  secret:
+    name: evidara-pg-app
+    username: username
+    password: password
+
+# Single replica; in-cluster ClusterIP service.
+replicaCount: 1
+service:
+  type: ClusterIP

@@ -10,6 +10,7 @@ from platform_control.config import Settings
 from platform_control.errors import IntegrationConfigurationError
 from platform_control.events.publisher import (
     LocalOutboxRawArtifactPublisher,
+    NatsRawArtifactPublisher,
     NoopRawArtifactPublisher,
     PubSubRawArtifactPublisher,
 )
@@ -38,6 +39,22 @@ def test_get_raw_artifact_publisher_can_use_local_outbox(tmp_path) -> None:
 
     assert isinstance(publisher, LocalOutboxRawArtifactPublisher)
     assert publisher.outbox_dir == tmp_path / "event-outbox"
+
+
+def test_get_raw_artifact_publisher_can_use_nats() -> None:
+    settings = Settings(
+        event_publisher_backend="nats",
+        nats_servers="nats://broker:4222",
+        nats_raw_artifact_subject="evidara.raw-artifact-available",
+        nats_artifact_bundle_subject="evidara.artifact-bundle-available",
+    )
+
+    publisher = get_raw_artifact_publisher(settings)
+
+    assert isinstance(publisher, NatsRawArtifactPublisher)
+    assert publisher.servers == "nats://broker:4222"
+    assert publisher.raw_artifact_subject == "evidara.raw-artifact-available"
+    assert publisher.artifact_bundle_subject == "evidara.artifact-bundle-available"
 
 
 def test_local_outbox_writes_raw_artifact_and_bundle_events(tmp_path) -> None:

@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-control-api
+  namespace: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: platform-control-api
+  template:
+    metadata:
+      labels:
+        app: platform-control-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/philipplukas/evidara-platform-control
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+            - secretRef:
+                name: evidara-app-secrets
+            - secretRef:
+                name: evidara-auth
+                optional: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-control-api
+  namespace: evidara
+spec:
+  selector:
+    app: platform-control-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-control-admin
+  namespace: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: platform-control-admin
+  template:
+    metadata:
+      labels:
+        app: platform-control-admin
+    spec:
+      containers:
+        - name: admin
+          image: ghcr.io/philipplukas/evidara-platform-control-admin
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+            - secretRef:
+                name: evidara-auth
+                optional: true
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-control-admin
+  namespace: evidara
+spec:
+  selector:
+    app: platform-control-admin
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -1,59 +1,25 @@
 /**
- * `Pill` — semantic status badge + neutral metadata chip, zero MUI.
+ * `Pill` — admin-side adapter over the shared `StatusBadge` primitive.
  *
- * `level` aligns with `AdminStatusLevel` (see `resources/shared/statusLevels.ts`)
- * so the existing status mapping helpers (`sourceStatusToLevel`,
- * `runRecordStatusToLevel`, …) transfer unchanged. UX-4 pill contract:
- * full-pill radius, 11px text, weight 600, 24px at `size="small"` — matches
- * the MUI chip theme in `AdminApp.tsx` exactly.
+ * The status-variant rendering is delegated to `@evidara/ui`'s `StatusBadge`
+ * so the workspace and admin surfaces stay aligned on the ADR-0016 status
+ * pill contract (status colour + icon + redundant label, all driven by the
+ * shared `--status-*` tokens). The admin-only `meta` variant — a neutral
+ * "outline" chip used for non-status metadata such as `source_type` — has
+ * no shared equivalent today and is preserved locally so existing
+ * `<Pill variant="meta">…</Pill>` callers render unchanged.
+ *
+ * `PillLevel` is re-exported as an alias for `@evidara/ui`'s `StatusLevel`
+ * so admin call sites that import `PillLevel` from `../../ui/primitives`
+ * keep compiling.
  */
 "use client";
 
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  type LucideIcon,
-  MinusCircle,
-  XCircle,
-} from "lucide-react";
+import { StatusBadge, type StatusLevel } from "@evidara/ui";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 
-export type PillLevel = "healthy" | "degraded" | "critical" | "neutral" | "info";
-
-interface LevelStyle {
-  Icon: LucideIcon;
-  className: string;
-}
-
-const LEVELS: Record<PillLevel, LevelStyle> = {
-  healthy: {
-    Icon: CheckCircle2,
-    className:
-      "bg-[var(--status-healthy-subtle)] text-[var(--status-healthy)] border-[var(--status-healthy)]/25",
-  },
-  degraded: {
-    Icon: AlertTriangle,
-    className:
-      "bg-[var(--status-degraded-subtle)] text-[var(--status-degraded)] border-[var(--status-degraded)]/30",
-  },
-  critical: {
-    Icon: XCircle,
-    className:
-      "bg-[var(--status-critical-subtle)] text-[var(--status-critical)] border-[var(--status-critical)]/30",
-  },
-  neutral: {
-    Icon: MinusCircle,
-    className:
-      "bg-[var(--status-neutral-subtle)] text-[var(--status-neutral)] border-[var(--status-neutral)]/20",
-  },
-  info: {
-    Icon: Info,
-    className:
-      "bg-[var(--status-info-subtle)] text-[var(--status-info)] border-[var(--status-info)]/25",
-  },
-};
+export type PillLevel = StatusLevel;
 
 interface PillProps {
   level?: PillLevel;
@@ -64,22 +30,20 @@ interface PillProps {
 }
 
 export function Pill({ level = "neutral", children, variant = "status", className }: PillProps) {
-  const { Icon, className: levelClassName } = LEVELS[level];
-  const isMeta = variant === "meta";
+  if (variant === "meta") {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full border font-semibold",
+          "h-6 px-2 text-[11px] leading-none",
+          "bg-[var(--surface-panel)] text-[var(--text-meta)] border-[var(--border)]",
+          className,
+        )}
+      >
+        <span>{children}</span>
+      </span>
+    );
+  }
 
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border font-semibold",
-        "h-6 px-2 text-[11px] leading-none",
-        isMeta
-          ? "bg-[var(--surface-panel)] text-[var(--text-meta)] border-[var(--border)]"
-          : levelClassName,
-        className,
-      )}
-    >
-      {!isMeta ? <Icon size={12} strokeWidth={2.5} aria-hidden /> : null}
-      <span>{children}</span>
-    </span>
-  );
+  return <StatusBadge status={level} label={String(children)} className={className} />;
 }
