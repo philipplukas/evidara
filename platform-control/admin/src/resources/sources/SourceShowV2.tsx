@@ -6,23 +6,30 @@
  *
  * Deferred until follow-up increments (documented inline in the deferred-
  * panel footnote at the bottom of the page):
- *   - `SourceHandoffPanel` — stateful URL-param read; ports with the
- *     shell migration.
  *   - `SourceVersionsSection` — mutations, dialogs, tables; ports with
  *     the Select primitive in the SourceCreate increment.
+ *
+ * Ported in #501 increment 1:
+ *   - `SourceHandoffPanel` — reads the legal-search handoff from the URL
+ *     (`readLegalSearchHandoff`) and renders the gradient "why you are
+ *     here / what to check next" card. The framework-agnostic guidance
+ *     copy is shared with v1 via `./sourceHandoff`.
  */
 "use client";
 
 import { useGetOne, useShowController } from "ra-core";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import type {
   AuthorityRecord,
   JurisdictionRecord,
   SourceRecord,
 } from "../../lib/admin/dataProvider";
+import { type LegalSearchHandoff, readLegalSearchHandoff } from "../../lib/admin/navigationContext";
 import { formatSwissDateTime } from "../../lib/format/date";
-import { DetailGrid, FieldCell, Pill } from "../../ui/primitives";
+import { DetailGrid, FieldCell, Panel, Pill } from "../../ui/primitives";
 import { sourceStatusToLevel } from "../shared/statusLevels";
+import { buildSourceHandoffGuidance } from "./sourceHandoff";
 
 const SOURCE_STATUS_META: Record<SourceRecord["status"], { label: string; detail: string }> = {
   active: {
@@ -38,6 +45,59 @@ const SOURCE_STATUS_META: Record<SourceRecord["status"], { label: string; detail
     detail: "This source is retained for history and should be treated as read-only.",
   },
 };
+
+/**
+ * Reads the legal-search handoff from the URL on mount (client-only, so it
+ * stays behind a `useEffect`/`useState` guard to avoid an SSR/client
+ * mismatch) and renders the gradient handoff card. Returns `null` when the
+ * visit did not originate from legal search, so the card never appears on a
+ * direct source-detail visit.
+ */
+function SourceHandoffPanel({ source }: { source: SourceRecord }) {
+  const [handoff, setHandoff] = useState<LegalSearchHandoff | null>(null);
+
+  useEffect(() => {
+    setHandoff(readLegalSearchHandoff());
+  }, []);
+
+  if (!handoff) {
+    return null;
+  }
+
+  const guidance = buildSourceHandoffGuidance(source, handoff);
+
+  if (!guidance) {
+    return null;
+  }
+
+  return (
+    <Panel
+      className="p-5 sm:p-6 space-y-3"
+      style={{
+        background: "linear-gradient(180deg, var(--brand-wash-4), var(--admin-panel-bg))",
+      }}
+    >
+      <div className="space-y-1">
+        <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Legal search handoff</h2>
+        <p className="text-[13px] text-[var(--foreground-subtle)]">
+          Why you are here and what to check next before changing this source.
+        </p>
+      </div>
+
+      <p className="text-sm text-[var(--foreground-muted)]">{guidance.whyYouAreHere}</p>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {handoff.query ? <Pill variant="meta">{handoff.query}</Pill> : null}
+        {handoff.scopeLabel ? <Pill variant="meta">{handoff.scopeLabel}</Pill> : null}
+        {handoff.selectedId ? (
+          <Pill variant="meta">{`Selected item: ${handoff.selectedId}`}</Pill>
+        ) : null}
+      </div>
+
+      <p className="text-sm text-[var(--foreground-muted)]">{guidance.whatToCheckNext}</p>
+    </Panel>
+  );
+}
 
 export default function SourceShowV2() {
   const { id } = useParams();
@@ -75,6 +135,7 @@ export default function SourceShowV2() {
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[var(--container-max)] mx-auto space-y-6">
+      <SourceHandoffPanel source={source} />
       <header className="space-y-3">
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
           Source detail

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SourceRecord } from "../../lib/admin/dataProvider";
 import type { LegalSearchHandoff } from "../../lib/admin/navigationContext";
-import { buildSourceHandoffGuidance } from "./SourceShow";
+import { buildSourceHandoffGuidance } from "./sourceHandoff";
 
 const baseSource: SourceRecord = {
   id: "source-1",
@@ -25,7 +25,7 @@ const handoff: LegalSearchHandoff = {
   selectedId: "decision-1",
 };
 
-describe("SourceShow handoff guidance", () => {
+describe("buildSourceHandoffGuidance", () => {
   it("frames the legal-search context for source operators", () => {
     const guidance = buildSourceHandoffGuidance(baseSource, handoff);
 
@@ -33,5 +33,22 @@ describe("SourceShow handoff guidance", () => {
     expect(guidance?.whyYouAreHere).toContain("Selected item: decision-1");
     expect(guidance?.whatToCheckNext).toContain("jurisdiction");
     expect(guidance?.whatToCheckNext).toContain("version history");
+  });
+
+  it("returns null when the visit did not originate from legal search", () => {
+    const guidance = buildSourceHandoffGuidance(baseSource, {
+      ...handoff,
+      hasOrigin: false,
+    });
+
+    expect(guidance).toBeNull();
+  });
+
+  it("frames inactive and archived sources with their own attention cue", () => {
+    const inactive = buildSourceHandoffGuidance({ ...baseSource, status: "inactive" }, handoff);
+    expect(inactive?.whatToCheckNext).toContain("reactivated");
+
+    const archived = buildSourceHandoffGuidance({ ...baseSource, status: "archived" }, handoff);
+    expect(archived?.whatToCheckNext).toContain("read-only");
   });
 });

@@ -17,15 +17,12 @@ import type {
   JurisdictionRecord,
   SourceRecord,
 } from "../../lib/admin/dataProvider";
-import {
-  describeLegalSearchHandoff,
-  type LegalSearchHandoff,
-  readLegalSearchHandoff,
-} from "../../lib/admin/navigationContext";
+import { type LegalSearchHandoff, readLegalSearchHandoff } from "../../lib/admin/navigationContext";
 import { PageContextBar } from "../shared/PageContextBar";
 import { formatReferenceLabel } from "../shared/referenceUtils";
 import { StatusBadge, sourceStatusToLevel } from "../shared/StatusBadge";
 import { SourceVersionsSection } from "./SourceVersionsSection";
+import { buildSourceHandoffGuidance } from "./sourceHandoff";
 
 const SOURCE_STATUS_META = {
   active: {
@@ -41,34 +38,6 @@ const SOURCE_STATUS_META = {
     detail: "This source is retained for history and should be treated as read-only.",
   },
 } as const;
-
-export type SourceHandoffGuidance = {
-  whyYouAreHere: string;
-  whatToCheckNext: string;
-};
-
-export function buildSourceHandoffGuidance(
-  source: SourceRecord,
-  handoff: LegalSearchHandoff,
-): SourceHandoffGuidance | null {
-  if (!handoff.hasOrigin) {
-    return null;
-  }
-
-  const contextSummary = describeLegalSearchHandoff(handoff);
-  const whyYouAreHere = `You came from legal search. ${contextSummary}.`;
-  const whatToCheckNext =
-    source.status === "active"
-      ? `${source.name} is active, so confirm the jurisdiction, authority, and version history below before you treat it as the source behind the selected search item.`
-      : source.status === "inactive"
-        ? `${source.name} is inactive, so check whether it should be reactivated before any work continues on the selected search item.`
-        : `${source.name} is archived, so treat the record as read-only and confirm whether the selected search item should point to a different source.`;
-
-  return {
-    whyYouAreHere,
-    whatToCheckNext,
-  };
-}
 
 function SourceLifecyclePanel() {
   const source = useRecordContext<SourceRecord>();
