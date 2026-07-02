@@ -20,7 +20,9 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@evidara/tokens": ["../../styles/tokens/tokens"]
+      "@evidara/tokens": ["../../styles/tokens/tokens"],
+      "@evidara/shell": ["../../styles/shell"],
+      "@evidara/shell/*": ["../../styles/shell/*"]
     }
   },
   "include": [
