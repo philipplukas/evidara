@@ -7,9 +7,8 @@
  * and *what to check next*.
  *
  * This logic is deliberately framework-agnostic (no React, no MUI, no
- * Tailwind) so both the v1 (`SourceShow.tsx`, MUI) and v2
- * (`SourceShowV2.tsx`, Tailwind primitives) detail pages share a single
- * tested implementation while the ADR-0026 v1->v2 migration is in flight.
+ * Tailwind) — separated from the Tailwind `SourceShow.tsx` detail page so the
+ * guidance copy can be unit-tested in isolation (ADR-0026).
  */
 import type { SourceRecord } from "../../lib/admin/dataProvider";
 import {

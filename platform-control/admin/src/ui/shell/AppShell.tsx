@@ -30,22 +30,20 @@ interface AppShellProps {
 }
 
 /**
- * v2-preview menu items that historically lived in `EvidaraAdminMenu`. Kept
- * as explicit entries so the sidebar still advertises the coexisting
- * Tailwind ports until they graduate and replace the v1 MUI resources.
+ * Workflow shortcuts rendered below the auto-registered resource links. The
+ * "setup" entries jump straight to a resource's create page; the remaining
+ * `kind: "preview"` entries advertise the coexisting Tailwind ports (runs,
+ * reference data) until they graduate and replace the v1 MUI resources.
+ *
+ * Sources have already graduated (ADR-0026 / #501): the `/sources` resource
+ * link is canonical Tailwind, so only the create shortcut lives here.
  */
 const DEFAULT_EXTRA_ITEMS: SidebarMenuExtraItem[] = [
-  {
-    to: "/sources-v2",
-    label: "Sources workspace",
-    kind: "preview",
-    inactiveOnPrefixes: ["/sources-v2/create"],
-  },
   { to: "/runs-v2", label: "Run queue", kind: "preview" },
   {
-    to: "/sources-v2/create",
+    to: "/sources/create",
     label: "Source setup",
-    kind: "preview",
+    kind: "custom",
     exact: true,
   },
   {

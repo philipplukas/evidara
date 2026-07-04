@@ -216,6 +216,17 @@ the MUI `StatusBadge` module so v2 Tailwind pages can consume status semantics
 without importing MUI chip/icon code. The run-launch dialog internals remain
 MUI for now, but the dashboard trigger uses the shared Tailwind `Button`.
 
+The **sources** resource has since completed ADR-0026 phase P5 (#501): the
+MUI `SourceList` / `SourceShow` / `SourceCreate` / `SourceVersionsSection`
+files were deleted and their Tailwind ports renamed into the canonical
+`/sources`, `/sources/create`, `/sources/:id/show` routes, wired through
+`<Resource list/create/show>` (no more `/sources-v2` `<CustomRoutes>`). The
+Pass 4 UX-12 entries above that reference `SourceListV2.tsx` / `SourceShowV2.tsx`
+/ `/sources-v2` are point-in-time spike records; the live files are now
+`SourceList.tsx` / `SourceShow.tsx` / `SourceCreate.tsx` /
+`SourceVersionsSection.tsx`. Runs + reference-data resources remain in the
+coexistence window at their `/*-v2` routes.
+
 ## 7. Linear sync — roadmap and templates
 
 Parent epic: **[TAR-243](https://linear.app/tart-baozi/issue/TAR-243)** — _Evidara — Design system & UX (ADR-0016)_.

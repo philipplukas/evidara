@@ -1,30 +1,38 @@
+/**
+ * `SourceShow` — the source detail page, rendered with Tailwind + `ra-core`
+ * primitives. Uses `useShowController` + `useGetOne` for the source +
+ * reference lookups, and `DetailGrid` / `FieldCell` from `src/ui/primitives/`
+ * for the M-9 / M-15 / M-16 two-column field grid. Wired via `<Resource show>`
+ * at `/sources/:id/show` (ADR-0026: replaced the retired MUI detail page once
+ * it reached parity — see #501).
+ *
+ * Sub-surfaces:
+ *   - `SourceVersionsSection` — the full source-version lifecycle surface
+ *     (lifecycle rollup, version table, create/edit + confirm dialogs). Pure
+ *     form/lifecycle logic lives in `./sourceVersionForm`; the diff view is
+ *     `SourceVersionDiffPanel`.
+ *   - `SourceHandoffPanel` — reads the legal-search handoff from the URL
+ *     (`readLegalSearchHandoff`) and renders the gradient "why you are here /
+ *     what to check next" card. The guidance copy lives in `./sourceHandoff`.
+ */
 "use client";
 
-import { Box, Chip, Grid, Paper, Stack, Typography } from "@mui/material";
-import { type ReactNode, useEffect, useState } from "react";
-import {
-  FunctionField,
-  ReferenceField,
-  Show,
-  SimpleShowLayout,
-  TextField,
-  useRecordContext,
-} from "react-admin";
-import { SwissDateField } from "../../components/SwissDateField";
-import { ResourceName } from "../../domain/resourceNames";
+import { useGetOne, useShowController } from "ra-core";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import type {
   AuthorityRecord,
   JurisdictionRecord,
   SourceRecord,
 } from "../../lib/admin/dataProvider";
 import { type LegalSearchHandoff, readLegalSearchHandoff } from "../../lib/admin/navigationContext";
-import { PageContextBar } from "../shared/PageContextBar";
-import { formatReferenceLabel } from "../shared/referenceUtils";
-import { StatusBadge, sourceStatusToLevel } from "../shared/StatusBadge";
+import { formatSwissDateTime } from "../../lib/format/date";
+import { DetailGrid, FieldCell, Panel, Pill } from "../../ui/primitives";
+import { sourceStatusToLevel } from "../shared/statusLevels";
 import { SourceVersionsSection } from "./SourceVersionsSection";
 import { buildSourceHandoffGuidance } from "./sourceHandoff";
 
-const SOURCE_STATUS_META = {
+const SOURCE_STATUS_META: Record<SourceRecord["status"], { label: string; detail: string }> = {
   active: {
     label: "Active",
     detail: "This source can receive new versions and launch new runs.",
@@ -37,80 +45,23 @@ const SOURCE_STATUS_META = {
     label: "Archived",
     detail: "This source is retained for history and should be treated as read-only.",
   },
-} as const;
+};
 
-function SourceLifecyclePanel() {
-  const source = useRecordContext<SourceRecord>();
-
-  if (!source) {
-    return null;
-  }
-
-  const statusMeta = SOURCE_STATUS_META[source.status];
-
-  return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack spacing={1.5}>
-        <Box>
-          <Typography variant="subtitle2">Source lifecycle</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Status, operating posture, and the main attention cue for this source.
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <StatusBadge level={sourceStatusToLevel(source.status)} label={statusMeta.label} />
-          <Typography variant="body2" color="text.secondary">
-            {statusMeta.detail}
-          </Typography>
-        </Stack>
-      </Stack>
-    </Paper>
-  );
-}
-
-function SourcePageContextBar() {
-  const source = useRecordContext<SourceRecord>();
-
-  if (!source) {
-    return null;
-  }
-
-  return (
-    <PageContextBar>
-      <Stack spacing={1.25}>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          {source.name}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-          {source.source_id}
-        </Typography>
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          <StatusBadge
-            level={sourceStatusToLevel(source.status)}
-            label={SOURCE_STATUS_META[source.status].label}
-          />
-          <Chip size="small" variant="outlined" label={`Type: ${source.source_type}`} />
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`Family: ${source.document_family ?? "none"}`}
-          />
-        </Stack>
-      </Stack>
-    </PageContextBar>
-  );
-}
-
-function SourceHandoffPanel() {
-  const source = useRecordContext<SourceRecord>();
+/**
+ * Reads the legal-search handoff from the URL on mount (client-only, so it
+ * stays behind a `useEffect`/`useState` guard to avoid an SSR/client
+ * mismatch) and renders the gradient handoff card. Returns `null` when the
+ * visit did not originate from legal search, so the card never appears on a
+ * direct source-detail visit.
+ */
+function SourceHandoffPanel({ source }: { source: SourceRecord }) {
   const [handoff, setHandoff] = useState<LegalSearchHandoff | null>(null);
 
   useEffect(() => {
     setHandoff(readLegalSearchHandoff());
   }, []);
 
-  if (!source || !handoff) {
+  if (!handoff) {
     return null;
   }
 
@@ -121,125 +72,139 @@ function SourceHandoffPanel() {
   }
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2,
-        mb: 2,
-        background: "linear-gradient(180deg, var(--brand-wash-4), rgba(255, 255, 255, 0.97))",
+    <Panel
+      className="p-5 sm:p-6 space-y-3"
+      style={{
+        background: "linear-gradient(180deg, var(--brand-wash-4), var(--admin-panel-bg))",
       }}
     >
-      <Stack spacing={1.5}>
-        <Box>
-          <Typography variant="subtitle2">Legal search handoff</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Why you are here and what to check next before changing this source.
-          </Typography>
-        </Box>
+      <div className="space-y-1">
+        <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Legal search handoff</h2>
+        <p className="text-[13px] text-[var(--foreground-subtle)]">
+          Why you are here and what to check next before changing this source.
+        </p>
+      </div>
 
-        <Typography variant="body2" color="text.secondary">
-          {guidance.whyYouAreHere}
-        </Typography>
+      <p className="text-sm text-[var(--foreground-muted)]">{guidance.whyYouAreHere}</p>
 
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          {handoff.query ? <Chip size="small" variant="outlined" label={handoff.query} /> : null}
-          {handoff.scopeLabel ? (
-            <Chip size="small" variant="outlined" label={handoff.scopeLabel} />
-          ) : null}
-          {handoff.selectedId ? (
-            <Chip size="small" variant="outlined" label={`Selected item: ${handoff.selectedId}`} />
-          ) : null}
-        </Stack>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {handoff.query ? <Pill variant="meta">{handoff.query}</Pill> : null}
+        {handoff.scopeLabel ? <Pill variant="meta">{handoff.scopeLabel}</Pill> : null}
+        {handoff.selectedId ? (
+          <Pill variant="meta">{`Selected item: ${handoff.selectedId}`}</Pill>
+        ) : null}
+      </div>
 
-        <Typography variant="body2" color="text.secondary">
-          {guidance.whatToCheckNext}
-        </Typography>
-      </Stack>
-    </Paper>
+      <p className="text-sm text-[var(--foreground-muted)]">{guidance.whatToCheckNext}</p>
+    </Panel>
   );
 }
 
-function SourceFieldCell({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Stack spacing={0.5}>
-      <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
-        {label}
-      </Typography>
-      <Box>{children}</Box>
-    </Stack>
-  );
-}
+export default function SourceShow() {
+  const { id } = useParams();
+  const controller = useShowController<SourceRecord>({
+    resource: "sources",
+    id,
+  });
+  const source = controller.record;
 
-export function SourceShow() {
+  const { data: jurisdiction } = useGetOne<JurisdictionRecord>(
+    "jurisdictions",
+    { id: source?.jurisdiction_id ?? "" },
+    { enabled: !!source?.jurisdiction_id },
+  );
+  const { data: authority } = useGetOne<AuthorityRecord>(
+    "authorities",
+    { id: source?.authority_id ?? "" },
+    { enabled: !!source?.authority_id },
+  );
+
+  if (controller.isPending) {
+    return (
+      <div className="px-4 py-10 text-center text-[var(--foreground-subtle)]">Loading source…</div>
+    );
+  }
+  if (controller.error || !source) {
+    return (
+      <div className="px-4 py-10 text-center text-[var(--status-critical)]">
+        Failed to load source.
+      </div>
+    );
+  }
+
+  const statusMeta = SOURCE_STATUS_META[source.status];
+
   return (
-    <Show resource={ResourceName.Sources} title="Source">
-      <SimpleShowLayout>
-        <SourceHandoffPanel />
-        <SourcePageContextBar />
-        <SourceLifecyclePanel />
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <SourceFieldCell label="Source ID">
-              <TextField source="source_id" />
-            </SourceFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <SourceFieldCell label="Name">
-              <TextField source="name" />
-            </SourceFieldCell>
-          </Grid>
-          <Grid size={12}>
-            <SourceFieldCell label="Description">
-              <TextField source="description" emptyText="-" />
-            </SourceFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <SourceFieldCell label="Jurisdiction">
-              <ReferenceField
-                source="jurisdiction_id"
-                reference={ResourceName.Jurisdictions}
-                link={false}
-              >
-                <FunctionField<JurisdictionRecord>
-                  render={(record) => formatReferenceLabel(record)}
-                />
-              </ReferenceField>
-            </SourceFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <SourceFieldCell label="Authority">
-              <ReferenceField
-                source="authority_id"
-                reference={ResourceName.Authorities}
-                link={false}
-              >
-                <FunctionField<AuthorityRecord> render={(record) => formatReferenceLabel(record)} />
-              </ReferenceField>
-            </SourceFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <SourceFieldCell label="Document family">
-              <TextField source="document_family" emptyText="-" />
-            </SourceFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <SourceFieldCell label="Source type">
-              <TextField source="source_type" />
-            </SourceFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <SourceFieldCell label="Created">
-              <SwissDateField source="created_at" showTime />
-            </SourceFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <SourceFieldCell label="Updated">
-              <SwissDateField source="updated_at" showTime />
-            </SourceFieldCell>
-          </Grid>
-        </Grid>
-        <SourceVersionsSection />
-      </SimpleShowLayout>
-    </Show>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[var(--container-max)] mx-auto space-y-6">
+      <SourceHandoffPanel source={source} />
+      <header className="space-y-3">
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
+          Source detail
+        </p>
+        <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          {source.name}
+        </h1>
+        <div className="font-mono text-[12px] text-[var(--foreground-subtle)]">
+          {source.source_id}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Pill level={sourceStatusToLevel(source.status)}>{statusMeta.label}</Pill>
+          <Pill variant="meta">{`Type: ${source.source_type}`}</Pill>
+          <Pill variant="meta">{`Family: ${source.document_family ?? "none"}`}</Pill>
+        </div>
+      </header>
+
+      {/*
+       * UX-12.4: the Active status pill is already present in the header
+       * above, so the lifecycle card no longer renders a second copy on
+       * the right. The card keeps its heading + description copy which
+       * give context the header pills alone can't.
+       */}
+      <section className="rounded-[18px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-1.5">
+        <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Source lifecycle</h2>
+        <p className="text-[13px] text-[var(--foreground-subtle)]">
+          Status, operating posture, and the main attention cue for this source.
+        </p>
+        <p className="text-sm text-[var(--foreground-muted)] pt-1">{statusMeta.detail}</p>
+      </section>
+
+      <DetailGrid>
+        <FieldCell label="Source ID">
+          <span className="font-mono text-[13px]">{source.source_id}</span>
+        </FieldCell>
+        <FieldCell label="Name">{source.name}</FieldCell>
+        <FieldCell label="Description" span="full">
+          {source.description ?? <span className="text-[var(--foreground-faint)]">—</span>}
+        </FieldCell>
+        <FieldCell label="Jurisdiction">
+          {jurisdiction ? (
+            <>
+              {jurisdiction.name}{" "}
+              <span className="text-[var(--foreground-subtle)]">({jurisdiction.slug})</span>
+            </>
+          ) : (
+            <span className="text-[var(--foreground-faint)]">—</span>
+          )}
+        </FieldCell>
+        <FieldCell label="Authority">
+          {authority ? (
+            <>
+              {authority.name}{" "}
+              <span className="text-[var(--foreground-subtle)]">({authority.slug})</span>
+            </>
+          ) : (
+            <span className="text-[var(--foreground-faint)]">—</span>
+          )}
+        </FieldCell>
+        <FieldCell label="Document family">
+          {source.document_family ?? <span className="text-[var(--foreground-faint)]">—</span>}
+        </FieldCell>
+        <FieldCell label="Source type">{source.source_type}</FieldCell>
+        <FieldCell label="Created">{formatSwissDateTime(source.created_at)}</FieldCell>
+        <FieldCell label="Updated">{formatSwissDateTime(source.updated_at)}</FieldCell>
+      </DetailGrid>
+
+      <SourceVersionsSection source={source} />
+    </div>
   );
 }

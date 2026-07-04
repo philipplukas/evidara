@@ -8,7 +8,7 @@
  * The admin uses `@radix-ui/react-select` for the token-styled dropdowns, but
  * `@radix-ui/react-dialog` is intentionally not a dependency (see ADR-0026 —
  * we keep the primitive surface small and dependency-light). This hand-rolled
- * dialog covers the source-version editor + confirm flows on `SourceShowV2`
+ * dialog covers the source-version editor + confirm flows on `SourceShow`
  * without pulling a new package into the lockfile.
  */
 "use client";

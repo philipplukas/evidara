@@ -4,9 +4,8 @@
  * The source-create wizard turns a country overlay + provider template into
  * a server-expanded `acquisition_spec` (previewed via
  * `controlPlaneActions.previewSourceBlueprint`). The pure, framework-agnostic
- * pieces of that flow live here so the v1 (`SourceCreate.tsx`, MUI) and v2
- * (`SourceCreateV2.tsx`, Tailwind primitives) create pages share one tested
- * implementation while the ADR-0026 v1->v2 migration is in flight:
+ * pieces of that flow live here — separated from the Tailwind
+ * `SourceCreate.tsx` wizard so they can be unit-tested in isolation:
  *
  *   - `OVERLAY_NAMES` — overlay-id -> operator-facing label.
  *   - `summarizePreview` — provider-specific one-line summary of an expanded

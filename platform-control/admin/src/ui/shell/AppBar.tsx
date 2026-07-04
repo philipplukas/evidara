@@ -36,10 +36,6 @@ function titleForPath(pathname: string): string {
   if (pathname.startsWith("/runs-v2")) {
     return pathname.includes("/") && /\/runs-v2\/[^/]+/.test(pathname) ? "Run detail" : "Run queue";
   }
-  if (pathname.startsWith("/sources-v2")) {
-    if (pathname.endsWith("/create")) return "Create source";
-    return /\/sources-v2\/[^/]+/.test(pathname) ? "Source detail" : "Sources";
-  }
   if (pathname.startsWith("/authorities-v2/create")) return "Create authority";
   if (/\/authorities-v2\/[^/]+\/edit/.test(pathname)) return "Edit authority";
   if (pathname.startsWith("/jurisdictions-v2/create")) return "Create jurisdiction";

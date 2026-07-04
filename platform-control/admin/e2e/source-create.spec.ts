@@ -203,7 +203,7 @@ async function pickRadixSelect(page: Page, label: string, optionText: string) {
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe("SourceCreateV2 wizard", () => {
+test.describe("SourceCreate wizard", () => {
   test.beforeEach(async ({ page }) => {
     // Set role so the auth gate lets us through
     await page.addInitScript(() => {
@@ -217,7 +217,7 @@ test.describe("SourceCreateV2 wizard", () => {
     const mocks = await mockPlatformControlApi(page);
 
     // react-admin uses hash routing by default
-    await page.goto("/#/sources-v2/create");
+    await page.goto("/#/sources/create");
     await expect(page.locator("h1")).toContainText("Create source");
 
     // ── Source metadata ──
@@ -259,7 +259,7 @@ test.describe("SourceCreateV2 wizard", () => {
 
   test("authority select filters when jurisdiction changes", async ({ page }) => {
     await mockPlatformControlApi(page);
-    await page.goto("/#/sources-v2/create");
+    await page.goto("/#/sources/create");
     await expect(page.locator("h1")).toContainText("Create source");
 
     // Pick Switzerland — should show Fedlex + Global Authority
@@ -286,7 +286,7 @@ test.describe("SourceCreateV2 wizard", () => {
 
   test("provider template choices are gated on the picked country overlay", async ({ page }) => {
     await mockPlatformControlApi(page);
-    await page.goto("/#/sources-v2/create");
+    await page.goto("/#/sources/create");
     await expect(page.locator("h1")).toContainText("Create source");
 
     // Pick the CH overlay — only its template should be offered.
@@ -312,7 +312,7 @@ test.describe("SourceCreateV2 wizard", () => {
     page,
   }) => {
     await mockPlatformControlApi(page);
-    await page.goto("/#/sources-v2/create");
+    await page.goto("/#/sources/create");
     await expect(page.locator("h1")).toContainText("Create source");
 
     await pickRadixSelect(page, "Country overlay", "Switzerland (CH)");

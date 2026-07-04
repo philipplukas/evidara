@@ -5,9 +5,8 @@
  * acquisition-spec preview) turns a provider-specific form into a validated
  * `acquisition_spec`, and a list of versions into an operator-facing
  * lifecycle summary. The pure, framework-agnostic pieces of that flow live
- * here so the v1 (`SourceVersionsSection.tsx`, MUI) and v2
- * (`SourceVersionsSectionV2.tsx`, Tailwind primitives) sections share one
- * tested implementation while the ADR-0026 v1->v2 migration is in flight:
+ * here — separated from the Tailwind `SourceVersionsSection.tsx` component so
+ * the state machine + acquisition-spec mapping can be unit-tested in isolation:
  *
  *   - form-state model (`SourceVersionFormState`, `emptyFormState`,
  *     `toFormState`) and its round-trip into an `acquisition_spec`
