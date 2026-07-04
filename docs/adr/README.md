@@ -29,6 +29,7 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0025 | [Portal HTTP provider strategy](adr-0025-portal-http-provider-strategy.md) |
 | ADR-0026 | [`authority_id` / `jurisdiction_id` naming policy](adr-0026-id-naming-policy.md) |
 | ADR-0027 | [Workspace ↔ admin visual language](0027-workspace-admin-visual-language.md) |
+| ADR-0028 | [Open-core licensing (AGPL-3.0 code + CC-BY-4.0 data) and CLA](adr-0028-open-core-licensing.md) |
 | ADR-0029 | [Self-hosted Hetzner runtime — retire GCP managed services](0029-self-hosted-hetzner-runtime.md) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 

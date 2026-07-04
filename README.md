@@ -70,6 +70,32 @@ For Zed-specific editor and MCP setup, use [Zed Setup](docs/setup/zed.md).
 
 See each component's doc in [docs/components/](docs/components/) for component-specific guidance.
 
+## Licensing & Commercial Use
+
+Evidara is **open core**, licensed by artifact type (see
+[ADR-0028](docs/adr/adr-0028-open-core-licensing.md)):
+
+| What | License | File |
+|---|---|---|
+| Platform **code** (`platform-control/`, `document-intelligence/`, `legal-search/`, `infra/`, `scripts/`, `tools/`, `service-template/`, `k8s/`) | **GNU AGPL-3.0-only** | [`LICENSE`](LICENSE) |
+| **Data, schemas, contracts** (`contracts/`, `country-overlays/`, `docs/`) | **CC-BY-4.0** | [`LICENSE-data`](LICENSE-data) |
+
+- **Free use.** You may use, study, modify, self-host, and redistribute Evidara
+  under these terms at no cost. The AGPL-3.0 requires that if you run a modified
+  version as a network service, you offer your modifications under the AGPL-3.0.
+- **Commercial use without copyleft.** If you want to use the core in a closed or
+  hosted product without the AGPL-3.0's copyleft obligations, a separate
+  commercial license may be available — contact the maintainer.
+- **Contributing.** External contributions require a signed
+  [Contributor License Agreement](CLA.md), which keeps the dual-license option
+  open. See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Legal texts.** CC-BY-4.0 covers Evidara's own structuring work (schemas, IDs,
+  overlays), not the underlying primary legal sources, which carry their own
+  upstream terms. See ADR-0028 §5.
+
+> The copyright holder retains all rights; the licenses above are grants
+> extended to others and do not limit the holder's own commercial use.
+
 ## Milestones
 
 | Milestone | Description |

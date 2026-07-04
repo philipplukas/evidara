@@ -4,6 +4,12 @@
 
 This is a **clean-room implementation**. All contributions must adhere to the [clean-room principles](docs/architecture/clean-room-principles.md). Do not copy source code, tests, prompts, or proprietary documentation from prior repositories.
 
+## License and Contributor Agreement
+
+Evidara is **open core** (see [ADR-0028](docs/adr/adr-0028-open-core-licensing.md)): platform code is **AGPL-3.0** ([`LICENSE`](LICENSE)) and data/schemas/contracts are **CC-BY-4.0** ([`LICENSE-data`](LICENSE-data)). A plain-language summary is in the README ["Licensing & Commercial Use"](README.md#licensing--commercial-use) section.
+
+**Every external contribution requires a signed [Contributor License Agreement](CLA.md).** The CLA lets you keep your copyright while granting the maintainer the rights needed to keep the dual-license/commercial option open. A CLA bot records your agreement on your first pull request; until it is wired up, add the manual attestation from [`CLA.md`](CLA.md) to your PR description.
+
 ## Branch Naming
 
 Use short-lived branches from `main` with these prefixes:

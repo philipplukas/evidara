@@ -2,6 +2,11 @@
 
 `contracts/` is the highest-authority interface layer in Evidara. If prose and a contract file disagree, the contract file wins.
 
+> **License:** Files in `contracts/` (OpenAPI specs, JSON Schemas, examples, IDs)
+> are Evidara's structuring work and are licensed under **CC-BY-4.0**
+> ([`/LICENSE-data`](../LICENSE-data)), not the AGPL-3.0 that covers the platform
+> code. See [ADR-0028](../docs/adr/adr-0028-open-core-licensing.md).
+
 ## Directory Layout
 
 ```text

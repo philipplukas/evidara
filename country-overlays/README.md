@@ -4,6 +4,12 @@ Country overlays keep jurisdiction-specific content, mapping, and operator guida
 in one place, then sync into component-specific surfaces (contracts, legal-search,
 platform-control).
 
+> **License:** Overlay data in `country-overlays/` is licensed under **CC-BY-4.0**
+> ([`/LICENSE-data`](../LICENSE-data)), not the AGPL-3.0 that covers the platform
+> code. This covers Evidara's own mapping/structuring work; the underlying primary
+> legal sources carry their own upstream terms, which each overlay must record.
+> See [ADR-0028](../docs/adr/adr-0028-open-core-licensing.md).
+
 Current overlays:
 
 - `at/` — Austria
