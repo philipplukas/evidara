@@ -1,5 +1,5 @@
 /**
- * `RunListV2` — v2 preview of the run queue. Richer than SourceListV2:
+ * `RunListV2` — v2 preview of the run queue. Richer than the sources list:
  *
  *   - 5-level status cascade (pending/running/completed/failed/cancelled)
  *     exercises every `Pill` level, not just 3 like sources.

@@ -5,7 +5,7 @@
  * Unlike `TextInput` / `Select` (which bind to `ra-core`'s `useInput`), this
  * primitive is fully controlled via `checked` / `onCheckedChange` so it can
  * back local `useState` dialog forms — the source-version editor on
- * `SourceShowV2` manages its form state locally rather than through a
+ * `SourceShow` manages its form state locally rather than through a
  * `<Form>` context.
  */
 "use client";

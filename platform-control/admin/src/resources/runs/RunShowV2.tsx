@@ -154,7 +154,7 @@ export default function RunShowV2() {
         ) : null}
       </section>
 
-      {/* Metadata grid — same M-15 2-col pattern as SourceShowV2. */}
+      {/* Metadata grid — same M-15 2-col pattern as SourceShow. */}
       <DetailGrid>
         <FieldCell label="Run">
           <span className="font-mono text-[13px]">{run.run_id}</span>

@@ -47,12 +47,9 @@ import { RunList } from "../resources/runs/RunList";
 import RunListV2 from "../resources/runs/RunListV2";
 import { RunShow } from "../resources/runs/RunShow";
 import RunShowV2 from "../resources/runs/RunShowV2";
-import { SourceCreate } from "../resources/sources/SourceCreate";
-import SourceCreateV2 from "../resources/sources/SourceCreateV2";
-import { SourceList } from "../resources/sources/SourceList";
-import SourceListV2 from "../resources/sources/SourceListV2";
-import { SourceShow } from "../resources/sources/SourceShow";
-import SourceShowV2 from "../resources/sources/SourceShowV2";
+import SourceCreate from "../resources/sources/SourceCreate";
+import SourceList from "../resources/sources/SourceList";
+import SourceShow from "../resources/sources/SourceShow";
 import { AppShell } from "../ui/shell";
 
 /** Thin adapter — ra-core's `LayoutComponent` contract takes `{ children }`. */
@@ -126,9 +123,6 @@ export default function AdminApp() {
        * corresponding v1 file is deleted.
        */}
       <CustomRoutes>
-        <Route path="/sources-v2" element={<SourceListV2 />} />
-        <Route path="/sources-v2/create" element={<SourceCreateV2 />} />
-        <Route path="/sources-v2/:id" element={<SourceShowV2 />} />
         <Route path="/runs-v2" element={<RunListV2 />} />
         <Route path="/runs-v2/:id" element={<RunShowV2 />} />
         <Route path="/authorities-v2/create" element={<AuthorityCreateV2 />} />

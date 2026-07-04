@@ -117,7 +117,7 @@ describe("admin resource brand token parity", () => {
   it("scans every resource .tsx file (sanity check)", () => {
     expect(resourceFiles.length).toBeGreaterThan(10);
     expect(resourceFiles).toContain("src/resources/runs/RunListV2.tsx");
-    expect(resourceFiles).toContain("src/resources/sources/SourceListV2.tsx");
+    expect(resourceFiles).toContain("src/resources/sources/SourceList.tsx");
   });
 
   it("does not reintroduce pre-parity color literals in resource components", () => {
