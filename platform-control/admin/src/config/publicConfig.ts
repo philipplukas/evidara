@@ -63,7 +63,7 @@ export type EnvSource = Readonly<Record<string, string | undefined>>;
 
 /**
  * Build a `PublicConfig` from an env-like source. Exported for tests; the
- * module-level `publicConfig` uses `process.env`.
+ * module-level `publicConfig` passes an explicit literal snapshot (see below).
  */
 export function buildPublicConfig(env: EnvSource = process.env): PublicConfig {
   const legalSearchBaseUrlOrUndefined = trimToUndefined(env.NEXT_PUBLIC_LEGAL_SEARCH_URL);
@@ -82,4 +82,24 @@ export function buildPublicConfig(env: EnvSource = process.env): PublicConfig {
   };
 }
 
-export const publicConfig: PublicConfig = buildPublicConfig();
+/**
+ * Literal `process.env.NEXT_PUBLIC_*` snapshot.
+ *
+ * CRITICAL: these must be spelled as literal member expressions here, not read
+ * via a variable (e.g. `env.NEXT_PUBLIC_USER_ROLE`). Next.js only substitutes
+ * `NEXT_PUBLIC_*` values into the *client* bundle when it sees the literal
+ * `process.env.NEXT_PUBLIC_FOO` at build time. Passing `process.env` through
+ * `buildPublicConfig`'s default parameter and dereferencing it dynamically
+ * left every value `undefined` in the browser — which silently broke the
+ * client-side admin access gate (`defaultUserRole` → `""` → 403) regardless of
+ * the Docker `ENV NEXT_PUBLIC_USER_ROLE=admin` bake, since that bake only
+ * populates the server runtime. Building the module-level config from this
+ * literal snapshot is what makes the bake reach the browser.
+ */
+const NEXT_PUBLIC_ENV: EnvSource = {
+  NEXT_PUBLIC_LEGAL_SEARCH_URL: process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL,
+  NEXT_PUBLIC_USER_ROLE: process.env.NEXT_PUBLIC_USER_ROLE,
+  NEXT_PUBLIC_ADMIN_ALLOWED_ROLES: process.env.NEXT_PUBLIC_ADMIN_ALLOWED_ROLES,
+};
+
+export const publicConfig: PublicConfig = buildPublicConfig(NEXT_PUBLIC_ENV);
