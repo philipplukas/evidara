@@ -8,6 +8,8 @@ A clean-room document intelligence platform for legal and regulatory content.
 
 Evidara is a monorepo containing all components of a document intelligence platform that processes, structures, and serves legal and regulatory documents. It is designed around strict component boundaries, explicit contracts, and a separation of canonical truth from serving projections.
 
+It is a **platform**, not a corpus: source lifecycle and governance, raw-to-canonical processing, and multi-jurisdiction (CH/AT/DE/EU/FR/IT) structure — designed to *consume* existing open legal corpora rather than duplicate them, and to emit open standards (Akoma Ntoso / ELI / ECLI) others can build on. For where Evidara fits in the open-law ecosystem and how it distinguishes itself, see [Open-law positioning](docs/positioning.md).
+
 **This is a clean-room implementation.** See [docs/architecture/clean-room-principles.md](docs/architecture/clean-room-principles.md).
 
 ## Repository Structure

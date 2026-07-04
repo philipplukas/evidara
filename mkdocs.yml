@@ -66,6 +66,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Open-Law Positioning: positioning.md
   - Architecture:
       - System Context: architecture/system-context.md
       - Agentic CLI Workflow: architecture/agentic-cli-workflow-architecture.md
