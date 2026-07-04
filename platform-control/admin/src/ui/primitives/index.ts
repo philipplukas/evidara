@@ -12,6 +12,7 @@ export {
   AccordionTrigger,
 } from "./Accordion";
 export { Button } from "./Button";
+export { Checkbox } from "./Checkbox";
 export { cn } from "./cn";
 export {
   DataTable,
@@ -20,6 +21,7 @@ export {
   type SortOrder,
 } from "./DataTable";
 export { DetailGrid, FieldCell } from "./DetailGrid";
+export { Dialog } from "./Dialog";
 export { FormField } from "./FormField";
 export { InlineAlert } from "./InlineAlert";
 export { Panel } from "./Panel";

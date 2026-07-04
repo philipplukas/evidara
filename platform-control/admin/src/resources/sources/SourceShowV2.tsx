@@ -4,10 +4,11 @@
  * and `DetailGrid` / `FieldCell` from `src/ui/primitives/` for the M-9 /
  * M-15 / M-16 two-column field grid.
  *
- * Deferred until follow-up increments (documented inline in the deferred-
- * panel footnote at the bottom of the page):
- *   - `SourceVersionsSection` — mutations, dialogs, tables; ports with
- *     the Select primitive in the SourceCreate increment.
+ * Ported in #501 increment 2:
+ *   - `SourceVersionsSectionV2` — the full source-version lifecycle surface
+ *     (lifecycle rollup, version table, create/edit + confirm dialogs).
+ *     Pure form/lifecycle logic is shared with the v1 MUI section via
+ *     `./sourceVersionForm`; the diff view reuses `SourceVersionDiffPanel`.
  *
  * Ported in #501 increment 1:
  *   - `SourceHandoffPanel` — reads the legal-search handoff from the URL
@@ -29,6 +30,7 @@ import { type LegalSearchHandoff, readLegalSearchHandoff } from "../../lib/admin
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DetailGrid, FieldCell, Panel, Pill } from "../../ui/primitives";
 import { sourceStatusToLevel } from "../shared/statusLevels";
+import { SourceVersionsSectionV2 } from "./SourceVersionsSectionV2";
 import { buildSourceHandoffGuidance } from "./sourceHandoff";
 
 const SOURCE_STATUS_META: Record<SourceRecord["status"], { label: string; detail: string }> = {
@@ -202,6 +204,8 @@ export default function SourceShowV2() {
         <FieldCell label="Created">{formatSwissDateTime(source.created_at)}</FieldCell>
         <FieldCell label="Updated">{formatSwissDateTime(source.updated_at)}</FieldCell>
       </DetailGrid>
+
+      <SourceVersionsSectionV2 source={source} />
     </div>
   );
 }
