@@ -226,23 +226,25 @@ test.describe("Canonical screenshot evidence pack", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Tailwind + ra-core migration capture for the sources list and show pages.
-  // Captures render side-by-side with the canonical admin pages above so the
-  // UX review can compare route families while the admin migration continues.
+  // Sources list + detail capture. The Tailwind + ra-core ports graduated to
+  // the canonical `/sources` routes (ADR-0026 P5 / #501, #509), so these hit
+  // the same pages as the v1 captures above. The `-v2.png` output filenames
+  // are retained as the documented UX-review artifacts (see
+  // docs/runbooks/ux-aesthetic-review.md).
   // ---------------------------------------------------------------------------
-  test("@screenshots captures admin sources-v2 list and detail", async ({ page }) => {
+  test("@screenshots captures admin sources list and detail", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await setupAdmin(page);
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources-v2`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources`);
     await expect(page.getByRole("heading", { name: /Sources/ })).toBeVisible();
     // Wait for reference data to resolve so the Jurisdiction / Authority
     // columns are populated before the capture.
     await expect(page.getByText("Swiss Federal Court")).toBeVisible();
     await saveScreenshot(page, "admin-sources-list-v2.png");
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources-v2/src_01`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources/src_01/show`);
     await expect(page.getByRole("heading", { name: "Swiss Federal Court" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Source lifecycle" })).toBeVisible();
     await saveScreenshot(page, "admin-source-detail-v2.png");
@@ -290,12 +292,12 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-authority-edit-v2.png");
   });
 
-  test("@screenshots captures admin source form v2", async ({ page }) => {
+  test("@screenshots captures admin source create form", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await setupAdmin(page);
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources-v2/create`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/sources/create`);
     await expect(page.getByRole("heading", { name: /Create source/ })).toBeVisible();
     // Wait for useGetList("jurisdictions") to hydrate so the Select has
     // at least one real option before the capture. The jurisdiction
