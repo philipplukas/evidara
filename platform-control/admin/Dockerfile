@@ -25,6 +25,13 @@ ENV PLATFORM_CONTROL_API_URL=http://platform-control-api:8000
 # Default the operator role so authorized users (gated by the ingress BasicAuth /
 # SSO front door) don't need the localStorage override. NEXT_PUBLIC_* is baked at build.
 ENV NEXT_PUBLIC_USER_ROLE=admin
+# Public legal-search URL for the "Back to legal search" cross-surface link.
+# AdminShell is a client component, so this NEXT_PUBLIC_* must be inlined at
+# BUILD time to reach the browser — a runtime Deployment env would not (same
+# client-inlining constraint as NEXT_PUBLIC_USER_ROLE above). Unset, it falls
+# back to the localhost:3101 dev default and sends real operators to their own
+# machine. Override at build for other environments via --build-arg if needed.
+ENV NEXT_PUBLIC_LEGAL_SEARCH_URL=https://search.evidara.veyo.dev
 RUN npm run build
 
 EXPOSE 8080
