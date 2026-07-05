@@ -84,8 +84,12 @@ spec:
             # (localhost:3102 was a dev default that ECONNREFUSED inside the pod.)
             - name: NEXT_PUBLIC_API_URL
               value: "http://legal-search-api.evidara.svc:8080"
+            # Public admin URL for the cross-surface "control panel" header link.
+            # Read server-side at request time (control-plane-entry-server.ts), so a
+            # runtime value change takes effect on rollout without an image rebuild.
+            # (localhost:3100 was a dev default that pointed real users at their own machine.)
             - name: NEXT_PUBLIC_CONTROL_PANEL_URL
-              value: "http://localhost:3100"
+              value: "https://admin.evidara.veyo.dev"
             # Server-side only (NOT NEXT_PUBLIC): middleware injects it as X-API-Key
             # when proxying /v1/*. Optional: absent key => no header => API stays open.
             - name: LEGAL_SEARCH_API_KEY
