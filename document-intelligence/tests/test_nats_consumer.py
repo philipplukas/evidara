@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -15,6 +16,7 @@ from document_intelligence.events.publisher import (
     NatsDocumentEventPublisher,
     NatsEventPublisherConfig,
 )
+from document_intelligence.jobs import nats_consumer
 from document_intelligence.jobs.nats_consumer import dispatch_message
 
 _VALID_EVENT = json.dumps(
@@ -230,6 +232,111 @@ class NatsDocumentEventPublisherTests(unittest.TestCase):
         self.assertEqual(processed_subject, "evidara.document-processed")
         self.assertEqual(status_headers, {"Nats-Msg-Id": "evt_s"})
         self.assertEqual(processed_headers, {"Nats-Msg-Id": "evt_p"})
+
+
+class _LoopBreak(Exception):
+    """Sentinel used to end the otherwise-infinite consumer loop deterministically."""
+
+
+class _RawMeta:
+    def __init__(self, num_delivered: int = 1) -> None:
+        self.num_delivered = num_delivered
+
+
+class _RawNatsMessage:
+    """Minimal stand-in for a nats.aio JetStream message (what _NatsMessage adapts)."""
+
+    def __init__(self, data: bytes, *, num_delivered: int = 1) -> None:
+        self.data = data
+        self.metadata = _RawMeta(num_delivered)
+        self.acked = False
+        self.naks: list[float | None] = []
+        self.terminated = False
+
+    async def ack(self) -> None:
+        self.acked = True
+
+    async def nak(self, delay: float | None = None) -> None:
+        self.naks.append(delay)
+
+    async def term(self) -> None:
+        self.terminated = True
+
+
+class _IdleThenMessageSubscription:
+    """fetch(): idle-timeout, then one message, then break out of the loop."""
+
+    def __init__(self, message: _RawNatsMessage) -> None:
+        self._message = message
+        self.calls = 0
+
+    async def fetch(self, batch: int, timeout: float | None = None) -> list[_RawNatsMessage]:
+        self.calls += 1
+        if self.calls == 1:
+            # nats-py 2.15 raises the *builtin* TimeoutError on an idle pull.
+            raise TimeoutError
+        if self.calls == 2:
+            return [self._message]
+        raise _LoopBreak
+
+
+class _FakeJetStream:
+    def __init__(self, subscription: _IdleThenMessageSubscription) -> None:
+        self._subscription = subscription
+        self.published: list[tuple[str, bytes, dict | None]] = []
+
+    async def pull_subscribe(self, subject, durable, stream, config):  # noqa: ANN001
+        return self._subscription
+
+    async def publish(self, subject, payload, headers=None):  # noqa: ANN001
+        self.published.append((subject, payload, headers))
+
+
+class _FakeConnection:
+    def __init__(self, jetstream: _FakeJetStream) -> None:
+        self._jetstream = jetstream
+        self.drained = False
+
+    def jetstream(self) -> _FakeJetStream:
+        return self._jetstream
+
+    async def drain(self) -> None:
+        self.drained = True
+
+
+class ConsumerRunLoopTests(unittest.TestCase):
+    def test_idle_fetch_timeout_does_not_crash_loop(self) -> None:
+        # Regression (di-consumer crash-loop): PullSubscription.fetch raises the
+        # builtin TimeoutError on an idle queue. The loop must treat that as a
+        # no-op and keep polling. Before the fix the loop caught only
+        # nats.errors.TimeoutError — which cannot catch a bare builtin TimeoutError
+        # (a subclass except never catches a parent instance) — so the idle
+        # timeout escaped run() and crash-looped the consumer whenever no bundles
+        # were pending (the empty-corpus steady state).
+        raw = _RawNatsMessage(_VALID_EVENT)
+        subscription = _IdleThenMessageSubscription(raw)
+        connection = _FakeConnection(_FakeJetStream(subscription))
+        pipeline = FakePipeline()
+
+        async def _fake_connect(servers):  # noqa: ANN001, ANN202
+            return connection
+
+        args = nats_consumer._parse_args(["--dry-run-publish"])
+
+        with (
+            mock.patch.object(nats_consumer, "_build_pipeline", return_value=pipeline),
+            mock.patch("nats.connect", _fake_connect),
+        ):
+            # The loop only exits via our sentinel; if the idle timeout were NOT
+            # swallowed, asyncio.TimeoutError (not _LoopBreak) would surface here.
+            with self.assertRaises(_LoopBreak):
+                asyncio.run(nats_consumer.run(args, {}))
+
+        # Survived the idle timeout (call 1), processed the later message (call 2),
+        # then hit the sentinel (call 3) — proof the loop kept polling.
+        self.assertEqual(subscription.calls, 3)
+        self.assertEqual(pipeline.calls, 1)
+        self.assertTrue(raw.acked)
 
 
 if __name__ == "__main__":
