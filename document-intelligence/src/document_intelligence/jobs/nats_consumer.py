@@ -209,7 +209,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 async def run(args: argparse.Namespace, environment: Mapping[str, str]) -> int:
     import nats
-    from nats.errors import TimeoutError as NatsTimeoutError
     from nats.js.api import AckPolicy, ConsumerConfig
 
     pipeline = _build_pipeline(environment)
@@ -257,7 +256,15 @@ async def run(args: argparse.Namespace, environment: Mapping[str, str]) -> int:
     while not should_stop.is_set():
         try:
             messages = await subscription.fetch(args.max_messages, timeout=args.fetch_timeout_seconds)
-        except NatsTimeoutError:
+        except TimeoutError:
+            # An idle fetch (no pending bundles within the timeout) is the normal
+            # steady state, not an error — keep polling. nats-py 2.15's
+            # PullSubscription.fetch raises the *builtin* TimeoutError; the earlier
+            # `except nats.errors.TimeoutError` could not catch it (that class is a
+            # *subclass* of builtin TimeoutError, and a subclass except never
+            # catches a parent instance), so the bare timeout escaped and
+            # crash-looped the consumer whenever the queue was empty. Catching the
+            # builtin covers both the bare timeout and the nats subclass.
             continue
         for msg in messages:
             await dispatch_message(
