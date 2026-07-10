@@ -92,3 +92,55 @@ spec:
               memory: 512Mi
             limits:
               memory: 1Gi
+---
+# NATS->legal-search projection bridge (M0.2). Subscribes to
+# evidara.document-processed and POSTs each event to the legal-search projections
+# endpoint, so processed documents become searchable without a manual
+# local_outbox_replay run. Reuses the DI consumer image (same package, new entry
+# point); LEGAL_SEARCH_API_URL comes from evidara-config, the optional X-API-Key
+# from evidara-auth.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: projection-bridge
+  namespace: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: projection-bridge
+  template:
+    metadata:
+      labels:
+        app: projection-bridge
+    spec:
+      containers:
+        - name: bridge
+          image: ghcr.io/philipplukas/evidara-document-intelligence-consumer
+          command: ["sh", "-c", "document_intelligence_projection_bridge --servers \"$NATS_SERVERS\""]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: LEGAL_SEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: evidara-auth
+                  key: LEGAL_SEARCH_API_KEY
+                  optional: true
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+            - secretRef:
+                name: evidara-app-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
