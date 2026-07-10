@@ -246,9 +246,7 @@ async def run(args: argparse.Namespace) -> int:
     )
     while not should_stop.is_set():
         try:
-            messages = await subscription.fetch(
-                args.max_messages, timeout=args.fetch_timeout_seconds
-            )
+            messages = await subscription.fetch(args.max_messages, timeout=args.fetch_timeout_seconds)
         except TimeoutError:
             # Idle fetch is the normal steady state, not an error (see nats_consumer
             # for the builtin-vs-nats TimeoutError subtlety that crash-looped #513).
