@@ -17,7 +17,12 @@ data:
   DI_S3_ENDPOINT_URL: "http://minio.evidara.svc:9000"
   DI_S3_REGION: "us-east-1"
   NATS_SERVERS: "nats://nats.evidara.svc:4222"
+  # legal-search API base for the NATS->projection bridge (document_intelligence_projection_bridge, M0.2)
+  LEGAL_SEARCH_API_URL: "http://legal-search-api.evidara.svc:8080"
   # legal-search
   OPENSEARCH_NODE: "http://opensearch-cluster-master.evidara.svc:9200"
+  # legal-search-api reads document bodies from the DI document-service when applying
+  # document.processed projections; unset => projection can't fetch bodies to index (M0.1).
+  DOCUMENT_INTELLIGENCE_BASE_URL: "http://document-service.evidara.svc:8090"
   # cross-surface
   PLATFORM_CONTROL_API_URL: "http://platform-control-api.evidara.svc:8080"
