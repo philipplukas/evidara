@@ -122,3 +122,8 @@ scripts/deploy-hetzner-runner.sh
 
 # --- Claude Code agent harness ---
 .claude/worktrees/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# macOS Spotlight "do not index" markers
+.metadata_never_index
