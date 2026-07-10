@@ -26,14 +26,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import logging
 import signal
 import sys
 import urllib.error
 import urllib.request
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 from document_intelligence.jobs._consumer_common import (
     extract_event_context,
