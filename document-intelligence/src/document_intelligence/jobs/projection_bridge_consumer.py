@@ -1,11 +1,16 @@
-"""Always-on NATS→legal-search projection bridge (M0.2).
+"""Always-on NATS→legal-search projection bridge (M0.2, issue #522).
 
 The document-intelligence consumer publishes ``document.processed`` events to the
-NATS ``evidara.document-processed`` subject, but nothing forwarded them into
-legal-search — so processed documents never became searchable without a manual
-``local_outbox_replay`` run. This consumer closes that gap: it subscribes to the
-processed subject and POSTs each event to the legal-search projections HTTP
-endpoint, mirroring the ack/nak/term/DLQ semantics of :mod:`nats_consumer`.
+NATS ``evidara.document-processed`` subject (and withdrawals to
+``evidara.document-withdrawn``), but nothing forwarded them into legal-search — so
+processed documents never became searchable, and withdrawals never de-indexed,
+without a manual ``local_outbox_replay`` run. This consumer closes that gap: it
+subscribes to both subjects and POSTs each event to the matching legal-search
+projections HTTP endpoint, mirroring the ack/nak/term/DLQ semantics of
+:mod:`nats_consumer`:
+
+- ``evidara.document-processed``  -> ``POST /v1/projections/events/document-processed``
+- ``evidara.document-withdrawn``  -> ``POST /v1/projections/events/document-withdrawn``
 
 Delivery semantics (same as the bundle consumer):
 
@@ -177,9 +182,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--servers", default=os.environ.get("NATS_SERVERS", "nats://localhost:4222"))
     parser.add_argument("--stream", default="EVIDARA")
+    # Durable for the processed subject. Kept as the original name so an in-place
+    # upgrade reuses the existing JetStream consumer rather than orphaning it.
     parser.add_argument("--durable-name", default="legal-search-projection-bridge")
+    parser.add_argument("--withdrawn-durable-name", default="legal-search-projection-withdrawal")
     parser.add_argument("--processed-subject", default="evidara.document-processed")
+    parser.add_argument("--withdrawn-subject", default="evidara.document-withdrawn")
     parser.add_argument("--dlq-subject", default="evidara.document-processed.dlq")
+    parser.add_argument("--withdrawn-dlq-subject", default="evidara.document-withdrawn.dlq")
     parser.add_argument(
         "--legal-search-api-url",
         default=os.environ.get("LEGAL_SEARCH_API_URL") or os.environ.get("NEXT_PUBLIC_API_URL"),
@@ -206,32 +216,58 @@ async def run(args: argparse.Namespace) -> int:
         LOGGER.error("legal-search API URL is required (set LEGAL_SEARCH_API_URL)")
         return 2
 
-    projection_url = f"{str(args.legal_search_api_url).rstrip('/')}/v1/projections/events/document-processed"
+    base_url = str(args.legal_search_api_url).rstrip("/")
     api_key = args.legal_search_api_key
-
-    async def forward(data: bytes) -> None:
-        # urllib is blocking — run it off the event loop so fetch/ack keep flowing.
-        await asyncio.to_thread(post_projection_event, projection_url, data, api_key=api_key)
 
     connection = await nats.connect(args.servers)
     jetstream = connection.jetstream()
 
-    async def dlq_publish(data: bytes) -> None:
-        await jetstream.publish(args.dlq_subject, data)
+    def make_forward(path: str) -> Callable[[bytes], Awaitable[None]]:
+        url = f"{base_url}{path}"
 
-    consumer_config = ConsumerConfig(
-        durable_name=args.durable_name,
-        ack_policy=AckPolicy.EXPLICIT,
-        ack_wait=args.ack_wait_seconds,
-        max_deliver=args.max_deliver + 2,
-        filter_subject=args.processed_subject,
-    )
-    subscription = await jetstream.pull_subscribe(
-        args.processed_subject,
-        durable=args.durable_name,
-        stream=args.stream,
-        config=consumer_config,
-    )
+        async def forward(data: bytes) -> None:
+            # urllib is blocking — run it off the event loop so fetch/ack keep flowing.
+            await asyncio.to_thread(post_projection_event, url, data, api_key=api_key)
+
+        return forward
+
+    def make_dlq(dlq_subject: str) -> Callable[[bytes], Awaitable[None]]:
+        async def dlq_publish(data: bytes) -> None:
+            await jetstream.publish(dlq_subject, data)
+
+        return dlq_publish
+
+    async def subscribe(subject: str, durable: str):  # noqa: ANN202
+        consumer_config = ConsumerConfig(
+            durable_name=durable,
+            ack_policy=AckPolicy.EXPLICIT,
+            ack_wait=args.ack_wait_seconds,
+            max_deliver=args.max_deliver + 2,
+            filter_subject=subject,
+        )
+        return await jetstream.pull_subscribe(
+            subject,
+            durable=durable,
+            stream=args.stream,
+            config=consumer_config,
+        )
+
+    # One process, one subscription per subject → matching projection endpoint. The
+    # endpoints are idempotent, so at-least-once redelivery on either route is safe.
+    routes = [
+        (
+            await subscribe(args.processed_subject, args.durable_name),
+            args.processed_subject,
+            make_forward("/v1/projections/events/document-processed"),
+            make_dlq(args.dlq_subject),
+        ),
+        (
+            await subscribe(args.withdrawn_subject, args.withdrawn_durable_name),
+            args.withdrawn_subject,
+            make_forward("/v1/projections/events/document-withdrawn"),
+            make_dlq(args.withdrawn_dlq_subject),
+        ),
+    ]
 
     should_stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -239,27 +275,29 @@ async def run(args: argparse.Namespace) -> int:
         loop.add_signal_handler(sig, should_stop.set)
 
     LOGGER.info(
-        "starting projection bridge on %s (subject=%s -> %s)",
+        "starting projection bridge on %s (subjects=%s, %s -> %s)",
         args.stream,
         args.processed_subject,
-        projection_url,
+        args.withdrawn_subject,
+        base_url,
     )
     while not should_stop.is_set():
-        try:
-            messages = await subscription.fetch(args.max_messages, timeout=args.fetch_timeout_seconds)
-        except TimeoutError:
-            # Idle fetch is the normal steady state, not an error (see nats_consumer
-            # for the builtin-vs-nats TimeoutError subtlety that crash-looped #513).
-            continue
-        for msg in messages:
-            await forward_message(
-                _NatsMessage(msg),
-                forward=forward,
-                dlq_publish=dlq_publish,
-                max_deliver=args.max_deliver,
-                nak_backoff_seconds=args.nak_backoff_seconds,
-                subject=args.processed_subject,
-            )
+        for subscription, subject, forward, dlq_publish in routes:
+            try:
+                messages = await subscription.fetch(args.max_messages, timeout=args.fetch_timeout_seconds)
+            except TimeoutError:
+                # Idle fetch is the normal steady state, not an error (see nats_consumer
+                # for the builtin-vs-nats TimeoutError subtlety that crash-looped #513).
+                continue
+            for msg in messages:
+                await forward_message(
+                    _NatsMessage(msg),
+                    forward=forward,
+                    dlq_publish=dlq_publish,
+                    max_deliver=args.max_deliver,
+                    nak_backoff_seconds=args.nak_backoff_seconds,
+                    subject=subject,
+                )
 
     await connection.drain()
     LOGGER.info("projection bridge stopped")
