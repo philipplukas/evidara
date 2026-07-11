@@ -2,11 +2,11 @@ import { expect, type Page, test } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // Smoke coverage for the ADR-0026 Tailwind port of the preview-approval queue
-// (PreviewReviewListV2 / PreviewReviewShowV2). The preview pages are the
+// (PreviewReviewList / PreviewReviewShow). The preview pages are the
 // preview-mode slice of the runs surface: the dataProvider forces
 // `mode: "preview"` on the list and guards the detail getOne to preview runs.
-// This spec drives the canonical `/#/preview-review-v2` preview routes, reusing
-// the shared operator-action stack and RunDetailSectionsV2.
+// This spec drives the canonical `/#/preview-review` routes, reusing
+// the shared operator-action stack and RunDetailSections.
 // ---------------------------------------------------------------------------
 
 const PREVIEW_RUNNING = {
@@ -45,7 +45,7 @@ const PREVIEW_DONE = {
 
 const PREVIEW_RUNS = { data: [PREVIEW_RUNNING, PREVIEW_DONE] };
 
-// Minimal-but-valid RunPipelineHealth so RunDetailSectionsV2's banner renders
+// Minimal-but-valid RunPipelineHealth so RunDetailSections's banner renders
 // (an empty `{ data: [] }` from the catch-all lacks `stages`, which the
 // decision-support builder reads → crash).
 const PIPELINE_HEALTH = {
@@ -72,7 +72,7 @@ async function mockPreviewReviewApi(page: Page) {
   );
 
   // Runs list (mode=preview filter is appended by the dataProvider) feeds
-  // PreviewReviewListV2.
+  // PreviewReviewList.
   await page.route("**/api/platform-control/v1/runs*", (route) =>
     route.fulfill({
       status: 200,
@@ -102,7 +102,7 @@ async function mockPreviewReviewApi(page: Page) {
   );
 }
 
-test.describe("Preview review v2 (ADR-0026 Tailwind port)", () => {
+test.describe("Preview review (ADR-0026 Tailwind port)", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem("evidara_user_role", "admin");
@@ -111,7 +111,7 @@ test.describe("Preview review v2 (ADR-0026 Tailwind port)", () => {
 
   test("list surfaces the Create Preview Run CTA and opens the launch dialog", async ({ page }) => {
     await mockPreviewReviewApi(page);
-    await page.goto("/#/preview-review-v2");
+    await page.goto("/#/preview-review");
 
     await page.getByRole("button", { name: "Create Preview Run" }).first().click();
 
@@ -124,7 +124,7 @@ test.describe("Preview review v2 (ADR-0026 Tailwind port)", () => {
 
   test("running preview run exposes a Cancel row action", async ({ page }) => {
     await mockPreviewReviewApi(page);
-    await page.goto("/#/preview-review-v2");
+    await page.goto("/#/preview-review");
 
     const runningRow = page.getByRole("row", { name: /preview_running/ });
     await expect(runningRow.getByRole("button", { name: "Cancel" })).toBeVisible();
@@ -137,7 +137,7 @@ test.describe("Preview review v2 (ADR-0026 Tailwind port)", () => {
     page,
   }) => {
     await mockPreviewReviewApi(page);
-    await page.goto("/#/preview-review-v2/preview_running");
+    await page.goto("/#/preview-review/preview_running/show");
 
     await expect(page.getByRole("heading", { name: /Run\s+preview_running/ })).toBeVisible();
     await expect(page.getByText("Operator actions")).toBeVisible();

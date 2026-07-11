@@ -1,11 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
-// Smoke coverage for the ADR-0026 runs v2 parity slice: the operator-action
-// stack and keyboard shortcuts wired into `RunListV2` / `RunShowV2` using the
+// Smoke coverage for the ADR-0026 runs parity slice: the operator-action
+// stack and keyboard shortcuts wired into `RunList` / `RunShow` using the
 // now-Tailwind action components (RunLaunchButton, CancelRunButton,
 // RunActionStack) plus the legal-search RunHandoffCard. Drives the canonical
-// `/#/runs-v2` preview routes, the surface an operator uses.
+// `/#/runs` routes, the surface an operator uses.
 // ---------------------------------------------------------------------------
 
 const RUN_RUNNING = {
@@ -44,7 +44,7 @@ const RUN_DONE = {
 
 const RUNS = { data: [RUN_RUNNING, RUN_DONE] };
 
-// Minimal-but-valid RunPipelineHealth so RunDetailSectionsV2's banner renders
+// Minimal-but-valid RunPipelineHealth so RunDetailSections's banner renders
 // (an empty `{ data: [] }` from the catch-all lacks `stages`, which the
 // decision-support builder reads → crash).
 const PIPELINE_HEALTH = {
@@ -60,8 +60,8 @@ const PIPELINE_HEALTH = {
 };
 
 async function mockRunsApi(page: Page) {
-  // Benign catch-all first (lowest priority) — RunDetailSectionsV2 and other
-  // read models the v2 pages touch resolve to an empty 200 instead of hanging.
+  // Benign catch-all first (lowest priority) — RunDetailSections and other
+  // read models the pages touch resolve to an empty 200 instead of hanging.
   await page.route("**/api/platform-control/**", (route) =>
     route.fulfill({
       status: 200,
@@ -70,7 +70,7 @@ async function mockRunsApi(page: Page) {
     }),
   );
 
-  // Runs list feeds RunListV2.
+  // Runs list feeds RunList.
   await page.route("**/api/platform-control/v1/runs*", (route) =>
     route.fulfill({
       status: 200,
@@ -79,7 +79,7 @@ async function mockRunsApi(page: Page) {
     }),
   );
 
-  // Single-run getOne feeds RunShowV2 (raw object, not `{ data }`). Registered
+  // Single-run getOne feeds RunShow (raw object, not `{ data }`). Registered
   // after the list route and matched exactly so sub-resource paths fall through
   // to the catch-all.
   await page.route("**/api/platform-control/v1/runs/run_running", (route) =>
@@ -90,7 +90,7 @@ async function mockRunsApi(page: Page) {
     }),
   );
 
-  // Pipeline-health read model for the RunShowV2 detail sections.
+  // Pipeline-health read model for the RunShow detail sections.
   await page.route("**/api/platform-control/v1/runs/*/pipeline-health", (route) =>
     route.fulfill({
       status: 200,
@@ -100,7 +100,7 @@ async function mockRunsApi(page: Page) {
   );
 }
 
-test.describe("Runs v2 parity (ADR-0026 operator-action stack)", () => {
+test.describe("Runs parity (ADR-0026 operator-action stack)", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem("evidara_user_role", "admin");
@@ -109,7 +109,7 @@ test.describe("Runs v2 parity (ADR-0026 operator-action stack)", () => {
 
   test("list surfaces the Create Run CTA and opens the launch dialog", async ({ page }) => {
     await mockRunsApi(page);
-    await page.goto("/#/runs-v2");
+    await page.goto("/#/runs");
 
     // The header CTA is the ported RunLaunchButton.
     await page.getByRole("button", { name: "Create Run" }).first().click();
@@ -121,7 +121,7 @@ test.describe("Runs v2 parity (ADR-0026 operator-action stack)", () => {
 
   test("running run exposes a Cancel row action", async ({ page }) => {
     await mockRunsApi(page);
-    await page.goto("/#/runs-v2");
+    await page.goto("/#/runs");
 
     // CancelRunButton renders only for pending/running runs — the running row
     // shows it, the completed row does not.
@@ -134,19 +134,19 @@ test.describe("Runs v2 parity (ADR-0026 operator-action stack)", () => {
 
   test("pressing O opens the attention run detail", async ({ page }) => {
     await mockRunsApi(page);
-    await page.goto("/#/runs-v2");
+    await page.goto("/#/runs");
 
     // Wait for the queue to render before firing the shortcut.
     await expect(page.getByText("run_running").first()).toBeVisible();
     await page.keyboard.press("o");
 
-    await expect(page).toHaveURL(/#\/runs-v2\/run_running/);
+    await expect(page).toHaveURL(/#\/runs\/run_running/);
     await expect(page.getByRole("heading", { name: /Run\s+run_running/ })).toBeVisible();
   });
 
   test("show renders the operator action stack with Cancel for a running run", async ({ page }) => {
     await mockRunsApi(page);
-    await page.goto("/#/runs-v2/run_running");
+    await page.goto("/#/runs/run_running/show");
 
     // RunActionStack renders its "Operator actions" panel with the Cancel CTA
     // for a running run.
@@ -160,7 +160,7 @@ test.describe("Runs v2 parity (ADR-0026 operator-action stack)", () => {
     await mockRunsApi(page);
     // Handoff context is read from window.location.search (before the hash).
     await page.goto(
-      "/?from=legal-search&ls_query=data+protection&ls_item=doc_42#/runs-v2/run_running",
+      "/?from=legal-search&ls_query=data+protection&ls_item=doc_42#/runs/run_running/show",
     );
 
     await expect(page.getByRole("heading", { name: "Legal search handoff" })).toBeVisible();
