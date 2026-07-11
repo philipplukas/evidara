@@ -1,12 +1,13 @@
 "use client";
 
-import { Chip, Paper, Stack, Typography } from "@mui/material";
 import { useState } from "react";
 import { useDataProvider, useNotify, useRecordContext, useRedirect, useRefresh } from "react-admin";
 import { ResourceName } from "../../domain/resourceNames";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { Panel, Pill } from "../../ui/primitives";
 import { ConfirmButton } from "../shared/ConfirmButton";
+import { runRecordStatusToLevel } from "../shared/statusLevels";
 
 type CancelRunButtonProps = {
   size?: "small" | "medium" | "large";
@@ -163,43 +164,19 @@ export function RunActionStack() {
             };
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 1.5,
-        minWidth: { xs: "100%", sm: 260 },
-        background: "linear-gradient(180deg, rgba(255, 250, 238, 0.98), rgba(255, 255, 255, 0.96))",
-      }}
-    >
-      <Stack spacing={1}>
-        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-          <Typography variant="subtitle2">Operator actions</Typography>
-          <Chip
-            size="small"
-            label={run.status}
-            color={
-              run.status === "failed"
-                ? "error"
-                : run.status === "running"
-                  ? "info"
-                  : run.status === "pending"
-                    ? "warning"
-                    : "default"
-            }
-            variant="outlined"
-          />
-        </Stack>
-        <Typography variant="body2" color="text.secondary">
-          {actionCopy.summary}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {actionCopy.followUp}
-        </Typography>
+    <Panel className="w-full p-4 sm:min-w-[260px]">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-[var(--foreground)] m-0">Operator actions</p>
+          <Pill level={runRecordStatusToLevel(run.status)}>{run.status}</Pill>
+        </div>
+        <p className="text-sm text-[var(--text-meta)] m-0">{actionCopy.summary}</p>
+        <p className="text-xs text-[var(--text-meta)] m-0">{actionCopy.followUp}</p>
         {canCancel ? <CancelRunButton size="medium" variant="contained" fullWidth /> : null}
         {canPromote ? (
           <PromoteToProductionButton size="medium" variant="contained" fullWidth />
         ) : null}
-      </Stack>
-    </Paper>
+      </div>
+    </Panel>
   );
 }
