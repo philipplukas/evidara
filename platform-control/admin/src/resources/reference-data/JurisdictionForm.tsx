@@ -1,18 +1,25 @@
 /**
- * Shared form body for JurisdictionCreateV2 + JurisdictionEditV2.
+ * Shared form body for JurisdictionCreate + JurisdictionEdit.
  *
- * Mirrors `AuthorityFormV2.tsx`: same primitives, same validators, same
+ * Mirrors `AuthorityForm.tsx`: same primitives, same validators, same
  * field ergonomics. The only difference from the authority form is the
  * field set (jurisdictions have `name` + `slug` only — no jurisdiction /
- * scope selection of their own).
+ * scope selection of their own). Edit passes `original` so the slug-change
+ * alert can warn when the operator diverges from the persisted slug.
  */
 "use client";
 
 import { required } from "ra-core";
 import { TextInput } from "../../ui/primitives";
-import { referenceSlugValidator } from "../shared/ReferenceInputs";
+import { ReferenceSlugChangeAlert, referenceSlugValidator } from "../shared/ReferenceFormFields";
 
-export function JurisdictionFormBodyV2({ idDisabled = false }: { idDisabled?: boolean }) {
+type JurisdictionFormBodyProps = {
+  idDisabled?: boolean;
+  /** Persisted values, present on edit only. Drives the slug-change alert. */
+  original?: { slug?: string | null };
+};
+
+export function JurisdictionFormBody({ idDisabled = false, original }: JurisdictionFormBodyProps) {
   return (
     <div className="space-y-5">
       {idDisabled ? (
@@ -31,6 +38,9 @@ export function JurisdictionFormBodyV2({ idDisabled = false }: { idDisabled?: bo
         helperText="Display name shown in lists and source forms."
         placeholder="e.g. Switzerland"
       />
+      {original ? (
+        <ReferenceSlugChangeAlert originalSlug={original.slug} entityLabel="Jurisdiction" />
+      ) : null}
       <TextInput
         source="slug"
         label="Slug"
