@@ -42,6 +42,7 @@ describe('opensearch.config', () => {
       citationsIndex: 'citations',
       citationTargetsIndex: 'citation-targets',
       projectionHistoryIndex: 'projection-history',
+      bootstrapOnStartup: true,
     });
   });
 
@@ -64,7 +65,17 @@ describe('opensearch.config', () => {
       citationsIndex: 'citations-prod',
       citationTargetsIndex: 'citation-targets-prod',
       projectionHistoryIndex: 'projection-history-prod',
+      bootstrapOnStartup: true,
     });
+  });
+
+  it('disables startup bootstrap when OPENSEARCH_BOOTSTRAP_ON_STARTUP=false', () => {
+    process.env.OPENSEARCH_BOOTSTRAP_ON_STARTUP = 'false';
+    try {
+      expect(opensearchConfig().bootstrapOnStartup).toBe(false);
+    } finally {
+      delete process.env.OPENSEARCH_BOOTSTRAP_ON_STARTUP;
+    }
   });
 
   it('exposes one canonical field per env var (no duplicate synonyms)', () => {

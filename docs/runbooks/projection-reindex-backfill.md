@@ -31,6 +31,27 @@ schema migration.
 The cutover script creates a new versioned index, optionally reindexes data,
 then atomically swaps the read/write aliases. Zero-downtime.
 
+## Read/write alias invariant
+
+Search reads the `documents-read` alias; projections write the
+`documents-write` alias. **Both must resolve to the same physical index** —
+otherwise a projected document lands in the write index but never surfaces in
+search (the single most likely place a document "disappears").
+
+Three producers keep this invariant, all consuming the same canonical mapping
+in `legal-search/api/src/core/opensearch/documents-index.mapping.ts`:
+
+- **`legal-search-api` startup** — `bootstrapDocumentsIndex` (see
+  `core/opensearch/documents-bootstrap.ts`) idempotently creates the physical
+  index with the canonical mapping and points both aliases at it if the read
+  alias is absent. Non-destructive: if the read alias already resolves (e.g. a
+  cutover manages it), startup does nothing. Disable with
+  `OPENSEARCH_BOOTSTRAP_ON_STARTUP=false`.
+- **`scripts/seed-from-opencaselaw.ts`** (`npm run seed:index`) — bootstraps the
+  aliases before bulk-indexing the OpenCaseLaw fixtures.
+- **`scripts/opensearch-alias-cutover.ts`** — versioned reindex/cutover, points
+  both aliases at the new index.
+
 ## Procedure: Full Reindex
 
 ### Step 1: Dry Run
@@ -85,7 +106,10 @@ curl -X DELETE http://localhost:9200/OLD_INDEX_NAME
 
 When the index mapping has changed:
 
-1. Update the mapping in `opensearch-alias-cutover.ts`
+1. Update the canonical mapping in
+   `legal-search/api/src/core/opensearch/documents-index.mapping.ts` (the single
+   source of truth consumed by the cutover script, the seed script, and the
+   startup bootstrap)
 2. Dry-run to verify
 3. Execute with `--reindex` to copy data from old → new (with new mapping)
 4. Verify document counts

@@ -13,6 +13,8 @@
  *   - OpenSearch running at localhost:9200 (only for --index)
  */
 
+import { bootstrapDocumentsIndex } from '../src/core/opensearch/documents-bootstrap';
+
 const HF_API =
   'https://datasets-server.huggingface.co/rows?dataset=voilaj/swiss-caselaw&config=default&split=train';
 
@@ -195,70 +197,6 @@ async function bulkIndex(
   }
 }
 
-// ─── Create index with mapping ───
-
-async function ensureIndex(indexName: string, nodeUrl: string): Promise<void> {
-  // Check if index exists
-  const check = await fetch(`${nodeUrl}/${indexName}`, { method: 'HEAD' });
-  if (check.ok) {
-    console.log(`Index "${indexName}" already exists, skipping creation`);
-    return;
-  }
-
-  console.log(`Creating index "${indexName}" with mapping...`);
-
-  const mapping = {
-    settings: {
-      number_of_shards: 1,
-      number_of_replicas: 0,
-      analysis: {
-        analyzer: {
-          legal_text: {
-            type: 'custom',
-            tokenizer: 'standard',
-            filter: ['lowercase', 'german_normalization'],
-          },
-        },
-      },
-    },
-    mappings: {
-      properties: {
-        document_id: { type: 'keyword' },
-        title: { type: 'text', analyzer: 'legal_text', fields: { keyword: { type: 'keyword' } } },
-        jurisdiction: { type: 'keyword' },
-        document_type: { type: 'keyword' },
-        language: { type: 'keyword' },
-        effective_date: { type: 'date', format: 'yyyy-MM-dd' },
-        structural_path: { type: 'text', fields: { keyword: { type: 'keyword' } } },
-        content: { type: 'text', analyzer: 'legal_text' },
-        content_preview: { type: 'text' },
-        sections_count: { type: 'integer' },
-        citations_count: { type: 'integer' },
-        related_decisions_count: { type: 'integer' },
-        related_commentary_count: { type: 'integer' },
-        source_id: { type: 'keyword' },
-        processed_at: { type: 'date' },
-        court: { type: 'keyword' },
-        docket_number: { type: 'keyword' },
-        regeste: { type: 'text', analyzer: 'legal_text' },
-      },
-    },
-  };
-
-  const response = await fetch(`${nodeUrl}/${indexName}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(mapping),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Failed to create index: ${response.status} — ${text.slice(0, 500)}`);
-  }
-
-  console.log(`  ✓ Index "${indexName}" created`);
-}
-
 // ─── Main ───
 
 async function main() {
@@ -307,10 +245,23 @@ async function main() {
   // 5. Optionally index into OpenSearch
   if (shouldIndex) {
     const nodeUrl = process.env.OPENSEARCH_NODE ?? 'http://localhost:9200';
-    const indexName = process.env.OPENSEARCH_ALIAS_WRITE ?? 'documents-write';
+    const readAlias = process.env.OPENSEARCH_ALIAS_READ ?? 'documents-read';
+    const writeAlias = process.env.OPENSEARCH_ALIAS_WRITE ?? 'documents-write';
 
-    await ensureIndex(indexName, nodeUrl);
-    await bulkIndex(projections, indexName, nodeUrl);
+    // Ensure the documents index exists with the canonical mapping and
+    // that BOTH the read and write aliases resolve to it — otherwise the
+    // seeded docs would land in the write index but never surface via
+    // the `documents-read` alias that search queries.
+    const bootstrap = await bootstrapDocumentsIndex({
+      node: nodeUrl,
+      readAlias,
+      writeAlias,
+      logger: { info: (m) => console.log(`  ${m}`), warn: (m) => console.warn(`  ${m}`) },
+    });
+    console.log(`  documents index bootstrap: ${bootstrap.status} (${bootstrap.physicalIndex})`);
+
+    // Write through the write alias so the read alias serves the same docs.
+    await bulkIndex(projections, writeAlias, nodeUrl);
   }
 
   // Stats summary

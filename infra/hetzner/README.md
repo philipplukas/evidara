@@ -83,6 +83,14 @@ MinIO. The DI pipeline writes Iceberg via PyIceberg → Nessie. See the lakehous
 Adapt the `k8s/gitops` overlay to this cluster: plain k8s `Secret`s (no Vault/ESO here),
 in-cluster store endpoints, k3s `traefik` ingress (or swap to nginx).
 
+> **Search index bootstrap.** On startup `legal-search-api` idempotently ensures the OpenSearch
+> `documents` index exists (canonical mapping from `legal-search/api/src/core/opensearch/`) and
+> that the `documents-read` (search) and `documents-write` (projections) aliases resolve to the
+> **same** physical index. Without this both aliases would diverge and projected documents would
+> never surface in search. Non-destructive and safe to re-run; set
+> `OPENSEARCH_BOOTSTRAP_ON_STARTUP=false` on the deployment if a versioned cutover manages the
+> aliases out-of-band (see `docs/runbooks/projection-reindex-backfill.md`).
+
 ## Stage 5 — real auth (ADR-0020)
 
 `deploy-stage5.sh` puts both apps behind real auth. Idempotent; rebuild the admin and
