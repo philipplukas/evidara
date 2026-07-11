@@ -116,6 +116,26 @@ Endpoints (contract):
 
 Phase 1 may implement this as a Databricks SQL REST gateway or a thin FastAPI service; the **OpenAPI spec is the contract** either way. The **legal-search BFF** is the primary caller.
 
+### Durable canonical persistence on the self-hosted stack
+
+`build_processing_pipeline` selects the sink from the canonical surface URIs
+(`DI_PUBLISHED_DOCUMENTS_URI` / `DI_PUBLISHED_SECTIONS_URI` / `DI_PROCESSING_MANIFESTS_URI`,
+or `DI_SURFACES_ROOT_URI`):
+
+- **Set** → `DeltaCanonicalSink` writes `published_documents` / `published_sections` /
+  `processing_manifests`, and `store_from_env()` returns a `DeltaPublishedDocumentStore` that
+  reads the same surfaces. On the Hetzner stack these point at Delta tables on MinIO
+  (`s3://evidara-lakehouse/canonical/...`); credentials/endpoint come from `DI_S3_*` and are
+  translated to `deltalake` `storage_options` (`AWS_ENDPOINT_URL`, `AWS_ALLOW_HTTP`,
+  `AWS_S3_ALLOW_UNSAFE_RENAME` for the single-writer consumer). A native `IcebergCanonicalSink`
+  on MinIO remains the longer-term follow-up; Delta-on-S3 is the production-safe interim.
+- **Unset** → `InMemoryCanonicalSink` and an `EmptyPublishedDocumentStore`.
+
+**Failure mode:** if the surface URIs are unset (or misconfigured) on `di-consumer`/`document-service`,
+processed documents are never durably stored, `GET /v1/documents/{id}/lean` misses, and
+legal-search projections fall back to thin metadata (title `Document {id}`, no sections/citations).
+Recovery is to set the surface URIs in the `evidara-config` ConfigMap and reprocess.
+
 ## Key Contracts
 
 - **Consumes:** `artifact_bundle.available`
@@ -139,6 +159,7 @@ Key tests:
 - Golden document tests with representative bundles
 - GCS loader tests with stubbed storage client behavior
 - Delta sink tests with real local Delta tables
+- Durable lean round-trip test: golden fixture → `DeltaCanonicalSink` → `GET /lean` serves real title/sections/citations (`tests/test_lean_durable_roundtrip.py`)
 - CLI smoke test for bundle processing
 - Databricks runtime wrapper and bundle-config tests
 - Invariant checks on provenance, revisions, and section ordering
