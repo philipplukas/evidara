@@ -239,7 +239,7 @@ export default function PreviewReviewListV2() {
           error={controller.error}
           sort={controller.sort}
           onSort={(field, order) => controller.setSort({ field, order })}
-          onRowClick={(r) => navigate(`/preview-review-v2/${encodeURIComponent(String(r.id))}`)}
+          onRowClick={(r) => navigate(`/preview-review/${encodeURIComponent(String(r.id))}/show`)}
           total={controller.total}
           page={controller.page}
           perPage={controller.perPage}

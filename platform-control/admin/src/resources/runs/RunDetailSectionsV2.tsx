@@ -7,17 +7,17 @@
  * — render as collapsed accordion items; each binds a `useGetList` with the
  * same `run_id` filter v1 used and draws rows via the `DataTable` primitive.
  *
- * Reuses pure helpers from v1 (`buildPipelineDecisionSupport`,
- * `overallSummaryByStatus`, `stageNextAction`, `stageActionTarget`) so the
- * operator cues stay identical while MUI chrome is replaced with primitives.
- * Stateful pieces from v1 that aren't in this slice — operator checklist
- * (`deriveOperatorChecklist`), preview summary, navigation button strip,
- * telemetry emission — stay in the v1 file and port alongside the shell.
+ * Reuses pure helpers (`buildPipelineDecisionSupport`, `overallSummaryByStatus`,
+ * `stageNextAction`, `stageActionTarget`) so the operator cues stay identical
+ * while MUI chrome is replaced with primitives. At full parity with v1: the
+ * operator checklist (`deriveOperatorChecklist`), preview summary, section
+ * navigation strip, and operator-journey telemetry all render here.
  */
 "use client";
 
 import { type Identifier, useGetList, useRecordContext } from "ra-core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { publicConfig } from "../../config/publicConfig";
 import type {
   CapturedResourceRecord,
   DocumentLifecycleRecord,
@@ -25,9 +25,11 @@ import type {
   ProviderJobRecord,
   RawArtifactRecord,
   RunPipelineHealth,
+  RunPreviewSummary,
   RunRecord,
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
+import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
 import { formatSwissDateTime } from "../../lib/format/date";
 import {
   AccordionContent,
@@ -41,11 +43,30 @@ import {
 } from "../../ui/primitives";
 import { pipelineHealthToLevel } from "../shared/statusLevels";
 import {
+  type ChecklistItem,
+  type ChecklistState,
+  deriveOperatorChecklist,
+} from "./operatorChecklist";
+import {
   buildPipelineDecisionSupport,
   overallSummaryByStatus,
   stageActionTarget,
   stageNextAction,
-} from "./RunDetailSections";
+} from "./pipelineDecisionSupport";
+
+const RUN_READINESS_CONFIRMED_KEY_PREFIX = "evidara_run_readiness_confirmed:";
+const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_codes:";
+const RUN_VERIFICATION_OPENED_KEY_PREFIX = "evidara_run_verification_opened:";
+
+const EVIDENCE_RUNBOOK_PATH =
+  "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
+
+const checklistStateToLevel = (state: ChecklistState): PillLevel => {
+  if (state === "ok") return "healthy";
+  if (state === "blocked") return "degraded";
+  if (state === "in_progress") return "info";
+  return "neutral";
+};
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 50 },
@@ -80,20 +101,64 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
   const [health, setHealth] = useState<RunPipelineHealth | null>(null);
   const [isPending, setIsPending] = useState(true);
   const [error, setError] = useState<unknown>(null);
-  const legalSearchUrl = process.env.NEXT_PUBLIC_LEGAL_SEARCH_URL?.trim();
-  const evidenceRunbookPath =
-    "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
+  const [readinessConfirmed, setReadinessConfirmed] = useState(false);
+  const [readinessBlockedCodes, setReadinessBlockedCodes] = useState<string[]>([]);
+  const [verificationOpened, setVerificationOpened] = useState(false);
+  // Hide the verification button entirely when no legal-search URL is
+  // configured rather than defaulting to localhost (matches v1 behavior).
+  const legalSearchUrl = publicConfig.legalSearchBaseUrlOrUndefined;
+  const healthLoadStartedAtRef = useRef<number | null>(null);
+  const firstRemediationEventEmittedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const readiness = window.localStorage.getItem(
+      `${RUN_READINESS_CONFIRMED_KEY_PREFIX}${run.run_id}`,
+    );
+    const blockedRaw = window.localStorage.getItem(
+      `${RUN_READINESS_BLOCKED_CODES_KEY_PREFIX}${run.run_id}`,
+    );
+    const verification = window.localStorage.getItem(
+      `${RUN_VERIFICATION_OPENED_KEY_PREFIX}${run.run_id}`,
+    );
+    setReadinessConfirmed(readiness === "true");
+    setVerificationOpened(verification === "true");
+    if (blockedRaw) {
+      try {
+        const parsed = JSON.parse(blockedRaw);
+        setReadinessBlockedCodes(Array.isArray(parsed) ? parsed.map(String) : []);
+      } catch {
+        setReadinessBlockedCodes([]);
+      }
+    } else {
+      setReadinessBlockedCodes([]);
+    }
+  }, [run.run_id]);
 
   useEffect(() => {
     let cancelled = false;
     setIsPending(true);
     setError(null);
+    healthLoadStartedAtRef.current = Date.now();
+    firstRemediationEventEmittedRef.current = false;
 
     void controlPlaneActions
       .getRunPipelineHealth(run.run_id)
       .then((response) => {
         if (!cancelled) {
           setHealth(response);
+          emitOperatorJourneyEvent("pipeline_health_loaded", {
+            run_id: run.run_id,
+            source_id: run.source_id,
+            source_version_id: run.source_version_id,
+            mode: run.mode,
+            duration_ms:
+              healthLoadStartedAtRef.current != null
+                ? Date.now() - healthLoadStartedAtRef.current
+                : undefined,
+          });
         }
       })
       .catch((reason) => {
@@ -111,11 +176,53 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
     return () => {
       cancelled = true;
     };
-  }, [run.run_id]);
+  }, [run.mode, run.run_id, run.source_id, run.source_version_id]);
+
+  const openVerification = (actionLabel: string) => {
+    if (!legalSearchUrl) {
+      return;
+    }
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(`${RUN_VERIFICATION_OPENED_KEY_PREFIX}${run.run_id}`, "true");
+    }
+    setVerificationOpened(true);
+    emitOperatorJourneyEvent("legal_search_verification_opened", {
+      run_id: run.run_id,
+      source_id: run.source_id,
+      source_version_id: run.source_version_id,
+      mode: run.mode,
+      action_label: actionLabel,
+      action_href: legalSearchUrl,
+    });
+  };
 
   const decisionSupport = useMemo(
     () => buildPipelineDecisionSupport({ run, health }),
     [health, run],
+  );
+
+  const checklistItems = useMemo<ChecklistItem[]>(
+    () =>
+      deriveOperatorChecklist({
+        run,
+        health,
+        readinessConfirmed,
+        readinessBlockedCodes,
+        verificationOpened,
+      }),
+    [run, health, readinessConfirmed, readinessBlockedCodes, verificationOpened],
+  );
+
+  const stageSummary = useMemo(
+    () =>
+      health?.stages.reduce(
+        (counts, stage) => {
+          counts[stage.status] = (counts[stage.status] ?? 0) + 1;
+          return counts;
+        },
+        { ok: 0, blocked: 0, failed: 0, in_progress: 0, pending: 0 } as Record<string, number>,
+      ) ?? null,
+    [health],
   );
 
   return (
@@ -182,12 +289,61 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
             </div>
           </div>
 
+          {stageSummary ? (
+            <div className="rounded-[12px] border border-[var(--border-faint)] bg-white/70 p-3">
+              <h3 className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">
+                Stage summary
+              </h3>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Pill level="healthy">{`Healthy ${stageSummary.ok ?? 0}`}</Pill>
+                <Pill level="degraded">
+                  {`Needs action ${(stageSummary.blocked ?? 0) + (stageSummary.failed ?? 0)}`}
+                </Pill>
+                <Pill level="info">{`In progress ${stageSummary.in_progress ?? 0}`}</Pill>
+                <Pill level="neutral">{`Pending ${stageSummary.pending ?? 0}`}</Pill>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="rounded-[12px] border border-[var(--border-faint)] bg-white/70 p-3">
+            <h3 className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">
+              Operator Checklist
+            </h3>
+            <ul className="space-y-2">
+              {checklistItems.map((item) => (
+                <li
+                  key={item.key}
+                  className="flex flex-col gap-1 md:flex-row md:items-start md:gap-2"
+                >
+                  <Pill level={checklistStateToLevel(item.state)}>
+                    {item.state.replaceAll("_", " ")}
+                  </Pill>
+                  <div className="min-w-0">
+                    <p className="text-[13px] text-[var(--foreground)]">{item.label}</p>
+                    <p className="text-[11px] text-[var(--foreground-subtle)]">{item.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {!verificationOpened && legalSearchUrl ? (
+              <a
+                href={legalSearchUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => openVerification("Operator checklist legal-search verification")}
+                className="mt-3 inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
+              >
+                Open legal-search verification
+              </a>
+            ) : null}
+          </div>
+
           <div className="space-y-2">
             {health.stages.map((stage) => {
               const level = pipelineHealthToLevel(stage.status);
               const action = stageActionTarget(stage, {
                 legalSearchUrl,
-                evidenceRunbookPath,
+                evidenceRunbookPath: EVIDENCE_RUNBOOK_PATH,
               });
               const isInPageAnchor = action.href.startsWith("#");
               const isHealthy = stage.status === "ok";
@@ -219,6 +375,20 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                         href={action.href}
                         target={isInPageAnchor ? undefined : "_blank"}
                         rel={isInPageAnchor ? undefined : "noreferrer"}
+                        onClick={() => {
+                          if (!firstRemediationEventEmittedRef.current) {
+                            emitOperatorJourneyEvent("remediation_action_clicked", {
+                              run_id: run.run_id,
+                              source_id: run.source_id,
+                              source_version_id: run.source_version_id,
+                              mode: run.mode,
+                              stage: stage.stage,
+                              action_label: action.label,
+                              action_href: action.href,
+                            });
+                            firstRemediationEventEmittedRef.current = true;
+                          }
+                        }}
                         className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
                       >
                         {action.label}
@@ -228,6 +398,28 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                 </div>
               );
             })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {legalSearchUrl ? (
+              <a
+                href={legalSearchUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => openVerification("Pipeline section legal-search verification")}
+                className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
+              >
+                Open legal-search verification
+              </a>
+            ) : null}
+            <a
+              href={EVIDENCE_RUNBOOK_PATH}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-8 items-center rounded-full px-3 text-[12px] font-semibold text-[var(--brand)] hover:underline"
+            >
+              Open related evidence runbook
+            </a>
           </div>
         </div>
       ) : null}
@@ -268,6 +460,7 @@ function PrimaryDecisionCell({ label, value }: { label: string; value: string })
 
 interface RunSectionProps<TRecord extends { id: Identifier }> {
   value: string;
+  sectionId?: string;
   title: string;
   description: string;
   rows: TRecord[] | undefined;
@@ -280,6 +473,7 @@ interface RunSectionProps<TRecord extends { id: Identifier }> {
 
 function RunAccordionSection<TRecord extends { id: Identifier }>({
   value,
+  sectionId,
   title,
   description,
   rows,
@@ -291,7 +485,7 @@ function RunAccordionSection<TRecord extends { id: Identifier }>({
 }: RunSectionProps<TRecord>) {
   const count = rows?.length ?? 0;
   return (
-    <AccordionItem value={value}>
+    <AccordionItem value={value} id={sectionId}>
       <AccordionTrigger>
         <span className="text-[15px] font-semibold text-[var(--foreground)]">{title}</span>
         {isPending ? (
@@ -488,6 +682,270 @@ const documentLifecycleColumns: DataTableColumn<DocumentLifecycleRecord>[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Section navigation strip — jump anchors into the stage that needs attention.
+// ---------------------------------------------------------------------------
+
+const SECTION_NAV_LINKS: { href: string; label: string }[] = [
+  { href: "#provider-jobs-section", label: "Provider jobs" },
+  { href: "#di-processing-status-section", label: "DI processing" },
+  { href: "#document-lifecycle-section", label: "Document lifecycle" },
+];
+
+function RunSectionNav() {
+  return (
+    <section className="space-y-3 rounded-[14px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-4">
+      <div className="space-y-1">
+        <h2 className="text-[15px] font-semibold text-[var(--foreground)]">Lifecycle sections</h2>
+        <p className="text-[13px] text-[var(--foreground-subtle)]">
+          Jump straight to the stage that needs attention.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {SECTION_NAV_LINKS.map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Preview Summary (preview-mode runs only) — heuristic signals before promotion.
+// ---------------------------------------------------------------------------
+
+interface PreviewPageRow {
+  id: Identifier;
+  title: string | null;
+  final_url: string;
+  content_type: string;
+  reason: string;
+}
+
+const previewPageColumns: DataTableColumn<PreviewPageRow>[] = [
+  { key: "title", header: "Title", render: (page) => page.title ?? "Untitled" },
+  {
+    key: "final_url",
+    header: "URL",
+    render: (page) => (
+      <a
+        href={page.final_url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-[12px] text-[var(--brand)] underline-offset-2 hover:underline"
+      >
+        {page.final_url}
+      </a>
+    ),
+  },
+  { key: "content_type", header: "Type", render: (page) => page.content_type },
+  { key: "reason", header: "Reason", render: (page) => page.reason },
+];
+
+function PreviewPageTable({
+  title,
+  description,
+  rows,
+  emptyMessage,
+}: {
+  title: string;
+  description: string;
+  rows: PreviewPageRow[];
+  emptyMessage: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div>
+        <h4 className="text-[14px] font-semibold text-[var(--foreground)]">{title}</h4>
+        <p className="text-[12px] text-[var(--foreground-subtle)]">{description}</p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-[13px] text-[var(--foreground-subtle)]">{emptyMessage}</p>
+      ) : (
+        <DataTable<PreviewPageRow>
+          records={rows}
+          columns={previewPageColumns}
+          getRowId={(page) => String(page.id)}
+          isLoading={false}
+        />
+      )}
+    </div>
+  );
+}
+
+function PreviewSummarySection({ run }: { run: RunRecord }) {
+  const [summary, setSummary] = useState<RunPreviewSummary | null>(null);
+  const [isPending, setIsPending] = useState(run.mode === "preview");
+  const [error, setError] = useState<unknown>(null);
+
+  useEffect(() => {
+    if (run.mode !== "preview") {
+      setSummary(null);
+      setError(null);
+      setIsPending(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPending(true);
+    setError(null);
+
+    void controlPlaneActions
+      .getRunPreviewSummary(run.run_id)
+      .then((response) => {
+        if (!cancelled) {
+          setSummary(response);
+        }
+      })
+      .catch((reason) => {
+        if (!cancelled) {
+          setError(reason);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsPending(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [run.mode, run.run_id]);
+
+  if (run.mode !== "preview") {
+    return null;
+  }
+
+  return (
+    <section className="space-y-4 rounded-[18px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-5 shadow-[var(--shadow-card)] backdrop-blur-[12px] sm:p-6">
+      <header className="space-y-1">
+        <h2 className="text-[16px] font-semibold text-[var(--foreground)]">Preview Summary</h2>
+        <p className="text-[13px] text-[var(--foreground-subtle)]">
+          Review heuristic signals before promoting this source version into production.
+        </p>
+      </header>
+
+      {isPending ? (
+        <p className="text-[13px] text-[var(--foreground-subtle)]">Loading preview summary…</p>
+      ) : null}
+
+      {!isPending && error ? (
+        <div
+          role="alert"
+          className="rounded-[12px] border border-[var(--status-critical)]/40 bg-[var(--status-critical-subtle)] p-3 text-[13px] text-[var(--status-critical)]"
+        >
+          {error instanceof Error ? error.message : "Unable to load preview summary."}
+        </div>
+      ) : null}
+
+      {!isPending && !error && summary ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Pill variant="meta">{`URLs ${summary.captured_url_count}`}</Pill>
+            <Pill variant="meta">{`Artifacts ${summary.artifacts_count}`}</Pill>
+            <Pill variant="meta">{`Captured ${summary.captured_resources_count}`}</Pill>
+            <Pill variant="meta">{`PDFs ${summary.pdf_count}`}</Pill>
+            <Pill variant="meta">{`Decision pages ${summary.likely_decision_page_count}`}</Pill>
+            <Pill variant="meta">{`Boilerplate ${summary.likely_boilerplate_page_count}`}</Pill>
+            <Pill variant="meta">{`Duplicates ${summary.likely_duplicate_page_count}`}</Pill>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-[14px] font-semibold text-[var(--foreground)]">Drift Checks</h3>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {summary.drift_checks.map((check) => (
+                <Pill key={check.name} level={check.status === "warn" ? "degraded" : "neutral"}>
+                  {`${check.name}: ${check.detail}`}
+                </Pill>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <h4 className="text-[14px] font-semibold text-[var(--foreground)]">
+                Content Type Breakdown
+              </h4>
+              <p className="text-[12px] text-[var(--foreground-subtle)]">
+                Observed content types for captured resources.
+              </p>
+            </div>
+            {summary.content_type_breakdown.length === 0 ? (
+              <p className="text-[13px] text-[var(--foreground-subtle)]">
+                No content types were observed.
+              </p>
+            ) : (
+              <DataTable<{ id: Identifier; content_type: string; count: number }>
+                records={summary.content_type_breakdown.map((entry, index) => ({
+                  id: `${entry.content_type}-${index}`,
+                  content_type: entry.content_type,
+                  count: entry.count,
+                }))}
+                columns={[
+                  {
+                    key: "content_type",
+                    header: "Content type",
+                    render: (entry) => entry.content_type,
+                  },
+                  { key: "count", header: "Count", render: (entry) => entry.count },
+                ]}
+                getRowId={(entry) => String(entry.id)}
+                isLoading={false}
+              />
+            )}
+          </div>
+
+          <PreviewPageTable
+            title="Likely Decision Pages"
+            description="Pages heuristically identified as candidate decisions."
+            emptyMessage="No likely decision pages were identified."
+            rows={summary.likely_decision_pages.map((page) => ({
+              id: page.captured_resource_id,
+              title: page.title,
+              final_url: page.final_url,
+              content_type: page.content_type,
+              reason: page.reason,
+            }))}
+          />
+
+          <PreviewPageTable
+            title="Likely Boilerplate Pages"
+            description="Pages heuristically identified as boilerplate."
+            emptyMessage="No likely boilerplate pages were identified."
+            rows={summary.likely_boilerplate_pages.map((page) => ({
+              id: page.captured_resource_id,
+              title: page.title,
+              final_url: page.final_url,
+              content_type: page.content_type,
+              reason: page.reason,
+            }))}
+          />
+
+          <PreviewPageTable
+            title="Likely Duplicate Pages"
+            description="Pages that look duplicated based on checksum matching."
+            emptyMessage="No likely duplicate pages were identified."
+            rows={summary.likely_duplicate_pages.map((page) => ({
+              id: page.captured_resource_id,
+              title: page.title,
+              final_url: page.final_url,
+              content_type: page.content_type,
+              reason: page.reason,
+            }))}
+          />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root — binds the five `useGetList` fetches and renders the accordion stack.
 // ---------------------------------------------------------------------------
 
@@ -526,11 +984,14 @@ export default function RunDetailSectionsV2() {
 
   return (
     <div className="space-y-4">
+      <RunSectionNav />
       <PipelineHealthBanner run={run} />
+      <PreviewSummarySection run={run} />
 
       <AccordionRoot type="multiple" className="flex flex-col gap-3">
         <RunAccordionSection<ProviderJobRecord>
           value="provider-jobs"
+          sectionId="provider-jobs-section"
           title="Provider Jobs"
           description="Provider-level crawl job state and webhook progression for this run."
           rows={providerJobs.data}
@@ -564,6 +1025,7 @@ export default function RunDetailSectionsV2() {
         />
         <RunAccordionSection<ProcessingStatusRecord>
           value="processing-status"
+          sectionId="di-processing-status-section"
           title="DI Processing Status"
           description="Document-intelligence processing updates correlated to this run."
           rows={processingStatus.data}
@@ -575,6 +1037,7 @@ export default function RunDetailSectionsV2() {
         />
         <RunAccordionSection<DocumentLifecycleRecord>
           value="document-lifecycle"
+          sectionId="document-lifecycle-section"
           title="Document Lifecycle"
           description="Published or withdrawn document lifecycle events emitted by document-intelligence."
           rows={documentLifecycle.data}

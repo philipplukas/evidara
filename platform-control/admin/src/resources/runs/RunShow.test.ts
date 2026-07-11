@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import type { LegalSearchHandoff } from "../../lib/admin/navigationContext";
-import { buildRunHandoffGuidance } from "./RunShow";
+import { buildRunHandoffGuidance } from "./runDecisionSupport";
 
 const baseRun: RunRecord = {
   id: "run-123",

@@ -6,7 +6,7 @@ import {
   isKeyboardShortcutInputTarget,
   selectAttentionRun,
   summarizeRunFilters,
-} from "./RunList";
+} from "./runQueueHelpers";
 
 const completedRun: RunRecord = {
   id: "run_completed",

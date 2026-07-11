@@ -27,7 +27,7 @@ import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
 import { PrimaryDecisionCell } from "./PrimaryDecisionCell";
 import { RunActionStack } from "./RunActions";
 import RunDetailSectionsV2 from "./RunDetailSectionsV2";
-import { buildRunDecisionSupport, buildRunHandoffGuidance } from "./RunShow";
+import { buildRunDecisionSupport, buildRunHandoffGuidance } from "./runDecisionSupport";
 
 function formatDuration(run: RunRecord): string {
   if (!run.started_at || !run.completed_at) return "—";

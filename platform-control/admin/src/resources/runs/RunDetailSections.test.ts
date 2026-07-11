@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { RunPipelineHealthStage } from "../../lib/admin/dataProvider";
-import { overallSummaryByStatus, stageActionTarget, stageNextAction } from "./RunDetailSections";
+import {
+  overallSummaryByStatus,
+  stageActionTarget,
+  stageNextAction,
+} from "./pipelineDecisionSupport";
 
 const acquisitionStage: RunPipelineHealthStage = {
   stage: "acquisition",

@@ -4,8 +4,8 @@ import type {
   RunPipelineHealthStage,
   RunRecord,
 } from "../../lib/admin/dataProvider";
-import { buildPipelineDecisionSupport } from "./RunDetailSections";
-import { buildRunDecisionSupport } from "./RunShow";
+import { buildPipelineDecisionSupport } from "./pipelineDecisionSupport";
+import { buildRunDecisionSupport } from "./runDecisionSupport";
 
 const baseRun: RunRecord = {
   id: "run-123",
