@@ -1,0 +1,40 @@
+# Heavy CI runner image for the self-hosted ARC pool (ADR-0029).
+#
+# WHY: the stock `ghcr.io/actions/actions-runner` image carries no browser system
+# libraries, so Playwright's Chromium dies with `libnspr4.so: cannot open shared
+# object file`. Every workflow guards its `playwright install-deps` step with
+# `if: runner.environment == 'github-hosted'` — i.e. self-hosted runners are
+# expected to have the deps baked in. This image is what makes that true.
+#
+# Installing at job time instead is not an option: the runner container runs as the
+# unprivileged `runner` user with no sudo, and `install-deps` needs root + apt.
+#
+# Pinned by digest for reproducibility: `:latest` drifts silently, and a base that
+# moves to a release whose archive `nodejs` is < 18 would break `install-deps` below.
+# The digest is a multi-arch OCI index; the amd64 sub-manifest is selected by the build
+# workflow's `platforms: linux/amd64`. It == `:latest` as of 2026-07-11 — bump it
+# deliberately (resolve the new digest from the GHCR manifest API) to take a newer base.
+FROM ghcr.io/actions/actions-runner:latest@sha256:08c30b0a7105f64bddfc485d2487a22aa03932a791402393352fdf674bda2c29
+
+# Keep in sync with `@playwright/test` in legal-search/frontend/package.json.
+# Only the OS-level deps come from here; browsers are still installed per job and
+# cached under ~/.cache/ms-playwright.
+ARG PLAYWRIGHT_VERSION=1.59.1
+
+USER root
+
+# `playwright install-deps` resolves the right package names per Ubuntu release,
+# which hand-maintaining an apt list does not (jammy vs noble `t64` suffixes).
+# nodejs/npm stay in the image only to run that CLI; jobs get their own Node from
+# actions/setup-node, which prepends its toolchain to PATH.
+#
+# This relies on the base being Ubuntu 24.04 (noble), whose archive `nodejs` is
+# 18.19 — the Playwright CLI needs Node >= 18. The base is digest-pinned above, so this
+# holds until you bump the pin; when you do, re-check the archive Node version and
+# install from NodeSource instead if it dropped below 18.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates nodejs npm \
+  && npx --yes "playwright@${PLAYWRIGHT_VERSION}" install-deps chromium \
+  && rm -rf /var/lib/apt/lists/*
+
+USER runner

@@ -129,6 +129,33 @@ variables and every workflow's `runs-on:`:
 Docker/buildx image builds (`runtime-images.yml`) deliberately stay GitHub-hosted —
 no Docker-in-Docker on-cluster.
 
+### The heavy pool runs a custom image
+
+The stock `ghcr.io/actions/actions-runner` image carries no browser system libraries,
+so Playwright's Chromium dies with `libnspr4.so: cannot open shared object file`. Every
+workflow guards its `playwright install-deps` step with `if: runner.environment ==
+'github-hosted'`, because the runner container has no root and `install-deps` needs
+apt — self-hosted runners are expected to have the deps baked in.
+
+`runners/Dockerfile.heavy` is what makes that true. It is built and pushed to
+`ghcr.io/philipplukas/evidara-runner-heavy` by `.github/workflows/runner-image.yml`
+(GitHub-hosted — building it on the pool it produces would be circular). That workflow
+launches Chromium as the unprivileged `runner` user before pushing, so a missing
+library fails the build instead of a nightly smoke four days later.
+
+Two things to know when changing it:
+
+- **The GHCR package must be public.** ARC pulls it with no `imagePullSecret`, like
+  every other `ghcr.io/philipplukas/evidara-*` image. A fresh package defaults to
+  private; flip it once, after the first push to `main`.
+- **`PLAYWRIGHT_VERSION` tracks `@playwright/test`** in `legal-search/frontend/package.json`.
+  It only pins the OS-level deps — browsers are still installed per job and cached
+  under `~/.cache/ms-playwright`.
+
+No redeploy is needed to roll out a new image: runner pods are ephemeral and created
+per job, and the `:latest` tag means `imagePullPolicy` defaults to `Always`, so the
+next heavy job pulls it.
+
 ```sh
 # One-time: create a classic PAT with the `repo` scope (ARC also accepts a GitHub App):
 #   https://github.com/settings/tokens/new?scopes=repo&description=evidara-arc-runners
