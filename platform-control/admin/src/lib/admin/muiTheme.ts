@@ -22,7 +22,7 @@
  * Exported as a `RaThemeOptions` (plain options object, not the result of
  * `createTheme`). React-admin's `<Admin theme={…}>` calls `createTheme`
  * internally; pre-calling it caused a runtime page-load failure on the
- * admin shell when the e2e test navigated to `/runs-v2/run_01`.
+ * admin shell when the e2e test navigated to `/runs/run_01`.
  */
 import {
   ACCENT_CORE,

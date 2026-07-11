@@ -6,10 +6,10 @@
  * `<ToastAdapter>`. The outer chrome (header, sidebar, notification surface)
  * is now fully Tailwind-rendered via the new shell.
  *
- * V1 MUI resource pages (SourceList, RunShow, AuthorityEdit, Dashboard, …)
- * keep importing `@mui/material` internally — only the surrounding shell
- * flipped. Dropping the MUI packages from `package.json` is P4b (after
- * every v1 page ports).
+ * Remaining v1 MUI resource pages (AuthorityList/Edit, JurisdictionList/Edit,
+ * CorrectionsList, CommentaryInsightList, Dashboard) keep importing
+ * `@mui/material` internally — only the surrounding shell flipped. Dropping the
+ * MUI packages from `package.json` is P4b (after every v1 page ports).
  *
  * Layout pattern: `<Admin>` from `react-admin` + `layout={AdminLayout}` with
  * a thin adapter that renders `<AppShell>{children}</AppShell>`. We tried
@@ -41,14 +41,10 @@ import JurisdictionCreateV2 from "../resources/reference-data/JurisdictionCreate
 import { JurisdictionEdit } from "../resources/reference-data/JurisdictionEdit";
 import JurisdictionEditV2 from "../resources/reference-data/JurisdictionEditV2";
 import { JurisdictionList } from "../resources/reference-data/JurisdictionList";
-import { PreviewReviewList } from "../resources/runs/PreviewReviewList";
-import PreviewReviewListV2 from "../resources/runs/PreviewReviewListV2";
-import { PreviewReviewShow } from "../resources/runs/PreviewReviewShow";
-import PreviewReviewShowV2 from "../resources/runs/PreviewReviewShowV2";
-import { RunList } from "../resources/runs/RunList";
-import RunListV2 from "../resources/runs/RunListV2";
-import { RunShow } from "../resources/runs/RunShow";
-import RunShowV2 from "../resources/runs/RunShowV2";
+import PreviewReviewList from "../resources/runs/PreviewReviewList";
+import PreviewReviewShow from "../resources/runs/PreviewReviewShow";
+import RunList from "../resources/runs/RunList";
+import RunShow from "../resources/runs/RunShow";
 import SourceCreate from "../resources/sources/SourceCreate";
 import SourceList from "../resources/sources/SourceList";
 import SourceShow from "../resources/sources/SourceShow";
@@ -125,10 +121,6 @@ export default function AdminApp() {
        * corresponding v1 file is deleted.
        */}
       <CustomRoutes>
-        <Route path="/runs-v2" element={<RunListV2 />} />
-        <Route path="/runs-v2/:id" element={<RunShowV2 />} />
-        <Route path="/preview-review-v2" element={<PreviewReviewListV2 />} />
-        <Route path="/preview-review-v2/:id" element={<PreviewReviewShowV2 />} />
         <Route path="/authorities-v2/create" element={<AuthorityCreateV2 />} />
         <Route path="/authorities-v2/:id/edit" element={<AuthorityEditV2 />} />
         <Route path="/jurisdictions-v2/create" element={<JurisdictionCreateV2 />} />

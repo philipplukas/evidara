@@ -4,7 +4,7 @@
  * This is intentionally narrow — it proves that `vitest.config.ts` is wired
  * to jsdom, that `@testing-library/jest-dom` matchers register, and that a
  * tsx component can render under `@testing-library/react`. Behavioural
- * coverage for `PrimaryDecisionCell` (and the wider RunShowV2 hierarchy)
+ * coverage for `PrimaryDecisionCell` (and the wider RunShow hierarchy)
  * belongs in follow-up tests once the harness exists.
  */
 import { render, screen } from "@testing-library/react";

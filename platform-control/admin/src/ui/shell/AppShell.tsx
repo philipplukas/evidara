@@ -35,11 +35,11 @@ interface AppShellProps {
  * `kind: "preview"` entries advertise the coexisting Tailwind ports (runs,
  * reference data) until they graduate and replace the v1 MUI resources.
  *
- * Sources have already graduated (ADR-0026 / #501): the `/sources` resource
- * link is canonical Tailwind, so only the create shortcut lives here.
+ * Sources and runs have already graduated (ADR-0026 / #501): their resource
+ * links are canonical Tailwind, so only setup shortcuts and the still-preview
+ * reference-data ports live here.
  */
 const DEFAULT_EXTRA_ITEMS: SidebarMenuExtraItem[] = [
-  { to: "/runs-v2", label: "Run queue", kind: "preview" },
   {
     to: "/sources/create",
     label: "Source setup",

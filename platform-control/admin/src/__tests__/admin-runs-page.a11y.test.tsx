@@ -3,7 +3,7 @@
  *
  * Companion to `admin-shell.a11y.test.tsx`: the shell test exercises the
  * outer chrome under axe; this one renders a real resource page
- * (`RunListV2`) so the table, pill, and preset-bar primitives that
+ * (`RunList`) so the table, pill, and preset-bar primitives that
  * dominate operator screens are also covered. Together they close the
  * cross-surface a11y asymmetry called out in ADR-0027.
  *
@@ -16,7 +16,7 @@ import { axe, toHaveNoViolations } from "jest-axe";
 import { CoreAdminContext, testDataProvider } from "ra-core";
 import { describe, expect, it } from "vitest";
 import type { RunListRecord } from "../lib/admin/dataProvider";
-import RunListV2 from "../resources/runs/RunListV2";
+import RunList from "../resources/runs/RunList";
 import { AppShell } from "../ui/shell/AppShell";
 
 expect.extend(toHaveNoViolations);
@@ -91,13 +91,13 @@ function renderRunsPage() {
   return render(
     <CoreAdminContext dataProvider={dataProvider} queryClient={queryClient}>
       <AppShell>
-        <RunListV2 />
+        <RunList />
       </AppShell>
     </CoreAdminContext>,
   );
 }
 
-describe("RunListV2 route-level accessibility", () => {
+describe("RunList route-level accessibility", () => {
   it("has no accessibility violations on the run queue page", async () => {
     const { container } = renderRunsPage();
 

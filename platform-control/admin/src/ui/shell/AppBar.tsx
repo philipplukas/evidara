@@ -33,9 +33,6 @@ const LEGAL_SEARCH_URL =
  */
 function titleForPath(pathname: string): string {
   // Exact matches first (order matters — longer paths before shorter ones).
-  if (pathname.startsWith("/runs-v2")) {
-    return pathname.includes("/") && /\/runs-v2\/[^/]+/.test(pathname) ? "Run detail" : "Run queue";
-  }
   if (pathname.startsWith("/authorities-v2/create")) return "Create authority";
   if (/\/authorities-v2\/[^/]+\/edit/.test(pathname)) return "Edit authority";
   if (pathname.startsWith("/jurisdictions-v2/create")) return "Create jurisdiction";

@@ -116,7 +116,7 @@ describe("admin resource brand token parity", () => {
 
   it("scans every resource .tsx file (sanity check)", () => {
     expect(resourceFiles.length).toBeGreaterThan(10);
-    expect(resourceFiles).toContain("src/resources/runs/RunListV2.tsx");
+    expect(resourceFiles).toContain("src/resources/runs/RunList.tsx");
     expect(resourceFiles).toContain("src/resources/sources/SourceList.tsx");
   });
 

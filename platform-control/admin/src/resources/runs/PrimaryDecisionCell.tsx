@@ -5,7 +5,7 @@
  * shadow token from `--shadow-card` to `--shadow-card-hover` so the operator's
  * primary cue reads as the anchor rather than a co-equal quadrant.
  *
- * Lifted from `RunShowV2.tsx` as a sibling export so the hierarchy can be
+ * Lifted from `RunShow.tsx` as a sibling export so the hierarchy can be
  * exercised by a unit test — see `PrimaryDecisionCell.test.tsx`.
  */
 export function PrimaryDecisionCell({ label, value }: { label: string; value: string }) {

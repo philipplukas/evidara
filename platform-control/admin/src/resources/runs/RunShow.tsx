@@ -1,41 +1,41 @@
+/**
+ * `RunShow` — Tailwind + `ra-core` run detail page. Largest single admin
+ * page. Covers header + metric band + decision-support (primary + 3) + 13-field
+ * metadata grid + failure alert, then delegates the lifecycle stack to
+ * `<RunDetailSections>` (ADR-0026 — pipeline health + 5 accordion sections).
+ * All primitives come from `src/ui/primitives/`.
+ *
+ * The operator-action stack (`RunActionStack`, cancel + promote) and the
+ * legal-search `RunHandoffCard` reuse the Tailwind action components; the
+ * handoff card reads the stateful URL-param context via `readLegalSearchHandoff`.
+ *
+ * Pure helpers (`buildRunDecisionSupport`, `buildRunHandoffGuidance`) live in
+ * `./runDecisionSupport`.
+ */
 "use client";
 
-import { Alert, Box, Chip, Grid, Paper, Stack, Typography } from "@mui/material";
-import { type ReactNode, useEffect, useState } from "react";
-import {
-  FunctionField,
-  NumberField,
-  Show,
-  SimpleShowLayout,
-  TextField,
-  useRecordContext,
-} from "react-admin";
-import { SwissDateField } from "../../components/SwissDateField";
-import { ResourceName } from "../../domain/resourceNames";
+import { RecordContextProvider, useShowController } from "ra-core";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import type { RunRecord } from "../../lib/admin/dataProvider";
-import {
-  describeLegalSearchHandoff,
-  type LegalSearchHandoff,
-  readLegalSearchHandoff,
-} from "../../lib/admin/navigationContext";
-import { PageContextBar } from "../shared/PageContextBar";
-import { runModeToLevel, runRecordStatusToLevel, StatusBadge } from "../shared/StatusBadge";
+import { type LegalSearchHandoff, readLegalSearchHandoff } from "../../lib/admin/navigationContext";
+import { formatSwissDateTime } from "../../lib/format/date";
+import { DetailGrid, FieldCell, Panel, Pill } from "../../ui/primitives";
+import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
+import { PrimaryDecisionCell } from "./PrimaryDecisionCell";
 import { RunActionStack } from "./RunActions";
-import { RunDetailSections } from "./RunDetailSections";
+import RunDetailSections from "./RunDetailSections";
+import { buildRunDecisionSupport, buildRunHandoffGuidance } from "./runDecisionSupport";
 
-export type RunDecisionSupport = {
-  whyItMatters: string;
-  whatIsBlocked: string;
-  whatChangedRecently: string;
-  whatHappensIfIgnored: string;
-};
+function formatDuration(run: RunRecord): string {
+  if (!run.started_at || !run.completed_at) return "—";
+  const ms = new Date(run.completed_at).getTime() - new Date(run.started_at).getTime();
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+}
 
-export type RunHandoffGuidance = {
-  whyYouAreHere: string;
-  whatToCheckNext: string;
-};
-
-const describeRunNextStep = (run: RunRecord): string => {
+function describeRunNextStep(run: RunRecord): string {
   if (run.status === "failed") {
     return "Open the pipeline sections below and use the failure reason to pinpoint the blocked stage.";
   }
@@ -49,385 +49,208 @@ const describeRunNextStep = (run: RunRecord): string => {
     return "The run completed successfully. Use the lifecycle sections as the audit trail.";
   }
   return "The run was cancelled. Review the detail sections if the stop was unexpected.";
+}
+
+const STATUS_LABEL: Record<RunRecord["status"], string> = {
+  pending: "Pending",
+  running: "Running",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
 };
 
-export function buildRunDecisionSupport(run: RunRecord): RunDecisionSupport {
-  const whyItMatters =
-    run.mode === "production"
-      ? "This production run reflects the live path for the source version and should be treated as operator-critical."
-      : "This preview run is the checkpoint before promotion, so its outcome decides whether the version is ready.";
+export default function RunShow() {
+  const { id } = useParams();
+  const controller = useShowController<RunRecord>({
+    resource: "runs",
+    id,
+  });
+  const run = controller.record;
 
-  const whatIsBlocked =
-    run.status === "failed"
-      ? run.failure_reason
-        ? `The run is blocked by a recorded failure: ${run.failure_reason}`
-        : "The run failed and is blocked until the failing stage is remediated."
-      : run.status === "running"
-        ? "No stage is blocked yet, but the active pipeline may stop if an upstream stage fails."
-        : run.status === "pending"
-          ? "Nothing is blocked yet because the run has not started."
-          : run.status === "cancelled"
-            ? "The run was stopped, so there is no remaining blocked stage to clear."
-            : "No blocker is visible from the run record.";
-
-  const whatChangedRecently =
-    run.status === "completed"
-      ? `The run finalized ${run.captured_resources_count} captured resources and ${run.artifacts_count} artifacts.`
-      : run.status === "running"
-        ? "The pipeline is still changing, so the stage sections below are the best source of the latest movement."
-        : run.status === "pending"
-          ? "The run is still waiting in queue, so no stage work has started yet."
-          : run.status === "failed"
-            ? "The latest recorded change is the failure outcome that operators need to inspect."
-            : "No new stage activity is expected after cancellation.";
-
-  const whatHappensIfIgnored =
-    run.status === "pending"
-      ? "It stays queued until the platform starts it or an operator cancels it."
-      : run.status === "running"
-        ? "It keeps progressing and may complete or fail without intervention."
-        : run.status === "failed"
-          ? "It remains failed and the blocked stage will not clear on its own."
-          : run.status === "completed"
-            ? "It stays as a stable audit trail unless the outcome needs review."
-            : "No further pipeline work will happen for this run.";
-
-  return {
-    whyItMatters,
-    whatIsBlocked,
-    whatChangedRecently,
-    whatHappensIfIgnored,
-  };
-}
-
-export function buildRunHandoffGuidance(
-  run: RunRecord,
-  handoff: LegalSearchHandoff,
-): RunHandoffGuidance | null {
-  if (!handoff.hasOrigin) {
-    return null;
+  if (controller.isPending) {
+    return (
+      <div className="px-4 py-10 text-center text-[var(--foreground-subtle)]">Loading run…</div>
+    );
+  }
+  if (controller.error || !run) {
+    return (
+      <div className="px-4 py-10 text-center text-[var(--status-critical)]">
+        Failed to load run.
+      </div>
+    );
   }
 
-  const contextSummary = describeLegalSearchHandoff(handoff);
-  const whyYouAreHere = `You came from legal search. ${contextSummary}.`;
-  const whatToCheckNext = `${describeRunNextStep(run)} ${
-    handoff.selectedId
-      ? `Use the selected item (${handoff.selectedId}) to confirm the source/version pair above is the one you expected.`
-      : "Use the source and version IDs above to confirm the run matches the result you were investigating."
-  }`;
-
-  return {
-    whyYouAreHere,
-    whatToCheckNext,
-  };
-}
-
-function DecisionSupportItem({ label, value }: { label: string; value: string }) {
-  return (
-    <Paper variant="outlined" sx={{ p: 1.5, background: "var(--brand-wash-3)" }}>
-      <Stack spacing={0.5}>
-        <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
-          {label}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {value}
-        </Typography>
-      </Stack>
-    </Paper>
-  );
-}
-
-function formatDuration(record: RunRecord): string {
-  if (!record.started_at || !record.completed_at) {
-    return "—";
-  }
-
-  const ms = new Date(record.completed_at).getTime() - new Date(record.started_at).getTime();
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
-}
-
-function RunDurationField() {
-  const record = useRecordContext<RunRecord>();
-  if (!record) {
-    return <Typography variant="body2">-</Typography>;
-  }
-  if (!record.started_at || !record.completed_at) return <Typography variant="body2">-</Typography>;
-  return <Typography variant="body2">{formatDuration(record)}</Typography>;
-}
-
-function RunPageContextBar() {
-  const run = useRecordContext<RunRecord>();
-  if (!run) {
-    return null;
-  }
+  const decision = buildRunDecisionSupport(run);
+  const duration = formatDuration(run);
 
   return (
-    <PageContextBar>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={2}
-        justifyContent="space-between"
-        alignItems={{ xs: "flex-start", md: "center" }}
-      >
-        <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="overline" color="text.secondary">
-            Run overview
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Run {run.run_id}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {run.source_id} · {run.source_version_id}
-          </Typography>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <StatusBadge
-              level={runRecordStatusToLevel(run.status)}
-              label={run.status.charAt(0).toUpperCase() + run.status.slice(1)}
-            />
-            <StatusBadge
-              level={runModeToLevel(run.mode)}
-              label={run.mode.charAt(0).toUpperCase() + run.mode.slice(1)}
-            />
-            <Chip
-              size="small"
-              variant="outlined"
-              label={`Source version ${run.source_version_id}`}
-            />
-          </Stack>
-        </Stack>
-        <Box sx={{ alignSelf: { xs: "stretch", md: "flex-start" } }}>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[var(--container-max)] mx-auto space-y-6">
+      <RunHandoffCard run={run} />
+
+      {/* Header — parity with v1 `RunPageContextBar`, incl. the action stack. */}
+      <header className="space-y-3">
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
+          Run detail
+        </p>
+        <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          Run <span className="font-mono text-[22px]">{run.run_id}</span>
+        </h1>
+        <div className="text-[13px] text-[var(--foreground-muted)] font-mono">
+          {run.source_id} · {run.source_version_id}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Pill level={runRecordStatusToLevel(run.status)}>{STATUS_LABEL[run.status]}</Pill>
+          <Pill level={runModeToLevel(run.mode)}>
+            {run.mode === "production" ? "Production" : "Preview"}
+          </Pill>
+          <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
+        </div>
+        <RecordContextProvider value={run}>
           <RunActionStack />
-        </Box>
-      </Stack>
-    </PageContextBar>
-  );
-}
+        </RecordContextProvider>
+      </header>
 
-function RunOverviewCard() {
-  const run = useRecordContext<RunRecord>();
+      {/* Overview band — metric chips + next-step narrative. */}
+      <section className="rounded-[18px] border border-[var(--border-faint)] bg-gradient-to-b from-[var(--brand-wash-4)] to-[var(--admin-panel-bg)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-4">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Pill variant="meta">{`Captured ${run.captured_resources_count}`}</Pill>
+          <Pill variant="meta">{`Artifacts ${run.artifacts_count}`}</Pill>
+          <Pill variant="meta">{`Duration ${duration}`}</Pill>
+        </div>
+        <p className="text-[14px] text-[var(--foreground-muted)]">{describeRunNextStep(run)}</p>
 
-  if (!run) {
-    return null;
-  }
-
-  const decisionSupport = buildRunDecisionSupport(run);
-
-  return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2,
-        mb: 2,
-        background: "linear-gradient(180deg, var(--brand-wash-4), rgba(255, 255, 255, 0.98))",
-      }}
-    >
-      <Stack spacing={2}>
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`Captured ${run.captured_resources_count}`}
-          />
-          <Chip size="small" variant="outlined" label={`Artifacts ${run.artifacts_count}`} />
-          <Chip size="small" variant="outlined" label={`Duration ${formatDuration(run)}`} />
-        </Stack>
-
-        <Typography variant="body2" color="text.secondary">
-          {describeRunNextStep(run)}
-        </Typography>
-
-        <Paper variant="outlined" sx={{ p: 1.5, background: "var(--brand-wash-3)" }}>
-          <Stack spacing={1.25}>
-            <Box>
-              <Typography variant="subtitle2">Decision support</Typography>
-              <Typography variant="body2" color="text.secondary">
-                The four cues below answer the operator questions we use most often on active runs.
-              </Typography>
-            </Box>
-            <Box
-              sx={{
-                display: "grid",
-                gap: 1,
-                gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
-              }}
-            >
-              <DecisionSupportItem label="Why this matters" value={decisionSupport.whyItMatters} />
-              <DecisionSupportItem label="What is blocked" value={decisionSupport.whatIsBlocked} />
-              <DecisionSupportItem
-                label="What changed recently"
-                value={decisionSupport.whatChangedRecently}
-              />
-              <DecisionSupportItem
-                label="If you do nothing"
-                value={decisionSupport.whatHappensIfIgnored}
-              />
-            </Box>
-          </Stack>
-        </Paper>
+        {/* Decision support — primary cue on top (full-width), three subordinate cues inline below on md+, all stacked on mobile. */}
+        <div className="rounded-[14px] border border-[var(--border-faint)] bg-[var(--brand-wash-3)] p-4 space-y-3">
+          <div>
+            <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Decision support</h2>
+            <p className="text-[12px] text-[var(--foreground-subtle)]">
+              The primary cue leads with why this run matters; the three subordinate cues add
+              operational context.
+            </p>
+          </div>
+          <div className="space-y-3">
+            <PrimaryDecisionCell label="Why this matters" value={decision.whyItMatters} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <DecisionCell label="What is blocked" value={decision.whatIsBlocked} />
+              <DecisionCell label="What changed recently" value={decision.whatChangedRecently} />
+              <DecisionCell label="If you do nothing" value={decision.whatHappensIfIgnored} />
+            </div>
+          </div>
+        </div>
 
         {run.failure_reason ? (
-          <Alert severity={run.status === "failed" ? "error" : "warning"} icon={false}>
-            <Stack spacing={0.5}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Failure reason
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {run.failure_reason}
-              </Typography>
-            </Stack>
-          </Alert>
+          <div
+            role="alert"
+            className={`rounded-[12px] border p-3 ${
+              run.status === "failed"
+                ? "border-[var(--status-critical)]/40 bg-[var(--status-critical-subtle)] text-[var(--status-critical)]"
+                : "border-[var(--status-degraded)]/40 bg-[var(--status-degraded-subtle)] text-[var(--status-degraded)]"
+            }`}
+          >
+            <p className="text-[13px] font-semibold">Failure reason</p>
+            <p className="text-[13px] mt-0.5 text-[var(--foreground-muted)]">
+              {run.failure_reason}
+            </p>
+          </div>
         ) : null}
-      </Stack>
-    </Paper>
+      </section>
+
+      {/* Metadata grid — same M-15 2-col pattern as SourceShow. */}
+      <DetailGrid>
+        <FieldCell label="Run">
+          <span className="font-mono text-[13px]">{run.run_id}</span>
+        </FieldCell>
+        <FieldCell label="Source ID">
+          <span className="font-mono text-[13px]">{run.source_id}</span>
+        </FieldCell>
+        <FieldCell label="Source version ID">
+          <span className="font-mono text-[13px]">{run.source_version_id}</span>
+        </FieldCell>
+        <FieldCell label="Mode">{run.mode}</FieldCell>
+        <FieldCell label="Status">{run.status}</FieldCell>
+        <FieldCell label="Captured resources">
+          <span className="tabular-nums">{run.captured_resources_count}</span>
+        </FieldCell>
+        <FieldCell label="Artifacts">
+          <span className="tabular-nums">{run.artifacts_count}</span>
+        </FieldCell>
+        <FieldCell label="Failure reason">
+          {run.failure_reason ?? <span className="text-[var(--foreground-faint)]">—</span>}
+        </FieldCell>
+        <FieldCell label="Started">
+          {run.started_at ? (
+            formatSwissDateTime(run.started_at)
+          ) : (
+            <span className="text-[var(--foreground-faint)]">—</span>
+          )}
+        </FieldCell>
+        <FieldCell label="Completed">
+          {run.completed_at ? (
+            formatSwissDateTime(run.completed_at)
+          ) : (
+            <span className="text-[var(--foreground-faint)]">—</span>
+          )}
+        </FieldCell>
+        <FieldCell label="Duration">{duration}</FieldCell>
+        <FieldCell label="Created">{formatSwissDateTime(run.created_at)}</FieldCell>
+        <FieldCell label="Updated">{formatSwissDateTime(run.updated_at)}</FieldCell>
+      </DetailGrid>
+
+      {/* Lifecycle stack — pipeline health banner + 5 collapsed accordion sections. */}
+      <RecordContextProvider value={run}>
+        <RunDetailSections />
+      </RecordContextProvider>
+    </div>
   );
 }
 
-function RunHandoffCard() {
-  const run = useRecordContext<RunRecord>();
+function DecisionCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[10px] border border-[var(--border-faint)] bg-white/80 p-3 space-y-0.5">
+      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--foreground-subtle)] leading-[1.2]">
+        {label}
+      </span>
+      <p className="text-[13px] text-[var(--foreground-muted)] leading-snug">{value}</p>
+    </div>
+  );
+}
+
+// Legal-search handoff banner — reads the URL-param context once on mount so
+// operators who arrive from a search result get "why you are here / what to
+// check next" guidance. Renders nothing outside the handoff flow.
+function RunHandoffCard({ run }: { run: RunRecord }) {
   const [handoff, setHandoff] = useState<LegalSearchHandoff | null>(null);
 
   useEffect(() => {
     setHandoff(readLegalSearchHandoff());
   }, []);
 
-  if (!run || !handoff) {
+  if (!handoff) {
     return null;
   }
 
   const guidance = buildRunHandoffGuidance(run, handoff);
-
   if (!guidance) {
     return null;
   }
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2,
-        mb: 2,
-        background: "linear-gradient(180deg, var(--brand-wash-4), rgba(255, 255, 255, 0.97))",
-      }}
-    >
-      <Stack spacing={1.5}>
-        <Box>
-          <Typography variant="subtitle2">Legal search handoff</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Why you are here and what to check next before acting on this run.
-          </Typography>
-        </Box>
-
-        <Typography variant="body2" color="text.secondary">
-          {guidance.whyYouAreHere}
-        </Typography>
-
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          {handoff.query ? <Chip size="small" variant="outlined" label={handoff.query} /> : null}
-          {handoff.scopeLabel ? (
-            <Chip size="small" variant="outlined" label={handoff.scopeLabel} />
-          ) : null}
-          {handoff.selectedId ? (
-            <Chip size="small" variant="outlined" label={`Selected item: ${handoff.selectedId}`} />
-          ) : null}
-        </Stack>
-
-        <Typography variant="body2" color="text.secondary">
-          {guidance.whatToCheckNext}
-        </Typography>
-      </Stack>
-    </Paper>
-  );
-}
-
-function RunFieldCell({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Stack spacing={0.5}>
-      <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
-        {label}
-      </Typography>
-      <Box>{children}</Box>
-    </Stack>
-  );
-}
-
-export function RunShow() {
-  return (
-    <Show resource={ResourceName.Runs} title="Run Detail">
-      <SimpleShowLayout>
-        <RunHandoffCard />
-        <RunPageContextBar />
-        <RunOverviewCard />
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Run">
-              <TextField source="run_id" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Source ID">
-              <TextField source="source_id" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Source version ID">
-              <TextField source="source_version_id" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Mode">
-              <TextField source="mode" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Status">
-              <TextField source="status" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Captured resources">
-              <NumberField source="captured_resources_count" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Artifacts">
-              <NumberField source="artifacts_count" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Failure reason">
-              <TextField source="failure_reason" emptyText="-" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Started">
-              <SwissDateField source="started_at" showTime emptyText="-" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Completed">
-              <SwissDateField source="completed_at" showTime emptyText="-" />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Duration">
-              <FunctionField render={() => <RunDurationField />} />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Created">
-              <SwissDateField source="created_at" showTime />
-            </RunFieldCell>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RunFieldCell label="Updated">
-              <SwissDateField source="updated_at" showTime />
-            </RunFieldCell>
-          </Grid>
-        </Grid>
-        <RunDetailSections />
-      </SimpleShowLayout>
-    </Show>
+    <Panel className="p-4 space-y-3">
+      <div>
+        <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Legal search handoff</h2>
+        <p className="text-[12px] text-[var(--foreground-subtle)]">
+          Why you are here and what to check next before acting on this run.
+        </p>
+      </div>
+      <p className="text-[13px] text-[var(--foreground-muted)]">{guidance.whyYouAreHere}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {handoff.query ? <Pill variant="meta">{handoff.query}</Pill> : null}
+        {handoff.scopeLabel ? <Pill variant="meta">{handoff.scopeLabel}</Pill> : null}
+        {handoff.selectedId ? (
+          <Pill variant="meta">{`Selected item: ${handoff.selectedId}`}</Pill>
+        ) : null}
+      </div>
+      <p className="text-[13px] text-[var(--foreground-muted)]">{guidance.whatToCheckNext}</p>
+    </Panel>
   );
 }
