@@ -186,10 +186,12 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.getByRole("button", { name: "Create Run" }).click();
     const createRunDialog = page.getByRole("dialog", { name: "Create Run" });
     await expect(createRunDialog).toBeVisible();
-    await createRunDialog.getByRole("combobox", { name: /^Source$/ }).click();
-    await page.getByRole("option", { name: "Swiss Federal Court" }).click();
-    await createRunDialog.getByRole("combobox", { name: "Source version" }).click();
-    await page.getByRole("option", { name: /2026.04.06/ }).click();
+    await createRunDialog
+      .getByLabel("Source", { exact: true })
+      .selectOption({ label: "Swiss Federal Court" });
+    await createRunDialog
+      .getByLabel("Source version", { exact: true })
+      .selectOption({ label: "2026.04.06 (approved)" });
     await expect(page.getByText(/Preflight is blocking launch/i)).toBeVisible();
     await saveScreenshot(page, "admin-run-launch-preflight.png");
 
