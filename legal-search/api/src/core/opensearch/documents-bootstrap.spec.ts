@@ -74,9 +74,7 @@ describe('bootstrapDocumentsIndex', () => {
       ([u, init]) => String(u).endsWith('/_aliases') && init?.method === 'POST',
     );
     const actions = bodyOf(aliasCall as unknown[]).actions as Array<Record<string, unknown>>;
-    const adds = actions
-      .filter((a) => 'add' in a)
-      .map((a) => (a as { add: unknown }).add);
+    const adds = actions.filter((a) => 'add' in a).map((a) => (a as { add: unknown }).add);
     expect(adds).toContainEqual({ index: 'documents-000001', alias: 'documents-read' });
     expect(adds).toContainEqual({
       index: 'documents-000001',
