@@ -1,22 +1,16 @@
 "use client";
 
-import RefreshIcon from "@mui/icons-material/Refresh";
+import { RefreshCw } from "lucide-react";
 import {
-  Alert,
-  AlertTitle,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  MenuItem,
-  Button as MuiButton,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+  type ChangeEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useDataProvider, useGetList, useNotify, useRedirect } from "react-admin";
 import { ResourceName } from "../../domain/resourceNames";
 import type {
@@ -29,13 +23,55 @@ import type {
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { emitOperatorJourneyEvent } from "../../lib/admin/operatorJourneyTelemetry";
 import { describeReadinessDetail } from "../../lib/admin/readiness-messages";
-import { Button } from "../../ui/primitives";
+import { Button, Dialog, FormField, InlineAlert, Panel, Pill } from "../../ui/primitives";
 import { ConfirmButton } from "../shared/ConfirmButton";
+import { runModeToLevel } from "../shared/statusLevels";
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 250 },
   sort: { field: "name", order: "ASC" as const },
 };
+
+// Native <select> styled to match the ra-core `Select` primitive's trigger.
+// The launch dialog holds its inputs in local state (not a ra-core `<Form>`),
+// so the `useInput`-bound `Select` primitive can't be used here.
+const NATIVE_SELECT_CLASS =
+  "w-full rounded-lg border border-[var(--border)] bg-[var(--surface-input)] " +
+  "px-3 py-2.5 text-sm text-[var(--foreground)] shadow-[var(--shadow-inset-surface)] " +
+  "transition-[border-color,box-shadow] hover:border-[var(--accent-core)]/30 " +
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] " +
+  "disabled:opacity-50 disabled:cursor-not-allowed";
+
+function LaunchSelect({
+  label,
+  value,
+  onChange,
+  disabled,
+  helperText,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+  disabled?: boolean;
+  helperText?: ReactNode;
+  children: ReactNode;
+}) {
+  const id = useId();
+  return (
+    <FormField id={id} label={label} helperText={helperText}>
+      <select
+        id={id}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        className={NATIVE_SELECT_CLASS}
+      >
+        {children}
+      </select>
+    </FormField>
+  );
+}
 
 type RunLaunchRedirectResource = typeof ResourceName.Runs | typeof ResourceName.PreviewReview;
 
@@ -88,9 +124,6 @@ const normalizeReadinessCodes = (checks: RunReadiness["checks"]): string[] =>
 
 const formatModeLabel = (mode: "preview" | "production"): string =>
   mode === "production" ? "Production" : "Preview";
-
-const modeChipColor = (mode: "preview" | "production"): "info" | "success" =>
-  mode === "production" ? "success" : "info";
 
 export type PreflightRetryPayload = {
   source_id: string;
@@ -324,235 +357,216 @@ export function RunLaunchButton({
         ? "secondary"
         : "primary";
 
+  const footer = (
+    <>
+      <Button variant="secondary" onClick={closeDialog} disabled={isSubmitting}>
+        Cancel
+      </Button>
+      {formState.mode === "production" ? (
+        <ConfirmButton
+          tier="notable"
+          variant="contained"
+          color="success"
+          disabled={!isReadyToCreate || isSubmitting}
+          confirmTitle="Create production run?"
+          confirmDescription="Production runs schedule real pipeline work against the selected approved version. Confirm only when you intend to verify capture end-to-end."
+          confirmLabel="Create run"
+          cancelLabel="Go back"
+          onConfirm={submit}
+        >
+          {isSubmitting ? "Creating..." : "Create Run"}
+        </ConfirmButton>
+      ) : (
+        <Button variant="primary" onClick={submit} disabled={!isReadyToCreate}>
+          {isSubmitting ? "Creating..." : "Create Run"}
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <>
       <Button variant={triggerVariant} onClick={() => setOpen(true)}>
         {label}
       </Button>
 
-      <Dialog open={open} onClose={closeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Stack spacing={0.5}>
-            <Typography variant="h6" component="div">
-              Create Run
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Pick a source/version pair, then review the preflight result before launch.
-            </Typography>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            {sources.error ? <Alert severity="error">Unable to load sources.</Alert> : null}
+      <Dialog
+        open={open}
+        onClose={closeDialog}
+        title="Create Run"
+        description="Pick a source/version pair, then review the preflight result before launch."
+        size="md"
+        dismissable={!isSubmitting}
+        footer={footer}
+      >
+        <div className="flex flex-col gap-4">
+          {sources.error ? <InlineAlert tone="error">Unable to load sources.</InlineAlert> : null}
 
-            <Paper variant="outlined" sx={{ p: 1.5 }}>
-              <Stack spacing={1.25}>
-                <Typography variant="subtitle2">Launch summary</Typography>
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  <Chip
-                    size="small"
-                    color={modeChipColor(formState.mode)}
-                    label={`${formatModeLabel(formState.mode)} mode`}
-                  />
-                  <Chip
-                    size="small"
-                    variant="outlined"
-                    label={`Source ${selectedSource?.name ?? "not selected"}`}
-                  />
-                  <Chip
-                    size="small"
-                    variant="outlined"
-                    label={
-                      selectedVersion
-                        ? `Version ${selectedVersion.version_label} (${selectedVersion.status})`
-                        : "Version not selected"
-                    }
-                  />
-                  <Chip size="small" label={readinessStatusLabel} variant="outlined" />
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  {formState.mode === "production"
-                    ? "Production runs require an approved version and should be used when the source is ready for operator verification."
-                    : "Preview runs let you inspect capture quality and readiness before promotion."}
-                </Typography>
-              </Stack>
-            </Paper>
+          <Panel className="p-4">
+            <div className="flex flex-col gap-3">
+              <p className="text-sm font-semibold text-[var(--foreground)] m-0">Launch summary</p>
+              <div className="flex flex-wrap gap-2">
+                <Pill level={runModeToLevel(formState.mode)}>
+                  {`${formatModeLabel(formState.mode)} mode`}
+                </Pill>
+                <Pill variant="meta">{`Source ${selectedSource?.name ?? "not selected"}`}</Pill>
+                <Pill variant="meta">
+                  {selectedVersion
+                    ? `Version ${selectedVersion.version_label} (${selectedVersion.status})`
+                    : "Version not selected"}
+                </Pill>
+                <Pill variant="meta">{readinessStatusLabel}</Pill>
+              </div>
+              <p className="text-sm text-[var(--text-meta)] m-0">
+                {formState.mode === "production"
+                  ? "Production runs require an approved version and should be used when the source is ready for operator verification."
+                  : "Preview runs let you inspect capture quality and readiness before promotion."}
+              </p>
+            </div>
+          </Panel>
 
-            <Paper variant="outlined" sx={{ p: 1.5 }}>
-              <Stack spacing={2}>
-                <Typography variant="subtitle2">Launch inputs</Typography>
+          <Panel className="p-4">
+            <div className="flex flex-col gap-4">
+              <p className="text-sm font-semibold text-[var(--foreground)] m-0">Launch inputs</p>
 
-                <TextField
-                  select
-                  label="Run mode"
-                  value={formState.mode}
-                  onChange={(event) => {
-                    const mode = event.target.value as RunLaunchFormState["mode"];
-                    setFormState((prev) => {
-                      const versions = sourceVersions.data ?? [];
-                      const allowedIds = new Set(
-                        versions
-                          .filter((v) => versionAllowedForMode(v.status, mode))
-                          .map((v) => v.source_version_id),
-                      );
-                      return {
-                        ...prev,
-                        mode,
-                        source_version_id: allowedIds.has(prev.source_version_id)
-                          ? prev.source_version_id
-                          : "",
-                      };
-                    });
-                  }}
-                  fullWidth
-                  disabled={allowedModes.length === 1}
-                >
-                  {allowedModes.map((mode) => (
-                    <MenuItem key={mode} value={mode}>
-                      {formatModeLabel(mode)}
-                    </MenuItem>
-                  ))}
-                </TextField>
+              <LaunchSelect
+                label="Run mode"
+                value={formState.mode}
+                disabled={allowedModes.length === 1}
+                onChange={(event) => {
+                  const mode = event.target.value as RunLaunchFormState["mode"];
+                  setFormState((prev) => {
+                    const versions = sourceVersions.data ?? [];
+                    const allowedIds = new Set(
+                      versions
+                        .filter((v) => versionAllowedForMode(v.status, mode))
+                        .map((v) => v.source_version_id),
+                    );
+                    return {
+                      ...prev,
+                      mode,
+                      source_version_id: allowedIds.has(prev.source_version_id)
+                        ? prev.source_version_id
+                        : "",
+                    };
+                  });
+                }}
+              >
+                {allowedModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {formatModeLabel(mode)}
+                  </option>
+                ))}
+              </LaunchSelect>
 
-                <TextField
-                  select
-                  label="Source"
-                  value={formState.source_id}
-                  onChange={(event) =>
-                    setFormState({
-                      ...formState,
-                      source_id: event.target.value,
-                      source_version_id: "",
-                    })
-                  }
-                  fullWidth
-                >
-                  {(sources.data ?? []).map((source) => (
-                    <MenuItem key={source.source_id} value={source.source_id}>
-                      {source.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <TextField
-                  select
-                  label="Source version"
-                  value={formState.source_version_id}
-                  onChange={(event) =>
-                    setFormState({
-                      ...formState,
-                      source_version_id: event.target.value,
-                    })
-                  }
-                  fullWidth
-                  disabled={!formState.source_id}
-                  helperText="Production runs require an approved version."
-                >
-                  {versionChoices.map((version) => (
-                    <MenuItem key={version.value} value={version.value}>
-                      {version.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Stack>
-            </Paper>
-
-            {isCheckingReadiness ? (
-              <Alert severity="info" icon={false}>
-                <AlertTitle>Checking preflight readiness</AlertTitle>
-                The launch dialog is validating the selected source/version pair.
-              </Alert>
-            ) : null}
-            {readinessError ? (
-              <Alert
-                severity="error"
-                action={
-                  <MuiButton
-                    size="small"
-                    color="inherit"
-                    startIcon={<RefreshIcon />}
-                    onClick={handleRetry}
-                    disabled={isCheckingReadiness}
-                  >
-                    Retry
-                  </MuiButton>
+              <LaunchSelect
+                label="Source"
+                value={formState.source_id}
+                onChange={(event) =>
+                  setFormState({
+                    ...formState,
+                    source_id: event.target.value,
+                    source_version_id: "",
+                  })
                 }
               >
-                {readinessError}
-              </Alert>
-            ) : null}
-            {readiness && !readiness.ready ? (
-              <Alert severity="warning" icon={false}>
-                <Stack spacing={1.25}>
-                  <AlertTitle>Preflight blocks launch</AlertTitle>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Preflight is blocking launch. Resolve the items below to enable Create Run.
-                  </Typography>
-                  <Stack spacing={1}>
-                    {failingChecks.map((check) => {
-                      const info = describeReadinessDetail(check.code);
-                      return (
-                        <Paper key={check.code} variant="outlined" sx={{ p: 1.25 }}>
-                          <Stack spacing={0.75}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {info.title}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {check.detail}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Next action: {info.action}
-                            </Typography>
-                          </Stack>
-                        </Paper>
-                      );
-                    })}
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary">
-                    {failingChecks.length} blocked check
-                    {failingChecks.length === 1 ? "" : "s"} need attention before the run can be
-                    created.
-                  </Typography>
-                  {selectedVersion ? (
-                    <Typography variant="caption" color="text.secondary">
-                      Selected version status: {selectedVersion.status}
-                    </Typography>
-                  ) : null}
-                </Stack>
-              </Alert>
-            ) : null}
-            {readiness?.ready ? (
-              <Alert severity="success" icon={false}>
-                <AlertTitle>Preflight ready</AlertTitle>
-                The current source/version pair is ready to launch.
-              </Alert>
-            ) : null}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <MuiButton onClick={closeDialog} disabled={isSubmitting}>
-            Cancel
-          </MuiButton>
-          {formState.mode === "production" ? (
-            <ConfirmButton
-              tier="notable"
-              variant="contained"
-              color="success"
-              disabled={!isReadyToCreate || isSubmitting}
-              confirmTitle="Create production run?"
-              confirmDescription="Production runs schedule real pipeline work against the selected approved version. Confirm only when you intend to verify capture end-to-end."
-              confirmLabel="Create run"
-              cancelLabel="Go back"
-              onConfirm={submit}
-            >
-              {isSubmitting ? "Creating..." : "Create Run"}
-            </ConfirmButton>
-          ) : (
-            <MuiButton variant="contained" onClick={submit} disabled={!isReadyToCreate}>
-              {isSubmitting ? "Creating..." : "Create Run"}
-            </MuiButton>
-          )}
-        </DialogActions>
+                <option value="">Select a source…</option>
+                {(sources.data ?? []).map((source) => (
+                  <option key={source.source_id} value={source.source_id}>
+                    {source.name}
+                  </option>
+                ))}
+              </LaunchSelect>
+
+              <LaunchSelect
+                label="Source version"
+                value={formState.source_version_id}
+                disabled={!formState.source_id}
+                helperText="Production runs require an approved version."
+                onChange={(event) =>
+                  setFormState({
+                    ...formState,
+                    source_version_id: event.target.value,
+                  })
+                }
+              >
+                <option value="">Select a version…</option>
+                {versionChoices.map((version) => (
+                  <option key={version.value} value={version.value}>
+                    {version.label}
+                  </option>
+                ))}
+              </LaunchSelect>
+            </div>
+          </Panel>
+
+          {isCheckingReadiness ? (
+            <InlineAlert tone="info">
+              <p className="font-semibold text-[var(--foreground)]">Checking preflight readiness</p>
+              <p>The launch dialog is validating the selected source/version pair.</p>
+            </InlineAlert>
+          ) : null}
+          {readinessError ? (
+            <InlineAlert tone="error">
+              <div className="flex items-start justify-between gap-3">
+                <span>{readinessError}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRetry}
+                  disabled={isCheckingReadiness}
+                  leftIcon={<RefreshCw size={14} />}
+                >
+                  Retry
+                </Button>
+              </div>
+            </InlineAlert>
+          ) : null}
+          {readiness && !readiness.ready ? (
+            <InlineAlert tone="warning">
+              <div className="flex flex-col gap-3">
+                <p className="font-semibold text-[var(--foreground)]">Preflight blocks launch</p>
+                <p className="font-semibold text-[var(--foreground)]">
+                  Preflight is blocking launch. Resolve the items below to enable Create Run.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {failingChecks.map((check) => {
+                    const info = describeReadinessDetail(check.code);
+                    return (
+                      <Panel key={check.code} className="p-3">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-sm font-semibold text-[var(--foreground)] m-0">
+                            {info.title}
+                          </p>
+                          <p className="text-sm text-[var(--text-meta)] m-0">{check.detail}</p>
+                          <p className="text-xs text-[var(--text-meta)] m-0">
+                            Next action: {info.action}
+                          </p>
+                        </div>
+                      </Panel>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-[var(--foreground)] m-0">
+                  {failingChecks.length} blocked check
+                  {failingChecks.length === 1 ? "" : "s"} need attention before the run can be
+                  created.
+                </p>
+                {selectedVersion ? (
+                  <p className="text-xs text-[var(--foreground)] m-0">
+                    Selected version status: {selectedVersion.status}
+                  </p>
+                ) : null}
+              </div>
+            </InlineAlert>
+          ) : null}
+          {readiness?.ready ? (
+            <InlineAlert tone="success">
+              <p className="font-semibold text-[var(--foreground)]">Preflight ready</p>
+              <p>The current source/version pair is ready to launch.</p>
+            </InlineAlert>
+          ) : null}
+        </div>
       </Dialog>
     </>
   );
