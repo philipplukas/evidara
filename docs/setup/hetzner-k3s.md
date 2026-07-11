@@ -91,6 +91,10 @@ bash infra/hetzner/deploy-stage1.sh        # MinIO + CloudNativePG Postgres
 kubectl -n evidara get pods
 ```
 
+Once the apps are up, verify the CH Fedlex head of the pipeline (platform-control → NATS →
+MinIO → document-intelligence) with the fast-loop canary: see
+[CH Fedlex canary — backend wiring & fast-loop](hetzner-ch-fedlex-canary.md).
+
 ## Steady state — codify it
 
 The above is bootstrap. The target operating model (see ADR-0029, migration docs):

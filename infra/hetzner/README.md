@@ -83,6 +83,13 @@ MinIO. The DI pipeline writes Iceberg via PyIceberg → Nessie. See the lakehous
 Adapt the `k8s/gitops` overlay to this cluster: plain k8s `Secret`s (no Vault/ESO here),
 in-cluster store endpoints, k3s `traefik` ingress (or swap to nginx).
 
+`apps/configmap.yaml` wires platform-control onto the real self-hosted backends
+(`event_publisher_backend=nats`, `artifact_store_backend=s3`/MinIO) so an admin-launched run
+publishes the `evidara.artifact-bundle-available` event + artifact that `di-consumer` reads.
+Verify the head of that chain with the CH Fedlex fast-loop canary — backend coordinate table
+and operator procedure in
+[`docs/setup/hetzner-ch-fedlex-canary.md`](../../docs/setup/hetzner-ch-fedlex-canary.md).
+
 ## Stage 5 — real auth (ADR-0020)
 
 `deploy-stage5.sh` puts both apps behind real auth. Idempotent; rebuild the admin and
