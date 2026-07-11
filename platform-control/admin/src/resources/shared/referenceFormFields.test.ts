@@ -3,9 +3,9 @@ import {
   describeAuthoritySelectState,
   describeJurisdictionSelectState,
   referenceSlugValidator,
-} from "./ReferenceInputs";
+} from "./ReferenceFormFields";
 
-describe("ReferenceInputs helpers", () => {
+describe("ReferenceFormFields helpers", () => {
   it("validates lowercase slug input", () => {
     expect(
       referenceSlugValidator("federal-supreme-court", {} as never, {} as never),

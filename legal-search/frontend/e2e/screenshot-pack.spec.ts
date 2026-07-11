@@ -186,10 +186,12 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.getByRole("button", { name: "Create Run" }).click();
     const createRunDialog = page.getByRole("dialog", { name: "Create Run" });
     await expect(createRunDialog).toBeVisible();
-    await createRunDialog.getByRole("combobox", { name: /^Source$/ }).click();
-    await page.getByRole("option", { name: "Swiss Federal Court" }).click();
-    await createRunDialog.getByRole("combobox", { name: "Source version" }).click();
-    await page.getByRole("option", { name: /2026.04.06/ }).click();
+    await createRunDialog
+      .getByLabel("Source", { exact: true })
+      .selectOption({ label: "Swiss Federal Court" });
+    await createRunDialog
+      .getByLabel("Source version", { exact: true })
+      .selectOption({ label: "2026.04.06 (approved)" });
     await expect(page.getByText(/Preflight is blocking launch/i)).toBeVisible();
     await saveScreenshot(page, "admin-run-launch-preflight.png");
 
@@ -274,17 +276,20 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-run-detail-v2.png");
   });
 
-  test("@screenshots captures admin authority form v2 (create + edit)", async ({ page }) => {
+  // Reference-data forms graduated to the canonical `/authorities` +
+  // `/jurisdictions` routes (ADR-0026 / #501 pattern). The `-v2.png` output
+  // filenames are retained as the documented UX-review artifacts.
+  test("@screenshots captures admin authority form (create + edit)", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await setupAdmin(page);
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/authorities-v2/create`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/authorities/create`);
     await expect(page.getByRole("heading", { name: /Create authority/ })).toBeVisible();
     await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
     await saveScreenshot(page, "admin-authority-create-v2.png");
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/authorities-v2/auth_bger/edit`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/authorities/auth_bger`);
     await expect(page.getByRole("heading", { name: /Edit Bundesgericht/ })).toBeVisible();
     // Wait for useEditController to hydrate the record so the Name field
     // has its existing value before we capture.
@@ -314,17 +319,17 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-source-create-v2.png");
   });
 
-  test("@screenshots captures admin jurisdiction form v2 (create + edit)", async ({ page }) => {
+  test("@screenshots captures admin jurisdiction form (create + edit)", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await setupAdmin(page);
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/jurisdictions-v2/create`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/jurisdictions/create`);
     await expect(page.getByRole("heading", { name: /Create jurisdiction/ })).toBeVisible();
     await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
     await saveScreenshot(page, "admin-jurisdiction-create-v2.png");
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/jurisdictions-v2/jur_ch/edit`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/jurisdictions/jur_ch`);
     await expect(page.getByRole("heading", { name: /Edit Switzerland/ })).toBeVisible();
     await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Switzerland");
     await saveScreenshot(page, "admin-jurisdiction-edit-v2.png");
