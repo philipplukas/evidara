@@ -692,6 +692,14 @@ export type CommentaryInsightRecord = {
   updated_at: string;
 };
 
+/**
+ * `CommentaryInsightRecord` intersected with `RaRecord` (the `id` is stamped by
+ * `toRecord(item, "insight_id")` in `getList`/`getOne`). Mirrors `CorrectionRecord`
+ * and is what the ra-core list/show controllers are parameterised on — the raw
+ * `CommentaryInsightRecord` is the wire shape, this is the in-store shape.
+ */
+export type CommentaryInsightRaRecord = CommentaryInsightRecord & RaRecord<Identifier>;
+
 export type CommentaryInsightListResponse = {
   data: CommentaryInsightRecord[];
   total?: number;

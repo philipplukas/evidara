@@ -32,11 +32,12 @@ interface AppShellProps {
 /**
  * Workflow shortcuts rendered below the auto-registered resource links. The
  * "setup" entries jump straight to a resource's create page; the remaining
- * `kind: "preview"` entries advertise the coexisting Tailwind ports (runs,
- * reference data) until they graduate and replace the v1 MUI resources.
+ * `kind: "preview"` entries advertise the coexisting Tailwind ports until they
+ * graduate and replace the v1 MUI resources.
  *
- * Sources have already graduated (ADR-0026 / #501): the `/sources` resource
- * link is canonical Tailwind, so only the create shortcut lives here.
+ * Sources and reference data (authorities, jurisdictions) have graduated
+ * (ADR-0026 / #501): their resource links and create shortcuts are canonical
+ * Tailwind, so only the runs preview remains.
  */
 const DEFAULT_EXTRA_ITEMS: SidebarMenuExtraItem[] = [
   { to: "/runs-v2", label: "Run queue", kind: "preview" },
@@ -47,15 +48,15 @@ const DEFAULT_EXTRA_ITEMS: SidebarMenuExtraItem[] = [
     exact: true,
   },
   {
-    to: "/authorities-v2/create",
+    to: "/authorities/create",
     label: "Authority setup",
-    kind: "preview",
+    kind: "custom",
     exact: true,
   },
   {
-    to: "/jurisdictions-v2/create",
+    to: "/jurisdictions/create",
     label: "Jurisdiction setup",
-    kind: "preview",
+    kind: "custom",
     exact: true,
   },
 ];
