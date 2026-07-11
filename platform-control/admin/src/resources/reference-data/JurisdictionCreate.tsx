@@ -1,44 +1,63 @@
+/**
+ * `JurisdictionCreate` — paired with `AuthorityCreate`. Same form-path
+ * pattern: `useCreateController` + `<Form>` + `useNotify`. Because
+ * jurisdictions don't have their own scope selection, the body is simpler
+ * than the authority form (name + slug only).
+ */
 "use client";
 
-import { Alert, Stack } from "@mui/material";
-import { Create, required, SimpleForm, TextInput } from "react-admin";
-import { ResourceName } from "../../domain/resourceNames";
-import {
-  ReferenceFormSection,
-  referenceSlugHelperText,
-  referenceSlugValidator,
-} from "../shared/ReferenceInputs";
+import { Form, useCreateController, useNotify } from "ra-core";
+import { useNavigate } from "react-router-dom";
+import type { JurisdictionRecord } from "../../lib/admin/dataProvider";
+import { Button } from "../../ui/primitives";
+import { JurisdictionFormBody } from "./JurisdictionForm";
 
-export function JurisdictionCreate() {
+export default function JurisdictionCreate() {
+  const notify = useNotify();
+  const navigate = useNavigate();
+  const controller = useCreateController<JurisdictionRecord>({
+    resource: "jurisdictions",
+    mutationOptions: {
+      onSuccess: () => {
+        notify("Jurisdiction created", { type: "success" });
+        navigate("/jurisdictions");
+      },
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        notify(`Could not create jurisdiction: ${message}`, { type: "error" });
+      },
+    },
+  });
+
   return (
-    <Create resource={ResourceName.Jurisdictions} title="Create Jurisdiction" redirect="list">
-      <SimpleForm warnWhenUnsavedChanges sanitizeEmptyValues>
-        <Stack spacing={2}>
-          <Alert severity="info" variant="outlined">
-            Jurisdiction records anchor the reference-data hierarchy. Keep the slug lowercase and
-            stable because it is used in downstream labels and seeded content.
-          </Alert>
-          <ReferenceFormSection
-            title="Identity"
-            description="Choose a human-readable name and a slug that operators can keep using over time."
-          >
-            <TextInput
-              source="name"
-              label="Name"
-              fullWidth
-              helperText="Display name shown in lists and reference forms."
-              validate={required()}
-            />
-            <TextInput
-              source="slug"
-              label="Slug"
-              fullWidth
-              helperText={referenceSlugHelperText}
-              validate={[required(), referenceSlugValidator]}
-            />
-          </ReferenceFormSection>
-        </Stack>
-      </SimpleForm>
-    </Create>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-3xl mx-auto space-y-6">
+      <header className="space-y-2">
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--text-meta)]">
+          Reference data
+        </p>
+        <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          Create jurisdiction
+        </h1>
+        <p className="text-[14px] text-[var(--text-meta)] max-w-[72ch]">
+          Add a jurisdiction used by source setup, authority scoping, and operator review filters.
+          Successful creation returns to the jurisdiction list.
+        </p>
+      </header>
+
+      <Form onSubmit={controller.save} sanitizeEmptyValues>
+        <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface-panel)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-6">
+          <JurisdictionFormBody />
+
+          <footer className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+            <Button variant="ghost" onClick={() => navigate("/jurisdictions")} type="button">
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" disabled={controller.saving}>
+              {controller.saving ? "Creating…" : "Create jurisdiction"}
+            </Button>
+          </footer>
+        </div>
+      </Form>
+    </div>
   );
 }

@@ -1,62 +1,85 @@
+/**
+ * `JurisdictionEdit` — edit counterpart to `JurisdictionCreate`, same
+ * pattern as `AuthorityEdit`. `useEditController({ resource, id })`
+ * hydrates `<Form record={...}>`; the shared body re-renders with
+ * `idDisabled` so the immutable `jurisdiction_id` is visible but not
+ * editable.
+ */
 "use client";
 
-import { Alert, Stack } from "@mui/material";
-import { Edit, required, SimpleForm, TextInput, useRecordContext } from "react-admin";
-import { ResourceName } from "../../domain/resourceNames";
+import { Form, useEditController, useNotify } from "ra-core";
+import { useNavigate, useParams } from "react-router-dom";
 import type { JurisdictionRecord } from "../../lib/admin/dataProvider";
-import {
-  ReferenceFormSection,
-  ReferenceSlugChangeAlert,
-  referenceSlugHelperText,
-  referenceSlugValidator,
-} from "../shared/ReferenceInputs";
+import { Button } from "../../ui/primitives";
+import { JurisdictionFormBody } from "./JurisdictionForm";
 
-function JurisdictionEditFormBody() {
-  const record = useRecordContext<JurisdictionRecord>();
+export default function JurisdictionEdit() {
+  const { id } = useParams();
+  const notify = useNotify();
+  const navigate = useNavigate();
+  const controller = useEditController<JurisdictionRecord>({
+    resource: "jurisdictions",
+    id,
+    mutationMode: "pessimistic",
+    mutationOptions: {
+      onSuccess: () => {
+        notify("Jurisdiction saved", { type: "success" });
+        navigate("/jurisdictions");
+      },
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        notify(`Could not save: ${message}`, { type: "error" });
+      },
+    },
+  });
+
+  if (controller.isPending) {
+    return (
+      <div className="px-4 py-10 text-center text-[var(--text-meta)]">Loading jurisdiction…</div>
+    );
+  }
+  if (controller.error || !controller.record) {
+    return (
+      <div className="px-4 py-10 text-center text-[var(--status-critical)]">
+        Failed to load jurisdiction.
+      </div>
+    );
+  }
 
   return (
-    <Stack spacing={2}>
-      <Alert severity="info" variant="outlined">
-        Edit jurisdiction metadata carefully. A slug change can ripple into seeded records, operator
-        notes, and any references that point to the old identifier.
-      </Alert>
-      <ReferenceFormSection
-        title="Record identity"
-        description="The jurisdiction ID is immutable, while the name and slug should stay easy to scan."
+    <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-3xl mx-auto space-y-6">
+      <header className="space-y-2">
+        <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--text-meta)]">
+          Reference data
+        </p>
+        <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+          Edit {controller.record.name}
+        </h1>
+        <p className="text-[14px] text-[var(--text-meta)] max-w-[72ch]">
+          Update the jurisdiction display name and slug. The jurisdiction ID remains immutable for
+          linked sources and authorities.
+        </p>
+      </header>
+
+      <Form
+        onSubmit={controller.save}
+        record={controller.record}
+        sanitizeEmptyValues
+        warnWhenUnsavedChanges
       >
-        <TextInput
-          source="jurisdiction_id"
-          label="Jurisdiction ID"
-          disabled
-          fullWidth
-          helperText="Immutable identifier used by linked records."
-        />
-        <TextInput
-          source="name"
-          label="Name"
-          fullWidth
-          helperText="Display name shown in lists and source forms."
-          validate={required()}
-        />
-        <ReferenceSlugChangeAlert originalSlug={record?.slug} entityLabel="Jurisdiction" />
-        <TextInput
-          source="slug"
-          label="Slug"
-          fullWidth
-          helperText={referenceSlugHelperText}
-          validate={[required(), referenceSlugValidator]}
-        />
-      </ReferenceFormSection>
-    </Stack>
-  );
-}
+        <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface-panel)] p-5 sm:p-6 shadow-[var(--shadow-card)] backdrop-blur-[12px] space-y-6">
+          <JurisdictionFormBody idDisabled original={{ slug: controller.record.slug }} />
 
-export function JurisdictionEdit() {
-  return (
-    <Edit resource={ResourceName.Jurisdictions} title="Edit Jurisdiction" redirect="list">
-      <SimpleForm warnWhenUnsavedChanges sanitizeEmptyValues>
-        <JurisdictionEditFormBody />
-      </SimpleForm>
-    </Edit>
+          <footer className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+            <Button variant="ghost" onClick={() => navigate("/jurisdictions")} type="button">
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" disabled={controller.saving}>
+              {controller.saving ? "Saving…" : "Save changes"}
+            </Button>
+          </footer>
+        </div>
+      </Form>
+    </div>
   );
 }
