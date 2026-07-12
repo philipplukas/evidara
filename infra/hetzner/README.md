@@ -83,6 +83,21 @@ MinIO. The DI pipeline writes Iceberg via PyIceberg → Nessie. See the lakehous
 Adapt the `k8s/gitops` overlay to this cluster: plain k8s `Secret`s (no Vault/ESO here),
 in-cluster store endpoints, k3s `traefik` ingress (or swap to nginx).
 
+`apps/configmap.yaml` wires platform-control onto the real self-hosted backends
+(`event_publisher_backend=nats`, `artifact_store_backend=s3`/MinIO) so an admin-launched run
+publishes the `evidara.artifact-bundle-available` event + artifact that `di-consumer` reads.
+Verify the head of that chain with the CH Fedlex fast-loop canary — backend coordinate table
+and operator procedure in
+[`docs/setup/hetzner-ch-fedlex-canary.md`](../../docs/setup/hetzner-ch-fedlex-canary.md).
+
+> **Search index bootstrap.** On startup `legal-search-api` idempotently ensures the OpenSearch
+> `documents` index exists (canonical mapping from `legal-search/api/src/core/opensearch/`) and
+> that the `documents-read` (search) and `documents-write` (projections) aliases resolve to the
+> **same** physical index. Without this both aliases would diverge and projected documents would
+> never surface in search. Non-destructive and safe to re-run; set
+> `OPENSEARCH_BOOTSTRAP_ON_STARTUP=false` on the deployment if a versioned cutover manages the
+> aliases out-of-band (see `docs/runbooks/projection-reindex-backfill.md`).
+
 ## Stage 5 — real auth (ADR-0020)
 
 `deploy-stage5.sh` puts both apps behind real auth. Idempotent; rebuild the admin and
@@ -129,6 +144,33 @@ variables and every workflow's `runs-on:`:
 Docker/buildx image builds (`runtime-images.yml`) deliberately stay GitHub-hosted —
 no Docker-in-Docker on-cluster.
 
+### The heavy pool runs a custom image
+
+The stock `ghcr.io/actions/actions-runner` image carries no browser system libraries,
+so Playwright's Chromium dies with `libnspr4.so: cannot open shared object file`. Every
+workflow guards its `playwright install-deps` step with `if: runner.environment ==
+'github-hosted'`, because the runner container has no root and `install-deps` needs
+apt — self-hosted runners are expected to have the deps baked in.
+
+`runners/Dockerfile.heavy` is what makes that true. It is built and pushed to
+`ghcr.io/philipplukas/evidara-runner-heavy` by `.github/workflows/runner-image.yml`
+(GitHub-hosted — building it on the pool it produces would be circular). That workflow
+launches Chromium as the unprivileged `runner` user before pushing, so a missing
+library fails the build instead of a nightly smoke four days later.
+
+Two things to know when changing it:
+
+- **The GHCR package must be public.** ARC pulls it with no `imagePullSecret`, like
+  every other `ghcr.io/philipplukas/evidara-*` image. A fresh package defaults to
+  private; flip it once, after the first push to `main`.
+- **`PLAYWRIGHT_VERSION` tracks `@playwright/test`** in `legal-search/frontend/package.json`.
+  It only pins the OS-level deps — browsers are still installed per job and cached
+  under `~/.cache/ms-playwright`.
+
+No redeploy is needed to roll out a new image: runner pods are ephemeral and created
+per job, and the `:latest` tag means `imagePullPolicy` defaults to `Always`, so the
+next heavy job pulls it.
+
 ```sh
 # One-time: create a classic PAT with the `repo` scope (ARC also accepts a GitHub App):
 #   https://github.com/settings/tokens/new?scopes=repo&description=evidara-arc-runners
@@ -143,9 +185,14 @@ credential as the `evidara-runner-github` Secret in `arc-runners`, and `helm upg
 self-recycle each job. Verify:
 
 ```sh
-kubectl -n arc-runners get pods          # one *-listener pod per scale set
+kubectl -n arc-systems get pods          # controller + one *-listener pod per scale set
+kubectl -n arc-runners get autoscalingrunnerset   # both scale sets, CURRENT RUNNERS 0 at rest
 gh api repos/philipplukas/evidara/actions/runners --jq '.runners[].name'
 ```
+
+> The listener pods live in `arc-systems` (the controller's namespace), not `arc-runners`.
+> `arc-runners` holds only ephemeral job pods, so it is legitimately **empty at rest** —
+> `minRunners: 0`. An empty `arc-runners` is not a runner outage; check `arc-systems`.
 
 > **These pools own the required checks.** If they are offline, no PR can merge —
 > `check-title` + `contract-validation` never start. That was the CI blocker after the

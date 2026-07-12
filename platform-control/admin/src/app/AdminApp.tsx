@@ -31,15 +31,11 @@ import { CommentaryInsightShow } from "../resources/corrections/CommentaryInsigh
 import { CorrectionShow } from "../resources/corrections/CorrectionShow";
 import { CorrectionsList } from "../resources/corrections/CorrectionsList";
 import { Dashboard } from "../resources/dashboard/Dashboard";
-import { AuthorityCreate } from "../resources/reference-data/AuthorityCreate";
-import AuthorityCreateV2 from "../resources/reference-data/AuthorityCreateV2";
-import { AuthorityEdit } from "../resources/reference-data/AuthorityEdit";
-import AuthorityEditV2 from "../resources/reference-data/AuthorityEditV2";
+import AuthorityCreate from "../resources/reference-data/AuthorityCreate";
+import AuthorityEdit from "../resources/reference-data/AuthorityEdit";
 import { AuthorityList } from "../resources/reference-data/AuthorityList";
-import { JurisdictionCreate } from "../resources/reference-data/JurisdictionCreate";
-import JurisdictionCreateV2 from "../resources/reference-data/JurisdictionCreateV2";
-import { JurisdictionEdit } from "../resources/reference-data/JurisdictionEdit";
-import JurisdictionEditV2 from "../resources/reference-data/JurisdictionEditV2";
+import JurisdictionCreate from "../resources/reference-data/JurisdictionCreate";
+import JurisdictionEdit from "../resources/reference-data/JurisdictionEdit";
 import { JurisdictionList } from "../resources/reference-data/JurisdictionList";
 import { PreviewReviewList } from "../resources/runs/PreviewReviewList";
 import PreviewReviewListV2 from "../resources/runs/PreviewReviewListV2";
@@ -121,18 +117,15 @@ export default function AdminApp() {
       />
       {/*
        * Tailwind + ra-core v2 previews (coexistence window, see ADR-0026).
-       * Each pair lives alongside the MUI canonical page until the
-       * corresponding v1 file is deleted.
+       * Reference-data forms (authorities, jurisdictions) graduated to the
+       * canonical resource `create`/`edit` routes above (#501 pattern); the
+       * runs and preview-review previews still coexist with their MUI resources.
        */}
       <CustomRoutes>
         <Route path="/runs-v2" element={<RunListV2 />} />
         <Route path="/runs-v2/:id" element={<RunShowV2 />} />
         <Route path="/preview-review-v2" element={<PreviewReviewListV2 />} />
         <Route path="/preview-review-v2/:id" element={<PreviewReviewShowV2 />} />
-        <Route path="/authorities-v2/create" element={<AuthorityCreateV2 />} />
-        <Route path="/authorities-v2/:id/edit" element={<AuthorityEditV2 />} />
-        <Route path="/jurisdictions-v2/create" element={<JurisdictionCreateV2 />} />
-        <Route path="/jurisdictions-v2/:id/edit" element={<JurisdictionEditV2 />} />
       </CustomRoutes>
     </Admin>
   );

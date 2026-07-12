@@ -122,6 +122,12 @@ npm run seed:index
 npm run dev
 ```
 
+`seed:index` creates the `documents` index with the canonical mapping
+(`src/core/opensearch/documents-index.mapping.ts`) and points **both** the
+`documents-read` (search) and `documents-write` (projection) aliases at it, so
+the seeded Swiss caselaw surfaces immediately via `GET /v1/search`. `npm run
+dev` performs the same idempotent bootstrap on startup.
+
 Expected health check:
 
 ```bash

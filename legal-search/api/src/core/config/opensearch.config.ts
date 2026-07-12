@@ -21,4 +21,9 @@ export default registerAs('opensearch', () => ({
   citationsIndex: process.env.OPENSEARCH_INDEX_CITATIONS ?? 'citations',
   citationTargetsIndex: process.env.OPENSEARCH_INDEX_CITATION_TARGETS ?? 'citation-targets',
   projectionHistoryIndex: process.env.OPENSEARCH_INDEX_PROJECTION_HISTORY ?? 'projection-history',
+  // On startup, idempotently ensure the documents index exists with the
+  // canonical mapping and that the read + write aliases resolve to one
+  // physical index. Non-destructive; set to `false` in environments where
+  // a versioned cutover manages the aliases out-of-band.
+  bootstrapOnStartup: (process.env.OPENSEARCH_BOOTSTRAP_ON_STARTUP ?? 'true') !== 'false',
 }));

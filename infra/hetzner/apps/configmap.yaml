@@ -17,6 +17,13 @@ data:
   DI_S3_ENDPOINT_URL: "http://minio.evidara.svc:9000"
   DI_S3_REGION: "us-east-1"
   NATS_SERVERS: "nats://nats.evidara.svc:4222"
+  # Durable canonical surfaces on MinIO (Delta). Set => di-consumer selects DeltaCanonicalSink
+  # (writes) and document-service selects DeltaPublishedDocumentStore (reads), so GET
+  # /v1/documents/{id}/lean serves real title/sections/citations instead of the thin fallback
+  # (#523). Bucket `evidara-lakehouse` is provisioned by values/minio.yaml.
+  DI_PUBLISHED_DOCUMENTS_URI: "s3://evidara-lakehouse/canonical/published_documents"
+  DI_PUBLISHED_SECTIONS_URI: "s3://evidara-lakehouse/canonical/published_sections"
+  DI_PROCESSING_MANIFESTS_URI: "s3://evidara-lakehouse/canonical/processing_manifests"
   # legal-search API base for the NATS->projection bridge (document_intelligence_projection_bridge, M0.2)
   LEGAL_SEARCH_API_URL: "http://legal-search-api.evidara.svc:8080"
   # legal-search

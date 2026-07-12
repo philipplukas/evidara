@@ -28,18 +28,14 @@ const LEGAL_SEARCH_URL =
  * Map the current pathname to a friendly title. Replaces MUI's `<TitlePortal>`
  * which depended on resource-page `<Title>` wiring we're dropping.
  *
- * Only v1 canonical + v2 preview routes are covered today; the default
- * (`"Control plane"`) is safe for any future / unknown route.
+ * Only the canonical resource routes + the runs-v2 preview are covered today;
+ * the default (`"Control plane"`) is safe for any future / unknown route.
  */
 function titleForPath(pathname: string): string {
   // Exact matches first (order matters — longer paths before shorter ones).
   if (pathname.startsWith("/runs-v2")) {
     return pathname.includes("/") && /\/runs-v2\/[^/]+/.test(pathname) ? "Run detail" : "Run queue";
   }
-  if (pathname.startsWith("/authorities-v2/create")) return "Create authority";
-  if (/\/authorities-v2\/[^/]+\/edit/.test(pathname)) return "Edit authority";
-  if (pathname.startsWith("/jurisdictions-v2/create")) return "Create jurisdiction";
-  if (/\/jurisdictions-v2\/[^/]+\/edit/.test(pathname)) return "Edit jurisdiction";
 
   if (pathname.startsWith("/runs")) {
     return /\/runs\/[^/]+/.test(pathname) ? "Run detail" : "Run queue";
