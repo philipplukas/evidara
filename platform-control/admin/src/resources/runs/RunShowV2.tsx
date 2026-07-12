@@ -6,25 +6,28 @@
  * `<RunDetailSectionsV2>` (ADR-0026 P3 — pipeline health + 5 accordion
  * sections). All primitives come from `src/ui/primitives/`.
  *
- * Deferred until follow-up increments:
- *   - `RunHandoffCard` — stateful URL-param read; ports with the shell.
- *   - `RunActionStack` (cancel button) — mutation migration.
+ * The operator-action stack (`RunActionStack`, cancel + promote) and the
+ * legal-search `RunHandoffCard` reuse the now-Tailwind action components; the
+ * handoff card reads the stateful URL-param context via `readLegalSearchHandoff`.
  *
- * Pure helpers (`buildRunDecisionSupport`, `describeRunNextStep`) are
- * imported from v1's `./RunShow.tsx` rather than forked.
+ * Pure helpers (`buildRunDecisionSupport`, `describeRunNextStep`,
+ * `buildRunHandoffGuidance`) are imported from v1's `./RunShow.tsx` rather
+ * than forked.
  */
 "use client";
 
 import { RecordContextProvider, useShowController } from "ra-core";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { RunRecord } from "../../lib/admin/dataProvider";
+import { type LegalSearchHandoff, readLegalSearchHandoff } from "../../lib/admin/navigationContext";
 import { formatSwissDateTime } from "../../lib/format/date";
-import { DetailGrid, FieldCell, Pill } from "../../ui/primitives";
+import { DetailGrid, FieldCell, Panel, Pill } from "../../ui/primitives";
 import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
 import { PrimaryDecisionCell } from "./PrimaryDecisionCell";
-import { canPromoteRunToProduction, PromoteToProductionButton } from "./RunActions";
+import { RunActionStack } from "./RunActions";
 import RunDetailSectionsV2 from "./RunDetailSectionsV2";
-import { buildRunDecisionSupport } from "./RunShow";
+import { buildRunDecisionSupport, buildRunHandoffGuidance } from "./RunShow";
 
 function formatDuration(run: RunRecord): string {
   if (!run.started_at || !run.completed_at) return "—";
@@ -84,7 +87,9 @@ export default function RunShowV2() {
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[var(--container-max)] mx-auto space-y-6">
-      {/* Header — parity with v1 `RunPageContextBar`, minus the action stack. */}
+      <RunHandoffCard run={run} />
+
+      {/* Header — parity with v1 `RunPageContextBar`, incl. the action stack. */}
       <header className="space-y-3">
         <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
           Run detail
@@ -102,11 +107,9 @@ export default function RunShowV2() {
           </Pill>
           <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
         </div>
-        {canPromoteRunToProduction(run) ? (
-          <RecordContextProvider value={run}>
-            <PromoteToProductionButton size="medium" variant="contained" />
-          </RecordContextProvider>
-        ) : null}
+        <RecordContextProvider value={run}>
+          <RunActionStack />
+        </RecordContextProvider>
       </header>
 
       {/* Overview band — metric chips + next-step narrative. */}
@@ -211,5 +214,45 @@ function DecisionCell({ label, value }: { label: string; value: string }) {
       </span>
       <p className="text-[13px] text-[var(--foreground-muted)] leading-snug">{value}</p>
     </div>
+  );
+}
+
+// Legal-search handoff banner — reads the URL-param context once on mount so
+// operators who arrive from a search result get "why you are here / what to
+// check next" guidance. Renders nothing outside the handoff flow.
+function RunHandoffCard({ run }: { run: RunRecord }) {
+  const [handoff, setHandoff] = useState<LegalSearchHandoff | null>(null);
+
+  useEffect(() => {
+    setHandoff(readLegalSearchHandoff());
+  }, []);
+
+  if (!handoff) {
+    return null;
+  }
+
+  const guidance = buildRunHandoffGuidance(run, handoff);
+  if (!guidance) {
+    return null;
+  }
+
+  return (
+    <Panel className="p-4 space-y-3">
+      <div>
+        <h2 className="text-[14px] font-semibold text-[var(--foreground)]">Legal search handoff</h2>
+        <p className="text-[12px] text-[var(--foreground-subtle)]">
+          Why you are here and what to check next before acting on this run.
+        </p>
+      </div>
+      <p className="text-[13px] text-[var(--foreground-muted)]">{guidance.whyYouAreHere}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {handoff.query ? <Pill variant="meta">{handoff.query}</Pill> : null}
+        {handoff.scopeLabel ? <Pill variant="meta">{handoff.scopeLabel}</Pill> : null}
+        {handoff.selectedId ? (
+          <Pill variant="meta">{`Selected item: ${handoff.selectedId}`}</Pill>
+        ) : null}
+      </div>
+      <p className="text-[13px] text-[var(--foreground-muted)]">{guidance.whatToCheckNext}</p>
+    </Panel>
   );
 }
