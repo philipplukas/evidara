@@ -1,0 +1,126 @@
+name: Runner Images
+
+# Builds the custom heavy CI runner image (Playwright system deps baked in).
+# Stays GitHub-hosted: it is the image the heavy pool runs on, so building it there
+# would be circular — and Docker/buildx builds deliberately stay off-cluster (ADR-0029).
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "infra/hetzner/runners/Dockerfile.heavy"
+      - ".github/workflows/runner-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/hetzner/runners/Dockerfile.heavy"
+      - ".github/workflows/runner-image.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR builds, but let a push-to-main build finish: aborting it
+  # mid-run can cancel the GHCR push and leave :latest pointing at a partial/older image.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # Single source of truth for the build arg and the verification step. Must match
+  # `@playwright/test` in legal-search/frontend/package.json — enforced by the
+  # "Verify PLAYWRIGHT_VERSION tracks @playwright/test" step below.
+  PLAYWRIGHT_VERSION: 1.59.1
+
+jobs:
+  runner-heavy:
+    name: Build heavy runner image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify PLAYWRIGHT_VERSION tracks @playwright/test
+        # PLAYWRIGHT_VERSION is the single source of truth for the image, but the app
+        # declares a caret range (^1.59.1) that npm can float. Fail loudly if the pin
+        # drifts from the app so the baked OS deps never silently lag the browsers jobs
+        # install. Compares against the range's minimum in legal-search/frontend.
+        run: |
+          set -euo pipefail
+          declared=$(sed -n 's/.*"@playwright\/test": *"[^0-9]*\([0-9][0-9.]*\)".*/\1/p' \
+            legal-search/frontend/package.json | head -1)
+          if [ -z "$declared" ]; then
+            echo "::error::Could not read @playwright/test from legal-search/frontend/package.json"
+            exit 1
+          fi
+          if [ "$declared" != "${PLAYWRIGHT_VERSION}" ]; then
+            echo "::error::PLAYWRIGHT_VERSION=${PLAYWRIGHT_VERSION} but @playwright/test pins ^${declared}. Update PLAYWRIGHT_VERSION in this workflow and Dockerfile.heavy to match."
+            exit 1
+          fi
+          echo "PLAYWRIGHT_VERSION ${PLAYWRIGHT_VERSION} matches @playwright/test ^${declared}."
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build for verification
+        uses: docker/build-push-action@v6
+        with:
+          context: infra/hetzner/runners
+          file: infra/hetzner/runners/Dockerfile.heavy
+          build-args: PLAYWRIGHT_VERSION=${{ env.PLAYWRIGHT_VERSION }}
+          # amd64 only, on purpose: the heavy pool nodes are amd64 (8 vCPU / 64 GiB —
+          # Hetzner's ARM/CAX line tops out at 32 GiB, so 64 GiB rules out arm64). Pinning
+          # it keeps verify and push on the same single arch the pool actually runs.
+          platforms: linux/amd64
+          load: true
+          tags: evidara-runner-heavy:verify
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify Chromium launches in the built image
+        # Runs as the unprivileged `runner` user, exactly as ARC does. A missing system
+        # library surfaces here instead of in a nightly smoke four days later — and it
+        # runs before the push, so a broken image never reaches GHCR.
+        run: |
+          set -euo pipefail
+          docker run --rm --user runner evidara-runner-heavy:verify bash -lc '
+            set -euo pipefail
+            npx --yes "playwright@${{ env.PLAYWRIGHT_VERSION }}" install chromium
+            npx --yes "playwright@${{ env.PLAYWRIGHT_VERSION }}" \
+              screenshot --browser chromium about:blank /tmp/blank.png
+            test -s /tmp/blank.png
+          '
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (runner-heavy)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/evidara-runner-heavy
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Push
+        # Cache hit from the verification build above, so this is a re-tag, not a rebuild.
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: infra/hetzner/runners
+          file: infra/hetzner/runners/Dockerfile.heavy
+          build-args: PLAYWRIGHT_VERSION=${{ env.PLAYWRIGHT_VERSION }}
+          # Match the verified image's arch (see the verification build above).
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

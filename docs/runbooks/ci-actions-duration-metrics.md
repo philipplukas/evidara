@@ -32,7 +32,7 @@ See `scripts/analyze_github_actions_queue.py --help` for filters (`--repo`, `--b
 
 Current exception:
 
-- Jobs that bootstrap generic Node or Python via `actions/setup-node` / `actions/setup-python` may need `ubuntu-latest` while the self-hosted Nix runner path is being hardened for those toolchains.
+- Jobs that bootstrap generic Node or Python via `actions/setup-node` / `actions/setup-python` may need `ubuntu-latest` while the self-hosted ARC pools are being hardened for those toolchains.
 - Use `.github/workflows/runner-pool-smoke.yml` for non-PR-blocking light/heavy pool verification while the bridge period is still active.
 
 ## Bridge policy while Hetzner K8s runners are being installed

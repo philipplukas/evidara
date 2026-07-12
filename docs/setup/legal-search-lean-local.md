@@ -11,8 +11,8 @@ Use this when you need **search + projections + `GET …/lean`** without staging
 
 Notes:
 
-- `shellcheck` is already available from this repo’s `nix develop` shell.
-- Docker should come from the workstation baseline (for example MacConfig-managed machine setup), not from the repo flake.
+- `shellcheck` is workstation-managed — install it with your OS package manager.
+- Docker should come from the workstation baseline (for example MacConfig-managed machine setup), not from the repo.
 
 OpenSearch’s `/_cluster/health?wait_for_status=…` long-poll and **HEAD** on index names have proven flaky with some local setups; `validate-tar89-metadata-local.sh` uses short **GET** polls and **GET + HTTP status** for index existence instead.
 
