@@ -1,12 +1,26 @@
 # Evidara
 
-A clean-room document intelligence platform for legal and regulatory content.
+**Trustworthy primary law as an API** — a clean-room platform that turns messy official legal sources into structured, provenanced, **citable** data: canonical text + provenance + in-force status + a citation graph.
 
-> **Status:** Architecture and bootstrap phase — structure, boundaries, documentation, and governance are in place. Implementation will follow the phased plan outlined in [docs/components/first-vertical-slice.md](docs/components/first-vertical-slice.md).
+> **Status:** Internal beta — ~12 Swiss federal laws, German UI, CH-first. The strategy is deliberately explicit about what is *built* vs. what is a *bet*: see the [business-model canvas](docs/product/business-model-canvas.md) and [value-proposition canvas](docs/product/value-proposition-canvas.md).
+
+## Why this is hard (the interesting part)
+
+Legal data is **heterogeneous** (every authority publishes differently, down to municipal PDFs), must be **continuously fresh** (stale law is worthless), and has to be **trustworthy enough to cite** — which is an architecture problem, not a scraping one. Evidara is built around that last constraint: a strict separation of *canonical truth* from *serving projections*, provenance on every document, and operator-approved ingestion.
+
+## Fastest way to judge the engineering
+
+Five minutes, in order of signal:
+
+1. **[ADR-0029 — retiring a cloud runtime](docs/adr/0029-self-hosted-hetzner-runtime.md)** — a cost/architecture trade-off made under real constraints (audit → decision → owned trade-offs). Narrative version: [scaling *down* a solo platform](docs/writeups/scaling-down-a-solo-platform.md).
+2. **[Boundary contracts](docs/architecture/boundary-contracts.md)** — canonical truth vs. serving projection; search is a rebuildable view, not the system of record.
+3. **[Business-model canvas](docs/product/business-model-canvas.md)** — judgment under commercial ambiguity, with every claim tagged built vs. bet.
+
+Prefer to watch? A [5-minute demo script](docs/writeups/demo-script.md) walks the trust loop end to end.
 
 ## What is Evidara?
 
-Evidara is a monorepo containing all components of a document intelligence platform that processes, structures, and serves legal and regulatory documents. It is designed around strict component boundaries, explicit contracts, and a separation of canonical truth from serving projections.
+Evidara is a monorepo containing all components of a platform that processes, structures, and serves legal and regulatory documents. It is designed around strict component boundaries, explicit contracts, and a separation of canonical truth from serving projections.
 
 **This is a clean-room implementation.** See [docs/architecture/clean-room-principles.md](docs/architecture/clean-room-principles.md).
 
