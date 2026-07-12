@@ -250,19 +250,19 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-source-detail-v2.png");
   });
 
-  test("@screenshots captures admin runs-v2 list and detail", async ({ page }) => {
+  test("@screenshots captures admin runs list and detail", async ({ page }) => {
     await mockSearchApi(page);
     await mockAdminRunFlowApi(page);
     await setupAdmin(page);
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs-v2`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs`);
     await expect(page.getByRole("heading", { name: "Runs" })).toBeVisible();
     // Wait for the first row to render so the preset count pills are
     // populated (otherwise the bar shows zeros for all statuses).
     await expect(page.locator("table tbody tr").first()).toBeVisible();
     await saveScreenshot(page, "admin-runs-list-v2.png");
 
-    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs-v2/run_01`);
+    await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs/run_01/show`);
     await expect(page.getByRole("heading", { name: /Decision support/ })).toBeVisible();
     // `Run run_01` heading renders at the top — wait for it so the status
     // pills and duration have resolved before capture.

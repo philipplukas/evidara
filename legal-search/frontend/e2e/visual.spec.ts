@@ -100,7 +100,7 @@ test.describe("Visual regressions", () => {
     }, [ADMIN_LOCAL_STORAGE_ROLE_KEY]);
     await page.setViewportSize({ width: 1600, height: 900 });
 
-    await page.goto(`${ADMIN_BASE_URL}/#/runs-v2/run_01`, {
+    await page.goto(`${ADMIN_BASE_URL}/#/runs/run_01/show`, {
       waitUntil: "load",
       timeout: 90_000,
     });
