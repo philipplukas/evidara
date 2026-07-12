@@ -16,3 +16,4 @@ resources:
   - legal-search-frontend.yaml
   - document-service.yaml
   - di-nats-consumer.yaml
+  - projection-bridge.yaml
