@@ -5,6 +5,12 @@ Last reviewed: 2026-04-13
 Last verified: 2026-04-13  
 Applies to: old Hetzner NixOS GitHub Actions runner path and pre-rebuild secret preservation
 
+> **Superseded — historical record.** The rebuild this runbook precedes has already happened: the
+> dedicated server now runs the single-node k3s cluster (ADR-0029), and the `infra/nix/` tree,
+> `flake.nix`, and `.sops.yaml` referenced below have been removed from the repo. Paths named here
+> resolve only in git history prior to the Nix removal. Kept as migration and audit evidence —
+> **do not execute**. Runners now run on ARC; see [infra/hetzner/README.md](../../infra/hetzner/README.md).
+
 This runbook preserves the old Hetzner runner host source of truth before the
 dedicated server is rebuilt into the single-node k3s platform.
 
@@ -20,11 +26,11 @@ Related docs:
 
 The old Hetzner host carries more than GitHub runner registration:
 
-- SOPS key routing in [`.sops.yaml`](../../.sops.yaml)
-- host secret wiring in [`infra/nix/hetzner-runner/configuration.nix`](../../infra/nix/hetzner-runner/configuration.nix)
-- the expected secret inventory in [`infra/nix/hetzner-runner/secrets/hetzner.yaml.template`](../../infra/nix/hetzner-runner/secrets/hetzner.yaml.template)
+- SOPS key routing in `.sops.yaml`
+- host secret wiring in `infra/nix/hetzner-runner/configuration.nix`
+- the expected secret inventory in `infra/nix/hetzner-runner/secrets/hetzner.yaml.template`
 - the old deploy path captured through operator shell history and the host NixOS
-  configuration in [`infra/nix/hetzner-runner/configuration.nix`](../../infra/nix/hetzner-runner/configuration.nix)
+  configuration in `infra/nix/hetzner-runner/configuration.nix`
 
 Important: the repo does not contain a tracked
 `infra/nix/hetzner-runner/secrets/hetzner.yaml`, only the template and README.
@@ -47,8 +53,8 @@ Capture your admin age public key:
 age-keygen -y ~/.config/sops/age/keys.txt
 ```
 
-These should match the intent described in [`.sops.yaml`](../../.sops.yaml)
-and [`infra/nix/hetzner-runner/secrets/README.md`](../../infra/nix/hetzner-runner/secrets/README.md).
+These should match the intent described in `.sops.yaml`
+and `infra/nix/hetzner-runner/secrets/README.md`.
 
 ### Secret keys
 
@@ -66,8 +72,8 @@ Inventory every key modeled by the old host:
 
 Source references:
 
-- [`infra/nix/hetzner-runner/secrets/hetzner.yaml.template`](../../infra/nix/hetzner-runner/secrets/hetzner.yaml.template)
-- [`infra/nix/hetzner-runner/configuration.nix`](../../infra/nix/hetzner-runner/configuration.nix)
+- `infra/nix/hetzner-runner/secrets/hetzner.yaml.template`
+- `infra/nix/hetzner-runner/configuration.nix`
 
 ## Preserve / Move / Archive
 
@@ -111,14 +117,14 @@ Hetzner runner host.
 4. Record the SOPS identities used by the old path.
 5. Archive the old deploy path:
    shell history, deployment notes, and the host wiring in
-   [`infra/nix/hetzner-runner/configuration.nix`](../../infra/nix/hetzner-runner/configuration.nix)
+   `infra/nix/hetzner-runner/configuration.nix`
 6. Archive the sidecar runtime config that `rocky-agents` needs:
    - [`infra/coordinator/compose.yml`](../../infra/coordinator/compose.yml)
    - [`infra/coordinator/README.md`](../../infra/coordinator/README.md)
-   - env assembly in [`infra/nix/hetzner-runner/configuration.nix`](../../infra/nix/hetzner-runner/configuration.nix)
+   - env assembly in `infra/nix/hetzner-runner/configuration.nix`
 7. Record the old recovery path:
    initrd SSH on `2222` plus `systemd-tty-ask-password-agent`, as described in
-   [`infra/nix/hetzner-runner/disko-config.nix`](../../infra/nix/hetzner-runner/disko-config.nix)
+   `infra/nix/hetzner-runner/disko-config.nix`
 
 ## Done Criteria
 

@@ -31,8 +31,8 @@ concurrency:
 jobs:
   # ─── API quality gate ───
   api:
-    # GitHub-hosted runners keep Node tool bootstrap stable while self-hosted Nix
-    # runners are reserved for image builds and other runner-native flows.
+    # GitHub-hosted: keeps the Node tool bootstrap (actions/setup-node) stable.
+    # The self-hosted ARC pools serve the required checks and heavy e2e jobs instead.
     runs-on: ubuntu-latest
     defaults:
       run:
