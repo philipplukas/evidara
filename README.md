@@ -62,7 +62,8 @@ Boundaries and contracts between these components are documented in [docs/archit
 ## Getting Started
 
 See [docs/setup/](docs/setup/) for infrastructure and environment documentation.
-For a reproducible shell with Terraform, `gcloud`, `jq`, `shellcheck`, and `uv`, use [Nix dev shell](docs/setup/nix.md) (`nix develop` from the repo root).
+Developer CLIs (`kubectl`, `helm`, `terraform`, `jq`, `shellcheck`, `uv`) are workstation-managed —
+install them with your OS package manager; the repo does not ship a shell.
 Treat Docker as part of the workstation baseline (for example via MacConfig), not as a repo-managed dependency.
 For the default live local search ↔ control-panel loop, use `npm run dev:cross-surface:live` from the repo root.
 For local end-to-end runtime bring-up, use [Local Vertical Slice Setup](docs/setup/local-vertical-slice.md).

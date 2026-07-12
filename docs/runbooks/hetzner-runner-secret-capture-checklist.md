@@ -5,14 +5,20 @@ Last reviewed: 2026-04-13
 Last verified: 2026-04-13  
 Applies to: old Hetzner NixOS GitHub Actions runner path in `infra/nix/hetzner-runner/`
 
+> **Superseded — historical record.** The legacy NixOS runner host it describes was rebuilt into
+> the single-node k3s cluster (ADR-0029), and the `infra/nix/` tree, `flake.nix`, and `.sops.yaml`
+> referenced below have been removed from the repo. Paths named here resolve only in git history
+> prior to the Nix removal. Kept as migration and audit evidence — **do not execute**. Runners now
+> run on ARC; see [infra/hetzner/README.md](../../infra/hetzner/README.md).
+
 ## Purpose
 
 Use this checklist before wiping or reimaging the legacy Hetzner runner host. It preserves the
 secret material, encrypted source files, and runtime state that still matter for migration, audit,
 or rollback.
 
-Run the capture commands from `nix develop` or the repo shell so `age-keygen`, `sops`, and
-`ssh-to-age` are available.
+The capture commands need `age-keygen`, `sops`, and `ssh-to-age` on `PATH` (install via your OS
+package manager).
 
 This checklist is the operator companion to
 [Hetzner runner secret capture](hetzner-runner-secret-capture.md) and the
@@ -20,10 +26,10 @@ This checklist is the operator companion to
 
 ## Source Of Truth
 
-- [infra/nix/hetzner-runner/configuration.nix](../../infra/nix/hetzner-runner/configuration.nix)
-- [infra/nix/hetzner-runner/disko-config.nix](../../infra/nix/hetzner-runner/disko-config.nix)
-- [infra/nix/hetzner-runner/secrets/README.md](../../infra/nix/hetzner-runner/secrets/README.md)
-- [infra/nix/hetzner-runner/secrets/hetzner.yaml.template](../../infra/nix/hetzner-runner/secrets/hetzner.yaml.template)
+- `infra/nix/hetzner-runner/configuration.nix`
+- `infra/nix/hetzner-runner/disko-config.nix`
+- `infra/nix/hetzner-runner/secrets/README.md`
+- `infra/nix/hetzner-runner/secrets/hetzner.yaml.template`
 - [docs/setup/scoped-credentials.md](../setup/scoped-credentials.md)
 - [docs/migration/README.md](../migration/README.md)
 - [docs/migration/parallel-workstreams.md](../migration/parallel-workstreams.md)
@@ -36,7 +42,7 @@ This checklist is the operator companion to
 ### 1. Capture the host age / SSH material
 
 The runner host uses `/etc/ssh/ssh_host_ed25519_key` as the sops-nix age source
-(`sops.age.sshKeyPaths` in [configuration.nix](../../infra/nix/hetzner-runner/configuration.nix)).
+(`sops.age.sshKeyPaths` in `configuration.nix`).
 Preserve both the private host key and the derived public recipient before the disk is wiped.
 
 ```bash
@@ -50,7 +56,7 @@ If the host is already gone, stop here and treat the host key as unrecoverable.
 ### 2. Capture the admin age identity
 
 The repo’s sops bootstrap expects a personal age identity, usually at
-`~/.config/sops/age/keys.txt` ([secrets README](../../infra/nix/hetzner-runner/secrets/README.md)).
+`~/.config/sops/age/keys.txt` (`secrets README`).
 Preserve the private identity and the public recipient used for `.sops.yaml`.
 
 ```bash
@@ -97,7 +103,7 @@ sudo tar -C / -czf /root/evidara-hetzner-archive/hetzner-runner-state.tgz \
 
 ## Exact Keys To Preserve
 
-The legacy host secret file in [secrets/hetzner.yaml.template](../../infra/nix/hetzner-runner/secrets/hetzner.yaml.template)
+The legacy host secret file in `secrets/hetzner.yaml.template`
 defines the payloads that existed on the old runner path:
 
 - `github_runner_token`

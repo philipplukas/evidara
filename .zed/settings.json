@@ -2,7 +2,6 @@
   "auto_install_extensions": {
     "dockerfile": true,
     "make": true,
-    "nix": true,
     "sql": true,
     "terraform": true,
     "xml": true
