@@ -11,6 +11,8 @@
  *   OPENSEARCH_NODE=http://localhost:9200 OPENSEARCH_ALIAS_READ=evidara-documents-read-dev npx tsx scripts/opensearch-alias-cutover.ts --reindex
  */
 
+import { documentsIndexDefinition } from '../src/core/opensearch/documents-index.mapping';
+
 const args = process.argv.slice(2);
 const shouldReindex = args.includes('--reindex');
 const dryRun = args.includes('--dry-run');
@@ -47,76 +49,11 @@ async function osFetch(path: string, init?: RequestInit): Promise<Response> {
 }
 
 async function ensureIndex(indexName: string): Promise<void> {
-  const mapping = {
-    settings: {
-      number_of_shards: 1,
-      number_of_replicas: 1,
-      analysis: {
-        filter: {
-          french_elision: {
-            type: 'elision',
-            articles_case: true,
-            articles: ['l', 'm', 't', 'qu', 'n', 's', 'j', 'd', 'c', 'jusqu', 'quoiqu', 'lorsqu', 'puisqu'],
-          },
-          french_stemmer: {
-            type: 'stemmer',
-            language: 'light_french',
-          },
-          italian_elision: {
-            type: 'elision',
-            articles_case: true,
-            articles: ['c', 'l', 'all', 'dall', 'dell', 'nell', 'sull', 'coll', 'pell', 'gl', 'agl', 'dagl', 'degl', 'negl', 'sugl', 'un', 'd', 'st'],
-          },
-          italian_stemmer: {
-            type: 'stemmer',
-            language: 'light_italian',
-          },
-        },
-        analyzer: {
-          legal_text: {
-            type: 'custom',
-            tokenizer: 'standard',
-            filter: ['lowercase', 'german_normalization'],
-          },
-          legal_text_fr: {
-            type: 'custom',
-            tokenizer: 'standard',
-            filter: ['lowercase', 'french_elision', 'french_stemmer'],
-          },
-          legal_text_it: {
-            type: 'custom',
-            tokenizer: 'standard',
-            filter: ['lowercase', 'italian_elision', 'italian_stemmer'],
-          },
-        },
-      },
-    },
-    mappings: {
-      properties: {
-        document_id: { type: 'keyword' },
-        title: { type: 'text', analyzer: 'legal_text', fields: { keyword: { type: 'keyword' } } },
-        jurisdiction: { type: 'keyword' },
-        document_type: { type: 'keyword' },
-        language: { type: 'keyword' },
-        effective_date: { type: 'date', format: 'yyyy-MM-dd' },
-        structural_path: { type: 'text', fields: { keyword: { type: 'keyword' } } },
-        content: { type: 'text', analyzer: 'legal_text' },
-        content_preview: { type: 'text' },
-        sections_count: { type: 'integer' },
-        citations_count: { type: 'integer' },
-        related_decisions_count: { type: 'integer' },
-        related_commentary_count: { type: 'integer' },
-        source_id: { type: 'keyword' },
-        processed_at: { type: 'date' },
-        document_revision: { type: 'long' },
-        lifecycle_status: { type: 'keyword' },
-      },
-    },
-  };
-
+  // Canonical mapping (single source of truth). A versioned production
+  // cutover keeps 1 replica for resilience.
   const response = await osFetch(`/${indexName}`, {
     method: 'PUT',
-    body: JSON.stringify(mapping),
+    body: JSON.stringify(documentsIndexDefinition(1)),
   });
   if (!response.ok) {
     const body = await response.text();

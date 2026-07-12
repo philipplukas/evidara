@@ -1,0 +1,66 @@
+# NATS JetStream → legal-search projection bridge (M0.2, issue #522).
+#
+# Durable subscriber that consumes document.processed / document.withdrawn from the
+# EVIDARA stream and POSTs each event to legal-search's HTTP projection endpoints,
+# replacing the manual scripts/close-loop-ris.py bridge. Ships in the same image as
+# di-nats-consumer (a different console-script entrypoint); see
+# document_intelligence/jobs/projection_bridge_consumer.py. ack/nak/term + DLQ
+# semantics mirror the DI artifact-bundle consumer.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: projection-bridge
+  labels:
+    app.kubernetes.io/name: projection-bridge
+    app.kubernetes.io/part-of: evidara
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: projection-bridge
+  template:
+    metadata:
+      labels:
+        app: projection-bridge
+        app.kubernetes.io/name: projection-bridge
+        app.kubernetes.io/part-of: evidara
+    spec:
+      containers:
+        - name: projection-bridge
+          image: ghcr.io/philipplukas/evidara-document-intelligence-consumer:latest
+          # NATS_SERVERS comes from evidara-config; the subjects (processed +
+          # withdrawn), stream EVIDARA, and DLQ subjects use the consumer defaults.
+          # LEGAL_SEARCH_API_URL points at the in-cluster legal-search API Service.
+          command:
+            - sh
+            - -c
+            - document_intelligence_projection_bridge --servers "$NATS_SERVERS"
+          env:
+            - name: LEGAL_SEARCH_API_URL
+              value: "http://legal-search-api"
+            # X-API-Key the legal-search guard enforces when API_KEY is set on the API.
+            # Optional: absent key => no header => matches an open (dev) API.
+            - name: LEGAL_SEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: legal-search-secrets
+                  key: LEGAL_SEARCH_API_KEY
+                  optional: true
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: evidara-config
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "500m"
+              memory: 512Mi

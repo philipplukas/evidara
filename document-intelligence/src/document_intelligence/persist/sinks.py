@@ -3,7 +3,7 @@
 import importlib
 import json
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 import pyarrow as pa
@@ -208,6 +208,36 @@ def _stringify_mapping_values(value: object) -> dict[str, str]:
     return {str(key): str(inner) for key, inner in value.items() if inner is not None}
 
 
+def delta_storage_options(environ: Mapping[str, str] | None = None) -> dict[str, str] | None:
+    """Build ``deltalake`` ``storage_options`` for a MinIO / S3 endpoint from ``DI_S3_*`` env vars.
+
+    Returns ``None`` when ``DI_S3_ENDPOINT_URL`` is unset — ``file://``, plain local paths and
+    ``gs://`` surfaces need no options, so the default (env-driven) object-store credentials apply.
+    Mirrors the S3 client wiring in ``ingest.loaders`` so the self-hosted (Hetzner / MinIO) consumer
+    and read API resolve the same endpoint and credentials.
+    """
+    env = environ if environ is not None else os.environ
+    endpoint = (env.get("DI_S3_ENDPOINT_URL") or "").strip()
+    if not endpoint:
+        return None
+    options: dict[str, str] = {
+        "AWS_ENDPOINT_URL": endpoint,
+        # MinIO in-cluster is reached over plain HTTP; object_store rejects it unless allowed.
+        "AWS_ALLOW_HTTP": "true" if endpoint.startswith("http://") else "false",
+        # Single-writer consumer without a DynamoDB lock table: permit the rename-based commit.
+        "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
+    }
+    region = (env.get("DI_S3_REGION") or "").strip()
+    if region:
+        options["AWS_REGION"] = region
+    access_key_id = (env.get("DI_S3_ACCESS_KEY_ID") or "").strip()
+    secret_access_key = (env.get("DI_S3_SECRET_ACCESS_KEY") or "").strip()
+    if access_key_id and secret_access_key:
+        options["AWS_ACCESS_KEY_ID"] = access_key_id
+        options["AWS_SECRET_ACCESS_KEY"] = secret_access_key
+    return options
+
+
 class CanonicalSink:
     """Persistence interface for canonical writes and emitted events."""
 
@@ -274,9 +304,12 @@ class DeltaCanonicalSink(CanonicalSink):
         config: DeltaSinkConfig,
         *,
         writer: Callable[..., object] | None = None,
+        storage_options: dict[str, str] | None = None,
     ) -> None:
         self._config = config
         self._writer = writer or _default_delta_writer()
+        # ``None`` sentinel means "resolve from the environment"; pass ``{}`` to force no options.
+        self._storage_options = delta_storage_options() if storage_options is None else storage_options
         self.status_events: list[dict[str, object]] = []
         self.document_processed_events: list[dict[str, object]] = []
 
@@ -349,7 +382,8 @@ class DeltaCanonicalSink(CanonicalSink):
             if mode == "append":
                 try:
                     deltalake_mod = importlib.import_module("deltalake")
-                    schema = deltalake_mod.DeltaTable(uri).to_pyarrow_dataset().schema
+                    table_kwargs = {"storage_options": self._storage_options} if self._storage_options else {}
+                    schema = deltalake_mod.DeltaTable(uri, **table_kwargs).to_pyarrow_dataset().schema
                 except Exception:
                     schema = schema_override
             if schema is not None:
@@ -363,6 +397,8 @@ class DeltaCanonicalSink(CanonicalSink):
             writer_kwargs: dict[str, object] = {"mode": mode}
             if mode == "append":
                 writer_kwargs["schema_mode"] = "merge"
+            if self._storage_options:
+                writer_kwargs["storage_options"] = self._storage_options
             self._writer(uri, table, **writer_kwargs)
         except Exception as error:  # pragma: no cover - library-specific
             raise ProcessingError(
@@ -497,9 +533,15 @@ class SparkDeltaCanonicalSink(CanonicalSink):
 
 
 def _delta_write_mode(uri: str) -> str:
-    if uri.startswith("gs://"):
+    if uri.startswith("file://"):
+        local_path = uri[len("file://") :]
+    elif "://" in uri:
+        # Remote object stores (gs://, s3://): the ``_delta_log`` can't be stat'd from the
+        # local filesystem, so always append. ``write_deltalake`` creates the table on first
+        # append, and appending (never overwriting) is what keeps prior events durable.
         return "append"
-    local_path = uri[len("file://") :] if uri.startswith("file://") else uri
+    else:
+        local_path = uri
     delta_log_path = os.path.join(local_path, "_delta_log")
     return "append" if os.path.exists(delta_log_path) else "overwrite"
 

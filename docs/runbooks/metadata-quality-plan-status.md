@@ -333,4 +333,4 @@ Local **lean-stack** (section 6.6) **skips hops 1–4** by using a file-backed f
 
 - [Document service & detail](document-service-document-detail.md)  
 - [ADR-0014 — DI pipeline integration](../adr/0014-document-intelligence-pipeline-integration.md)  
-- [Nix dev shell](../setup/nix.md) (tooling for local Terraform/scripts)
+- `Nix dev shell` (tooling for local Terraform/scripts)

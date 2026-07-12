@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from document_intelligence.config.runtime import RuntimeSettings
+from document_intelligence.persist.sinks import delta_storage_options
 
 _DOC_ID_RE = re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
 _PM_ID_RE = re.compile(r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
@@ -81,9 +82,16 @@ class DeltaPublishedDocumentStore:
         self,
         published_documents_uri: str,
         published_sections_uri: str | None = None,
+        storage_options: dict[str, str] | None = None,
     ) -> None:
         self._published_documents_uri = published_documents_uri
         self._published_sections_uri = published_sections_uri
+        # ``None`` sentinel resolves MinIO / S3 credentials from ``DI_S3_*`` env vars so the read
+        # API reaches the same object store the consumer wrote to; ``{}`` forces no options.
+        self._storage_options = delta_storage_options() if storage_options is None else storage_options
+
+    def _delta_table_kwargs(self) -> dict[str, Any]:
+        return {"storage_options": self._storage_options} if self._storage_options else {}
 
     def get_full(
         self,
@@ -107,7 +115,7 @@ class DeltaPublishedDocumentStore:
             filters.append(dataset_mod.field("processing_manifest_id") == processing_manifest_id)
 
         table = (
-            deltalake.DeltaTable(self._published_documents_uri)
+            deltalake.DeltaTable(self._published_documents_uri, **self._delta_table_kwargs())
             .to_pyarrow_dataset()
             .to_table(
                 filter=_and_filters(filters),
@@ -148,7 +156,7 @@ class DeltaPublishedDocumentStore:
 
         try:
             table = (
-                deltalake.DeltaTable(self._published_sections_uri)
+                deltalake.DeltaTable(self._published_sections_uri, **self._delta_table_kwargs())
                 .to_pyarrow_dataset()
                 .to_table(filter=_and_filters(filters))
             )
