@@ -17,7 +17,12 @@ template:
   spec:
     containers:
       - name: runner
-        image: ghcr.io/actions/actions-runner:latest
+        # Custom image: stock actions-runner ships no browser system libraries, so
+        # Playwright's Chromium dies with `libnspr4.so: cannot open shared object file`.
+        # Built by .github/workflows/runner-image.yml from runners/Dockerfile.heavy.
+        # The GHCR package must be public — ARC pulls it with no imagePullSecret, same
+        # as every other ghcr.io/philipplukas/evidara-* image (k8s/gitops/base/).
+        image: ghcr.io/philipplukas/evidara-runner-heavy:latest
         command: ["/home/runner/run.sh"]
         resources:
           requests:

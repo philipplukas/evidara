@@ -51,9 +51,11 @@ spec:
     - port: 8090
       targetPort: 8090
 ---
-# DI NATS JetStream consumer. Surfaces unset -> in-memory sink for the first bring-up
-# (proves the event flow); writing canonical tables to the lakehouse (Delta/Iceberg on
-# MinIO) is the follow-up after the IcebergCanonicalSink lands.
+# DI NATS JetStream consumer. Canonical surface URIs are set in the evidara-config ConfigMap
+# (DI_PUBLISHED_DOCUMENTS_URI / _SECTIONS_URI / _PROCESSING_MANIFESTS_URI on MinIO), so
+# build_processing_pipeline selects the durable DeltaCanonicalSink and document-service reads the
+# same surfaces back (#523). A native IcebergCanonicalSink on MinIO remains the longer-term
+# follow-up; Delta-on-S3 is the production-safe interim.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

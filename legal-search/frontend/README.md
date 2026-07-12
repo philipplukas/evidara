@@ -63,4 +63,4 @@ Expected local prerequisites:
 
 - Docker available on the machine for the lean backend stack
 - Node/npm for frontend and admin dev servers
-- `shellcheck` is already provided by the repo `nix develop` shell
+- `shellcheck` installed via your OS package manager

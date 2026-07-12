@@ -9,6 +9,10 @@
 #   HEAVY_RUNNER_SCALE_SET = evidara-heavy-v2   (e2e/Playwright, DI heavy jobs)
 # Docker/buildx image builds (runtime-images.yml) deliberately stay GitHub-hosted.
 #
+# The heavy pool runs a custom image (ghcr.io/philipplukas/evidara-runner-heavy) that
+# bakes in Playwright's system libraries. It is built by runner-image.yml on push to
+# main; the GHCR package must be public, since ARC pulls it without an imagePullSecret.
+#
 # Idempotent: `helm upgrade --install` throughout.
 #
 # ONE-TIME CREDENTIAL you must supply (I can't mint it for you):

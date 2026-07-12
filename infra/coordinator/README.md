@@ -42,15 +42,13 @@ docker compose up -d
 
 ## Deploy to Hetzner
 
-The NixOS configuration at `infra/nix/hetzner-runner/configuration.nix` includes a systemd service that runs this Compose stack from `/etc/evidara-coordinator/`.
-
-```bash
-# Copy files to server
-scp -r compose.yml human-gates.yaml .env Dockerfile src/ pyproject.toml root@88.99.26.120:/etc/evidara-coordinator/
-
-# Rebuild NixOS config
-ssh root@88.99.26.120 nixos-rebuild switch --flake /path/to/repo#hetzner-runner
-```
+> **No supported deploy path.** This stack was deployed by a systemd unit in the NixOS host
+> config at `infra/nix/hetzner-runner/configuration.nix`. That host was rebuilt into the
+> single-node k3s cluster (ADR-0029) and the NixOS tree has been removed from the repo — see
+> git history before the `chore/remove-nix` change if you need the old unit. The dedicated
+> server now runs k3s; anything scheduled on it goes through `infra/hetzner/`.
+>
+> Local `docker compose up -d` (above) still works for development.
 
 ## Tests
 
