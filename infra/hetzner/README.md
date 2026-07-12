@@ -170,9 +170,14 @@ credential as the `evidara-runner-github` Secret in `arc-runners`, and `helm upg
 self-recycle each job. Verify:
 
 ```sh
-kubectl -n arc-runners get pods          # one *-listener pod per scale set
+kubectl -n arc-systems get pods          # controller + one *-listener pod per scale set
+kubectl -n arc-runners get autoscalingrunnerset   # both scale sets, CURRENT RUNNERS 0 at rest
 gh api repos/philipplukas/evidara/actions/runners --jq '.runners[].name'
 ```
+
+> The listener pods live in `arc-systems` (the controller's namespace), not `arc-runners`.
+> `arc-runners` holds only ephemeral job pods, so it is legitimately **empty at rest** —
+> `minRunners: 0`. An empty `arc-runners` is not a runner outage; check `arc-systems`.
 
 > **These pools own the required checks.** If they are offline, no PR can merge —
 > `check-title` + `contract-validation` never start. That was the CI blocker after the
