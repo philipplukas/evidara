@@ -2,7 +2,11 @@ name: PR Title
 
 on:
   pull_request:
-    types: [opened, edited, reopened]
+    # `synchronize` is required, not optional: `check-title` is a required check
+    # and branch protection is `strict` (branch must be up to date). Every
+    # "Update branch" pushes a new head SHA via `synchronize` — without it the
+    # required check never reports on that SHA and the PR blocks forever.
+    types: [opened, edited, reopened, synchronize]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
