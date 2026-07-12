@@ -5,6 +5,8 @@ Last reviewed: 2026-07-08
 Status: **Draft v0** — a shared "what/why/how/for-whom" artifact to align the team. Follows the house convention from [`personas.md`](./personas.md) and [`ga-criteria.md`](./ga-criteria.md): every claim is tagged **[grounded]** (traceable to the repo/docs today) or **[hypothesis]** (a bet not yet validated by research, revenue, or a design partner). Do not treat hypotheses as commitments.
 
 > How to use this page: read the Golden Circle first for the one-paragraph "why", then the Value Proposition Canvas for the wedge customer, then the Lean Canvas for the business shape. Everything in the **Open decisions** and **Assumptions ledger** at the bottom is what we still have to answer *together* — those are the gaps, stated honestly.
+>
+> For the **operating view** — Osterwalder's classic 9-block Business Model Canvas (revenue, resources, activities, partners, cost made explicit), with the boxes ranked by fragility and a competitor canvas — see [`business-model-canvas.md`](./business-model-canvas.md).
 
 ## Working thesis (locked 2026-07-10 — revisit if a design partner says otherwise)
 
