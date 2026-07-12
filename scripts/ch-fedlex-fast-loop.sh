@@ -20,6 +20,10 @@ RUN_DIR=""
 SOURCE_ID=""
 SOURCE_VERSION_ID=""
 RUN_ID=""
+# Self-hosted (Hetzner) auth: when an operator X-API-Key is supplied (flag or env),
+# the loop skips gcloud/Cloud-Run identity-token minting and authenticates with
+# `X-API-Key` against an explicit `--pc-url`. See docs/setup/hetzner-ch-fedlex-canary.md.
+PC_API_KEY="${EVIDARA_PLATFORM_CONTROL_API_KEY:-}"
 STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 usage() {
@@ -39,6 +43,10 @@ Options:
   --impersonate-sa <email>       Service account override
   --pc-url <url>                 Platform-control URL override
   --ls-url <url>                 Legal-search URL override
+  --api-key <key>                Operator X-API-Key (self-hosted / Hetzner mode).
+                                 When set, skips gcloud + Cloud-Run token minting and
+                                 authenticates with X-API-Key against --pc-url.
+                                 Also read from EVIDARA_PLATFORM_CONTROL_API_KEY.
   --template <template-id>       Source blueprint template (default: fedlex_sparql_constitution_de)
   --max-resources <n>            Preview scope max_resources (default: 25)
   --max-polls <n>                Maximum run polls (default: 60)
@@ -77,6 +85,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pc-url)
       EVIDARA_PLATFORM_CONTROL_URL="${2:?missing value for --pc-url}"
+      shift 2
+      ;;
+    --api-key)
+      PC_API_KEY="${2:?missing value for --api-key}"
       shift 2
       ;;
     --ls-url)
@@ -142,18 +154,8 @@ require_cmd() {
   }
 }
 
-require_cmd gcloud
 require_cmd curl
 require_cmd jq
-
-PROJECT_ID="${GCP_PROJECT_ID:-project-dacd6b7b-dc96-4534-b82}"
-REGION="${GCP_REGION:-europe-west6}"
-SA="${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}"
-
-if [[ -z "${SA}" ]]; then
-  echo "error: set EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT before running this loop." >&2
-  exit 1
-fi
 
 mkdir -p "${WORKDIR_ROOT}"
 if [[ -z "${RUN_DIR}" ]]; then
@@ -161,21 +163,52 @@ if [[ -z "${RUN_DIR}" ]]; then
 fi
 mkdir -p "${RUN_DIR}"
 
-PC_URL="${EVIDARA_PLATFORM_CONTROL_URL:-$(gcloud run services describe "platform-control-api-${ENVIRONMENT}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')}"
-LS_URL="${EVIDARA_LEGAL_SEARCH_URL:-$(gcloud run services describe "legal-search-api-${ENVIRONMENT}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')}"
+# Auth header args reused by every platform-control call.
+PC_AUTH_HEADER=()
 
-export EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT="${SA}"
-export EVIDARA_PLATFORM_CONTROL_URL="${PC_URL%/}"
-export EVIDARA_LEGAL_SEARCH_URL="${LS_URL%/}"
+if [[ -n "${PC_API_KEY}" ]]; then
+  # Self-hosted (Hetzner) mode: X-API-Key against an explicit platform-control URL —
+  # typically a `kubectl port-forward` to svc/platform-control-api. No gcloud, no SA,
+  # no Cloud-Run token minting.
+  if [[ -z "${EVIDARA_PLATFORM_CONTROL_URL:-}" ]]; then
+    echo "error: self-hosted mode (--api-key) requires --pc-url / EVIDARA_PLATFORM_CONTROL_URL." >&2
+    exit 1
+  fi
+  PROJECT_ID="self-hosted"
+  REGION="self-hosted"
+  PC_URL="${EVIDARA_PLATFORM_CONTROL_URL%/}"
+  LS_URL="${EVIDARA_LEGAL_SEARCH_URL:-}"
+  export EVIDARA_PLATFORM_CONTROL_URL="${PC_URL}"
+  [[ -n "${LS_URL}" ]] && export EVIDARA_LEGAL_SEARCH_URL="${LS_URL%/}"
+  PC_AUTH_HEADER=(-H "X-API-Key: ${PC_API_KEY}")
+else
+  # Managed (GCP Cloud Run) mode: impersonated identity token as a Bearer credential.
+  require_cmd gcloud
 
-eval "$(
-  ./scripts/mint-cloud-run-tokens.sh
-)"
+  PROJECT_ID="${GCP_PROJECT_ID:-project-dacd6b7b-dc96-4534-b82}"
+  REGION="${GCP_REGION:-europe-west6}"
+  SA="${EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT:-}"
+
+  if [[ -z "${SA}" ]]; then
+    echo "error: set EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT (or pass --api-key for self-hosted)." >&2
+    exit 1
+  fi
+
+  PC_URL="${EVIDARA_PLATFORM_CONTROL_URL:-$(gcloud run services describe "platform-control-api-${ENVIRONMENT}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')}"
+  LS_URL="${EVIDARA_LEGAL_SEARCH_URL:-$(gcloud run services describe "legal-search-api-${ENVIRONMENT}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')}"
+
+  export EVIDARA_GCP_IMPERSONATE_SERVICE_ACCOUNT="${SA}"
+  export EVIDARA_PLATFORM_CONTROL_URL="${PC_URL%/}"
+  export EVIDARA_LEGAL_SEARCH_URL="${LS_URL%/}"
+
+  eval "$(
+    ./scripts/mint-cloud-run-tokens.sh
+  )"
+  PC_AUTH_HEADER=(-H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}")
+fi
 
 curl_json() {
-  curl -fsS \
-    -H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}" \
-    "$@"
+  curl -fsS "${PC_AUTH_HEADER[@]}" "$@"
 }
 
 log() {
@@ -257,7 +290,7 @@ CREATE_PAYLOAD="$(jq -n --arg version_label "${VERSION_LABEL}" --arg template_id
 
 log "==> Creating source + version"
 curl -fsS -X POST "${PC_URL}/v1/sources/with-version" \
-  -H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}" \
+  "${PC_AUTH_HEADER[@]}" \
   -H "Content-Type: application/json" \
   -d "${CREATE_PAYLOAD}" | tee "${RUN_DIR}/create.json" >/dev/null
 
@@ -281,7 +314,7 @@ fi
 
 log "==> Approving source version"
 curl -fsS -X POST "${PC_URL}/v1/versions/${SOURCE_VERSION_ID}/approve" \
-  -H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}" | tee "${RUN_DIR}/approve.json" >/dev/null
+  "${PC_AUTH_HEADER[@]}" | tee "${RUN_DIR}/approve.json" >/dev/null
 
 RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --argjson max_resources "${MAX_RESOURCES}" '{
   source_id: $source_id,
@@ -295,7 +328,7 @@ RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${S
 
 log "==> Launching preview run"
 curl -fsS -X POST "${PC_URL}/v1/runs" \
-  -H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}" \
+  "${PC_AUTH_HEADER[@]}" \
   -H "Content-Type: application/json" \
   -d "${RUN_PAYLOAD}" | tee "${RUN_DIR}/run-create.json" >/dev/null
 
