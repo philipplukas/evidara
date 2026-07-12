@@ -27,6 +27,14 @@ _EVENT = json.dumps(
     }
 ).encode("utf-8")
 
+_WITHDRAWN_EVENT = json.dumps(
+    {
+        "event_type": "document.withdrawn",
+        "event_id": "evt_withdrawn_1",
+        "payload": {"document_id": "doc_1", "provenance": {"run_id": "run_1"}},
+    }
+).encode("utf-8")
+
 
 class FakeMessage:
     def __init__(self, data: bytes, *, num_delivered: int = 1) -> None:
@@ -314,6 +322,74 @@ class BridgeRunLoopTests(unittest.TestCase):
         args = bridge._parse_args([])
         args.legal_search_api_url = None
         self.assertEqual(asyncio.run(bridge.run(args)), 2)
+
+
+class _AlwaysIdleSubscription:
+    async def fetch(self, batch: int, timeout: float | None = None) -> list[_RawNatsMessage]:
+        raise TimeoutError  # idle pull — nothing pending on this subject
+
+
+class _OnceSubscription:
+    def __init__(self, message: _RawNatsMessage) -> None:
+        self._message = message
+        self.calls = 0
+
+    async def fetch(self, batch: int, timeout: float | None = None) -> list[_RawNatsMessage]:
+        self.calls += 1
+        if self.calls == 1:
+            return [self._message]
+        raise _LoopBreak
+
+
+class _RoutingJetStream:
+    def __init__(self, subs_by_subject: dict[str, object]) -> None:
+        self._subs = subs_by_subject
+        self.published: list[tuple[str, bytes, dict | None]] = []
+
+    async def pull_subscribe(self, subject, durable, stream, config):  # noqa: ANN001
+        return self._subs[subject]
+
+    async def publish(self, subject, payload, headers=None):  # noqa: ANN001
+        self.published.append((subject, payload, headers))
+
+
+class WithdrawalRouteTests(unittest.TestCase):
+    def test_parse_args_defaults_include_withdrawal_subject(self) -> None:
+        args = bridge._parse_args(["--legal-search-api-url", "http://ls:8080"])
+        self.assertEqual(args.processed_subject, "evidara.document-processed")
+        self.assertEqual(args.withdrawn_subject, "evidara.document-withdrawn")
+
+    def test_withdrawal_event_forwarded_to_withdrawn_endpoint_and_acked(self) -> None:
+        raw = _RawNatsMessage(_WITHDRAWN_EVENT)
+        jetstream = _RoutingJetStream(
+            {
+                "evidara.document-processed": _AlwaysIdleSubscription(),
+                "evidara.document-withdrawn": _OnceSubscription(raw),
+            }
+        )
+        connection = _FakeConnection(jetstream)
+        posted: list[tuple[str, bytes]] = []
+
+        async def _fake_connect(servers):  # noqa: ANN001, ANN202
+            return connection
+
+        def _fake_post(url, data, *, api_key, timeout=30.0):  # noqa: ANN001, ANN202
+            posted.append((url, data))
+
+        args = bridge._parse_args(["--legal-search-api-url", "http://ls:8080"])
+
+        with (
+            mock.patch("nats.connect", _fake_connect),
+            mock.patch.object(bridge, "post_projection_event", _fake_post),
+        ):
+            with self.assertRaises(_LoopBreak):
+                asyncio.run(bridge.run(args))
+
+        self.assertEqual(len(posted), 1)
+        url, data = posted[0]
+        self.assertEqual(url, "http://ls:8080/v1/projections/events/document-withdrawn")
+        self.assertEqual(data, _WITHDRAWN_EVENT)
+        self.assertTrue(raw.acked)
 
 
 if __name__ == "__main__":
