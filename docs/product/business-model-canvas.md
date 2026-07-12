@@ -145,6 +145,7 @@ Below is the strongest threat, **Noxtua** (publisher-backed AI: Beck-/MANZ-/Swis
 
 ## Related
 
+- [Business model modes (money / career / open source)](./business-model-modes.md) — the canvas theory, and how the *same* canvas describes three different goals by swapping the "revenue" currency; includes a full portfolio canvas.
 - [Value Proposition Canvas & Lean Canvas](./value-proposition-canvas.md) — customer/value fit, competitive landscape (§4a), strategic fork (§4b), coverage strategy (§4c), and the customer-discovery interview script (Appendix A).
 - [Personas](./personas.md) — P1–P5, the wedge question.
 - [Platform API one-pager](./platform-api-one-pager.md) — the design-partner pitch this canvas is drawn for.
