@@ -1,6 +1,6 @@
 # Evidara
 
-**Trustworthy primary law as an API** — a clean-room platform that turns messy official legal sources into structured, provenanced, **citable** data: canonical text + provenance + in-force status + a citation graph.
+**Trustworthy primary law as an API** — a platform that turns messy official legal sources into structured, provenanced, **citable** data: canonical text + provenance + in-force status + a citation graph.
 
 > **Status:** Internal beta — ~12 Swiss federal laws, German UI, CH-first. The strategy is deliberately explicit about what is *built* vs. what is a *bet*: see the [business-model canvas](docs/product/business-model-canvas.md) and [value-proposition canvas](docs/product/value-proposition-canvas.md).
 
@@ -20,9 +20,7 @@ Prefer to watch? A [5-minute demo script](docs/writeups/demo-script.md) walks th
 
 ## What is Evidara?
 
-Evidara is a monorepo containing all components of a platform that processes, structures, and serves legal and regulatory documents. It is designed around strict component boundaries, explicit contracts, and a separation of canonical truth from serving projections.
-
-**This is a clean-room implementation.** See [docs/architecture/clean-room-principles.md](docs/architecture/clean-room-principles.md).
+Evidara is a monorepo containing all components of a platform that processes, structures, and serves legal and regulatory documents — designed around strict component boundaries, explicit contracts, and a separation of canonical truth from serving projections.
 
 ## Repository Structure
 
@@ -84,13 +82,8 @@ For Zed-specific editor and MCP setup, use [Zed Setup](docs/setup/zed.md).
 
 See each component's doc in [docs/components/](docs/components/) for component-specific guidance.
 
-## Milestones
+## Status & what's next
 
-| Milestone | Description |
-|-----------|-------------|
-| M0 | Repo Bootstrap |
-| M1 | Minimal Platform Control |
-| M2 | Minimal Document Intelligence |
-| M3 | Minimal Legal Search |
-| M4 | First Vertical Slice |
-| M5 | Research Workflow Foundation |
+Evidara is at **internal beta**: the full vertical slice — source onboarding → canonical processing → search — runs over a small curated corpus (~12 Swiss federal laws, German UI, CH-first). The original M1–M6 bootstrap roadmap is complete; current direction and open bets are tracked in the [business-model canvas](docs/product/business-model-canvas.md) and [value-proposition canvas](docs/product/value-proposition-canvas.md).
+
+Active work: retiring the usage-billed GCP runtime for a fixed-cost self-hosted stack ([ADR-0029](docs/adr/0029-self-hosted-hetzner-runtime.md)).

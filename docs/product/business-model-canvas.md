@@ -76,7 +76,7 @@ The rest of the page expands each block. The numbering follows your working orde
 
 ## ⑥ Key Resources — *the non-negotiable assets*
 
-- **The provenance/trust data model + canonical-truth/projection architecture.** Clean-room, contract-first, citation-aware. This is the differentiated asset and it's built. **[grounded — architecture.]**
+- **The provenance/trust data model + canonical-truth/projection architecture.** Contract-first, citation-aware, purpose-built. This is the differentiated asset and it's built. **[grounded — architecture.]**
 - **The reference taxonomy** — 6 top-level jurisdictions (CH/AT/DE/FR/IT/EU) × real authorities, a recursive `parent_id` tree reaching **2,169 seeded jurisdictions** down to municipal level. This is *addressability* — the map the corpus fills in. **[grounded — `seeds/reference/*.yaml`.]**
 - **The maintained, citable corpus itself** — the compounding proprietary asset. **Thin today (~12 CH-federal docs); the gap between 2,169 addressable and ~12 real is the business.** **[grounded — this is the honest weak point.]**
 - **Per-authority ingestion adapters** (Fedlex live; RIS/Bundesrecht/Légifrance/Normattiva/EUR-Lex roadmap). **[grounded/roadmap.]**

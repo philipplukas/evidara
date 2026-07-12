@@ -1,9 +1,5 @@
 # Contributing to Evidara
 
-## Clean-Room Implementation
-
-This is a **clean-room implementation**. All contributions must adhere to the [clean-room principles](docs/architecture/clean-room-principles.md). Do not copy source code, tests, prompts, or proprietary documentation from prior repositories.
-
 ## Branch Naming
 
 Use short-lived branches from `main` with these prefixes:

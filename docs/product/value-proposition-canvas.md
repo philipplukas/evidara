@@ -94,7 +94,7 @@ Scoped to the **wedge persona candidate: the practising lawyer / in-house counse
 | **Customer segments** | Wedge: **P1 legal end user** (lawyer / researcher / paralegal, DACH, DE-first). Early adopter: **[decide]**. Also internal: content operators, reviewers, SRE (personas P2–P5). | [grounded] personas; wedge [hypothesis] |
 | **Unique value proposition** | "Primary DACH law you can cite — every result traceable to an authoritative, in-force source." | [hypothesis] |
 | **Solution** | Provenance-first ingestion + approval; canonical processing (sections/citations); citation-aware search; HITL quality loop. | [grounded] |
-| **Unfair advantage** | Rigorous provenance/trust data model + clean-room canonical architecture + operator curation discipline. (Not yet: proprietary corpus rights, brand, or a design-partner moat.) | [grounded arch]; moat [hypothesis] |
+| **Unfair advantage** | Rigorous provenance/trust data model + purpose-built canonical architecture + operator curation discipline. (Not yet: proprietary corpus rights, brand, or a design-partner moat.) | [grounded arch]; moat [hypothesis] |
 | **Channels** | **[gap — no documentation in repo]** Candidates: direct design-partner outreach to CH firms, bar-association/legal-tech communities, content SEO on statute pages. | [hypothesis] |
 | **Revenue streams** | **[gap — Lane 10 says no pricing/SLA/packaging exists]** Candidates: per-seat SaaS, firm licence, API/agent access tier. | [hypothesis] |
 | **Cost structure** | Content acquisition & processing (compute), self-hosted runtime (Hetzner k3s: NATS/MinIO/OpenSearch/Trino/Postgres), infra ops, legal/compliance review per jurisdiction. | [grounded — infra] |

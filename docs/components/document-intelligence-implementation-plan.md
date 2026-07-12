@@ -35,7 +35,7 @@ The first implementation must:
 - Sections are part of MVP. The first release should not treat section extraction as optional.
 - Citation extraction and jurisdiction assignment remain post-MVP unless contracts are deliberately expanded.
 - The first supported source family should be narrow, ideally HTML or the earliest real source family selected for the vertical slice.
-- All implementation must be clean-room and authored fresh for this repository.
+- All implementation is authored fresh for this repository, starting from the requirements and contracts documented here.
 
 ## Source of truth
 

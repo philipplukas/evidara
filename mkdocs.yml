@@ -78,7 +78,6 @@ nav:
       - Disaster Recovery: architecture/disaster-recovery.md
       - Data Lifecycle: architecture/data-lifecycle.md
       - Implementation Principles: architecture/implementation-principles.md
-      - Clean-Room Principles: architecture/clean-room-principles.md
   - ADRs:
       - Index: adr/README.md
       - "0001: Monorepo Structure": adr/0001-monorepo-structure.md
