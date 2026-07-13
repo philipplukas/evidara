@@ -15,6 +15,7 @@ dependencies = [
   "google-cloud-storage>=2.16.0",
   "jsonschema>=4.14.0",
   "nats-py>=2.9.0,<3",
+  "prometheus-client>=0.21.0,<1",
   "pyarrow>=14.0.0",
   "PyYAML>=6.0.0",
 ]
@@ -65,6 +66,7 @@ document_intelligence_nats_consumer = "document_intelligence.jobs.nats_consumer:
 document_intelligence_projection_bridge = "document_intelligence.jobs.projection_bridge_consumer:main"
 document_intelligence_runtime_consumer = "document_intelligence.jobs.runtime_consumer:main"
 document_intelligence_replay_local_outbox = "document_intelligence.jobs.local_outbox_replay:main"
+document_intelligence_delta_projection_backfill = "document_intelligence.jobs.delta_projection_backfill:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

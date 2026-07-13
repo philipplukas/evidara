@@ -84,6 +84,13 @@ Available entrypoints:
 
 - `document_intelligence_document_service` for the read-oriented document service
 - `document_intelligence_runtime_ingress` for the internal event-processing ingress
+- `document_intelligence_delta_projection_backfill` to rebuild the legal-search
+  OpenSearch index from canonical Delta (ADR-0005). It replays each
+  `published_documents` row as a `document.processed` event through the normal
+  projections endpoint, so it is idempotent, resumable (`--resume`), and safe to
+  run against a live read alias. This is the recovery path when the search index
+  is lost — see
+  [docs/runbooks/projection-reindex-backfill.md](../docs/runbooks/projection-reindex-backfill.md).
 
 ## Optional LLM extraction extras
 

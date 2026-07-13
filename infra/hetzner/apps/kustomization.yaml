@@ -11,18 +11,31 @@ resources:
   - platform-control.yaml
   - legal-search.yaml
   - document-intelligence.yaml
+  # Legal-retention hard delete (ADR-0031). In `resources:` — unlike migrate-job.yaml —
+  # so the `images:` pin below applies and the tag never has to be maintained by hand.
+  - retention-sweep-cronjob.yaml
 
-# Single place to pin the image tag (the build tagged images with the branch name).
+# Single place to pin the image tag.
+#
+# Pinned to a commit SHA on `main`, not to `latest` or a branch name: `latest`
+# moves under the cluster on every merge, and a branch tag says nothing about
+# what is actually running. `runtime-images.yml` tags each image with the full
+# `github.sha`, so this pin is exactly reproducible.
+#
+# Pick a SHA that actually *built* — the workflow is path-filtered, so a
+# docs- or test-only commit (e.g. main's tip 579799a) publishes no images at
+# all and would leave every reference here unpullable. 237ee8bb is the newest
+# main commit that published all seven images.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: claude-repo-status-check-cdso8i
+    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: claude-repo-status-check-cdso8i
+    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: claude-repo-status-check-cdso8i
+    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: claude-repo-status-check-cdso8i
+    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: claude-repo-status-check-cdso8i
+    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: claude-repo-status-check-cdso8i
+    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2

@@ -30,6 +30,7 @@ class _LimiterObservingProvider:
     """Provider stub that snapshots ``current_rate_limiter`` during start_run."""
 
     provider_name: str = "deterministic_http"
+    live_ready: bool = True
     observed: HostRateLimiter | None = None
     observed_once: bool = False
 

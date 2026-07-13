@@ -1,7 +1,7 @@
 # ADR-0016: Cloud Run Services vs Jobs for Pull-Based Workers
 
 Date: 2026-04-04
-Status: Accepted
+Status: Accepted — superseded for runtime hosting by [ADR-0029](0029-self-hosted-hetzner-runtime.md) (Cloud Run is being retired for a self-hosted Hetzner/Kubernetes runtime)
 Deciders: Platform Team
 Applies to: platform-control-worker, document-intelligence-consumer
 
