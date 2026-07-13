@@ -12,7 +12,13 @@ services:
     command:
       - sh
       - -c
-      - alembic upgrade head && platform-control-seed-reference-data --seed-dir /app/seeds
+      # No --seed-dir: the seeds ship inside the installed package and
+      # seed_reference_data.DEFAULT_SEED_DIR resolves them via importlib. The old
+      # `--seed-dir /app/seeds` pointed at a directory that does not exist in the
+      # image (the Dockerfile copies the repo to /app, so the seeds land under
+      # /app/src/platform_control/seeds), which failed with
+      # "Seed file not found: /app/seeds/reference/compliance_policies.yaml".
+      - alembic upgrade head && platform-control-seed-reference-data
     depends_on:
       postgres:
         condition: service_healthy
@@ -158,12 +164,16 @@ services:
     depends_on:
       - nats
     entrypoint: ["sh", "-c"]
+    # Literal block (|), not folded (>). With `>`, YAML keeps a newline before each
+    # *more-indented* line, so wrapping `nats stream add` across lines split it into
+    # separate shell commands — the flags ran as their own command ("sh: --subjects:
+    # not found") and the bare `nats stream add EVIDARA` then blocked on a prompt
+    # ("cannot prompt for user input without a terminal"). Keep the nats invocation
+    # on one line.
     command:
-      - >
+      - |
         for i in $$(seq 1 30); do
-          if nats --server nats://nats:4222 stream add EVIDARA
-              --subjects 'evidara.>' --storage file --retention limits
-              --discard old --dupe-window 2m --defaults >/dev/null 2>&1; then
+          if nats --server nats://nats:4222 stream add EVIDARA --subjects 'evidara.>' --storage file --retention limits --discard old --dupe-window 2m --defaults >/dev/null 2>&1; then
             echo 'EVIDARA stream ready'; exit 0;
           fi;
           echo "waiting for nats ($$i/30)"; sleep 2;
