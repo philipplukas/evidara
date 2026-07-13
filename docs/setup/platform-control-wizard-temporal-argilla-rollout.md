@@ -1,5 +1,12 @@
 # Platform-Control Wizard, Temporal, and Argilla — post-merge rollout
 
+> **Status note (ADR-0031, 2026-07-13).** Not a live procedure. **Argilla has been deleted** — skip
+> every Argilla step and env var below. **Temporal is deployed in no environment** and
+> `PLATFORM_CONTROL_WIZARD_ORCHESTRATOR_BACKEND` stays `in_memory`, so there is no worker to roll
+> out. Kept as the record of what a Temporal rollout would involve; #560, #561, and #564 are the
+> entry criteria for ever running one. The retention sweep, which used to depend on this rollout,
+> now runs as a CronJob — see `docs/runbooks/retention-sweep.md`.
+
 Use this checklist after merging wizard API / Temporal / Argilla work into an environment (staging or production).
 
 ## 1. Database migrations
@@ -40,7 +47,7 @@ Use the same Temporal connection settings as the API. Without a worker, `tempora
 
 - **API health** — existing smoke targets for platform-control.
 - **Wizard contracts** — `pytest platform-control/tests/integration/test_wizard_api_contracts.py` (or full `bash scripts/check-platform-control.sh` in CI parity).
-- **Reviews** — with Argilla configured, exercise `POST /v1/reviews/tasks` and idempotent `POST /v1/reviews/sync-from-argilla` per [Argilla review routing runbook](../runbooks/argilla-review-routing-and-sync.md).
+- **Reviews** — exercise `POST /v1/reviews/tasks` then `POST /v1/reviews/tasks/{task_id}/decision` per the [extraction review routing runbook](../runbooks/extraction-review-routing.md). (The Argilla enqueue/sync steps that used to be here are gone — ADR-0031.)
 
 ## 5. Operator handoff
 

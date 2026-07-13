@@ -355,7 +355,7 @@ class ScopeShardActivities:
 
 
 # ---------------------------------------------------------------------------
-# ReviewDrainActivities — Argilla enqueue + completion-gate activities
+# ReviewDrainActivities — review-queue completion gate
 # ---------------------------------------------------------------------------
 
 
@@ -363,77 +363,14 @@ class ScopeShardActivities:
 class ReviewDrainActivities:
     """Activities executed inside ``ReviewDrainWorkflow`` child workflows.
 
-    Handles enqueuing pending review tasks to Argilla and polling for queue drain.
+    Polls until the run's review queue has drained. There is no enqueue step:
+    persisting a ``ReviewTask`` *is* the enqueue — the queue is the table, which the
+    admin app reads. The Argilla push that used to live here is gone (ADR-0031, #563).
 
     ``session_factory`` must point to the same database as the rest of platform-control.
-    Optional ``argilla_api_base_url``, ``argilla_api_key``, ``argilla_dataset_id`` activate
-    live Argilla HTTP calls; when absent the enqueue step records the skip in the ledger.
     """
 
     session_factory: async_sessionmaker[AsyncSession]
-    argilla_api_base_url: str | None = None
-    argilla_api_key: str | None = None
-    argilla_dataset_id: str | None = None
-
-    @activity.defn
-    async def enqueue_pending_reviews(self, wizard_run_id: str) -> dict:
-        """Enqueue all PENDING review tasks for this wizard run to Argilla.
-
-        Returns a summary dict with ``enqueued``, ``skipped``, ``failed`` counts.
-        Idempotent: tasks already enqueued (``argilla_enqueued_at`` is set) are skipped.
-        """
-        from platform_control.config import Settings
-        from platform_control.services.argilla_enqueue_service import ArgillaEnqueueService
-
-        settings = Settings(
-            argilla_api_base_url=self.argilla_api_base_url or "",
-            argilla_api_key=self.argilla_api_key or "",
-            argilla_dataset_id=self.argilla_dataset_id or "",
-        )
-        argilla = ArgillaEnqueueService(settings)
-
-        enqueued = 0
-        skipped = 0
-        failed = 0
-
-        async with self.session_factory() as session:
-            tasks = (
-                await session.scalars(
-                    select(ReviewTask).where(
-                        ReviewTask.wizard_run_id == wizard_run_id,
-                        ReviewTask.status == ReviewTaskStatus.PENDING,
-                        ReviewTask.argilla_enqueued_at.is_(None),
-                    )
-                )
-            ).all()
-
-            for task in tasks:
-                payload_for_argilla = dict(task.payload or {})
-                meta = dict(payload_for_argilla.get("metadata") or {})
-                meta.setdefault("wizard_run_id", task.wizard_run_id)
-                meta.setdefault("review_task_id", task.review_task_id)
-                if task.record_id:
-                    meta.setdefault("recordId", task.record_id)
-                payload_for_argilla["metadata"] = meta
-
-                result = await argilla.enqueue_record(
-                    external_id=task.argilla_external_id,
-                    task_payload=payload_for_argilla,
-                    idempotency_key=task.review_task_id,
-                )
-                if result.outcome == "enqueued":
-                    task.argilla_enqueued_at = datetime.now(UTC)
-                    task.argilla_enqueue_last_error = None
-                    enqueued += 1
-                elif result.outcome == "skipped_not_configured":
-                    skipped += 1
-                else:
-                    task.argilla_enqueue_last_error = (result.detail or "unknown")[:2000]
-                    failed += 1
-
-            await session.commit()
-
-        return {"enqueued": enqueued, "skipped": skipped, "failed": failed}
 
     @activity.defn
     async def check_review_drain_complete(self, wizard_run_id: str) -> bool:
