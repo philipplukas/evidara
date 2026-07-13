@@ -33,7 +33,7 @@ describe('moveAliasActions', () => {
 /** Every alias name an action list touches, whether adding or removing. */
 function aliasesTouched(actions: AliasAction[]): string[] {
   const aliases = actions.flatMap((action) => {
-    const entry = (action as { add?: { alias: string }; remove?: { alias: string } });
+    const entry = action as { add?: { alias: string }; remove?: { alias: string } };
     const alias = entry.add?.alias ?? entry.remove?.alias;
     return alias ? [alias] : [];
   });
