@@ -26,8 +26,14 @@ concurrency:
 
 jobs:
   validate-workspace-dsl:
-    # Heavy pool: Docker is available there (see e2e-ch-fedlex-loop.yml).
-    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'ubuntu-latest' }}
+    # GitHub-hosted, NOT the self-hosted pools: the Hetzner ARC runners are plain
+    # k8s pods with no Docker daemon (no containerMode: dind in
+    # infra/hetzner/runners/values-*.yaml), so the validator cannot run there.
+    # `--strict` surfaces that as a failure rather than a silent skip — which is
+    # exactly how this was caught. This job is paths-filtered to structurizr/**,
+    # so it runs only when the DSL actually changes. ubuntu-latest is already used
+    # unconditionally by legal-search.yml and platform-control-image.yml.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
