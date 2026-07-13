@@ -5,6 +5,28 @@ from __future__ import annotations
 from document_intelligence.nlp.citation_extractor import extract_citations, normalize_citation
 
 
+class TestSwissLegislationCitations:
+    """Swiss federal legislation (Fedlex) SR + article + statute forms.
+
+    Mirrors the ``ch_fedlex_law_html`` golden fixture body so the citation
+    forms that Stream E/G rely on stay covered at the extractor level.
+    """
+
+    _BODY = (
+        "Bundesverfassung der Schweizerischen Eidgenossenschaft, SR 101. "
+        "Sie foerdert die gemeinsame Wohlfahrt im Sinne von Art. 5 BV. "
+        "Ergaenzend gilt das ZGB (SR 210)."
+    )
+
+    def test_sr_numbers_extracted(self):
+        sr = {c.metadata["sr_number"] for c in extract_citations(self._BODY) if c.citation_type == "sr"}
+        assert {"101", "210"} <= sr
+
+    def test_article_reference_extracted(self):
+        articles = [c for c in extract_citations(self._BODY) if c.citation_type == "article"]
+        assert any("Art. 5 BV" in c.text for c in articles)
+
+
 class TestSRCitations:
     def test_basic_sr(self):
         citations = extract_citations("Gemäss SR 210 ist das ZGB anwendbar.")

@@ -30,6 +30,7 @@ class GoldenBundleTests(unittest.TestCase):
             "ris_xml_law_consolidated",
             "ris_xml_law_short",
             "ch_commentary_html",
+            "ch_fedlex_law_html",
         ]
         for fixture_name in fixture_names:
             with self.subTest(fixture=fixture_name):

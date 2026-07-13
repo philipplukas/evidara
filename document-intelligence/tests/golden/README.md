@@ -27,3 +27,4 @@ Current fixture coverage:
 - `ris_html_decision_vfgh`: same VfGH decision in HTML format
 - `ris_html_decision_vwgh`: same VwGH decision in HTML format
 - `ch_commentary_html`: synthetic Swiss German commentary with provision and case-law anchors
+- `ch_fedlex_law_html`: Swiss Fedlex constitution excerpt (Bundesverfassung, SR 101) — article-level `Art. N` headings, SR + article citation forms
