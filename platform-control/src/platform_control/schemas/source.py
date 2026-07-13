@@ -131,13 +131,29 @@ class EurLexSparqlAcquisitionSpec(BaseAcquisitionSpec):
         return self
 
 
+class CantonHttpAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.CANTON_HTTP] = AcquisitionProvider.CANTON_HTTP
+    # ISO 3166-2:CH cantonal code (e.g. CH-ZH). The provider allow-lists a
+    # portal host per code, so an unknown or foreign code is rejected at run.
+    canton_code: str = Field(pattern=r"^CH-[A-Z]{2}$")
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_canton_http_config(self) -> CantonHttpAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("canton_http provider requires seed_url or seed_urls")
+        return self
+
+
 AcquisitionSpec = Annotated[
     FirecrawlAcquisitionSpec
     | DeterministicHttpAcquisitionSpec
     | FedlexSparqlAcquisitionSpec
     | RisOgdAcquisitionSpec
     | LegifranceAcquisitionSpec
-    | EurLexSparqlAcquisitionSpec,
+    | EurLexSparqlAcquisitionSpec
+    | CantonHttpAcquisitionSpec,
     Field(discriminator="provider"),
 ]
 AcquisitionSpecAdapter = TypeAdapter(AcquisitionSpec)

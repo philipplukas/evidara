@@ -242,6 +242,56 @@ overlays:
         language_codes: [de]
         document_type_hint: legislation
         enabled: true
+      # ───────────────────────────────────────────────────────────────
+      # Swiss cantonal legislation via each canton's OWN portal (canton_http).
+      # Distinct from the Fedlex cantonal-concordat discovery path: this
+      # provider scrapes the cantonal systematic collections directly, which
+      # surface the bulk of cantonal/"state" legislation. Provider
+      # `canton_http` is a scaffold (live_ready=false); these templates stay
+      # `enabled: false` until an operator captures per-canton acceptance-run
+      # evidence and flips both keys. The seed_urls below are placeholder
+      # portal URLs and the portal hosts/paths need verification at
+      # live-enablement. Kept as a trailing block to minimise merge conflict.
+      # ───────────────────────────────────────────────────────────────
+      canton_http_zh:
+        provider: canton_http
+        canton_code: CH-ZH
+        seed_urls:
+          - https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung.html
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_zh_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      canton_http_be:
+        provider: canton_http
+        canton_code: CH-BE
+        seed_urls:
+          - https://www.belex.sites.be.ch/
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_be_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr]
+        document_type_hint: legislation
+        enabled: false
+      canton_http_bs:
+        provider: canton_http
+        canton_code: CH-BS
+        seed_urls:
+          - https://www.gesetzessammlung.bs.ch/
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bs_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
   fr:
     provider_templates:
       legifrance_codes:

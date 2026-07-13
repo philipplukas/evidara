@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from platform_control.config import Settings
 from platform_control.services.bundesland_http_provider import BundeslandHttpProvider
+from platform_control.services.canton_http_provider import CantonHttpProvider
 from platform_control.services.cassette_provider import CassetteProvider
 from platform_control.services.deterministic_http_provider import DeterministicHttpProvider
 from platform_control.services.eur_lex_sparql_provider import EurLexSparqlProvider
@@ -31,6 +32,10 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     )
     registry.register(BundeslandHttpProvider())
     registry.register(RegioneHttpProvider())
+    # Swiss cantonal legislation portals. Scaffold: live_ready=false, so its
+    # blueprint templates parse but the two-key lock rejects live runs until an
+    # operator captures per-canton acceptance-run evidence.
+    registry.register(CantonHttpProvider())
     # Fixture-backed replay for SHADOW execution mode.
     registry.register(CassetteProvider(cassette_dir=settings.cassette_dir))
     return registry
