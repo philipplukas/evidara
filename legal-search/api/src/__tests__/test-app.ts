@@ -17,6 +17,7 @@ import { Test } from '@nestjs/testing';
 import { vi } from 'vitest';
 import documentIntelligenceConfig from '../core/config/document-intelligence.config';
 import opensearchConfig from '../core/config/opensearch.config';
+import { AllExceptionsFilter } from '../core/filters/all-exceptions.filter';
 import { OPENSEARCH_CLIENT } from '../core/opensearch/client';
 import {
   DOCUMENT_INTELLIGENCE_CLIENT,
@@ -116,6 +117,9 @@ export async function createTestApp(overrides?: {
   const searchRepo: SearchRepository = {
     search: vi.fn().mockResolvedValue(SEARCH_WITH_RESULTS),
     getContextAggregations: vi.fn().mockResolvedValue(CONTEXT_AGGS),
+    checkReadAlias: vi
+      .fn()
+      .mockResolvedValue({ status: 'ok', alias: 'documents-read', indices: ['documents-000001'] }),
     ...overrides?.searchRepo,
   };
 
@@ -206,7 +210,7 @@ export async function createTestApp(overrides?: {
 
   const app = moduleRef.createNestApplication();
 
-  // Apply the same global config as main.ts
+  // Apply the same global config as main.ts / AppModule
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -214,6 +218,7 @@ export async function createTestApp(overrides?: {
       transformOptions: { enableImplicitConversion: false },
     }),
   );
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   await app.init();
 

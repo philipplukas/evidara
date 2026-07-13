@@ -1,26 +1,43 @@
-"""Always-on NATS→legal-search projection bridge (M0.2, issue #522).
+"""Always-on NATS→legal-search + platform-control event bridge (M0.2, issues #522/#550).
 
-The document-intelligence consumer publishes ``document.processed`` events to the
-NATS ``evidara.document-processed`` subject (and withdrawals to
-``evidara.document-withdrawn``), but nothing forwarded them into legal-search — so
-processed documents never became searchable, and withdrawals never de-indexed,
-without a manual ``local_outbox_replay`` run. This consumer closes that gap: it
-subscribes to both subjects and POSTs each event to the matching legal-search
-projections HTTP endpoint, mirroring the ack/nak/term/DLQ semantics of
-:mod:`nats_consumer`:
+The document-intelligence consumer publishes its outbound events to NATS
+(``evidara.document-processed``, ``evidara.document-withdrawn``,
+``evidara.document-processing-status-updated``) but never calls any HTTP peer
+itself. This bridge is the only process that turns those subjects into HTTP
+calls, and it forwards each one to *every* consumer that needs it:
 
-- ``evidara.document-processed``  -> ``POST /v1/projections/events/document-processed``
-- ``evidara.document-withdrawn``  -> ``POST /v1/projections/events/document-withdrawn``
+- ``evidara.document-processed``
+    -> legal-search   ``POST /v1/projections/events/document-processed``
+    -> platform-control ``POST /v1/di/events/document-processed``
+- ``evidara.document-withdrawn``
+    -> legal-search   ``POST /v1/projections/events/document-withdrawn``
+    -> platform-control ``POST /v1/di/events/document-withdrawn``
+- ``evidara.document-processing-status-updated``
+    -> platform-control ``POST /v1/di/events/document-processing-status-updated``
+
+Before #550 only the legal-search routes existed: the status subject had **no
+consumer at all** and nothing ever reached platform-control, so every run's
+``/v1/runs/{id}/pipeline-health`` sat at ``pending`` for document_intelligence /
+projection / search even when the document processed fine and was searchable.
+platform-control's ``PLATFORM_CONTROL_API_URL`` being present in the DI
+consumer's environment was a red herring — it comes from the shared
+``evidara-config`` ConfigMap and no DI code ever read it.
 
 Delivery semantics (same as the bundle consumer):
 
-- forward succeeds (2xx)      -> ``ack``
-- permanent error (HTTP 4xx)  -> ``term`` (bad event; retrying is futile)
-- transient error (5xx / net) -> ``nak`` with backoff, until ``max_deliver``
+- every target succeeds (2xx)  -> ``ack``
+- permanent error (HTTP 4xx)   -> ``term`` (bad event; retrying is futile)
+- transient error (5xx / net)  -> ``nak`` with backoff, until ``max_deliver``
+- auth error (401/403)         -> transient: a missing/wrong API key is an operator
+  misconfiguration, not a bad event. Terminating it would silently discard the
+  event forever; instead it is logged at ERROR and retried, so the event still
+  lands once the key is fixed.
 - exhausted transient          -> publish to the DLQ subject, then ``term``
 
-The projection endpoint is idempotent (it dedups by event/revision and returns
-202 for stale/duplicate), so at-least-once redelivery is safe.
+All target endpoints are idempotent (they dedup by event id / revision and return
+202 for stale or duplicate deliveries), so at-least-once redelivery — including a
+re-POST to a target that already succeeded before a *later* target in the same
+fan-out failed — is safe.
 
 :func:`forward_message` operates on the broker-agnostic ``IncomingMessage``
 interface and an injected ``forward`` coroutine, so it is unit-testable without a
@@ -37,6 +54,7 @@ import sys
 import urllib.error
 import urllib.request
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 
 from document_intelligence.jobs._consumer_common import (
     extract_event_context,
@@ -51,9 +69,31 @@ LOGGER = logging.getLogger("document_intelligence.projection_bridge")
 # retry-worthy despite being 4xx, so they fall through to the transient path.
 _TRANSIENT_4XX = frozenset({408, 425, 429})
 
+# 401/403 mean *we* are misconfigured (missing or wrong X-API-Key), not that the
+# event is bad. Treated as transient so the event is retried/DLQ'd and logged at
+# ERROR rather than silently terminated (#550).
+_AUTH_STATUS = frozenset({401, 403})
+
 
 class PermanentForwardError(RuntimeError):
     """The projection endpoint rejected the event as invalid — do not retry."""
+
+
+class AuthForwardError(RuntimeError):
+    """The endpoint rejected our credentials (401/403) — operator must fix the API key.
+
+    A plain :class:`RuntimeError` subclass so it takes the transient (nak → retry →
+    DLQ) path and is logged at ERROR; it exists as its own type only so the failure
+    is unmistakable in ``error_type`` on the ``projection_forward_failed`` log line.
+    """
+
+
+@dataclass(frozen=True)
+class ForwardTarget:
+    """One HTTP endpoint an event is forwarded to."""
+
+    url: str
+    api_key: str | None
 
 
 async def forward_message(
@@ -150,14 +190,16 @@ def post_projection_event(
     api_key: str | None,
     timeout: float = 30.0,
 ) -> None:
-    """POST a raw event payload to the legal-search projections endpoint.
+    """POST a raw event payload to a legal-search or platform-control endpoint.
 
-    Raises :class:`PermanentForwardError` on a client (4xx) rejection and
+    Raises :class:`AuthForwardError` on 401/403 (retryable — our key is wrong),
+    :class:`PermanentForwardError` on any other client (4xx) rejection, and
     :class:`RuntimeError` on a transient (5xx / network) failure.
     """
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
     if api_key:
-        # legal-search ApiKeyGuard enforces X-API-Key (not bearer); no-op when unset.
+        # Both peers enforce X-API-Key (not bearer): legal-search's ApiKeyGuard and
+        # platform-control's require_control_plane_service. No-op when unset.
         headers["X-API-Key"] = api_key
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
@@ -166,6 +208,12 @@ def post_projection_event(
             return
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
+        if exc.code in _AUTH_STATUS:
+            # Config error, not a bad event — do NOT term/drop it (#550).
+            raise AuthForwardError(
+                f"POST {url} rejected {exc.code}: missing or invalid X-API-Key "
+                f"(api_key {'set' if api_key else 'NOT set'}): {body}"
+            ) from exc
         if 400 <= exc.code < 500 and exc.code not in _TRANSIENT_4XX:
             raise PermanentForwardError(f"POST {url} rejected {exc.code}: {body}") from exc
         raise RuntimeError(f"POST {url} failed {exc.code}: {body}") from exc
@@ -186,10 +234,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # upgrade reuses the existing JetStream consumer rather than orphaning it.
     parser.add_argument("--durable-name", default="legal-search-projection-bridge")
     parser.add_argument("--withdrawn-durable-name", default="legal-search-projection-withdrawal")
+    parser.add_argument("--status-durable-name", default="platform-control-processing-status")
     parser.add_argument("--processed-subject", default="evidara.document-processed")
     parser.add_argument("--withdrawn-subject", default="evidara.document-withdrawn")
+    parser.add_argument("--status-subject", default="evidara.document-processing-status-updated")
     parser.add_argument("--dlq-subject", default="evidara.document-processed.dlq")
     parser.add_argument("--withdrawn-dlq-subject", default="evidara.document-withdrawn.dlq")
+    parser.add_argument(
+        "--status-dlq-subject",
+        default="evidara.document-processing-status-updated.dlq",
+    )
     parser.add_argument(
         "--legal-search-api-url",
         default=os.environ.get("LEGAL_SEARCH_API_URL") or os.environ.get("NEXT_PUBLIC_API_URL"),
@@ -199,6 +253,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--legal-search-api-key",
         default=os.environ.get("LEGAL_SEARCH_API_KEY"),
         help="Optional X-API-Key for the legal-search projections endpoint.",
+    )
+    parser.add_argument(
+        "--platform-control-api-url",
+        default=os.environ.get("PLATFORM_CONTROL_API_URL"),
+        help="platform-control API base URL (the /v1/di/events endpoints are derived from it).",
+    )
+    parser.add_argument(
+        "--platform-control-api-key",
+        default=(os.environ.get("PLATFORM_CONTROL_OPERATOR_API_KEY") or os.environ.get("PLATFORM_CONTROL_API_KEY")),
+        help=(
+            "X-API-Key for platform-control's /v1/di/events endpoints. Required whenever "
+            "platform-control has auth enabled; a missing key surfaces as a loud 401 retry."
+        ),
     )
     parser.add_argument("--max-messages", type=int, default=10)
     parser.add_argument("--fetch-timeout-seconds", type=float, default=5.0)
@@ -215,19 +282,46 @@ async def run(args: argparse.Namespace) -> int:
     if not args.legal_search_api_url:
         LOGGER.error("legal-search API URL is required (set LEGAL_SEARCH_API_URL)")
         return 2
+    if not args.platform_control_api_url:
+        # Without this the run-detail UI and the canary are blind for every run (#550) —
+        # refuse to start half-wired rather than drop the callbacks on the floor.
+        LOGGER.error("platform-control API URL is required (set PLATFORM_CONTROL_API_URL)")
+        return 2
+    if not args.platform_control_api_key:
+        # Only a heads-up: an unauthenticated dev platform-control (docker-compose.local)
+        # is legitimate, so this is not ERROR — crying wolf there would devalue the ERROR
+        # that a real 401 raises per callback. In a deployed environment this is the #550
+        # misconfiguration, and it will surface loudly on the first forward.
+        LOGGER.warning(
+            "no platform-control API key configured (set PLATFORM_CONTROL_OPERATOR_API_KEY); "
+            "DI event callbacks will 401 unless platform-control has auth disabled"
+        )
 
-    base_url = str(args.legal_search_api_url).rstrip("/")
-    api_key = args.legal_search_api_key
+    legal_search_base = str(args.legal_search_api_url).rstrip("/")
+    platform_control_base = str(args.platform_control_api_url).rstrip("/")
+
+    def legal_search(path: str) -> ForwardTarget:
+        return ForwardTarget(f"{legal_search_base}{path}", args.legal_search_api_key)
+
+    def platform_control(path: str) -> ForwardTarget:
+        return ForwardTarget(f"{platform_control_base}{path}", args.platform_control_api_key)
 
     connection = await nats.connect(args.servers)
     jetstream = connection.jetstream()
 
-    def make_forward(path: str) -> Callable[[bytes], Awaitable[None]]:
-        url = f"{base_url}{path}"
-
+    def make_forward(*targets: ForwardTarget) -> Callable[[bytes], Awaitable[None]]:
         async def forward(data: bytes) -> None:
-            # urllib is blocking — run it off the event loop so fetch/ack keep flowing.
-            await asyncio.to_thread(post_projection_event, url, data, api_key=api_key)
+            # Sequential fan-out: the first failing target raises, so the message is
+            # nak'd and every target is re-POSTed on redelivery. Safe because all of
+            # them are idempotent (dedup by event id / revision -> 202).
+            for target in targets:
+                # urllib is blocking — run it off the event loop so fetch/ack keep flowing.
+                await asyncio.to_thread(
+                    post_projection_event,
+                    target.url,
+                    data,
+                    api_key=target.api_key,
+                )
 
         return forward
 
@@ -252,20 +346,37 @@ async def run(args: argparse.Namespace) -> int:
             config=consumer_config,
         )
 
-    # One process, one subscription per subject → matching projection endpoint. The
-    # endpoints are idempotent, so at-least-once redelivery on either route is safe.
+    # One process, one subscription per subject, fanned out to every endpoint that needs
+    # the event. legal-search makes it searchable; platform-control records it so
+    # /v1/runs/{id}/pipeline-health can advance past `pending` (#550). All endpoints are
+    # idempotent, so at-least-once redelivery on any route is safe.
     routes = [
         (
             await subscribe(args.processed_subject, args.durable_name),
             args.processed_subject,
-            make_forward("/v1/projections/events/document-processed"),
+            make_forward(
+                legal_search("/v1/projections/events/document-processed"),
+                platform_control("/v1/di/events/document-processed"),
+            ),
             make_dlq(args.dlq_subject),
         ),
         (
             await subscribe(args.withdrawn_subject, args.withdrawn_durable_name),
             args.withdrawn_subject,
-            make_forward("/v1/projections/events/document-withdrawn"),
+            make_forward(
+                legal_search("/v1/projections/events/document-withdrawn"),
+                platform_control("/v1/di/events/document-withdrawn"),
+            ),
             make_dlq(args.withdrawn_dlq_subject),
+        ),
+        (
+            # Status updates are control-plane only — legal-search has no use for them.
+            await subscribe(args.status_subject, args.status_durable_name),
+            args.status_subject,
+            make_forward(
+                platform_control("/v1/di/events/document-processing-status-updated"),
+            ),
+            make_dlq(args.status_dlq_subject),
         ),
     ]
 
@@ -275,11 +386,13 @@ async def run(args: argparse.Namespace) -> int:
         loop.add_signal_handler(sig, should_stop.set)
 
     LOGGER.info(
-        "starting projection bridge on %s (subjects=%s, %s -> %s)",
+        "starting projection bridge on %s (subjects=%s, %s, %s -> legal-search %s, platform-control %s)",
         args.stream,
         args.processed_subject,
         args.withdrawn_subject,
-        base_url,
+        args.status_subject,
+        legal_search_base,
+        platform_control_base,
     )
     while not should_stop.is_set():
         for subscription, subject, forward, dlq_publish in routes:

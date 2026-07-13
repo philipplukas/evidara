@@ -81,6 +81,22 @@ in `legal-search/api/src/core/opensearch/documents-index.mapping.ts`:
 - **`scripts/opensearch-alias-cutover.ts`** — versioned reindex/cutover, points
   both aliases at the new index.
 
+### How a broken alias surfaces
+
+A missing read alias is a total outage of search, so it fails loudly (#551) —
+it is never reported as "no results":
+
+- `GET /v1/search` and `GET /v1/search/context` return **503** with an ERROR log
+  (`index_not_found_exception` / connection failure). A query that executed and
+  matched nothing still returns **200** with an empty `results` array.
+- `GET /health/ready` returns **503** with
+  `checks.documents_read_alias.status = "error"` when the read alias does not
+  resolve to an index. Check it first when search looks empty:
+
+  ```bash
+  curl -s ${LS_URL}/health/ready | jq '.checks.documents_read_alias'
+  ```
+
 ## Procedure: Rebuild from canonical Delta (disaster recovery)
 
 **Use this when the index is missing, empty, or degraded** — i.e. whenever

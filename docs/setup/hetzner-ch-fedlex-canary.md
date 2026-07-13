@@ -117,6 +117,23 @@ running and subscribed (`kubectl -n evidara logs deploy/di-consumer`), that the 
 stream exists (`nats-evidara-stream-init` Job completed), and that MinIO holds the bundle
 under `evidara-raw-artifacts`.
 
+**Note the counters are reported, not inferred.** `accepted_count` / `processing_count` /
+`canonical_ready_count` / `processed_count` are read back from platform-control, and DI never
+calls platform-control itself — `di-consumer` only publishes to NATS. The
+[`projection-bridge`](../../document-intelligence/src/document_intelligence/jobs/projection_bridge_consumer.py)
+Deployment is what POSTs those events to platform-control's `/v1/di/events/*` endpoints. So a
+run can process perfectly, index into OpenSearch, and *still* come back `downstream_failed` if
+the bridge is down or unauthorized (#550). When the pipeline visibly worked but the counters
+are 0, check the bridge before you suspect DI:
+
+```bash
+kubectl -n evidara logs deploy/projection-bridge | grep -E 'projection_forward_failed|AuthForwardError'
+```
+
+An `AuthForwardError` there means `PLATFORM_CONTROL_OPERATOR_API_KEY` is missing from the
+`evidara-auth` secret (or does not match platform-control's) — the callbacks 401. They are
+retried rather than dropped, so fixing the key drains the backlog.
+
 ## 3. Integration milestone
 
 `verdict=pass` end-to-end is the definition of done for the whole CH-data-to-search-UI set
