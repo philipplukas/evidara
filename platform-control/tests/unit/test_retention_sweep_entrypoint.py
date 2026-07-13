@@ -1,21 +1,27 @@
-"""Unit coverage for the Temporal-driven retention path.
+"""Unit coverage for the retention-sweep entry points.
 
-- :class:`RetentionActivities.run_retention_sweep` is exercised directly
-  against a real session_factory + a real :class:`RetentionService` so the
-  activity's integration with sweep logic is guarded.
-- :func:`build_schedule` is validated without booting a Temporal cluster
-  (the ephemeral test server isn't reachable in this sandbox — see the
-  temporal.download 403 failures elsewhere).
+The sweep enforces a legal obligation, so what matters is that *the thing the
+CronJob actually invokes* deletes expired artifacts:
+
+- :func:`platform_control.retention_sweep.main` — the ``platform-control-retention-sweep``
+  console script, which is the CronJob's command. This is the test that proves
+  retention runs.
+- :meth:`RetentionActivities.run_retention_sweep` — the Temporal adapter, kept
+  (ADR-0031) and asserted to delegate to the same shared implementation rather
+  than carry its own copy of the sweep.
 """
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from platform_control import retention_sweep
 from platform_control.domain import RunMode, RunStatus, SourceVersionStatus
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
@@ -24,7 +30,6 @@ from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
-from platform_control.schedule_retention import build_schedule
 from platform_control.temporal.activities import RetentionActivities
 
 
@@ -110,93 +115,64 @@ async def _seed_expired_artifact(
         return artifact.artifact_id
 
 
+async def _surviving_artifact_count(session_maker: async_sessionmaker[AsyncSession]) -> int:
+    async with session_maker() as session:
+        return len((await session.scalars(select(RawArtifact.artifact_id))).all())
+
+
+def test_console_script_purges_expired_artifacts(
+    session_maker: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The CronJob's command performs the sweep — the point of the ADR-0031 move.
+
+    Nothing is injected: ``main`` resolves settings and the session factory from
+    the environment exactly as it does inside the CronJob pod (the ``session_maker``
+    fixture points that environment at a temp SQLite DB + local artifact dir).
+    """
+    asyncio.run(_seed_expired_artifact(session_maker, tmp_path))
+
+    exit_code = retention_sweep.main([])
+
+    assert exit_code == 0
+    assert asyncio.run(_surviving_artifact_count(session_maker)) == 0
+
+    out = capsys.readouterr().out
+    assert "artifacts_purged=1" in out
+    assert "resources_purged=1" in out
+
+
+def test_console_script_dry_run_reports_without_deleting(
+    session_maker: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    asyncio.run(_seed_expired_artifact(session_maker, tmp_path))
+
+    exit_code = retention_sweep.main(["--dry-run"])
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert out.startswith("[dry-run] ")
+    assert "artifacts_purged=1" in out
+    assert "blobs_deleted=0" in out
+    # Reported, not purged.
+    assert asyncio.run(_surviving_artifact_count(session_maker)) == 1
+
+
 @pytest.mark.asyncio
-async def test_activity_drives_retention_sweep(
+async def test_temporal_activity_delegates_to_the_same_sweep(
     session_maker: async_sessionmaker[AsyncSession],
     tmp_path: Path,
 ) -> None:
+    """The kept Temporal adapter reuses the shared sweep (it holds no copy of its own)."""
     await _seed_expired_artifact(session_maker, tmp_path)
 
-    def _settings_factory():
-        class _StubSettings:
-            artifact_store_backend = "local"
-            raw_artifact_local_dir = tmp_path
+    activity = RetentionActivities(session_factory=session_maker)
 
-        return _StubSettings()
-
-    activity = RetentionActivities(
-        session_factory=session_maker,
-        settings_factory=_settings_factory,
-    )
-
-    # Temporal decorates the bound method; call the underlying fn directly
-    # so tests don't need a running worker.
     report = await activity.run_retention_sweep(dry_run=False)
 
     assert report["artifacts_purged"] == 1
     assert report["resources_purged"] == 1
-
-
-@pytest.mark.asyncio
-async def test_activity_dry_run_reports_without_deleting(
-    session_maker: async_sessionmaker[AsyncSession],
-    tmp_path: Path,
-) -> None:
-    await _seed_expired_artifact(session_maker, tmp_path)
-
-    def _settings_factory():
-        class _StubSettings:
-            artifact_store_backend = "local"
-            raw_artifact_local_dir = tmp_path
-
-        return _StubSettings()
-
-    activity = RetentionActivities(
-        session_factory=session_maker,
-        settings_factory=_settings_factory,
-    )
-
-    report = await activity.run_retention_sweep(dry_run=True)
-
-    assert report["artifacts_purged"] == 1
-    assert report["blobs_deleted"] == 0
-
-    # Nothing actually purged.
-    async with session_maker() as session:
-        surviving = await session.get(
-            RawArtifact,
-            (
-                await session.scalars(__import__("sqlalchemy").select(RawArtifact.artifact_id))
-            ).first(),
-        )
-        assert surviving is not None
-
-
-def test_build_schedule_shapes_workflow_invocation() -> None:
-    schedule = build_schedule(
-        task_queue="platform-control-wizard",
-        cron="0 4 * * *",
-        dry_run=False,
-        paused=False,
-    )
-    action = schedule.action
-    # Action targets the right workflow with the right task_queue.
-    assert action.workflow == "RetentionSweepWorkflow"
-    assert action.task_queue == "platform-control-wizard"
-    assert action.args == [False]
-    # Spec has the configured cron.
-    assert schedule.spec.cron_expressions == ["0 4 * * *"]
-    # Default state is active.
-    assert schedule.state.paused is False
-
-
-def test_build_schedule_honours_paused_flag() -> None:
-    schedule = build_schedule(
-        task_queue="q",
-        cron="*/15 * * * *",
-        dry_run=True,
-        paused=True,
-    )
-    assert schedule.action.args == [True]
-    assert schedule.state.paused is True
-    assert schedule.spec.cron_expressions == ["*/15 * * * *"]
+    assert await _surviving_artifact_count(session_maker) == 0

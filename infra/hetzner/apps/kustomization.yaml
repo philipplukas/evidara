@@ -11,6 +11,9 @@ resources:
   - platform-control.yaml
   - legal-search.yaml
   - document-intelligence.yaml
+  # Legal-retention hard delete (ADR-0031). In `resources:` — unlike migrate-job.yaml —
+  # so the `images:` pin below applies and the tag never has to be maintained by hand.
+  - retention-sweep-cronjob.yaml
 
 # Single place to pin the image tag.
 #

@@ -29,7 +29,10 @@ dependencies = [
 platform-control-seed-reference-data = "platform_control.seed_reference_data:main"
 platform-control-connector-worker = "platform_control.connector_worker:main"
 platform-control-temporal-worker = "platform_control.temporal_worker:main"
-platform-control-schedule-retention = "platform_control.schedule_retention:main"
+# Legal-retention hard delete. Scheduled by the retention-sweep CronJob (ADR-0031),
+# NOT by a Temporal schedule — Temporal is deployed nowhere. `pc retention sweep`
+# is the manual alias over the same implementation.
+platform-control-retention-sweep = "platform_control.retention_sweep:main"
 pc = "platform_control.cli:main"
 
 [dependency-groups]
