@@ -1,0 +1,81 @@
+# What Prometheus scrapes in the `evidara` namespace (ADR-0031).
+#
+# ServiceMonitor for anything with a Service; PodMonitor for the two DI consumers,
+# which are Deployments with no Service (nothing calls them — they pull from NATS).
+#
+# These objects live next to the workloads they describe, not in `monitoring`, and the
+# operator finds them because values/kube-prometheus-stack.yaml nils the namespace-scoped
+# selectors. Adding a service = adding a block here, not editing the Helm release.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: legal-search-api
+  namespace: evidara
+  labels:
+    app.kubernetes.io/part-of: evidara
+spec:
+  selector:
+    matchLabels:
+      app: legal-search-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      # The index probe does two OpenSearch round-trips per scrape; a stuck cluster
+      # must time out well inside the scrape interval or the target flaps.
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: platform-control-api
+  namespace: evidara
+  labels:
+    app.kubernetes.io/part-of: evidara
+spec:
+  selector:
+    matchLabels:
+      app: platform-control-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: di-consumers
+  namespace: evidara
+  labels:
+    app.kubernetes.io/part-of: evidara
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [di-consumer, projection-bridge]
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+---
+# NATS exposes JetStream metrics through the chart's prometheus-nats-exporter sidecar
+# (values/nats.yaml, `promExporter.enabled`). The chart can create this PodMonitor
+# itself, but that would make `deploy-stage2.sh` depend on the Prometheus Operator CRDs
+# existing — a stage-ordering trap. Owning it here keeps stage 2 independent.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: nats
+  namespace: evidara
+  labels:
+    app.kubernetes.io/part-of: evidara
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nats
+  podMetricsEndpoints:
+    - port: prom-metrics
+      path: /metrics
+      interval: 30s

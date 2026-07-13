@@ -76,7 +76,10 @@ spec:
           image: ghcr.io/philipplukas/evidara-document-intelligence-consumer
           command: ["sh", "-c", "document_intelligence_nats_consumer --servers \"$NATS_SERVERS\""]
           ports:
-            - containerPort: 8080
+            # Named so the `di-consumers` PodMonitor can scrape /metrics off the same
+            # health server that already answers /health (ADR-0031).
+            - name: http
+              containerPort: 8080
           envFrom:
             - configMapRef:
                 name: evidara-config
@@ -121,7 +124,8 @@ spec:
           image: ghcr.io/philipplukas/evidara-document-intelligence-consumer
           command: ["sh", "-c", "document_intelligence_projection_bridge --servers \"$NATS_SERVERS\""]
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
           env:
             - name: LEGAL_SEARCH_API_KEY
               valueFrom:

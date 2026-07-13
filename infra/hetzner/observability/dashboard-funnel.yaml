@@ -1,0 +1,445 @@
+# The Evidara pipeline funnel — one number per stage (ADR-0031, #553).
+#
+# Read left to right, top to bottom. A leak between any two stages is a step change in
+# the numbers; a total outage is a zero. Deriving this by hand took most of a session
+# with kubectl and `_cat/aliases`.
+#
+# Delivered as a labelled ConfigMap rather than baked into the Helm values: the Grafana
+# sidecar (values/kube-prometheus-stack.yaml, `sidecar.dashboards`) imports anything
+# labelled `grafana_dashboard: "1"`, so editing this file and re-applying is the whole
+# update path — no Helm upgrade, no Grafana restart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-evidara-funnel
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: Evidara
+data:
+  evidara-funnel.json: |
+    {
+      "uid": "evidara-funnel",
+      "title": "Evidara — pipeline funnel",
+      "description": "One number per pipeline stage. A leak between two stages is visible instantly.",
+      "tags": ["evidara"],
+      "schemaVersion": 39,
+      "editable": true,
+      "time": { "from": "now-24h", "to": "now" },
+      "refresh": "1m",
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "label": "Datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": {},
+            "hide": 0
+          }
+        ]
+      },
+      "panels": [
+        {
+          "type": "row",
+          "title": "Funnel — counts over the dashboard time range",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "1. Runs launched",
+          "description": "platform-control handed a run to a provider (API, worker or Temporal path).",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 5, "x": 0, "y": 1 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(platform_control_runs_launched_total[$__range])) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "2. Artifacts captured",
+          "description": "Raw artifacts persisted (inline providers + async Firecrawl webhook).",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 5, "x": 5, "y": 1 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(platform_control_artifacts_captured_total[$__range])) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "3. Bundle events published",
+          "description": "artifact_bundle.available events handed to NATS.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 5, "x": 10, "y": 1 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(platform_control_bundle_events_published_total[$__range])) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "4. DI messages processed",
+          "description": "di-consumer turned a bundle into a document.processed event.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 5, "x": 15, "y": 1 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(di_messages_total{outcome=\"processed\"}[$__range])) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "`documents-read` resolves",
+          "description": "0 = the core search feature is dead. This is the alert that pages.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max(legal_search_alias_resolved{alias=\"documents-read\"}) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value_and_name"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "NO", "color": "red", "index": 0 },
+                    "1": { "text": "yes", "color": "green", "index": 1 }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "5. document.processed forwarded",
+          "description": "projection-bridge delivered the event to legal-search.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 5, "x": 0, "y": 6 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(di_projection_forwards_total{outcome=\"forwarded\"}[$__range])) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 7,
+          "type": "stat",
+          "title": "6. Documents indexed",
+          "description": "Upserts that actually landed in the OpenSearch write alias.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 5, "x": 5, "y": 6 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(legal_search_documents_indexed_total[$__range])) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 8,
+          "type": "stat",
+          "title": "Docs searchable now",
+          "description": "Documents behind `documents-read` right now. Not a rate — the standing corpus.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 5, "x": 10, "y": 6 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max(legal_search_indexed_documents) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 9,
+          "type": "stat",
+          "title": "7. Search queries",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 5, "x": 15, "y": 6 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(legal_search_search_queries_total[$__range])) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 10,
+          "type": "stat",
+          "title": "  ...with hits",
+          "description": "Queries that returned at least one result. 340 queries / 0 with hits is the outage.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 5, "w": 4, "x": 20, "y": 6 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "clamp_min(sum(increase(legal_search_search_queries_total[$__range])) - sum(increase(legal_search_search_queries_zero_hits_total[$__range])), 0) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "type": "row",
+          "title": "Flow over time — where the leak starts",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+          "collapsed": false
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Pipeline stages (per hour)",
+          "description": "Stages that should track each other. A line that flattens while the one above it keeps climbing is the leak.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 12 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(platform_control_runs_launched_total[1h]))",
+              "legendFormat": "1. runs launched"
+            },
+            {
+              "refId": "B",
+              "expr": "sum(increase(platform_control_artifacts_captured_total[1h]))",
+              "legendFormat": "2. artifacts captured"
+            },
+            {
+              "refId": "C",
+              "expr": "sum(increase(di_messages_total{outcome=\"processed\"}[1h]))",
+              "legendFormat": "4. DI messages processed"
+            },
+            {
+              "refId": "D",
+              "expr": "sum(increase(di_projection_forwards_total{outcome=\"forwarded\"}[1h]))",
+              "legendFormat": "5. document.processed forwarded"
+            },
+            {
+              "refId": "E",
+              "expr": "sum(increase(legal_search_documents_indexed_total[1h]))",
+              "legendFormat": "6. documents indexed"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": { "lineWidth": 2, "fillOpacity": 5, "showPoints": "never" },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          }
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "Search: queries vs. zero-hit queries (per 5m)",
+          "description": "The two lines converging is the search outage — every query answered, none with results.",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 21 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(legal_search_search_queries_total[5m]))",
+              "legendFormat": "queries"
+            },
+            {
+              "refId": "B",
+              "expr": "sum(increase(legal_search_search_queries_zero_hits_total[5m]))",
+              "legendFormat": "zero-hit queries"
+            },
+            {
+              "refId": "C",
+              "expr": "sum(increase(legal_search_search_errors_total[5m]))",
+              "legendFormat": "backend errors (served as empty)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": { "lineWidth": 2, "fillOpacity": 5, "showPoints": "never" },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          }
+        }
+      ]
+    }

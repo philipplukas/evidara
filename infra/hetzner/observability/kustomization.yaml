@@ -1,0 +1,14 @@
+# Evidara-owned observability objects (ADR-0031). The kube-prometheus-stack Helm
+# release itself is installed by deploy-observability.sh; everything here is the part
+# that describes *Evidara*, and is applied with `kubectl apply -k`.
+#
+# No `namespace:` field on purpose — these objects span two namespaces (the scrape
+# targets and rules live next to the workloads in `evidara`, the dashboard ConfigMap
+# has to be somewhere the Grafana sidecar looks), so each manifest sets its own.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - scrape-targets.yaml
+  - alerts.yaml
+  - dashboard-funnel.yaml

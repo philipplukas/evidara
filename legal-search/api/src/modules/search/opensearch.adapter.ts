@@ -12,6 +12,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type {
   AggregationBucket,
@@ -61,6 +62,8 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     private readonly client: Client,
     @Inject(ConfigService)
     config: ConfigService,
+    @Inject(MetricsService)
+    private readonly metrics: MetricsService,
   ) {
     this.indexDocuments = config.get<string>('opensearch.documentsReadAlias') ?? 'documents-read';
   }
@@ -196,6 +199,7 @@ export class SearchOpenSearchAdapter implements SearchRepository {
           };
         });
 
+      this.metrics.recordSearch(total);
       return {
         total,
         hits,
@@ -203,7 +207,10 @@ export class SearchOpenSearchAdapter implements SearchRepository {
       };
     } catch (err) {
       this.logger.error('Search failed', err);
-      // Return empty results instead of crashing — observable degradation
+      // Return empty results instead of crashing — observable degradation. The metric
+      // is what makes it *observable*: without `search_errors_total` a dead cluster is
+      // indistinguishable from "the corpus has no match for that query".
+      this.metrics.recordSearchError();
       return { total: 0, hits: [], aggregations: {} };
     }
   }

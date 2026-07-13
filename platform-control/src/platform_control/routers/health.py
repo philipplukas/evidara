@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
 
@@ -6,6 +6,7 @@ from platform_control.config import get_settings
 from platform_control.database import get_session_maker
 from platform_control.models.run import Run
 from platform_control.models.source import Source
+from platform_control.observability.metrics import CONTENT_TYPE_LATEST, render_latest
 from platform_control.schemas.health import DependencyCheck, HealthResponse, ReadinessResponse
 
 router = APIRouter(tags=["health"])
@@ -15,6 +16,16 @@ router = APIRouter(tags=["health"])
 async def get_health() -> HealthResponse:
     settings = get_settings()
     return HealthResponse(status="ok", service=settings.app_name)
+
+
+@router.get("/metrics", include_in_schema=False)
+async def get_metrics() -> Response:
+    """Prometheus scrape endpoint (ADR-0031).
+
+    Lives on the unauthenticated health router on purpose: the port is cluster-internal
+    (no Ingress route reaches it) and the scraper carries no operator API key.
+    """
+    return Response(content=render_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @router.get("/ready", response_model=ReadinessResponse)

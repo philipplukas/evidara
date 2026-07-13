@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ApiKeyGuard } from './core/auth/api-key.guard';
 import documentIntelligenceConfig from './core/config/document-intelligence.config';
 import opensearchConfig from './core/config/opensearch.config';
+import { MetricsModule } from './core/metrics/metrics.module';
 import { OpenSearchModule } from './core/opensearch/client';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
@@ -17,6 +18,7 @@ import { SearchModule } from './modules/search/search.module';
       load: [opensearchConfig, documentIntelligenceConfig],
     }),
     OpenSearchModule,
+    MetricsModule,
     HealthModule,
     SearchModule,
     DocumentsModule,

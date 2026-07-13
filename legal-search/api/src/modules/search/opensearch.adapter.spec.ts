@@ -1,5 +1,6 @@
 import type { ConfigService } from '@nestjs/config';
 import { describe, expect, it, vi } from 'vitest';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { SearchOpenSearchAdapter } from './opensearch.adapter';
 
 describe('SearchOpenSearchAdapter', () => {
@@ -17,6 +18,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     await adapter.search('verantwortlichkeit', {
@@ -100,6 +102,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     await adapter.search('verantwortlichkeit', {
@@ -136,6 +139,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     await adapter.search('arbeitsrecht', {
@@ -172,6 +176,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     await adapter.search('arbeitsrecht', {
@@ -199,6 +204,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     await adapter.search('verantwortlichkeit', {
@@ -239,6 +245,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     const result = await adapter.search('obligationenrecht');
@@ -278,6 +285,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     const result = await adapter.search('obligationenrecht');
@@ -306,6 +314,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     const result = await adapter.search('Bundesgericht');
@@ -329,6 +338,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     await adapter.search('Art. 8 EMRK');
@@ -359,6 +369,7 @@ describe('SearchOpenSearchAdapter', () => {
         get: (key: string) =>
           key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null,
       } as ConfigService,
+      new MetricsService(),
     );
 
     await adapter.search('verwaltungsrat haftung gesellschaftsrecht');

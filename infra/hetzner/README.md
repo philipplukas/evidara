@@ -20,6 +20,7 @@ whole node.
 | Lakehouse catalog | **Nessie** (Iceberg REST, git-like) | helm `nessie/nessie`, Postgres-backed |
 | Lakehouse query | **Trino** | helm `trino/trino` |
 | Apps | Evidara services | `k8s/gitops` overlay (adapted) |
+| Observability | **Prometheus + Alertmanager + Grafana** | helm `prometheus-community/kube-prometheus-stack` |
 
 Stateful services use the k3s built-in `local-path` storage class and the RAID-5 root.
 
@@ -197,3 +198,42 @@ gh api repos/philipplukas/evidara/actions/runners --jq '.runners[].name'
 > **These pools own the required checks.** If they are offline, no PR can merge —
 > `check-title` + `contract-validation` never start. That was the CI blocker after the
 > GKE cluster (which hosted the old ARC pools) was decommissioned.
+
+## Stage 7 — observability (ADR-0031)
+
+Until this stage the cluster had **no metrics and no alerting**. Every failure in the
+June/July outage (#549/#550/#551) was silent: the OpenSearch document index was missing
+entirely, search returned an empty page for every query, and every pod stayed `Running`,
+`1/1 Ready`, zero restarts the whole time. Liveness probes answer *"is the process
+alive"*; nothing answered *"is work actually flowing"*.
+
+```sh
+bash infra/hetzner/deploy-observability.sh
+```
+
+Idempotent. Installs `kube-prometheus-stack` (Prometheus + Alertmanager + Grafana) into a
+new `monitoring` namespace, re-applies the NATS release to add the JetStream exporter
+sidecar, then applies the Evidara scrape targets, alert rules, and the **pipeline funnel
+dashboard** — one number per stage:
+
+```
+runs launched → artifacts captured → DI messages processed → document.processed
+  → documents indexed → docs searchable now → search queries → ...with hits
+```
+
+A leak between any two stages is a step change you cannot miss; an outage is a zero.
+
+Day-one alerts include `documents-read` failing to resolve (the #549 total outage,
+previously 100% undetected), read/write alias divergence (#551), a zero-result rate above
+95%, and DI processing messages while zero documents reach OpenSearch.
+
+Full deploy/verify/receiver-wiring guide:
+[`docs/setup/hetzner-observability.md`](../../docs/setup/hetzner-observability.md).
+
+> **Alertmanager has no external receiver out of the box** — alerts land in its UI and
+> nobody's phone rings. Wiring a Slack webhook is a one-value change; the credential is
+> deliberately the operator's, not the repo's. See the setup guide.
+
+> **First-rollout check.** Confirm `jetstream_consumer_num_pending` actually resolves in
+> Prometheus. The `prometheus-nats-exporter` metric names have moved between versions,
+> and an alert on a metric that does not exist is worse than no alert — it looks like one.
