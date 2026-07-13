@@ -13,7 +13,7 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.4.1
+ * OpenAPI spec version: 0.5.0
  */
 import type {
   CitedByResponse,
@@ -41,11 +41,16 @@ export type searchDocumentsResponse400 = {
   data: void
   status: 400
 }
+
+export type searchDocumentsResponse503 = {
+  data: void
+  status: 503
+}
     
 export type searchDocumentsResponseSuccess = (searchDocumentsResponse200) & {
   headers: Headers;
 };
-export type searchDocumentsResponseError = (searchDocumentsResponse400) & {
+export type searchDocumentsResponseError = (searchDocumentsResponse400 | searchDocumentsResponse503) & {
   headers: Headers;
 };
 
@@ -94,11 +99,16 @@ export type getSearchContextResponse400 = {
   data: void
   status: 400
 }
+
+export type getSearchContextResponse503 = {
+  data: void
+  status: 503
+}
     
 export type getSearchContextResponseSuccess = (getSearchContextResponse200) & {
   headers: Headers;
 };
-export type getSearchContextResponseError = (getSearchContextResponse400) & {
+export type getSearchContextResponseError = (getSearchContextResponse400 | getSearchContextResponse503) & {
   headers: Headers;
 };
 

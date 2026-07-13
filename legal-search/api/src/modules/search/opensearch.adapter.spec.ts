@@ -1,6 +1,28 @@
 import type { ConfigService } from '@nestjs/config';
 import { describe, expect, it, vi } from 'vitest';
 import { SearchOpenSearchAdapter } from './opensearch.adapter';
+import { SearchBackendUnavailableError } from './search.errors';
+
+const CONFIG = {
+  get: (key: string) => (key === 'opensearch.documentsReadAlias' ? 'documents-read-test' : null),
+} as ConfigService;
+
+/** The error the OpenSearch client raises when the index/alias does not exist. */
+function indexNotFoundError(): Error {
+  const err = new Error('index_not_found_exception');
+  Object.assign(err, {
+    meta: {
+      statusCode: 404,
+      body: {
+        error: {
+          type: 'index_not_found_exception',
+          reason: 'no such index [documents-read-test]',
+        },
+      },
+    },
+  });
+  return err;
+}
 
 describe('SearchOpenSearchAdapter', () => {
   it('translates multi-filter options into OpenSearch bool filters', async () => {
@@ -373,5 +395,90 @@ describe('SearchOpenSearchAdapter', () => {
       }),
     );
     expect(firstCall.body.query.bool.must[0].multi_match.operator).toBeUndefined();
+  });
+
+  // ─── Failure vs. zero matches (#551) ───
+
+  describe('failed queries are not empty result sets', () => {
+    it('resolves with an empty result set when the query executes and matches nothing', async () => {
+      const search = vi.fn().mockResolvedValue({
+        body: { hits: { total: { value: 0 }, hits: [] }, aggregations: {} },
+      });
+      const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG);
+
+      await expect(adapter.search('nichts')).resolves.toEqual({
+        total: 0,
+        hits: [],
+        aggregations: {},
+      });
+    });
+
+    it('throws index_missing instead of returning empty when the index does not exist', async () => {
+      const search = vi.fn().mockRejectedValue(indexNotFoundError());
+      const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG);
+
+      const failure = await adapter.search('obligationenrecht').catch((err: unknown) => err);
+
+      expect(failure).toBeInstanceOf(SearchBackendUnavailableError);
+      expect((failure as SearchBackendUnavailableError).reason).toBe('index_missing');
+      expect((failure as SearchBackendUnavailableError).index).toBe('documents-read-test');
+      expect((failure as SearchBackendUnavailableError).message).toContain(
+        'index_not_found_exception',
+      );
+    });
+
+    it('throws unavailable when the cluster cannot be reached', async () => {
+      const search = vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:9200'));
+      const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG);
+
+      const failure = await adapter.search('obligationenrecht').catch((err: unknown) => err);
+
+      expect(failure).toBeInstanceOf(SearchBackendUnavailableError);
+      expect((failure as SearchBackendUnavailableError).reason).toBe('unavailable');
+    });
+
+    it('throws rather than returning empty context aggregations when the index is missing', async () => {
+      const search = vi.fn().mockRejectedValue(indexNotFoundError());
+      const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG);
+
+      await expect(adapter.getContextAggregations()).rejects.toBeInstanceOf(
+        SearchBackendUnavailableError,
+      );
+    });
+  });
+
+  // ─── Read-alias readiness probe (#551) ───
+
+  describe('checkReadAlias', () => {
+    it('reports ok with the resolved indices', async () => {
+      const getAlias = vi.fn().mockResolvedValue({ body: { 'documents-000001': { aliases: {} } } });
+      const adapter = new SearchOpenSearchAdapter({ indices: { getAlias } } as never, CONFIG);
+
+      await expect(adapter.checkReadAlias()).resolves.toEqual({
+        status: 'ok',
+        alias: 'documents-read-test',
+        indices: ['documents-000001'],
+      });
+      expect(getAlias).toHaveBeenCalledWith({ name: 'documents-read-test' });
+    });
+
+    it('reports error when the alias does not resolve', async () => {
+      const getAlias = vi.fn().mockRejectedValue(indexNotFoundError());
+      const adapter = new SearchOpenSearchAdapter({ indices: { getAlias } } as never, CONFIG);
+
+      const result = await adapter.checkReadAlias();
+
+      expect(result.status).toBe('error');
+      expect(result).toMatchObject({ alias: 'documents-read-test' });
+    });
+
+    it('reports error when the alias resolves to no index', async () => {
+      const getAlias = vi.fn().mockResolvedValue({ body: {} });
+      const adapter = new SearchOpenSearchAdapter({ indices: { getAlias } } as never, CONFIG);
+
+      const result = await adapter.checkReadAlias();
+
+      expect(result.status).toBe('error');
+    });
   });
 });

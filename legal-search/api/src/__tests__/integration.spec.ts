@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { DocumentIntelligenceClient } from '../lib/document-intelligence/document-intelligence.client';
 import type { DocumentsRepository } from '../modules/documents/documents.repository';
 import type { ProjectionRepository } from '../modules/projections/projections.repository';
+import { SearchBackendUnavailableError } from '../modules/search/search.errors';
 import type { SearchRepository } from '../modules/search/search.repository';
 import { createTestApp, EMPTY_SEARCH } from './test-app';
 
@@ -131,6 +132,34 @@ describe('search response contract (ADR-0011)', () => {
     expect(res.body.results).toEqual([]);
     expect(res.body.facets).toEqual([]);
     expect(res.body.totalResults).toBe(0);
+  });
+
+  // ─── #551: a broken index must not look like "no results" ───
+
+  it('a missing search index returns 503, not an empty 200', async () => {
+    (searchRepo.search as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new SearchBackendUnavailableError('search', 'documents-read', {
+        meta: { statusCode: 404, body: { error: { type: 'index_not_found_exception' } } },
+      }),
+    );
+
+    const res = await supertest(app.getHttpServer()).get('/v1/search?q=obligationenrecht');
+
+    expect(res.status).toBe(503);
+    expect(res.body.message).toContain('documents-read');
+    expect(res.body.results).toBeUndefined();
+  });
+
+  it('an unreachable search backend returns 503 on /v1/search/context', async () => {
+    (searchRepo.getContextAggregations as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new SearchBackendUnavailableError(
+        'context aggregation',
+        'documents-read',
+        new Error('connect ECONNREFUSED'),
+      ),
+    );
+
+    await supertest(app.getHttpServer()).get('/v1/search/context').expect(503);
   });
 });
 
@@ -384,5 +413,29 @@ describe('projections event ingestion', () => {
       .expect(202);
 
     expect(res.body.status).toBe('applied');
+  });
+});
+
+// ─── Readiness (#551) ───
+
+describe('readiness reflects the documents read alias', () => {
+  it('GET /health/ready → 200 when the read alias resolves', async () => {
+    const res = await supertest(app.getHttpServer()).get('/health/ready').expect(200);
+
+    expect(res.body.status).toBe('ok');
+    expect(res.body.checks.documents_read_alias.status).toBe('ok');
+  });
+
+  it('GET /health/ready → 503 when the read alias is missing', async () => {
+    (searchRepo.checkReadAlias as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: 'error',
+      alias: 'documents-read',
+      detail: 'index_not_found_exception: no such index [documents-read]',
+    });
+
+    const res = await supertest(app.getHttpServer()).get('/health/ready').expect(503);
+
+    expect(res.body.status).toBe('degraded');
+    expect(res.body.checks.documents_read_alias.status).toBe('error');
   });
 });
