@@ -35,6 +35,7 @@ flowchart LR
 ## Retention
 
 - **Legal / compliance** retention for raw and canonical data is a product and policy decision; encode in corpus metadata and bucket policies.
+- **Enforcement** is the `platform-control-retention-sweep` CronJob (daily, 04:00 UTC): it hard-deletes raw artifacts past their jurisdiction's `CompliancePolicy.retention_days`. See the [retention sweep runbook](../runbooks/retention-sweep.md).
 - **Logs and traces** follow environment retention (e.g. 30–90 days) unless audit requires longer.
 
 ## Related
