@@ -12,7 +12,7 @@ info:
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
     Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
-  version: 0.4.1
+  version: 0.5.0
   contact:
     name: Evidara Team
   license:
@@ -156,6 +156,11 @@ paths:
                 $ref: "#/components/schemas/SearchResponseView"
         "400":
           description: Invalid query parameters
+        "503":
+          description: |
+            The search backend could not execute the query (missing index/alias,
+            connection failure, timeout). Distinct from a query that executed and
+            matched nothing — that is a 200 with an empty `results` array.
 
   /v1/search/context:
     get:
@@ -176,6 +181,8 @@ paths:
                 $ref: "#/components/schemas/SearchContextView"
         "400":
           description: Invalid request
+        "503":
+          description: The search backend could not execute the aggregation query
 
   /v1/documents/{document_id}:
     get:
