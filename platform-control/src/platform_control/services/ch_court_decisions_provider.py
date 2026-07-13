@@ -41,6 +41,7 @@ resolves is honoured.
 
 from __future__ import annotations
 
+import html
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -70,22 +71,38 @@ _DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = (
     "entscheidsuche.ch",
 )
 
-# Modern Swiss federal-court file number, e.g. ``1C_123/2024``, ``6B_45/2023``.
-_DOCKET_RE = re.compile(r"\b\d{1,2}[A-Z]?_\d+/\d{4}\b")
-# Official reporter citation, e.g. ``BGE 149 III 1`` / ``ATF 149 III 1``.
+# Swiss federal-court file numbers. Two shapes are recognised:
+#   * BGer/BStGer/BPGer:  ``1C_123/2024``, ``6B_45/2023`` (chamber code + ``_``)
+#   * BVGer:              ``A-1234/2024``, ``B-567/2023``  (division letter A–F + ``-``)
+# Both are language-neutral, so the same regex serves DE/FR/IT rulings.
+_DOCKET_RE = re.compile(r"\b(?:\d{1,2}[A-Z]?_\d+|[A-F]-\d+)/\d{4}\b")
+# Official reporter citation, e.g. ``BGE 149 III 1`` / ``ATF 149 III 1`` / ``DTF 149 III 1``.
 _BGE_RE = re.compile(r"\b(?:BGE|ATF|DTF)\s+\d{1,3}\s+[IVX]+\s+\d+\b")
-# European Case Law Identifier, e.g. ``ECLI:CH:BGER:2024:...``.
+# European Case Law Identifier, e.g. ``ECLI:CH:BGER:2024:...`` / ``ECLI:CH:BVGER:2024:...``.
 _ECLI_RE = re.compile(r"ECLI:CH:[A-Z0-9]+:\d{4}:[A-Za-z0-9._-]+")
-# German long-form decision date, e.g. ``12. März 2024``.
+# Long-form decision date in any of the three official languages, e.g.
+# ``12. März 2024`` (DE), ``12 mars 2024`` / ``1er mars 2024`` (FR),
+# ``12 marzo 2024`` (IT). The day separator (``.``) and the ``er`` ordinal are
+# both optional so the single pattern spans all three forms.
+_MONTH_NAMES = (
+    # German
+    "Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|"
+    # French
+    "janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|"
+    # Italian
+    "gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre"
+)
 _DATE_RE = re.compile(
-    r"\b\d{1,2}\.\s?"
-    r"(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)"
-    r"\s?\d{4}\b"
+    r"\b\d{1,2}(?:er)?\.?\s?(?:" + _MONTH_NAMES + r")\s?\d{4}\b",
+    re.IGNORECASE,
 )
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+# First-heading fallback when a decision page ships an empty/boilerplate title.
+_H1_RE = re.compile(r"<h1[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
+_TAG_RE = re.compile(r"<[^>]+>")
 _HREF_RE = re.compile(r"""href\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
 # Discovery default: decision links carry a docket in the URL or end in .html.
-_DEFAULT_LINK_PATTERN = r"\d{1,2}[A-Z]?_\d+/\d{4}|\.html?($|[?#])"
+_DEFAULT_LINK_PATTERN = r"\d{1,2}[A-Z]?_\d+/\d{4}|[A-F]-\d+/\d{4}|\.html?($|[?#])"
 
 _DEFAULT_MAX_DOCUMENTS = 50
 _DEFAULT_MAX_CONTENT_BYTES = 5_000_000
@@ -133,12 +150,31 @@ def _seed_list(acquisition_spec: dict[str, Any], key: str) -> list[str]:
     return []
 
 
+def _clean_inline_text(raw: str) -> str:
+    """Strip nested tags/entities and collapse whitespace to a single line."""
+    without_tags = _TAG_RE.sub(" ", raw)
+    unescaped = html.unescape(without_tags)
+    return re.sub(r"\s+", " ", unescaped).strip()
+
+
 def _extract_title(body_text: str) -> str | None:
+    """Title from ``<title>``; fall back to the first ``<h1>`` when it is empty.
+
+    Many court pages ship a boilerplate or blank ``<title>`` (e.g. just the
+    portal name) while the actual case caption lives in an ``<h1>``. Falling
+    back keeps a meaningful title instead of dropping to the URL basename.
+    """
     match = _TITLE_RE.search(body_text)
-    if not match:
-        return None
-    title = re.sub(r"\s+", " ", match.group(1)).strip()
-    return title or None
+    if match:
+        title = _clean_inline_text(match.group(1))
+        if title:
+            return title
+    h1_match = _H1_RE.search(body_text)
+    if h1_match:
+        heading = _clean_inline_text(h1_match.group(1))
+        if heading:
+            return heading
+    return None
 
 
 def _extract_links(
@@ -151,7 +187,9 @@ def _extract_links(
     seen: set[str] = set()
     links: list[str] = []
     for match in _HREF_RE.finditer(body_text):
-        href = match.group(1).strip()
+        # Unescape HTML entities (e.g. ``&amp;`` in query strings) so the
+        # discovered URL is the real target, not a broken entity-laden one.
+        href = html.unescape(match.group(1).strip())
         if not href or href.startswith(("#", "mailto:", "javascript:")):
             continue
         absolute = urljoin(base_url, href)
@@ -381,7 +419,12 @@ class ChCourtDecisionsProvider:
             final_url=final_url,
             content_type=normalized_ct,
             body=body,
-            title=_extract_title(body) or citation.get("docket") or url.rsplit("/", 1)[-1],
+            title=(
+                _extract_title(body)
+                or citation.get("docket")
+                or citation.get("ecli")
+                or url.rsplit("/", 1)[-1]
+            ),
             http_status=response.status_code,
             discovery_depth=1 if discovery_source == "index" else 0,
             metadata={
