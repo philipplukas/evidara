@@ -66,7 +66,6 @@ Primary ownership:
 
 - `document-intelligence/**`
 - `infra/**`
-- `.github/workflows/document-intelligence-cd.yml`
 - `.github/workflows/terraform.yml`
 - release docs that describe the promotion path
 
@@ -74,15 +73,13 @@ Recommended branch and PR topology:
 
 | Order | Branch | Base | PR title | Primary paths |
 |---|---|---|---|---|
-| 1 | `ci/tar-62-di-staging-promotion` | `origin/main` | `ci(document-intelligence): add staging promotion path for bundle deploy` | `document-intelligence/databricks.yml`, `.github/workflows/document-intelligence-cd.yml` |
-| 2 | `ci/tar-62-runtime-promotion-gates` | `origin/main` | `ci(infra): add runtime promotion gating and traceability` | `.github/workflows/terraform.yml`, `infra/terraform/gcp/runtime_stack/`, `infra/env/README.md` |
-| 3 | `docs/tar-62-promotion-runbook` | `origin/main` after 1 and 2 merge | `docs(infra): document dev to staging to prod promotion flow` | `docs/runbooks/runtime-stack.md`, `docs/setup/cd-workflow-blueprint.md` |
+| 1 | `ci/tar-62-runtime-promotion-gates` | `origin/main` | `ci(infra): add runtime promotion gating and traceability` | `.github/workflows/terraform.yml`, `infra/terraform/gcp/runtime_stack/`, `infra/env/README.md` |
+| 2 | `docs/tar-62-promotion-runbook` | `origin/main` after 1 merges | `docs(infra): document dev to staging to prod promotion flow` | `docs/runbooks/runtime-stack.md`, `docs/setup/cd-workflow-blueprint.md` |
 
 Notes:
 
-- PRs 1 and 2 can be prepared in parallel because they do not need the same files.
-- PR 3 should merge last so the runbook describes the final deployed path, not an intermediate state.
-- If a staging-only Terraform or environment variable change is needed, keep it in PR 2 rather than splitting another infra PR.
+- PR 2 should merge last so the runbook describes the final deployed path, not an intermediate state.
+- If a staging-only Terraform or environment variable change is needed, keep it in PR 1 rather than splitting another infra PR.
 
 Suggested checks:
 

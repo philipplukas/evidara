@@ -24,15 +24,10 @@ All gates are exercised by `scripts/check-document-intelligence.sh`.
 | OpenAPI contract lint | `@redocly/cli lint` | Invalid OpenAPI specs for DI APIs |
 | dbt deps + parse | `dbt parse` | Broken dbt model definitions |
 
-## Runtime / Deployment Gates (CI only)
-
-Exercised by `scripts/check-document-intelligence-runtime.sh` in the
-`document-intelligence-runtime-check` CI job.
+## Runtime Gates (CI only)
 
 | Gate | Tool | What it catches |
 |------|------|-----------------|
-| Terraform fmt | `terraform fmt -check` | Inconsistent HCL formatting |
-| Terraform validate | `terraform validate` | Invalid Terraform config for DI modules |
 | DI surface schema preflight (dev smoke) | `scripts/check-di-surface-schema-drift.sh` | Delta surface required-column drift before smoke execution |
 
 Cloud Run calls in `E2E Smoke Dev` use audience-scoped ID tokens minted via
@@ -47,31 +42,14 @@ Exercised by `.github/workflows/runtime-images.yml`.
 |------|-----------------|
 | Docker build (consumer) | Broken `Dockerfile` or missing dependencies |
 
-## CD Pipeline Gates
-
-Exercised by `.github/workflows/document-intelligence-cd.yml` on push to
-`main`.
-
-| Gate | Tool | What it catches |
-|------|------|-----------------|
-| DAB validate (dev) | `databricks bundle validate` | Invalid bundle config |
-| DAB deploy (dev) | `databricks bundle deploy` | Failed deployment to dev |
-| DAB validate (staging) | `databricks bundle validate` | Invalid staging bundle config |
-| DAB deploy (staging) | `databricks bundle deploy` | Failed deployment to staging |
-| DAB validate (prod) | `databricks bundle validate` | Invalid prod bundle config |
-| DAB deploy (prod) | `databricks bundle deploy` | Failed deployment to prod |
-
 ## Release Checklist
 
 Before promoting a document-intelligence change to production:
 
 1. All CI checks pass on the PR (quality + runtime gates)
 2. Container image builds successfully
-3. DAB dev deployment succeeds
-4. DAB staging deployment succeeds
-5. DAB prod deployment succeeds (requires manual approval via GitHub environment)
-6. DI schema preflight passes in dev (`published_*` surfaces)
-7. Smoke-test ingestion flow in dev environment
+3. DI schema preflight passes in dev (`published_*` surfaces)
+4. Smoke-test ingestion flow in dev environment
 
 ## Dev Runtime Verification Commands
 
@@ -98,9 +76,7 @@ gcloud storage rm --recursive "gs://evidara-document-intelligence-surfaces-dev/p
 ## Related Files
 
 - [`scripts/check-document-intelligence.sh`](../../scripts/check-document-intelligence.sh)
-- [`scripts/check-document-intelligence-runtime.sh`](../../scripts/check-document-intelligence-runtime.sh)
 - [`scripts/check-di-surface-schema-drift.sh`](../../scripts/check-di-surface-schema-drift.sh)
 - [`.github/workflows/document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
-- [`.github/workflows/document-intelligence-cd.yml`](../../.github/workflows/document-intelligence-cd.yml)
 - [`.github/workflows/runtime-images.yml`](../../.github/workflows/runtime-images.yml)
 - [`.github/workflows/e2e-smoke-dev.yml`](../../.github/workflows/e2e-smoke-dev.yml)

@@ -23,7 +23,7 @@ Legend: **Platform** → candidate for MacConfig `clusters/<env>/…`; **Product
 | Path / artifact | Class | Merge owner | Credentials / identity | Notes |
 | --- | --- | --- | --- | --- |
 | [`infra/terraform/gcp/runtime_stack/main.tf`](../../infra/terraform/gcp/runtime_stack/main.tf) (Cloud Run, Pub/Sub, Cloud SQL, buckets, …) | Product | Infra | GCP Terraform SA | Deployed via Terraform + [GitHub Actions CD](../../.github/workflows/); not covered by MacConfig `platform-contract` YAML kinds until you render static manifests. |
-| [`.github/workflows/platform-control-cd.yml`](../../.github/workflows/platform-control-cd.yml), [`document-intelligence-cd.yml`](../../.github/workflows/document-intelligence-cd.yml), related | Product | Platform + DI teams | GitHub OIDC → GCP | Image promotion and Cloud Run updates. |
+| [`.github/workflows/platform-control-cd.yml`](../../.github/workflows/platform-control-cd.yml), [`runtime-images.yml`](../../.github/workflows/runtime-images.yml), related | Product | Platform + DI teams | GitHub OIDC → GCP | Image promotion and Cloud Run updates (Cloud Run CD is gated behind `ENABLE_GCP_CLOUD_RUN_CD`). |
 
 ## Contracts and CI (build-time, not cluster)
 
@@ -52,4 +52,3 @@ Legend: **Platform** → candidate for MacConfig `clusters/<env>/…`; **Product
 | Item | Reason |
 | --- | --- |
 | Cloud Run Terraform modules | Product deploy path until GitOps migration is scoped. |
-| Databricks / DI Terraform | Data plane; not Kubernetes. |
