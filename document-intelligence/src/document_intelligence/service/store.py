@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -15,6 +16,22 @@ from document_intelligence.persist.sinks import delta_storage_options
 
 _DOC_ID_RE = re.compile(r"^doc_[0-9a-hjkmnp-tv-z]{26}$")
 _PM_ID_RE = re.compile(r"^pm_[0-9a-hjkmnp-tv-z]{26}$")
+
+# Columns the Delta -> OpenSearch backfill needs to rebuild a `document.processed` event.
+# Deliberately excludes `full_text` / `body_text` / `extensions`: enumerating a whole corpus
+# must not pull document bodies into memory.
+_BACKFILL_ROW_COLUMNS = (
+    "document_id",
+    "document_revision",
+    "processing_manifest_id",
+    "processing_version",
+    "provenance",
+    "authority_id",
+    "lifecycle_status",
+    "metadata",
+    "processed_at",
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,6 +153,42 @@ class DeltaPublishedDocumentStore:
         if sections:
             payload["sections"] = sections
         return payload
+
+    def iter_latest_document_rows(
+        self,
+        *,
+        after_document_id: str | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """Yield the latest revision of every published document, ordered by ``document_id``.
+
+        This is the enumeration side of the Delta -> OpenSearch backfill (ADR-0005): the
+        search index is a derived view, so rebuilding it means walking canonical truth.
+
+        Only the columns needed to rebuild a ``document.processed`` event are read — the
+        heavy payload columns (``full_text``, ``body_text``, ``extensions``) are left on
+        disk, because the projection re-fetches the document body through the read API.
+
+        Ordering by ``document_id`` makes the walk resumable: a caller that crashes after
+        document *N* passes ``after_document_id=N`` to continue without redoing prior work.
+        """
+        deltalake = importlib.import_module("deltalake")
+        dataset = deltalake.DeltaTable(self._published_documents_uri, **self._delta_table_kwargs()).to_pyarrow_dataset()
+
+        available = set(dataset.schema.names)
+        columns = [name for name in _BACKFILL_ROW_COLUMNS if name in available]
+
+        latest_by_document: dict[str, dict[str, Any]] = {}
+        for row in dataset.to_table(columns=columns).to_pylist():
+            document_id = row.get("document_id")
+            if not isinstance(document_id, str) or not document_id:
+                continue
+            if after_document_id is not None and document_id <= after_document_id:
+                continue
+            current = latest_by_document.get(document_id)
+            latest_by_document[document_id] = row if current is None else _pick_latest_row([current, row])
+
+        for document_id in sorted(latest_by_document):
+            yield latest_by_document[document_id]
 
     def _get_sections(
         self,
