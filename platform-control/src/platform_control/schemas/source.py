@@ -23,6 +23,14 @@ from platform_control.domain import (
 
 LanguageCode = Annotated[str, Field(pattern=r"^[a-z]{2}(?:-[A-Z]{2})?$")]
 
+# Court hint for the ch_court_decisions provider. Federal courts use their
+# abbreviation (bger, bvger, bstger, bpger); cantonal courts (aggregated via
+# entscheidsuche.ch) use the lowercase cantonal code (e.g. zh, be, bs). Kept as
+# a validated lowercase token rather than a closed Literal so cantonal coverage
+# does not require an enum edit per canton (#531). The provider passes this hint
+# straight into ProviderResource.metadata["court"].
+CourtHint = Annotated[str, Field(pattern=r"^[a-z]{2,8}$")]
+
 
 class BaseAcquisitionSpec(BaseModel):
     # --- Shared provenance / manifest defaults ---
@@ -148,7 +156,7 @@ class ChCourtDecisionsAcquisitionSpec(BaseAcquisitionSpec):
     seed_url: HttpUrl | None = None
     seed_urls: list[HttpUrl] = Field(default_factory=list)
     index_urls: list[HttpUrl] = Field(default_factory=list)
-    court: Literal["bger", "bvger", "bstger", "bpger"] | None = None
+    court: CourtHint | None = None
     link_pattern: str | None = None
     allowed_hosts: list[str] = Field(default_factory=list)
     max_documents: int = Field(default=50, ge=1, le=1000)

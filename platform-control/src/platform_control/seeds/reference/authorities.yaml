@@ -69,6 +69,27 @@ items:
     jurisdiction_id: jur_ch_ti
     slug: ti-cancelleria
     name: Cancelleria dello Stato del Cantone Ticino
+  # ─── Swiss cantonal courts ─────────────────────────────────
+  # Representative cantonal courts (ZH/BE/BS). Like the federal courts above,
+  # cantonal rulings carry no open-data licence, so they bind the public-official
+  # compliance tier (cp_ch_court_decisions) rather than any open-data policy.
+  # Their decisions are aggregated on entscheidsuche.ch and consumed via the
+  # reused ch_court_decisions provider (canton-hinted). See #531.
+  - authority_id: auth_zh_obergericht
+    jurisdiction_id: jur_ch_zh
+    slug: zh-obergericht
+    name: Obergericht des Kantons Zürich
+    compliance_policy_id: cp_ch_court_decisions
+  - authority_id: auth_be_obergericht
+    jurisdiction_id: jur_ch_be
+    slug: be-obergericht
+    name: Obergericht des Kantons Bern / Cour suprême du canton de Berne
+    compliance_policy_id: cp_ch_court_decisions
+  - authority_id: auth_bs_appellationsgericht
+    jurisdiction_id: jur_ch_bs
+    slug: bs-appellationsgericht
+    name: Appellationsgericht Basel-Stadt
+    compliance_policy_id: cp_ch_court_decisions
 
   # ─── Austria ────────────────────────────────────────────────
   - authority_id: auth_at_ris
