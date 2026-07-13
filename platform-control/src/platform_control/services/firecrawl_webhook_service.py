@@ -28,6 +28,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.models.webhook_receipt import WebhookReceipt
+from platform_control.observability import metrics
 from platform_control.services.artifact_store import ArtifactStore
 from platform_control.services.replay_checkpoint import merge_run_replay_checkpoint
 
@@ -239,6 +240,7 @@ class FirecrawlWebhookService:
                 self.session.add(resource)
                 run.artifacts_count += 1
                 run.captured_resources_count += 1
+                metrics.record_artifact_captured("webhook")
                 await self.publisher.publish_raw_artifact_available(artifact)
             merge_run_replay_checkpoint(
                 run,
@@ -397,6 +399,7 @@ class FirecrawlWebhookService:
             occurred_at=run.completed_at or datetime.now(UTC),
         )
         await self.publisher.publish_artifact_bundle_available(event)
+        metrics.record_bundle_event_published()
 
     @staticmethod
     def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:

@@ -36,10 +36,12 @@ from document_intelligence.jobs._consumer_common import (
     start_health_server,
 )
 from document_intelligence.observability.event_logging import log_event
+from document_intelligence.observability.metrics import record_message_outcome
 from document_intelligence.pipeline import ProcessingPipeline
 from document_intelligence.processing_runtime import build_processing_pipeline
 
 LOGGER = logging.getLogger("document_intelligence.nats_consumer")
+CONSUMER_SERVICE = "document-intelligence-nats-consumer"
 
 
 class IncomingMessage(Protocol):
@@ -267,7 +269,7 @@ async def run(args: argparse.Namespace, environment: Mapping[str, str]) -> int:
             # builtin covers both the bare timeout and the nats subclass.
             continue
         for msg in messages:
-            await dispatch_message(
+            outcome = await dispatch_message(
                 _NatsMessage(msg),
                 pipeline=pipeline,
                 publisher=publisher,
@@ -276,6 +278,7 @@ async def run(args: argparse.Namespace, environment: Mapping[str, str]) -> int:
                 nak_backoff_seconds=args.nak_backoff_seconds,
                 subject=args.bundle_subject,
             )
+            record_message_outcome(CONSUMER_SERVICE, outcome)
 
     await connection.drain()
     LOGGER.info("consumer stopped")
@@ -287,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    start_health_server("document-intelligence-nats-consumer")
+    start_health_server(CONSUMER_SERVICE)
     return asyncio.run(run(args, os.environ))
 
 

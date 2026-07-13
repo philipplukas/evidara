@@ -21,6 +21,17 @@ class ProviderConfigurationError(PlatformControlError):
     """Raised when an external provider is not configured correctly."""
 
 
+class BlueprintTemplateNotEnabledError(PlatformControlError):
+    """Raised when a run targets a blueprint template that is not enabled.
+
+    Config-owner key of the two-key lock (ADR-0030): a source version created
+    from a `source_blueprints.yaml` template may only launch live runs while
+    that template carries `enabled: true`. Absent/false means the operator has
+    not accepted it for live acquisition yet (no acceptance-run evidence), so
+    the run-launch path refuses to dispatch.
+    """
+
+
 class SignatureVerificationError(PlatformControlError):
     """Raised when a webhook signature cannot be verified."""
 
