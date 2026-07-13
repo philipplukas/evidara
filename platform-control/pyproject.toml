@@ -16,6 +16,7 @@ dependencies = [
   "greenlet>=3.2.0,<4",
   "httpx>=0.28.0,<1",
   "nats-py>=2.9.0,<3",
+  "prometheus-client>=0.21.0,<1",
   "pydantic-settings>=2.10.0,<3",
   "pydantic>=2.11.0,<3",
   "pyyaml>=6.0.2,<7",

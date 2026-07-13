@@ -42,6 +42,7 @@ from platform_control.models.raw_artifact import RawArtifact
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
+from platform_control.observability import metrics
 from platform_control.schemas.run import (
     CapturedResourceListResponse,
     CapturedResourceResponse,
@@ -927,6 +928,9 @@ class RunService:
         self.session.add(provider_job)
         run.status = RunStatus.RUNNING
         run.started_at = datetime.now(UTC)
+        # Funnel stage 1. Every launch path (API, connector worker, Temporal activity)
+        # converges on _dispatch_run, so one counter here covers all three.
+        metrics.record_run_launched(provider_job.provider)
         pending_publications = PendingDispatchPublications()
 
         if provider_result.inline_resources:
@@ -1022,6 +1026,7 @@ class RunService:
             )
             run.artifacts_count += 1
             run.captured_resources_count += 1
+            metrics.record_artifact_captured("inline")
             artifact_ids.append(artifact.artifact_id)
         return artifact_ids
 
@@ -1283,6 +1288,7 @@ class RunService:
                 await self.publisher.publish_raw_artifact_available(artifact)
             for event in pending.bundle_events:
                 await self.publisher.publish_artifact_bundle_available(event)
+                metrics.record_bundle_event_published()
 
     @staticmethod
     def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:
