@@ -25,7 +25,7 @@ with the same `evidara-config` + `evidara-app-secrets` env as the API.
 > anywhere**. It is a cron; it does not need durable execution. The workflow is still in the
 > codebase and now calls the same shared implementation — but if you ever re-create a Temporal
 > Schedule for it, delete the CronJob first, or the sweep runs twice.
-
+>
 > **Note on the GitOps path.** `k8s/gitops/base/` cannot host this CronJob: `CronJob` is not in
 > `allowedResources` in `vendor/platform-contract.yaml`. Moving the sweep there needs a contract
 > minor bump first.
