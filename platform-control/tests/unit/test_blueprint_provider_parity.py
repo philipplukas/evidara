@@ -71,11 +71,11 @@ def test_blueprint_references_at_least_the_core_providers() -> None:
 
 
 # Providers whose AcquisitionSpec union member is not landed yet, so their
-# blueprint templates cannot be parsed by parse_acquisition_spec. These are
-# pre-existing DE/IT subdivision scaffolds; adding their spec classes is
-# tracked separately and out of scope for the CH work. Every other template
+# blueprint templates cannot be parsed by parse_acquisition_spec. Every
+# template — including the DE/IT subdivision scaffolds, whose spec classes
+# (BundeslandHttpAcquisitionSpec / RegioneHttpAcquisitionSpec) now exist —
 # MUST round-trip through parse_acquisition_spec (the source-creation path).
-_SCAFFOLD_PROVIDERS_PENDING_SPEC = frozenset({"bundesland_http", "regione_http"})
+_SCAFFOLD_PROVIDERS_PENDING_SPEC: frozenset[str] = frozenset()
 
 
 def test_every_blueprint_template_parses_as_acquisition_spec() -> None:

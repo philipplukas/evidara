@@ -185,6 +185,36 @@ class CantonHttpAcquisitionSpec(BaseAcquisitionSpec):
         return self
 
 
+class BundeslandHttpAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.BUNDESLAND_HTTP] = AcquisitionProvider.BUNDESLAND_HTTP
+    # ISO 3166-2:DE Bundesland code (e.g. DE-BY). The provider allow-lists a
+    # portal host per code, so an unknown or foreign code is rejected at run.
+    bundesland: str = Field(pattern=r"^DE-[A-Z]{2}$")
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_bundesland_http_config(self) -> BundeslandHttpAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("bundesland_http provider requires seed_url or seed_urls")
+        return self
+
+
+class RegioneHttpAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.REGIONE_HTTP] = AcquisitionProvider.REGIONE_HTTP
+    # ISO 3166-2:IT regione code (e.g. IT-25). The provider allow-lists a
+    # portal host per code, so an unknown or foreign code is rejected at run.
+    regione: str = Field(pattern=r"^IT-[0-9]{2}$")
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_regione_http_config(self) -> RegioneHttpAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("regione_http provider requires seed_url or seed_urls")
+        return self
+
+
 AcquisitionSpec = Annotated[
     FirecrawlAcquisitionSpec
     | DeterministicHttpAcquisitionSpec
@@ -193,7 +223,9 @@ AcquisitionSpec = Annotated[
     | LegifranceAcquisitionSpec
     | EurLexSparqlAcquisitionSpec
     | ChCourtDecisionsAcquisitionSpec
-    | CantonHttpAcquisitionSpec,
+    | CantonHttpAcquisitionSpec
+    | BundeslandHttpAcquisitionSpec
+    | RegioneHttpAcquisitionSpec,
     Field(discriminator="provider"),
 ]
 AcquisitionSpecAdapter = TypeAdapter(AcquisitionSpec)
