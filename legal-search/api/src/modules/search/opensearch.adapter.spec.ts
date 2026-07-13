@@ -415,7 +415,11 @@ describe('SearchOpenSearchAdapter', () => {
       const search = vi.fn().mockResolvedValue({
         body: { hits: { total: { value: 0 }, hits: [] }, aggregations: {} },
       });
-      const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG, new MetricsService());
+      const adapter = new SearchOpenSearchAdapter(
+        { search } as never,
+        CONFIG,
+        new MetricsService(),
+      );
 
       await expect(adapter.search('nichts')).resolves.toEqual({
         total: 0,
@@ -426,7 +430,11 @@ describe('SearchOpenSearchAdapter', () => {
 
     it('throws index_missing instead of returning empty when the index does not exist', async () => {
       const search = vi.fn().mockRejectedValue(indexNotFoundError());
-      const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG, new MetricsService());
+      const adapter = new SearchOpenSearchAdapter(
+        { search } as never,
+        CONFIG,
+        new MetricsService(),
+      );
 
       const failure = await adapter.search('obligationenrecht').catch((err: unknown) => err);
 
@@ -440,7 +448,11 @@ describe('SearchOpenSearchAdapter', () => {
 
     it('throws unavailable when the cluster cannot be reached', async () => {
       const search = vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:9200'));
-      const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG, new MetricsService());
+      const adapter = new SearchOpenSearchAdapter(
+        { search } as never,
+        CONFIG,
+        new MetricsService(),
+      );
 
       const failure = await adapter.search('obligationenrecht').catch((err: unknown) => err);
 
@@ -450,7 +462,11 @@ describe('SearchOpenSearchAdapter', () => {
 
     it('throws rather than returning empty context aggregations when the index is missing', async () => {
       const search = vi.fn().mockRejectedValue(indexNotFoundError());
-      const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG, new MetricsService());
+      const adapter = new SearchOpenSearchAdapter(
+        { search } as never,
+        CONFIG,
+        new MetricsService(),
+      );
 
       await expect(adapter.getContextAggregations()).rejects.toBeInstanceOf(
         SearchBackendUnavailableError,
@@ -463,7 +479,11 @@ describe('SearchOpenSearchAdapter', () => {
   describe('checkReadAlias', () => {
     it('reports ok with the resolved indices', async () => {
       const getAlias = vi.fn().mockResolvedValue({ body: { 'documents-000001': { aliases: {} } } });
-      const adapter = new SearchOpenSearchAdapter({ indices: { getAlias } } as never, CONFIG, new MetricsService());
+      const adapter = new SearchOpenSearchAdapter(
+        { indices: { getAlias } } as never,
+        CONFIG,
+        new MetricsService(),
+      );
 
       await expect(adapter.checkReadAlias()).resolves.toEqual({
         status: 'ok',
@@ -475,7 +495,11 @@ describe('SearchOpenSearchAdapter', () => {
 
     it('reports error when the alias does not resolve', async () => {
       const getAlias = vi.fn().mockRejectedValue(indexNotFoundError());
-      const adapter = new SearchOpenSearchAdapter({ indices: { getAlias } } as never, CONFIG, new MetricsService());
+      const adapter = new SearchOpenSearchAdapter(
+        { indices: { getAlias } } as never,
+        CONFIG,
+        new MetricsService(),
+      );
 
       const result = await adapter.checkReadAlias();
 
@@ -485,7 +509,11 @@ describe('SearchOpenSearchAdapter', () => {
 
     it('reports error when the alias resolves to no index', async () => {
       const getAlias = vi.fn().mockResolvedValue({ body: {} });
-      const adapter = new SearchOpenSearchAdapter({ indices: { getAlias } } as never, CONFIG, new MetricsService());
+      const adapter = new SearchOpenSearchAdapter(
+        { indices: { getAlias } } as never,
+        CONFIG,
+        new MetricsService(),
+      );
 
       const result = await adapter.checkReadAlias();
 
