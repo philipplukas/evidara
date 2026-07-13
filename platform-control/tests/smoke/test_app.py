@@ -317,3 +317,94 @@ async def test_sync_hierarchy_endpoint(session_maker) -> None:
         assert "scrape_targets" not in body
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_two_key_lock_rejects_scaffold_and_disabled_template_with_400(session_maker) -> None:
+    """The ADR-0030 lock must surface as a client error, never a 500 (#559).
+
+    Two runs, one per key: a hand-written spec naming the `canton_http` scaffold
+    (live_ready = False) and a version created from a `enabled: false` blueprint
+    template whose provider IS live_ready. Both must be refused before any
+    request leaves the process, with a 400 the admin UI can render.
+    """
+    async with session_maker() as seed_session:
+        seed_session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+        seed_session.add(
+            Authority(
+                authority_id="auth_zh",
+                jurisdiction_id="jur_ch",
+                name="Canton of Zurich",
+                slug="zh",
+            )
+        )
+        await seed_session.commit()
+
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        source_response = await client.post(
+            "/v1/sources",
+            json={
+                "name": "Zurich legislation",
+                "jurisdiction_id": "jur_ch",
+                "authority_id": "auth_zh",
+            },
+        )
+        assert source_response.status_code == 201
+        source_id = source_response.json()["source_id"]
+
+        # Key 1 (code owner): scaffold provider, hand-written spec.
+        scaffold_version = await client.post(
+            f"/v1/sources/{source_id}/versions",
+            json={
+                "version_label": "scaffold",
+                "acquisition_spec": {
+                    "provider": "canton_http",
+                    "canton_code": "CH-ZH",
+                    "seed_urls": ["https://www.zh.ch/de/politik-staat/gesetze-beschluesse.html"],
+                    "language_codes": ["de"],
+                },
+            },
+        )
+        assert scaffold_version.status_code == 201
+        scaffold_run = await client.post(
+            "/v1/runs",
+            json={
+                "source_id": source_id,
+                "source_version_id": scaffold_version.json()["source_version_id"],
+                "mode": "preview",
+            },
+        )
+        assert scaffold_run.status_code == 400
+        assert "scaffold" in scaffold_run.json()["detail"]
+
+        # Key 2 (config owner): live_ready provider, template not enabled.
+        disabled_version = await client.post(
+            f"/v1/sources/{source_id}/versions",
+            json={
+                "version_label": "disabled-template",
+                "overlay_id": "de",
+                "provider_template_id": "bundesland_http_bayern",
+            },
+        )
+        assert disabled_version.status_code == 201
+        disabled_run = await client.post(
+            "/v1/runs",
+            json={
+                "source_id": source_id,
+                "source_version_id": disabled_version.json()["source_version_id"],
+                "mode": "preview",
+            },
+        )
+        assert disabled_run.status_code == 400
+        assert "not enabled" in disabled_run.json()["detail"]
+
+    app.dependency_overrides.clear()
