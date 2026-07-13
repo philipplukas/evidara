@@ -107,6 +107,64 @@ def test_every_blueprint_template_parses_as_acquisition_spec() -> None:
     )
 
 
+def _templates() -> list[tuple[str, str, dict]]:
+    with BLUEPRINTS.open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    rows: list[tuple[str, str, dict]] = []
+    for overlay_id, overlay in (payload.get("overlays") or {}).items():
+        for template_id, template in ((overlay or {}).get("provider_templates") or {}).items():
+            if isinstance(template, dict):
+                rows.append((overlay_id, template_id, template))
+    return rows
+
+
+def test_every_template_declares_enabled_explicitly() -> None:
+    # `enabled` is the config-owner key of the ADR-0030 two-key lock and fails
+    # closed: a template that omits it cannot launch runs. Requiring the value
+    # to be stated keeps that a deliberate decision rather than an oversight —
+    # a new template that silently never runs is as bad as one that runs when it
+    # shouldn't.
+    missing = [
+        f"{overlay_id}/{template_id}"
+        for overlay_id, template_id, template in _templates()
+        if not isinstance(template.get("enabled"), bool)
+    ]
+    assert not missing, (
+        "source_blueprints.yaml templates missing an explicit `enabled: true|false`:\n"
+        + "\n".join(missing)
+    )
+
+
+def test_enabled_templates_only_reference_live_ready_providers() -> None:
+    # Both keys of the lock must be consistent in the repo: enabling a template
+    # whose provider is still a scaffold would land a config change that can only
+    # ever produce ProviderNotLiveReadyError at dispatch. Catch it here instead.
+    from platform_control.config import get_settings
+    from platform_control.services.provider_registry_factory import build_provider_registry
+
+    live_ready = build_provider_registry(get_settings()).live_ready_names()
+    offenders = [
+        f"{overlay_id}/{template_id} -> {template.get('provider')}"
+        for overlay_id, template_id, template in _templates()
+        if template.get("enabled") is True and template.get("provider") not in live_ready
+    ]
+    assert not offenders, (
+        "source_blueprints.yaml enables templates whose provider is a scaffold "
+        "(live_ready = False):\n" + "\n".join(offenders)
+    )
+
+
+def test_ch_fedlex_canary_template_stays_enabled() -> None:
+    # scripts/ch-fedlex-fast-loop.sh launches a run from this template; the
+    # two-key lock must not silently disable the canary (see AGENTS.md / #559).
+    templates = {
+        (overlay_id, template_id): template for overlay_id, template_id, template in _templates()
+    }
+    canary = templates[("ch", "fedlex_sparql_constitution_de")]
+    assert canary["enabled"] is True
+    assert canary["provider"] == "fedlex_sparql"
+
+
 def _seeded_extractor_profile_ids() -> set[str]:
     seed = (
         REPO_ROOT
