@@ -104,6 +104,7 @@ nav:
       - "0022: Agentic CLI Workflow Control Surface": adr/adr-0022-agentic-cli-workflow-control-surface.md
       - "0026: authority_id / jurisdiction_id Naming Policy": adr/adr-0026-id-naming-policy.md
       - "0030: Acquisition Provider Enablement Lifecycle": adr/0030-acquisition-provider-enablement-lifecycle.md
+      - "0031: Pipeline Observability": adr/0031-pipeline-observability.md
       - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md
@@ -154,6 +155,7 @@ nav:
       - GCP local Cloud Run auth: setup/gcp-local-cloud-run-auth.md
       - Infrastructure Overview: setup/infrastructure-overview.md
       - Hetzner k3s bootstrap: setup/hetzner-k3s.md
+      - Hetzner observability: setup/hetzner-observability.md
       - Branch Rules: setup/branch-rules.md
       - Zed Setup: setup/zed.md
       - Wizard Temporal Argilla Rollout: setup/platform-control-wizard-temporal-argilla-rollout.md

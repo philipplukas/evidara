@@ -151,7 +151,7 @@ disabled in `values/kube-prometheus-stack.yaml`, along with the single-node-host
 
 ## Consequences
 
-**Positive**
+### Positive
 
 - Every failure in the table above becomes a page instead of a human noticing an empty UI.
 - The funnel makes a *partial* leak (12 in, 5 out) as visible as a total outage — the
@@ -160,7 +160,7 @@ disabled in `values/kube-prometheus-stack.yaml`, along with the single-node-host
 - The scrape targets live next to the workloads (`infra/hetzner/observability/`), so
   adding a service means adding a `ServiceMonitor` block, not editing a Helm release.
 
-**Negative / accepted**
+### Negative / accepted
 
 - Roughly 2 GiB of RAM and ~22 GiB of disk on a single-node box, at 15d retention.
 - Two new runtime dependencies (`prom-client`, `prometheus-client`) — both are the
@@ -170,7 +170,7 @@ disabled in `values/kube-prometheus-stack.yaml`, along with the single-node-host
   (`docs/setup/hetzner-observability.md`) and is deliberately left to the operator, who
   owns the credential.
 
-**Deferred**
+### Deferred
 
 - **Stale-image-SHA alert** (deployed image != newest `main` image for > N days, the rot
   that caused #549). It needs a GitHub-aware exporter — a genuinely different piece of
