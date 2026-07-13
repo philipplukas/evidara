@@ -1,0 +1,92 @@
+name: E2E CH Fedlex Loop
+
+# End-to-end proof of the CH Fedlex admin→search loop against a full local docker
+# compose stack (issue #533, Stream H): create source → approve → run → DI →
+# projection-bridge → searchable in legal-search.
+#
+# Cadence is nightly + on-demand by design. Standing up the whole stack (postgres,
+# opensearch, minio, nats, platform-control, legal-search, di-consumer,
+# projection-bridge) and driving a real Fedlex preview is far too heavy for a
+# per-PR gate — issue #533 explicitly allows nightly + workflow_dispatch instead of
+# blocking every PR.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 03:30 UTC nightly. Not a required PR check; see cadence note above.
+    - cron: "30 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    env:
+      # Exercise the real publish + projection path: platform-control publishes to
+      # NATS and the artifact store is MinIO/S3, so di-consumer → projection-bridge →
+      # legal-search runs exactly as in the self-hosted runtime (ADR-0029).
+      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: nats
+      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: s3
+      COMPOSE_FILES: "-f docker-compose.yml -f docker-compose.local.yml"
+      # `search` is required alongside `apps`: opensearch (which legal-search-api and
+      # the seed depend on) lives behind the `search`/`full` profiles in
+      # docker-compose.yml, so `apps`+`nats`+`minio` alone fails config validation.
+      COMPOSE_PROFILES_ARGS: "--profile apps --profile search --profile nats --profile minio"
+      EVIDENCE_DIR: tmp/evidence/ch-fedlex-e2e-${{ github.run_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Bring up the full local stack
+        run: |
+          set -euo pipefail
+          mkdir -p "${EVIDENCE_DIR}"
+          # shellcheck disable=SC2086
+          docker compose ${COMPOSE_FILES} ${COMPOSE_PROFILES_ARGS} up -d --wait
+
+      - name: Run CH Fedlex admin→search e2e
+        id: e2e
+        run: |
+          set -euo pipefail
+          RUN_DIR="${EVIDENCE_DIR}" bash scripts/ch-fedlex-compose-e2e.sh
+
+      - name: Dump compose logs
+        if: always()
+        run: |
+          set -uo pipefail
+          mkdir -p "${EVIDENCE_DIR}"
+          # shellcheck disable=SC2086
+          docker compose ${COMPOSE_FILES} ${COMPOSE_PROFILES_ARGS} logs --no-color \
+            > "${EVIDENCE_DIR}/compose-logs.txt" 2>&1 || true
+
+      - name: Tear down the stack
+        if: always()
+        run: |
+          set -uo pipefail
+          # shellcheck disable=SC2086
+          docker compose ${COMPOSE_FILES} ${COMPOSE_PROFILES_ARGS} down -v || true
+
+      - name: Upload e2e evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: ch-fedlex-e2e-evidence-${{ github.run_id }}
+          path: tmp/evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Summarize outcome
+        if: always()
+        run: |
+          STATUS=${{ steps.e2e.outcome == 'success' && 'PASSED' || 'FAILED' }}
+          {
+            echo "### E2E CH Fedlex Loop"
+            echo ""
+            echo "- Status: **${STATUS}**"
+            echo "- Evidence artifact: ch-fedlex-e2e-evidence-${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
