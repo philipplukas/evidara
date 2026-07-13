@@ -2,11 +2,11 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
-2026-06-28
+2026-06-28 (proposed), 2026-07-13 (accepted)
 
 ## Context
 
@@ -58,9 +58,11 @@ Migrate the Evidara runtime to a self-hosted, fixed-cost stack on Hetzner, repla
 each GCP managed service with a self-hosted equivalent delivered via the existing
 MacConfig + Argo CD GitOps path.
 
-> **Note:** decisions D1–D3 reflect the owner's stated direction and the
-> recommended defaults as of 2026-06-28. This ADR is **Proposed** until they are
-> confirmed; flip to **Accepted** once execution on Slice 1 begins.
+> **Note:** decisions D1–D3 were confirmed by execution. This ADR was **Proposed**
+> pending the owner's confirmation, to flip to **Accepted** once execution on Slice 1
+> began. Slices 1, 3 and 4 are done and Slices 2 and 5 are underway (see Progress), so
+> it is now **Accepted** (2026-07-13). NATS JetStream (D2) and MinIO are the shipped
+> local runtime; Databricks is no longer on any active code path.
 
 ### Target mapping
 
@@ -203,4 +205,4 @@ MacConfig + Argo CD GitOps path.
 - `vendor/platform-contract.yaml` — platform contract (nginx, Let's Encrypt, External Secrets/Vault).
 - `docs/runbooks/gcp-cost-stop.md` — GCP wind-down procedure (companion to this ADR).
 - `docs/runbooks/hetzner-cutover.md` — Slice 6 cutover checklist (companion to this ADR).
-- ADR-0016 (Cloud Run services vs jobs) and ADR-0003 (storage strategy) — superseded for runtime hosting by this ADR once Accepted.
+- ADR-0016 (Cloud Run services vs jobs) and ADR-0003 (storage strategy) — superseded for runtime hosting by this ADR.
