@@ -188,6 +188,36 @@ services:
         condition: service_completed_successfully
     mem_limit: 1024m
 
+  # document-intelligence NATS→legal-search projection bridge (M0.2, issue #522).
+  # di-consumer publishes evidara.document-processed / evidara.document-withdrawn, but
+  # nothing in the local stack forwarded those into legal-search — so processed documents
+  # never became searchable locally. This service closes that hop: it subscribes to both
+  # subjects and POSTs each event to the legal-search projections endpoints, making the
+  # admin→search loop end-to-end (required by the CH Fedlex e2e in issue #533). Same
+  # runtime-ingress image as di-consumer; pairs with the `nats` profile. It depends on the
+  # `apps`-profile legal-search-api (which in turn needs opensearch from the `search`
+  # profile), so bring the loop up with:
+  #   --profile apps --profile search --profile nats --profile minio
+  projection-bridge:
+    build:
+      context: ./document-intelligence
+      dockerfile: Dockerfile.runtime-ingress
+    profiles: ["nats"]
+    command:
+      - document_intelligence_projection_bridge
+      - --servers
+      - nats://nats:4222
+      - --legal-search-api-url
+      - http://legal-search-api:3102
+    environment:
+      PORT: "8093"
+    depends_on:
+      nats-init:
+        condition: service_completed_successfully
+      legal-search-api:
+        condition: service_healthy
+    mem_limit: 512m
+
   # MinIO — self-hosted S3-compatible object storage (ADR-0029 Slice 4). Opt-in via the
   # `minio` profile; the default stack still uses the local artifact store. To exercise
   # the S3 path:
