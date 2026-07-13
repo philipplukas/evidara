@@ -247,7 +247,7 @@ export function AppHeader({
   return (
     <>
       <header className="app-header">
-        <div className="app-header__inner">
+        <div className="app-header__inner shell-frame">
           {/* Wordmark */}
           <div className="app-header__brand">
             <BrandMark size={32} className="app-header__brand-mark" />
