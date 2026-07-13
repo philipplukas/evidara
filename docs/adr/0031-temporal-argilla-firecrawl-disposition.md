@@ -133,9 +133,9 @@ ADR-0030 is correct; the code must be made to match it.
 
 ## Alternatives considered
 
-**Roll Temporal out now.** Rejected: ~1–2 weeks of correctness work (#560, #561, and
-#564) plus a server, a worker deployment, and secrets, to orchestrate a workflow with
-no current caller.
+**Roll Temporal out now.** Rejected: ~1–2 weeks of correctness work
+(#560, #561, #564) plus a server, a worker deployment, and secrets, to
+orchestrate a workflow with no current caller.
 
 **Rip Temporal out entirely.** Rejected: the durable-execution problem is real and
 will return with the wizard. ADR-0021's abstraction makes keeping it cheap.
