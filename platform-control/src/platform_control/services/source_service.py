@@ -106,6 +106,11 @@ class SourceService:
             version_label=request.source_version.version_label,
             execution_mode=request.source_version.execution_mode,
             acquisition_spec=acquisition_spec.model_dump(mode="json"),
+            **self._blueprint_provenance(
+                acquisition_spec=request.source_version.acquisition_spec,
+                overlay_id=request.source_version.overlay_id,
+                provider_template_id=request.source_version.provider_template_id,
+            ),
         )
         self.session.add(source_version)
         await self.session.commit()
@@ -160,6 +165,11 @@ class SourceService:
             version_label=request.version_label,
             execution_mode=request.execution_mode,
             acquisition_spec=acquisition_spec.model_dump(mode="json"),
+            **self._blueprint_provenance(
+                acquisition_spec=request.acquisition_spec,
+                overlay_id=request.overlay_id,
+                provider_template_id=request.provider_template_id,
+            ),
         )
         self.session.add(version)
         await self.session.commit()
@@ -201,6 +211,15 @@ class SourceService:
                 provider_template_id=request.provider_template_id,
             )
             version.acquisition_spec = acquisition_spec.model_dump(mode="json")
+            # Provenance follows the spec: re-pointing a version at a blueprint
+            # records the template; replacing it with a hand-written spec clears it.
+            provenance = self._blueprint_provenance(
+                acquisition_spec=request.acquisition_spec,
+                overlay_id=request.overlay_id,
+                provider_template_id=request.provider_template_id,
+            )
+            version.overlay_id = provenance["overlay_id"]
+            version.provider_template_id = provenance["provider_template_id"]
         if "extractor_profile_id" in payload:
             version.extractor_profile_id = payload["extractor_profile_id"]
         if request.execution_mode is not None:
@@ -290,6 +309,25 @@ class SourceService:
             if default_id is not None and await self.session.get(ExtractorProfile, default_id):
                 return default_id
         return None
+
+    @staticmethod
+    def _blueprint_provenance(
+        *,
+        acquisition_spec: AcquisitionSpec | None,
+        overlay_id: str | None,
+        provider_template_id: str | None,
+    ) -> dict[str, str | None]:
+        """Blueprint provenance to persist on the SourceVersion (ADR-0030).
+
+        Only set when the version is created from a blueprint template; an
+        explicit acquisition_spec wins over blueprint fields in
+        _resolve_acquisition_spec, so it must clear the provenance too — else
+        the run-launch path would gate a hand-written spec on a template the
+        version no longer uses.
+        """
+        if acquisition_spec is None and overlay_id and provider_template_id:
+            return {"overlay_id": overlay_id, "provider_template_id": provider_template_id}
+        return {"overlay_id": None, "provider_template_id": None}
 
     @staticmethod
     def _resolve_acquisition_spec(

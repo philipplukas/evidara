@@ -105,7 +105,8 @@ After deployment, optionally verify deeper:
 # Platform-control readiness (includes DB check)
 curl -s ${PC_URL}/ready | jq .
 
-# Legal-search readiness (includes OpenSearch check)
+# Legal-search readiness (OpenSearch ping + `documents-read` alias resolves)
+# 503 + checks.documents_read_alias.status == "error" → search cannot be served
 curl -s ${LS_URL}/health/ready | jq .
 
 # Platform-control API: list sources

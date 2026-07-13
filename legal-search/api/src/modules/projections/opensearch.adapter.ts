@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type {
   CitationProjection,
@@ -29,6 +30,8 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
     private readonly client: Client,
     @Inject(ConfigService)
     config: ConfigService,
+    @Inject(MetricsService)
+    private readonly metrics: MetricsService,
   ) {
     this.indexDocumentsWrite =
       config.get<string>('opensearch.documentsWriteAlias') ?? 'documents-write';
@@ -81,6 +84,9 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
       body: document,
       refresh: 'wait_for',
     });
+    // Counted only after the write succeeds: this is the funnel's "docs reached
+    // OpenSearch" stage, and it must not count attempts.
+    this.metrics.recordDocumentIndexed();
   }
 
   async deleteProjection(documentId: string): Promise<void> {
@@ -90,6 +96,7 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
         id: documentId,
         refresh: 'wait_for',
       });
+      this.metrics.recordDocumentDeleted();
     } catch (err) {
       // Ignore missing index/document errors to keep event handling idempotent.
       const message = String((err as { message?: string }).message ?? '');

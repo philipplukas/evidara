@@ -12,10 +12,6 @@ on:
       - "contracts/schemas/**"
       - "contracts/vocabularies/document-type.json"
       - "scripts/check-document-intelligence.sh"
-      - "scripts/check-document-intelligence-runtime.sh"
-      - "infra/terraform/databricks/document_intelligence/**"
-      - "infra/terraform/databricks/document_intelligence_stack/**"
-      - "infra/env/*/document_intelligence.databricks.tfvars"
   push:
     branches: [main]
     paths:
@@ -28,10 +24,6 @@ on:
       - "contracts/schemas/**"
       - "contracts/vocabularies/document-type.json"
       - "scripts/check-document-intelligence.sh"
-      - "scripts/check-document-intelligence-runtime.sh"
-      - "infra/terraform/databricks/document_intelligence/**"
-      - "infra/terraform/databricks/document_intelligence_stack/**"
-      - "infra/env/*/document_intelligence.databricks.tfvars"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -62,50 +54,3 @@ jobs:
 
       - name: Check (ruff + pytest + contracts + dbt)
         run: bash scripts/check-document-intelligence.sh
-
-  document-intelligence-runtime-check:
-    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Ensure unzip is available
-        run: |
-          if command -v unzip &>/dev/null; then exit 0; fi
-          mkdir -p "$HOME/.local/bin"
-          python3 -c "
-          import pathlib, os, stat, textwrap
-          script = textwrap.dedent('''\
-          #!/usr/bin/env python3
-          import sys, zipfile, os, stat
-          args, dest = sys.argv[1:], '.'
-          i = 0
-          while i < len(args):
-              if args[i] == '-d':
-                  dest = args[i+1]; i += 2; continue
-              if args[i].startswith('-'):
-                  i += 1; continue
-              with zipfile.ZipFile(args[i]) as zf:
-                  zf.extractall(dest)
-                  for info in zf.infolist():
-                      out = os.path.join(dest, info.filename)
-                      if info.external_attr >> 16 & 0o111:
-                          os.chmod(out, os.stat(out).st_mode | stat.S_IEXEC)
-              i += 1
-          ''')
-          p = pathlib.Path(os.path.expanduser('~/.local/bin/unzip'))
-          p.write_text(script)
-          p.chmod(p.stat().st_mode | stat.S_IEXEC)
-          "
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      - name: Runtime / deployment checks
-        run: bash scripts/check-document-intelligence-runtime.sh

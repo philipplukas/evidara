@@ -73,6 +73,13 @@ repos:
         pass_filenames: false
         files: ^(structurizr/|scripts/check-architecture\.sh$)
 
+      - id: check-compose-profiles
+        name: Check Docker Compose profiles resolve
+        entry: python scripts/check_compose_profiles.py
+        language: system
+        pass_filenames: false
+        files: ^(docker-compose.*\.yml|scripts/.*\.sh|docs/.*\.md|\.github/workflows/.*\.yml|justfile|README\.md)$
+
       - id: check-component-doc-headings
         name: Check component doc headings
         entry: python scripts/check_component_docs.py

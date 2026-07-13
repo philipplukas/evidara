@@ -208,9 +208,53 @@ async function main() {
   console.log(`  Index:  ${shouldIndex ? 'yes' : 'no (fixture only)'}`);
   console.log('');
 
-  // 1. Fetch from HuggingFace
-  const rows = await fetchRows(offset, count);
-  console.log(`  Fetched ${rows.length} decisions`);
+  // 1. Bootstrap the OpenSearch index + aliases FIRST.
+  //
+  // This must happen before the HuggingFace fetch, and must not depend on it.
+  // The demo corpus is a convenience; the index and the documents-read /
+  // documents-write aliases are load-bearing — without them legal-search cannot
+  // serve a search at all, and the projection path (document.processed -> write
+  // alias) has nowhere to land. Bootstrapping first means an upstream outage
+  // costs you the sample documents, not a working stack.
+  const nodeUrl = process.env.OPENSEARCH_NODE ?? 'http://localhost:9200';
+  const readAlias = process.env.OPENSEARCH_ALIAS_READ ?? 'documents-read';
+  const writeAlias = process.env.OPENSEARCH_ALIAS_WRITE ?? 'documents-write';
+
+  if (shouldIndex) {
+    const bootstrap = await bootstrapDocumentsIndex({
+      node: nodeUrl,
+      readAlias,
+      writeAlias,
+      logger: { info: (m) => console.log(`  ${m}`), warn: (m) => console.warn(`  ${m}`) },
+    });
+    console.log(`  documents index bootstrap: ${bootstrap.status} (${bootstrap.physicalIndex})`);
+  }
+
+  // 2. Fetch the demo corpus from HuggingFace — best-effort.
+  //
+  // datasets-server.huggingface.co is a third party and does go down (observed
+  // 503 for the whole dataset). Taking the entire local stack — and the nightly
+  // CH Fedlex e2e, which seeds its own documents through the real pipeline and
+  // does not need this corpus at all — down with it is the wrong trade.
+  // Set SEED_REQUIRE_CORPUS=1 to make a fetch failure fatal instead.
+  let rows: OpenCaseLawRow[];
+  try {
+    rows = await fetchRows(offset, count);
+    console.log(`  Fetched ${rows.length} decisions`);
+  } catch (err) {
+    if (process.env.SEED_REQUIRE_CORPUS === '1') {
+      throw err;
+    }
+    console.warn('');
+    console.warn('  ⚠ Could not fetch the OpenCaseLaw demo corpus (upstream unavailable).');
+    console.warn(`    ${err instanceof Error ? err.message : String(err)}`);
+    console.warn('    The OpenSearch index and aliases are bootstrapped, so search and the');
+    console.warn('    projection path still work — there just are no sample documents.');
+    console.warn('    Re-run `npm run seed:index` once upstream recovers, or set');
+    console.warn('    SEED_REQUIRE_CORPUS=1 to treat this as a hard failure.');
+    console.warn('');
+    return;
+  }
 
   // Filter to rows with full text
   const withText = rows.filter((r) => r.has_full_text && r.full_text);
@@ -231,36 +275,23 @@ async function main() {
   console.log(`\n  ✓ Fixtures written to ${fixturePath}`);
 
   // 4. Print sample
-  console.log('\n── Sample document ──');
   const sample = projections[0];
-  console.log(`  ID:           ${sample.document_id}`);
-  console.log(`  Title:        ${sample.title}`);
-  console.log(`  Jurisdiction: ${sample.jurisdiction}`);
-  console.log(`  Language:     ${sample.language}`);
-  console.log(`  Date:         ${sample.effective_date}`);
-  console.log(`  Citations:    ${sample.citations_count}`);
-  console.log(`  Path:         ${sample.structural_path}`);
-  console.log(`  Content:      ${(sample.content?.length ?? 0)} chars`);
+  if (sample) {
+    console.log('\n── Sample document ──');
+    console.log(`  ID:           ${sample.document_id}`);
+    console.log(`  Title:        ${sample.title}`);
+    console.log(`  Jurisdiction: ${sample.jurisdiction}`);
+    console.log(`  Language:     ${sample.language}`);
+    console.log(`  Date:         ${sample.effective_date}`);
+    console.log(`  Citations:    ${sample.citations_count}`);
+    console.log(`  Path:         ${sample.structural_path}`);
+    console.log(`  Content:      ${(sample.content?.length ?? 0)} chars`);
+  }
 
-  // 5. Optionally index into OpenSearch
-  if (shouldIndex) {
-    const nodeUrl = process.env.OPENSEARCH_NODE ?? 'http://localhost:9200';
-    const readAlias = process.env.OPENSEARCH_ALIAS_READ ?? 'documents-read';
-    const writeAlias = process.env.OPENSEARCH_ALIAS_WRITE ?? 'documents-write';
-
-    // Ensure the documents index exists with the canonical mapping and
-    // that BOTH the read and write aliases resolve to it — otherwise the
-    // seeded docs would land in the write index but never surface via
-    // the `documents-read` alias that search queries.
-    const bootstrap = await bootstrapDocumentsIndex({
-      node: nodeUrl,
-      readAlias,
-      writeAlias,
-      logger: { info: (m) => console.log(`  ${m}`), warn: (m) => console.warn(`  ${m}`) },
-    });
-    console.log(`  documents index bootstrap: ${bootstrap.status} (${bootstrap.physicalIndex})`);
-
-    // Write through the write alias so the read alias serves the same docs.
+  // 5. Optionally index into OpenSearch. The index and aliases were already
+  // bootstrapped in step 1; write through the write alias so the read alias
+  // serves the same documents.
+  if (shouldIndex && projections.length > 0) {
     await bulkIndex(projections, writeAlias, nodeUrl);
   }
 

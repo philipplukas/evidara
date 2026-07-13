@@ -233,11 +233,17 @@ class RescoreFromCorrectionWorkflow:
 class RetentionSweepWorkflow:
     """Thin wrapper that delegates to ``RetentionActivities.run_retention_sweep``.
 
-    Scheduled via a Temporal Schedule (see platform-control-schedule-retention)
-    so the sweep fires on a cron without anyone remembering to run
-    ``pc retention sweep`` manually. Hard-delete retention is a legal
-    requirement for some jurisdictions; cron enforcement matches the
-    obligation's timing rather than relying on operator discipline.
+    **Not the scheduler.** Hard-delete retention is a legal requirement in some
+    jurisdictions, and this workflow only fires when a Temporal worker is running
+    — which it is in no environment. So the sweep is scheduled by a Kubernetes
+    CronJob (``infra/hetzner/apps/retention-sweep-cronjob.yaml``) invoking the
+    ``platform-control-retention-sweep`` console script, and the Temporal Schedule
+    that used to drive this workflow is gone. A cron obligation does not need
+    durable execution. See ADR-0031 and docs/runbooks/retention-sweep.md.
+
+    Kept — and pointed at the same shared implementation — so the Temporal code
+    stays honest if a worker is ever deployed. If you re-add a Temporal Schedule
+    for it, remove the CronJob first: two schedulers would double-sweep.
     """
 
     @workflow.run

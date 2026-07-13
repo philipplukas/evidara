@@ -12,6 +12,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type {
   AggregationBucket,
@@ -19,7 +20,13 @@ import type {
   SearchHitEntity,
   SearchResultEntity,
 } from './entities/search.entities';
-import type { SearchOptions, SearchRefinement, SearchRepository } from './search.repository';
+import { describeOpenSearchError, SearchBackendUnavailableError } from './search.errors';
+import type {
+  ReadAliasCheck,
+  SearchOptions,
+  SearchRefinement,
+  SearchRepository,
+} from './search.repository';
 
 type OpenSearchHit = {
   _source?: Record<string, unknown>;
@@ -61,6 +68,8 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     private readonly client: Client,
     @Inject(ConfigService)
     config: ConfigService,
+    @Inject(MetricsService)
+    private readonly metrics: MetricsService,
   ) {
     this.indexDocuments = config.get<string>('opensearch.documentsReadAlias') ?? 'documents-read';
   }
@@ -196,15 +205,19 @@ export class SearchOpenSearchAdapter implements SearchRepository {
           };
         });
 
+      this.metrics.recordSearch(total);
       return {
         total,
         hits,
         aggregations: this.parseAggregations(result.aggregations),
       };
     } catch (err) {
-      this.logger.error('Search failed', err);
-      // Return empty results instead of crashing — observable degradation
-      return { total: 0, hits: [], aggregations: {} };
+      // A query that could not be executed is NOT an empty result set (#551).
+      // Count it before rethrowing: `search_errors_total` is what lets the
+      // zero-result alert tell a dead cluster apart from a query that simply
+      // matched nothing. `failure()` already logs at ERROR.
+      this.metrics.recordSearchError();
+      throw this.failure('search', err);
     }
   }
 
@@ -229,12 +242,43 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         source_types: this.parseBuckets(aggs?.source_types),
       };
     } catch (err) {
-      this.logger.error('Context aggregation failed', err);
-      return { jurisdictions: [], languages: [], source_types: [] };
+      throw this.failure('context aggregation', err);
+    }
+  }
+
+  async checkReadAlias(): Promise<ReadAliasCheck> {
+    const alias = this.indexDocuments;
+    try {
+      const response = await this.client.indices.getAlias({ name: alias });
+      const indices = Object.keys((response.body ?? {}) as Record<string, unknown>);
+      if (indices.length === 0) {
+        const detail = `read alias "${alias}" resolves to no index`;
+        this.logger.error(`Readiness check failed: ${detail}`);
+        return { status: 'error', alias, detail };
+      }
+      return { status: 'ok', alias, indices };
+    } catch (err) {
+      const detail = describeOpenSearchError(err);
+      this.logger.error(`Readiness check failed: read alias "${alias}" unresolvable — ${detail}`);
+      return { status: 'error', alias, detail };
     }
   }
 
   // ─── Helpers ───
+
+  /**
+   * Log loudly and build the domain error. The whole point of #551: a
+   * missing index is a total outage of the core product feature, so it must
+   * be the loudest failure we have, not the quietest.
+   */
+  private failure(operation: string, err: unknown): SearchBackendUnavailableError {
+    const failure = new SearchBackendUnavailableError(operation, this.indexDocuments, err);
+    this.logger.error(
+      `OpenSearch ${operation} failed [${failure.reason}] on "${this.indexDocuments}": ${failure.detail}`,
+      err instanceof Error ? err.stack : undefined,
+    );
+    return failure;
+  }
 
   private classifyQuery(query: string): QueryShape {
     if (query === '*' || query.length === 0) return 'wildcard';

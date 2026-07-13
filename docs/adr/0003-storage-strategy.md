@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted — superseded for storage *hosting* by [ADR-0029](0029-self-hosted-hetzner-runtime.md). The storage
+model below (Postgres for control state, object storage for raw artifacts, Delta for canonical truth,
+OpenSearch for serving projections) still stands; only the managed services backing it change — GCS to
+MinIO, Cloud SQL to self-hosted Postgres, and Databricks-hosted Delta to pure-Python `deltalake`.
 
 ## Date
 

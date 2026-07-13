@@ -6,25 +6,63 @@
  * Create a new versioned projection index and atomically cut over
  * the stable read/write aliases used by legal-search.
  *
+ * Three modes:
+ *
+ * 1. Cutover (default) — create a new index, optionally copy data from the
+ *    previous index (`--reindex`), then swap both aliases at once.
+ *
+ * 2. `--stage-write` — create a new index and move only the WRITE alias to it.
+ *    The READ alias keeps serving the old index, so a Delta-sourced rebuild can
+ *    fill the new index while live traffic is unaffected. This is what makes a
+ *    versioned reindex sourceable from canonical truth rather than from the
+ *    previous index (ADR-0005): OpenSearch's own `_reindex` cannot help when the
+ *    old index is gone or when its contents are degraded.
+ *
+ * 3. `--promote-read --index <name>` — point the READ alias at a staged index,
+ *    completing the cutover.
+ *
  * Usage:
  *   npx tsx scripts/opensearch-alias-cutover.ts
- *   OPENSEARCH_NODE=http://localhost:9200 OPENSEARCH_ALIAS_READ=evidara-documents-read-dev npx tsx scripts/opensearch-alias-cutover.ts --reindex
+ *   npx tsx scripts/opensearch-alias-cutover.ts --reindex
+ *
+ *   # Delta-sourced versioned reindex (see docs/runbooks/projection-reindex-backfill.md):
+ *   npx tsx scripts/opensearch-alias-cutover.ts --stage-write
+ *   document_intelligence_delta_projection_backfill --resume   # fills the staged index
+ *   npx tsx scripts/opensearch-alias-cutover.ts --promote-read --index <staged-index>
  */
 
+import {
+  type AliasAction,
+  cutoverAliasActions,
+  moveAliasActions,
+} from '../src/core/opensearch/alias-actions';
 import { documentsIndexDefinition } from '../src/core/opensearch/documents-index.mapping';
 
 const args = process.argv.slice(2);
 const shouldReindex = args.includes('--reindex');
 const dryRun = args.includes('--dry-run');
-const sourceIndexArg = (() => {
-  const sourceIndexArgIndex = args.indexOf('--source-index');
-  if (sourceIndexArgIndex === -1) return undefined;
-  const value = args[sourceIndexArgIndex + 1];
-  if (!value) {
-    throw new Error('missing value for --source-index');
+const stageWrite = args.includes('--stage-write');
+const promoteRead = args.includes('--promote-read');
+
+function flagValue(flag: string): string | undefined {
+  const index = args.indexOf(flag);
+  if (index === -1) return undefined;
+  const value = args[index + 1];
+  if (!value || value.startsWith('--')) {
+    throw new Error(`missing value for ${flag}`);
   }
   return value;
-})();
+}
+
+const sourceIndexArg = flagValue('--source-index');
+const promoteIndexArg = flagValue('--index');
+
+if (stageWrite && promoteRead) {
+  throw new Error('--stage-write and --promote-read are separate phases; run them one at a time');
+}
+if (promoteRead && !promoteIndexArg) {
+  throw new Error('--promote-read requires --index <staged-index-name>');
+}
 
 const node = process.env.OPENSEARCH_NODE ?? 'http://localhost:9200';
 const readAlias = process.env.OPENSEARCH_ALIAS_READ ?? 'evidara-documents-read-dev';
@@ -87,36 +125,112 @@ async function reindex(sourceIndex: string, destinationIndex: string): Promise<v
   }
 }
 
-async function cutoverAliases(
-  previousReadTargets: string[],
-  previousWriteTargets: string[],
-  destinationIndex: string,
-): Promise<void> {
-  const actions: Array<Record<string, unknown>> = [];
-  for (const indexName of previousReadTargets) {
-    actions.push({ remove: { index: indexName, alias: readAlias } });
-  }
-  for (const indexName of previousWriteTargets) {
-    actions.push({ remove: { index: indexName, alias: writeAlias } });
-  }
-  actions.push({ add: { index: destinationIndex, alias: readAlias } });
-  actions.push({ add: { index: destinationIndex, alias: writeAlias, is_write_index: true } });
-
+async function applyAliasActions(actions: AliasAction[]): Promise<void> {
   const response = await osFetch('/_aliases', {
     method: 'POST',
     body: JSON.stringify({ actions }),
   });
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`alias cutover failed: ${response.status} ${body}`);
+    throw new Error(`alias update failed: ${response.status} ${body}`);
   }
 }
 
-async function main(): Promise<void> {
-  if (dryRun) {
-    console.log('[DRY RUN] No changes will be made.');
+async function cutoverAliases(
+  previousReadTargets: string[],
+  previousWriteTargets: string[],
+  destinationIndex: string,
+): Promise<void> {
+  await applyAliasActions(
+    cutoverAliasActions(
+      readAlias,
+      writeAlias,
+      previousReadTargets,
+      previousWriteTargets,
+      destinationIndex,
+    ),
+  );
+}
+
+async function indexExists(indexName: string): Promise<boolean> {
+  const response = await osFetch(`/${indexName}`, { method: 'HEAD' });
+  return response.ok;
+}
+
+async function countDocuments(indexName: string): Promise<number | undefined> {
+  const response = await osFetch(`/${indexName}/_count`, { method: 'GET' });
+  if (!response.ok) return undefined;
+  const payload = (await response.json()) as { count?: number };
+  return payload.count;
+}
+
+/**
+ * Phase 1 of a Delta-sourced versioned reindex: create the new index and move only
+ * the WRITE alias onto it. Reads keep serving the previous index, so the backfill
+ * (and any concurrent live projection) fills the new index with zero user impact.
+ */
+async function stageWriteMain(): Promise<void> {
+  console.log(`[1/3] Creating new projection index: ${nextIndex}`);
+  if (!dryRun) {
+    await ensureIndex(nextIndex);
   }
 
+  console.log('[2/3] Reading current alias targets...');
+  const currentReadTargets = await getAliasIndices(readAlias);
+  const currentWriteTargets = await getAliasIndices(writeAlias);
+  console.log(`  read alias → [${currentReadTargets.join(', ')}]`);
+  console.log(`  write alias → [${currentWriteTargets.join(', ')}]`);
+
+  console.log(`[3/3] Staging write alias: ${writeAlias} → ${nextIndex} (read alias unchanged)`);
+  if (!dryRun) {
+    await applyAliasActions(moveAliasActions(writeAlias, currentWriteTargets, nextIndex, true));
+    console.log('Write alias staged ✓');
+  } else {
+    console.log(`  [DRY RUN] Would point ${writeAlias} at ${nextIndex}`);
+  }
+
+  console.log('');
+  console.log('Next: rebuild the staged index from canonical Delta, then promote reads:');
+  console.log('  document_intelligence_delta_projection_backfill --resume');
+  console.log(
+    `  npx tsx scripts/opensearch-alias-cutover.ts --promote-read --index ${nextIndex}`,
+  );
+}
+
+/** Phase 2: point the READ alias at a staged index that the backfill has filled. */
+async function promoteReadMain(): Promise<void> {
+  const target = promoteIndexArg as string;
+
+  console.log(`[1/3] Verifying staged index: ${target}`);
+  if (!(await indexExists(target))) {
+    throw new Error(`staged index ${target} does not exist`);
+  }
+  const stagedCount = await countDocuments(target);
+  console.log(`  ${target} document count → ${stagedCount ?? 'unknown'}`);
+  if (stagedCount === 0) {
+    throw new Error(
+      `refusing to promote ${target}: it contains 0 documents (run the Delta backfill first)`,
+    );
+  }
+
+  console.log('[2/3] Reading current alias targets...');
+  const currentReadTargets = await getAliasIndices(readAlias);
+  console.log(`  read alias → [${currentReadTargets.join(', ')}]`);
+  for (const previous of currentReadTargets) {
+    if (previous === target) continue;
+    console.log(`  ${previous} document count → ${(await countDocuments(previous)) ?? 'unknown'}`);
+  }
+
+  console.log(`[3/3] Promoting read alias: ${readAlias} → ${target}`);
+  if (!dryRun) {
+    await applyAliasActions(moveAliasActions(readAlias, currentReadTargets, target));
+    console.log('Read alias promoted ✓');
+  } else {
+    console.log(`  [DRY RUN] Would point ${readAlias} at ${target}`);
+  }
+}
+
+async function cutoverMain(): Promise<void> {
   console.log(`[1/4] Creating new projection index: ${nextIndex}`);
   if (!dryRun) {
     await ensureIndex(nextIndex);
@@ -162,6 +276,16 @@ async function main(): Promise<void> {
   } else {
     console.log(`  [DRY RUN] Would remove ${currentReadTargets.length} read + ${currentWriteTargets.length} write targets, point to ${nextIndex}`);
   }
+}
+
+async function main(): Promise<void> {
+  if (dryRun) {
+    console.log('[DRY RUN] No changes will be made.');
+  }
+
+  if (promoteRead) return promoteReadMain();
+  if (stageWrite) return stageWriteMain();
+  return cutoverMain();
 }
 
 main().catch((error) => {

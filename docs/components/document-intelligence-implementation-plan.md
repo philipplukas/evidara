@@ -10,7 +10,7 @@ Define the planned architecture, delivery phases, documentation updates, and tes
 
 ## Current state
 
-`document-intelligence` is not production-implemented yet. Contracts and component docs exist, and the current scaffold now includes bundle-based event intake, local and GCS bundle reads, HTML-first plus initial XML canonicalization, Delta-backed published-surface writes, explicit surface definitions, offline contract validation helpers, a Databricks runtime entrypoint, Databricks Asset Bundle scaffolding, a reusable Terraform module plus top-level Databricks stack and per-environment tfvars for Unity Catalog scaffolding, SQL/bootstrap assets for published-surface registration, a dedicated component quality gate in CI, and golden/adapter/CLI tests. Spark-native runtime wiring, deploy/promotion integration for Terraform + Bundles, broader XML coverage, citations, and jurisdiction resolution still need to be created.
+`document-intelligence` is not production-implemented yet. Contracts and component docs exist, and the current scaffold now includes bundle-based event intake, local and GCS bundle reads, HTML-first plus initial XML canonicalization, Delta-backed published-surface writes, explicit surface definitions, offline contract validation helpers, SQL renderers for published-surface registration, a dedicated component quality gate in CI, and golden/adapter/CLI tests. Spark-native runtime wiring, broader XML coverage, citations, and jurisdiction resolution still need to be created.
 
 ## Goal
 
@@ -82,10 +82,8 @@ The first implementation must:
 - [x] Land the first unit, contract, golden, invariant, and integration tests
 - [x] Add local Delta-backed persistence adapters and GCS-backed read adapters
 - [x] Define initial published surface schemas explicitly
-- [x] Add Databricks workflow packaging and runtime wrapper
-- [x] Add Terraform and SQL/bootstrap scaffolding for Unity Catalog published-surface registration
+- [x] Add SQL/bootstrap scaffolding for published-surface registration
 - [x] Add XML-first second source family support
-- [ ] Integrate Terraform + Asset Bundle deployment into CI/CD and environment promotion
 
 ## Target Architecture
 
@@ -270,9 +268,6 @@ document-intelligence/
     contract/
     integration/
     golden/
-  databricks/
-    workflows/
-    jobs/
 ```
 
 This structure is a recommendation for implementation, not current state.
@@ -490,7 +485,6 @@ Do not add Dagster for the first implementation unless a new ADR justifies the c
 - Create package structure under `document-intelligence/`
 - Add config loading and job entrypoint stubs
 - Add local development README
-- Add Databricks workflow placeholders
 
 ### Documentation
 

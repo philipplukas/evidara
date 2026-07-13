@@ -48,6 +48,8 @@ def get_provider_registry(provider: ProviderDep) -> ProviderRegistry:
 
     class _ProviderAdapter:
         provider_name = "firecrawl"
+        # Wraps the (live_ready) Firecrawl provider, so it inherits its key.
+        live_ready = True
 
         async def start_run(self, source, source_version, run):
             return await provider.start_run(source, source_version, run)
