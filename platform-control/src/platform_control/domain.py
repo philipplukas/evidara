@@ -63,6 +63,7 @@ class AcquisitionProvider(StrEnum):
     EUR_LEX_SPARQL = "eur_lex_sparql"
     BUNDESLAND_HTTP = "bundesland_http"
     REGIONE_HTTP = "regione_http"
+    CANTON_HTTP = "canton_http"
     LEGIFRANCE = "legifrance"
     CH_COURT_DECISIONS = "ch_court_decisions"
 

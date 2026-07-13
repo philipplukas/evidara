@@ -8,22 +8,26 @@
  *     Tailwind buttons instead of MUI `SelectInput` — proves the filter-
  *     controller surface works without MUI.
  *
- * Deferred until follow-up increments:
- *   - Keyboard shortcuts (`/` focus, `o` open attention) — domain logic,
- *     not primitive work; pure helpers stay in `./RunList.tsx`.
- *   - `CancelRunButton` row action + `RunLaunchButton` "Create Run" CTA —
- *     mutation migration (needs `<Dialog>` primitive).
+ * The operator-action stack (`RunLaunchButton` "Create Run" CTA,
+ * `CancelRunButton` row action) and the `/`+`o` keyboard shortcuts reuse the
+ * now-Tailwind action components and the pure helpers in `./RunList.tsx`.
  */
 "use client";
 
-import { ListContextProvider, useListController } from "ra-core";
-import { useMemo } from "react";
+import { ListContextProvider, RecordContextProvider, useListController } from "ra-core";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { RunListRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import { DataTable, type DataTableColumn, Pill, type PillLevel } from "../../ui/primitives";
 import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
-import { describeRunState, summarizeRunFilters } from "./RunList";
+import { CancelRunButton } from "./RunActions";
+import { RunLaunchButton } from "./RunLaunchDialog";
+import {
+  describeRunState,
+  getRunQueueKeyboardShortcutAction,
+  summarizeRunFilters,
+} from "./RunList";
 
 type RunStatus = RunListRecord["status"];
 type RunMode = RunListRecord["mode"];
@@ -82,6 +86,7 @@ export default function RunListV2() {
     sort: { field: "created_at", order: "DESC" },
   });
   const navigate = useNavigate();
+  const attentionButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const records = controller.data;
   const filterValues = controller.filterValues as RunQueueFilterValues;
@@ -113,6 +118,23 @@ export default function RunListV2() {
     }
     return seed;
   }, [runs]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const shortcut = getRunQueueKeyboardShortcutAction(event, event.target, attentionRun);
+      if (!shortcut) {
+        return;
+      }
+      event.preventDefault();
+      if (shortcut.type === "focus-attention") {
+        attentionButtonRef.current?.focus();
+        return;
+      }
+      navigate(`/runs-v2/${encodeURIComponent(shortcut.runId)}`);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [attentionRun, navigate]);
 
   const setStatus = (status: RunStatus | undefined) =>
     controller.setFilters({ ...filterValues, status }, undefined, false);
@@ -203,22 +225,45 @@ export default function RunListV2() {
         </span>
       ),
     },
+    {
+      key: "actions",
+      header: "Actions",
+      headerClassName: "sr-only",
+      className: "text-right",
+      // Renders only for pending/running runs; the ConfirmButton inside
+      // CancelRunButton stops click propagation so the row-click navigation
+      // does not fire when the operator opens the cancel confirmation.
+      render: (record) => (
+        <RecordContextProvider value={record}>
+          <CancelRunButton />
+        </RecordContextProvider>
+      ),
+    },
   ];
 
   return (
     <ListContextProvider value={controller}>
       <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-[var(--container-max)] mx-auto space-y-4">
-        <header className="space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
-            Run queue
-          </p>
-          <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
-            Runs
-          </h1>
-          <p className="text-[14px] text-[var(--foreground-muted)] max-w-[72ch]">
-            Triage active, failed, and completed acquisition runs. Use presets to narrow the
-            operator queue without leaving the list.
-          </p>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[var(--foreground-subtle)]">
+              Run queue
+            </p>
+            <h1 className="font-[family:var(--font-admin-serif)] text-[28px] font-semibold text-[var(--foreground)] leading-tight">
+              Runs
+            </h1>
+            <p className="text-[14px] text-[var(--foreground-muted)] max-w-[72ch]">
+              Triage active, failed, and completed acquisition runs. Use presets to narrow the
+              operator queue without leaving the list.
+            </p>
+            <p className="text-[12px] text-[var(--foreground-subtle)]">
+              Press <kbd className="font-mono">/</kbd> to focus the attention run. Press{" "}
+              <kbd className="font-mono">O</kbd> to open it.
+            </p>
+          </div>
+          <div className="shrink-0">
+            <RunLaunchButton label="Create Run" defaultMode="production" />
+          </div>
         </header>
 
         {/* Preset bar (replaces the MUI RunQueueHeader presets). */}
@@ -250,6 +295,7 @@ export default function RunListV2() {
             </div>
             {attentionRun ? (
               <button
+                ref={attentionButtonRef}
                 type="button"
                 onClick={() => navigate(`/runs-v2/${encodeURIComponent(attentionRun.run_id)}`)}
                 className="inline-flex items-center rounded-full border border-[var(--status-degraded)]/40 bg-[var(--status-degraded-subtle)] px-3 h-9 text-[12px] font-semibold text-[var(--status-degraded)] hover:bg-[var(--status-degraded-subtle)]/80"

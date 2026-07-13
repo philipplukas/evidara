@@ -63,6 +63,7 @@ _SUPPORTED_PROVIDERS = {
     "eur_lex_sparql",
     "bundesland_http",
     "regione_http",
+    "canton_http",
     "legifrance",
     "ch_court_decisions",
 }
@@ -164,6 +165,21 @@ def _validate_template(
         ):
             errors.append(
                 f"Overlay '{overlay_id}' template '{template_id}' regione_http requires seed_url or seed_urls."
+            )
+        return errors
+
+    if provider == "canton_http":
+        errors = []
+        if not _has_nonempty_str(payload.get("canton_code")):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' canton_http requires canton_code (ISO 3166-2:CH)."
+            )
+        if not (
+            _has_nonempty_str(payload.get("seed_url"))
+            or _has_nonempty_str_list(payload.get("seed_urls"))
+        ):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' canton_http requires seed_url or seed_urls."
             )
         return errors
 
