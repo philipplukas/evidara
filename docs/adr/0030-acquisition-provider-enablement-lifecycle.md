@@ -59,15 +59,42 @@ run may launch only when **both** keys are turned:
   [`source_blueprints.yaml`](../../platform-control/src/platform_control/hierarchies/source_blueprints.yaml)
   (the operator has accepted it for live acquisition).
 
-`ProviderRegistry.require_live_ready()` is the loader-path guard: it
-resolves the provider for an acquisition spec and raises
-`ProviderNotLiveReadyError` when the provider is a scaffold. Callers that
-only want to resolve-and-introspect keep using `resolve_for_spec()`; only
-the run-launch path calls `require_live_ready()`, so a scaffold can never
-fire even if a template mistakenly references it. The `enabled` flag is
-enforced by the readiness check on the template side. Both keys default to
-the safe value (`live_ready = False`, `enabled` absent/false), so new work
-is inert until deliberately turned on.
+Both keys are enforced in the run-launch path — `RunService._require_launchable()`,
+called from `create_run()` (before the run row is persisted, so a
+worker-backed dispatch cannot accept a run it can never run) and again from
+`_dispatch_run()` (the last gate before any outbound request, covering the
+scheduler, retry, and Temporal paths):
+
+- **Provider key.** `ensure_live_ready()` (shared by
+  `ProviderRegistry.require_live_ready()`, which resolves-then-checks for
+  loader-style callers) raises `ProviderNotLiveReadyError` when the provider
+  that will actually be called is a scaffold. Callers that only want to
+  resolve-and-introspect keep using `resolve_for_spec()` /
+  `resolve_for_version()`.
+- **Template key.** A source version created from a blueprint records its
+  `overlay_id` / `provider_template_id`, and the run-launch path re-reads that
+  template's `enabled` flag from `source_blueprints.yaml`, raising
+  `BlueprintTemplateNotEnabledError` unless it is `true`. Re-reading (rather
+  than snapshotting at creation) makes `enabled: false` a kill switch: flipping
+  a template off stops its existing source versions from dispatching. Versions
+  built from a hand-written `acquisition_spec` carry no template, so only the
+  provider key applies to them.
+
+Both errors surface as HTTP 400, the same family as `ProviderConfigurationError`.
+A `PENDING` run that the lock rejects is marked `FAILED` by the worker rather
+than retried forever.
+
+`ExecutionMode.SHADOW` versions are exempt: they are routed to the cassette
+provider and replay fixtures, so no request reaches the portal the lock
+protects — that is the rehearsal mode an operator uses *before* capturing
+acceptance-run evidence.
+
+Both keys default to the safe value (`live_ready = False`, `enabled`
+absent/false), so new work is inert until deliberately turned on. Templates
+state `enabled` explicitly, and a template may only be `enabled: true` if its
+provider is `live_ready` — both invariants are asserted by
+`tests/unit/test_blueprint_provider_parity.py`, and the lock itself by
+`tests/unit/test_provider_enablement_lock.py` (#559).
 
 ### 3. AcquisitionSpec discriminated union with `extra="forbid"`
 
@@ -180,7 +207,11 @@ within one jurisdiction without per-template duplication.
 ## References
 
 - [`platform-control/src/acquisition_core/providers.py`](../../platform-control/src/acquisition_core/providers.py)
-  — protocol, `live_ready`, `require_live_ready` two-key guard.
+  — protocol, `live_ready`, `ensure_live_ready` / `require_live_ready`.
+- [`platform-control/src/platform_control/services/run_service.py`](../../platform-control/src/platform_control/services/run_service.py)
+  — `_require_launchable()`, the run-launch enforcement point for both keys.
+- [`platform-control/src/platform_control/services/source_blueprints.py`](../../platform-control/src/platform_control/services/source_blueprints.py)
+  — `require_source_blueprint_enabled()`, the template-side key.
 - [`platform-control/src/platform_control/schemas/source.py`](../../platform-control/src/platform_control/schemas/source.py)
   — `AcquisitionSpec` discriminated union, `extra="forbid"`,
   `parse_acquisition_spec`.

@@ -11,8 +11,16 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from acquisition_core.normalization import ArtifactPipeline
-from platform_control.domain import ProviderJobStatus, RunMode, RunStatus, SourceVersionStatus
+from acquisition_core.providers import ProviderNotLiveReadyError, ensure_live_ready
+from platform_control.domain import (
+    ExecutionMode,
+    ProviderJobStatus,
+    RunMode,
+    RunStatus,
+    SourceVersionStatus,
+)
 from platform_control.errors import (
+    BlueprintTemplateNotEnabledError,
     InvalidStateTransitionError,
     NotFoundError,
     ProviderConfigurationError,
@@ -63,6 +71,7 @@ from platform_control.services.politeness import current_rate_limiter
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.replay_checkpoint import checkpoint_dict_from_parent
 from platform_control.services.robots import RobotsChecker, current_robots_context
+from platform_control.services.source_blueprints import require_source_blueprint_enabled
 
 
 @dataclass(slots=True)
@@ -110,6 +119,34 @@ class RunService:
         if provider is None and self.provider_registry is not None:
             provider = self.provider_registry.resolve_for_version(source_version)
         return provider
+
+    def _require_launchable(
+        self,
+        source_version: SourceVersion,
+        provider: AcquisitionProvider,
+    ) -> None:
+        """Two-key lock for the run-launch path (ADR-0030).
+
+        A run may only fire at a third-party portal when BOTH keys are turned:
+
+        - config owner: the blueprint template the version came from carries
+          `enabled: true` in source_blueprints.yaml, and
+        - code owner: the provider that will actually be called declares
+          `live_ready = True` (i.e. `start_run` is not a stub).
+
+        SHADOW versions are exempt: they are routed to the cassette provider
+        and replay fixtures, so no request ever reaches the portal the lock
+        protects — that is precisely the rehearsal mode an operator uses
+        *before* capturing acceptance-run evidence.
+        """
+        if source_version.execution_mode is ExecutionMode.SHADOW:
+            return
+        if source_version.overlay_id and source_version.provider_template_id:
+            require_source_blueprint_enabled(
+                source_version.overlay_id,
+                source_version.provider_template_id,
+            )
+        ensure_live_ready(provider, template_id=source_version.provider_template_id)
 
     def _should_dispatch_via_worker(self, source_version: SourceVersion) -> bool:
         if self.run_dispatch_backend == "worker":
@@ -183,6 +220,14 @@ class RunService:
             details = "; ".join(check.detail for check in readiness.checks if not check.ok)
             raise InvalidStateTransitionError(f"Run preflight failed: {details}")
 
+        # Two-key lock, checked before the Run row exists: worker-backed dispatch
+        # would otherwise accept a run here and only reject it out-of-band, leaving
+        # a PENDING run the worker can never dispatch. _dispatch_run re-checks, so
+        # scheduler/retry/temporal paths are covered too.
+        provider = self._resolve_provider_for_source_version(source_version)
+        if provider is not None:
+            self._require_launchable(source_version, provider)
+
         run_metadata: dict[str, Any] = {
             "scope": request.scope.model_dump(mode="json"),
             "replay": request.replay.model_dump(mode="json") if request.replay else None,
@@ -243,16 +288,27 @@ class RunService:
         )
         dispatched = 0
         pending_publications: list[PendingDispatchPublications] = []
+        locked = 0
         for run in pending_runs:
             source = await self.session.get(Source, run.source_id)
             source_version = await self.session.get(SourceVersion, run.source_version_id)
             if source is None or source_version is None:
                 continue
-            pending_publications.append(await self._dispatch_run(source, source_version, run))
+            try:
+                pending_publications.append(await self._dispatch_run(source, source_version, run))
+            except (BlueprintTemplateNotEnabledError, ProviderNotLiveReadyError) as exc:
+                # A run the two-key lock rejects can never succeed — fail it instead
+                # of leaving it PENDING, or the worker retries it every poll cycle.
+                run.status = RunStatus.FAILED
+                run.failure_reason = str(exc)
+                run.completed_at = datetime.now(UTC)
+                locked += 1
+                continue
             dispatched += 1
 
-        if dispatched > 0:
+        if dispatched > 0 or locked > 0:
             await self.session.commit()
+        if dispatched > 0:
             await self._publish_pending_dispatch_events(pending_publications)
         return dispatched
 
@@ -839,6 +895,10 @@ class RunService:
             raise ProviderConfigurationError(
                 "An acquisition provider or provider registry is required before creating runs."
             )
+
+        # Last gate before any outbound request: no scaffold provider and no
+        # disabled blueprint template may reach a live portal (ADR-0030).
+        self._require_launchable(source_version, provider)
 
         # Bind the jurisdiction's rate limiter + robots context into the async
         # context so every outbound GET performed by the provider honours them.

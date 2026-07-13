@@ -1,3 +1,12 @@
+# Blueprint templates for source creation.
+#
+# `enabled` is the config-owner key of the ADR-0030 two-key lock: the
+# run-launch path refuses to dispatch a run for a source version created from a
+# template that is not `enabled: true` (the other key is the provider's
+# `live_ready` flag in code). The flag FAILS CLOSED — a template that omits it
+# is treated as disabled, so a new template is inert until an operator captures
+# acceptance-run evidence and turns it on. Every template therefore states its
+# value explicitly (enforced by tests/unit/test_blueprint_provider_parity.py).
 overlays:
   at:
     provider_templates:
@@ -14,6 +23,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: decision
+        enabled: true
       ris_ogd_bundesrecht_narrow_html:
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
@@ -29,6 +39,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       ris_ogd_bundesrecht_small_batch_html:
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
@@ -44,6 +55,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       firecrawl_justice_portal:
         provider: firecrawl
         mode: crawl
@@ -61,6 +73,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: decision
+        enabled: true
       # Sub-federal: Bundesländer LGBl templates. Reuse the existing RIS OGD
       # provider with per-LGBl applikation codes. Live RIS exposes LGBl per
       # Bundesland via the same API shape as Bundesrecht.
@@ -109,6 +122,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       # Major German federal codes — full-text BJNR URLs for proper titles.
       # Index pages give abbreviated titles ("StGB - nichtamtliches
       # Inhaltsverzeichnis"); BJNR pages give full law names.
@@ -171,6 +185,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de, fr, it]
         document_type_hint: legislation
+        enabled: true
       fedlex_sparql_constitution_de:
         provider: fedlex_sparql
         seed_url: https://fedlex.data.admin.ch/eli/cc/1999/404
@@ -186,6 +201,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       fedlex_sparql_vwvg_de:
         provider: fedlex_sparql
         seed_url: https://fedlex.data.admin.ch/eli/cc/1969/737_757_755
@@ -201,6 +217,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       fedlex_sparql_federal_law_batch_de:
         provider: fedlex_sparql
         seed_urls:
@@ -218,6 +235,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       # Broad Swiss federal law corpus — major codes and statutes.
       # ELI URIs verified against fedlex.data.admin.ch SPARQL ASK (2026-04-21).
       fedlex_sparql_federal_codes_de:
@@ -474,6 +492,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [it]
         document_type_hint: legislation
+        enabled: true
       # Sub-federal: regione template. Provider scaffold; live adapter
       # lands per-regione alongside its first acceptance run.
       regione_http_lombardia:
