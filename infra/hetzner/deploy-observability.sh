@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Observability for self-hosted Evidara on Hetzner k3s (ADR-0031):
+# Observability for self-hosted Evidara on Hetzner k3s (ADR-0032):
 # kube-prometheus-stack (Prometheus + Alertmanager + Grafana) into `monitoring`, then the
 # Evidara scrape targets, alerts, and the pipeline funnel dashboard. Idempotent.
 #

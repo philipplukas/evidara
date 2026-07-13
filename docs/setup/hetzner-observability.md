@@ -2,7 +2,7 @@
 
 Prometheus + Alertmanager + Grafana on the self-hosted k3s cluster, and the pipeline
 funnel dashboard that makes a broken pipeline visible in five seconds instead of a
-session with `kubectl`. See [ADR-0031](../adr/0031-pipeline-observability.md) for why,
+session with `kubectl`. See [ADR-0032](../adr/0032-pipeline-observability.md) for why,
 and [ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md) for the cluster itself.
 
 > **The problem this solves.** Liveness probes answer *"is the process alive"*. During
@@ -75,7 +75,7 @@ this counter those two are byte-identical.
 ## Alerts
 
 `severity: critical` routes to the Alertmanager `page` receiver; `warning` to `default`.
-The full list and the reasoning is in [ADR-0031](../adr/0031-pipeline-observability.md);
+The full list and the reasoning is in [ADR-0032](../adr/0032-pipeline-observability.md);
 what to do when one fires is in
 [the alert-response playbook](../runbooks/alert-response-playbook.md).
 

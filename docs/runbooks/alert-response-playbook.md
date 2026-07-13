@@ -13,13 +13,13 @@ monitoring stack. Each alert links to a specific section below.
 For SLI/SLO definitions, see [docs/adr/sli-slo-definitions.md](../adr/sli-slo-definitions.md).
 
 > **Two monitoring stacks are described in this file.** The [Hetzner pipeline
-> alerts](#hetzner-pipeline-alerts-adr-0031) below fire from Prometheus/Alertmanager on
-> the self-hosted k3s cluster and are the **live** ones (ADR-0031). The Cloud
+> alerts](#hetzner-pipeline-alerts-adr-0032) below fire from Prometheus/Alertmanager on
+> the self-hosted k3s cluster and are the **live** ones (ADR-0032). The Cloud
 > Run / Pub/Sub / Cloud Logging sections further down describe the retired GCP stack and
 > are kept for historical reference until they are ported or removed — do not expect a
 > `gcloud` command in them to work against the current runtime (ADR-0029).
 
-## Hetzner pipeline alerts (ADR-0031)
+## Hetzner pipeline alerts (ADR-0032)
 
 Rules: `infra/hetzner/observability/alerts.yaml`. Dashboard: Grafana →
 **Evidara → pipeline funnel** (`docs/setup/hetzner-observability.md` for access).

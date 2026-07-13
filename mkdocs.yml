@@ -104,7 +104,7 @@ nav:
       - "0022: Agentic CLI Workflow Control Surface": adr/adr-0022-agentic-cli-workflow-control-surface.md
       - "0026: authority_id / jurisdiction_id Naming Policy": adr/adr-0026-id-naming-policy.md
       - "0030: Acquisition Provider Enablement Lifecycle": adr/0030-acquisition-provider-enablement-lifecycle.md
-      - "0031: Pipeline Observability": adr/0031-pipeline-observability.md
+      - "0032: Pipeline Observability": adr/0032-pipeline-observability.md
       - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md

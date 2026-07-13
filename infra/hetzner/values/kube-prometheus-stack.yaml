@@ -1,4 +1,4 @@
-# kube-prometheus-stack for self-hosted Evidara (ADR-0031).
+# kube-prometheus-stack for self-hosted Evidara (ADR-0032).
 # Chart: prometheus-community/kube-prometheus-stack, installed into namespace `monitoring`.
 # Single node, modest retention — this cluster is one dedicated box, not a fleet.
 

@@ -77,7 +77,7 @@ spec:
           command: ["sh", "-c", "document_intelligence_nats_consumer --servers \"$NATS_SERVERS\""]
           ports:
             # Named so the `di-consumers` PodMonitor can scrape /metrics off the same
-            # health server that already answers /health (ADR-0031).
+            # health server that already answers /health (ADR-0032).
             - name: http
               containerPort: 8080
           envFrom:

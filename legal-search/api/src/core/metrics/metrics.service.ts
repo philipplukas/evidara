@@ -1,5 +1,5 @@
 /**
- * Prometheus counters for the legal-search funnel (ADR-0031).
+ * Prometheus counters for the legal-search funnel (ADR-0032).
  *
  * Deliberately dependency-free: adapters inject this and call `recordX()`. The
  * OpenSearch-derived gauges live in `SearchIndexProbe`, so instrumenting a code

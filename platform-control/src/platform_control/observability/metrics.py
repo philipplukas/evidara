@@ -1,4 +1,4 @@
-"""Prometheus counters for the platform-control end of the pipeline funnel (ADR-0031).
+"""Prometheus counters for the platform-control end of the pipeline funnel (ADR-0032).
 
 Module-level counters on the default registry, mirroring `event_logging.py`: the call
 sites are already the places that emit a structured log, so instrumenting them is a

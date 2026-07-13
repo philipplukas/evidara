@@ -1,5 +1,5 @@
 /**
- * Scrape-time gauges for the state of the search index (ADR-0031).
+ * Scrape-time gauges for the state of the search index (ADR-0032).
  *
  * These are the metrics that would have caught #549/#551 on the day they broke:
  * `documents-read` resolving to nothing, or resolving to a physical index that holds

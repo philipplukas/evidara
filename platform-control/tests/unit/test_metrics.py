@@ -1,4 +1,4 @@
-"""The funnel counters platform-control contributes (ADR-0031, #553)."""
+"""The funnel counters platform-control contributes (ADR-0032, #553)."""
 
 from __future__ import annotations
 

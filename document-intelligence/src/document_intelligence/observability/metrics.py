@@ -1,4 +1,4 @@
-"""Prometheus counters for the document-intelligence consumers (ADR-0031).
+"""Prometheus counters for the document-intelligence consumers (ADR-0032).
 
 Two middle stages of the pipeline funnel:
 

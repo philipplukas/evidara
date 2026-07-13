@@ -39,7 +39,7 @@ def start_health_server(service: str) -> None:
 
     Serves ``GET /health`` (liveness — "the process is alive") and ``GET /metrics``
     (Prometheus — "work is actually flowing"). The consumers ran green on the former
-    for weeks while doing nothing; the latter is the point of ADR-0031.
+    for weeks while doing nothing; the latter is the point of ADR-0032.
 
     Runs off the synchronous/async consume loop so it never blocks message handling.
     ``prometheus_client`` counters are thread-safe, so serialising them from this

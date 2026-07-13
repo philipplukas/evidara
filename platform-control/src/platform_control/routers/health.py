@@ -20,7 +20,7 @@ async def get_health() -> HealthResponse:
 
 @router.get("/metrics", include_in_schema=False)
 async def get_metrics() -> Response:
-    """Prometheus scrape endpoint (ADR-0031).
+    """Prometheus scrape endpoint (ADR-0032).
 
     Lives on the unauthenticated health router on purpose: the port is cluster-internal
     (no Ingress route reaches it) and the scraper carries no operator API key.

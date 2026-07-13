@@ -1,4 +1,4 @@
-# The Evidara pipeline funnel — one number per stage (ADR-0031, #553).
+# The Evidara pipeline funnel — one number per stage (ADR-0032, #553).
 #
 # Read left to right, top to bottom. A leak between any two stages is a step change in
 # the numbers; a total outage is a zero. Deriving this by hand took most of a session

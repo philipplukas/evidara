@@ -1,4 +1,4 @@
-# What Prometheus scrapes in the `evidara` namespace (ADR-0031).
+# What Prometheus scrapes in the `evidara` namespace (ADR-0032).
 #
 # ServiceMonitor for anything with a Service; PodMonitor for the two DI consumers,
 # which are Deployments with no Service (nothing calls them — they pull from NATS).

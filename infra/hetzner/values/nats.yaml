@@ -13,7 +13,7 @@ config:
   cluster:
     enabled: false
 
-# JetStream metrics — a prometheus-nats-exporter sidecar on port 7777 (ADR-0031).
+# JetStream metrics — a prometheus-nats-exporter sidecar on port 7777 (ADR-0032).
 # This is how a stuck bridge becomes visible: consumer pending/redelivery counts climb
 # while every pod stays Running. The chart can also emit a PodMonitor, but that would
 # make this stage depend on the Prometheus Operator CRDs existing; the PodMonitor is

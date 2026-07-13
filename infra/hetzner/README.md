@@ -199,7 +199,7 @@ gh api repos/philipplukas/evidara/actions/runners --jq '.runners[].name'
 > `check-title` + `contract-validation` never start. That was the CI blocker after the
 > GKE cluster (which hosted the old ARC pools) was decommissioned.
 
-## Stage 7 — observability (ADR-0031)
+## Stage 7 — observability (ADR-0032)
 
 Until this stage the cluster had **no metrics and no alerting**. Every failure in the
 June/July outage (#549/#550/#551) was silent: the OpenSearch document index was missing

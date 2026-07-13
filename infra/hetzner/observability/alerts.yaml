@@ -1,4 +1,4 @@
-# Day-one alerts for the Evidara pipeline (ADR-0031, #553).
+# Day-one alerts for the Evidara pipeline (ADR-0032, #553).
 #
 # Every one of these fires on a failure that was 100% undetected in the June/July
 # outage — the whole cluster was Running, 1/1 Ready, zero restarts, while search

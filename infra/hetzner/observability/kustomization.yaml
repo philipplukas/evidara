@@ -1,4 +1,4 @@
-# Evidara-owned observability objects (ADR-0031). The kube-prometheus-stack Helm
+# Evidara-owned observability objects (ADR-0032). The kube-prometheus-stack Helm
 # release itself is installed by deploy-observability.sh; everything here is the part
 # that describes *Evidara*, and is applied with `kubectl apply -k`.
 #

@@ -92,7 +92,7 @@ them.
 ## Monitoring Stack
 
 Since the move to the self-hosted Hetzner runtime (ADR-0029), the signal sources below
-replaced every GCP one. See [ADR-0031](0031-pipeline-observability.md).
+replaced every GCP one. See [ADR-0032](0032-pipeline-observability.md).
 
 - **Metrics source**: Prometheus (kube-prometheus-stack) scraping a `/metrics` endpoint
   on every service, plus the NATS JetStream exporter
@@ -106,7 +106,7 @@ replaced every GCP one. See [ADR-0031](0031-pipeline-observability.md).
 > The SLIs in the tables above still name Cloud Run / Pub/Sub metrics as their source.
 > The *targets* remain valid; the sources are being ported to their Prometheus
 > equivalents. `documents-read` alias resolution, search zero-result rate, and the
-> pipeline funnel counters are live today (ADR-0031).
+> pipeline funnel counters are live today (ADR-0032).
 
 ### Retired (GCP)
 

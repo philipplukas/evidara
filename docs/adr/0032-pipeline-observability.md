@@ -1,4 +1,4 @@
-# ADR-0031: Pipeline Observability — Prometheus, Grafana, and a Funnel That Cannot Lie
+# ADR-0032: Pipeline Observability — Prometheus, Grafana, and a Funnel That Cannot Lie
 
 ## Status
 
