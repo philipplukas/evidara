@@ -20,7 +20,33 @@ def _load_blueprints() -> dict[str, Any]:
     return payload
 
 
+# Blueprint-level keys that are NOT part of the acquisition_spec and must be
+# stripped before AcquisitionSpec parsing (which forbids extra fields):
+# `enabled` is the two-key-lock flag; `extractor_profile_id` is a source-version
+# default applied by source_service, not a provider config field.
+_NON_SPEC_TEMPLATE_KEYS = frozenset({"enabled", "extractor_profile_id"})
+
+
 def resolve_source_blueprint(overlay_id: str, provider_template_id: str) -> dict[str, Any]:
+    template_payload = _resolve_template(overlay_id, provider_template_id)
+    return {k: v for k, v in template_payload.items() if k not in _NON_SPEC_TEMPLATE_KEYS}
+
+
+def resolve_blueprint_extractor_profile_id(
+    overlay_id: str, provider_template_id: str
+) -> str | None:
+    """Return the template's default extractor_profile_id, if it declares one.
+
+    Blueprint templates do not carry acquisition-spec fields for this; it is a
+    source-version default that source_service applies when the create request
+    does not specify an extractor_profile_id.
+    """
+    template_payload = _resolve_template(overlay_id, provider_template_id)
+    value = template_payload.get("extractor_profile_id")
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _resolve_template(overlay_id: str, provider_template_id: str) -> dict[str, Any]:
     payload = _load_blueprints()
     overlays = payload.get("overlays")
     if not isinstance(overlays, dict):
@@ -39,8 +65,7 @@ def resolve_source_blueprint(overlay_id: str, provider_template_id: str) -> dict
         raise NotFoundError(
             f"Unknown provider_template_id '{provider_template_id}' in overlay '{overlay_id}'."
         )
-    # Strip blueprint-level metadata before handing to AcquisitionSpec parsing.
-    return {k: v for k, v in template_payload.items() if k != "enabled"}
+    return template_payload
 
 
 def list_source_blueprint_templates() -> list[dict[str, str]]:

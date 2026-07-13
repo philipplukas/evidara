@@ -20,6 +20,7 @@ from platform_control.schemas.source import (
 )
 from platform_control.services.source_blueprints import (
     list_source_blueprint_templates,
+    resolve_blueprint_extractor_profile_id,
     resolve_source_blueprint,
 )
 
@@ -76,14 +77,12 @@ class SourceService:
             jurisdiction_id=request.source.jurisdiction_id,
             authority_id=request.source.authority_id,
         )
-        if request.source_version.extractor_profile_id:
-            extractor_profile = await self.session.get(
-                ExtractorProfile, request.source_version.extractor_profile_id
-            )
-            if extractor_profile is None:
-                raise NotFoundError(
-                    f"Extractor profile not found: {request.source_version.extractor_profile_id}"
-                )
+        extractor_profile_id = await self._resolve_extractor_profile_id(
+            requested=request.source_version.extractor_profile_id,
+            acquisition_spec=request.source_version.acquisition_spec,
+            overlay_id=request.source_version.overlay_id,
+            provider_template_id=request.source_version.provider_template_id,
+        )
         acquisition_spec = self._resolve_acquisition_spec(
             acquisition_spec=request.source_version.acquisition_spec,
             overlay_id=request.source_version.overlay_id,
@@ -103,7 +102,7 @@ class SourceService:
 
         source_version = SourceVersion(
             source_id=source.source_id,
-            extractor_profile_id=request.source_version.extractor_profile_id,
+            extractor_profile_id=extractor_profile_id,
             version_label=request.source_version.version_label,
             execution_mode=request.source_version.execution_mode,
             acquisition_spec=acquisition_spec.model_dump(mode="json"),
@@ -142,12 +141,12 @@ class SourceService:
         request: CreateSourceVersionRequest,
     ) -> SourceVersion:
         await self.get_source(source_id)
-        if request.extractor_profile_id:
-            extractor_profile = await self.session.get(
-                ExtractorProfile, request.extractor_profile_id
-            )
-            if extractor_profile is None:
-                raise NotFoundError(f"Extractor profile not found: {request.extractor_profile_id}")
+        extractor_profile_id = await self._resolve_extractor_profile_id(
+            requested=request.extractor_profile_id,
+            acquisition_spec=request.acquisition_spec,
+            overlay_id=request.overlay_id,
+            provider_template_id=request.provider_template_id,
+        )
 
         acquisition_spec = self._resolve_acquisition_spec(
             acquisition_spec=request.acquisition_spec,
@@ -157,7 +156,7 @@ class SourceService:
 
         version = SourceVersion(
             source_id=source_id,
-            extractor_profile_id=request.extractor_profile_id,
+            extractor_profile_id=extractor_profile_id,
             version_label=request.version_label,
             execution_mode=request.execution_mode,
             acquisition_spec=acquisition_spec.model_dump(mode="json"),
@@ -262,6 +261,35 @@ class SourceService:
             raise InvalidStateTransitionError(
                 "Authority does not belong to the requested jurisdiction."
             )
+
+    async def _resolve_extractor_profile_id(
+        self,
+        *,
+        requested: str | None,
+        acquisition_spec: AcquisitionSpec | None,
+        overlay_id: str | None,
+        provider_template_id: str | None,
+    ) -> str | None:
+        """Resolve the effective extractor_profile_id and validate it exists.
+
+        An explicit request value wins and is validated strictly. Otherwise,
+        when the version is created from a blueprint (no explicit
+        acquisition_spec), fall back to the template's default
+        extractor_profile_id — e.g. Fedlex legislation templates default to
+        exp_legislation_v1 (#532). The blueprint default is best-effort
+        enrichment: if that profile is not present it is skipped rather than
+        blocking source creation (blueprint profile ids are integrity-checked
+        against the seed by test_blueprint_provider_parity).
+        """
+        if requested is not None:
+            if await self.session.get(ExtractorProfile, requested) is None:
+                raise NotFoundError(f"Extractor profile not found: {requested}")
+            return requested
+        if acquisition_spec is None and overlay_id and provider_template_id:
+            default_id = resolve_blueprint_extractor_profile_id(overlay_id, provider_template_id)
+            if default_id is not None and await self.session.get(ExtractorProfile, default_id):
+                return default_id
+        return None
 
     @staticmethod
     def _resolve_acquisition_spec(

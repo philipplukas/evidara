@@ -53,8 +53,9 @@ WHERE {{
 LIMIT 1
 """.strip()
 
-    # Discover cantonal-concordat works filtered by canton of origin. Not
-    # wired into start_run() yet; awaits the cantonal acceptance run per
+    # Discover cantonal-concordat works filtered by canton of origin. Wired
+    # into start_run() via scope_kind="canton" (#531); the cantonal blueprint
+    # templates stay `enabled: false` until the live acceptance run per
     # docs/runbooks/country-rollout-drift-prevention-backlog.md §4.4.
     # `canton_iri` is a full IRI (e.g. https://fedlex.data.admin.ch/vocabulary/canton/ZH).
     _CANTON_WORK_DISCOVERY_QUERY = """
