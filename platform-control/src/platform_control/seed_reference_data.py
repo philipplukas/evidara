@@ -226,6 +226,13 @@ class ReferenceDataSeeder:
                     "Authority seed references missing jurisdiction: "
                     f"{item.authority_id} -> {item.jurisdiction_id}"
                 )
+            if item.compliance_policy_id is not None:
+                policy = await session.get(CompliancePolicy, item.compliance_policy_id)
+                if policy is None:
+                    raise ValueError(
+                        "Authority seed references missing compliance policy: "
+                        f"{item.authority_id} -> {item.compliance_policy_id}"
+                    )
             existing = await session.get(Authority, item.authority_id)
             if existing is None:
                 await self._check_alias_collision(

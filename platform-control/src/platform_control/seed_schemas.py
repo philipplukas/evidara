@@ -100,6 +100,13 @@ class AuthoritySeed(BaseModel):
     jurisdiction_id: str
     slug: str
     name: str
+    # Optional authority-level compliance override. When set, it takes
+    # precedence over the authority's jurisdiction policy at resolution time
+    # (see compliance_policy_service._resolve_policy_for_source). Lets a
+    # single jurisdiction (e.g. jur_ch_federal) carry the Fedlex open-data
+    # policy for legislation while its court authorities bind a stricter
+    # public-official policy.
+    compliance_policy_id: str | None = None
     # Previously-used authority_ids for this same logical entity. See
     # JurisdictionSeed.deprecated_aliases for the contract.
     deprecated_aliases: list[str] = Field(default_factory=list)

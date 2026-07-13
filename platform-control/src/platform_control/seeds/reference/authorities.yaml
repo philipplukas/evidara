@@ -13,26 +13,33 @@ items:
     # Renamed from auth_ch_fedlex in migration 20260417_0012 — see #264.
     deprecated_aliases:
       - auth_ch_fedlex
+  # Swiss federal courts bind the public-official compliance tier
+  # (cp_ch_court_decisions), overriding jur_ch_federal's Fedlex open-data
+  # policy — court rulings carry no open-data licence. See #530.
   - authority_id: auth_bger
     jurisdiction_id: jur_ch_federal
     slug: ch-bger
     name: Bundesgericht
+    compliance_policy_id: cp_ch_court_decisions
     deprecated_aliases:
       - auth_ch_bundesgericht
   - authority_id: auth_bvger
     jurisdiction_id: jur_ch_federal
     slug: ch-bvger
     name: Bundesverwaltungsgericht
+    compliance_policy_id: cp_ch_court_decisions
     deprecated_aliases:
       - auth_ch_bundesverwaltungsgericht
   - authority_id: auth_bstger
     jurisdiction_id: jur_ch_federal
     slug: ch-bstger
     name: Bundesstrafgericht / Tribunal pénal fédéral
+    compliance_policy_id: cp_ch_court_decisions
   - authority_id: auth_bpger
     jurisdiction_id: jur_ch_federal
     slug: ch-bpger
     name: Bundespatentgericht / Tribunal fédéral des brevets
+    compliance_policy_id: cp_ch_court_decisions
   # ─── Swiss cantonal authorities ────────────────────────────
   - authority_id: auth_zh_sk
     jurisdiction_id: jur_ch_zh

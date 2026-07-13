@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.errors import InvalidStateTransitionError, NotFoundError
-from platform_control.models.authority import Jurisdiction
+from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.source import Source
 from platform_control.schemas.compliance_policy import (
@@ -169,6 +169,17 @@ _DEFAULT_USER_AGENT = "platform-control/1.0 (+https://evidara.ai)"
 async def _resolve_policy_for_source(
     session: AsyncSession, source: Source
 ) -> CompliancePolicy | None:
+    # Authority-level policy takes precedence over the jurisdiction default, so
+    # one jurisdiction can carry different politeness tiers per authority — e.g.
+    # under jur_ch_federal, Fedlex legislation stays on the open-data policy
+    # while the federal courts (auth_bger/auth_bvger/…) bind the stricter
+    # public-official cp_ch_court_decisions. Falls back to the jurisdiction
+    # policy when the authority has no override.
+    authority_id = getattr(source, "authority_id", None)
+    if authority_id is not None:
+        authority = await session.get(Authority, authority_id)
+        if authority is not None and authority.compliance_policy_id is not None:
+            return await session.get(CompliancePolicy, authority.compliance_policy_id)
     jurisdiction = await session.get(Jurisdiction, source.jurisdiction_id)
     if jurisdiction is None or jurisdiction.compliance_policy_id is None:
         return None

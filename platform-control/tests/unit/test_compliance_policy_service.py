@@ -87,3 +87,57 @@ async def test_registry_caches_limiter_so_buckets_persist_across_runs(session) -
     second = await resolve_rate_limiter_for_source(session, source, registry)
 
     assert first is second
+
+
+@pytest.mark.asyncio
+async def test_authority_policy_overrides_jurisdiction_policy(session) -> None:
+    # jur_ch_federal carries the open-data policy (for legislation) while the
+    # court authority binds a stricter public-official policy — resolution must
+    # prefer the authority override. (#530 authority-level compliance seam.)
+    open_data = CompliancePolicy(
+        name="ch-open-data",
+        robots_mode=RobotsMode.IGNORE,
+        max_requests_per_minute_per_host=600,
+        max_concurrent_per_host=4,
+    )
+    court = CompliancePolicy(
+        name="ch-court",
+        robots_mode=RobotsMode.STRICT,
+        max_requests_per_minute_per_host=20,
+        max_concurrent_per_host=2,
+    )
+    session.add_all([open_data, court])
+    await session.flush()
+    session.add(
+        Jurisdiction(
+            jurisdiction_id="jur_ch_federal",
+            name="Swiss Confederation",
+            slug="ch-federal",
+            compliance_policy_id=open_data.compliance_policy_id,
+        )
+    )
+    session.add(
+        Authority(
+            authority_id="auth_bger",
+            jurisdiction_id="jur_ch_federal",
+            name="Bundesgericht",
+            slug="ch-bger",
+            compliance_policy_id=court.compliance_policy_id,
+        )
+    )
+    source = Source(
+        source_id="src_bger",
+        name="BGer decisions",
+        jurisdiction_id="jur_ch_federal",
+        authority_id="auth_bger",
+    )
+    session.add(source)
+    await session.commit()
+
+    limiter = await resolve_rate_limiter_for_source(session, source, RateLimiterRegistry())
+
+    assert limiter is not None
+    # The authority's court policy (20 rpm / 2 concurrent) wins over the
+    # jurisdiction's open-data policy (600 rpm / 4 concurrent).
+    assert limiter.max_requests_per_minute == 20
+    assert limiter.max_concurrent == 2
