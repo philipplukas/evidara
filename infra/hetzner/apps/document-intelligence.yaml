@@ -98,12 +98,16 @@ spec:
             limits:
               memory: 1Gi
 ---
-# NATS->legal-search projection bridge (M0.2). Subscribes to
-# evidara.document-processed and POSTs each event to the legal-search projections
-# endpoint, so processed documents become searchable without a manual
-# local_outbox_replay run. Reuses the DI consumer image (same package, new entry
-# point); LEGAL_SEARCH_API_URL comes from evidara-config, the optional X-API-Key
-# from evidara-auth.
+# NATS->legal-search + platform-control event bridge (M0.2 / #550). Subscribes to
+# evidara.document-processed, evidara.document-withdrawn and
+# evidara.document-processing-status-updated, and POSTs each event to the legal-search
+# projections endpoints (so processed documents become searchable without a manual
+# local_outbox_replay run) *and* to platform-control's /v1/di/events endpoints (so
+# /v1/runs/{id}/pipeline-health advances past `pending` and the admin run-detail
+# "DI Processing Status" section is populated). This is the only DI process that makes
+# HTTP calls to either peer — di-consumer above only publishes to NATS.
+# Reuses the DI consumer image (same package, new entry point); LEGAL_SEARCH_API_URL and
+# PLATFORM_CONTROL_API_URL come from evidara-config, both X-API-Keys from evidara-auth.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -132,6 +136,15 @@ spec:
                 secretKeyRef:
                   name: evidara-auth
                   key: LEGAL_SEARCH_API_KEY
+                  optional: true
+            # X-API-Key for platform-control's /v1/di/events endpoints, which are gated by
+            # require_control_plane_service (the operator key satisfies it). Without this
+            # the callbacks 401 — loudly now, at ERROR, with retry (#550).
+            - name: PLATFORM_CONTROL_OPERATOR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: evidara-auth
+                  key: PLATFORM_CONTROL_OPERATOR_API_KEY
                   optional: true
           envFrom:
             - configMapRef:

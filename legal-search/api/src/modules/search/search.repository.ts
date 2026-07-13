@@ -5,9 +5,28 @@
 import type { ContextAggregations, SearchResultEntity } from './entities/search.entities';
 
 export interface SearchRepository {
+  /**
+   * Runs the query. Resolving means the query *executed*: `total: 0` is a
+   * genuine "zero matches". A query that could not be executed (missing
+   * index/alias, connection refused, timeout) rejects with
+   * `SearchBackendUnavailableError` — it is never flattened into an empty
+   * result set (#551).
+   */
   search(query: string, options?: SearchOptions): Promise<SearchResultEntity>;
+  /** Same contract as `search`: rejects rather than returning empty aggregations. */
   getContextAggregations(): Promise<ContextAggregations>;
+  /**
+   * Readiness probe: does the documents read alias resolve to at least one
+   * index? Non-throwing by design — the caller (health endpoint) reports the
+   * failure rather than propagating it.
+   */
+  checkReadAlias(): Promise<ReadAliasCheck>;
 }
+
+/** Result of the read-alias readiness probe. */
+export type ReadAliasCheck =
+  | { status: 'ok'; alias: string; indices: string[] }
+  | { status: 'error'; alias: string; detail: string };
 
 export interface SearchOptions {
   jurisdictions?: string[];

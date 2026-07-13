@@ -20,7 +20,13 @@ import type {
   SearchHitEntity,
   SearchResultEntity,
 } from './entities/search.entities';
-import type { SearchOptions, SearchRefinement, SearchRepository } from './search.repository';
+import { describeOpenSearchError, SearchBackendUnavailableError } from './search.errors';
+import type {
+  ReadAliasCheck,
+  SearchOptions,
+  SearchRefinement,
+  SearchRepository,
+} from './search.repository';
 
 type OpenSearchHit = {
   _source?: Record<string, unknown>;
@@ -206,12 +212,12 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         aggregations: this.parseAggregations(result.aggregations),
       };
     } catch (err) {
-      this.logger.error('Search failed', err);
-      // Return empty results instead of crashing — observable degradation. The metric
-      // is what makes it *observable*: without `search_errors_total` a dead cluster is
-      // indistinguishable from "the corpus has no match for that query".
+      // A query that could not be executed is NOT an empty result set (#551).
+      // Count it before rethrowing: `search_errors_total` is what lets the
+      // zero-result alert tell a dead cluster apart from a query that simply
+      // matched nothing. `failure()` already logs at ERROR.
       this.metrics.recordSearchError();
-      return { total: 0, hits: [], aggregations: {} };
+      throw this.failure('search', err);
     }
   }
 
@@ -236,12 +242,43 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         source_types: this.parseBuckets(aggs?.source_types),
       };
     } catch (err) {
-      this.logger.error('Context aggregation failed', err);
-      return { jurisdictions: [], languages: [], source_types: [] };
+      throw this.failure('context aggregation', err);
+    }
+  }
+
+  async checkReadAlias(): Promise<ReadAliasCheck> {
+    const alias = this.indexDocuments;
+    try {
+      const response = await this.client.indices.getAlias({ name: alias });
+      const indices = Object.keys((response.body ?? {}) as Record<string, unknown>);
+      if (indices.length === 0) {
+        const detail = `read alias "${alias}" resolves to no index`;
+        this.logger.error(`Readiness check failed: ${detail}`);
+        return { status: 'error', alias, detail };
+      }
+      return { status: 'ok', alias, indices };
+    } catch (err) {
+      const detail = describeOpenSearchError(err);
+      this.logger.error(`Readiness check failed: read alias "${alias}" unresolvable — ${detail}`);
+      return { status: 'error', alias, detail };
     }
   }
 
   // ─── Helpers ───
+
+  /**
+   * Log loudly and build the domain error. The whole point of #551: a
+   * missing index is a total outage of the core product feature, so it must
+   * be the loudest failure we have, not the quietest.
+   */
+  private failure(operation: string, err: unknown): SearchBackendUnavailableError {
+    const failure = new SearchBackendUnavailableError(operation, this.indexDocuments, err);
+    this.logger.error(
+      `OpenSearch ${operation} failed [${failure.reason}] on "${this.indexDocuments}": ${failure.detail}`,
+      err instanceof Error ? err.stack : undefined,
+    );
+    return failure;
+  }
 
   private classifyQuery(query: string): QueryShape {
     if (query === '*' || query.length === 0) return 'wildcard';
