@@ -42,6 +42,7 @@ from document_intelligence.normalize.html import (
 from document_intelligence.normalize.ir import NormalizedDocumentIR
 from document_intelligence.normalize.xml import normalize_xml_document
 from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
+from document_intelligence.persist.surfaces import PUBLISHED_DOCUMENTS, PUBLISHED_SECTIONS
 from document_intelligence.profiles.registry import resolve_selected_profiles
 from document_intelligence.quality.invariants import validate_document_and_sections
 from document_intelligence.sectionize.html import (
@@ -686,22 +687,14 @@ def _build_processing_manifest(
     normalized_document: NormalizedDocumentIR,
     citation_count: int = 0,
 ) -> ProcessingManifest:
-    published_document_ref = {
-        "surface_name": "published_documents",
-        "surface_version": 1,
-        "record_key": {
-            "document_id": document.document_id,
-            "processing_manifest_id": processing_manifest_id,
-        },
-    }
-    published_sections_ref = {
-        "surface_name": "published_sections",
-        "surface_version": 1,
-        "record_filter": {
-            "document_id": document.document_id,
-            "processing_manifest_id": processing_manifest_id,
-        },
-    }
+    published_document_ref = PUBLISHED_DOCUMENTS.dataset_ref(
+        document_id=document.document_id,
+        processing_manifest_id=processing_manifest_id,
+    )
+    published_sections_ref = PUBLISHED_SECTIONS.dataset_ref(
+        document_id=document.document_id,
+        processing_manifest_id=processing_manifest_id,
+    )
     selected_profiles = resolve_selected_profiles(
         source_origin_kind=manifest.source_origin_kind,
         trust_tier=manifest.trust_tier,

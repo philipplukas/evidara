@@ -21,6 +21,7 @@ from platform_control.services.acquisition_provider import (
 
 class _CannedProvider:
     provider_name = "deterministic_http"
+    live_ready = True
 
     def __init__(self, resources: list[ProviderResource]) -> None:
         self._resources = resources

@@ -9,6 +9,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from acquisition_core.providers import ProviderNotLiveReadyError
 from platform_control.auth import require_control_plane_operator, require_control_plane_service
 from platform_control.config import get_settings
 from platform_control.errors import (
@@ -123,6 +124,16 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(ProviderConfigurationError)
     async def provider_handler(request: Request, exc: ProviderConfigurationError) -> JSONResponse:
+        return JSONResponse(status_code=400, content=_error_payload(request, str(exc)))
+
+    @app.exception_handler(ProviderNotLiveReadyError)
+    async def provider_not_live_ready_handler(
+        request: Request, exc: ProviderNotLiveReadyError
+    ) -> JSONResponse:
+        # Provider-side key of the ADR-0030 two-key lock. Same 400 family as
+        # ProviderConfigurationError: the provider cannot serve this request.
+        # BlueprintTemplateNotEnabledError (config-side key) is a
+        # PlatformControlError and lands on the domain handler below, also 400.
         return JSONResponse(status_code=400, content=_error_payload(request, str(exc)))
 
     @app.exception_handler(SignatureVerificationError)

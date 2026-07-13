@@ -44,6 +44,9 @@ from platform_control.services.acquisition_provider import (
 
 class CassetteProvider:
     provider_name = "cassette"
+    # Implemented (replays fixtures, no network), so the two-key lock's
+    # provider-side key is turned: SHADOW runs route here and must dispatch.
+    live_ready = True
 
     def __init__(self, cassette_dir: Path) -> None:
         self.cassette_dir = Path(cassette_dir)

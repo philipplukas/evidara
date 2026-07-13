@@ -31,6 +31,7 @@ from platform_control.services.source_service import SourceService
 @dataclass
 class StubProvider:
     provider_name: str = "firecrawl"
+    live_ready: bool = True
     external_job_id: str | None = None
     calls: int = 0
 
@@ -49,6 +50,7 @@ class StubProvider:
 @dataclass
 class FedlexSparqlProviderStub:
     provider_name: str = "fedlex_sparql"
+    live_ready: bool = True
 
     async def start_run(self, source, source_version, run) -> ProviderStartResult:
         del source, run
@@ -74,6 +76,7 @@ class FedlexSparqlProviderStub:
 @dataclass
 class RisOgdProviderStub:
     provider_name: str = "ris_ogd"
+    live_ready: bool = True
     external_job_id: str | None = None
     calls: int = 0
 
@@ -94,6 +97,7 @@ class InlineJsonDeterministicProvider:
     """Simulates deterministic_http capturing a single JSON document (no HTML)."""
 
     provider_name: str = "deterministic_http"
+    live_ready: bool = True
 
     async def start_run(self, source, source_version, run) -> ProviderStartResult:
         del source, source_version, run
@@ -119,6 +123,7 @@ class InlineJsonDeterministicProvider:
 @dataclass
 class InlineDeterministicProvider:
     provider_name: str = "deterministic_http"
+    live_ready: bool = True
 
     async def start_run(self, source, source_version, run) -> ProviderStartResult:
         del source, source_version, run
@@ -144,6 +149,7 @@ class InlineDeterministicProvider:
 @dataclass
 class FlakyInlineDeterministicProvider:
     provider_name: str = "deterministic_http"
+    live_ready: bool = True
     calls: int = 0
 
     async def start_run(self, source, source_version, run) -> ProviderStartResult:
