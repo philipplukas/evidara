@@ -242,6 +242,41 @@ overlays:
         language_codes: [de]
         document_type_hint: legislation
         enabled: true
+      # ───────────────────────────────────────────────────────────────
+      # Swiss federal court decisions (BGer / BVGer) — CH e2e Stream E (#530)
+      # Provider `ch_court_decisions` is a scaffold (live_ready=false); these
+      # templates stay `enabled: false` until scripts/ch-bger-fast-loop.sh
+      # captures acceptance-run evidence and an operator flips both keys.
+      # seed_urls are placeholder court landing pages; the real discovery
+      # (index_urls) URLs are set at live-enablement. Kept as a trailing block
+      # to minimise merge conflict with the cantonal section added by #531.
+      # ───────────────────────────────────────────────────────────────
+      ch_court_decisions_bger:
+        provider: ch_court_decisions
+        seed_urls:
+          - https://www.bger.ch/
+        court: bger
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_bger_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr, it]
+        document_type_hint: decision
+        enabled: false
+      ch_court_decisions_bvger:
+        provider: ch_court_decisions
+        seed_urls:
+          - https://www.bvger.ch/
+        court: bvger
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_bvger_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr, it]
+        document_type_hint: decision
+        enabled: false
   fr:
     provider_templates:
       legifrance_codes:
