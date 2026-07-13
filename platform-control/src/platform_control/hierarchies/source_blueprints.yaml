@@ -277,6 +277,60 @@ overlays:
         language_codes: [de, fr, it]
         document_type_hint: decision
         enabled: false
+      # ───────────────────────────────────────────────────────────────
+      # Swiss cantonal legislation via Fedlex — CH e2e Stream F (#531)
+      # Uses the federal fedlex_sparql provider in cantonal-discovery mode
+      # (scope_kind=canton + canton), discovering works via jolux:CantonOfOrigin
+      # instead of seed URIs. Templates stay `enabled: false` until the live
+      # cantonal acceptance run per country-rollout-drift-prevention §4.4 lands
+      # evidence. Distinct section from the court block above (#530) to minimise
+      # merge conflict.
+      # ───────────────────────────────────────────────────────────────
+      fedlex_sparql_canton_zh:
+        provider: fedlex_sparql
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        scope_kind: canton
+        canton: CH-ZH
+        preferred_languages: [de]
+        max_works: 50
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_zh_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      fedlex_sparql_canton_be:
+        provider: fedlex_sparql
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        scope_kind: canton
+        canton: CH-BE
+        preferred_languages: [de, fr]
+        max_works: 50
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_be_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr]
+        document_type_hint: legislation
+        enabled: false
+      fedlex_sparql_canton_bs:
+        provider: fedlex_sparql
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        scope_kind: canton
+        canton: CH-BS
+        preferred_languages: [de]
+        max_works: 50
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bs_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
   fr:
     provider_templates:
       legifrance_codes:
