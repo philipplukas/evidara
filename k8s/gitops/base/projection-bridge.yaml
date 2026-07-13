@@ -1,9 +1,11 @@
-# NATS JetStream → legal-search projection bridge (M0.2, issue #522).
+# NATS JetStream → legal-search + platform-control event bridge (M0.2 #522, #550).
 #
-# Durable subscriber that consumes document.processed / document.withdrawn from the
-# EVIDARA stream and POSTs each event to legal-search's HTTP projection endpoints,
-# replacing the manual scripts/close-loop-ris.py bridge. Ships in the same image as
-# di-nats-consumer (a different console-script entrypoint); see
+# Durable subscriber that consumes document.processed / document.withdrawn /
+# document.processing_status.updated from the EVIDARA stream and POSTs each event to
+# legal-search's HTTP projection endpoints (replacing the manual scripts/close-loop-ris.py
+# bridge) and to platform-control's /v1/di/events endpoints (so run pipeline-health leaves
+# `pending` and the admin run-detail DI sections are populated — #550). Ships in the same
+# image as di-nats-consumer (a different console-script entrypoint); see
 # document_intelligence/jobs/projection_bridge_consumer.py. ack/nak/term + DLQ
 # semantics mirror the DI artifact-bundle consumer.
 apiVersion: apps/v1
@@ -28,9 +30,9 @@ spec:
       containers:
         - name: projection-bridge
           image: ghcr.io/philipplukas/evidara-document-intelligence-consumer:latest
-          # NATS_SERVERS comes from evidara-config; the subjects (processed +
-          # withdrawn), stream EVIDARA, and DLQ subjects use the consumer defaults.
-          # LEGAL_SEARCH_API_URL points at the in-cluster legal-search API Service.
+          # NATS_SERVERS comes from evidara-config; the subjects (processed + withdrawn +
+          # processing-status), stream EVIDARA, and DLQ subjects use the consumer defaults.
+          # LEGAL_SEARCH_API_URL / PLATFORM_CONTROL_API_URL point at the in-cluster Services.
           command:
             - sh
             - -c
@@ -45,6 +47,19 @@ spec:
                 secretKeyRef:
                   name: legal-search-secrets
                   key: LEGAL_SEARCH_API_KEY
+                  optional: true
+            - name: PLATFORM_CONTROL_API_URL
+              value: "http://platform-control-api"
+            # X-API-Key for platform-control's /v1/di/events endpoints (gated by
+            # require_control_plane_service; the operator key satisfies it). Optional here
+            # for an open dev API — where platform-control has auth on, this key must be
+            # present in platform-control-secrets or the callbacks 401 (logged at ERROR
+            # and retried, never silently dropped — #550).
+            - name: PLATFORM_CONTROL_OPERATOR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: platform-control-secrets
+                  key: PLATFORM_CONTROL_OPERATOR_API_KEY
                   optional: true
           ports:
             - containerPort: 8080
