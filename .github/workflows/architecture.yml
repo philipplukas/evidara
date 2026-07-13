@@ -1,0 +1,39 @@
+name: Architecture
+
+# structurizr/workspace.dsl is the declared source of truth for system architecture
+# (AGENTS.md), but nothing validated it — so a malformed or dangling-reference DSL
+# could sit on main indefinitely. This gate parses it with the Structurizr CLI.
+#
+# --strict: the script skips when no validator is present, which is right for local
+# dev but would make this job a silent no-op. Strict mode fails instead.
+
+on:
+  pull_request:
+    paths:
+      - "structurizr/**"
+      - "scripts/check-architecture.sh"
+      - ".github/workflows/architecture.yml"
+  push:
+    branches: [main]
+    paths:
+      - "structurizr/**"
+      - "scripts/check-architecture.sh"
+      - ".github/workflows/architecture.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-workspace-dsl:
+    # Heavy pool: Docker is available there (see e2e-ch-fedlex-loop.yml).
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'ubuntu-latest' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Validate Structurizr workspace DSL
+        run: bash scripts/check-architecture.sh --strict

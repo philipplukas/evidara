@@ -64,6 +64,15 @@ repos:
         pass_filenames: false
         files: ^k8s/gitops/
 
+      # Skips when Docker is unavailable locally; CI runs it with --strict
+      # (.github/workflows/architecture.yml), same as the kustomize gate above.
+      - id: check-architecture
+        name: Validate Structurizr workspace DSL
+        entry: bash scripts/check-architecture.sh
+        language: system
+        pass_filenames: false
+        files: ^(structurizr/|scripts/check-architecture\.sh$)
+
       - id: check-component-doc-headings
         name: Check component doc headings
         entry: python scripts/check_component_docs.py
