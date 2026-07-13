@@ -21,6 +21,9 @@ _FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "ch_court_dec
 _INDEX_URL = "https://www.bger.ch/decisions/index.html"
 _DECISION_URL = "https://www.bger.ch/decisions/1C_123_2024.html"
 _DISALLOWED_URL = "https://evil.example.com/1C_9/2024.html"
+# Cantonal rulings are aggregated on entscheidsuche.ch (already allow-listed);
+# there is no per-canton host, so the template supplies an explicit court hint.
+_CANTONAL_DECISION_URL = "https://entscheidsuche.ch/docs/ZH_VG/2024/vb_2024_00042.html"
 
 _INDEX_HTML = """
 <html><head><title>Entscheide</title></head><body>
@@ -63,6 +66,10 @@ class _FakeCourtClient:
                 200, html=_INDEX_HTML, headers={"content-type": "text/html"}, request=request
             )
         if url == _DECISION_URL:
+            return httpx.Response(
+                200, html=_DECISION_HTML, headers={"content-type": "text/html"}, request=request
+            )
+        if url == _CANTONAL_DECISION_URL:
             return httpx.Response(
                 200, html=_DECISION_HTML, headers={"content-type": "text/html"}, request=request
             )
@@ -122,6 +129,34 @@ async def test_direct_seed_url_is_fetched(monkeypatch: pytest.MonkeyPatch) -> No
     resource = result.inline_resources[0]
     assert resource.discovery_depth == 0
     assert resource.metadata["docket"] == "1C_123/2024"
+
+
+@pytest.mark.asyncio
+async def test_cantonal_court_hint_flows_into_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Cantonal templates fetch from the entscheidsuche.ch aggregator (allow-listed)
+    # and carry an explicit lowercase cantonal court hint, since the host cannot
+    # be mapped to a court. The hint must reach the resource metadata unchanged.
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeCourtClient)
+    provider = ChCourtDecisionsProvider()
+
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(
+            {
+                "provider": "ch_court_decisions",
+                "seed_url": _CANTONAL_DECISION_URL,
+                "court": "zh",
+            }
+        ),
+        SimpleNamespace(run_id="run_ch_court_zh", scope=None),
+    )
+
+    assert result.response_payload["captured"] == 1
+    resource = result.inline_resources[0]
+    assert resource.metadata["court"] == "zh"
+    assert resource.metadata["document_type"] == "decision"
 
 
 @pytest.mark.asyncio
@@ -188,6 +223,38 @@ def test_plan_reports_targets_without_network() -> None:
 
 def test_provider_is_scaffold_until_live_enablement() -> None:
     assert ChCourtDecisionsProvider.live_ready is False
+
+
+@pytest.mark.parametrize("court", ["bger", "bvger", "bstger", "bpger", "zh", "be", "bs"])
+def test_acquisition_spec_accepts_federal_and_cantonal_court_hints(court: str) -> None:
+    # The court hint was widened from a closed federal Literal to a validated
+    # lowercase token so cantonal templates (#531) parse without an enum edit.
+    from platform_control.schemas.source import parse_acquisition_spec
+
+    spec = parse_acquisition_spec(
+        {
+            "provider": "ch_court_decisions",
+            "index_urls": ["https://entscheidsuche.ch/list/ZH"],
+            "court": court,
+        }
+    )
+    assert spec.court == court
+
+
+@pytest.mark.parametrize("bad_court", ["ZH", "canton-zh", "z", "toolongcourt", "zh1"])
+def test_acquisition_spec_rejects_malformed_court_hints(bad_court: str) -> None:
+    from pydantic import ValidationError
+
+    from platform_control.schemas.source import parse_acquisition_spec
+
+    with pytest.raises(ValidationError):
+        parse_acquisition_spec(
+            {
+                "provider": "ch_court_decisions",
+                "seed_url": "https://entscheidsuche.ch/docs/ZH/x.html",
+                "court": bad_court,
+            }
+        )
 
 
 # ---------------------------------------------------------------------------

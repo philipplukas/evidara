@@ -229,6 +229,56 @@ class TestSeedIdConsistency(unittest.TestCase):
             ),
         )
 
+    def test_seed_authority_compliance_policies_resolve(self) -> None:
+        """Every authority row's compliance_policy_id must resolve in
+        compliance_policies.yaml. Mirrors the seeder's FK guard so a stale or
+        typo'd binding (e.g. the cantonal court authorities added for #531) is
+        caught at build time, not at seed time."""
+        with _AUTHORITIES_YAML.open(encoding="utf-8") as handle:
+            authorities = yaml.safe_load(handle)
+        with (_SEEDS_DIR / "compliance_policies.yaml").open(encoding="utf-8") as handle:
+            policies = yaml.safe_load(handle)
+        policy_ids = {
+            item["compliance_policy_id"]
+            for item in policies.get("items", [])
+            if isinstance(item, dict)
+        }
+        orphans = [
+            (item["authority_id"], item["compliance_policy_id"])
+            for item in authorities.get("items", [])
+            if isinstance(item, dict)
+            and item.get("compliance_policy_id") is not None
+            and item["compliance_policy_id"] not in policy_ids
+        ]
+        self.assertFalse(
+            orphans,
+            msg=f"Authority rows reference unknown compliance policies: {orphans}",
+        )
+
+    def test_cantonal_court_authorities_bind_court_compliance_policy(self) -> None:
+        """The representative cantonal court authorities (#531) must exist under
+        their canton and bind the public-official court policy, matching how the
+        federal court authorities are wired."""
+        with _AUTHORITIES_YAML.open(encoding="utf-8") as handle:
+            authorities = yaml.safe_load(handle)
+        by_id = {
+            item["authority_id"]: item
+            for item in authorities.get("items", [])
+            if isinstance(item, dict)
+        }
+        expected = {
+            "auth_zh_obergericht": "jur_ch_zh",
+            "auth_be_obergericht": "jur_ch_be",
+            "auth_bs_appellationsgericht": "jur_ch_bs",
+        }
+        for authority_id, jurisdiction_id in expected.items():
+            self.assertIn(
+                authority_id, by_id, msg=f"missing cantonal court authority {authority_id}"
+            )
+            row = by_id[authority_id]
+            self.assertEqual(row.get("jurisdiction_id"), jurisdiction_id)
+            self.assertEqual(row.get("compliance_policy_id"), "cp_ch_court_decisions")
+
     def test_seed_jurisdiction_parents_resolve(self) -> None:
         """Every jurisdiction row's parent_id must resolve to a sibling row.
 

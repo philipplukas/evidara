@@ -283,6 +283,60 @@ overlays:
         document_type_hint: decision
         enabled: false
       # ───────────────────────────────────────────────────────────────
+      # Swiss CANTONAL court decisions (ZH / BE / BS) — CH e2e (#531)
+      # Reuses the ch_court_decisions provider (no new provider/enum): cantonal
+      # rulings are aggregated on entscheidsuche.ch, which is already in the
+      # provider's host allow-list. Each template carries a lowercase cantonal
+      # `court` hint (zh/be/bs) that flows into the decision metadata, and a
+      # cantonal corpus. Provider `ch_court_decisions` is a scaffold
+      # (live_ready=false); these templates stay `enabled: false` until an
+      # operator captures per-canton acceptance-run evidence and flips both keys.
+      # The index_urls below are PLACEHOLDER entscheidsuche.ch canton listings
+      # and need verification at live-enablement (the exact canton-filter path /
+      # or a cantonal court portal host must be confirmed, and a portal host
+      # added to the allow-list if used). Kept as a distinct banner section to
+      # minimise merge conflict with the federal court block above.
+      # ───────────────────────────────────────────────────────────────
+      ch_court_decisions_zh:
+        provider: ch_court_decisions
+        index_urls:
+          - https://entscheidsuche.ch/list/ZH
+        court: zh
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_zh_court_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: decision
+        enabled: false
+      ch_court_decisions_be:
+        provider: ch_court_decisions
+        index_urls:
+          - https://entscheidsuche.ch/list/BE
+        court: be
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_be_court_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr]
+        document_type_hint: decision
+        enabled: false
+      ch_court_decisions_bs:
+        provider: ch_court_decisions
+        index_urls:
+          - https://entscheidsuche.ch/list/BS
+        court: bs
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bs_court_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: decision
+        enabled: false
+      # ───────────────────────────────────────────────────────────────
       # Swiss cantonal legislation via Fedlex — CH e2e Stream F (#531)
       # Uses the federal fedlex_sparql provider in cantonal-discovery mode
       # (scope_kind=canton + canton), discovering works via jolux:CantonOfOrigin

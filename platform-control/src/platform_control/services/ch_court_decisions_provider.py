@@ -1,8 +1,16 @@
-"""Swiss federal court decisions provider (BGer / BVGer / BStGer / BPGer).
+"""Swiss court decisions provider (federal + cantonal).
 
-Fetches published Swiss *federal* court rulings as HTML and shapes them into
-canonical :class:`ProviderResource` objects carrying case-law citation
-metadata (docket number, BGE reference, ECLI, court, decision date).
+Fetches published Swiss court rulings as HTML and shapes them into canonical
+:class:`ProviderResource` objects carrying case-law citation metadata (docket
+number, BGE reference, ECLI, court, decision date).
+
+Federal courts (BGer / BVGer / BStGer / BPGer) are fetched directly from their
+official portals; the ``court`` metadata is inferred from the host. Cantonal
+court rulings are aggregated on ``entscheidsuche.ch`` (already in the host
+allow-list), which has no per-canton host, so those templates carry an explicit
+``court`` hint (the lowercase cantonal code, e.g. ``zh`` / ``be`` / ``bs``) that
+:func:`_court_from_url` passes straight through to the resource metadata. See
+issue #531 for the cantonal rollout.
 
 Two acquisition inputs are supported, mirroring the shape of
 ``ris_ogd_provider`` (listing → refs → fetch each) but over plain HTML:
