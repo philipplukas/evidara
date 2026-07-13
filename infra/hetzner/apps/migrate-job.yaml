@@ -1,5 +1,10 @@
 # One-shot: run Alembic migrations + seed reference data against the CNPG Postgres.
 # Uses the platform-control image (carries alembic + seeds). ADR-0029 stage 4.
+#
+# This Job is NOT in kustomization.yaml's `resources:`, so the `images:` tag
+# transformer does not reach it — the tag below has to be bumped by hand,
+# in lockstep with the one there. Letting it drift is how you roll out a
+# platform-control that expects a migration the DB has never run.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -15,7 +20,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migrate
-          image: ghcr.io/philipplukas/evidara-platform-control:claude-repo-status-check-cdso8i
+          image: ghcr.io/philipplukas/evidara-platform-control:237ee8bb48c6a9a730ab4c45576b39c5af720ce2
           command: ["sh", "-c", "alembic upgrade head && platform-control-seed-reference-data"]
           envFrom:
             - configMapRef:
