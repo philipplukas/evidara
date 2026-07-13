@@ -79,6 +79,7 @@ nav:
       - Data Lifecycle: architecture/data-lifecycle.md
       - Implementation Principles: architecture/implementation-principles.md
       - Clean-Room Principles: architecture/clean-room-principles.md
+      - CH Acquisition Coverage Status: architecture/ch-acquisition-coverage-status.md
   - ADRs:
       - Index: adr/README.md
       - "0001: Monorepo Structure": adr/0001-monorepo-structure.md
@@ -102,6 +103,7 @@ nav:
       - "0021: Wizard Orchestration Abstraction": adr/adr-0021-wizard-orchestration-abstraction.md
       - "0022: Agentic CLI Workflow Control Surface": adr/adr-0022-agentic-cli-workflow-control-surface.md
       - "0026: authority_id / jurisdiction_id Naming Policy": adr/adr-0026-id-naming-policy.md
+      - "0030: Acquisition Provider Enablement Lifecycle": adr/0030-acquisition-provider-enablement-lifecycle.md
       - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md
