@@ -49,7 +49,7 @@ Do not require these universally yet:
 | Platform-control PR | `PR Title / check-title`, `Docs and Contracts Checks / contract-validation`, `Platform Control / check`, relevant `Runtime Images` jobs | Treat admin/worker/platform images as component gates, not universal gates. |
 | Document-intelligence PR | `PR Title / check-title`, `Docs and Contracts Checks / contract-validation`, `Document Intelligence / document-intelligence-check` | Runtime/deployment checks should stay limited to the paths that trigger them. |
 | Document-intelligence runtime / deployment PR | Above, plus `Document Intelligence / document-intelligence-runtime-check` and `Runtime Images / Build document-intelligence consumer image` | Keep the runtime check tied to deployment-relevant paths. |
-| Terraform / infra PR | `PR Title / check-title`, `Docs and Contracts Checks / contract-validation`, `Terraform / fmt-check`, `Terraform / plan-dev`, `Terraform / plan-staging` (and Databricks equivalents when relevant) | Terraform jobs are important, but they are not universal PR gates. |
+| Terraform / infra PR | `PR Title / check-title`, `Docs and Contracts Checks / contract-validation`, `Terraform / fmt-check`, `Terraform / plan-dev`, `Terraform / plan-staging` | Terraform jobs are important, but they are not universal PR gates. |
 | Release / evidence run | `Release Readiness / release-readiness`, `scraping-qa` when the workflow or paths trigger them | These are release-lane gates; keep them out of universal branch protection unless they always emit. |
 
 ## Validation rule

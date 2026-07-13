@@ -23,9 +23,7 @@ To apply with real secret values, provide sensitive maps via environment variabl
 export TF_VAR_environment_secrets='{
   "dev": {
     "GCP_WORKLOAD_IDENTITY_PROVIDER": "projects/123/locations/global/workloadIdentityPools/github/providers/evidara",
-    "GCP_SERVICE_ACCOUNT_DEV": "gha-deployer-dev@evidara-dev.iam.gserviceaccount.com",
-    "DATABRICKS_HOST": "https://dbc-xxxx.cloud.databricks.com",
-    "DATABRICKS_TOKEN": "..."
+    "GCP_SERVICE_ACCOUNT_DEV": "gha-deployer-dev@evidara-dev.iam.gserviceaccount.com"
   },
   "staging": {
     "GCP_WORKLOAD_IDENTITY_PROVIDER": "projects/123/locations/global/workloadIdentityPools/github/providers/evidara",
@@ -34,9 +32,7 @@ export TF_VAR_environment_secrets='{
   },
   "prod": {
     "GCP_WORKLOAD_IDENTITY_PROVIDER": "projects/123/locations/global/workloadIdentityPools/github/providers/evidara",
-    "GCP_SERVICE_ACCOUNT_PROD": "gha-deployer-prod@evidara-prod.iam.gserviceaccount.com",
-    "DATABRICKS_HOST": "https://dbc-yyyy.cloud.databricks.com",
-    "DATABRICKS_TOKEN": "..."
+    "GCP_SERVICE_ACCOUNT_PROD": "gha-deployer-prod@evidara-prod.iam.gserviceaccount.com"
   }
 }'
 

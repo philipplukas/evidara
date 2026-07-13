@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Sync GitHub CD environments/variables/secrets from gcloud/databricks context.
+# Sync GitHub CD environments/variables/secrets from gcloud context.
 # - Dry-run by default
 # - --apply to write
 # - --interactive to select gcloud account/projects
@@ -35,22 +35,6 @@ Options:
   --service-account-staging <email>
   --service-account-prod <email>
   --staging-project <id>            GCP project for GitHub environment "staging" (optional)
-  --databricks-host-dev <url>
-  --databricks-host-staging <url>
-  --databricks-host-prod <url>
-  --databricks-host-source <mode>  (tfvars|profile, default: tfvars; explicit host flags win)
-  --skip-databricks-host-dns-check
-  --databricks-profile-dev <name>   (default: dev)
-  --databricks-profile-staging <name> (default: staging)
-  --databricks-profile-prod <name>  (default: prod)
-  --databricks-token-source <mode>  (gsm|profile, default: gsm)
-  --gsm-token-secret-dev <name>
-  --gsm-token-secret-staging <name>
-  --gsm-token-secret-prod <name>
-  --sync-databricks-compute-policy-ids
-                                    With --sync-secrets: set DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID per env
-                                    from databricks cluster-policies list (warn if missing)
-  --compute-policy-name <string>    (default: Evidara compute guardrails)
   -h, --help
 
 Examples:
@@ -65,8 +49,6 @@ Examples:
     --artifact-repo evidara-images \
     --platform-control-service platform-control-api \
     --legal-search-api-service legal-search-api \
-    --databricks-token-source profile \
-    --sync-databricks-compute-policy-ids \
     --sync-secrets \
     --apply
 EOF
@@ -212,162 +194,6 @@ detect_service_account() {
   echo "$found"
 }
 
-detect_databricks_host_from_profile() {
-  local profile_name="$1"
-  local payload
-  payload="$(databricks auth env --profile "$profile_name" --output json 2>/dev/null || true)"
-  [[ -n "$payload" ]] || return 0
-  printf '%s' "$payload" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("env",{}).get("DATABRICKS_HOST",""))'
-}
-
-read_tfvars_string() {
-  local tfvars_path="$1"
-  local field_name="$2"
-  [[ -f "$tfvars_path" ]] || die "Missing tfvars file: $tfvars_path"
-  python3 - "$tfvars_path" "$field_name" <<'PY'
-import re
-import sys
-
-path, field = sys.argv[1:3]
-pattern = re.compile(rf"^\s*{re.escape(field)}\s*=\s*\"([^\"]+)\"\s*(?:#.*)?$")
-with open(path, encoding="utf-8") as handle:
-    for line in handle:
-        match = pattern.match(line)
-        if match:
-            print(match.group(1))
-            sys.exit(0)
-sys.exit(1)
-PY
-}
-
-detect_databricks_host_from_tfvars() {
-  local environment="$1"
-  read_tfvars_string "infra/env/$environment/document_intelligence.databricks.tfvars" "workspace_host"
-}
-
-needs_databricks_cli() {
-  [[ "$DATABRICKS_HOST_SOURCE" == "profile" || "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]
-}
-
-validate_databricks_host() {
-  local environment="$1"
-  local host="$2"
-  [[ -n "$host" ]] || die "Databricks host for '$environment' is empty."
-  python3 - "$environment" "$host" "$CHECK_DATABRICKS_HOST_DNS" <<'PY'
-import socket
-import sys
-from urllib.parse import urlparse
-
-environment, raw_url, check_dns = sys.argv[1:4]
-url = raw_url.strip()
-parsed = urlparse(url)
-
-def fail(message: str) -> None:
-    print(f"ERROR: invalid Databricks host for {environment}: {message}", file=sys.stderr)
-    sys.exit(1)
-
-if "${" in url:
-    fail(f"{url!r} still contains interpolation")
-if "0000000000000000" in url or "dbc-xxxx" in url or "dbc-yyyy" in url:
-    fail(f"{url!r} is a placeholder")
-if parsed.scheme != "https":
-    fail(f"{url!r} must use https://")
-if not parsed.hostname:
-    fail(f"{url!r} is missing a hostname")
-if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
-    fail(f"{url!r} should be the workspace origin only, without path/query/fragment")
-if check_dns == "true":
-    try:
-        socket.getaddrinfo(parsed.hostname, 443)
-    except OSError as exc:
-        fail(f"{parsed.hostname!r} does not resolve from this machine: {exc}")
-PY
-}
-
-resolve_databricks_host() {
-  local environment="$1"
-  local explicit_host="$2"
-  local profile_name="$3"
-  local host="$explicit_host"
-  if [[ -z "$host" ]]; then
-    case "$DATABRICKS_HOST_SOURCE" in
-      tfvars) host="$(detect_databricks_host_from_tfvars "$environment")" ;;
-      profile) host="$(detect_databricks_host_from_profile "$profile_name")" ;;
-      *) die "--databricks-host-source must be 'tfvars' or 'profile'." ;;
-    esac
-  fi
-  validate_databricks_host "$environment" "$host" || return 1
-  printf '%s\n' "$host"
-}
-
-get_databricks_token_from_profile() {
-  local profile_name="$1"
-  local payload
-  payload="$(databricks auth env --profile "$profile_name" --output json 2>/dev/null || true)"
-  [[ -n "$payload" ]] || die "Unable to read Databricks auth env for profile '$profile_name'."
-  printf '%s' "$payload" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("env",{}).get("DATABRICKS_TOKEN",""))'
-}
-
-# Prints policy id or empty string if not found / JSON parse error.
-get_cluster_policy_id_from_profile() {
-  local profile_name="$1"
-  local policy_name="$2"
-  local json
-  json="$(databricks cluster-policies list --profile "$profile_name" --output json 2>/dev/null || true)"
-  [[ -n "$json" ]] || {
-    echo ""
-    return 0
-  }
-  printf '%s' "$json" | POLICY_NAME="$policy_name" python3 -c '
-import json, os, sys
-name = os.environ.get("POLICY_NAME", "").strip()
-raw = json.load(sys.stdin)
-
-def candidates(r):
-    if isinstance(r, list):
-        return r
-    if isinstance(r, dict):
-        for key in ("policies", "items", "cluster_policies"):
-            if key in r and isinstance(r[key], list):
-                return r[key]
-    return []
-
-rows = candidates(raw)
-for row in rows:
-    if not isinstance(row, dict):
-        continue
-    if row.get("name") != name:
-        continue
-    pid = row.get("policy_id") or row.get("id")
-    if pid:
-        print(pid)
-        sys.exit(0)
-' 2>/dev/null || true
-}
-
-upsert_gsm_secret_version() {
-  local secret_name="$1"
-  local project_id="$2"
-  local secret_value="$3"
-  if [[ "$APPLY" == "true" ]]; then
-    printf '%s' "$secret_value" | CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud secrets versions add "$secret_name" --project "$project_id" --data-file=- >/dev/null
-  else
-    echo "DRY-RUN: gcloud secrets versions add $secret_name --project $project_id --data-file=- <hidden>"
-  fi
-}
-
-detect_gsm_token_secret_name() {
-  local project_id="$1"
-  local env_hint="$2"
-  local names preferred broad
-  names="$(gcloud secrets list --project "$project_id" --format='value(name)' 2>/dev/null || true)"
-  [[ -n "$names" ]] || die "Unable to list secrets in '$project_id'."
-  preferred="$(printf '%s\n' "$names" | awk -v env="$env_hint" 'tolower($0) ~ /databricks/ && tolower($0) ~ /token/ && tolower($0) ~ env {print; exit}')"
-  if [[ -n "$preferred" ]]; then echo "$preferred"; return; fi
-  broad="$(printf '%s\n' "$names" | awk 'tolower($0) ~ /databricks/ && tolower($0) ~ /token/ {print; exit}')"
-  [[ -n "$broad" ]] && echo "$broad" || die "Could not auto-detect Databricks token secret in '$project_id'."
-}
-
 detect_wif_provider() {
   local project_id="$1"
   local pool_hint="$2"
@@ -403,12 +229,6 @@ detect_wif_provider() {
   die "Could not auto-detect WIF provider in '$project_id'."
 }
 
-get_gsm_secret() {
-  local secret_name="$1"
-  local project_id="$2"
-  gcloud secrets versions access latest --project "$project_id" --secret "$secret_name"
-}
-
 set_repo_var() {
   local name="$1"
   local value="$2"
@@ -424,21 +244,6 @@ set_env_secret() {
   else
     echo "DRY-RUN: gh secret set $secret_name --repo $REPO --env $env_name <hidden>"
   fi
-}
-
-maybe_sync_compute_policy_id() {
-  local env_name="$1"
-  local profile_name="$2"
-  [[ "$SYNC_COMPUTE_POLICY_IDS" == "true" ]] || return 0
-  local pid
-  pid="$(get_cluster_policy_id_from_profile "$profile_name" "$COMPUTE_POLICY_NAME")"
-  pid="$(echo "$pid" | tr -d '[:space:]')"
-  if [[ -z "$pid" ]]; then
-    log "WARN: cluster policy '$COMPUTE_POLICY_NAME' not found for profile '$profile_name'; skipping DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID for $env_name"
-    return 0
-  fi
-  log "Syncing DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID → GitHub environment '$env_name'"
-  set_env_secret "$env_name" "DATABRICKS_COMPUTE_GUARDRAILS_POLICY_ID" "$pid"
 }
 
 run_preflight_checks() {
@@ -470,21 +275,6 @@ run_preflight_checks() {
     preflight_check "PROD service accounts listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud iam service-accounts list --project "$PROD_PROJECT" --limit=1 || failures=$((failures + 1))
     if [[ -n "${STAGING_PROJECT:-}" ]]; then
       preflight_check "STAGING service accounts listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud iam service-accounts list --project "$STAGING_PROJECT" --limit=1 || failures=$((failures + 1))
-    fi
-    preflight_check "DEV secrets listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud secrets list --project "$DEV_PROJECT" --limit=1 || failures=$((failures + 1))
-    preflight_check "PROD secrets listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud secrets list --project "$PROD_PROJECT" --limit=1 || failures=$((failures + 1))
-    if [[ -n "${STAGING_PROJECT:-}" ]]; then
-      preflight_check "STAGING secrets listable" env CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud secrets list --project "$STAGING_PROJECT" --limit=1 || failures=$((failures + 1))
-    fi
-    if needs_databricks_cli; then
-      preflight_check "Databricks CLI available" databricks --version || failures=$((failures + 1))
-    fi
-    if [[ "$DATABRICKS_HOST_SOURCE" == "profile" || "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]; then
-      preflight_check "Databricks dev profile auth env readable ($DATABRICKS_PROFILE_DEV)" databricks auth env --profile "$DATABRICKS_PROFILE_DEV" --output json || failures=$((failures + 1))
-      if [[ -n "${STAGING_PROJECT:-}" || "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]; then
-        preflight_check "Databricks staging profile auth env readable ($DATABRICKS_PROFILE_STAGING)" databricks auth env --profile "$DATABRICKS_PROFILE_STAGING" --output json || failures=$((failures + 1))
-      fi
-      preflight_check "Databricks prod profile auth env readable ($DATABRICKS_PROFILE_PROD)" databricks auth env --profile "$DATABRICKS_PROFILE_PROD" --output json || failures=$((failures + 1))
     fi
   fi
   (( failures == 0 )) || die "Preflight failed with $failures failing checks."
@@ -545,7 +335,7 @@ Configuration plan:
   mode:                        $([[ "$APPLY" == "true" ]] && echo "APPLY" || echo "DRY-RUN")
   sync secrets:                $SYNC_SECRETS
   dev project:                 $DEV_PROJECT
-  staging project:             ${STAGING_PROJECT:-"(none — staging Databricks secrets skipped if GSM)"}
+  staging project:             ${STAGING_PROJECT:-"(none)"}
   prod project:                $PROD_PROJECT
   region:                      $REGION
   artifact project:            $ARTIFACT_PROJECT
@@ -559,27 +349,12 @@ EOF
   service account dev:         $SERVICE_ACCOUNT_DEV
   service account staging:     ${SERVICE_ACCOUNT_STAGING:-"(none)"}
   service account prod:        $SERVICE_ACCOUNT_PROD
-  databricks host dev:         $DATABRICKS_HOST_DEV
-  databricks host staging:     $DATABRICKS_HOST_STAGING
-  databricks host prod:        $DATABRICKS_HOST_PROD
-  databricks host source:      $DATABRICKS_HOST_SOURCE
-  databricks host DNS check:   $CHECK_DATABRICKS_HOST_DNS
-  databricks token source:     $DATABRICKS_TOKEN_SOURCE
-  databricks profile dev:      $DATABRICKS_PROFILE_DEV
-  databricks profile staging:  $DATABRICKS_PROFILE_STAGING
-  databricks profile prod:     $DATABRICKS_PROFILE_PROD
-  gsm token secret dev:        $GSM_TOKEN_SECRET_DEV
-  gsm token secret staging:    $GSM_TOKEN_SECRET_STAGING
-  gsm token secret prod:       $GSM_TOKEN_SECRET_PROD
-  sync compute policy ids:     $SYNC_COMPUTE_POLICY_IDS
-  compute policy name:         $COMPUTE_POLICY_NAME
 EOF
   fi
 }
 
 APPLY="false"
 SYNC_SECRETS="false"
-SYNC_COMPUTE_POLICY_IDS="false"
 PREFLIGHT_ONLY="false"
 INTERACTIVE="false"
 REPO=""
@@ -598,19 +373,6 @@ WIF_PROVIDER_ID=""
 SERVICE_ACCOUNT_DEV=""
 SERVICE_ACCOUNT_STAGING=""
 SERVICE_ACCOUNT_PROD=""
-DATABRICKS_HOST_DEV=""
-DATABRICKS_HOST_STAGING=""
-DATABRICKS_HOST_PROD=""
-DATABRICKS_HOST_SOURCE="tfvars"
-CHECK_DATABRICKS_HOST_DNS="true"
-DATABRICKS_PROFILE_DEV="dev"
-DATABRICKS_PROFILE_STAGING="staging"
-DATABRICKS_PROFILE_PROD="prod"
-DATABRICKS_TOKEN_SOURCE="gsm"
-GSM_TOKEN_SECRET_DEV=""
-GSM_TOKEN_SECRET_STAGING=""
-GSM_TOKEN_SECRET_PROD=""
-COMPUTE_POLICY_NAME="Evidara compute guardrails"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -631,20 +393,6 @@ while [[ $# -gt 0 ]]; do
     --service-account-dev) SERVICE_ACCOUNT_DEV="$2"; shift 2 ;;
     --service-account-staging) SERVICE_ACCOUNT_STAGING="$2"; shift 2 ;;
     --service-account-prod) SERVICE_ACCOUNT_PROD="$2"; shift 2 ;;
-    --databricks-host-dev) DATABRICKS_HOST_DEV="$2"; shift 2 ;;
-    --databricks-host-staging) DATABRICKS_HOST_STAGING="$2"; shift 2 ;;
-    --databricks-host-prod) DATABRICKS_HOST_PROD="$2"; shift 2 ;;
-    --databricks-host-source) DATABRICKS_HOST_SOURCE="$2"; shift 2 ;;
-    --skip-databricks-host-dns-check) CHECK_DATABRICKS_HOST_DNS="false"; shift ;;
-    --databricks-profile-dev) DATABRICKS_PROFILE_DEV="$2"; shift 2 ;;
-    --databricks-profile-staging) DATABRICKS_PROFILE_STAGING="$2"; shift 2 ;;
-    --databricks-profile-prod) DATABRICKS_PROFILE_PROD="$2"; shift 2 ;;
-    --databricks-token-source) DATABRICKS_TOKEN_SOURCE="$2"; shift 2 ;;
-    --gsm-token-secret-dev) GSM_TOKEN_SECRET_DEV="$2"; shift 2 ;;
-    --gsm-token-secret-staging) GSM_TOKEN_SECRET_STAGING="$2"; shift 2 ;;
-    --gsm-token-secret-prod) GSM_TOKEN_SECRET_PROD="$2"; shift 2 ;;
-    --sync-databricks-compute-policy-ids) SYNC_COMPUTE_POLICY_IDS="true"; shift ;;
-    --compute-policy-name) COMPUTE_POLICY_NAME="$2"; shift 2 ;;
     --sync-secrets) SYNC_SECRETS="true"; shift ;;
     --preflight) PREFLIGHT_ONLY="true"; shift ;;
     --apply) APPLY="true"; shift ;;
@@ -652,13 +400,6 @@ while [[ $# -gt 0 ]]; do
     *) die "Unknown argument: $1" ;;
   esac
 done
-
-if [[ "$SYNC_COMPUTE_POLICY_IDS" == "true" && "$SYNC_SECRETS" != "true" ]]; then
-  die "--sync-databricks-compute-policy-ids requires --sync-secrets"
-fi
-if [[ "$DATABRICKS_HOST_SOURCE" != "tfvars" && "$DATABRICKS_HOST_SOURCE" != "profile" ]]; then
-  die "--databricks-host-source must be 'tfvars' or 'profile'."
-fi
 
 require_cmd gh
 require_cmd gcloud
@@ -676,19 +417,6 @@ fi
 if [[ -z "$DEV_PROJECT" || -z "$PROD_PROJECT" ]]; then
   usage
   die "Both --dev-project and --prod-project are required (or use --interactive)."
-fi
-
-if [[ "$SYNC_SECRETS" == "true" ]]; then
-  require_cmd python3
-  if needs_databricks_cli; then
-    require_cmd databricks
-  fi
-  [[ "$DATABRICKS_TOKEN_SOURCE" == "gsm" || "$DATABRICKS_TOKEN_SOURCE" == "profile" ]] || die "--databricks-token-source must be 'gsm' or 'profile'."
-  DATABRICKS_HOST_DEV="$(resolve_databricks_host "dev" "$DATABRICKS_HOST_DEV" "$DATABRICKS_PROFILE_DEV")"
-  if [[ -n "$STAGING_PROJECT" || -n "$DATABRICKS_HOST_STAGING" || "$DATABRICKS_TOKEN_SOURCE" == "profile" || "$SYNC_COMPUTE_POLICY_IDS" == "true" ]]; then
-    DATABRICKS_HOST_STAGING="$(resolve_databricks_host "staging" "$DATABRICKS_HOST_STAGING" "$DATABRICKS_PROFILE_STAGING")"
-  fi
-  DATABRICKS_HOST_PROD="$(resolve_databricks_host "prod" "$DATABRICKS_HOST_PROD" "$DATABRICKS_PROFILE_PROD")"
 fi
 
 if [[ "$PREFLIGHT_ONLY" == "true" ]]; then
@@ -710,13 +438,6 @@ if [[ "$SYNC_SECRETS" == "true" ]]; then
   [[ -n "$SERVICE_ACCOUNT_PROD" ]] || SERVICE_ACCOUNT_PROD="$(detect_service_account "$PROD_PROJECT" "prod")"
   if [[ -n "$STAGING_PROJECT" ]]; then
     [[ -n "$SERVICE_ACCOUNT_STAGING" ]] || SERVICE_ACCOUNT_STAGING="$(detect_service_account "$STAGING_PROJECT" "staging")"
-  fi
-  if [[ "$DATABRICKS_TOKEN_SOURCE" == "gsm" || -n "$GSM_TOKEN_SECRET_DEV" || -n "$GSM_TOKEN_SECRET_PROD" ]]; then
-    [[ -n "$GSM_TOKEN_SECRET_DEV" ]] || GSM_TOKEN_SECRET_DEV="$(detect_gsm_token_secret_name "$DEV_PROJECT" "dev")"
-    [[ -n "$GSM_TOKEN_SECRET_PROD" ]] || GSM_TOKEN_SECRET_PROD="$(detect_gsm_token_secret_name "$PROD_PROJECT" "prod")"
-    if [[ -n "$STAGING_PROJECT" ]]; then
-      [[ -n "$GSM_TOKEN_SECRET_STAGING" ]] || GSM_TOKEN_SECRET_STAGING="$(detect_gsm_token_secret_name "$STAGING_PROJECT" "staging")"
-    fi
   fi
 fi
 
@@ -740,42 +461,9 @@ set_repo_var "PLATFORM_CONTROL_SERVICE_NAME" "$PLATFORM_CONTROL_SERVICE"
 set_repo_var "LEGAL_SEARCH_API_SERVICE_NAME" "$LEGAL_SEARCH_API_SERVICE"
 
 if [[ "$SYNC_SECRETS" == "true" ]]; then
-  DATABRICKS_TOKEN_STAGING=""
-
-  if [[ "$DATABRICKS_TOKEN_SOURCE" == "profile" ]]; then
-    log "Reading Databricks tokens from CLI profiles"
-    DATABRICKS_TOKEN_DEV="$(get_databricks_token_from_profile "$DATABRICKS_PROFILE_DEV")"
-    DATABRICKS_TOKEN_STAGING="$(get_databricks_token_from_profile "$DATABRICKS_PROFILE_STAGING")"
-    DATABRICKS_TOKEN_PROD="$(get_databricks_token_from_profile "$DATABRICKS_PROFILE_PROD")"
-    [[ -n "$DATABRICKS_TOKEN_DEV" ]] || die "Databricks token is empty for profile '$DATABRICKS_PROFILE_DEV'."
-    [[ -n "$DATABRICKS_TOKEN_STAGING" ]] || die "Databricks token is empty for profile '$DATABRICKS_PROFILE_STAGING'."
-    [[ -n "$DATABRICKS_TOKEN_PROD" ]] || die "Databricks token is empty for profile '$DATABRICKS_PROFILE_PROD'."
-
-    if [[ -n "$GSM_TOKEN_SECRET_DEV" && -n "$GSM_TOKEN_SECRET_PROD" ]]; then
-      log "Rotating Databricks tokens in Secret Manager from CLI profiles"
-      upsert_gsm_secret_version "$GSM_TOKEN_SECRET_DEV" "$DEV_PROJECT" "$DATABRICKS_TOKEN_DEV"
-      upsert_gsm_secret_version "$GSM_TOKEN_SECRET_PROD" "$PROD_PROJECT" "$DATABRICKS_TOKEN_PROD"
-      if [[ -n "$STAGING_PROJECT" && -n "$GSM_TOKEN_SECRET_STAGING" ]]; then
-        upsert_gsm_secret_version "$GSM_TOKEN_SECRET_STAGING" "$STAGING_PROJECT" "$DATABRICKS_TOKEN_STAGING"
-      fi
-    fi
-  else
-    log "Reading Databricks tokens from Secret Manager"
-    DATABRICKS_TOKEN_DEV="$(get_gsm_secret "$GSM_TOKEN_SECRET_DEV" "$DEV_PROJECT")"
-    DATABRICKS_TOKEN_PROD="$(get_gsm_secret "$GSM_TOKEN_SECRET_PROD" "$PROD_PROJECT")"
-    if [[ -n "$STAGING_PROJECT" ]]; then
-      DATABRICKS_TOKEN_STAGING="$(get_gsm_secret "$GSM_TOKEN_SECRET_STAGING" "$STAGING_PROJECT")"
-    else
-      log "Note: no --staging-project; skipping staging DATABRICKS_* from GSM (use --databricks-token-source profile to sync staging without a staging GCP project)."
-    fi
-  fi
-
   log "Syncing dev environment secrets"
   set_env_secret "dev" "GCP_WORKLOAD_IDENTITY_PROVIDER" "$WIF_PROVIDER"
   set_env_secret "dev" "GCP_SERVICE_ACCOUNT_DEV" "$SERVICE_ACCOUNT_DEV"
-  set_env_secret "dev" "DATABRICKS_HOST" "$DATABRICKS_HOST_DEV"
-  set_env_secret "dev" "DATABRICKS_TOKEN" "$DATABRICKS_TOKEN_DEV"
-  maybe_sync_compute_policy_id "dev" "$DATABRICKS_PROFILE_DEV"
 
   if [[ -n "$STAGING_PROJECT" ]]; then
     log "Syncing staging environment secrets"
@@ -784,21 +472,10 @@ if [[ "$SYNC_SECRETS" == "true" ]]; then
   else
     log "Skipping staging GCP secrets (no --staging-project)."
   fi
-  if [[ -n "$DATABRICKS_TOKEN_STAGING" && -n "$DATABRICKS_HOST_STAGING" ]]; then
-    log "Syncing staging Databricks secrets"
-    set_env_secret "staging" "DATABRICKS_HOST" "$DATABRICKS_HOST_STAGING"
-    set_env_secret "staging" "DATABRICKS_TOKEN" "$DATABRICKS_TOKEN_STAGING"
-    maybe_sync_compute_policy_id "staging" "$DATABRICKS_PROFILE_STAGING"
-  elif [[ "$DATABRICKS_TOKEN_SOURCE" == "gsm" ]]; then
-    log "WARN: staging DATABRICKS_HOST/TOKEN not written (need --staging-project for GSM or use profile token source)."
-  fi
 
   log "Syncing prod environment secrets"
   set_env_secret "prod" "GCP_WORKLOAD_IDENTITY_PROVIDER" "$WIF_PROVIDER"
   set_env_secret "prod" "GCP_SERVICE_ACCOUNT_PROD" "$SERVICE_ACCOUNT_PROD"
-  set_env_secret "prod" "DATABRICKS_HOST" "$DATABRICKS_HOST_PROD"
-  set_env_secret "prod" "DATABRICKS_TOKEN" "$DATABRICKS_TOKEN_PROD"
-  maybe_sync_compute_policy_id "prod" "$DATABRICKS_PROFILE_PROD"
 fi
 
 log "Done."

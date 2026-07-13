@@ -10,7 +10,6 @@ Current implemented example:
 
 - [`../../.github/workflows/platform-control.yml`](../../.github/workflows/platform-control.yml)
 - [`../../.github/workflows/document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
-- [`../../.github/workflows/document-intelligence-cd.yml`](../../.github/workflows/document-intelligence-cd.yml)
 - [`../../.github/workflows/platform-control-cd.yml`](../../.github/workflows/platform-control-cd.yml)
 
 ## Baseline Principles
@@ -42,24 +41,11 @@ Typical set for Google Cloud OIDC deployment:
 - `GCP_ARTIFACT_PROJECT_ID`
 - `GCP_REGION`
 - `ARTIFACT_REGISTRY_REPOSITORY`
-- service-specific values (for example `PLATFORM_CONTROL_SERVICE_NAME`, `LEGAL_SEARCH_API_SERVICE_NAME`, Databricks host/profile references)
-
-For `document-intelligence` specifically, configure per-environment secrets:
-
-- `DATABRICKS_HOST`
-- `DATABRICKS_TOKEN`
+- service-specific values (for example `PLATFORM_CONTROL_SERVICE_NAME`, `LEGAL_SEARCH_API_SERVICE_NAME`)
 
 Repository environments/variables/secrets can be provisioned via Terraform in [`../../infra/terraform/github/repo_settings`](../../infra/terraform/github/repo_settings) with example inputs in [`../../infra/env/github.repo_settings.tfvars.example`](../../infra/env/github.repo_settings.tfvars.example).
 
-For CLI-driven synchronization (discovery via `gcloud`/Databricks CLI and write via `gh`), use [`../../scripts/sync-github-cd-config.sh`](../../scripts/sync-github-cd-config.sh). It supports dry-run by default, optional secret sync via Google Secret Manager, optional Databricks PAT sourcing from local Databricks CLI profiles (`--databricks-token-source profile`) with Secret Manager rotation, auto-detection for common WIF/token naming patterns, GitHub environment **staging** (with `--staging-project`), optional **`--sync-databricks-compute-policy-ids`**, and an `--interactive` mode for account/project selection when gcloud context needs fixing. Run [`../../scripts/ensure-evidara-cli-auth.sh`](../../scripts/ensure-evidara-cli-auth.sh) first if you need guided **gh** / **gcloud** / **databricks** logins.
-
-For Databricks, keep the sync declarative by making the environment tfvars the host source of truth:
-
-- `infra/env/dev/document_intelligence.databricks.tfvars`
-- `infra/env/staging/document_intelligence.databricks.tfvars`
-- `infra/env/prod/document_intelligence.databricks.tfvars`
-
-`sync-github-cd-config.sh` reads `workspace_host` from those files by default, rejects placeholder values, and verifies DNS resolution before writing GitHub `DATABRICKS_HOST`. Use explicit `--databricks-host-*` flags only as an emergency override, or `--databricks-host-source profile` when the Databricks CLI profiles are the intended host source. The token remains secret material and should come from Secret Manager (`--databricks-token-source gsm`) or from Databricks CLI profiles during rotation (`--databricks-token-source profile`).
+For CLI-driven synchronization (discovery via `gcloud` and write via `gh`), use [`../../scripts/sync-github-cd-config.sh`](../../scripts/sync-github-cd-config.sh). It supports dry-run by default, optional secret sync (`--sync-secrets`) for the WIF provider and per-environment deployer service accounts, auto-detection for common WIF/service-account naming patterns, GitHub environment **staging** (with `--staging-project`), and an `--interactive` mode for account/project selection when gcloud context needs fixing. Run [`../../scripts/ensure-evidara-cli-auth.sh`](../../scripts/ensure-evidara-cli-auth.sh) first if you need guided **gh** / **gcloud** logins.
 
 Recommended first run:
 
@@ -72,7 +58,7 @@ scripts/sync-github-cd-config.sh \
 
 Then run with `--apply` after preflight passes.
 
-Recommended token rotation flow (Databricks CLI profile -> Secret Manager -> GitHub):
+Recommended non-interactive run:
 
 ```bash
 scripts/sync-github-cd-config.sh \
@@ -85,12 +71,6 @@ scripts/sync-github-cd-config.sh \
   --wif-provider "projects/585502170445/locations/global/workloadIdentityPools/github/providers/evidara" \
   --service-account-dev "gha-deployer-dev@data-platform-dev-492214.iam.gserviceaccount.com" \
   --service-account-prod "gha-deployer-prod@data-platform-prod-492214.iam.gserviceaccount.com" \
-  --databricks-host-source tfvars \
-  --databricks-profile-dev DEFAULT \
-  --databricks-profile-prod DEFAULT \
-  --databricks-token-source profile \
-  --gsm-token-secret-dev evidara-databricks-token-dev \
-  --gsm-token-secret-prod evidara-databricks-token-prod \
   --sync-secrets \
   --apply
 ```
@@ -103,8 +83,6 @@ The operator running the sync script needs:
 - GCP access to list/describe target projects
 - GCP access to list workload identity pools/providers
 - GCP access to list service accounts in dev/prod projects
-- GCP Secret Manager access to list secrets and read latest token secret versions
-- Databricks CLI configured for profile-based host discovery (or explicit host flags)
 
 ## Failure Recovery
 
@@ -209,84 +187,9 @@ jobs:
         run: echo "Run service health/smoke tests"
 ```
 
-## Reusable Skeleton: Document Intelligence (Databricks)
-
-Use this for `document-intelligence` bundle promotion.
-
-```yaml
-name: Deploy Document Intelligence
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - "document-intelligence/**"
-      - ".github/workflows/document-intelligence-cd.yml"
-
-permissions:
-  contents: read
-  id-token: write
-
-jobs:
-  build_bundle_artifact:
-    runs-on: ubuntu-latest
-    outputs:
-      artifact_version: ${{ steps.meta.outputs.artifact_version }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build wheel/bundle artifact
-        run: echo "Build package for Databricks job"
-      - name: Capture artifact version
-        id: meta
-        run: |
-          echo "artifact_version=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-
-  deploy_dev:
-    runs-on: ubuntu-latest
-    needs: build_bundle_artifact
-    environment: dev
-    steps:
-      - name: Authenticate to Databricks
-        run: echo "Auth using dev profile/workspace"
-      - name: Deploy bundle to dev
-        run: echo "databricks bundle deploy --target dev"
-      - name: Run lightweight smoke
-        run: echo "databricks bundle run document_intelligence_smoke --target dev"
-
-  deploy_staging:
-    runs-on: ubuntu-latest
-    needs: [build_bundle_artifact, deploy_dev]
-    environment: staging
-    steps:
-      - name: Authenticate to Databricks
-        run: echo "Auth using staging profile/workspace"
-      - name: Deploy bundle to staging
-        run: echo "databricks bundle deploy --target staging"
-      - name: Run staging smoke
-        run: echo "databricks bundle run document_intelligence_smoke --target staging"
-
-  deploy_prod:
-    runs-on: ubuntu-latest
-    needs: [build_bundle_artifact, deploy_staging]
-    environment: prod
-    steps:
-      - name: Authenticate to Databricks
-        run: echo "Auth using prod profile/workspace"
-      - name: Deploy bundle to prod
-        run: echo "databricks bundle deploy --target prod"
-      - name: Run post-deploy smoke
-        run: echo "Run prod smoke and fail fast on contract regressions"
-```
-
 ## Implemented reference workflows (this repo)
 
 These are concrete implementations of the patterns above (use them as the “real” blueprint when docs and skeleton diverge):
-
-### Databricks bundle CD
-
-- Workflow: [`.github/workflows/document-intelligence-cd.yml`](../../.github/workflows/document-intelligence-cd.yml)
-- Bundle targets: [`document-intelligence/databricks.yml`](../../document-intelligence/databricks.yml)
-- Promotion: `dev -> staging -> prod` with GitHub Environments (`dev`, `staging`, `prod`)
 
 ### GCP `runtime_stack` Terraform
 
@@ -330,6 +233,5 @@ Treat smoke as blocking for promotion to `prod`.
 ## Rollback Pattern
 
 - Cloud Run: redeploy previous known-good digest or shift traffic to previous revision
-- Databricks: redeploy previous bundle artifact version and rerun smoke validation
 
 Capture rollback commands in component runbooks as implementation progresses.

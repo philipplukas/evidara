@@ -55,8 +55,6 @@ it = [
 
 [project.scripts]
 document_intelligence_process_event = "document_intelligence.jobs.process_event:main"
-document_intelligence_databricks_process_event = "document_intelligence.jobs.databricks_process_event:cli"
-databricks_process_event = "document_intelligence.jobs.databricks_process_event:run"
 document_intelligence_render_surface_sql = "document_intelligence.bootstrap.register_surfaces:cli"
 document_intelligence_render_bronze_sql = "document_intelligence.bootstrap.register_bronze:cli"
 document_intelligence_render_source_contracts = "document_intelligence.bootstrap.render_source_contracts:cli"
@@ -82,9 +80,6 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
 
-[tool.ruff.lint.per-file-ignores]
-"databricks/notebooks/*.py" = ["F821"]  # dbutils is injected by Databricks runtime
-
 [tool.ruff.format]
 quote-style = "double"
 
@@ -93,8 +88,6 @@ dev = [
     "pytest>=9.0.2",
 ]
 
-# Default collection is tests/ only — `databricks/notebooks/` contains PySpark smoke
-# modules that are not valid local pytest targets (no pyspark in dev env).
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
