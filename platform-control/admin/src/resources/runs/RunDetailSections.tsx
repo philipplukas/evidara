@@ -15,7 +15,7 @@
 "use client";
 
 import { type Identifier, useGetList, useRecordContext } from "ra-core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { publicConfig } from "../../config/publicConfig";
 import type {
   CapturedResourceRecord,
@@ -60,6 +60,31 @@ const RUN_VERIFICATION_OPENED_KEY_PREFIX = "evidara_run_verification_opened:";
 const EVIDENCE_RUNBOOK_PATH =
   "https://github.com/philipplukas/evidara/blob/main/docs/runbooks/interaction-flow-validation.md";
 
+/**
+ * Jump targets for the section nav and the pipeline-health remediation CTAs.
+ * `sectionId` is the DOM id on the accordion item; `value` is that item's
+ * radix accordion key. Jumping opens the item *and* scrolls to it — under the
+ * HashRouter a plain `#sectionId` link would be read as a route, so these are
+ * buttons, not anchors (see `StageActionTarget`).
+ */
+const RUN_JUMP_SECTIONS = [
+  { sectionId: "provider-jobs-section", value: "provider-jobs", label: "Provider jobs" },
+  {
+    sectionId: "di-processing-status-section",
+    value: "processing-status",
+    label: "DI processing",
+  },
+  {
+    sectionId: "document-lifecycle-section",
+    value: "document-lifecycle",
+    label: "Document lifecycle",
+  },
+] as const;
+
+/** Shared chrome for the pill-shaped jump/open CTAs. */
+const JUMP_BUTTON_CLASS =
+  "inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white";
+
 const checklistStateToLevel = (state: ChecklistState): PillLevel => {
   if (state === "ok") return "healthy";
   if (state === "blocked") return "degraded";
@@ -96,7 +121,13 @@ function CodeBlock({ value }: { value: unknown }) {
 // Pipeline Health (expanded banner, not inside an accordion — matches v1).
 // ---------------------------------------------------------------------------
 
-function PipelineHealthBanner({ run }: { run: RunRecord }) {
+function PipelineHealthBanner({
+  run,
+  onJumpToSection,
+}: {
+  run: RunRecord;
+  onJumpToSection: (sectionId: string) => void;
+}) {
   const [health, setHealth] = useState<RunPipelineHealth | null>(null);
   const [isPending, setIsPending] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -344,8 +375,22 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                 legalSearchUrl,
                 evidenceRunbookPath: EVIDENCE_RUNBOOK_PATH,
               });
-              const isInPageAnchor = action.href.startsWith("#");
               const isHealthy = stage.status === "ok";
+              const emitRemediationClick = () => {
+                if (firstRemediationEventEmittedRef.current) return;
+                emitOperatorJourneyEvent("remediation_action_clicked", {
+                  run_id: run.run_id,
+                  source_id: run.source_id,
+                  source_version_id: run.source_version_id,
+                  mode: run.mode,
+                  stage: stage.stage,
+                  action_label: action.label,
+                  // Keep the historical `#section-id` shape so the telemetry
+                  // series stays continuous across this fix.
+                  action_href: action.kind === "section" ? `#${action.sectionId}` : action.href,
+                });
+                firstRemediationEventEmittedRef.current = true;
+              };
               return (
                 <div
                   key={stage.stage}
@@ -370,28 +415,28 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                       <p className="text-[12px] font-semibold text-[var(--foreground)]">
                         Next action: {stageNextAction(stage)}
                       </p>
-                      <a
-                        href={action.href}
-                        target={isInPageAnchor ? undefined : "_blank"}
-                        rel={isInPageAnchor ? undefined : "noreferrer"}
-                        onClick={() => {
-                          if (!firstRemediationEventEmittedRef.current) {
-                            emitOperatorJourneyEvent("remediation_action_clicked", {
-                              run_id: run.run_id,
-                              source_id: run.source_id,
-                              source_version_id: run.source_version_id,
-                              mode: run.mode,
-                              stage: stage.stage,
-                              action_label: action.label,
-                              action_href: action.href,
-                            });
-                            firstRemediationEventEmittedRef.current = true;
-                          }
-                        }}
-                        className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
-                      >
-                        {action.label}
-                      </a>
+                      {action.kind === "section" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            emitRemediationClick();
+                            onJumpToSection(action.sectionId);
+                          }}
+                          className={JUMP_BUTTON_CLASS}
+                        >
+                          {action.label}
+                        </button>
+                      ) : (
+                        <a
+                          href={action.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={emitRemediationClick}
+                          className={JUMP_BUTTON_CLASS}
+                        >
+                          {action.label}
+                        </a>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -684,13 +729,7 @@ const documentLifecycleColumns: DataTableColumn<DocumentLifecycleRecord>[] = [
 // Section navigation strip — jump anchors into the stage that needs attention.
 // ---------------------------------------------------------------------------
 
-const SECTION_NAV_LINKS: { href: string; label: string }[] = [
-  { href: "#provider-jobs-section", label: "Provider jobs" },
-  { href: "#di-processing-status-section", label: "DI processing" },
-  { href: "#document-lifecycle-section", label: "Document lifecycle" },
-];
-
-function RunSectionNav() {
+function RunSectionNav({ onJumpToSection }: { onJumpToSection: (sectionId: string) => void }) {
   return (
     <section className="space-y-3 rounded-[14px] border border-[var(--border-faint)] bg-[var(--admin-panel-bg)] p-4">
       <div className="space-y-1">
@@ -700,14 +739,15 @@ function RunSectionNav() {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {SECTION_NAV_LINKS.map((link) => (
-          <a
-            key={link.href}
-            href={link.href}
-            className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
+        {RUN_JUMP_SECTIONS.map((section) => (
+          <button
+            key={section.sectionId}
+            type="button"
+            onClick={() => onJumpToSection(section.sectionId)}
+            className={JUMP_BUTTON_CLASS}
           >
-            {link.label}
-          </a>
+            {section.label}
+          </button>
         ))}
       </div>
     </section>
@@ -950,6 +990,22 @@ function PreviewSummarySection({ run }: { run: RunRecord }) {
 
 export default function RunDetailSections() {
   const run = useRecordContext<RunRecord>();
+  // Sections start collapsed; a jump expands its target so the operator lands
+  // on the rows, not on a closed header.
+  const [openSections, setOpenSections] = useState<string[]>([]);
+
+  const jumpToSection = useCallback((sectionId: string) => {
+    const section = RUN_JUMP_SECTIONS.find((candidate) => candidate.sectionId === sectionId);
+    if (!section) return;
+    setOpenSections((previous) =>
+      previous.includes(section.value) ? previous : [...previous, section.value],
+    );
+    // Scroll after the expand has committed, so the item is at its open
+    // height and lands in view rather than under the fold.
+    requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   const providerJobs = useGetList<ProviderJobRecord>(
     "run-provider-jobs",
@@ -983,11 +1039,16 @@ export default function RunDetailSections() {
 
   return (
     <div className="space-y-4">
-      <RunSectionNav />
-      <PipelineHealthBanner run={run} />
+      <RunSectionNav onJumpToSection={jumpToSection} />
+      <PipelineHealthBanner run={run} onJumpToSection={jumpToSection} />
       <PreviewSummarySection run={run} />
 
-      <AccordionRoot type="multiple" className="flex flex-col gap-3">
+      <AccordionRoot
+        type="multiple"
+        value={openSections}
+        onValueChange={setOpenSections}
+        className="flex flex-col gap-3"
+      >
         <RunAccordionSection<ProviderJobRecord>
           value="provider-jobs"
           sectionId="provider-jobs-section"

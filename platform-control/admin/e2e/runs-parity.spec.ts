@@ -46,15 +46,23 @@ const RUNS = { data: [RUN_RUNNING, RUN_DONE] };
 
 // Minimal-but-valid RunPipelineHealth so RunDetailSections's banner renders
 // (an empty `{ data: [] }` from the catch-all lacks `stages`, which the
-// decision-support builder reads → crash).
+// decision-support builder reads → crash). The blocked document_intelligence
+// stage makes the banner emit its "Jump to DI processing" remediation CTA.
 const PIPELINE_HEALTH = {
   run_id: "run_running",
   source_id: "src_1",
   source_version_id: "sv_1",
   mode: "preview",
   run_status: "running",
-  overall_status: "in_progress",
-  stages: [],
+  overall_status: "blocked",
+  stages: [
+    {
+      stage: "document_intelligence",
+      status: "blocked",
+      detail: "DI processing halted on schema mismatch.",
+      updated_at: "2026-04-15T09:15:00Z",
+    },
+  ],
   processing_status_event_count: 0,
   document_lifecycle_event_count: 0,
 };
@@ -153,6 +161,35 @@ test.describe("Runs parity (ADR-0026 operator-action stack)", () => {
     await expect(page.getByText("Operator actions")).toBeVisible();
     await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   });
+
+  // Regression: these used to be `<a href="#di-processing-status-section">`.
+  // The admin is a HashRouter SPA, so the fragment IS the route — clicking the
+  // jump replaced `#/runs/run_running/show` with `#di-processing-status-section`
+  // and react-admin rendered "page not found".
+  for (const source of ["Lifecycle sections nav", "pipeline health remediation CTA"] as const) {
+    const label = source.startsWith("Lifecycle") ? "DI processing" : "Jump to DI processing";
+
+    test(`${source} jumps to the DI section without leaving the run route`, async ({ page }) => {
+      await mockRunsApi(page);
+      await page.goto("/#/runs/run_running/show");
+
+      await page.getByRole("button", { name: label, exact: true }).click();
+
+      // Still on the run detail route — not the catch-all "page not found".
+      await expect(page).toHaveURL(/#\/runs\/run_running\/show$/);
+      await expect(page.getByText(/not found/i)).toHaveCount(0);
+
+      // And the target section is expanded, so the operator sees its rows.
+      const section = page.locator("#di-processing-status-section");
+      await expect(section.getByRole("button", { name: /DI Processing Status/ })).toHaveAttribute(
+        "data-state",
+        "open",
+      );
+      await expect(
+        section.getByText("No DI processing status updates have been received for this run."),
+      ).toBeVisible();
+    });
+  }
 
   test("show renders the legal-search handoff card when handoff params are present", async ({
     page,

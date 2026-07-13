@@ -107,21 +107,46 @@ export function stageNextAction(stage: RunPipelineHealth["stages"][number]): str
   return "Verify lifecycle search disposition and confirm indexed document visibility in legal-search.";
 }
 
+/**
+ * Where a blocked stage's remediation CTA points.
+ *
+ * In-page targets carry a `sectionId` rather than a `#…` href: the admin runs
+ * under react-admin's HashRouter, so the URL fragment *is* the route. An
+ * `<a href="#di-processing-status-section">` navigates to the (nonexistent)
+ * route `/di-processing-status-section` and lands the operator on "page not
+ * found". Callers scroll to `sectionId` instead of letting the browser do it.
+ */
+export type StageActionTarget =
+  | { kind: "section"; label: string; sectionId: string }
+  | { kind: "external"; label: string; href: string };
+
 export function stageActionTarget(
   stage: RunPipelineHealth["stages"][number],
   options: { legalSearchUrl?: string; evidenceRunbookPath: string },
-): { label: string; href: string } {
+): StageActionTarget {
   if (stage.stage === "acquisition") {
-    return { label: "Jump to provider jobs", href: "#provider-jobs-section" };
+    return { kind: "section", label: "Jump to provider jobs", sectionId: "provider-jobs-section" };
   }
   if (stage.stage === "document_intelligence") {
-    return { label: "Jump to DI processing", href: "#di-processing-status-section" };
+    return {
+      kind: "section",
+      label: "Jump to DI processing",
+      sectionId: "di-processing-status-section",
+    };
   }
   if (stage.stage === "projection") {
-    return { label: "Jump to document lifecycle", href: "#document-lifecycle-section" };
+    return {
+      kind: "section",
+      label: "Jump to document lifecycle",
+      sectionId: "document-lifecycle-section",
+    };
   }
   if (options.legalSearchUrl) {
-    return { label: "Open legal-search verification", href: options.legalSearchUrl };
+    return {
+      kind: "external",
+      label: "Open legal-search verification",
+      href: options.legalSearchUrl,
+    };
   }
-  return { label: "Open evidence runbook", href: options.evidenceRunbookPath };
+  return { kind: "external", label: "Open evidence runbook", href: options.evidenceRunbookPath };
 }

@@ -186,10 +186,15 @@ test.describe("Canonical screenshot evidence pack", () => {
     await page.getByRole("button", { name: "Create Run" }).click();
     const createRunDialog = page.getByRole("dialog", { name: "Create Run" });
     await expect(createRunDialog).toBeVisible();
-    await createRunDialog.getByRole("combobox", { name: /^Source$/ }).click();
-    await page.getByRole("option", { name: "Swiss Federal Court" }).click();
-    await createRunDialog.getByRole("combobox", { name: "Source version" }).click();
-    await page.getByRole("option", { name: /2026.04.06/ }).click();
+    // The launch dialog holds its inputs in local state, so both pickers are
+    // native `<select>` elements — drive them with `selectOption`, not by
+    // clicking an `<option>` (native options never report as visible).
+    await createRunDialog
+      .getByRole("combobox", { name: /^Source$/ })
+      .selectOption({ label: "Swiss Federal Court" });
+    await createRunDialog
+      .getByRole("combobox", { name: "Source version" })
+      .selectOption({ label: "2026.04.06 (approved)" });
     await expect(page.getByText(/Preflight is blocking launch/i)).toBeVisible();
     await saveScreenshot(page, "admin-run-launch-preflight.png");
 
