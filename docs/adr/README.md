@@ -30,6 +30,7 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0026 | [`authority_id` / `jurisdiction_id` naming policy](adr-0026-id-naming-policy.md) |
 | ADR-0027 | [Workspace ↔ admin visual language](0027-workspace-admin-visual-language.md) |
 | ADR-0029 | [Self-hosted Hetzner runtime — retire GCP managed services](0029-self-hosted-hetzner-runtime.md) |
+| ADR-0030 | [Acquisition provider enablement lifecycle](0030-acquisition-provider-enablement-lifecycle.md) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.
