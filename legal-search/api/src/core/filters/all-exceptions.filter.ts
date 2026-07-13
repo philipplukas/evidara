@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { SearchBackendUnavailableError } from '../../modules/search/search.errors';
 
 /**
  * Global exception filter.
@@ -14,7 +15,7 @@ import type { Request, Response } from 'express';
  * Maps all exceptions to a consistent error shape:
  *   { statusCode, message, error, requestId }
  *
- * Domain exceptions (e.g. DocumentNotFoundError) should be mapped here.
+ * Domain exceptions (e.g. SearchBackendUnavailableError) are mapped here.
  * Service code should never throw HTTP exceptions directly.
  */
 @Catch()
@@ -35,6 +36,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode = exception.getStatus();
       const res = exception.getResponse();
       message = typeof res === 'string' ? res : ((res as { message?: string }).message ?? message);
+    } else if (exception instanceof SearchBackendUnavailableError) {
+      // The search backend could not execute the query (missing index/alias,
+      // connection refused, timeout). Surfacing it as a 503 is what keeps a
+      // dead search index from looking like "no results" (#551).
+      statusCode = HttpStatus.SERVICE_UNAVAILABLE;
+      message = exception.message;
+      this.logger.error(exception.message, exception.stack);
     } else if (exception instanceof Error) {
       // Map known domain exceptions here as the system grows, e.g.:
       // if (exception instanceof DocumentNotFoundError) statusCode = 404;

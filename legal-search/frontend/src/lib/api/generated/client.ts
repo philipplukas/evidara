@@ -41,11 +41,16 @@ export type searchDocumentsResponse400 = {
   data: void
   status: 400
 }
+
+export type searchDocumentsResponse503 = {
+  data: void
+  status: 503
+}
     
 export type searchDocumentsResponseSuccess = (searchDocumentsResponse200) & {
   headers: Headers;
 };
-export type searchDocumentsResponseError = (searchDocumentsResponse400) & {
+export type searchDocumentsResponseError = (searchDocumentsResponse400 | searchDocumentsResponse503) & {
   headers: Headers;
 };
 
@@ -94,11 +99,16 @@ export type getSearchContextResponse400 = {
   data: void
   status: 400
 }
+
+export type getSearchContextResponse503 = {
+  data: void
+  status: 503
+}
     
 export type getSearchContextResponseSuccess = (getSearchContextResponse200) & {
   headers: Headers;
 };
-export type getSearchContextResponseError = (getSearchContextResponse400) & {
+export type getSearchContextResponseError = (getSearchContextResponse400 | getSearchContextResponse503) & {
   headers: Headers;
 };
 
