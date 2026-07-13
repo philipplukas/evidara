@@ -9,8 +9,8 @@ Data moves from **acquisition** through **canonical truth** to **search projecti
 flowchart LR
   A[/Raw artifacts/] --> B[platform-control]
   B --> C[/Immutable bundle/]
-  C -.->|Pub/Sub| D[document-intelligence]
-  D --> E[(Delta — canonical & published)]
+  C -.->|NATS JetStream| D[document-intelligence]
+  D --> E[(Delta on MinIO — canonical & published)]
   E --> F[Document Service reads]
   E --> G[Search projection]
   G --> H[(OpenSearch)]
@@ -21,9 +21,9 @@ flowchart LR
 
 | Stage | Owner | Storage | Notes |
 |-------|--------|---------|--------|
-| Acquisition | platform-control | GCS + Postgres metadata | Raw files + manifest refs; immutable handoff. |
+| Acquisition | platform-control | MinIO (S3) + Postgres metadata | Raw files + manifest refs; immutable handoff. |
 | Processing | document-intelligence | Delta (internal + published) | Bronze/silver/gold naming is internal; consumers use **published** surfaces only. |
-| Publication | document-intelligence | Pub/Sub + Delta published rows | `document.processed` signals readiness; refs point at contract surfaces. |
+| Publication | document-intelligence | NATS JetStream + Delta published rows | `document.processed` signals readiness; refs point at contract surfaces. |
 | Serving — search | legal-search | OpenSearch | Projections derived from published refs; aliases for cutover. |
 | Serving — detail | legal-search BFF + Document Service | OpenSearch (metadata) + Delta (body via API) | Body reads go through `contracts/api/document-intelligence.openapi.yaml` per ADR-0010. |
 
@@ -34,7 +34,7 @@ flowchart LR
 
 ## Retention
 
-- **Legal / compliance** retention for raw and canonical data is a product and policy decision; encode in corpus metadata and bucket policies.
+- **Legal / compliance** retention for raw and canonical data is a product and policy decision; encode in corpus metadata and MinIO bucket policies.
 - **Logs and traces** follow environment retention (e.g. 30–90 days) unless audit requires longer.
 
 ## Related

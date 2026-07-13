@@ -21,16 +21,16 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         evidara = softwareSystem "Evidara" "Document intelligence platform" {
 
             # --- platform-control ---
-            platformControl = container "platform-control" "Source lifecycle, runs, approvals, reference data" "Cloud Run / FastAPI" {
+            platformControl = container "platform-control" "Source lifecycle, runs, approvals, reference data" "Kubernetes (k3s) / FastAPI" {
                 sourceRegistry = component "Source Registry" "Manages seed sources and source versions"
                 runOrchestrator = component "Run Orchestrator" "Creates and tracks processing runs"
                 approvalWorkflow = component "Approval Workflow" "Manages approval state for source versions"
                 referenceData = component "Reference Data" "Jurisdictions, authorities, metadata"
             }
-            platformControlAdmin = container "platform-control-admin" "Internal control-plane admin UI for operators" "Cloud Run / Next.js + React-admin"
+            platformControlAdmin = container "platform-control-admin" "Internal control-plane admin UI for operators" "Kubernetes (k3s) / Next.js + React-admin"
 
             # --- document-intelligence ---
-            docIntelligence = container "document-intelligence" "Raw-to-canonical processing pipelines" "Databricks" {
+            docIntelligence = container "document-intelligence" "Raw-to-canonical processing pipelines" "Kubernetes (k3s) / Python queue consumer" {
                 parser = component "Parser" "Extracts structure from raw artifacts (HTML, PDF)"
                 segmenter = component "Segmenter" "Splits documents into sections"
                 citationExtractor = component "Citation Extractor" "Identifies and normalizes legal citations"
@@ -41,18 +41,18 @@ workspace "Evidara" "Document intelligence platform for legal research" {
             }
 
             # --- legal-search ---
-            legalSearch = container "legal-search" "Search and document detail experience" "Cloud Run" {
+            legalSearch = container "legal-search" "Search and document detail experience" "Kubernetes (k3s)" {
                 frontend = component "Frontend" "Search UI, document detail, workspace" "Next.js"
                 bff = component "BFF" "Backend-for-frontend, shapes data for UI" "NestJS"
                 searchProjection = component "Search Projection" "Builds search-ready projections from canonical"
             }
 
-            # --- Data stores ---
-            postgres = container "PostgreSQL" "Source registry, runs, approvals, reference data" "Cloud SQL" "Database"
-            deltaLake = container "Delta Lake" "Canonical document truth and published downstream surfaces" "Databricks / Cloud Storage" "Database"
-            openSearch = container "OpenSearch" "Serving index and aliases for legal document projections" "OpenSearch Service" "Database"
-            objectStorage = container "Cloud Storage" "Raw artifact files and immutable manifest objects" "GCS" "Database"
-            pubSub = container "Pub/Sub" "Asynchronous event transport for bundle, processing-status, publication, and withdrawal events" "GCP Pub/Sub"
+            # --- Data stores (all self-hosted in-cluster; see ADR-0029) ---
+            postgres = container "PostgreSQL" "Source registry, runs, approvals, reference data" "CloudNativePG" "Database"
+            deltaLake = container "Delta Lake" "Canonical document truth and published downstream surfaces" "Delta on MinIO (pure-Python deltalake); queried via Nessie + Trino" "Database"
+            openSearch = container "OpenSearch" "Serving index and aliases for legal document projections" "OpenSearch" "Database"
+            objectStorage = container "Object Storage" "Raw artifact files and immutable manifest objects" "MinIO (S3-compatible)" "Database"
+            broker = container "NATS JetStream" "Asynchronous event transport for bundle, processing-status, publication, and withdrawal events" "NATS JetStream"
         }
 
         # --- External systems ---
@@ -65,17 +65,17 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         # --- Relationships: Platform flow ---
         legalSources -> platformControl "Provides raw legal artifacts"
         platformControl -> objectStorage "Stores raw artifacts and bundle manifests"
-        platformControl -> pubSub "Publishes artifact bundle events"
+        platformControl -> broker "Publishes artifact bundle events"
         platformControl -> postgres "Persists source, run, approval state"
         platformControlAdmin -> platformControl "Calls operator read and business APIs" "HTTPS / OpenAPI"
 
-        pubSub -> docIntelligence "Delivers artifact bundle events"
+        broker -> docIntelligence "Delivers artifact bundle events"
         docIntelligence -> objectStorage "Reads raw artifacts and bundle manifests"
         docIntelligence -> deltaLake "Writes canonical documents, sections, processing manifests, and published surfaces"
-        docIntelligence -> pubSub "Publishes processing status, document publication, and document withdrawal events"
-        platformControl -> pubSub "Publishes artifact bundle and index update events"
-        pubSub -> platformControl "Delivers processing status events"
-        pubSub -> legalSearch "Delivers document publication, withdrawal, and index update events"
+        docIntelligence -> broker "Publishes processing status, document publication, and document withdrawal events"
+        platformControl -> broker "Publishes artifact bundle and index update events"
+        broker -> platformControl "Delivers processing status events"
+        broker -> legalSearch "Delivers document publication, withdrawal, and index update events"
 
         legalSearch -> openSearch "Writes and queries search projections"
 
@@ -84,7 +84,7 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         bff -> openSearch "Search queries"
         bff -> documentService "Document detail reads (lean/full body)" "HTTPS / OpenAPI"
         documentService -> deltaLake "Queries published document / section / Docling surfaces only"
-        pubSub -> searchProjection "Delivers publication and reindex events"
+        broker -> searchProjection "Delivers publication and reindex events"
         searchProjection -> deltaLake "Reads published canonical surfaces for projection build"
         searchProjection -> openSearch "Writes projections and alias updates"
 

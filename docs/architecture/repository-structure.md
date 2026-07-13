@@ -35,8 +35,8 @@ Evidara uses a monorepo with top-level domain folders. Each folder represents a 
 - Jurisdiction assignment to documents
 - Citation extraction
 - Canonical domain entities: documents, sections, citations, relationships
-- Databricks pipelines
-- Delta table definitions and canonical truth
+- Processing jobs and the NATS JetStream consumers (`jobs/nats_consumer.py`, `jobs/projection_bridge_consumer.py`)
+- Delta table definitions and canonical truth (written by the pure-Python `deltalake` sink onto MinIO)
 
 **Does NOT own:**
 
@@ -86,8 +86,8 @@ Evidara uses a monorepo with top-level domain folders. Each folder represents a 
 
 **Owns:**
 
-- `terraform/gcp/` — Google Cloud infrastructure
-- `terraform/databricks/` — Databricks workspace and resources
+- `hetzner/` — the **live runtime**: staged, idempotent deploy scripts (`deploy-stage1.sh` … `deploy-stage5.sh`), helm values, and app manifests for the self-hosted single-node k3s cluster ([ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md)). Run from a laptop against the cluster — not GitOps, not CI.
+- `terraform/gcp/` — legacy Google Cloud infrastructure. Still present, **not destroyed**; the Cloud Run CD workflow is feature-flagged off behind `vars.ENABLE_GCP_CLOUD_RUN_CD`.
 - `terraform/github/` — GitHub repository governance automation
 - `env/dev | staging | prod/` — Environment-specific configurations
 
@@ -129,7 +129,11 @@ Evidara uses a monorepo with top-level domain folders. Each folder represents a 
 
 **Owns:**
 
-- Product-facing Kustomize roots (for example `prod/`) synced by Argo CD per `docs/migration/`.
+- Product-facing Kustomize roots (for example `prod/`) intended to be synced by Argo CD per `docs/migration/`.
+
+**Status:** **scaffolding, not the live deployment path.** These manifests still carry
+placeholder hostnames (`*.evidara.example`), `prod/` is empty, and they have never been
+applied. The cluster is deployed by `infra/hetzner/deploy-stage*.sh` instead.
 
 **Does NOT own:**
 
