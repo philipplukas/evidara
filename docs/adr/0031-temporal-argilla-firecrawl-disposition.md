@@ -109,7 +109,7 @@ independent of Argilla — and moves to the review-task model.
 Keep the code. It is the only path for portals with no structured API (the Austrian
 RIS portal), which is a real category, and it is well built. Leave it unconfigured.
 
-#558 (the webhook race) is a precondition for ever enabling it, not for keeping it.
+The webhook race (#558) is a precondition for ever enabling it, not for keeping it.
 
 **#559 is not a Firecrawl issue and must be fixed immediately regardless.**
 ADR-0030 — accepted — states that "the run-launch path calls `require_live_ready()`,
@@ -133,7 +133,7 @@ ADR-0030 is correct; the code must be made to match it.
 
 ## Alternatives considered
 
-**Roll Temporal out now.** Rejected: ~1–2 weeks of correctness work (#560, #561,
+**Roll Temporal out now.** Rejected: ~1–2 weeks of correctness work (#560, #561, and
 #564) plus a server, a worker deployment, and secrets, to orchestrate a workflow with
 no current caller.
 
