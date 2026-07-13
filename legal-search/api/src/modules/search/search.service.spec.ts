@@ -27,6 +27,9 @@ function createMockRepo(overrides?: Partial<SearchRepository>): SearchRepository
       languages: [{ key: 'de', doc_count: 100 }],
       source_types: [{ key: 'law', doc_count: 50 }],
     } satisfies ContextAggregations),
+    checkReadAlias: vi
+      .fn()
+      .mockResolvedValue({ status: 'ok', alias: 'documents-read', indices: ['documents-000001'] }),
     ...overrides,
   };
 }
