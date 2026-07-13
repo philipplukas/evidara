@@ -76,7 +76,15 @@ even while the runtime is mid-migration.
 | **6** | ADR-0029's two tables: the **migration-surface audit** (difficulty column) + the **GCP → self-hosted target mapping** | "How I make trade-offs. I moved the runtime off usage-billed cloud to fixed-cost self-hosted — but first I *audited the coupling*. It proved the app was already abstracted behind ports, so a scary 'cloud migration' was really one concentrated task. Built solo, so I chose the lightest broker, not the most powerful." | `docs/adr/0029-self-hosted-hetzner-runtime.md` |
 | **7** | Honest status + "where to look" (ADR-0029, boundary-contracts, the canvas) | "Internal beta — a dozen Swiss federal laws. Thin on purpose; I was proving the engine and the architecture. Fastest way to judge the engineering: these three docs, five minutes each." | `README.md` "Fastest way to judge" |
 
-## Building the slides fast
+## The deck is already built
+
+A self-contained, ready-to-present version of these seven slides ships alongside this doc:
+[`evidara-demo-deck.html`](./evidara-demo-deck.html). Open it in any browser — no build step,
+no dependencies. Navigate with **← / →** (or click), and press **S** to toggle the speaker
+notes (the "Say" narration for each slide) at the bottom. It's 16:9, letterboxes to any
+window for a clean screen-share, and adapts to light/dark. Record straight from it.
+
+## Building the slides fast (if you'd rather roll your own)
 
 - **Fastest path:** you don't even need a deck tool. Open the seven source files in your
   editor, zoom the font, and *scroll* through them while narrating — a "code tour" reads as

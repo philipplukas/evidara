@@ -1,0 +1,606 @@
+<title>Evidara — 5-minute demo deck</title>
+<style>
+  :root {
+    --bg: #E7E9EC;
+    --stage: #FCFCFB;
+    --ink: #15171B;
+    --ink-soft: #565C66;
+    --faint: #8A909A;
+    --line: #E2E4E8;
+    --line-strong: #CDD0D6;
+    --accent: #C23A2B;
+    --accent-ink: #9E2C20;
+    --accent-wash: rgba(194, 58, 43, 0.07);
+    --good: #2E7D57;
+    --good-wash: rgba(46, 125, 87, 0.12);
+    --warn: #916310;
+    --warn-wash: rgba(145, 99, 16, 0.12);
+    --crit: #B23A34;
+    --crit-wash: rgba(178, 58, 52, 0.10);
+    --gone: #767D88;
+    --gone-wash: rgba(118, 125, 136, 0.12);
+    --code-bg: #F3F4F6;
+    --code-key: #9E2C20;
+    --code-str: #3A6B4E;
+    --code-num: #2A5C86;
+    --shadow: 0 4px 14px rgba(20, 24, 34, 0.10), 0 22px 60px rgba(20, 24, 34, 0.14);
+    --sans: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Menlo", "Cascadia Mono", "Consolas", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #08090C;
+      --stage: #12161F;
+      --ink: #EDEFF3;
+      --ink-soft: #A3AAB4;
+      --faint: #6C7480;
+      --line: #232935;
+      --line-strong: #343B49;
+      --accent: #E45C45;
+      --accent-ink: #F0917F;
+      --accent-wash: rgba(228, 92, 69, 0.13);
+      --good: #4EB185;
+      --good-wash: rgba(78, 177, 133, 0.15);
+      --warn: #D6A44A;
+      --warn-wash: rgba(214, 164, 74, 0.15);
+      --crit: #E06A5F;
+      --crit-wash: rgba(224, 106, 95, 0.15);
+      --gone: #7E8794;
+      --gone-wash: rgba(126, 135, 148, 0.16);
+      --code-bg: #0C1017;
+      --code-key: #F0917F;
+      --code-str: #7FC7A0;
+      --code-num: #7FB0DE;
+      --shadow: 0 2px 10px rgba(0, 0, 0, 0.4), 0 24px 70px rgba(0, 0, 0, 0.55);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #E7E9EC; --stage: #FCFCFB; --ink: #15171B; --ink-soft: #565C66; --faint: #8A909A;
+    --line: #E2E4E8; --line-strong: #CDD0D6; --accent: #C23A2B; --accent-ink: #9E2C20;
+    --accent-wash: rgba(194, 58, 43, 0.07); --good: #2E7D57; --good-wash: rgba(46,125,87,.12);
+    --warn: #916310; --warn-wash: rgba(145,99,16,.12); --crit: #B23A34; --crit-wash: rgba(178,58,52,.10);
+    --gone: #767D88; --gone-wash: rgba(118,125,136,.12); --code-bg: #F3F4F6; --code-key: #9E2C20;
+    --code-str: #3A6B4E; --code-num: #2A5C86;
+    --shadow: 0 4px 14px rgba(20,24,34,.10), 0 22px 60px rgba(20,24,34,.14);
+  }
+  :root[data-theme="dark"] {
+    --bg: #08090C; --stage: #12161F; --ink: #EDEFF3; --ink-soft: #A3AAB4; --faint: #6C7480;
+    --line: #232935; --line-strong: #343B49; --accent: #E45C45; --accent-ink: #F0917F;
+    --accent-wash: rgba(228,92,69,.13); --good: #4EB185; --good-wash: rgba(78,177,133,.15);
+    --warn: #D6A44A; --warn-wash: rgba(214,164,74,.15); --crit: #E06A5F; --crit-wash: rgba(224,106,95,.15);
+    --gone: #7E8794; --gone-wash: rgba(126,135,148,.16); --code-bg: #0C1017; --code-key: #F0917F;
+    --code-str: #7FC7A0; --code-num: #7FB0DE;
+    --shadow: 0 2px 10px rgba(0,0,0,.4), 0 24px 70px rgba(0,0,0,.55);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+
+  .deck { position: fixed; inset: 0; display: grid; place-items: center; padding: min(3.5vmin, 34px); }
+
+  .stage {
+    position: relative;
+    width: min(100%, calc((100vh - 7vmin) * 16 / 9));
+    height: min(100%, calc((100vw - 7vmin) * 9 / 16));
+    background: var(--stage);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+    container-type: size;
+    overflow: hidden;
+  }
+
+  /* progress rule */
+  .rail { position: absolute; top: 0; left: 0; right: 0; height: 0.5cqmin; min-height: 2px; background: var(--line); z-index: 5; }
+  .rail > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .45s cubic-bezier(.4,0,.2,1); }
+
+  /* slides */
+  .slide {
+    position: absolute; inset: 0;
+    padding: 8cqmin 8.5cqmin 6cqmin;
+    display: flex; flex-direction: column;
+    opacity: 0; visibility: hidden;
+    transform: translateY(1.2cqmin);
+    transition: opacity .38s ease, transform .38s ease, visibility .38s;
+  }
+  .slide.is-active { opacity: 1; visibility: visible; transform: none; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 1.65cqmin;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    display: flex; align-items: center; gap: 1.4cqmin;
+  }
+  .eyebrow::before { content: ""; width: 3cqmin; height: 1px; background: var(--accent); display: inline-block; }
+
+  h1, h2 { margin: 0; font-weight: 700; letter-spacing: -0.015em; text-wrap: balance; line-height: 1.02; }
+  h1 { font-size: 8.2cqmin; }
+  h2 { font-size: 6cqmin; }
+
+  .lead { font-size: 2.7cqmin; color: var(--ink-soft); line-height: 1.35; max-width: 62ch; margin: 0; }
+  .body { font-size: 2.3cqmin; color: var(--ink-soft); line-height: 1.45; }
+
+  .head-block { display: flex; flex-direction: column; gap: 2.6cqmin; }
+  .fill { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 3cqmin; }
+  .fill.top { justify-content: flex-start; }
+
+  /* footer */
+  .foot {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 2cqmin;
+    font-family: var(--mono); font-size: 1.5cqmin; color: var(--faint);
+    border-top: 1px solid var(--line); padding-top: 2.4cqmin; margin-top: 2cqmin;
+  }
+  .foot .src { letter-spacing: 0.02em; }
+  .foot .src b { color: var(--ink-soft); font-weight: 500; }
+  .foot .mark { letter-spacing: 0.34em; text-transform: uppercase; color: var(--ink-soft); }
+
+  /* title slide */
+  .title-wordmark { font-family: var(--mono); font-size: 2cqmin; letter-spacing: 0.4em; text-transform: uppercase; color: var(--ink); }
+  .title-sub {
+    font-family: var(--mono); font-size: 1.9cqmin; color: var(--ink-soft);
+    display: flex; flex-wrap: wrap; gap: 1cqmin 2.4cqmin;
+  }
+  .title-sub span { display: inline-flex; align-items: center; gap: 1.6cqmin; }
+  .title-sub span::after { content: "·"; color: var(--accent); }
+  .title-sub span:last-child::after { content: ""; }
+
+  /* aspect cards (slide 2) */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3cqmin; }
+  .card {
+    border: 1px solid var(--line); border-top: 2px solid var(--accent);
+    border-radius: 2px; padding: 3cqmin 2.8cqmin; background: var(--accent-wash);
+    display: flex; flex-direction: column; gap: 1.6cqmin; min-height: 0;
+  }
+  .card .k { font-family: var(--mono); font-size: 1.55cqmin; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent-ink); }
+  .card .t { font-size: 2.5cqmin; font-weight: 650; line-height: 1.15; }
+  .card .d { font-size: 1.85cqmin; color: var(--ink-soft); line-height: 1.4; }
+
+  /* code (slide 3) */
+  .split { display: grid; grid-template-columns: 1.15fr 1fr; gap: 4cqmin; align-items: center; }
+  pre.code {
+    margin: 0; background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 3px; padding: 3cqmin 3.2cqmin; overflow: auto;
+    font-family: var(--mono); font-size: 1.85cqmin; line-height: 1.6; color: var(--ink-soft);
+  }
+  .code .k { color: var(--code-key); }
+  .code .s { color: var(--code-str); }
+  .code .n { color: var(--code-num); }
+  .code .c { color: var(--faint); }
+  .side-note { display: flex; flex-direction: column; gap: 2.4cqmin; }
+  .side-note p { margin: 0; font-size: 2.1cqmin; color: var(--ink-soft); line-height: 1.45; }
+  .side-note b { color: var(--ink); font-weight: 600; }
+
+  /* status pills */
+  .pills { display: flex; flex-wrap: wrap; gap: 1.4cqmin; }
+  .pill {
+    font-family: var(--mono); font-size: 1.55cqmin; letter-spacing: 0.04em;
+    padding: 0.9cqmin 1.6cqmin; border-radius: 100px; display: inline-flex; align-items: center; gap: 1cqmin;
+    border: 1px solid transparent;
+  }
+  .pill::before { content: ""; width: 1.3cqmin; height: 1.3cqmin; border-radius: 50%; background: currentColor; }
+  .pill.ok { color: var(--good); background: var(--good-wash); border-color: color-mix(in srgb, var(--good) 30%, transparent); }
+  .pill.wn { color: var(--warn); background: var(--warn-wash); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+  .pill.cr { color: var(--crit); background: var(--crit-wash); border-color: color-mix(in srgb, var(--crit) 30%, transparent); }
+  .pill.gn { color: var(--gone); background: var(--gone-wash); border-color: color-mix(in srgb, var(--gone) 30%, transparent); }
+
+  /* flow (slide 4) */
+  .flow { display: flex; align-items: stretch; gap: 2cqmin; }
+  .node {
+    flex: 1; border: 1px solid var(--line-strong); border-radius: 3px; padding: 3cqmin 2.6cqmin;
+    display: flex; flex-direction: column; gap: 1.4cqmin; background: var(--stage); min-width: 0;
+  }
+  .node.canon { border-color: var(--accent); background: var(--accent-wash); }
+  .node .n-name { font-family: var(--mono); font-size: 1.8cqmin; font-weight: 600; letter-spacing: 0.02em; color: var(--ink); }
+  .node .n-role { font-size: 1.8cqmin; color: var(--ink-soft); line-height: 1.35; }
+  .node .n-tag { font-family: var(--mono); font-size: 1.4cqmin; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-top: auto; }
+  .arrow { align-self: center; color: var(--accent); font-size: 4cqmin; line-height: 1; flex: 0 0 auto; }
+  .flow-caption { font-size: 2.2cqmin; color: var(--ink-soft); line-height: 1.4; }
+  .flow-caption b { color: var(--ink); font-weight: 600; }
+
+  /* events + gate (slide 5) */
+  .evline { display: flex; align-items: center; gap: 2.2cqmin; flex-wrap: wrap; }
+  .ev {
+    font-family: var(--mono); font-size: 2cqmin; padding: 1.3cqmin 2.2cqmin; border-radius: 3px;
+    background: var(--code-bg); border: 1px solid var(--line-strong); color: var(--ink);
+  }
+  .ev .dot { color: var(--accent); }
+  .evline .arrow { font-size: 3cqmin; }
+  .gate { display: flex; align-items: center; gap: 0; margin-top: 1cqmin; }
+  .gstep {
+    font-family: var(--mono); font-size: 1.7cqmin; letter-spacing: 0.04em; padding: 1.2cqmin 2.4cqmin;
+    border: 1px solid var(--line-strong); color: var(--ink-soft); background: var(--stage);
+  }
+  .gstep:first-child { border-radius: 3px 0 0 3px; }
+  .gstep:last-child { border-radius: 0 3px 3px 0; }
+  .gstep.on { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-wash); font-weight: 600; }
+  .gstep .lock { margin-right: 1cqmin; }
+
+  /* tables (slide 6) */
+  .tables { display: grid; grid-template-columns: 1.1fr 1fr; gap: 4cqmin; align-items: start; }
+  .tbl-wrap { overflow-x: auto; }
+  .tbl-cap { font-family: var(--mono); font-size: 1.5cqmin; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-bottom: 1.6cqmin; }
+  table { border-collapse: collapse; width: 100%; font-size: 1.75cqmin; }
+  th, td { text-align: left; padding: 1.3cqmin 1.6cqmin; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 1.4cqmin; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); font-weight: 500; border-bottom-color: var(--line-strong); }
+  td.mono, .tag-hard, .tag-easy { font-family: var(--mono); }
+  td .from { color: var(--ink-soft); }
+  .tag-hard { color: var(--accent-ink); font-weight: 600; }
+  .tag-easy { color: var(--ink-soft); }
+
+  /* link cards (slide 7) */
+  .links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3cqmin; }
+  .lk {
+    border: 1px solid var(--line-strong); border-radius: 3px; padding: 3cqmin 2.8cqmin;
+    display: flex; flex-direction: column; gap: 1.4cqmin; text-decoration: none; color: inherit; background: var(--stage);
+    transition: border-color .2s ease, transform .2s ease;
+  }
+  .lk:hover, .lk:focus-visible { border-color: var(--accent); transform: translateY(-0.6cqmin); outline: none; }
+  .lk .lk-k { font-family: var(--mono); font-size: 1.5cqmin; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink); }
+  .lk .lk-t { font-size: 2.3cqmin; font-weight: 650; line-height: 1.15; }
+  .lk .lk-d { font-size: 1.7cqmin; color: var(--ink-soft); line-height: 1.4; }
+  .close-line { font-size: 2.1cqmin; color: var(--ink-soft); }
+  .close-line b { color: var(--ink); font-weight: 600; }
+
+  /* controls */
+  .hud {
+    position: fixed; bottom: 2.2vmin; right: 2.4vmin; z-index: 20;
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 13px; color: var(--ink-soft);
+  }
+  .counter { font-variant-numeric: tabular-nums; letter-spacing: 0.08em; }
+  .counter b { color: var(--accent-ink); font-weight: 600; }
+  .nav-btn {
+    appearance: none; border: 1px solid var(--line-strong); background: var(--stage); color: var(--ink);
+    width: 34px; height: 34px; border-radius: 3px; cursor: pointer; font-size: 16px; line-height: 1;
+    display: grid; place-items: center; transition: border-color .2s ease, color .2s ease;
+  }
+  .nav-btn:hover, .nav-btn:focus-visible { border-color: var(--accent); color: var(--accent-ink); outline: none; }
+  .nav-btn:disabled { opacity: 0.35; cursor: default; }
+
+  .hint {
+    position: fixed; bottom: 2.4vmin; left: 50%; transform: translateX(-50%); z-index: 20;
+    font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.06em; color: var(--faint);
+    background: color-mix(in srgb, var(--stage) 88%, transparent); border: 1px solid var(--line);
+    padding: 7px 14px; border-radius: 100px; transition: opacity .5s ease; backdrop-filter: blur(4px);
+  }
+  .hint kbd { color: var(--accent-ink); font-family: var(--mono); }
+  .hint.gone { opacity: 0; pointer-events: none; }
+
+  /* speaker notes */
+  .notes {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+    background: color-mix(in srgb, var(--stage) 96%, var(--ink) 4%);
+    border-top: 2px solid var(--accent);
+    padding: 16px clamp(16px, 4vw, 48px) 18px;
+    transform: translateY(101%); transition: transform .35s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 -12px 40px rgba(0,0,0,0.18);
+  }
+  .notes.open { transform: none; }
+  .notes .n-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 7px; }
+  .notes .n-text { font-size: clamp(14px, 1.7vw, 18px); line-height: 1.5; color: var(--ink); max-width: 96ch; margin: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide, .rail > i, .notes, .hint, .lk, .nav-btn { transition: none; }
+    .slide { transform: none; }
+  }
+</style>
+
+<div class="deck" id="deck">
+  <div class="stage" id="stage">
+    <div class="rail"><i id="rail"></i></div>
+
+    <!-- 1 · Title -->
+    <section class="slide" data-note="The hard part of legal search isn't finding text — it's trust. Where did a statement come from, and is it still in force? General AI can search law and hallucinate it; you can't cite that. This is a five-minute walk through how Evidara solves that as a data problem.">
+      <div class="head-block">
+        <div class="title-wordmark">Evidara</div>
+      </div>
+      <div class="fill">
+        <h1>Trustworthy primary&nbsp;law, as an API.</h1>
+        <div class="title-sub">
+          <span>canonical text</span><span>provenance</span><span>in-force status</span><span>citation graph</span>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="src">Internal beta — Swiss federal law · a 5-minute walkthrough</div>
+        <div class="mark">Product demo</div>
+      </div>
+    </section>
+
+    <!-- 2 · Problem -->
+    <section class="slide" data-note="Every authority publishes differently — down to municipal PDFs on ad-hoc websites. Stale law is worthless, so freshness is continuous, not one-time. And 'citable' isn't a search-ranking problem, it's an architecture problem. That last constraint is what the whole system is built around.">
+      <div class="head-block">
+        <div class="eyebrow">The problem</div>
+        <h2>Trust is the hard part — not search.</h2>
+      </div>
+      <div class="fill">
+        <div class="cards">
+          <div class="card">
+            <div class="k">Heterogeneous</div>
+            <div class="t">Every source is different</div>
+            <div class="d">Federal SPARQL endpoints down to municipal PDFs on ad-hoc sites — one adapter per authority.</div>
+          </div>
+          <div class="card">
+            <div class="k">Perishable</div>
+            <div class="t">Freshness is forever</div>
+            <div class="d">Law changes. A stale legal answer is worse than none — currency must be tracked, not assumed.</div>
+          </div>
+          <div class="card">
+            <div class="k">Citable</div>
+            <div class="t">An architecture problem</div>
+            <div class="d">Being trustworthy enough to put in a brief is about provenance and structure, not ranking.</div>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="src">source · <b>README.md</b></div>
+        <div class="mark">Evidara</div>
+      </div>
+    </section>
+
+    <!-- 3 · Data model -->
+    <section class="slide" data-note="Trust is modelled, not asserted. Every canonical document carries its provenance — which authority, which jurisdiction, what trust tier, whether the source is official and primary — plus an in-force lifecycle status: active, superseded, repealed, or withdrawn. And it's parsed into sections and a citation graph, not stored as a full-text blob.">
+      <div class="head-block">
+        <div class="eyebrow">Data model</div>
+        <h2>Trust is modelled, not asserted.</h2>
+      </div>
+      <div class="fill">
+        <div class="split">
+<pre class="code"><span class="c">// canonical document (excerpt)</span>
+{
+  <span class="k">"document_id"</span>: <span class="s">"doc_ch_sr_220"</span>,
+  <span class="k">"title"</span>: <span class="s">"Obligationenrecht"</span>,
+  <span class="k">"lifecycle_status"</span>: <span class="s">"active"</span>,
+  <span class="k">"provenance"</span>: {
+    <span class="k">"authority_id"</span>: <span class="s">"auth_fedlex"</span>,
+    <span class="k">"jurisdiction_id"</span>: <span class="s">"jur_ch_federal"</span>,
+    <span class="k">"trust_tier"</span>: <span class="s">"authoritative"</span>,
+    <span class="k">"source_origin_kind"</span>: <span class="s">"official_primary"</span>,
+    <span class="k">"eli_uri"</span>: <span class="s">"https://fedlex…/eli/cc/27/…"</span>
+  },
+  <span class="k">"sections"</span>: [ <span class="c">/* … */</span> ],
+  <span class="k">"citations"</span>: [ <span class="c">/* citation graph */</span> ]
+}</pre>
+          <div class="side-note">
+            <p><b>Provenance on every document</b> — authority, jurisdiction, trust tier, and a link back to the official source.</p>
+            <p><b>In-force status</b> so you never cite dead law:</p>
+            <div class="pills">
+              <span class="pill ok">active</span>
+              <span class="pill wn">superseded</span>
+              <span class="pill cr">repealed</span>
+              <span class="pill gn">withdrawn</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="src">source · <b>contracts/schemas/document.schema.json</b></div>
+        <div class="mark">Evidara</div>
+      </div>
+    </section>
+
+    <!-- 4 · Architecture -->
+    <section class="slide" data-note="Here's the decision I'd point to. Canonical truth is kept separate from what search serves. A document is processed once into canonical structure; search is a rebuildable projection of it, not the system of record. That means you can reprocess or re-index at any time and stable citations survive.">
+      <div class="head-block">
+        <div class="eyebrow">Architecture</div>
+        <h2>Canonical truth, separate from what search serves.</h2>
+      </div>
+      <div class="fill">
+        <div class="flow">
+          <div class="node">
+            <div class="n-name">platform-control</div>
+            <div class="n-role">Acquire sources, gate approvals, orchestrate runs.</div>
+            <div class="n-tag">FastAPI</div>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node canon">
+            <div class="n-name">document-intelligence</div>
+            <div class="n-role">Parse → canonical structure + citations. The system of record.</div>
+            <div class="n-tag">Delta · canonical</div>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">
+            <div class="n-name">legal-search</div>
+            <div class="n-role">Project canonical truth into a search index and serve it.</div>
+            <div class="n-tag">OpenSearch · projection</div>
+          </div>
+        </div>
+        <p class="flow-caption">Search is a <b>rebuildable view</b>, not the source of truth — reprocess or re-index anytime, and citations stay stable.</p>
+      </div>
+      <div class="foot">
+        <div class="src">source · <b>docs/architecture/boundary-contracts.md</b></div>
+        <div class="mark">Evidara</div>
+      </div>
+    </section>
+
+    <!-- 5 · Boundaries -->
+    <section class="slide" data-note="Components hand off through events, not a shared database — platform-control emits artifact-bundle-available, document-intelligence emits document-processed. And none of it publishes automatically: a source moves through an operator approval gate first. Quality is a gated feature, not an accident.">
+      <div class="head-block">
+        <div class="eyebrow">Boundaries</div>
+        <h2>Handoffs are events. Publishing is gated.</h2>
+      </div>
+      <div class="fill">
+        <div class="evline">
+          <span class="ev">artifact_bundle<span class="dot">.</span>available</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="ev">document<span class="dot">.</span>processed</span>
+        </div>
+        <p class="body" style="max-width:70ch">Event-driven boundaries between components — each owns its data and emits a contract, so no component reaches into another's store.</p>
+        <div>
+          <div class="tbl-cap" style="margin-bottom:1.8cqmin">Operator approval lifecycle</div>
+          <div class="gate">
+            <span class="gstep">draft</span>
+            <span class="gstep">version</span>
+            <span class="gstep on"><span class="lock" aria-hidden="true">⦿</span>approve</span>
+            <span class="gstep">publish</span>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="src">source · <b>contracts/events/</b> · <b>docs/components/platform-control.md</b></div>
+        <div class="mark">Evidara</div>
+      </div>
+    </section>
+
+    <!-- 6 · ADR-0029 -->
+    <section class="slide" data-note="This is how I make trade-offs. I moved the whole runtime off usage-billed cloud onto a fixed-cost self-hosted stack — but first I audited the coupling. The audit proved the app was already abstracted behind ports and adapters, so a scary cloud migration was really one concentrated task: the message consumer. Built by one person, so I chose the lightest broker to operate, not the most powerful.">
+      <div class="head-block">
+        <div class="eyebrow">Decision · ADR-0029</div>
+        <h2>I audited the coupling before moving anything.</h2>
+      </div>
+      <div class="fill">
+        <div class="tables">
+          <div class="tbl-wrap">
+            <div class="tbl-cap">Migration-surface audit</div>
+            <table>
+              <thead><tr><th>Dependency</th><th>Rework</th></tr></thead>
+              <tbody>
+                <tr><td>Object storage · secrets</td><td class="tag-easy">port + adapter</td></tr>
+                <tr><td>Postgres</td><td class="tag-easy">trivial</td></tr>
+                <tr><td>Canonical persistence</td><td class="tag-easy">Spark opt-in</td></tr>
+                <tr><td>Message <b>consumer</b></td><td class="tag-hard">the only real work</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="tbl-wrap">
+            <div class="tbl-cap">GCP → self-hosted</div>
+            <table>
+              <thead><tr><th>From</th><th>To</th></tr></thead>
+              <tbody>
+                <tr><td class="mono"><span class="from">Cloud Run</span></td><td class="mono">Kubernetes / Hetzner</td></tr>
+                <tr><td class="mono"><span class="from">Pub/Sub</span></td><td class="mono">NATS JetStream</td></tr>
+                <tr><td class="mono"><span class="from">GCS</span></td><td class="mono">MinIO (S3)</td></tr>
+                <tr><td class="mono"><span class="from">Databricks</span></td><td class="mono">pure-Python container</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="flow-caption">Driver: a <b>fixed monthly cost</b> one operator can carry — the lightest broker, not the most powerful.</p>
+      </div>
+      <div class="foot">
+        <div class="src">source · <b>docs/adr/0029-self-hosted-hetzner-runtime.md</b></div>
+        <div class="mark">Evidara</div>
+      </div>
+    </section>
+
+    <!-- 7 · Status + where to look -->
+    <section class="slide" data-note="Honest status: it's an internal beta, about a dozen Swiss federal laws. The corpus is thin on purpose — what I was proving is the engine and the architecture, not breadth. If you want to judge the engineering, these three documents are the five-minute version.">
+      <div class="head-block">
+        <div class="eyebrow">Honest status</div>
+        <h2>Thin corpus, on purpose. The engine is the point.</h2>
+      </div>
+      <div class="fill">
+        <div class="links">
+          <a class="lk" href="#" onclick="return false;">
+            <span class="lk-k">Trade-off</span>
+            <span class="lk-t">ADR-0029</span>
+            <span class="lk-d">Retiring a cloud runtime — audit → decision → owned trade-offs.</span>
+          </a>
+          <a class="lk" href="#" onclick="return false;">
+            <span class="lk-k">Architecture</span>
+            <span class="lk-t">Boundary contracts</span>
+            <span class="lk-d">Canonical truth vs. serving projection, drawn explicitly.</span>
+          </a>
+          <a class="lk" href="#" onclick="return false;">
+            <span class="lk-k">Judgment</span>
+            <span class="lk-t">Business-model canvas</span>
+            <span class="lk-d">Every claim tagged built vs. bet — decisions under ambiguity.</span>
+          </a>
+        </div>
+        <p class="close-line"><b>Five minutes each.</b> The corpus is small; the reasoning isn't.</p>
+      </div>
+      <div class="foot">
+        <div class="src">source · <b>README.md</b> → “Fastest way to judge the engineering”</div>
+        <div class="mark">Evidara</div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="hud">
+  <button class="nav-btn" id="prev" aria-label="Previous slide">‹</button>
+  <span class="counter"><b id="cur">01</b> / <span id="total">07</span></span>
+  <button class="nav-btn" id="next" aria-label="Next slide">›</button>
+</div>
+
+<div class="hint" id="hint"><kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>S</kbd> speaker notes</div>
+
+<div class="notes" id="notes" aria-live="polite">
+  <div class="n-label">Speaker notes — what to say</div>
+  <p class="n-text" id="noteText"></p>
+</div>
+
+<script>
+  (function () {
+    var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+    var rail = document.getElementById("rail");
+    var cur = document.getElementById("cur");
+    var total = document.getElementById("total");
+    var prev = document.getElementById("prev");
+    var next = document.getElementById("next");
+    var hint = document.getElementById("hint");
+    var notes = document.getElementById("notes");
+    var noteText = document.getElementById("noteText");
+    var i = 0, notesOpen = false, hintShown = true;
+    total.textContent = String(slides.length).padStart(2, "0");
+
+    function pad(n) { return String(n).padStart(2, "0"); }
+
+    function render() {
+      slides.forEach(function (s, idx) { s.classList.toggle("is-active", idx === i); });
+      rail.style.width = ((i + 1) / slides.length * 100) + "%";
+      cur.textContent = pad(i + 1);
+      prev.disabled = i === 0;
+      next.disabled = i === slides.length - 1;
+      noteText.textContent = slides[i].getAttribute("data-note") || "";
+    }
+
+    function go(n) {
+      var t = Math.max(0, Math.min(slides.length - 1, n));
+      if (t !== i) { i = t; render(); }
+      dismissHint();
+    }
+
+    function dismissHint() {
+      if (hintShown) { hintShown = false; hint.classList.add("gone"); }
+    }
+
+    function toggleNotes() {
+      notesOpen = !notesOpen;
+      notes.classList.toggle("open", notesOpen);
+      dismissHint();
+    }
+
+    prev.addEventListener("click", function () { go(i - 1); });
+    next.addEventListener("click", function () { go(i + 1); });
+
+    document.addEventListener("keydown", function (e) {
+      switch (e.key) {
+        case "ArrowRight": case "PageDown": case " ": e.preventDefault(); go(i + 1); break;
+        case "ArrowLeft": case "PageUp": go(i - 1); break;
+        case "Home": go(0); break;
+        case "End": go(slides.length - 1); break;
+        case "s": case "S": case "n": case "N": toggleNotes(); break;
+      }
+    });
+
+    // click stage to advance (ignore links/buttons)
+    document.getElementById("stage").addEventListener("click", function (e) {
+      if (e.target.closest("a, button")) return;
+      go(i + 1);
+    });
+
+    setTimeout(dismissHint, 6000);
+    render();
+  })();
+</script>
