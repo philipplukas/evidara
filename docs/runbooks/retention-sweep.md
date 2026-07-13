@@ -1,5 +1,10 @@
 # Retention sweep (legal hard delete)
 
+Owner: Platform team  
+Last reviewed: 2026-07-13  
+Last verified: 2026-07-13 (ADR-0031 — sweep moved from Temporal to a CronJob)  
+Applies to: the Hetzner k3s cluster (`evidara` namespace)
+
 The retention sweep purges `RawArtifact` rows, their `CapturedResource` children, and the
 underlying blobs once the artifact is older than its jurisdiction's
 `CompliancePolicy.retention_days`. Hard delete is deliberate: retention windows here come from
