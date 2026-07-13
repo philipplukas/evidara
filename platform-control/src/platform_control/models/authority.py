@@ -40,3 +40,10 @@ class Authority(TimestampMixin, Base):
     )
     name: Mapped[str] = mapped_column()
     slug: Mapped[str] = mapped_column(unique=True)
+    # Optional authority-level compliance override. When set it takes
+    # precedence over the jurisdiction's policy so a single jurisdiction can
+    # carry different politeness tiers per authority (e.g. Fedlex open-data
+    # legislation vs. public-official courts under jur_ch_federal). See #530.
+    compliance_policy_id: Mapped[str | None] = mapped_column(
+        ForeignKey("compliance_policies.compliance_policy_id"), nullable=True
+    )

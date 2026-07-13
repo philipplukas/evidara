@@ -4,6 +4,7 @@ from platform_control.config import Settings
 from platform_control.services.bundesland_http_provider import BundeslandHttpProvider
 from platform_control.services.canton_http_provider import CantonHttpProvider
 from platform_control.services.cassette_provider import CassetteProvider
+from platform_control.services.ch_court_decisions_provider import ChCourtDecisionsProvider
 from platform_control.services.deterministic_http_provider import DeterministicHttpProvider
 from platform_control.services.eur_lex_sparql_provider import EurLexSparqlProvider
 from platform_control.services.fedlex_sparql_provider import FedlexSparqlProvider
@@ -32,6 +33,10 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     )
     registry.register(BundeslandHttpProvider())
     registry.register(RegioneHttpProvider())
+    # Swiss federal court decisions (BGer/BVGer). Scaffold: live_ready=false,
+    # so its blueprint templates parse but the two-key lock rejects live runs
+    # until an operator captures acceptance-run evidence (#530).
+    registry.register(ChCourtDecisionsProvider())
     # Swiss cantonal legislation portals. Scaffold: live_ready=false, so its
     # blueprint templates parse but the two-key lock rejects live runs until an
     # operator captures per-canton acceptance-run evidence.

@@ -15,3 +15,24 @@ items:
       sections:
         - heading
         - body
+  # Statute/legislation profile tuned for the article/paragraph/lettered
+  # structure of Swiss (Fedlex) and comparable civil-law legislation. Court
+  # decisions keep exp_court_decision_v1; this covers laws and constitutions.
+  - extractor_profile_id: exp_legislation_v1
+    name: Legislation v1
+    source_family: legislation
+    version: v1
+    definition:
+      format: legislation
+      extraction_mode: exhaustive
+      required_fields:
+        - title
+        - body
+      sections:
+        - article
+        - paragraph
+        - lettered_item
+      citation_forms:
+        - sr
+        - eli
+        - article

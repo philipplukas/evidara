@@ -91,9 +91,19 @@ class FedlexSparqlAcquisitionSpec(BaseAcquisitionSpec):
     preferred_languages: list[LanguageCode] = Field(default_factory=list)
     query_mode: Literal["work_to_expression"] = "work_to_expression"
     max_expressions: int = Field(default=1, ge=1, le=10)
+    # Cantonal-discovery mode (#531): scope_kind="canton" discovers works via
+    # jolux:CantonOfOrigin instead of seed URIs. See the FedlexSparqlProvider
+    # start_run wiring and country-rollout-drift-prevention §4.4.
+    scope_kind: Literal["seed", "canton"] = "seed"
+    canton: str | None = Field(default=None, pattern=r"^(?:CH-)?[A-Za-z]{2}$")
+    max_works: int = Field(default=50, ge=1, le=500)
 
     @model_validator(mode="after")
     def validate_fedlex_sparql_config(self) -> FedlexSparqlAcquisitionSpec:
+        if self.scope_kind == "canton":
+            if not self.canton:
+                raise ValueError("fedlex_sparql scope_kind=canton requires canton (ISO 3166-2:CH)")
+            return self
         if self.seed_url is None and not self.seed_urls:
             raise ValueError("fedlex_sparql provider requires seed_url or seed_urls")
         return self
@@ -131,6 +141,27 @@ class EurLexSparqlAcquisitionSpec(BaseAcquisitionSpec):
         return self
 
 
+class ChCourtDecisionsAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.CH_COURT_DECISIONS] = (
+        AcquisitionProvider.CH_COURT_DECISIONS
+    )
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+    index_urls: list[HttpUrl] = Field(default_factory=list)
+    court: Literal["bger", "bvger", "bstger", "bpger"] | None = None
+    link_pattern: str | None = None
+    allowed_hosts: list[str] = Field(default_factory=list)
+    max_documents: int = Field(default=50, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def validate_ch_court_decisions_config(self) -> ChCourtDecisionsAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls and not self.index_urls:
+            raise ValueError(
+                "ch_court_decisions provider requires seed_url, seed_urls, or index_urls"
+            )
+        return self
+
+
 class CantonHttpAcquisitionSpec(BaseAcquisitionSpec):
     provider: Literal[AcquisitionProvider.CANTON_HTTP] = AcquisitionProvider.CANTON_HTTP
     # ISO 3166-2:CH cantonal code (e.g. CH-ZH). The provider allow-lists a
@@ -153,6 +184,7 @@ AcquisitionSpec = Annotated[
     | RisOgdAcquisitionSpec
     | LegifranceAcquisitionSpec
     | EurLexSparqlAcquisitionSpec
+    | ChCourtDecisionsAcquisitionSpec
     | CantonHttpAcquisitionSpec,
     Field(discriminator="provider"),
 ]

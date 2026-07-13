@@ -65,6 +65,7 @@ class AcquisitionProvider(StrEnum):
     REGIONE_HTTP = "regione_http"
     CANTON_HTTP = "canton_http"
     LEGIFRANCE = "legifrance"
+    CH_COURT_DECISIONS = "ch_court_decisions"
 
 
 class RobotsMode(StrEnum):

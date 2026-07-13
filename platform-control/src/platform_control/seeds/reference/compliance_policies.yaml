@@ -54,3 +54,29 @@ items:
     attribution_required: true
     attribution_text: "Source: Rechtsinformationssystem des Bundes (RIS), Bundeskanzleramt Österreich — Open Government Data."
     contact_url: "https://evidara.ai/contact"
+
+  # CH federal court decisions (BGer / BVGer / BStGer / BPGer). Unlike Fedlex
+  # legislation, court rulings carry no explicit open-data licence, so they sit
+  # in the public-official tier: honour robots.txt, ~20 rpm, 2 concurrent, and a
+  # 365-day retention floor. This policy governs the ch_court_decisions provider
+  # (#530). jur_ch_federal itself stays on cp_ch_fedlex_open_data (correct for
+  # legislation); binding this policy to court runs is a live-enablement
+  # follow-up via authority-level compliance resolution (the Authority model
+  # already carries the compliance_policy_id FK).
+  - compliance_policy_id: cp_ch_court_decisions
+    name: ch-court-decisions
+    description: >-
+      Swiss federal court decisions policy (Bundesgericht, Bundesverwaltungs-,
+      Bundesstraf- and Bundespatentgericht). Public-official tier: robots.txt is
+      honoured, requests stay in a conservative 10–20 rpm corridor with at most
+      two concurrent connections per host, and raw artifacts are retained for
+      365 days. Attribution names the issuing federal court on every bundle.
+    robots_mode: strict
+    min_requests_per_minute_per_host: 10
+    start_requests_per_minute_per_host: 20
+    max_requests_per_minute_per_host: 20
+    max_concurrent_per_host: 2
+    retention_days: 365
+    attribution_required: true
+    attribution_text: "Source: Swiss Federal Courts (Bundesgericht / Bundesverwaltungsgericht)."
+    contact_url: "https://evidara.ai/contact"
