@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,21 @@ class PublishedSurfaceDefinition:
 
     def column_names(self) -> tuple[str, ...]:
         return tuple(column.name for column in self.columns)
+
+    def dataset_ref(self, **selector: Any) -> dict[str, Any]:
+        """Build a ``dataset-ref`` (see ``contracts/events/common``) for this surface.
+
+        The selector lands under ``record_key`` or ``record_filter`` depending on the
+        surface's ``selector_kind`` — a single-row surface (``published_documents``) is
+        keyed, a multi-row surface (``published_sections``) is filtered. Callers that
+        must reconstruct a ref without holding the originating ``ProcessingManifest``
+        (e.g. the Delta -> OpenSearch backfill) get the same shape the pipeline emits.
+        """
+        return {
+            "surface_name": self.surface_name,
+            "surface_version": self.surface_version,
+            self.selector_kind: dict(selector),
+        }
 
 
 PUBLISHED_DOCUMENTS = PublishedSurfaceDefinition(
