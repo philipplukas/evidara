@@ -39,7 +39,7 @@ _COMPONENTS = {
     "document-intelligence": ComponentGuide(
         name="document-intelligence",
         path="document-intelligence/",
-        language="Python / Databricks",
+        language="Python",
         quality_gate="bash scripts/check-document-intelligence.sh",
         docs="docs/components/document-intelligence.md",
     ),
@@ -119,16 +119,6 @@ _CHANGE_SYNC_REQUIREMENTS = {
 }
 
 _PATH_CHECK_RULES = (
-    {
-        "prefixes": (
-            "document-intelligence/src/document_intelligence/config/",
-            "document-intelligence/src/document_intelligence/processing_runtime.py",
-        ),
-        "component": "document-intelligence",
-        "recommended_check": "bash scripts/check-document-intelligence-runtime.sh",
-        "docs": "docs/components/document-intelligence.md",
-        "reason": "Runtime/config changes should prove the focused DI runtime path before the broader component check.",
-    },
     {
         "prefixes": ("document-intelligence/",),
         "component": "document-intelligence",

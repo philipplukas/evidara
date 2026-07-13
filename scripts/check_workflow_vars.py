@@ -49,9 +49,6 @@ ALLOWLIST: dict[str, str] = {
     "TERRAFORM_APPLY_ENABLED": "operator-managed auto-apply kill switch (main infra stack)",
     "TERRAFORM_APPLY_ENABLED_STAGING": "operator-managed auto-apply kill switch (main infra, staging env)",
     "TERRAFORM_APPLY_ENABLED_PROD": "operator-managed auto-apply kill switch (main infra, prod env)",
-    "TERRAFORM_DATABRICKS_APPLY_ENABLED": "operator-managed auto-apply kill switch (databricks stack)",
-    "TERRAFORM_DATABRICKS_APPLY_ENABLED_STAGING": "operator-managed auto-apply kill switch (databricks, staging env)",
-    "TERRAFORM_DATABRICKS_APPLY_ENABLED_PROD": "operator-managed auto-apply kill switch (databricks, prod env)",
     # --- Release readiness overrides -----------------------------------
     # Documented as optional in
     # `infra/terraform/github/repo_settings/README.md` — the workflow has

@@ -8,7 +8,6 @@ Evidara targets three cloud/platform providers:
 
 - **Hetzner k3s (`rocky-agents`)** — current low-cost dev/staging runtime while GCP billing is disabled
 - **Google Cloud Platform (GCP)** — opt-in Cloud Run / managed runtime path
-- **Databricks** — target document-intelligence processing and published canonical surfaces
 - **GitHub** — current source control and CI/CD system
 
 Runtime images publish to GHCR by default. Artifact Registry publishing and
@@ -87,25 +86,22 @@ Standard deployment flow:
 3. Deploy or roll Cloud Run services to load latest secret versions.
 4. Verify health and event flow.
 
-## Databricks
+## Document Intelligence Surfaces
+
+`document-intelligence` runs as a containerized queue consumer (Hetzner k3s today, Cloud Run optionally). There is no managed processing-workspace deployment surface in the repo — see [ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md).
 
 | Resource | Purpose |
 |----------|---------|
-| Workspace | Document intelligence processing |
 | Delta tables | Canonical truth and processing manifests |
 | Published views or tables | Stable downstream surfaces for legal-search |
-| Unity Catalog lineage | Table, job, and published-surface lineage inside DI |
-| Workflows / Jobs | Processing pipeline orchestration |
 
 Current repo scaffolding splits ownership this way:
 
-- Terraform under [`../../infra/terraform/databricks/document_intelligence_stack`](../../infra/terraform/databricks/document_intelligence_stack) wires the top-level Databricks workspace/environment layer and invokes the reusable module under [`../../infra/terraform/databricks/document_intelligence`](../../infra/terraform/databricks/document_intelligence)
 - Terraform under [`../../infra/terraform/gcp/runtime_stack`](../../infra/terraform/gcp/runtime_stack) provisions environment runtime primitives (GCS, Pub/Sub, service accounts, Secret Manager placeholders, Cloud SQL and Cloud Run scaffolding)
 - Terraform under [`../../infra/terraform/opensearch/gke_stack`](../../infra/terraform/opensearch/gke_stack) provisions self-managed OpenSearch on GKE with dedicated networking
-- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for runtime GCP, GKE OpenSearch, and DI Databricks stacks
-- Databricks Asset Bundle files under [`../../document-intelligence/`](../../document-intelligence/) define the DI processing job
-- SQL/bootstrap assets under [`../../document-intelligence/databricks/sql`](../../document-intelligence/databricks/sql) register the published Delta surfaces after the first successful write
-- GitHub Actions validates the DI Terraform path plus the Databricks bundle/runtime shape before merge
+- Manifests under [`../../infra/hetzner/`](../../infra/hetzner/) provision the self-hosted k3s runtime (NATS JetStream, MinIO, CloudNativePG Postgres, OpenSearch, Nessie + Trino)
+- Environment tfvars under [`../../infra/env/`](../../infra/env/) provide `dev` / `staging` / `prod` planning inputs for the runtime GCP and GKE OpenSearch stacks
+- SQL renderers under [`../../document-intelligence/src/document_intelligence/bootstrap/`](../../document-intelligence/src/document_intelligence/bootstrap/) emit the catalog statements that register published surfaces after the first successful write
 
 ### Published Surfaces
 
@@ -142,6 +138,6 @@ Recommended lifecycle pattern:
 | Component | Deployment Target | Notes |
 |-----------|-------------------|-------|
 | platform-control | Hetzner k3s dev/staging; Cloud Run optional | Hetzner uses CNPG Postgres and local artifact PVCs first |
-| document-intelligence | Databricks | Triggered by Pub/Sub and reads bundle manifests + artifacts |
+| document-intelligence | Hetzner k3s dev/staging; Cloud Run optional | Containerized queue consumer; reads bundle manifests + artifacts |
 | legal-search (BFF) | Hetzner k3s dev/staging; Cloud Run optional | Hetzner uses in-cluster OpenSearch first |
 | legal-search (frontend) | Hetzner k3s dev/staging; Cloud Run/CDN optional | Static assets + server components |
