@@ -62,6 +62,7 @@ from document_intelligence.jobs._consumer_common import (
 )
 from document_intelligence.jobs.nats_consumer import IncomingMessage, _NatsMessage
 from document_intelligence.observability.event_logging import log_event
+from document_intelligence.observability.metrics import record_projection_outcome
 
 LOGGER = logging.getLogger("document_intelligence.projection_bridge")
 
@@ -403,7 +404,7 @@ async def run(args: argparse.Namespace) -> int:
                 # for the builtin-vs-nats TimeoutError subtlety that crash-looped #513).
                 continue
             for msg in messages:
-                await forward_message(
+                outcome = await forward_message(
                     _NatsMessage(msg),
                     forward=forward,
                     dlq_publish=dlq_publish,
@@ -411,6 +412,7 @@ async def run(args: argparse.Namespace) -> int:
                     nak_backoff_seconds=args.nak_backoff_seconds,
                     subject=subject,
                 )
+                record_projection_outcome(outcome)
 
     await connection.drain()
     LOGGER.info("projection bridge stopped")
