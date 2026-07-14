@@ -97,7 +97,6 @@ The vertical slice can progress in parallel with clear handoff boundaries:
 
 - [x] GCS bucket for raw artifacts and bundle manifests
 - [x] Pub/Sub topics and subscriptions
-- [~] Databricks workspace and published-surface deployment automation is partially wired
 - [x] OpenSearch runtime target and alias cutover automation are defined
 - [x] OpenSearch alias cutover path
 - [x] Cloud Run services and worker/runtime health endpoints are defined

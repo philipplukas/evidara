@@ -21,7 +21,14 @@ permissions:
 
 jobs:
   e2e:
-    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'ubuntu-latest' }}
+    # MUST be a Docker-capable runner. The self-hosted Hetzner ARC pools
+    # (vars.HEAVY_RUNNER_SCALE_SET) are plain k8s pods with no containerMode: dind,
+    # so `docker compose` cannot run there at all — this job targeted them and had
+    # therefore never been able to pass. It is nightly + on-demand, so the
+    # GitHub-hosted minutes are infrequent; platform-control.yml and legal-search.yml
+    # already run on ubuntu-latest on every PR. If this ever needs to move back to
+    # the self-hosted pool, enable DinD in infra/hetzner/runners/values-heavy.yaml first.
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       # Exercise the real publish + projection path: platform-control publishes to

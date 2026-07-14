@@ -6,7 +6,7 @@ This is the Evidara monorepo — a document intelligence platform for legal rese
 
 - **legal-search** — Next.js frontend + NestJS BFF for search and document detail
 - **platform-control** — Source lifecycle, runs, approvals, reference data (Cloud Run)
-- **document-intelligence** — Raw-to-canonical processing pipelines (Databricks)
+- **document-intelligence** — Raw-to-canonical processing pipelines (containerized NATS JetStream consumer; Spark/Databricks is opt-in only — see ADR-0029)
 - **contracts** — OpenAPI specs, JSON Schemas, event schemas (build-time only)
 - **infra** — Terraform, deployment configs, environment definitions
 - **docs** — Architecture, ADRs, runbooks, testing strategy, component docs
@@ -35,7 +35,7 @@ Every change should be classified as one or more of:
 - `user-visible-behavior` — changes what users see or experience
 - `contract-change` — API specs, event schemas, shared entity shapes
 - `infra-change` — Terraform, deployment, cloud resources
-- `pipeline-change` — Databricks processing, data quality
+- `pipeline-change` — document-intelligence processing, data quality
 - `architecture-change` — domain boundaries, storage decisions, communication patterns
 - `docs-only` — documentation without code
 
@@ -133,7 +133,7 @@ All shared contracts live at `contracts/` (monorepo root). Never inside a compon
 | `legal-search/frontend` | TypeScript / Next.js | User-facing UI |
 | `legal-search/api` | TypeScript / NestJS | Search and document API |
 | `platform-control` | Python / FastAPI | Consistent with data infrastructure |
-| `document-intelligence` | Python / Databricks | Data processing pipelines |
+| `document-intelligence` | Python | Data processing pipelines (containerized consumer; Spark/Databricks opt-in) |
 | `infra` | HCL / Terraform | Infrastructure as code |
 
 The pre-commit hooks and CI workflows must run the same checks. If you add a check to one, add it to the other. `scripts/` is the shared entry point.

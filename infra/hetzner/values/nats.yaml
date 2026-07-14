@@ -12,3 +12,14 @@ config:
   # single, non-clustered server (chart default)
   cluster:
     enabled: false
+
+# JetStream metrics — a prometheus-nats-exporter sidecar on port 7777 (ADR-0032).
+# This is how a stuck bridge becomes visible: consumer pending/redelivery counts climb
+# while every pod stays Running. The chart can also emit a PodMonitor, but that would
+# make this stage depend on the Prometheus Operator CRDs existing; the PodMonitor is
+# owned by infra/hetzner/observability/scrape-targets.yaml instead, so stage 2 stays
+# installable on its own.
+promExporter:
+  enabled: true
+  podMonitor:
+    enabled: false

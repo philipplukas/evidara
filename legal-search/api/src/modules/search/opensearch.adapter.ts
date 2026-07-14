@@ -12,6 +12,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
+import { MetricsService } from '../../core/metrics/metrics.service';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
 import type {
   AggregationBucket,
@@ -67,6 +68,8 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     private readonly client: Client,
     @Inject(ConfigService)
     config: ConfigService,
+    @Inject(MetricsService)
+    private readonly metrics: MetricsService,
   ) {
     this.indexDocuments = config.get<string>('opensearch.documentsReadAlias') ?? 'documents-read';
   }
@@ -202,6 +205,7 @@ export class SearchOpenSearchAdapter implements SearchRepository {
           };
         });
 
+      this.metrics.recordSearch(total);
       return {
         total,
         hits,
@@ -209,6 +213,10 @@ export class SearchOpenSearchAdapter implements SearchRepository {
       };
     } catch (err) {
       // A query that could not be executed is NOT an empty result set (#551).
+      // Count it before rethrowing: `search_errors_total` is what lets the
+      // zero-result alert tell a dead cluster apart from a query that simply
+      // matched nothing. `failure()` already logs at ERROR.
+      this.metrics.recordSearchError();
       throw this.failure('search', err);
     }
   }

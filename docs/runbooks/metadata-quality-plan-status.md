@@ -205,7 +205,7 @@ Post a short comment on **TAR-89** when **3.5.2** remote rows are verified. Alwa
 
 **Week-shaped cut (2026-04-09):** acceptance criteria in Linear **TAR-89** + section 3.5 here, section 6.8 (reference trace), LLM policy in DI README, and [document-intelligence implementation plan](../components/document-intelligence-implementation-plan.md) reconciled with repo reality.
 
-1. **Parallel engineering (DI)** — Terraform + Databricks bundle CI/CD, golden/XML quality, citations, jurisdiction: see [document-intelligence implementation plan](../components/document-intelligence-implementation-plan.md) **Immediate next steps**; track against platform milestones separately from metadata acceptance above.
+1. **Parallel engineering (DI)** — golden/XML quality, citations, jurisdiction: see [document-intelligence implementation plan](../components/document-intelligence-implementation-plan.md) **Immediate next steps**; track against platform milestones separately from metadata acceptance above.
 
 ---
 
@@ -239,7 +239,7 @@ Use this when validating **§3.1** fixes: you need to know which process talks t
 | **legal-search API (BFF)** | NestJS: search, detail, **projection ingestion**                                                | `PORT` (e.g. 3102)                                                                                                                        | Cloud Run / k8s URL           |
 | **OpenSearch**             | Search index + **projection document** store (via adapter)                                      | `OPENSEARCH_NODE` e.g. `http://localhost:9200`                                                                                            | Managed cluster               |
 | **Document Service**       | document-intelligence **read** API: `GET /v1/documents/{id}/lean`                               | Python service; default listen port from `PORT` or `DOCUMENT_SERVICE_PORT` (**8090** in `document_intelligence/service/main.py` if unset) | Same contract, cloud URL      |
-| **DI processing**          | Pipeline / Databricks / consumer — **writes** published surfaces and emits `document.processed` | CLI, local consumer, or remote job                                                                                                        | Databricks / runtime consumer |
+| **DI processing**          | Pipeline / consumer — **writes** published surfaces and emits `document.processed`               | CLI, local consumer, or remote job                                                                                                        | Runtime consumer              |
 
 **Upstream** for the BFF means: **OpenSearch** (always for search + stored projections) and **Document Service** (when `DOCUMENT_INTELLIGENCE_BASE_URL` is set — projections and detail body both lean on this; if unset, lean fetch returns null and projections use event-only fallbacks).
 

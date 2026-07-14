@@ -29,13 +29,13 @@ def test_change_sync_requirements_returns_contract_change_expectations() -> None
     assert "OpenAPI spec in contracts/api/" in requirements["required_updates"]
 
 
-def test_narrowest_check_for_path_prefers_runtime_gate_for_di_runtime_files() -> None:
+def test_narrowest_check_for_path_uses_component_gate_for_di_runtime_files() -> None:
     recommendation = narrowest_check_for_path(
         "document-intelligence/src/document_intelligence/processing_runtime.py"
     )
 
     assert recommendation["component"] == "document-intelligence"
-    assert recommendation["recommended_check"] == "bash scripts/check-document-intelligence-runtime.sh"
+    assert recommendation["recommended_check"] == "bash scripts/check-document-intelligence.sh"
 
 
 def test_narrowest_check_for_path_uses_schema_validation_for_contract_schema_files() -> None:

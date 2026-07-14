@@ -414,15 +414,21 @@ class ReviewDrainActivities:
 
 @dataclass
 class RetentionActivities:
-    """Runs :class:`RetentionService.sweep` from a Temporal schedule.
+    """Thin Temporal adapter over :func:`platform_control.retention_sweep.run_retention_sweep`.
 
-    Deferred imports inside the activity method avoid pulling FastAPI/asyncpg
-    machinery into module load when the worker is booted from a minimal
-    context. Temporal activities run in the worker process, so re-importing
-    on each invocation is fine.
+    **This is not how the retention sweep is scheduled.** Hard-delete retention is
+    a legal obligation, so it runs from a Kubernetes CronJob against the
+    ``platform-control-retention-sweep`` console script — not from a Temporal
+    worker, which is deployed in no environment (ADR-0031). This activity is kept
+    only so the Temporal code stays correct and callable if a worker is ever stood
+    up; it delegates to the same shared implementation and holds no sweep logic of
+    its own.
 
-    ``settings_factory`` returns the current ``Settings`` so the activity
-    picks up any config change on the next run without restarting the worker.
+    Deferred import inside the activity method avoids pulling FastAPI/asyncpg
+    machinery into module load when the worker is booted from a minimal context.
+
+    ``settings_factory`` returns the current ``Settings`` so the activity picks up
+    any config change on the next run without restarting the worker.
     """
 
     session_factory: async_sessionmaker[AsyncSession]
@@ -433,21 +439,19 @@ class RetentionActivities:
         """Execute one retention sweep pass, returning the usual report dict.
 
         Parameters are kept kwarg-free on the Temporal wire (single positional
-        bool) so the schedule payload stays trivial. The returned dict matches
+        bool) so the payload stays trivial. The returned dict matches
         :class:`RetentionSweepReport` so dashboards can log the counts.
         """
         from dataclasses import asdict as _asdict
 
-        from platform_control.config import get_settings
-        from platform_control.integrations import get_artifact_store
-        from platform_control.services.retention_service import RetentionService
+        from platform_control.retention_sweep import run_retention_sweep
 
-        settings = self.settings_factory() if self.settings_factory is not None else get_settings()
-        artifact_store = get_artifact_store(settings)
-
-        async with self.session_factory() as session:
-            service = RetentionService(session=session, artifact_store=artifact_store)
-            report = await service.sweep(dry_run=dry_run)
+        settings = self.settings_factory() if self.settings_factory is not None else None
+        report = await run_retention_sweep(
+            dry_run=dry_run,
+            settings=settings,
+            session_factory=self.session_factory,
+        )
         return _asdict(report)
 
 
