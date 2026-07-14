@@ -33,11 +33,45 @@ else
   echo "    generated a Grafana admin password"
 fi
 
+echo "==> Alert receivers (evidara-alertmanager Secret)"
+# Holds the Slack webhook + Telegram bot token, mounted into Alertmanager as files
+# so they never appear in git or in `helm get values`. Created out-of-band:
+#   docs/setup/hetzner-observability.md#wiring-the-receivers
+#
+# `chat_id` is the one value Alertmanager will not read from a file — it must be an
+# inline int64 — so we read it back out of the Secret and substitute it at render
+# time. It is not a credential (it is inert without the bot token), but keeping it
+# beside the token means there is exactly one place to configure.
+if kubectl -n "$NS" get secret evidara-alertmanager >/dev/null 2>&1; then
+  EVIDARA_TELEGRAM_CHAT_ID="$(kubectl -n "$NS" get secret evidara-alertmanager \
+    -o jsonpath='{.data.telegram-chat-id}' | base64 -d)"
+  if [[ -z "${EVIDARA_TELEGRAM_CHAT_ID}" ]]; then
+    echo "    error: secret evidara-alertmanager has no telegram-chat-id key." >&2
+    echo "    See docs/setup/hetzner-observability.md#wiring-the-receivers." >&2
+    exit 1
+  fi
+  echo "    receivers configured (Slack -> warnings, Telegram -> critical)"
+else
+  # Deliberately not fatal. A missing Secret must not block the dashboards and the
+  # rules engine — but say so loudly, because silent non-delivery is the exact
+  # failure this stack exists to catch.
+  EVIDARA_TELEGRAM_CHAT_ID=0
+  echo "    !! WARNING: secret evidara-alertmanager not found."
+  echo "    !! Alerts will fire into the Alertmanager UI and NOWHERE ELSE."
+  echo "    !! Nobody's phone will ring. See docs/setup/hetzner-observability.md."
+fi
+export EVIDARA_TELEGRAM_CHAT_ID
+
+VALUES_RENDERED="$(mktemp)"
+trap 'rm -f "$VALUES_RENDERED"' EXIT
+envsubst '${EVIDARA_TELEGRAM_CHAT_ID}' \
+  < "${SCRIPT_DIR}/values/kube-prometheus-stack.yaml" > "$VALUES_RENDERED"
+
 echo "==> kube-prometheus-stack (Prometheus + Alertmanager + Grafana)"
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
 helm repo update prometheus-community
 helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-  -n "$NS" -f "${SCRIPT_DIR}/values/kube-prometheus-stack.yaml" --wait --timeout 10m
+  -n "$NS" -f "$VALUES_RENDERED" --wait --timeout 10m
 
 echo "==> NATS JetStream exporter (adds the prom-metrics sidecar; no-op if already on)"
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/ >/dev/null 2>&1 || true

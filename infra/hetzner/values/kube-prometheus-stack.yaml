@@ -73,6 +73,11 @@ prometheus:
 alertmanager:
   enabled: true
   alertmanagerSpec:
+    # Credentials are mounted from the `evidara-alertmanager` Secret at
+    # /etc/alertmanager/secrets/evidara-alertmanager/. The Secret is created
+    # out-of-band (docs/setup/hetzner-observability.md) so tokens never enter git.
+    secrets:
+      - evidara-alertmanager
     resources:
       requests:
         cpu: 20m
@@ -88,9 +93,21 @@ alertmanager:
             requests:
               storage: 2Gi
 
-  # Routing. `critical` is the page tier (see docs/adr/sli-slo-definitions.md); until a
-  # real receiver is wired it lands in the Alertmanager UI only. To page for real, add a
-  # Slack webhook: see docs/setup/hetzner-observability.md#wiring-a-receiver.
+  # Routing. Two tiers, and the split is the whole point:
+  #
+  #   critical -> `page`   -> Telegram. A real phone push. These mean the product
+  #                           is down (read alias unresolved, index empty, every
+  #                           query returning nothing). The June/July outage was
+  #                           exactly this, and it went unnoticed for weeks
+  #                           because nothing pushed. Repeats hourly until fixed.
+  #
+  #   warning  -> `default` -> Slack. A feed you check, not a pager. Dead-letters,
+  #                            backlogs, probe flaps — real, but they can wait for
+  #                            business hours.
+  #
+  # Delivery is deliberately EXTERNAL to this cluster. Self-hosting the notifier
+  # here (ntfy, Gotify) would mean a node failure silences the alerts about the
+  # node failure.
   config:
     global:
       resolve_timeout: 5m
@@ -108,8 +125,34 @@ alertmanager:
           receiver: "null"
     receivers:
       - name: "null"
+
+      # Review tier. Slack is already in this stack (the coordinator's human
+      # gates use it), so this adds no new dependency.
       - name: "default"
+        slack_configs:
+          - api_url_file: /etc/alertmanager/secrets/evidara-alertmanager/slack-webhook-url
+            channel: "#evidara-alerts"
+            send_resolved: true
+            title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+            text: >-
+              {{ range .Alerts }}{{ .Annotations.summary }}
+              {{ .Annotations.description }}
+              {{ end }}
+
+      # Page tier. Telegram, because it actually reaches a phone that is not
+      # being watched. `critical` here means the product is down.
       - name: "page"
+        telegram_configs:
+          - bot_token_file: /etc/alertmanager/secrets/evidara-alertmanager/telegram-bot-token
+            chat_id: ${EVIDARA_TELEGRAM_CHAT_ID}
+            parse_mode: HTML
+            send_resolved: true
+            message: >-
+              <b>[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}</b>
+              {{ range .Alerts }}
+              {{ .Annotations.summary }}
+              {{ .Annotations.description }}
+              {{ end }}
     inhibit_rules:
       # A resolved-alias outage implies zero-result queries; don't page twice.
       - source_matchers: ["alertname = DocumentsReadAliasUnresolved"]
