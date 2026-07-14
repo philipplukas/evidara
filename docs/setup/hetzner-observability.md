@@ -81,18 +81,23 @@ what to do when one fires is in
 
 ### Wiring the receivers
 
-Two tiers, and the split is the whole point:
+Two tiers, one channel — both go to the same Telegram chat:
 
-| Tier | Receiver | Channel | Why |
+| Tier | Receiver | Behaviour | Why |
 |---|---|---|---|
-| `critical` | `page` | **Telegram** | A real phone push. These mean *the product is down* — read alias unresolved, index empty, every query returning nothing. The June/July outage was exactly this and went unnoticed for weeks, because nothing pushed. Repeats hourly until resolved. |
-| `warning` | `default` | **Slack** | A feed you check, not a pager. Dead-letters, backlogs, probe flaps — real, but they can wait for business hours. |
+| `critical` | `page` | 🔴 prefix, repeats **hourly** | *The product is down* — read alias unresolved, index empty, every query returning nothing. The June/July outage was exactly this and went unnoticed for weeks, because nothing pushed. It is meant to nag. |
+| `warning` | `default` | ⚠️ prefix, repeats every **4h** | Dead-letters, backlogs, probe flaps. Real, but they can wait for business hours. |
+
+A second channel for warnings (Slack) was considered and dropped. This is a one-operator
+system, and **a channel you check "sometimes" is where alerts go to die** — which is the
+failure this whole stack exists to prevent. What actually changes behaviour is the repeat
+interval and the prefix, not which app the message lands in.
 
 Delivery is deliberately **external to this cluster**. Self-hosting the notifier here
 (ntfy, Gotify) would mean a node failure silences the alerts about the node failure.
 
-Both credentials live in one Secret, mounted into Alertmanager as *files*, so they never
-enter git and never appear in `helm get values`.
+The bot token is mounted into Alertmanager as a *file*, so it never enters git and never
+appears in `helm get values`.
 
 **1. Create a Telegram bot** — message [@BotFather](https://t.me/botfather), send
 `/newbot`, and keep the token it gives you. Then send your new bot any message and read
@@ -106,7 +111,6 @@ curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | jq '.result[0].messag
 
 ```bash
 kubectl -n monitoring create secret generic evidara-alertmanager \
-  --from-literal=slack-webhook-url='https://hooks.slack.com/services/...' \
   --from-literal=telegram-bot-token='123456:ABC-DEF...' \
   --from-literal=telegram-chat-id='123456789'
 ```

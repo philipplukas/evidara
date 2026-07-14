@@ -34,7 +34,7 @@ else
 fi
 
 echo "==> Alert receivers (evidara-alertmanager Secret)"
-# Holds the Slack webhook + Telegram bot token, mounted into Alertmanager as files
+# Holds the Telegram bot token, mounted into Alertmanager as a file
 # so they never appear in git or in `helm get values`. Created out-of-band:
 #   docs/setup/hetzner-observability.md#wiring-the-receivers
 #
@@ -50,7 +50,7 @@ if kubectl -n "$NS" get secret evidara-alertmanager >/dev/null 2>&1; then
     echo "    See docs/setup/hetzner-observability.md#wiring-the-receivers." >&2
     exit 1
   fi
-  echo "    receivers configured (Slack -> warnings, Telegram -> critical)"
+  echo "    receivers configured (Telegram: critical pages hourly, warnings every 4h)"
 else
   # Deliberately not fatal. A missing Secret must not block the dashboards and the
   # rules engine — but say so loudly, because silent non-delivery is the exact
