@@ -79,10 +79,67 @@ merges, cantonal portal legislation — the bulk of cantonal law noted above
 home for real per-canton statute coverage, distinct from the Fedlex
 concordat slice.
 
+### Communal legislation — `gemeinde_http` provider (#584)
+
+The municipal layer is where the ADR-0033 acceptance test actually lives
+("can the city ban a certain thing for dogs, year-round?" — the act being
+challenged is a *communal* ordinance). 2,110 `jur_ch_gemeinde_*`
+jurisdictions were seeded with **no authority, no template and no
+provider**: modelled and unreachable. #584 lands the first reachable
+commune — deliberately **one** city, not 2,110.
+
+**What the City of Zürich publishes** (verified 2026-07-14): the Amtliche
+Sammlung is a systematic collection with stable, AS-number-shaped URLs
+(AS 554.510 → `…/amtliche-sammlung/5/554/510.html`). robots.txt permits
+these paths. But that URL is a **metadata landing page, not the law** — it
+carries the AS number, title, Beschlussdatum, Inkrafttreten,
+**Ausserkrafttreten** and a version history in an embedded JSON blob, plus
+a link to the operative text. **The operative text is a PDF. There is no
+HTML manifestation.**
+
+Note the metadata is genuinely valuable on its own: `Ausserkrafttreten` is
+exactly the repeal/until date ADR-0033 records the corpus as lacking. The
+provider parses it (and is unit-tested against a verbatim capture of the
+live page).
+
+**Why both keys stay shut.** Two independent, structural blockers, neither
+fixable inside the provider:
+
+1. `acquisition_core.ProviderResource.body` is typed `str` — the
+   acquisition interface cannot carry binary bytes at all.
+2. `document-intelligence` has no PDF path: `normalize/` ships `html.py`
+   and `xml.py` only, and both the legacy and `docling` backends take
+   `artifact_text: str`. An `application/pdf` artifact falls through to
+   `normalize_plain_text_document`, which would normalize raw PDF binary.
+
+Naive text extraction is **not** a shortcut: the AS PDFs carry marginal
+headings (*Randtitel*) that `pdftotext` splices mid-sentence — "die Führung
+des **Organisation** Hundeverzeichnisses" — silently corrupting the legal
+text. Municipal law needs a layout-aware PDF pipeline.
+
+The provider therefore **refuses** on a PDF-only manifestation rather than
+emitting the metadata landing page as a stand-in for the ordinance —
+indexing a metadata stub as if it were the law is the "demo that lies
+convincingly" failure ADR-0033 exists to prevent. A commune that published
+HTML law would acquire normally through the same code path.
+
+**Unblocked by:** a binary-artifact path through `ProviderResource` +
+artifact store, and a layout-aware PDF normaliser in
+document-intelligence. Neither belongs in a provider PR.
+
 ## NOT BUILT
 
 - **Cantonal court decisions** — no provider or templates. Federal court
   decisions (#530) come first; cantonal case law is a later tier.
+- **Binary (PDF) artifact acquisition** — the whole acquisition +
+  normalisation path is text-only end to end (see the `gemeinde_http`
+  section above). This is the single blocker on the municipal layer, and
+  Swiss communal law is overwhelmingly PDF.
+- **National communal coverage** — communal law lives on ~2,000
+  independent municipal sites with no API and no common schema. Only
+  Zürich (BFS 261) is allow-listed. This is likely the hardest acquisition
+  problem in the project and is explicitly out of scope for the vertical
+  slice.
 - **Full per-canton portal coverage** — beyond the ZH/BE/BS Fedlex
   concordat slice, no cantonal portal statutes are covered. Even once
   `canton_http` lands, the first targets are a small allow-list of cantons
@@ -107,6 +164,8 @@ gate that code alone cannot satisfy (ADR-0030 §5).
 | 5 | CI-gated CH e2e (#533) | Steps 2–3 live | Wire fast-loops as a required CI status check |
 | 6 | Cantonal court decisions | Steps 2 + 4 patterns | New provider + acceptance run |
 | 7 | Full per-canton portal coverage | Step 4 | Extend `canton_http` allow-list beyond ZH/BE/BS |
+| 8 | Communal legislation — Stadt Zürich (#584) | **Binary-artifact path + layout-aware PDF normaliser** — the provider and template are landed and inert until then | Acceptance run on AS 554.510 → flip both keys |
+| 9 | Full communal coverage | Step 8 | ~2,000 municipal sites — a programme, not a step |
 
 See the
 [country rollout & drift-prevention backlog](../runbooks/country-rollout-drift-prevention-backlog.md)
