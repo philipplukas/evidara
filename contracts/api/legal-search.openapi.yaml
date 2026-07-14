@@ -12,7 +12,7 @@ info:
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
     Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
-  version: 0.5.0
+  version: 0.6.0
   contact:
     name: Evidara Team
   license:
@@ -253,6 +253,109 @@ paths:
                 $ref: "#/components/schemas/CitedByResponse"
         "404":
           description: Document not found
+
+  /v1/citations/resolve:
+    get:
+      operationId: resolveCitation
+      summary: Resolve a citation string to the norm it points at
+      description: |
+        Citation-graph traversal, forward direction (ADR-0033 step 3, "walk up").
+        Backs the `resolve_citation` MCP tool.
+
+        Accepts either a raw citation string ("SR 210") or a canonical key
+        ("sr:210") and returns the document(s) that ARE that norm.
+
+        Resolution is DETERMINISTIC only: SR numbers, CELEX numbers, ECLIs and
+        Austrian BGBl references carry their identifier in the string itself.
+        Fuzzy citations ("Art. 36 BV", BGE references) cannot be normalized by
+        today's extractor and come back `resolved: false` with
+        `unresolved_reason: not_normalizable` — never a similarity-search guess,
+        which would return a plausible wrong norm.
+      tags: [citations, agent-discovery]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: A citation string ("SR 210") or a canonical key ("sr:210").
+          schema:
+            type: string
+          example: SR 210
+      responses:
+        "200":
+          description: Resolution result — resolved or explicitly, attributably not
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolveCitationResponse"
+        "400":
+          description: Missing or empty `q`
+
+  /v1/citations/citing:
+    get:
+      operationId: findCitingDocuments
+      summary: Find the documents that cite a norm
+      description: |
+        Citation-graph traversal, reverse direction (ADR-0033 step 4, "walk
+        out"). Backs the `find_citing` MCP tool — "which decisions interpret
+        this provision?".
+
+        `q` is either a document id (`doc_...`) or a citation key / string
+        naming the norm ("sr:210", "SR 210"). A document id is first mapped to
+        the canonical keys that document IS.
+
+        Traversal joins on the canonical key, NOT on the `target_document_id`
+        denormalization written at projection time — that field is only set if
+        the cited document already existed when the citing document was
+        projected, so relying on it drops every edge whose endpoints arrived in
+        the wrong order.
+      tags: [citations, agent-discovery]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: A document id (`doc_...`), a canonical key (`sr:210`), or a citation string.
+          schema:
+            type: string
+          example: sr:210
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Citing documents (self-citations from the norm's own masthead excluded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindCitingResponse"
+        "400":
+          description: Missing or empty `q`
+
+  /v1/citations/stats:
+    get:
+      operationId: getCitationGraphStats
+      summary: Citation graph resolution rate
+      description: |
+        What share of extracted citations actually resolve to an edge, plus the
+        unresolved remainder broken down by cause.
+
+        This is reported as a first-class result rather than buried in logs
+        because an unresolved citation is a BROKEN EDGE: consumers read a
+        missing edge as "no such relation exists". A graph with silently missing
+        edges is worse than no graph (ADR-0032), so the miss rate is part of the
+        contract.
+      tags: [citations, agent-discovery]
+      responses:
+        "200":
+          description: Corpus-wide citation resolution statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CitationGraphStats"
 
 components:
   parameters:
@@ -652,6 +755,134 @@ components:
           type: string
         resolved:
           type: boolean
+
+    CitationTarget:
+      description: |
+        A norm that citations can address — one row of the `citation-targets`
+        index. `{identifier_type}:{identifier_value}` is the canonical key that
+        document-intelligence's `normalize_citation()` emits, so it is the join
+        key of the whole citation graph.
+      type: object
+      required: [document_id, identifier_type, identifier_value]
+      properties:
+        document_id:
+          description: The document that IS this norm.
+          type: string
+        identifier_type:
+          type: string
+          example: sr
+        identifier_value:
+          type: string
+          example: "210"
+        title:
+          type: string
+        document_type:
+          type: string
+        jurisdiction:
+          type: string
+
+    CitationEdge:
+      description: A citation edge — a citing document, and the reference it carries.
+      type: object
+      required: [citation_id, source_document_id, citation_text]
+      properties:
+        citation_id:
+          type: string
+        source_document_id:
+          description: The document doing the citing.
+          type: string
+        source_section_id:
+          type: string
+        citation_text:
+          type: string
+          example: SR 210
+        citation_type:
+          type: string
+        normalized_reference:
+          description: The canonical key this citation resolves to, if it is a deterministic type.
+          type: [string, "null"]
+          example: sr:210
+        target_document_id:
+          type: string
+        target_title:
+          type: string
+
+    ResolveCitationResponse:
+      type: object
+      required: [query, normalized_reference, resolved, unresolved_reason, targets]
+      properties:
+        query:
+          type: string
+        normalized_reference:
+          description: The canonical key `query` normalizes to; null for a fuzzy citation.
+          type: [string, "null"]
+        resolved:
+          type: boolean
+        unresolved_reason:
+          description: |
+            Why an unresolved citation is unresolved. The distinction is load-bearing:
+            `not_normalizable` is an EXTRACTOR gap (the citation form is fuzzy),
+            `no_target_in_corpus` is a COVERAGE gap (the key is valid, the norm is
+            simply not ingested). Collapsing both into a bare `resolved: false` is how
+            a citation graph ends up with silently missing edges.
+          type: [string, "null"]
+          enum: [not_normalizable, no_target_in_corpus, null]
+        targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/CitationTarget"
+          default: []
+
+    FindCitingResponse:
+      type: object
+      required: [query, normalized_references, citing, total]
+      properties:
+        query:
+          type: string
+        normalized_references:
+          description: The canonical keys the queried norm is addressable by.
+          type: array
+          items:
+            type: string
+          default: []
+        citing:
+          type: array
+          items:
+            $ref: "#/components/schemas/CitationEdge"
+          default: []
+        total:
+          type: integer
+
+    CitationGraphStats:
+      type: object
+      required:
+        - citations_total
+        - citations_with_key
+        - citations_resolved
+        - resolution_rate
+        - unresolved_by_type
+      properties:
+        citations_total:
+          description: Every citation extracted into the citations index.
+          type: integer
+        citations_with_key:
+          description: Citations DI could normalize to a canonical key — the edge candidates.
+          type: integer
+        citations_resolved:
+          description: Citations whose key addresses a norm actually in the corpus — real edges.
+          type: integer
+        resolution_rate:
+          description: citations_resolved / citations_total (0..1). The graph's edge coverage.
+          type: number
+          format: float
+        unresolved_by_type:
+          description: |
+            The unresolved remainder, attributed. Keys are `citation_type` values for
+            citations DI could not normalize, plus `unresolved_target` for citations
+            that carry a valid key addressing a norm not in the corpus.
+          type: object
+          additionalProperties:
+            type: integer
 
     Annotation:
       type: object

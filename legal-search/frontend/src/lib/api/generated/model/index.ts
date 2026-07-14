@@ -13,14 +13,19 @@ See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
 
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
 
 export * from './acceptLanguageParameter';
 export * from './action';
 export * from './annotation';
 export * from './badge';
+export * from './citationEdge';
+export * from './citationEdgeNormalizedReference';
+export * from './citationGraphStats';
+export * from './citationGraphStatsUnresolvedByType';
 export * from './citationLink';
+export * from './citationTarget';
 export * from './citedByResponse';
 export * from './contentLanguage';
 export * from './contextChip';
@@ -31,6 +36,8 @@ export * from './detailViewLocalStructure';
 export * from './filterFacetView';
 export * from './filterFacetViewType';
 export * from './filterOption';
+export * from './findCitingDocumentsParams';
+export * from './findCitingResponse';
 export * from './getDocumentSections200';
 export * from './localStructureItem';
 export * from './metadataRow';
@@ -40,6 +47,10 @@ export * from './referenceItem';
 export * from './relatedCount';
 export * from './relatedGroup';
 export * from './relatedItem';
+export * from './resolveCitationParams';
+export * from './resolveCitationResponse';
+export * from './resolveCitationResponseNormalizedReference';
+export * from './resolveCitationResponseUnresolvedReason';
 export * from './searchContextView';
 export * from './searchDocumentsParams';
 export * from './searchResponseView';

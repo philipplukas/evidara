@@ -32,6 +32,14 @@ export type ProjectionApplyResult = {
 export class ProjectionsService {
   private readonly logger = new Logger(ProjectionsService.name);
 
+  /**
+   * How far into the body a document may still be stating its own identifier.
+   * Fedlex puts the SR number in the first line ("Vom 18. April 1999 (Stand am
+   * 1. Januar 2024), SR 101."); beyond the masthead, an SR number is a citation
+   * to a different norm, not a self-declaration. See `citationTargetScanText`.
+   */
+  private static readonly MASTHEAD_WINDOW_CHARS = 400;
+
   constructor(
     @Inject(PROJECTION_REPOSITORY)
     private readonly repository: ProjectionRepository,
@@ -841,6 +849,27 @@ export class ProjectionsService {
    * Extract identifier→document_id mappings so other documents' citations can
    * resolve against our corpus. Identifiers include official_citation,
    * jurisdiction-specific codes (SR, CELEX, ECLI), and docket numbers.
+   *
+   * This is the NODE half of the citation graph (#582, ADR-0033). A citation
+   * only becomes an edge if the norm it names is addressable here — so every
+   * identifier this method fails to find is an edge that silently never forms.
+   *
+   * Where the identifiers actually live (verified against
+   * `document-intelligence/tests/golden/ch_fedlex_law_html/`):
+   *
+   *   - `official_citation` — set by DI only when the source supplies one. The
+   *     Fedlex SPARQL provider does NOT: it emits title, title_short and an ELI
+   *     URI, and no SR number. So for Swiss federal law this is usually absent.
+   *   - the document's MASTHEAD — Fedlex publishes the SR number in the title
+   *     ("Bundesverfassung ... (SR 101)") and in the opening line of the body
+   *     ("Vom 18. April 1999 (Stand am 1. Januar 2024), SR 101."). That is the
+   *     document stating its own identifier, and it is the only deterministic
+   *     SR source available without re-scraping.
+   *
+   * Scanning only the projection's NORMALIZED title (as this method previously
+   * did) misses both: normalization strips the "(SR 101)" suffix. Result: zero
+   * targets for every Fedlex document, so `citation-targets` was never even
+   * created and all 504 extracted citations stayed unresolved.
    */
   private extractCitationTargets(
     projection: SearchProjectionDocument,
@@ -862,13 +891,9 @@ export class ProjectionsService {
       });
     }
 
-    // Extract structured identifiers from the content_preview or title
-    // that match deterministic patterns (SR, CELEX, ECLI).
-    const text = [projection.title, projection.official_citation, projection.structural_path]
-      .filter(Boolean)
-      .join(' ');
+    const text = this.citationTargetScanText(projection, leanDocument);
 
-    const srMatch = text.match(/\bSR\s+(\d{3}(?:\.\d+)*)\b/);
+    const srMatch = text.match(/\bSR\s+(\d{3}(?:\.\d+)*)\b/i);
     if (srMatch) {
       targets.push({ ...base, identifier_type: 'sr', identifier_value: srMatch[1] });
     }
@@ -878,9 +903,13 @@ export class ProjectionsService {
       targets.push({ ...base, identifier_type: 'celex', identifier_value: celexMatch[1] });
     }
 
-    const ecliMatch = text.match(/\bECLI:[A-Z]{2}:[A-Z0-9]+:\d{4}:[A-Z0-9.]+\b/);
+    const ecliMatch = text.match(/\bECLI:[A-Z]{2}:[A-Z0-9]+:\d{4}:[A-Z0-9.]+\b/i);
     if (ecliMatch) {
-      targets.push({ ...base, identifier_type: 'ecli', identifier_value: ecliMatch[0] });
+      targets.push({
+        ...base,
+        identifier_type: 'ecli',
+        identifier_value: ecliMatch[0].toUpperCase(),
+      });
     }
 
     const atBgblRef = this.extractAustrianBgblReference(projection, leanDocument);
@@ -896,6 +925,61 @@ export class ProjectionsService {
             other.identifier_value === target.identifier_value,
         ) === index,
     );
+  }
+
+  /**
+   * The text a document is allowed to declare its OWN identifier in.
+   *
+   * The distinction that keeps this honest: an SR number in a document's
+   * masthead is that document's identity; the same SR number 40 paragraphs
+   * down is a citation to a different norm. Confusing the two would make a
+   * cantonal decree claim to BE the civil code and corrupt every edge that
+   * points at it — a wrong edge is worse than a missing one.
+   *
+   * So the body is scanned only within a short masthead window, and only for
+   * documents that are legislation (`document_type: 'law'`, DI's normalized
+   * form of `legislation`). Case law and commentary declare no SR number of
+   * their own and would only ever match a citation.
+   */
+  private citationTargetScanText(
+    projection: SearchProjectionDocument,
+    leanDocument?: unknown | null,
+  ): string {
+    const parts = [
+      projection.title,
+      projection.official_citation,
+      projection.structural_path,
+      // The RAW lean-document title, before `normalizeTitle` strips the
+      // parenthetical: this is where Fedlex puts "(SR 101)".
+      this.rawLeanTitle(leanDocument),
+    ];
+
+    if (projection.document_type === 'law') {
+      parts.push(this.mastheadText(leanDocument));
+    }
+
+    return parts.filter(Boolean).join(' ');
+  }
+
+  /** The lean document's untouched `title`, if any. */
+  private rawLeanTitle(leanDocument?: unknown | null): string | undefined {
+    if (!leanDocument || typeof leanDocument !== 'object') return undefined;
+    const doc = leanDocument as Record<string, unknown>;
+    return typeof doc.title === 'string' && doc.title.trim() ? doc.title : undefined;
+  }
+
+  /**
+   * The opening window of the document body, where a statute states its own
+   * identifier. Bounded deliberately: a wider window starts swallowing the
+   * document's citations to OTHER norms.
+   */
+  private mastheadText(leanDocument?: unknown | null): string | undefined {
+    if (!leanDocument || typeof leanDocument !== 'object') return undefined;
+    const doc = leanDocument as Record<string, unknown>;
+    const body = [doc.body_text, doc.full_text, doc.content_text, doc.text].find(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0,
+    );
+    return body?.slice(0, ProjectionsService.MASTHEAD_WINDOW_CHARS);
   }
 
   private extractAustrianBgblReference(

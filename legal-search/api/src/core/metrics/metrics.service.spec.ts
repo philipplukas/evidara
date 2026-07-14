@@ -45,4 +45,65 @@ describe('MetricsService', () => {
     expect(await counter(metrics, 'legal_search_documents_indexed_total')).toBe(2);
     expect(await counter(metrics, 'legal_search_documents_deleted_total')).toBe(1);
   });
+
+  // ── Citation graph (#582) ──
+  // An unresolved citation is a broken edge. These counters exist so that a hollow
+  // graph is loud rather than invisible — it returns 200s and empty lists otherwise.
+
+  it('separates citations DI could key from the ones it could not', async () => {
+    const metrics = new MetricsService();
+    metrics.recordCitationsProjected(2, 4);
+
+    const json = await metrics.registry.getMetricsAsJSON();
+    const projected = json.find((m) => m.name === 'legal_search_citations_projected_total') as
+      | { values: { value: number; labels: { keyed: string } }[] }
+      | undefined;
+
+    const keyed = projected?.values.find((v) => v.labels.keyed === 'true')?.value;
+    const unkeyed = projected?.values.find((v) => v.labels.keyed === 'false')?.value;
+    // A single blended "citations indexed: 6" would look perfectly healthy while
+    // two-thirds of the graph's edges quietly do not exist.
+    expect(keyed).toBe(2);
+    expect(unkeyed).toBe(4);
+  });
+
+  it('attributes a resolution failure to its cause', async () => {
+    const metrics = new MetricsService();
+    metrics.recordCitationResolution(true, null);
+    metrics.recordCitationResolution(false, 'not_normalizable');
+    metrics.recordCitationResolution(false, 'no_target_in_corpus');
+
+    const json = await metrics.registry.getMetricsAsJSON();
+    const resolutions = json.find((m) => m.name === 'legal_search_citation_resolutions_total') as
+      | { values: { value: number; labels: { outcome: string } }[] }
+      | undefined;
+
+    const byOutcome = Object.fromEntries(
+      (resolutions?.values ?? []).map((v) => [v.labels.outcome, v.value]),
+    );
+    // An extractor gap and a coverage gap need different fixes; one number cannot
+    // tell an operator which they have.
+    expect(byOutcome).toEqual({
+      resolved: 1,
+      not_normalizable: 1,
+      no_target_in_corpus: 1,
+    });
+  });
+
+  it('exposes the corpus-wide resolution rate as a gauge', async () => {
+    const metrics = new MetricsService();
+    metrics.setCitationResolutionRate(0.3333, 6, 2);
+
+    expect(await counter(metrics, 'legal_search_citation_resolution_rate')).toBeCloseTo(0.3333, 4);
+    expect(await counter(metrics, 'legal_search_citations_indexed_count')).toBe(6);
+    expect(await counter(metrics, 'legal_search_citations_resolved_count')).toBe(2);
+  });
+
+  it('counts citation targets — the graph nodes anything can be cited by', async () => {
+    const metrics = new MetricsService();
+    metrics.recordCitationTargetsIndexed(3);
+    metrics.recordCitationTargetsIndexed(0);
+
+    expect(await counter(metrics, 'legal_search_citation_targets_indexed_total')).toBe(3);
+  });
 });

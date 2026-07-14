@@ -146,6 +146,12 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
           failed: failed.length,
         });
       }
+      // Counted after the write, like `recordDocumentIndexed`. A citation with
+      // no `normalized_reference` is one DI could not normalize — it can never
+      // become an edge, so it is counted separately rather than blended into a
+      // single "citations indexed" number that would look healthy.
+      const keyed = citations.filter((c) => Boolean(c.normalized_reference)).length;
+      this.metrics.recordCitationsProjected(keyed, citations.length - keyed);
     } catch (err) {
       this.logger.error('bulk_index_citations_failed', err as Error);
     }
@@ -173,6 +179,7 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
           failed: failed.length,
         });
       }
+      this.metrics.recordCitationTargetsIndexed(targets.length);
     } catch (err) {
       this.logger.error('bulk_index_citation_targets_failed', err as Error);
     }
