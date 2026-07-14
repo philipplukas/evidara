@@ -106,6 +106,7 @@ nav:
       - "0030: Acquisition Provider Enablement Lifecycle": adr/0030-acquisition-provider-enablement-lifecycle.md
       - "0031: Temporal / Argilla / Firecrawl Disposition": adr/0031-temporal-argilla-firecrawl-disposition.md
       - "0032: Pipeline Observability": adr/0032-pipeline-observability.md
+      - "0033: Agentic Legal Reasoning": adr/0033-agentic-legal-reasoning.md
       - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md
