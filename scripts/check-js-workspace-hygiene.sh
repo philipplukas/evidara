@@ -45,6 +45,12 @@ if grep -rn '"postinstall".*ensure-monorepo-shared-modules' \
   err "a package.json re-introduced the 'ensure-monorepo-shared-modules' postinstall."
 fi
 
+# 2b. No Dockerfile may still COPY the deleted symlink script (the image build
+#     fails on a missing COPY source, which the unit gates never exercise).
+if grep -rln 'ensure-monorepo-shared-modules' --include='Dockerfile*' . 2>/dev/null | grep -qv node_modules; then
+  err "a Dockerfile still COPYs scripts/ensure-monorepo-shared-modules.mjs, which no longer exists."
+fi
+
 # 3. `legal-search/` must not carry a package.json.
 #
 #    It used to hold a vestigial one (no `workspaces` field, no `src/`,
