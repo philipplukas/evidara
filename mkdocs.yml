@@ -130,6 +130,7 @@ nav:
           - Contracts: components/testing/contracts-testing.md
           - Infrastructure: components/testing/infra-testing.md
   - Runbooks:
+      - Extraction review routing: runbooks/extraction-review-routing.md
       - Retention sweep (legal hard delete): runbooks/retention-sweep.md
       - Document Service & Detail: runbooks/document-service-document-detail.md
       - Firecrawl Preview Run: runbooks/firecrawl-preview-run.md
