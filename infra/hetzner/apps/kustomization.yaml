@@ -23,19 +23,26 @@ resources:
 # `github.sha`, so this pin is exactly reproducible.
 #
 # Pick a SHA that actually *built* — the workflow is path-filtered, so a
-# docs- or test-only commit (e.g. main's tip 579799a) publishes no images at
-# all and would leave every reference here unpullable. 237ee8bb is the newest
-# main commit that published all seven images.
+# docs- or test-only commit publishes no images at all and would leave every
+# reference here unpullable. Check `gh run list --workflow=runtime-images.yml
+# --commit <sha>` before pinning.
+#
+# 6e1816a is the first SHA carrying the M12 pipeline-trust work: the search
+# adapter that 503s instead of silently returning "no results" (#554), the DI
+# status callbacks (#555), the /metrics endpoints the Prometheus scrape config
+# expects (#565), and the provider live-ready lock (#569). It is also the first
+# SHA whose alembic history is single-headed again (#574) — anything between
+# #571 and #574 ships two migrations numbered 0019 and must not be deployed.
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
+    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
+    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
+    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
+    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
+    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 237ee8bb48c6a9a730ab4c45576b39c5af720ce2
+    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
