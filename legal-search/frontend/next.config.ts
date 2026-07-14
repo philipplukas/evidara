@@ -33,6 +33,24 @@ const nextConfig: NextConfig = {
     // and interaction-flow-evidence then screenshot the 500 page.
     // Must match the Docker build context root (see Dockerfile).
     root: path.resolve(__dirname, "../.."),
+    // Widening the root (above) also widens module resolution: the shared
+    // `@evidara/ui` module at `styles/ui/` lives outside any npm package, so
+    // Turbopack resolves ITS bare imports by walking up from `styles/` and
+    // finds no `node_modules` at the repo root — `next build` then fails with
+    // "Module not found: Can't resolve 'clsx'". Pin the shared modules'
+    // runtime deps to this surface's own `node_modules`.
+    //
+    // `react` is deliberately NOT aliased here: Next resolves it itself (and
+    // must, for the RSC react channel). See #588.
+    //
+    // Paths are relative to THIS project directory (where next.config.ts
+    // lives), not to `root` — Turbopack treats resolveAlias values as module
+    // requests, so an absolute path is rejected.
+    resolveAlias: {
+      clsx: "./node_modules/clsx",
+      "lucide-react": "./node_modules/lucide-react",
+      "tailwind-merge": "./node_modules/tailwind-merge",
+    },
   },
 };
 

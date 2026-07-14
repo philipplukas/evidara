@@ -106,12 +106,24 @@ repos:
         pass_filenames: false
         files: ^(docs|legal-search/frontend/docs)/.*\.md$
 
-      - id: legal-search-check
-        name: Legal Search checks (typecheck + lint + test)
-        entry: bash -c 'cd legal-search && npm run check'
+      - id: js-workspace-hygiene
+        name: JS workspace hygiene (no root node_modules symlink, react deduped)
+        entry: bash scripts/check-js-workspace-hygiene.sh
         language: system
         pass_filenames: false
-        files: ^legal-search/src/
+        files: ^(package\.json|\.nvmrc|scripts/check-js-workspace-hygiene\.sh|\.github/workflows/.*\.yml|(legal-search|platform-control/admin)/.*/?(package\.json|package-lock\.json|tsconfig\.json|vitest\.config\.ts|next\.config\.ts))$
+
+      # `legal-search/` is NOT an npm workspace root — the real packages are
+      # `legal-search/frontend` and `legal-search/api`. This hook used to run
+      # `cd legal-search && npm run check` against a vestigial package.json,
+      # gated on `^legal-search/src/` — a path that does not exist, so it
+      # never fired. It now runs the same script CI does. See #588.
+      - id: legal-search-check
+        name: Legal Search checks (api + frontend, same script as CI)
+        entry: bash scripts/check-legal-search.sh
+        language: system
+        pass_filenames: false
+        files: ^legal-search/
 
       - id: platform-control-check
         name: Platform Control checks (ruff + pytest)

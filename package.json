@@ -2,6 +2,9 @@
   "name": "evidara-doc-tools",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22 <24"
+  },
   "scripts": {
     "check:mermaid": "node scripts/check_mermaid_diagrams.mjs",
     "dev:cross-surface:live": "bash scripts/dev-cross-surface-live.sh",
