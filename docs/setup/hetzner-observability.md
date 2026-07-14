@@ -128,7 +128,7 @@ done
 # 3. The JetStream metric names resolve. The prometheus-nats-exporter `jsz` collector
 #    names these, and the name has moved between exporter versions — an alert on a
 #    metric that does not exist is worse than no alert, because it looks like one.
-curl -s 'http://localhost:9090/api/v1/query?query=jetstream_consumer_num_pending' \
+curl -s 'http://localhost:9090/api/v1/query?query=nats_consumer_num_pending' \
   | jq -r '.data.result | length'    # expect >= 1, NOT 0
 ```
 

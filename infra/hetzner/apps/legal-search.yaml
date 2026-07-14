@@ -51,6 +51,12 @@ kind: Service
 metadata:
   name: legal-search-api
   namespace: evidara
+  # A ServiceMonitor selects on *Service* labels, not pod labels. Without this
+  # the scrape config in infra/hetzner/observability/scrape-targets.yaml matches
+  # nothing and Prometheus collects no legal_search_* metrics at all — while
+  # still looking perfectly configured. (ADR-0032)
+  labels:
+    app: legal-search-api
 spec:
   selector:
     app: legal-search-api
