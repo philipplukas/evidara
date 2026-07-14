@@ -65,12 +65,12 @@
   --admin-cta-shadow-hover: 0 18px 34px color-mix(in oklab, var(--brand) 28%, transparent);
 
   /*
-   * Map the cross-surface brand-mark serif onto admin's loaded Source Serif
-   * face. Defined as a shared token in `styles/tokens/tokens.css` with a
-   * Georgia fallback; this override picks up the variable font that's
-   * already loaded for the AppBar wordmark.
+   * Lift the BrandMark accent node for this surface. The lattice itself inherits
+   * `--admin-on-brand` (near-white) from the dark navy header, but the accent node
+   * must stay violet on BOTH grounds — the workspace's `--accent-core` is too dark
+   * to carry on navy, so mix it toward the on-brand foreground.
    */
-  --font-brand-mark: var(--font-admin-serif), Georgia, serif;
+  --brand-mark-accent: color-mix(in oklab, var(--accent-core) 52%, var(--admin-on-brand));
 }
 
 html,
@@ -172,19 +172,16 @@ a {
   min-width: 0;
 }
 
+/*
+ * Pre-boot / access-denied shell. The BrandMark lattice draws in `currentColor`,
+ * so this wrapper only has to set the colour it should inherit.
+ */
 .evidara-shell__mark {
   width: 42px;
   height: 42px;
   display: grid;
   place-items: center;
-  border-radius: 14px;
-  border: 1px solid var(--admin-on-brand-border-subtle);
-  background: linear-gradient(135deg, var(--brand), var(--brand-hover));
   color: var(--admin-on-brand);
-  box-shadow: var(--admin-brand-mark-shadow);
-  font-family: var(--font-admin-serif), Georgia, serif;
-  font-size: 18px;
-  font-weight: 700;
 }
 
 .evidara-shell__eyebrow {

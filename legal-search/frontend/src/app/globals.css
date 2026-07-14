@@ -14,12 +14,6 @@
   --workspace-page-sheen-light: color-mix(in oklab, var(--surface-panel) 45%, transparent);
   --workspace-input-highlight: color-mix(in oklab, var(--surface-panel) 60%, transparent);
 
-  /*
-   * Map the cross-surface brand-mark serif onto the workspace's loaded
-   * Source Serif face. Defined as a shared token in `styles/tokens/tokens.css`
-   * with a Georgia fallback; this override picks up the variable font.
-   */
-  --font-brand-mark: var(--font-serif), "Georgia", serif;
 }
 
 @theme inline {
@@ -231,10 +225,14 @@
     transition-timing-function: var(--motion-easing-standard);
   }
 
+  /*
+   * The BrandMark lattice is drawn in `currentColor`, so the wrapper's `color`
+   * IS the mark's colour. On this light header that must be brand navy; the
+   * accent node stays violet via `--brand-mark-accent`. See `@evidara/shell`.
+   */
   .app-header__brand-mark {
-    @apply flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold text-white shadow-sm;
-    background: var(--brand-mark-gradient);
-    font-family: var(--font-brand-mark);
+    @apply flex h-8 w-8 items-center justify-center;
+    color: var(--brand);
   }
 
   .app-header__brand-name {

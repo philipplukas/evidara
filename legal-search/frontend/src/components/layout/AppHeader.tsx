@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@evidara/shell";
 import {
   Bookmark,
   BookmarkCheck,
@@ -250,7 +251,7 @@ export function AppHeader({
           {/* Wordmark */}
           <div className="app-header__brand">
             <div className="app-header__brand-mark">
-              <span className="text-white font-bold text-sm">E</span>
+              <BrandMark size={32} />
             </div>
             <span className="app-header__brand-name">Evidara</span>
           </div>

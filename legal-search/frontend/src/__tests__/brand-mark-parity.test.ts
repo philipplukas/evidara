@@ -5,43 +5,72 @@ import { describe, expect, it } from "vitest";
 /**
  * Cross-surface brand-mark parity guard.
  *
- * The "Evidara" brand-mark tile (gradient navy square + serif "E") is
- * rendered inline in two places: workspace's `AppHeader` and admin's
- * `AppBar`. The fill and the display-letter typeface are a *shared* brand
- * contract — they must consume `--brand-mark-gradient` and
- * `--font-brand-mark` from `styles/tokens/tokens.css`.
+ * The Evidara mark is the `BrandMark` lattice from `@evidara/shell` — ONE
+ * component consumed by both surfaces, not two lookalikes. Its strokes and nodes
+ * are drawn in `currentColor` so it inherits navy on workspace's light header and
+ * near-white on admin's dark navy bar. That inheritance is the whole design: a
+ * hardcoded navy mark would be invisible on the admin bar.
  *
- * This test enforces the workspace half. The admin half is enforced by the
- * mirror at `platform-control/admin/src/ui/shell/brand-mark-parity.test.ts`.
- * Either side drifting fails its own surface's `npm run check`.
+ * This test enforces the workspace half. The admin half is enforced by the mirror
+ * at `platform-control/admin/src/ui/shell/brand-mark-parity.test.ts`. Either side
+ * drifting fails its own surface's `npm run check`.
  */
 const sharedTokensCss = readFileSync(join(process.cwd(), "../../styles/tokens/tokens.css"), "utf8");
 const workspaceGlobalsCss = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+const appHeader = readFileSync(join(process.cwd(), "src/components/layout/AppHeader.tsx"), "utf8");
+const brandMark = readFileSync(join(process.cwd(), "../../styles/shell/BrandMark.tsx"), "utf8");
 
 describe("brand-mark cross-surface contract", () => {
-  it("declares the shared brand-mark gradient + serif tokens in tokens.css", () => {
-    expect(sharedTokensCss).toContain("--brand-mark-gradient:");
-    expect(sharedTokensCss).toContain("--font-brand-mark:");
+  it("declares the shared accent-node token in tokens.css", () => {
+    expect(sharedTokensCss).toContain("--brand-mark-accent:");
   });
 
-  it("ties --brand-mark-gradient to the shared --brand / --brand-hover pair", () => {
-    expect(sharedTokensCss).toContain(
-      "--brand-mark-gradient: linear-gradient(135deg, var(--brand), var(--brand-hover));",
-    );
+  it("ties the accent node to the single action colour", () => {
+    expect(sharedTokensCss).toContain("--brand-mark-accent: var(--accent-core);");
+  });
+
+  it("has retired the placeholder tile's gradient + serif tokens", () => {
+    // The navy-gradient-tile-with-an-E is gone. If either token comes back, so has
+    // the placeholder.
+    expect(sharedTokensCss).not.toContain("--brand-mark-gradient:");
+    expect(sharedTokensCss).not.toContain("--font-brand-mark:");
   });
 });
 
-describe("workspace brand-mark consumes shared tokens", () => {
-  it("maps --font-brand-mark onto the workspace's loaded serif face", () => {
-    expect(workspaceGlobalsCss).toMatch(/--font-brand-mark:\s*var\(--font-serif\)/);
+describe("the mark itself", () => {
+  it("draws the lattice in currentColor so it can invert per surface", () => {
+    expect(brandMark).toContain('stroke="currentColor"');
+    expect(brandMark).toContain('fill="currentColor"');
   });
 
-  it("renders .app-header__brand-mark with the shared gradient + serif", () => {
-    expect(workspaceGlobalsCss).toContain("background: var(--brand-mark-gradient);");
-    expect(workspaceGlobalsCss).toContain("font-family: var(--font-brand-mark);");
+  it("colours ONLY the accent node from a token", () => {
+    expect(brandMark).toContain('fill="var(--brand-mark-accent)"');
+    // A second hardcoded colour would break the single-accent rule.
+    expect(brandMark).not.toMatch(/fill="#[0-9a-fA-F]{3,8}"/);
+    expect(brandMark).not.toMatch(/stroke="#[0-9a-fA-F]{3,8}"/);
   });
 
-  it("does not re-inline the brand-mark gradient literal", () => {
+  it("keeps the hit node off-centre — the asymmetry is the idea", () => {
+    // Centre of the 32x32 grid is [16, 16]. The hit must not sit there.
+    expect(brandMark).toContain("const HIT: readonly [number, number] = [23, 9];");
+  });
+
+  it("ships a compact variant, because the full lattice dies at favicon size", () => {
+    expect(brandMark).toContain("export function BrandMarkCompact");
+  });
+});
+
+describe("workspace consumes the shared mark", () => {
+  it("renders BrandMark from @evidara/shell, not a local lookalike", () => {
+    expect(appHeader).toContain('import { BrandMark } from "@evidara/shell";');
+    expect(appHeader).toContain("<BrandMark size={32} />");
+  });
+
+  it("sets the colour the lattice inherits on this light header", () => {
+    expect(workspaceGlobalsCss).toMatch(/\.app-header__brand-mark\s*{[^}]*color:\s*var\(--brand\)/);
+  });
+
+  it("does not re-inline the retired gradient literal", () => {
     expect(workspaceGlobalsCss).not.toContain(
       "linear-gradient(135deg, var(--brand), var(--brand-hover))",
     );

@@ -12,6 +12,7 @@
  */
 "use client";
 
+import { BrandMark } from "@evidara/shell";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -87,15 +88,13 @@ export function AppBar() {
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-4 w-full px-3 sm:px-6 py-2 md:py-3 min-w-0">
         {/* Brand mark + product */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div
-            aria-hidden
-            className="w-[42px] h-[42px] rounded-2xl grid place-items-center text-[18px] font-bold leading-none border border-[var(--admin-on-brand-border-subtle)] shadow-[var(--admin-brand-mark-shadow)]"
-            style={{
-              background: "var(--brand-mark-gradient)",
-              fontFamily: "var(--font-brand-mark)",
-            }}
-          >
-            E
+          {/*
+            The lattice is drawn in `currentColor`. This bar is dark navy, so the
+            mark must inherit near-white — `--admin-on-brand`. The accent node stays
+            violet via `--brand-mark-accent`, which admin lifts for this ground.
+          */}
+          <div className="grid place-items-center" style={{ color: "var(--admin-on-brand)" }}>
+            <BrandMark size={42} />
           </div>
           <div className="min-w-0">
             <div className="text-[10px] font-semibold tracking-[0.16em] text-[var(--admin-on-brand-muted)] uppercase leading-[1.15]">

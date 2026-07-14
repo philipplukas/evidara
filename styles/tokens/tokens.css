@@ -28,10 +28,9 @@
  *     `--sidebar-*`, `--radius`, `--radius-pill`)
  *   - brand palette (`--brand`, `--brand-hover`, `--brand-strong`,
  *     `--brand-wash-3/4/6/8`, `--brand-focus-ring`)
- *   - brand-mark contract (`--brand-mark-gradient`, `--font-brand-mark`) —
- *     the gradient fill and display-letter typeface for the cross-surface
- *     "Evidara" tile; each surface maps `--font-brand-mark` to its loaded
- *     serif face in its local globals.css
+ *   - brand-mark contract (`--brand-mark-accent`) — the accent node of the
+ *     cross-surface `BrandMark` lattice; the rest of the mark is drawn in
+ *     `currentColor` and inherits from each surface's header
  *   - surfaces (`--surface-page`, `--surface-panel`, `--surface-input`,
  *     `--surface-shell`, `--surface-shell-strong`)
  *   - accent core (the single violet action color: `--accent-core`,
@@ -119,29 +118,25 @@
   --brand-strong: #1d293d;
 
   /*
-   * ─── Brand mark (cross-surface; consumed by both `AppHeader` and `AppBar`) ───
+   * ─── Brand mark (cross-surface; consumed by `AppHeader`, `AppBar`, `AdminShell`) ───
    *
-   * The "Evidara" wordmark tile (gradient navy square with a serif "E")
-   * appears in workspace's `AppHeader` *and* admin's `AppBar`. Tile
-   * dimensions, corner radius, and surrounding chrome stay surface-local
-   * (workspace ships a 32px tile; admin ships a 42px tile with a darker
-   * shadow on its cool-blue gradient header). The *fill* and the
-   * *display-letter typeface* are the shared brand contract — those live
-   * here.
+   * The mark is the `BrandMark` lattice from `@evidara/shell` — a single
+   * component, not two variants. Its strokes and nodes are drawn in
+   * `currentColor`, so it inherits navy on workspace's light header and
+   * near-white on admin's dark navy bar. That inheritance is the whole design:
+   * a hardcoded navy mark would be invisible on the admin bar.
    *
-   * `--font-brand-mark` is intentionally a fallback only. Each surface
-   * overrides it in its local globals.css to point at the actual loaded
-   * serif face (`var(--font-serif)` in workspace, `var(--font-admin-serif)`
-   * in admin). The Georgia fallback prevents the mark from rendering in
-   * the body sans if a surface forgets to map it.
+   * Only the accent node — the authority the search resolved to — needs a token,
+   * because it must stay violet on BOTH grounds. Admin re-points it at a lighter
+   * violet in its local globals.css so it still carries on the brand header.
    *
-   * Drift on either token (e.g. one surface re-inlining the
-   * gradient literal) is caught by the brand-mark parity tests on both
-   * surfaces — see `legal-search/frontend/src/__tests__/brand-mark-parity.test.ts`
-   * and `platform-control/admin/src/ui/shell/brand-mark-parity.test.ts`.
+   * The previous placeholder (a navy gradient tile with a serif "E") is gone,
+   * which is why `--brand-mark-gradient` and `--font-brand-mark` no longer exist.
+   * Drift is caught by the brand-mark parity tests on both surfaces — see
+   * `legal-search/frontend/src/__tests__/brand-mark-parity.test.ts` and
+   * `platform-control/admin/src/ui/shell/brand-mark-parity.test.ts`.
    */
-  --brand-mark-gradient: linear-gradient(135deg, var(--brand), var(--brand-hover));
-  --font-brand-mark: Georgia, serif;
+  --brand-mark-accent: var(--accent-core);
 
   /* ─── Surfaces ─── */
   --surface-page: #e4e9ef;
