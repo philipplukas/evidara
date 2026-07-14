@@ -126,16 +126,20 @@ These are not preferences. A mark that fails any of them cannot ship.
 5. **No second accent, no gradient in the mark itself.** The gradient currently in the placeholder
    tile is going away.
 
-## 7. Known conflicts — resolve before locking anything
+## 7. Known conflicts
 
-**There is a second, dead brand in the repo.** `contracts/design-tokens/evidara-tokens.css`
-encodes a *different* identity — **cream paper (`#f4efe7`), muted gold (`#9a7a4a`), and no violet
-at all**. Nothing imports it; a grep finds only its own docstring. The old design critique also
-describes a cream canvas (`#FBF6EC`) that the live tokens no longer have.
+**A second, dead brand used to live in the repo — it has been deleted.**
+`contracts/design-tokens/evidara-tokens.css` encoded a *different* identity — cream paper
+(`#f4efe7`), muted gold (`#9a7a4a`), and **no violet at all** — while its own docstring declared
+itself the "single source of truth" and told both apps to import it. Nothing did. Its badge and
+chart ramps were duplicated (and superseded) in the live file, and its gold `--highlight` existed
+nowhere else.
 
-So there are two plausible-looking sources of brand truth and only one is real. **`styles/tokens/tokens.css`
-is the live one.** Delete or reconcile the other before briefing anyone, or you will get work back
-in the wrong palette.
+It was removed in the same change that added this brief, precisely so nobody briefs a designer or a
+model against it by accident. **`styles/tokens/tokens.css` is the only palette.**
+
+Note that the older design critique still describes a cream canvas (`#FBF6EC`) the live tokens no
+longer have. Treat that document as a record of a direction that was walked back, not as current.
 
 **The previous brand exploration is lost.** The critique cites
 `screenshot-pack/design/brand-decision-playbook.md` with "27 design artifacts, 5 exploration SVGs,

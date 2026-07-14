@@ -18,10 +18,13 @@ Source Serif 4. There is an unmerged candidate mark (the "lattice") with a genui
 behind it — nodes are legal authorities, the lines between them are citations, and one highlighted
 node is the authority you were searching for.
 
-Two things to fix before briefing anyone: a **second, dead brand** still sits in the repo
-(`contracts/design-tokens/evidara-tokens.css` — cream paper, muted gold, no violet, imported by
-nothing), and the **asset layer is at zero** — no favicon, no OG image, no manifest.
+One thing still to fix: the **asset layer is at zero** — no favicon (the workspace ships the default
+Next.js icon; the admin app has none), no OG image, no manifest.
+
+A *second, dead brand* used to sit in `contracts/design-tokens/evidara-tokens.css` — cream paper,
+muted gold, no violet — declaring itself the "single source of truth" while nothing imported it.
+It was deleted alongside these docs so that no one briefs a designer or a model against it.
 
 ## Source of truth
 
-`styles/tokens/tokens.css` is the live palette. Nothing else is, whatever it looks like.
+`styles/tokens/tokens.css` is the live palette, and now the only one.

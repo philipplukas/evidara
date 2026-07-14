@@ -25,11 +25,14 @@ React component. Canva will not reliably give you that. So:
 
 **Use Canva for the brand system and the assets. Use a vector-native tool for the mark itself.**
 
-## Step 0 — resolve the conflicting brand first
+## Step 0 — the conflicting brand is already gone
 
-Do not brief any tool until the dead cream/gold token file is dealt with (brief §7). Otherwise you
-will get beautiful work back in a palette you abandoned. Either delete
-`contracts/design-tokens/evidara-tokens.css` or explicitly re-adopt it. Ten minutes; saves a round trip.
+The dead cream/gold token file (`contracts/design-tokens/evidara-tokens.css`) was deleted alongside
+this doc. It claimed to be the "single source of truth" while nothing imported it, and briefing a
+tool against it would have returned work in a palette Evidara abandoned.
+
+**`styles/tokens/tokens.css` is now the only palette in the repo.** Nothing to do here — it is
+recorded so the question does not get re-opened.
 
 ## Step 1 — set up the Canva Brand Kit
 
