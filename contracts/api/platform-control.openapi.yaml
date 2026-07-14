@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.6.0
+  version: 0.7.0
   contact:
     name: Evidara Team
 
