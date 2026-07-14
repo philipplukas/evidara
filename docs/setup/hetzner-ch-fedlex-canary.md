@@ -85,13 +85,23 @@ kubectl -n evidara port-forward svc/platform-control-api 8080:8080 &
 OPERATOR_KEY="$(kubectl -n evidara get secret evidara-auth \
   -o jsonpath='{.data.PLATFORM_CONTROL_OPERATOR_API_KEY}' | base64 -d)"
 
-# 3. Run the canary. --env is only a label here (no Cloud Run lookup happens).
+# 3. Reach legal-search too — the indexed-language gate reads the search projection.
+kubectl -n evidara port-forward svc/legal-search-api 3102:3000 &
+
+# 4. Run the canary. --env is only a label here (no Cloud Run lookup happens).
 scripts/ch-fedlex-fast-loop.sh \
   --pc-url http://localhost:8080 \
+  --ls-url http://localhost:3102 \
   --api-key "$OPERATOR_KEY" \
   --env hetzner \
   --json
 ```
+
+`--ls-url` is required for the **indexed-language gate** (#572): without it the loop cannot
+read back the `language` facet it just wrote and reports `indexed_language_checked: 0` +
+`verdict=pipeline_pass_content_suspect`. That is deliberate — the bug this gate exists for
+(the German Federal Constitution indexed as `language: it`) passed every raw-body check, so
+"unverified" must not read as "fine".
 
 Add `--dry-run` first to print the resolved settings and confirm the URL/auth without
 mutating anything. Self-hosted mode is triggered by a **non-empty** `--api-key`; if the
@@ -105,10 +115,21 @@ The loop prints a `verdict` (also in `summary.json` / the evidence markdown). Me
 
 | `verdict` | Meaning | What passed / failed |
 |---|---|---|
-| `pass` | Full end-to-end success | Provider capture, DI `accepted`/`processing`/`canonical_ready`, `document.processed` lifecycle, **and** content-quality gates (text/html, Fedlex `…​.html` URL, `Bundesverfassung` title, ≥3 `Art.` occurrences, ≥10 KB body, German markers `Abs.`/`Bund`/`Recht`) all held. |
+| `pass` | Full end-to-end success | Provider capture, DI `accepted`/`processing`/`canonical_ready`, `document.processed` lifecycle, **and** content-quality gates (text/html, Fedlex `…​.html` URL, `Bundesverfassung` title, ≥3 `Art.` occurrences, ≥10 KB body, German markers `Abs.`/`Bund`/`Recht`, and the indexed `language` facet matching the template's language) all held. |
 | `provider_failed` | Acquisition failed | No `text/html` captured, no captured resources, or no raw artifacts. |
 | `downstream_failed` | Publish/consume seam broke | Provider captured, but DI never reported `accepted`/`processing`/`canonical_ready` or no `document.processed` lifecycle event arrived — i.e. the NATS/MinIO hop did not complete. |
-| `pipeline_pass_content_suspect` | Flowed but content is thin | Lifecycle completed but the title/URL/article-density/length/language gates did not all hold. |
+| `pipeline_pass_content_suspect` | Flowed but content is thin, or the indexed language is wrong | Lifecycle completed but the title/URL/article-density/length/language gates did not all hold. |
+
+#### The language gates
+
+Two separate checks, and the difference matters (#572):
+
+| Check | What it proves |
+|---|---|
+| `body_lang_hint_ok` | The **raw artifact body** reads as German (`Abs.`/`Bund`/`Recht`). Says nothing about how the document is indexed — it reported `1` for the run that indexed the Bundesverfassung as Italian. |
+| `indexed_language_ok` | The **search facet** `language` on every `document.processed` document of this run equals the template's language (`fedlex_sparql_constitution_de` → `de`), read back from `GET {legal-search}/v1/documents/{id}`. This is the gate that protects the facet users and agents filter on. |
+
+`lang_agreement_ok` is now the AND of the two, so a `1` means both held.
 
 The script **exits non-zero unless `verdict=pass`**.
 
