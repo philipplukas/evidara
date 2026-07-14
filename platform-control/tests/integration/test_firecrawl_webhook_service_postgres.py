@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from docker.errors import DockerException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.core.exceptions import ContainerStartException
@@ -55,7 +56,7 @@ async def postgres_session_maker() -> AsyncIterator[async_sessionmaker[AsyncSess
             yield async_sessionmaker(engine, expire_on_commit=False)
 
             await engine.dispose()
-    except (ContainerStartException, OSError) as exc:
+    except (ContainerStartException, DockerException, OSError) as exc:
         pytest.skip(f"Docker-backed Postgres is unavailable: {exc}")
 
 

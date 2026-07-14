@@ -71,103 +71,105 @@ async def test_wizard_state_guards_and_transitions(session) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.requires_network
+@pytest.mark.temporal
 async def test_temporal_orchestrator_starts_workflow_and_signals(
     session_maker: async_sessionmaker[AsyncSession],
+    temporal_env: WorkflowEnvironment,
 ) -> None:
     state_acts, shard_acts, drain_acts = _make_test_activities(session_maker)
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        async with Worker(
-            env.client,
+    env = temporal_env
+    async with Worker(
+        env.client,
+        task_queue="wizard",
+        workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
+        activities=[
+            state_acts.persist_pilot_completed,
+            state_acts.fetch_scope_shards,
+            shard_acts.run_shard_crawl,
+            shard_acts.report_shard_progress,
+            drain_acts.check_review_drain_complete,
+        ],
+    ):
+        orch = TemporalOrchestrator(
+            namespace="default",
             task_queue="wizard",
-            workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
-            activities=[
-                state_acts.persist_pilot_completed,
-                state_acts.fetch_scope_shards,
-                shard_acts.run_shard_crawl,
-                shard_acts.report_shard_progress,
-                drain_acts.check_review_drain_complete,
-            ],
-        ):
-            orch = TemporalOrchestrator(
-                namespace="default",
-                task_queue="wizard",
-                client=env.client,
+            client=env.client,
+        )
+        async with session_maker() as session:
+            service = WizardService(session, orch)
+            project = await service.create_project(CreateWizardProjectRequest(name="Wizard DE"))
+            await service.update_scope(project.wizard_project_id, {"domains": ["example.de"]})
+            await service.update_discovery_plan(
+                project.wizard_project_id,
+                {"seed_urls": ["https://example.de"], "max_depth": 1},
             )
-            async with session_maker() as session:
-                service = WizardService(session, orch)
-                project = await service.create_project(CreateWizardProjectRequest(name="Wizard DE"))
-                await service.update_scope(project.wizard_project_id, {"domains": ["example.de"]})
-                await service.update_discovery_plan(
-                    project.wizard_project_id,
-                    {"seed_urls": ["https://example.de"], "max_depth": 1},
-                )
-                run = await service.start_pilot_run(project.wizard_project_id)
-                assert run.workflow_id is not None
-                assert run.state is WizardRunState.PILOT_RUN
+            run = await service.start_pilot_run(project.wizard_project_id)
+            assert run.workflow_id is not None
+            assert run.state is WizardRunState.PILOT_RUN
 
-            # Allow the workflow's persist_pilot_completed activity to commit the
-            # PilotRun → HumanGateApproval transition before we signal approve.
-            async with session_maker() as session:
-                service = WizardService(session, orch)
-                for _ in range(50):
-                    await asyncio.sleep(0)
-                    session.expire_all()
-                    current = await service.get_run(run.wizard_run_id)
-                    if current.state is WizardRunState.HUMAN_GATE_APPROVAL:
-                        break
+        # Allow the workflow's persist_pilot_completed activity to commit the
+        # PilotRun → HumanGateApproval transition before we signal approve.
+        async with session_maker() as session:
+            service = WizardService(session, orch)
+            for _ in range(50):
+                await asyncio.sleep(0)
+                session.expire_all()
+                current = await service.get_run(run.wizard_run_id)
+                if current.state is WizardRunState.HUMAN_GATE_APPROVAL:
+                    break
 
-                approved = await service.approve_run(run.wizard_run_id, reason="ok")
-                assert approved.state is WizardRunState.SCALED_RUN
+            approved = await service.approve_run(run.wizard_run_id, reason="ok")
+            assert approved.state is WizardRunState.SCALED_RUN
 
-            handle = env.client.get_workflow_handle(approved.workflow_id)
-            assert await handle.result() == "scaled"
+        handle = env.client.get_workflow_handle(approved.workflow_id)
+        assert await handle.result() == "scaled"
 
 
 @pytest.mark.asyncio
-@pytest.mark.requires_network
+@pytest.mark.temporal
 async def test_temporal_orchestrator_starts_standalone_child_workflows(
     session_maker: async_sessionmaker[AsyncSession],
+    temporal_env: WorkflowEnvironment,
 ) -> None:
     state_acts, shard_acts, drain_acts = _make_test_activities(session_maker)
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        async with Worker(
-            env.client,
+    env = temporal_env
+    async with Worker(
+        env.client,
+        task_queue="wizard",
+        workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
+        activities=[
+            state_acts.persist_pilot_completed,
+            state_acts.fetch_scope_shards,
+            shard_acts.run_shard_crawl,
+            shard_acts.report_shard_progress,
+            drain_acts.check_review_drain_complete,
+        ],
+    ):
+        orch = TemporalOrchestrator(
+            namespace="default",
             task_queue="wizard",
-            workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
-            activities=[
-                state_acts.persist_pilot_completed,
-                state_acts.fetch_scope_shards,
-                shard_acts.run_shard_crawl,
-                shard_acts.report_shard_progress,
-                drain_acts.check_review_drain_complete,
-            ],
-        ):
-            orch = TemporalOrchestrator(
-                namespace="default",
-                task_queue="wizard",
-                client=env.client,
-            )
-            scope_id = await orch.start_scope_shard_workflow(
-                "wrn_childtest001",
-                scope_shard_key="de/hamburg",
-            )
-            assert "scope_shard_api" in scope_id
-            scope_resume = await orch.start_scope_shard_workflow(
-                "wrn_childtest001",
-                scope_shard_key="de/hamburg-resume",
-                resume_token="seed:checkpoint=v1",
-            )
-            assert "scope_shard_api" in scope_resume
-            resume_handle = env.client.get_workflow_handle(scope_resume)
-            assert await resume_handle.result() == "shard_complete"
-            drain_id = await orch.start_review_drain_workflow("wrn_childtest001")
-            assert "review_drain_api" in drain_id
+            client=env.client,
+        )
+        scope_id = await orch.start_scope_shard_workflow(
+            "wrn_childtest001",
+            scope_shard_key="de/hamburg",
+        )
+        assert "scope_shard_api" in scope_id
+        scope_resume = await orch.start_scope_shard_workflow(
+            "wrn_childtest001",
+            scope_shard_key="de/hamburg-resume",
+            resume_token="seed:checkpoint=v1",
+        )
+        assert "scope_shard_api" in scope_resume
+        resume_handle = env.client.get_workflow_handle(scope_resume)
+        assert await resume_handle.result() == "shard_complete"
+        drain_id = await orch.start_review_drain_workflow("wrn_childtest001")
+        assert "review_drain_api" in drain_id
 
-            sh = env.client.get_workflow_handle(scope_id)
-            dh = env.client.get_workflow_handle(drain_id)
-            assert await sh.result() == "shard_complete"
-            assert await dh.result() == "drain_complete"
+        sh = env.client.get_workflow_handle(scope_id)
+        dh = env.client.get_workflow_handle(drain_id)
+        assert await sh.result() == "shard_complete"
+        assert await dh.result() == "drain_complete"
 
 
 @pytest.mark.asyncio

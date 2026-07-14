@@ -255,3 +255,17 @@ class RetentionSweepWorkflow:
             start_to_close_timeout=timedelta(minutes=30),
             retry_policy=retry,
         )
+
+
+#: Every workflow the Temporal worker registers. Single source of truth for
+#: `temporal_worker.py` and for the replay suite, which asserts that each entry
+#: here has a recorded history checked in (`tests/data/temporal_histories/`).
+#: Adding a workflow without a history is a test failure, on purpose: an
+#: unreplayed workflow is an unguarded one.
+ALL_WORKFLOWS: list[type] = [
+    WizardRunWorkflow,
+    ScopeShardWorkflow,
+    ReviewDrainWorkflow,
+    RetentionSweepWorkflow,
+    RescoreFromCorrectionWorkflow,
+]
