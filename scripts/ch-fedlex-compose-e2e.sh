@@ -110,6 +110,18 @@ expected_title_regex() {
   esac
 }
 
+# Fedlex publishes every act as DE/FR/IT expressions and the templates are
+# per-language, so the template suffix IS the language the indexed document must
+# carry on its `language` facet (#572).
+expected_language() {
+  case "${TEMPLATE_ID}" in
+    *_de) printf '%s' 'de' ;;
+    *_fr) printf '%s' 'fr' ;;
+    *_it) printf '%s' 'it' ;;
+    *) printf '%s' '' ;;
+  esac
+}
+
 poll_terminal_run_status() {
   local status=""
   for i in $(seq 1 "${MAX_POLLS}"); do
@@ -251,6 +263,38 @@ for i in $(seq 1 "${SEARCH_MAX_POLLS}"); do
   sleep "${SEARCH_POLL_INTERVAL}"
 done
 
+# ── 8b. Assert the indexed language matches the acquired expression (#572) ──
+# The search-facing `language` field is a facet and a filter: a wrong value is a
+# wrong answer, not a missing one. Assert it on the documents THIS run produced.
+EXPECTED_LANG="$(expected_language)"
+indexed_language_ok=1
+indexed_language_observed=""
+if [[ -n "${EXPECTED_LANG}" ]]; then
+  processed_document_ids="$(jq -r '[.data[]? | select(.event_type=="document.processed") | .document_id] | unique | join(" ")' < "${RUN_DIR}/document-lifecycle.json")"
+  if [[ -z "${processed_document_ids}" ]]; then
+    indexed_language_ok=0
+  else
+    log "==> Asserting indexed language=${EXPECTED_LANG} for: ${processed_document_ids}"
+    read -ra doc_ids <<< "${processed_document_ids}"
+    for doc_id in "${doc_ids[@]}"; do
+      observed="missing"
+      for i in $(seq 1 "${SEARCH_MAX_POLLS}"); do
+        if curl_json "${LS_URL}/v1/documents/${doc_id}" > "${RUN_DIR}/ls-document-${doc_id}.json" 2>/dev/null; then
+          observed="$(jq -r '.contentLanguage.display // "missing"' < "${RUN_DIR}/ls-document-${doc_id}.json")"
+          break
+        fi
+        log "  language poll ${i}/${SEARCH_MAX_POLLS}: ${doc_id} not projected yet"
+        sleep "${SEARCH_POLL_INTERVAL}"
+      done
+      indexed_language_observed="${indexed_language_observed}${indexed_language_observed:+,}${doc_id}=${observed}"
+      if [[ "${observed}" != "${EXPECTED_LANG}" ]]; then
+        indexed_language_ok=0
+        log "  language mismatch: ${doc_id} expected=${EXPECTED_LANG} observed=${observed}"
+      fi
+    done
+  fi
+fi
+
 # ── 9. Content gates (reused from ch-fedlex-fast-loop.sh) ───────────────────
 TITLE_REGEX="$(expected_title_regex)"
 content_type_count="$(jq -r '[.content_type_breakdown[]? | select(.content_type=="text/html") | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
@@ -270,7 +314,7 @@ elif [[ ! "${search_hits}" =~ ^[0-9]+$ || "${search_hits}" -lt 1 ]]; then
   # The whole point of Stream H: DI output must reach legal-search via the
   # projection-bridge and be searchable.
   verdict="search_failed"
-elif [[ "${title_ok}" -lt 1 ]]; then
+elif [[ "${title_ok}" -lt 1 || "${indexed_language_ok}" -lt 1 ]]; then
   verdict="pipeline_pass_content_suspect"
 fi
 
@@ -296,6 +340,9 @@ SUMMARY_JSON="$(jq -n \
   --argjson processed_count "${processed_count}" \
   --argjson title_ok "${title_ok}" \
   --argjson search_hits "${search_hits}" \
+  --argjson indexed_language_ok "${indexed_language_ok}" \
+  --arg indexed_language_expected "${EXPECTED_LANG}" \
+  --arg indexed_language_observed "${indexed_language_observed}" \
   '{
     environment: "compose-local",
     template_id: $template_id,
@@ -319,7 +366,10 @@ SUMMARY_JSON="$(jq -n \
       canonical_ready_count: $canonical_ready_count,
       processed_count: $processed_count,
       title_ok: $title_ok,
-      search_hits: $search_hits
+      search_hits: $search_hits,
+      indexed_language_expected: $indexed_language_expected,
+      indexed_language_observed: $indexed_language_observed,
+      indexed_language_ok: $indexed_language_ok
     }
   }')"
 

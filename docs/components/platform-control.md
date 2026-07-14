@@ -12,7 +12,7 @@ For the current slice, scope fields such as `tenant_id`, `corpus_id`, and `scope
 
 Wizard API v1 foundation is available with persisted project/run/review/ledger entities plus orchestration abstraction wiring (`in_memory` default, `temporal` backend). With `PLATFORM_CONTROL_WIZARD_ORCHESTRATOR_BACKEND=temporal`, the API starts a `WizardRunWorkflow` execution (workflow id `wizard-run-{wizard_run_id}`) and sends approve/reject signals; run `platform-control-temporal-worker` against the same `PLATFORM_CONTROL_TEMPORAL_*` settings so workflows make progress. Temporal workers register `WizardRunWorkflow`, `ScopeShardWorkflow`, and `ReviewDrainWorkflow`. After operator approve, the parent runs a pilot scope-shard child and a review-drain child (stubs today; real activities and multi-shard fan-out are follow-on). Pilot-completion-driven `HUMAN_GATE_APPROVAL` persistence remains follow-on; see ADR-0021 and `docs/architecture/temporal-argilla-wizard-architecture.md`.
 
-Review loop: `POST /v1/reviews/tasks` persists a `ReviewTask` and, when `PLATFORM_CONTROL_ARGILLA_API_BASE_URL` (plus API key and dataset id) are set, POSTs a bulk records payload to Argilla; otherwise `enqueue_outcome` is `skipped_not_configured`. Ingestion stays on `POST /v1/reviews/sync-from-argilla` (idempotent on `external_id` + `annotation_updated_at`).
+Review loop: `POST /v1/reviews/tasks` persists a `ReviewTask` — and persisting it *is* the enqueue, since the queue is the `review_tasks` table that `platform-control/admin` reads. What gets routed there is decided by the confidence-band policy (`>= 0.90` auto-accept with a 5% audit sample; `0.70–0.90` sampled at `>= 20%`; `< 0.70` mandatory; any extractor conflict mandatory). An operator closes a task with `POST /v1/reviews/tasks/{task_id}/decision`; a second verdict on an already-decided task is a `409`. The Argilla enqueue and `POST /v1/reviews/sync-from-argilla` were removed in ADR-0031 — see `docs/runbooks/extraction-review-routing.md`.
 
 See [Platform Control Implementation Plan](platform-control-implementation-plan.md) for the planned repo structure, worker layout, and phased delivery approach.
 
@@ -126,8 +126,8 @@ Multi-country operator scaling references:
 
 - `docs/components/five-country-content-rollout.md`
 - `docs/runbooks/platform-control-multi-country-operator-playbook.md`
-- `docs/architecture/temporal-argilla-wizard-architecture.md`
-- `docs/runbooks/argilla-review-routing-and-sync.md`
+- `docs/architecture/temporal-argilla-wizard-architecture.md` (Argilla sections superseded by ADR-0031)
+- `docs/runbooks/extraction-review-routing.md`
 
 HITL (corrections, commentary overlays, canonical filters) rollout:
 

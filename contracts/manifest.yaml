@@ -1,5 +1,5 @@
-version: "2.2.0"
-last_reviewed: "2026-04-25"
+version: "2.4.0"
+last_reviewed: "2026-07-14"
 owner: "Platform Team"
 
 mvp_flow:
@@ -18,7 +18,7 @@ mvp_flow:
 apis:
   platform_control:
     file: "contracts/api/platform-control.openapi.yaml"
-    version: "0.5.1"
+    version: "0.7.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"

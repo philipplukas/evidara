@@ -87,26 +87,21 @@ class ScopeShardWorkflow:
 
 @workflow.defn
 class ReviewDrainWorkflow:
-    """Argilla enqueue / drain / gating workflow.
+    """Review-queue gate: wait until operators have cleared the run's review tasks.
 
-    Enqueues all pending review tasks for the run, then polls until the queue drains
-    or the maximum wait window is exceeded.
+    Polls until every ``ReviewTask`` for the run reaches a terminal status, or the
+    maximum wait window (``_MAX_DRAIN_POLLS`` × 30min = 24h) is exceeded.
+
+    There is no enqueue step any more. Review tasks are created directly in the
+    ``review_tasks`` table by the extraction path, and operators clear them in
+    ``platform-control/admin`` — the queue *is* the table. The workflow used to first
+    push every pending task to a hosted Argilla instance; that integration is deleted
+    (ADR-0031), and it was in any case swallowing every failure and reporting
+    ``drain_complete`` having enqueued nothing (#563).
     """
 
     @workflow.run
     async def run(self, wizard_run_id: str) -> str:
-        enqueue_retry = RetryPolicy(
-            maximum_attempts=5,
-            backoff_coefficient=2.0,
-            initial_interval=timedelta(seconds=30),
-        )
-        await workflow.execute_activity_method(
-            ReviewDrainActivities.enqueue_pending_reviews,
-            wizard_run_id,
-            start_to_close_timeout=timedelta(minutes=30),
-            retry_policy=enqueue_retry,
-        )
-
         for _ in range(_MAX_DRAIN_POLLS):
             complete: bool = await workflow.execute_activity_method(
                 ReviewDrainActivities.check_review_drain_complete,
@@ -260,3 +255,17 @@ class RetentionSweepWorkflow:
             start_to_close_timeout=timedelta(minutes=30),
             retry_policy=retry,
         )
+
+
+#: Every workflow the Temporal worker registers. Single source of truth for
+#: `temporal_worker.py` and for the replay suite, which asserts that each entry
+#: here has a recorded history checked in (`tests/data/temporal_histories/`).
+#: Adding a workflow without a history is a test failure, on purpose: an
+#: unreplayed workflow is an unguarded one.
+ALL_WORKFLOWS: list[type] = [
+    WizardRunWorkflow,
+    ScopeShardWorkflow,
+    ReviewDrainWorkflow,
+    RetentionSweepWorkflow,
+    RescoreFromCorrectionWorkflow,
+]

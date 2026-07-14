@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import httpx
 import pytest
 
@@ -71,42 +69,40 @@ async def test_wizard_api_happy_path(client, session_maker) -> None:
     )
     assert reject_after_scale.status_code == 409
 
+    # Review queue: create → operator decision → terminal. No Argilla anywhere (ADR-0031).
     create_task = await client.post(
         "/v1/reviews/tasks",
         json={
             "wizard_run_id": run_id,
-            "argilla_external_id": "api_argilla_1",
+            "external_id": "api_review_1",
             "record_id": "rec_1",
             "payload": {
                 "fields": {"title": "Decision 1"},
+                # 0.82 → the 0.70–0.90 band, sampled into review.
                 "metadata": {"recordConfidence": 0.82},
             },
         },
     )
     assert create_task.status_code == 201
-    assert create_task.json()["enqueue_outcome"] == "skipped_not_configured"
+    assert create_task.json()["status"] == "pending"
     task_id = create_task.json()["review_task_id"]
 
-    sync_payload = {
-        "tasks": [
-            {
-                "external_id": "api_argilla_1",
-                "annotation_updated_at": datetime(2026, 4, 7, 13, 0, tzinfo=UTC).isoformat(),
-                "decision": "accept",
-                "reviewed_by": "reviewer_api",
-                "payload": {"decision": "accept"},
-            }
-        ]
-    }
-    sync_first = await client.post("/v1/reviews/sync-from-argilla", json=sync_payload)
-    assert sync_first.status_code == 200
-    assert sync_first.json()["accepted"] == 1
+    decision = await client.post(
+        f"/v1/reviews/tasks/{task_id}/decision",
+        json={"decision": "accept", "reviewed_by": "reviewer_api"},
+    )
+    assert decision.status_code == 200
+    assert decision.json()["status"] == "completed"
 
-    sync_second = await client.post("/v1/reviews/sync-from-argilla", json=sync_payload)
-    assert sync_second.status_code == 200
-    assert sync_second.json()["duplicates"] == 1
+    # A second verdict conflicts rather than silently overwriting the first.
+    replay = await client.post(
+        f"/v1/reviews/tasks/{task_id}/decision",
+        json={"decision": "reject", "reviewed_by": "reviewer_api"},
+    )
+    assert replay.status_code == 409
 
     fetched = await client.get(f"/v1/reviews/tasks/{task_id}")
     assert fetched.status_code == 200
     assert fetched.json()["status"] == "completed"
-    assert fetched.json()["argilla_external_id"] == "api_argilla_1"
+    assert fetched.json()["external_id"] == "api_review_1"
+    assert fetched.json()["decision_payload"]["decision"] == "accept"

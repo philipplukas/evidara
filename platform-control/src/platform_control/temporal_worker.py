@@ -18,13 +18,7 @@ from platform_control.temporal.activities import (
 )
 from platform_control.temporal.client import connect_temporal
 from platform_control.temporal.runners import build_rescore_runner_factory
-from platform_control.temporal.workflows import (
-    RescoreFromCorrectionWorkflow,
-    RetentionSweepWorkflow,
-    ReviewDrainWorkflow,
-    ScopeShardWorkflow,
-    WizardRunWorkflow,
-)
+from platform_control.temporal.workflows import ALL_WORKFLOWS
 
 LOGGER = logging.getLogger("platform_control.temporal_worker")
 
@@ -49,12 +43,7 @@ async def _async_main() -> None:
         session_factory=session_factory,
         provider_registry_factory=lambda: build_provider_registry(settings),
     )
-    review_drain_acts = ReviewDrainActivities(
-        session_factory=session_factory,
-        argilla_api_base_url=settings.argilla_api_base_url,
-        argilla_api_key=settings.argilla_api_key,
-        argilla_dataset_id=settings.argilla_dataset_id,
-    )
+    review_drain_acts = ReviewDrainActivities(session_factory=session_factory)
     retention_acts = RetentionActivities(session_factory=session_factory)
     rescore_acts = RescoreFromCorrectionActivities(
         session_factory=session_factory,
@@ -65,19 +54,12 @@ async def _async_main() -> None:
     worker = Worker(
         client,
         task_queue=settings.temporal_task_queue,
-        workflows=[
-            WizardRunWorkflow,
-            ScopeShardWorkflow,
-            ReviewDrainWorkflow,
-            RetentionSweepWorkflow,
-            RescoreFromCorrectionWorkflow,
-        ],
+        workflows=ALL_WORKFLOWS,
         activities=[
             wizard_state_acts.persist_pilot_completed,
             wizard_state_acts.fetch_scope_shards,
             scope_shard_acts.run_shard_crawl,
             scope_shard_acts.report_shard_progress,
-            review_drain_acts.enqueue_pending_reviews,
             review_drain_acts.check_review_drain_complete,
             retention_acts.run_retention_sweep,
             rescore_acts.run_targeted_rescore,
