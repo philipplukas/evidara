@@ -163,7 +163,7 @@ export class ProjectionsService {
     const title = extracted.title ?? `Document ${event.payload.document_id}`;
     const preview =
       extracted.previewText ??
-      this.truncateForPreview(extracted.bodyPreviewFallback) ??
+      this.truncateForPreview(extracted.fullText) ??
       event.payload.processing_version;
     const jurisdiction =
       extracted.jurisdictionFromCanonical ?? this.inferJurisdiction(provenance.corpus_id);
@@ -191,6 +191,7 @@ export class ProjectionsService {
       language: extracted.language ?? this.inferLanguage(provenance.corpus_id),
       content_preview: preview,
     };
+    if (extracted.fullText) projection.content = extracted.fullText;
     if (extracted.documentType) projection.document_type = extracted.documentType;
     if (extracted.effectiveDate) projection.effective_date = extracted.effectiveDate;
     if (extracted.structuralPath) projection.structural_path = extracted.structuralPath;
@@ -250,6 +251,7 @@ export class ProjectionsService {
     translationStatus?: 'original' | 'machine_translated' | 'translation_unavailable';
     previewText?: string;
     bodyPreviewFallback?: string;
+    fullText?: string;
     sectionsCount: number;
     citationsCount: number;
     documentType?: string;
@@ -305,6 +307,10 @@ export class ProjectionsService {
         : typeof doc.full_text === 'string' && doc.full_text.trim()
           ? doc.full_text
           : undefined;
+    // The body the highlighter searches. Prefer the document body; when the
+    // lean document carries only structured sections, the concatenated section
+    // text is the full body.
+    const fullText = bodyPreviewFallback ?? this.extractSectionsText(doc);
     const structuredTitle = this.extractStructuredTitle([
       doc.title,
       doc.body_text,
@@ -385,6 +391,7 @@ export class ProjectionsService {
       translationStatus,
       previewText,
       bodyPreviewFallback,
+      fullText,
       sectionsCount,
       citationsCount,
       documentType,
@@ -504,6 +511,26 @@ export class ProjectionsService {
       return undefined;
     }
     return title;
+  }
+
+  /**
+   * Concatenate the canonical section bodies into one searchable text. Used
+   * when the lean document has no `body_text` / `full_text` of its own — the
+   * sections then *are* the document body.
+   */
+  private extractSectionsText(doc: Record<string, unknown>): string | undefined {
+    const raw = doc.sections ?? doc.document_sections ?? doc.body_sections;
+    if (!Array.isArray(raw)) return undefined;
+    const parts = raw
+      .filter((s): s is Record<string, unknown> => s != null && typeof s === 'object')
+      .map((s) => {
+        const title = typeof s.title === 'string' ? s.title.trim() : '';
+        const content = typeof s.content === 'string' ? s.content.trim() : '';
+        return [title, content].filter(Boolean).join('\n');
+      })
+      .filter(Boolean);
+    if (parts.length === 0) return undefined;
+    return parts.join('\n\n');
   }
 
   private truncateForPreview(text: string | undefined, maxChars = 400): string | undefined {

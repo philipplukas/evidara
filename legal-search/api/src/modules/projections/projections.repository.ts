@@ -69,6 +69,14 @@ export type SearchProjectionDocument = {
    */
   source_document_ids?: string[];
   language?: string;
+  /**
+   * Full document text. Indexed as `content` (analyzer `legal_text`) and
+   * is what the search highlighter reads to build a query-relevant snippet.
+   * Without it, `SearchResult.snippet` degrades to `content_preview`, which
+   * is the head of the document and identical for every query.
+   */
+  content?: string;
+  /** Derived: the head of `content`, for display without loading the body. */
   content_preview?: string;
   /** Normalized document type from canonical DI row (law, decision, …). */
   document_type?: string;

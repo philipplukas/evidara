@@ -182,6 +182,64 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('indexes the document body as `content` so the highlighter can build a snippet', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const body =
+      'Die Kündigungsfrist beträgt drei Monate. Ein Konkurrenzverbot ist nur verbindlich, ' +
+      'wenn es schriftlich vereinbart wurde.';
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Obligationenrecht Auszug',
+      body_text: body,
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({ content: body }),
+    );
+  });
+
+  it('falls back to the concatenated section bodies when there is no body_text', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Zivilgesetzbuch Auszug',
+      sections: [
+        { section_id: 'sec_1', title: 'Art. 1', content: 'Erster Abschnitt zum Grundsatz.' },
+        { section_id: 'sec_2', title: 'Art. 2', content: 'Zweiter Abschnitt zu Treu und Glauben.' },
+      ],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const projection = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as { content?: string };
+    expect(projection.content).toContain('Erster Abschnitt zum Grundsatz.');
+    expect(projection.content).toContain('Zweiter Abschnitt zu Treu und Glauben.');
+  });
+
+  it('derives content_preview from the indexed body rather than replacing it', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const body = 'A'.repeat(900);
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Langes Dokument',
+      body_text: body,
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const projection = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as { content?: string; content_preview?: string };
+    // The preview is truncated; the indexed body is not.
+    expect(projection.content).toHaveLength(900);
+    expect(projection.content_preview?.length).toBeLessThan(body.length);
+  });
+
   it('indexes Austrian BGBl citation targets from publication-organ sections', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
