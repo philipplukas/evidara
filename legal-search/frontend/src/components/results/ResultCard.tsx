@@ -6,6 +6,7 @@ import { ShareButton } from "@/components/ui/ShareButton";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
+import { HighlightedSnippet } from "./HighlightedSnippet";
 
 const iconComponents: Record<string, React.ComponentType<{ className?: string }>> = {
   "file-text": FileText,
@@ -113,9 +114,7 @@ export function ResultCard({
       </div>
 
       {/* Snippet */}
-      <p className="mb-3 mt-3 line-clamp-3 text-[13px] leading-6 text-foreground/80 font-document">
-        {result.snippet}
-      </p>
+      <HighlightedSnippet className="mb-3 mt-3 line-clamp-3" snippet={result.snippet} />
 
       {/* Metadata rows */}
       {result.metadataRows.length > 0 && (
