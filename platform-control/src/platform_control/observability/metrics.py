@@ -19,6 +19,7 @@ __all__ = [
     "record_artifact_captured",
     "record_bundle_event_published",
     "record_di_event_received",
+    "record_firecrawl_webhook_unmatched",
     "record_run_launched",
     "render_latest",
 ]
@@ -46,6 +47,16 @@ _DI_EVENTS_RECEIVED = Counter(
     ["event_type"],
 )
 
+_FIRECRAWL_WEBHOOKS_UNMATCHED = Counter(
+    "platform_control_firecrawl_webhooks_unmatched_total",
+    "Firecrawl webhook deliveries that matched no provider job/run and were not applied.",
+    # reason: "unknown_job_id" (no ProviderJob for the payload's crawl id — usually a
+    # webhook that raced the dispatch commit, so the retry should succeed) |
+    # "missing_job_id" (payload carried no crawl id) |
+    # "orphaned_provider_job" (ProviderJob exists but its Run does not).
+    ["event_type", "reason"],
+)
+
 
 def record_run_launched(provider: str) -> None:
     _RUNS_LAUNCHED.labels(provider=provider).inc()
@@ -62,6 +73,15 @@ def record_bundle_event_published(count: int = 1) -> None:
 
 def record_di_event_received(event_type: str) -> None:
     _DI_EVENTS_RECEIVED.labels(event_type=event_type).inc()
+
+
+def record_firecrawl_webhook_unmatched(*, event_type: str, reason: str) -> None:
+    """Count a Firecrawl delivery we could not apply.
+
+    A non-zero rate that does not drain is the signal that crawl events are being
+    redelivered forever against state that will never exist — the run is stuck.
+    """
+    _FIRECRAWL_WEBHOOKS_UNMATCHED.labels(event_type=event_type, reason=reason).inc()
 
 
 def render_latest() -> bytes:

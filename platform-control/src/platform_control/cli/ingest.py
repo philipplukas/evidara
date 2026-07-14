@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from platform_control.errors import WebhookRetryableError
 from platform_control.services.firecrawl_webhook_service import FirecrawlWebhookService
 
 
@@ -69,7 +70,13 @@ async def run_from_args(namespace: argparse.Namespace) -> int:
             # entrypoint that does not call _verify_signature.
             webhook_secret=settings.firecrawl_webhook_secret,
         )
-        processed = await ingest_payloads(payloads, service=service)
+        try:
+            processed = await ingest_payloads(payloads, service=service)
+        except WebhookRetryableError as exc:
+            # The fixture references a crawl this database knows nothing about — replaying
+            # it applies to nothing. Fail loudly rather than reporting a clean ingest.
+            print(f"ingest failed: {exc}", file=sys.stderr)
+            return 1
 
     print(f"processed {processed} payload(s) from {fixture_path}")
     return 0
