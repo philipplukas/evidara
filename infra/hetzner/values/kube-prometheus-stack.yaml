@@ -73,6 +73,11 @@ prometheus:
 alertmanager:
   enabled: true
   alertmanagerSpec:
+    # Credentials are mounted from the `evidara-alertmanager` Secret at
+    # /etc/alertmanager/secrets/evidara-alertmanager/. The Secret is created
+    # out-of-band (docs/setup/hetzner-observability.md) so tokens never enter git.
+    secrets:
+      - evidara-alertmanager
     resources:
       requests:
         cpu: 20m
@@ -88,9 +93,27 @@ alertmanager:
             requests:
               storage: 2Gi
 
-  # Routing. `critical` is the page tier (see docs/adr/sli-slo-definitions.md); until a
-  # real receiver is wired it lands in the Alertmanager UI only. To page for real, add a
-  # Slack webhook: see docs/setup/hetzner-observability.md#wiring-a-receiver.
+  # Routing. Two tiers, one channel.
+  #
+  #   critical -> `page`    Product is down: read alias unresolved, index empty,
+  #                         every query returning nothing. The June/July outage was
+  #                         exactly this and went unnoticed for weeks, because
+  #                         nothing pushed. Repeats HOURLY until resolved — it is
+  #                         meant to nag.
+  #
+  #   warning  -> `default` Dead-letters, backlogs, probe flaps. Real, but they can
+  #                         wait for business hours. Fires once and repeats only
+  #                         every 4h.
+  #
+  # Both go to the same Telegram chat, on purpose. A second channel for warnings
+  # (Slack) was considered and dropped: a channel you check "sometimes" is where
+  # alerts go to die, and this is a one-operator system. The tiers are distinguished
+  # by the message prefix and the repeat interval, which is the part that actually
+  # changes behaviour — not by which app they land in.
+  #
+  # Delivery is deliberately EXTERNAL to this cluster. Self-hosting the notifier
+  # here (ntfy, Gotify) would mean a node failure silences the alerts about the
+  # node failure.
   config:
     global:
       resolve_timeout: 5m
@@ -108,8 +131,36 @@ alertmanager:
           receiver: "null"
     receivers:
       - name: "null"
+
+      # Review tier. Same chat as `page`, deliberately quieter: no siren, and it
+      # repeats every 4h rather than hourly.
       - name: "default"
+        telegram_configs:
+          - bot_token_file: /etc/alertmanager/secrets/evidara-alertmanager/telegram-bot-token
+            chat_id: ${EVIDARA_TELEGRAM_CHAT_ID}
+            parse_mode: HTML
+            send_resolved: true
+            message: >-
+              ⚠️ <b>{{ .Status | toUpper }} · {{ .CommonLabels.alertname }}</b>
+              {{ range .Alerts }}
+              {{ .Annotations.summary }}
+              <i>{{ .Annotations.description }}</i>
+              {{ end }}
+
+      # Page tier. The product is down. Nags hourly until someone fixes it.
       - name: "page"
+        telegram_configs:
+          - bot_token_file: /etc/alertmanager/secrets/evidara-alertmanager/telegram-bot-token
+            chat_id: ${EVIDARA_TELEGRAM_CHAT_ID}
+            parse_mode: HTML
+            send_resolved: true
+            message: >-
+              🔴 <b>CRITICAL · {{ .CommonLabels.alertname }}</b>
+              {{ range .Alerts }}
+              {{ .Annotations.summary }}
+              <i>{{ .Annotations.description }}</i>
+              {{ end }}
+              <b>Runbook:</b> docs/runbooks/alert-response-playbook.md
     inhibit_rules:
       # A resolved-alias outage implies zero-result queries; don't page twice.
       - source_matchers: ["alertname = DocumentsReadAliasUnresolved"]
