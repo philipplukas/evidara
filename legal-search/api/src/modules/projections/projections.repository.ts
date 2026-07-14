@@ -76,6 +76,36 @@ export type SearchProjectionDocument = {
   effective_date?: string;
   /** Breadcrumb-style path when present in canonical metadata. */
   structural_path?: string;
+  /**
+   * Rank in the hierarchy of norms (ADR-0033), derived from the row's
+   * jurisdiction — see `core/norm-hierarchy`. Absent when the jurisdiction is
+   * unknown to the hierarchy vocabulary; the row is then simply not reachable
+   * through `norm_hierarchy()`, which is the honest outcome.
+   */
+  level?: string;
+  /**
+   * Jurisdictions whose law outranks this row, most authoritative first.
+   * Derived from the jurisdiction tree.
+   */
+  subordinate_to?: string[];
+  /**
+   * Competence this norm delegates downward. UNPOPULATED — it is an assertion
+   * made by the norm's text, not a fact derivable from the tree. See the
+   * `delegates_to` note in `documents-index.mapping.ts`.
+   */
+  delegates_to?: NormDelegation[];
+  /** First date the norm was in force; falls back to `effective_date`. */
+  in_force_from?: string;
+  /** Last date the norm WAS in force (inclusive). Absent = not known to be repealed. */
+  in_force_until?: string;
+};
+
+/** One `delegates_to` edge. Declared, not yet produced. */
+export type NormDelegation = {
+  target_level?: string;
+  target_jurisdiction_id?: string;
+  section_id?: string;
+  scope?: string;
 };
 
 /**

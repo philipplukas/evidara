@@ -722,4 +722,109 @@ describe('ProjectionsService', () => {
       );
     });
   });
+
+  describe('norm hierarchy (#583, ADR-0033)', () => {
+    /** Project a lean document and return the row that was written. */
+    async function project(leanDocument: Record<string, unknown>) {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue(leanDocument);
+      const service = new ProjectionsService(repository, diClient);
+      await service.applyDocumentProcessed(baseProcessedEvent);
+      return (repository.upsertProjection as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    }
+
+    it('gives a federal document the federal level', async () => {
+      const row = await project({
+        title: 'Tierschutzgesetz',
+        jurisdiction_ids: ['jur_ch_federal'],
+      });
+      expect(row.level).toBe('federal');
+    });
+
+    it('gives a cantonal document the cantonal level and makes it subordinate to federal law', async () => {
+      const row = await project({ title: 'Hundegesetz', jurisdiction_ids: ['jur_ch_zh'] });
+      expect(row.level).toBe('cantonal');
+      expect(row.subordinate_to).toContain('jur_ch_federal');
+      expect(row.subordinate_to).not.toContain('jur_ch_zh');
+    });
+
+    it('gives a communal ordinance the municipal level, subordinate to its canton AND the federation', async () => {
+      // The act being challenged in the dog question. Steps 2 and 3 of the walk
+      // — is it authorised, is it preempted — are these two edges.
+      const row = await project({
+        title: 'Hundereglement',
+        jurisdiction_ids: ['jur_ch_gemeinde_261'],
+      });
+      expect(row.level).toBe('municipal');
+      expect(row.subordinate_to).toContain('jur_ch_zh');
+      expect(row.subordinate_to).toContain('jur_ch_federal');
+    });
+
+    it('honours a declared `constitutional` level the jurisdiction cannot supply', async () => {
+      const row = await project({
+        title: 'Bundesverfassung',
+        jurisdiction_ids: ['jur_ch_federal'],
+        level: 'constitutional',
+      });
+      expect(row.level).toBe('constitutional');
+    });
+
+    it('leaves level unset for a jurisdiction the hierarchy does not know', async () => {
+      const row = await project({ title: 'Unknown', jurisdiction_ids: ['jur_atlantis'] });
+      expect(row.level).toBeUndefined();
+      expect(row.subordinate_to).toBeUndefined();
+    });
+
+    it('falls back to effective_date for in_force_from so there is one field to range-query', async () => {
+      const row = await project({
+        title: 'Hundegesetz',
+        jurisdiction_ids: ['jur_ch_zh'],
+        effective_date: '2005-01-01',
+      });
+      expect(row.in_force_from).toBe('2005-01-01');
+    });
+
+    it('carries the repeal date so temporal validity is answerable', async () => {
+      const row = await project({
+        title: 'Altes Hundegesetz',
+        jurisdiction_ids: ['jur_ch_zh'],
+        effective_date: '2005-01-01',
+        in_force_until: '2018-12-31',
+      });
+      expect(row.in_force_until).toBe('2018-12-31');
+    });
+
+    it('accepts `repealed_date` as an alias for the repeal date', async () => {
+      const row = await project({
+        title: 'Altes Hundegesetz',
+        jurisdiction_ids: ['jur_ch_zh'],
+        repealed_date: '2018-12-31',
+      });
+      expect(row.in_force_until).toBe('2018-12-31');
+    });
+
+    it('does not rank commentary in the hierarchy of norms', async () => {
+      // Commentary is not a norm; it governs nothing.
+      const repository = createRepositoryMock();
+      const service = new ProjectionsService(repository, createDocumentIntelligenceMock());
+      await service.applyCommentaryInsight({
+        insight_id: 'doc_01jq7bhgy7g0pkj4f1d03f8f8d',
+        document_id: 'doc_01jq7bhgy7g0pkj4f1d03f8f8c',
+        document_revision: 1,
+        processing_manifest_id: 'pm_01jq7bhgy7g0pkj4f1d03f8f8c',
+        insight_type: 'summary',
+        claim: 'A claim',
+        display_text: 'Some text',
+        jurisdiction_ids: ['jur_ch_zh'],
+        authority_ids: ['auth_fedlex'],
+        source_document_ids: ['doc_01jq7bhgy7g0pkj4f1d03f8f8c'],
+        confidence: 0.9,
+        review_state: 'approved',
+      });
+      const row = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(row.level).toBeUndefined();
+      expect(row.subordinate_to).toBeUndefined();
+    });
+  });
 });

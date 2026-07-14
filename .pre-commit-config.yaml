@@ -50,6 +50,14 @@ repos:
         pass_filenames: false
         files: ^contracts/(schemas|events)/.*\.json$
 
+      # Mirrors the CI step in .github/workflows/docs-and-contracts.yml.
+      - id: check-jurisdiction-hierarchy-vocab
+        name: Check jurisdiction-hierarchy vocabulary matches the seed
+        entry: python scripts/generate_jurisdiction_hierarchy_vocab.py --check
+        language: system
+        pass_filenames: false
+        files: ^(platform-control/src/platform_control/seeds/reference/jurisdictions\.yaml|contracts/vocabularies/(jurisdiction-hierarchy|norm-level)\.json)$
+
       - id: check-platform-contract-vendor
         name: Check vendored MacConfig platform contract pin
         entry: python scripts/check_platform_contract_vendor.py

@@ -12,13 +12,16 @@ See ADR-0011 for contract conventions.
 See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
+See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
 import type {
   CitedByResponse,
   DetailView,
   GetDocumentSections200,
+  GetNormHierarchyParams,
+  NormHierarchyView,
   SearchContextView,
   SearchDocumentsParams,
   SearchResponseView
@@ -254,6 +257,79 @@ export const getGetDocumentCitedByUrl = (documentId: string,) => {
 export const getDocumentCitedBy = async (documentId: string, options?: RequestInit): Promise<getDocumentCitedByResponse> => {
   
   return customFetch<getDocumentCitedByResponse>(getGetDocumentCitedByUrl(documentId),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+/**
+ * Returns the legal orders that bind a jurisdiction — constitutional,
+federal, cantonal, municipal — ordered most authoritative first, with the
+norms the corpus actually holds at each level. See ADR-0033.
+
+This is a **traversal, not a search**. The governing chain is derived
+from the jurisdiction tree
+(`contracts/vocabularies/jurisdiction-hierarchy.json`), not from text
+similarity: a communal ordinance is subordinate to its canton's law and
+to federal law because of where the commune sits, not because the
+documents resemble each other.
+
+`coverage.missing_levels` lists the levels that bind this place but for
+which the corpus holds nothing. It is load-bearing: an agent that
+reasons past a missing level is fabricating, and "I do not have the
+communal ordinance for this place" is a correct answer.
+
+ * @summary What governs this place, at each level of the hierarchy of norms
+ */
+export type getNormHierarchyResponse200 = {
+  data: NormHierarchyView
+  status: 200
+}
+
+export type getNormHierarchyResponse400 = {
+  data: void
+  status: 400
+}
+
+export type getNormHierarchyResponse404 = {
+  data: void
+  status: 404
+}
+    
+export type getNormHierarchyResponseSuccess = (getNormHierarchyResponse200) & {
+  headers: Headers;
+};
+export type getNormHierarchyResponseError = (getNormHierarchyResponse400 | getNormHierarchyResponse404) & {
+  headers: Headers;
+};
+
+export type getNormHierarchyResponse = (getNormHierarchyResponseSuccess | getNormHierarchyResponseError)
+
+export const getGetNormHierarchyUrl = (jurisdictionId: string,
+    params?: GetNormHierarchyParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/norm-hierarchy/${jurisdictionId}?${stringifiedParams}` : `/v1/norm-hierarchy/${jurisdictionId}`
+}
+
+export const getNormHierarchy = async (jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: RequestInit): Promise<getNormHierarchyResponse> => {
+  
+  return customFetch<getNormHierarchyResponse>(getGetNormHierarchyUrl(jurisdictionId,params),
   {      
     ...options,
     method: 'GET'
