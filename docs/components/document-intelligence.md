@@ -135,6 +135,32 @@ processed documents are never durably stored, `GET /v1/documents/{id}/lean` miss
 legal-search projections fall back to thin metadata (title `Document {id}`, no sections/citations).
 Recovery is to set the surface URIs in the `evidara-config` ConfigMap and reprocess.
 
+### HTML sectioning
+
+Sections are the retrieval unit: a lawyer searches for a *provision*, not a statute. The HTML
+normalizer (`normalize/html.py`) therefore distinguishes two kinds of tags:
+
+- **Leaf text tags** (`p`, `li`, `td`, `th`, `blockquote`, `pre`) and headings (`h1`–`h6`) each
+  become exactly one `Block`.
+- **Structural containers** (`article`, `section`, `main` — plus `div`, which is transparent) are
+  recursed into. They never become blocks themselves, so a `<h6>` nested inside
+  `<article id="art_36">` stays a heading. Loose text sitting directly inside a container with no
+  leaf tag around it is still captured, and flushed as a paragraph block.
+
+`sectionize/html.py` then splits on heading blocks. Each section carries:
+
+- `metadata.anchor` — the nearest enclosing element id (e.g. `art_36` for a Fedlex provision). This
+  is the stable, citable address of the provision.
+- `metadata.ancestor_titles` / `parent_title` / `parent_anchor` — the enclosing heading chain, so an
+  article knows its chapter (`Art. 36` → `2. Titel: Grundrechte` → `1. Kapitel: Grundrechte`).
+- `depth` — derived from the heading level.
+
+**Failure mode:** if a container is treated as a leaf text tag, it buffers every nested heading and
+paragraph into a single block, all headings disappear, and the whole statute collapses into one
+section (issue #573: the Bundesverfassung produced 2 sections, one of them 197 KB). The
+`ch_fedlex_bv_html` golden fixture — the real, full Bundesverfassung — guards this with a minimum
+section count and a maximum per-section length.
+
 ## Key Contracts
 
 - **Consumes:** `artifact_bundle.available`
