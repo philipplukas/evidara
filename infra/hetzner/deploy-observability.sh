@@ -71,4 +71,4 @@ echo
 echo "!! First-rollout check — confirm the NATS JetStream metric names resolve, or the"
 echo "   JetStream alerts are decorative (see docs/setup/hetzner-observability.md):"
 echo "     kubectl -n $NS exec sts/prometheus-kps-prometheus -c prometheus -- \\"
-echo "       wget -qO- 'http://localhost:9090/api/v1/query?query=jetstream_consumer_num_pending'"
+echo "       wget -qO- 'http://localhost:9090/api/v1/query?query=nats_consumer_num_pending'"

@@ -45,6 +45,10 @@ kind: Service
 metadata:
   name: platform-control-api
   namespace: evidara
+  # A ServiceMonitor selects on *Service* labels, not pod labels. See the note on
+  # the legal-search-api Service. (ADR-0032)
+  labels:
+    app: platform-control-api
 spec:
   selector:
     app: platform-control-api

@@ -234,6 +234,6 @@ Full deploy/verify/receiver-wiring guide:
 > nobody's phone rings. Wiring a Slack webhook is a one-value change; the credential is
 > deliberately the operator's, not the repo's. See the setup guide.
 
-> **First-rollout check.** Confirm `jetstream_consumer_num_pending` actually resolves in
+> **First-rollout check.** Confirm `nats_consumer_num_pending` actually resolves in
 > Prometheus. The `prometheus-nats-exporter` metric names have moved between versions,
 > and an alert on a metric that does not exist is worse than no alert — it looks like one.

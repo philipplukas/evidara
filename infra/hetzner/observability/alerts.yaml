@@ -144,7 +144,7 @@ spec:
         # rollout (docs/setup/hetzner-observability.md has the one-liner) — an alert on a
         # metric name that does not exist is worse than no alert, because it looks like one.
         - alert: JetStreamConsumerBacklogGrowing
-          expr: max by (consumer_name, stream_name) (jetstream_consumer_num_pending) > 100
+          expr: max by (consumer_name, stream_name) (nats_consumer_num_pending) > 100
           for: 15m
           labels:
             severity: warning
@@ -155,7 +155,7 @@ spec:
               is stuck, crash-looping, or slower than the producer.
 
         - alert: JetStreamRedeliveriesClimbing
-          expr: sum by (consumer_name) (increase(jetstream_consumer_num_redelivered[15m])) > 10
+          expr: sum by (consumer_name) (increase(nats_consumer_num_redelivered[15m])) > 10
           for: 15m
           labels:
             severity: warning
