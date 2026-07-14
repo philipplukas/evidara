@@ -9,6 +9,8 @@ WORKDIR /workspace
 # token layer (and vice versa).
 COPY styles/tokens ./styles/tokens
 COPY styles/ui ./styles/ui
+# @evidara/shell — the BrandMark lattice both surfaces render in their header.
+COPY styles/shell ./styles/shell
 # postinstall (in package.json) symlinks /workspace/node_modules -> the
 # surface's node_modules so styles/ui's bare imports (clsx, tailwind-merge)
 # resolve during `next build`. Copy the script into the build context so
