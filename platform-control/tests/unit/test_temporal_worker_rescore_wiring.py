@@ -87,19 +87,26 @@ async def test_activity_persists_unchanged_outcome_via_in_memory_runner(
 
 
 def test_temporal_worker_registers_rescore_activity_and_workflow() -> None:
-    """Sanity-check the worker module wires the rescore artefacts.
+    """The worker must register the rescore workflow and its activity.
 
-    Full worker boot requires a Temporal server; this test just confirms
-    the production module imports the right symbols so a future refactor
-    that drops the activity registration trips immediately.
+    Full worker boot needs a Temporal server, so this asserts against the
+    registry the worker actually passes to `Worker(workflows=...)` plus the
+    activity wiring in `_async_main` — not a grep for symbol names, which
+    passed happily whether or not the symbols were ever used.
     """
     from platform_control import temporal_worker
+    from platform_control.temporal.workflows import (
+        ALL_WORKFLOWS,
+        RescoreFromCorrectionWorkflow,
+    )
+
+    assert RescoreFromCorrectionWorkflow in ALL_WORKFLOWS
 
     source = (
         __import__("inspect").getsource(temporal_worker._async_main)  # type: ignore[attr-defined]
     )
+    assert "workflows=ALL_WORKFLOWS" in source
     assert "RescoreFromCorrectionActivities" in source
-    assert "RescoreFromCorrectionWorkflow" in source
     assert "build_rescore_runner_factory" in source
     assert "rescore_acts.run_targeted_rescore" in source
 

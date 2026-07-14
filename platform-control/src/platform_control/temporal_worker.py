@@ -18,13 +18,7 @@ from platform_control.temporal.activities import (
 )
 from platform_control.temporal.client import connect_temporal
 from platform_control.temporal.runners import build_rescore_runner_factory
-from platform_control.temporal.workflows import (
-    RescoreFromCorrectionWorkflow,
-    RetentionSweepWorkflow,
-    ReviewDrainWorkflow,
-    ScopeShardWorkflow,
-    WizardRunWorkflow,
-)
+from platform_control.temporal.workflows import ALL_WORKFLOWS
 
 LOGGER = logging.getLogger("platform_control.temporal_worker")
 
@@ -60,13 +54,7 @@ async def _async_main() -> None:
     worker = Worker(
         client,
         task_queue=settings.temporal_task_queue,
-        workflows=[
-            WizardRunWorkflow,
-            ScopeShardWorkflow,
-            ReviewDrainWorkflow,
-            RetentionSweepWorkflow,
-            RescoreFromCorrectionWorkflow,
-        ],
+        workflows=ALL_WORKFLOWS,
         activities=[
             wizard_state_acts.persist_pilot_completed,
             wizard_state_acts.fetch_scope_shards,
