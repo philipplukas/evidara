@@ -57,6 +57,12 @@ Only invest here once V (below) shows a builder will pay. Today's read API (`GET
 
 **Exit gate:** a design partner integrates against the documented external API without hand-holding.
 
+> Related but distinct: the **reasoning-surface primitives + MCP** (the graph-traversal
+> tools from [ADR-0033](../adr/0033-agentic-legal-reasoning.md), scoped to M13/M14) are
+> broken out as sequenced work items in
+> [`reasoning-surface-work-items.md`](./reasoning-surface-work-items.md). WP 2.4 (API keys /
+> metering / rate limits) is shared with that doc's WI-10.
+
 ---
 
 ## M3 — Freshness engine (the standing operational commitment) [gated by V]

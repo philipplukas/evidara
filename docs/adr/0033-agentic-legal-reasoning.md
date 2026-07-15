@@ -152,6 +152,10 @@ The order is forced by the dependency column above:
    model. Needed only for the anchor step.
 6. **Then MCP.**
 
+> Execution anchor: the endpoint-surfacing breakdown of this build order — sequenced,
+> acceptance-gated, file-grounded work items (M13/M14) — lives in
+> [`docs/product/reasoning-surface-work-items.md`](../product/reasoning-surface-work-items.md).
+
 ### 5. The corpus is scoped by the demo, not by ambition
 
 M13 is rescoped from *horizontal coverage* to a **vertical slice**: the smallest corpus
