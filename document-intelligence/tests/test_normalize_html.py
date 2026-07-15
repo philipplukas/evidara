@@ -62,6 +62,65 @@ class NormalizeHtmlDocumentTests(unittest.TestCase):
         self.assertIn("Art. 109 OR", ir.blocks[0].text)
         self.assertNotIn("fallback", ir.blocks[0].attrs)
 
+    def test_article_container_keeps_nested_heading_and_paragraph_separate(self) -> None:
+        """Fedlex wraps each provision in `<article id="art_N">`; the nested heading must survive."""
+        html = (
+            "<html><body><main>"
+            '<article id="art_1"><h6><b>Art. 1</b> Zweck</h6>'
+            '<div class="collapseable"><p>Erster Absatz.</p><p>Zweiter Absatz.</p></div></article>'
+            '<article id="art_2"><h6><b>Art. 2</b> Geltung</h6><p>Dritter Absatz.</p></article>'
+            "</main></body></html>"
+        )
+        ir = normalize_html_document(html, "art_fedlex")
+        self.assertEqual(
+            [(block.type, block.text) for block in ir.blocks],
+            [
+                ("heading", "Art. 1 Zweck"),
+                ("paragraph", "Erster Absatz."),
+                ("paragraph", "Zweiter Absatz."),
+                ("heading", "Art. 2 Geltung"),
+                ("paragraph", "Dritter Absatz."),
+            ],
+        )
+        headings = [block for block in ir.blocks if block.type == "heading"]
+        self.assertEqual([block.level for block in headings], [6, 6])
+        self.assertEqual([block.attrs.get("anchor") for block in headings], ["art_1", "art_2"])
+        # Body paragraphs inherit the enclosing article anchor.
+        self.assertEqual(ir.blocks[1].attrs.get("anchor"), "art_1")
+
+    def test_loose_text_in_container_becomes_paragraph_block(self) -> None:
+        """Bare text directly inside a container still yields a block (no tag-strip fallback)."""
+        html = "<html><head><title>T</title></head><body><article>Loser Text ohne p-Tag.</article></body></html>"
+        ir = normalize_html_document(html, "art_loose")
+        self.assertFalse(ir.metadata.get("html_parse_used_fallback"))
+        self.assertEqual(len(ir.blocks), 1)
+        self.assertEqual(ir.blocks[0].type, "paragraph")
+        self.assertEqual(ir.blocks[0].text, "Loser Text ohne p-Tag.")
+
+    def test_loose_text_flushed_before_sibling_block_starts(self) -> None:
+        """Loose text is flushed when a child block opens, so it does not swallow the heading."""
+        html = (
+            "<html><body>"
+            '<section id="sec_1">Vorspann.<h2>Kapitel 1</h2><p>Inhalt.</p>Nachspann.</section>'
+            "</body></html>"
+        )
+        ir = normalize_html_document(html, "art_flush")
+        self.assertEqual(
+            [(block.type, block.text) for block in ir.blocks],
+            [
+                ("paragraph", "Vorspann."),
+                ("heading", "Kapitel 1"),
+                ("paragraph", "Inhalt."),
+                ("paragraph", "Nachspann."),
+            ],
+        )
+        self.assertEqual({block.attrs.get("anchor") for block in ir.blocks}, {"sec_1"})
+
+    def test_unclosed_container_still_flushes_loose_text(self) -> None:
+        html = "<html><body><main>Text ohne schliessendes Tag."
+        ir = normalize_html_document(html, "art_unclosed")
+        self.assertEqual([block.text for block in ir.blocks], ["Text ohne schliessendes Tag."])
+
     def test_header_chrome_skipped_body_keeps_paragraph(self) -> None:
         html = (
             "<!DOCTYPE html><html><head><title>Test</title></head>"

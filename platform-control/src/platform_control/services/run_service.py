@@ -967,6 +967,21 @@ class RunService:
             run.status = RunStatus.FAILED
             run.completed_at = datetime.now(UTC)
             run.failure_reason = provider_result.inline_failure_reason
+
+        if run.status is RunStatus.RUNNING:
+            # The run is now in the provider's hands and will only ever complete via a
+            # webhook (Firecrawl) or a later poll. Commit the ProviderJob immediately
+            # instead of leaving it to the caller: until it is committed, an inbound
+            # `crawl.started` cannot resolve external_job_id -> run. Callers hold the
+            # transaction open for a while — `dispatch_pending_runs` batches up to 10
+            # runs before one commit — so the window is wide (#558).
+            #
+            # This narrows the race but cannot close it: `external_job_id` is minted by
+            # the provider, so no row can exist before the POST returns, and Firecrawl
+            # may fire `crawl.started` while that response is still in flight. The
+            # webhook handler therefore also treats an unmatched job as retryable rather
+            # than consuming it.
+            await self.session.commit()
         return pending_publications
 
     async def _persist_inline_resources(

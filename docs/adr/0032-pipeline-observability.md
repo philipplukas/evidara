@@ -83,6 +83,7 @@ emits a structured log event:
 | Artifacts captured | `platform_control_artifacts_captured_total{path}` | `RunService._persist_inline_resources` **and** `FirecrawlWebhookService._apply_event` (two capture paths; counting one would look like a leak) |
 | Bundle events published | `platform_control_bundle_events_published_total` | `RunService._publish_pending_dispatch_events`, `FirecrawlWebhookService._publish_bundle_manifest` |
 | DI callbacks received | `platform_control_di_events_received_total{event_type}` | `routers/di_events.py` |
+| Firecrawl webhooks unmatched | `platform_control_firecrawl_webhooks_unmatched_total{event_type,reason}` | `FirecrawlWebhookService._reject_unmatched` — a delivery that matched no provider job/run and was therefore not applied (#558). Transient blips are the dispatch race resolving itself; a rate that does not drain means a run is stuck |
 | DI messages processed | `di_messages_total{service,outcome}` | `dispatch_message` — labelled with the outcome string the function already returns |
 | Projections forwarded | `di_projection_forwards_total{outcome}` | `forward_message` — same |
 | Documents indexed | `legal_search_documents_indexed_total` | `ProjectionOpenSearchAdapter.upsertProjection`, **after** the write succeeds |
