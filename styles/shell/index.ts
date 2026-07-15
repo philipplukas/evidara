@@ -8,15 +8,11 @@
  *   "@evidara/shell":   ["../../styles/shell"],
  *   "@evidara/shell/*": ["../../styles/shell/*"]
  *
- * **Scaffolding-only at intro.** This barrel currently exports a single
- * placeholder marker so both surfaces can prove the path-alias wiring with a
- * real consumer before the first real component lands. The brand-mark
- * unification is owned by a separate PR (#496) and is intentionally not the
- * first migration here.
- *
  * See `docs/adr/0028-shared-shell-module.md` for the rationale and the
  * follow-up plan.
  */
+
+export { BrandMark, type BrandMarkProps } from "./BrandMark";
 
 /**
  * Sentinel value the scaffolding gate-tests can import to confirm the

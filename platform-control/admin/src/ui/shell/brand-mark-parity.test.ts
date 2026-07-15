@@ -5,50 +5,65 @@ import { describe, expect, it } from "vitest";
 /**
  * Cross-surface brand-mark parity guard (admin half).
  *
- * The "Evidara" brand-mark tile (gradient navy square + serif "E") is
- * rendered inline in `AppBar.tsx` and in workspace's `AppHeader`. The
- * fill and the display-letter typeface are a *shared* brand contract —
- * they must consume `--brand-mark-gradient` and `--font-brand-mark` from
- * `styles/tokens/tokens.css`.
+ * See the workspace mirror at
+ * `legal-search/frontend/src/__tests__/brand-mark-parity.test.ts` for the full
+ * rationale. In short: the mark used to be a gradient tile inlined in three
+ * places, and is now the single shared `BrandMark` component in
+ * `styles/shell/BrandMark.tsx`.
  *
- * The workspace half lives at
- * `legal-search/frontend/src/__tests__/brand-mark-parity.test.ts`. Either
- * side drifting fails its own surface's `npm run check`.
+ * Admin is the harder half, because it renders the mark on *two different
+ * grounds*: `AppBar` sits on the dark navy brand header (so the lattice must
+ * inherit the near-white `--admin-on-brand`, and the accent node must be lifted
+ * or it goes muddy), while the pre-boot `AdminShell` states sit on a light
+ * panel (so the lattice inherits navy, exactly like workspace). Both are
+ * asserted below — a navy lattice on the navy header would be invisible, and
+ * that is a bug no screenshot diff on the light surfaces would ever catch.
  */
 const sharedTokensCss = readFileSync(join(process.cwd(), "../../styles/tokens/tokens.css"), "utf8");
 const adminGlobalsCss = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 const appBarSource = readFileSync(join(process.cwd(), "src/ui/shell/AppBar.tsx"), "utf8");
+const adminShellSource = readFileSync(join(process.cwd(), "src/app/AdminShell.tsx"), "utf8");
 
 describe("brand-mark cross-surface contract", () => {
-  it("declares the shared brand-mark gradient + serif tokens in tokens.css", () => {
-    expect(sharedTokensCss).toContain("--brand-mark-gradient:");
-    expect(sharedTokensCss).toContain("--font-brand-mark:");
+  it("declares the shared accent-node token in tokens.css", () => {
+    expect(sharedTokensCss).toContain("--brand-mark-accent: var(--accent-core);");
   });
 
-  it("ties --brand-mark-gradient to the shared --brand / --brand-hover pair", () => {
-    expect(sharedTokensCss).toContain(
-      "--brand-mark-gradient: linear-gradient(135deg, var(--brand), var(--brand-hover));",
-    );
+  it("has fully retired the gradient-tile tokens", () => {
+    expect(sharedTokensCss).not.toContain("--brand-mark-gradient:");
+    expect(sharedTokensCss).not.toContain("--font-brand-mark:");
   });
 });
 
-describe("admin brand-mark consumes shared tokens", () => {
-  it("maps --font-brand-mark onto admin's loaded serif face", () => {
-    expect(adminGlobalsCss).toMatch(/--font-brand-mark:\s*var\(--font-admin-serif\)/);
+describe("admin consumes the shared BrandMark", () => {
+  it("imports it from @evidara/shell in both shell surfaces", () => {
+    for (const source of [appBarSource, adminShellSource]) {
+      expect(source).toContain('import { BrandMark } from "@evidara/shell"');
+      expect(source).toContain("<BrandMark");
+    }
   });
 
-  it("renders the AppBar brand-mark tile with the shared gradient + serif", () => {
-    expect(appBarSource).toContain('background: "var(--brand-mark-gradient)"');
-    expect(appBarSource).toContain('fontFamily: "var(--font-brand-mark)"');
+  it("gives the AppBar mark on-brand colour, not navy, on the dark header", () => {
+    // The whole reason BrandMark draws in currentColor. Navy-on-navy = invisible.
+    expect(appBarSource).toContain("text-[var(--admin-on-brand)]");
+    expect(appBarSource).toContain("[--brand-mark-accent:var(--admin-brand-mark-accent)]");
   });
 
-  it("does not re-inline the brand-mark gradient literal", () => {
-    // `var(--font-admin-serif)` is still used elsewhere in AppBar (the
-    // route-aware page-title portal) and is intentionally surface-local —
-    // we only forbid the gradient literal, since that's the shared half
-    // of the brand-mark contract.
-    expect(appBarSource).not.toContain(
-      'background: "linear-gradient(135deg, var(--brand), var(--brand-hover))"',
+  it("lifts the accent node off --accent-core for the brand header", () => {
+    expect(adminGlobalsCss).toMatch(/--admin-brand-mark-accent:\s*color-mix\([^;]*--accent-core/);
+  });
+
+  it("gives the pre-boot shell mark navy, since it sits on a light panel", () => {
+    expect(adminGlobalsCss).toMatch(/\.evidara-shell__mark \{[^}]*color:\s*var\(--brand\);/);
+  });
+
+  it("does not rebuild the retired gradient tile", () => {
+    for (const source of [appBarSource, adminShellSource, adminGlobalsCss]) {
+      expect(source).not.toContain("var(--brand-mark-gradient)");
+      expect(source).not.toContain("var(--font-brand-mark)");
+    }
+    expect(adminGlobalsCss).not.toContain(
+      "background: linear-gradient(135deg, var(--brand), var(--brand-hover))",
     );
   });
 });
