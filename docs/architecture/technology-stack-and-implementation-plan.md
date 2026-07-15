@@ -2,9 +2,30 @@
 
 ## Status
 
-Planned. This document defines the recommended technology choices, language boundaries, tooling, and phased implementation approach for Evidara.
+**Historical planning record. Superseded for runtime hosting and deployment by
+[ADR-0029: Self-Hosted Hetzner Runtime](../adr/0029-self-hosted-hetzner-runtime.md).**
 
-The stack and language-boundary decisions in this document are formalized in [ADR-0009: Technology Stack and Language Boundaries](../adr/0009-technology-stack-and-language-boundaries.md).
+> **Read this before the rest of the page.** Everything below that recommends a
+> **runtime, deployment, or managed-service** choice — Cloud Run, Cloud Run jobs, Pub/Sub,
+> Cloud SQL, GCS, Databricks (workspaces, Lakeflow Jobs, Asset Bundles, Unity Catalog,
+> PySpark), Databricks SQL warehouses — **no longer describes how Evidara runs.** The
+> system now runs on a self-hosted single-node k3s cluster on a Hetzner dedicated server,
+> with NATS JetStream, MinIO, CloudNativePG Postgres, OpenSearch, and Nessie + Trino
+> in-cluster. For the actual runtime, see
+> [System Context — Deployment Topology](system-context.md#deployment-topology) and
+> [Storage Model](storage-model.md).
+>
+> What in this document **still stands**: the language split (TypeScript for
+> user-facing/control-plane services, Python for acquisition and document intelligence,
+> SQL for data modeling, HCL for infrastructure), the component boundaries, the
+> contract-first posture, and the "no extra backend language without an ADR" rule. Those
+> are the parts formalized in
+> [ADR-0009: Technology Stack and Language Boundaries](../adr/0009-technology-stack-and-language-boundaries.md).
+>
+> The page is kept unrewritten as a record of what was planned and why. Do not use it as a
+> source of truth for infrastructure.
+
+This document defined the recommended technology choices, language boundaries, tooling, and phased implementation approach for Evidara.
 
 ## Purpose
 

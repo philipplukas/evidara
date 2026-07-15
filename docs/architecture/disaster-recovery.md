@@ -4,22 +4,24 @@
 
 Recovery priorities: **restore operator control**, **restore search serving**, then **replay or rebuild** canonical data and indices as needed.
 
+The runtime is a **self-hosted single-node k3s cluster** ([ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md)): every store below is self-managed, and node loss is a full outage. There is no managed-service SLA to fall back on — backup and restore are the operator's responsibility.
+
 ## Component recovery notes
 
 ### platform-control (Postgres)
 
-- Restore from **managed backups** (Cloud SQL PITR or equivalent).
+- Restore from **CloudNativePG backups** (in-cluster Postgres operator); PITR depends on the cluster's configured backup target.
 - After restore, validate run/source state against object storage manifests before resuming ingestion.
 
 ### Object storage (raw artifacts, manifests)
 
-- **Versioned buckets** and lifecycle rules reduce accidental loss.
+- MinIO in-cluster; **bucket versioning** and lifecycle rules reduce accidental loss.
 - Reprocessing depends on **immutable bundle manifests** still being present; if lost, recovery requires re-acquisition from sources (operational runbook).
 
-### document-intelligence (Delta, Databricks)
+### document-intelligence (Delta on MinIO)
 
-- **Unity Catalog** and workspace backups are environment-specific; document the actual backup/export procedure in Terraform / runbooks for each env.
-- **Replay model**: Pub/Sub retains and DLQs should be configured so that, after outage, events can be **replayed** or bundles re-triggered without corrupting canonical identity (`document_id`, revisions).
+- Canonical Delta tables live on MinIO and are written by the pure-Python `deltalake` sink. Their durability is MinIO's durability — back up the bucket; there is no separate catalog or workspace to restore.
+- **Replay model**: NATS JetStream stream retention, redelivery, and the app-level DLQ subject should be configured so that, after outage, events can be **replayed** or bundles re-triggered without corrupting canonical identity (`document_id`, revisions).
 
 ### legal-search (OpenSearch)
 
@@ -28,8 +30,8 @@ Recovery priorities: **restore operator control**, **restore search serving**, t
 
 ### Document Service
 
-- If implemented as Databricks SQL gateway, recovery follows Databricks workspace and SQL warehouse availability.
-- If implemented as a dedicated service, redeploy from artifact and restore connectivity to published Delta tables or materialized JSON.
+- Runs as a Deployment in the cluster: redeploy from the image and restore connectivity to the published Delta tables on MinIO.
+- If SQL-gateway reads are used, they go through in-cluster **Trino** over the **Nessie** catalog; recovery there is a redeploy plus catalog availability, and it is not a source of truth.
 
 ## Runbooks
 
