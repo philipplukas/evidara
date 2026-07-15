@@ -10,6 +10,7 @@ _DEFAULT_RESOLUTION_POLICY = "default_resolution_v1"
 _SOURCE_PROFILE_BY_NORMALIZER = {
     "html_v1": "default_html_v1",
     "xml_v1": "default_xml_v1",
+    "pdf_v1": "default_pdf_v1",
     "plain_text_v1": "default_plain_text_v1",
     "docling_v1": "default_docling_v1",
     "docling_fallback_v1": "default_docling_fallback_v1",

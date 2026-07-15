@@ -29,22 +29,23 @@ The operative text is a **PDF**. There is no HTML manifestation.
 
 WHY THE PROVIDER SHIPS DISABLED (`live_ready = False`)
 ------------------------------------------------------
-Two independent, structural blockers — neither fixable in this provider:
+The two *foundational* blockers that made a PDF ordinance unrepresentable
+were resolved by #590 (see ADR-0034):
 
-1. `acquisition_core.ProviderResource.body` is typed `str`. The
-   acquisition interface cannot carry binary bytes at all, so a PDF
-   manifestation cannot be represented, let alone stored.
-2. `document_intelligence` has no PDF path: `normalize/` ships `html.py`
-   and `xml.py` only, and both the legacy and "docling" backends take
-   `artifact_text: str`. An `application/pdf` artifact falls through to
-   `normalize_plain_text_document`, which would normalize raw PDF binary.
+1. `acquisition_core.ProviderResource` now carries binary bytes
+   (`body_bytes`) alongside text (`body`), so a PDF manifestation can be
+   represented, checksummed and stored end-to-end.
+2. `document_intelligence` now has a layout-aware PDF path
+   (`normalize/pdf.py`) that separates marginal headings ("Randtitel")
+   from the body column by their x-position, so it does not splice them
+   mid-sentence — "die Führung des **Organisation** Hundeverzeichnisses" —
+   the way a naive `pdftotext` dump would.
 
-Naive text extraction is NOT a shortcut: the AS PDFs carry marginal
-headings ("Randtitel") that `pdftotext` splices mid-sentence — "die
-Führung des **Organisation** Hundeverzeichnisses" — silently corrupting
-the legal text. Municipal law needs a layout-aware PDF pipeline.
-
-So this provider deliberately **refuses** rather than emitting the
+What remains is the **municipal acquisition slice (#584)**: wiring this
+provider to actually *emit* the PDF manifestation as a binary
+`ProviderResource`, plus a municipal blueprint template and the operator
+evidence to flip `live_ready`/`enabled`. Until that lands, this provider
+deliberately **refuses** a PDF-only manifestation rather than emit the
 metadata landing page in place of the ordinance: indexing a metadata stub
 as if it were the law is precisely the "demo that lies convincingly"
 failure ADR-0033 exists to prevent. When it meets a PDF-only
@@ -323,9 +324,9 @@ class GemeindeHttpProvider:
             if skipped:
                 inline_failure_reason = (
                     f"{self.provider_name} found {len(skipped)} manifestation(s) for BFS "
-                    f"{bfs_number} but all are binary (PDF). ProviderResource.body is str-typed "
-                    "and document-intelligence has no PDF normaliser, so the operative text "
-                    "cannot be acquired without a layout-aware PDF pipeline. See #584."
+                    f"{bfs_number} but all are binary (PDF). The binary body and the "
+                    "layout-aware PDF normaliser exist as of #590, but this provider does "
+                    "not yet emit PDFs — the municipal acquisition slice is #584."
                 )
             else:
                 inline_failure_reason = (

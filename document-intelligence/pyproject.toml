@@ -15,6 +15,10 @@ dependencies = [
   "google-cloud-storage>=2.16.0",
   "jsonschema>=4.14.0",
   "nats-py>=2.9.0,<3",
+  # Layout-aware PDF normalisation (#590): pure-Python, MIT, word-level coordinates,
+  # no ML model downloads. See docs/adr/0034 and normalize/pdf.py for the rationale
+  # (evaluated against docling, which is heavier and not reproducible in CI).
+  "pdfplumber>=0.11.0,<0.12",
   "prometheus-client>=0.21.0,<1",
   "pyarrow>=14.0.0",
   "PyYAML>=6.0.0",
@@ -44,8 +48,11 @@ llm = [
 ]
 # Pytest + anything eval/CI needs to import the package without the full dev stack.
 # Used by: scripts/check-document-intelligence.sh, eval-ris workflow, local `make eval-*`.
+# reportlab generates the synthetic multi-column PDF fixture that reproduces the
+# marginal-splice failure mode for the anti-corruption regression test (#590).
 test = [
   "pytest>=9.0.2",
+  "reportlab>=4.0.0",
 ]
 # Integration tests requiring Docker (opt-in via EVIDARA_NATS_IT=1). See
 # tests/test_nats_integration.py and ADR-0029.

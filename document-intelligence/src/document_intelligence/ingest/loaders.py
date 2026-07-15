@@ -34,6 +34,15 @@ class BundleLoader:
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
         raise NotImplementedError
 
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
+        """Return the artifact's verified raw bytes without decoding.
+
+        Binary modalities (e.g. ``application/pdf``, #590) must not be forced through a
+        text decode, which would corrupt the payload. Text loaders decode these same
+        bytes; the PDF normaliser consumes them raw.
+        """
+        raise NotImplementedError
+
 
 class DispatchingBundleLoader(BundleLoader):
     """Route bundle reads to the appropriate loader based on URI scheme."""
@@ -56,6 +65,10 @@ class DispatchingBundleLoader(BundleLoader):
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
         loader = self._loader_for_uri(artifact.storage_ref.uri)
         return loader.read_artifact_text(artifact)
+
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
+        loader = self._loader_for_uri(artifact.storage_ref.uri)
+        return loader.read_artifact_bytes(artifact)
 
     def _loader_for_uri(self, uri: str) -> BundleLoader:
         if uri.startswith("gs://"):
@@ -95,6 +108,10 @@ class LocalFilesystemBundleLoader(BundleLoader):
         return _build_selected_bundle(manifest)
 
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
+        artifact_bytes = self.read_artifact_bytes(artifact)
+        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
         file_path = _resolve_local_path(artifact.storage_ref.uri)
         try:
             with open(file_path, "rb") as artifact_file:
@@ -111,7 +128,7 @@ class LocalFilesystemBundleLoader(BundleLoader):
             ) from error
 
         _verify_checksum(artifact_bytes, artifact.storage_ref, "artifact")
-        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+        return artifact_bytes
 
 
 class GcsBundleLoader(BundleLoader):
@@ -132,9 +149,12 @@ class GcsBundleLoader(BundleLoader):
         return _build_selected_bundle(manifest)
 
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
+        return _decode_text(self.read_artifact_bytes(artifact), artifact.storage_ref.uri)
+
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
         artifact_bytes = self._download_bytes(artifact.storage_ref.uri, "artifact")
         _verify_checksum(artifact_bytes, artifact.storage_ref, "artifact")
-        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+        return artifact_bytes
 
     def _download_bytes(self, uri: str, object_kind: str) -> bytes:
         bucket_name, object_name = _parse_gcs_uri(uri)
@@ -168,9 +188,12 @@ class S3BundleLoader(BundleLoader):
         return _build_selected_bundle(manifest)
 
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
+        return _decode_text(self.read_artifact_bytes(artifact), artifact.storage_ref.uri)
+
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
         artifact_bytes = self._download_bytes(artifact.storage_ref.uri, "artifact")
         _verify_checksum(artifact_bytes, artifact.storage_ref, "artifact")
-        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+        return artifact_bytes
 
     def _download_bytes(self, uri: str, object_kind: str) -> bytes:
         bucket_name, object_name = _parse_s3_uri(uri)
