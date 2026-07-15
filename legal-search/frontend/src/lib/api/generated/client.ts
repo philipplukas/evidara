@@ -17,11 +17,16 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
  * OpenAPI spec version: 0.6.0
  */
 import type {
+  CitationGraphStats,
   CitedByResponse,
   DetailView,
+  FindCitingDocumentsParams,
+  FindCitingResponse,
   GetDocumentSections200,
   GetNormHierarchyParams,
   NormHierarchyView,
+  ResolveCitationParams,
+  ResolveCitationResponse,
   SearchContextView,
   SearchDocumentsParams,
   SearchResponseView
@@ -330,6 +335,178 @@ export const getNormHierarchy = async (jurisdictionId: string,
     params?: GetNormHierarchyParams, options?: RequestInit): Promise<getNormHierarchyResponse> => {
   
   return customFetch<getNormHierarchyResponse>(getGetNormHierarchyUrl(jurisdictionId,params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+/**
+ * Citation-graph traversal, forward direction (ADR-0033 step 3, "walk up").
+Backs the `resolve_citation` MCP tool.
+
+Accepts either a raw citation string ("SR 210") or a canonical key
+("sr:210") and returns the document(s) that ARE that norm.
+
+Resolution is DETERMINISTIC only: SR numbers, CELEX numbers, ECLIs and
+Austrian BGBl references carry their identifier in the string itself.
+Fuzzy citations ("Art. 36 BV", BGE references) cannot be normalized by
+today's extractor and come back `resolved: false` with
+`unresolved_reason: not_normalizable` — never a similarity-search guess,
+which would return a plausible wrong norm.
+
+ * @summary Resolve a citation string to the norm it points at
+ */
+export type resolveCitationResponse200 = {
+  data: ResolveCitationResponse
+  status: 200
+}
+
+export type resolveCitationResponse400 = {
+  data: void
+  status: 400
+}
+    
+export type resolveCitationResponseSuccess = (resolveCitationResponse200) & {
+  headers: Headers;
+};
+export type resolveCitationResponseError = (resolveCitationResponse400) & {
+  headers: Headers;
+};
+
+export type resolveCitationResponse = (resolveCitationResponseSuccess | resolveCitationResponseError)
+
+export const getResolveCitationUrl = (params: ResolveCitationParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/citations/resolve?${stringifiedParams}` : `/v1/citations/resolve`
+}
+
+export const resolveCitation = async (params: ResolveCitationParams, options?: RequestInit): Promise<resolveCitationResponse> => {
+  
+  return customFetch<resolveCitationResponse>(getResolveCitationUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+/**
+ * Citation-graph traversal, reverse direction (ADR-0033 step 4, "walk
+out"). Backs the `find_citing` MCP tool — "which decisions interpret
+this provision?".
+
+`q` is either a document id (`doc_...`) or a citation key / string
+naming the norm ("sr:210", "SR 210"). A document id is first mapped to
+the canonical keys that document IS.
+
+Traversal joins on the canonical key, NOT on the `target_document_id`
+denormalization written at projection time — that field is only set if
+the cited document already existed when the citing document was
+projected, so relying on it drops every edge whose endpoints arrived in
+the wrong order.
+
+ * @summary Find the documents that cite a norm
+ */
+export type findCitingDocumentsResponse200 = {
+  data: FindCitingResponse
+  status: 200
+}
+
+export type findCitingDocumentsResponse400 = {
+  data: void
+  status: 400
+}
+    
+export type findCitingDocumentsResponseSuccess = (findCitingDocumentsResponse200) & {
+  headers: Headers;
+};
+export type findCitingDocumentsResponseError = (findCitingDocumentsResponse400) & {
+  headers: Headers;
+};
+
+export type findCitingDocumentsResponse = (findCitingDocumentsResponseSuccess | findCitingDocumentsResponseError)
+
+export const getFindCitingDocumentsUrl = (params: FindCitingDocumentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/citations/citing?${stringifiedParams}` : `/v1/citations/citing`
+}
+
+export const findCitingDocuments = async (params: FindCitingDocumentsParams, options?: RequestInit): Promise<findCitingDocumentsResponse> => {
+  
+  return customFetch<findCitingDocumentsResponse>(getFindCitingDocumentsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+/**
+ * What share of extracted citations actually resolve to an edge, plus the
+unresolved remainder broken down by cause.
+
+This is reported as a first-class result rather than buried in logs
+because an unresolved citation is a BROKEN EDGE: consumers read a
+missing edge as "no such relation exists". A graph with silently missing
+edges is worse than no graph (ADR-0032), so the miss rate is part of the
+contract.
+
+ * @summary Citation graph resolution rate
+ */
+export type getCitationGraphStatsResponse200 = {
+  data: CitationGraphStats
+  status: 200
+}
+    
+export type getCitationGraphStatsResponseSuccess = (getCitationGraphStatsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCitationGraphStatsResponse = (getCitationGraphStatsResponseSuccess)
+
+export const getGetCitationGraphStatsUrl = () => {
+
+
+  
+
+  return `/v1/citations/stats`
+}
+
+export const getCitationGraphStats = async ( options?: RequestInit): Promise<getCitationGraphStatsResponse> => {
+  
+  return customFetch<getCitationGraphStatsResponse>(getGetCitationGraphStatsUrl(),
   {      
     ...options,
     method: 'GET'

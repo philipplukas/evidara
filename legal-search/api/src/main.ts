@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { bootstrapCitationGraphIndices } from './core/opensearch/citation-graph-bootstrap';
 import { bootstrapDocumentsIndex } from './core/opensearch/documents-bootstrap';
 
 /**
@@ -13,9 +14,10 @@ import { bootstrapDocumentsIndex } from './core/opensearch/documents-bootstrap';
 async function bootstrapOpenSearch(config: ConfigService): Promise<void> {
   if (!config.get<boolean>('opensearch.bootstrapOnStartup')) return;
   const logger = new Logger('OpenSearchBootstrap');
+  const node = config.get<string>('opensearch.node') ?? 'http://localhost:9200';
   try {
     const result = await bootstrapDocumentsIndex({
-      node: config.get<string>('opensearch.node') ?? 'http://localhost:9200',
+      node,
       readAlias: config.get<string>('opensearch.documentsReadAlias') ?? 'documents-read',
       writeAlias: config.get<string>('opensearch.documentsWriteAlias') ?? 'documents-write',
       logger: { info: (m) => logger.log(m), warn: (m) => logger.warn(m) },
@@ -23,6 +25,25 @@ async function bootstrapOpenSearch(config: ConfigService): Promise<void> {
     logger.log(`documents index bootstrap ${result.status}: ${result.physicalIndex}`);
   } catch (err) {
     logger.warn(`documents index bootstrap skipped: ${(err as Error).message}`);
+  }
+
+  // The citation graph (#582): `citation-targets` never existed on any cluster
+  // because nothing ever wrote to it, so its mapping would have been whatever
+  // OpenSearch guessed on the first write. Create both graph indices from the
+  // canonical mapping instead.
+  try {
+    const result = await bootstrapCitationGraphIndices({
+      node,
+      citationsIndex: config.get<string>('opensearch.citationsIndex') ?? 'citations',
+      citationTargetsIndex:
+        config.get<string>('opensearch.citationTargetsIndex') ?? 'citation-targets',
+      logger: { info: (m) => logger.log(m), warn: (m) => logger.warn(m) },
+    });
+    logger.log(
+      `citation graph bootstrap: citations ${result.citations}, citation-targets ${result.citationTargets}`,
+    );
+  } catch (err) {
+    logger.warn(`citation graph bootstrap skipped: ${(err as Error).message}`);
   }
 }
 

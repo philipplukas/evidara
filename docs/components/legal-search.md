@@ -148,6 +148,55 @@ These replace the need for custom index-lifecycle semantics in shared contracts.
 - **API:** `contracts/api/legal-search.openapi.yaml`
 - **Reads:** published DI surfaces referenced by event refs
 
+## Citation graph
+
+Per [ADR-0033](../adr/0033-agentic-legal-reasoning.md), legal reasoning is *traversal*, not
+similarity: "RAG to enter, graph to reason." The citation graph is what steps 3–4 of that
+workflow walk, and it lives in two OpenSearch indices, both with a managed mapping in
+`legal-search/api/src/core/opensearch/citation-graph-index.mapping.ts` and bootstrapped on
+startup (`citation-graph-bootstrap.ts`):
+
+| Index | Role | Written by |
+|---|---|---|
+| `citations` | **Edges.** One row per citation string found in a document, carrying `normalized_reference` — the canonical `{type}:{value}` key (`sr:210`) that DI's `normalize_citation()` emits. | `ProjectionsService.extractCitations` |
+| `citation-targets` | **Nodes.** One row per identifier a document *is* — `sr:101` is the Bundesverfassung. | `ProjectionsService.extractCitationTargets` |
+
+An edge exists when a citation's key matches a target's key. That join is the entire graph.
+
+**Where a document's own identifier comes from.** The Fedlex SPARQL provider emits a title,
+a short title and an ELI URI — but no SR number. So a Swiss federal law declares its SR
+number only in its **masthead**: the raw title (`Bundesverfassung ... (SR 101)`) and the
+opening line of the body (`Vom 18. April 1999 (Stand am 1. Januar 2024), SR 101.`). Target
+extraction therefore scans the raw (un-normalized) title, plus a bounded masthead window of
+the body, and only for `document_type: law`. The bound is deliberate: an SR number past the
+masthead is a citation to a *different* norm, and letting a decision register itself as
+`sr:210` would make every citation of the civil code in the corpus resolve to it. **A wrong
+edge is worse than a missing one.**
+
+**Traversal is keyed, not denormalized.** `GET /v1/citations/citing` joins on the canonical
+key, not on the `target_document_id` written onto a citation at projection time. That field
+is only set if the cited document already existed when the citing document was projected —
+so a graph traversed through it silently loses every edge whose endpoints arrived in the
+wrong order. (`GET /v1/documents/{id}/cited_by` still reads `target_document_id`, and is
+correspondingly order-dependent.)
+
+**The resolution rate is part of the contract.** `GET /v1/citations/stats` reports what
+share of extracted citations actually resolve, and attributes the remainder:
+
+- `not_normalizable` — DI could not key the citation at all (a fuzzy form like `Art. 36 BV`).
+  An **extractor** gap.
+- `unresolved_target` — the key is valid but names a norm not in the corpus. A **coverage** gap.
+
+These are reported rather than hidden because an unresolved citation is a *broken edge*, and
+consumers read a missing edge as "no such relation exists" (see [ADR-0032](../adr/0032-pipeline-observability.md)).
+The same numbers are exported as Prometheus metrics (`legal_search_citation_resolution_rate`,
+`legal_search_citations_projected_total{keyed}`) and alerted on in
+`infra/hetzner/observability/alerts.yaml` (`evidara.citation-graph`).
+
+**Known gap:** bare article references (`Art. 36 BV`) are the dominant citation form and are
+*not* resolved — they need search-based resolution against article-level sections, which
+depends on article-level sectioning. They are counted as `not_normalizable`, never guessed.
+
 ## Operator references
 
 - `docs/runbooks/projection-reindex-backfill.md` — alias-cutover reindex pattern.

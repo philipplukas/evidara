@@ -240,6 +240,96 @@ describe('ProjectionsService', () => {
     expect(projection.content_preview?.length).toBeLessThan(body.length);
   });
 
+  // ── Citation graph: the NODE half (#582, ADR-0033) ──
+  //
+  // Before this, `extractCitationTargets` scanned only the NORMALIZED title and
+  // `official_citation`. The Fedlex SPARQL provider sets no official_citation,
+  // and normalization strips the "(SR 101)" suffix from the title — so a real
+  // Fedlex law produced ZERO targets, `citation-targets` was never created, and
+  // all 504 extracted citations stayed unresolved. These tests pin the fix.
+  //
+  // The lean document below mirrors the golden fixture
+  // `document-intelligence/tests/golden/ch_fedlex_law_html/document.html`.
+
+  it('indexes a Swiss law under its own SR number, taken from the raw title', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft (SR 101)',
+      document_type: 'legislation',
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.bulkIndexCitationTargets).toHaveBeenCalledWith([
+      expect.objectContaining({
+        document_id: baseProcessedEvent.payload.document_id,
+        identifier_type: 'sr',
+        identifier_value: '101',
+      }),
+    ]);
+  });
+
+  it('indexes a Swiss law under the SR number in its masthead line', async () => {
+    // Fedlex states the SR number in the opening line of the body, which is the
+    // only deterministic source when the title carries no "(SR nnn)" suffix.
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Schweizerisches Zivilgesetzbuch',
+      document_type: 'legislation',
+      body_text:
+        'Schweizerisches Zivilgesetzbuch vom 10. Dezember 1907 (Stand am 1. Januar 2024), SR 210.\n' +
+        'Art. 1 Anwendung des Rechts ...',
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.bulkIndexCitationTargets).toHaveBeenCalledWith([
+      expect.objectContaining({ identifier_type: 'sr', identifier_value: '210' }),
+    ]);
+  });
+
+  it('does NOT let a document claim to BE a norm it merely cites', async () => {
+    // The hazard the masthead window exists to prevent. A wrong edge is worse
+    // than a missing one: if this decision registered itself as `sr:210`, every
+    // citation of the civil code in the entire corpus would resolve to it.
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Urteil 5A_123/2024',
+      document_type: 'decision',
+      body_text:
+        'Das Bundesgericht hat entschieden. '.repeat(30) +
+        'Nach Art. 8 ZGB (SR 210) traegt die Beweislast ...',
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    // No targets at all — a decision declares no SR number of its own.
+    expect(repository.bulkIndexCitationTargets).not.toHaveBeenCalled();
+  });
+
+  it('does not read an SR number from deep in a law body', async () => {
+    // Same hazard, inside a law: an SR number past the masthead is a citation to
+    // a DIFFERENT norm, not a self-declaration.
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Kantonales Hundegesetz',
+      document_type: 'legislation',
+      body_text: `${'Lorem ipsum dolor sit amet. '.repeat(40)}Es gilt das ZGB (SR 210).`,
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.bulkIndexCitationTargets).not.toHaveBeenCalled();
+  });
+
   it('indexes Austrian BGBl citation targets from publication-organ sections', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
