@@ -22,6 +22,7 @@ from dataclasses import dataclass
 import httpx
 import pytest
 import pytest_asyncio
+from docker.errors import DockerException
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -85,7 +86,7 @@ async def postgres_session_maker() -> AsyncIterator[async_sessionmaker[AsyncSess
             yield async_sessionmaker(engine, expire_on_commit=False)
 
             await engine.dispose()
-    except (ContainerStartException, OSError) as exc:
+    except (ContainerStartException, DockerException, OSError) as exc:
         pytest.skip(f"Docker-backed Postgres is unavailable: {exc}")
     finally:
         for key, value in previous_env.items():
@@ -125,9 +126,10 @@ async def _seed_operator(session_maker: async_sessionmaker[AsyncSession]) -> Non
 
 
 @pytest.mark.asyncio
-@pytest.mark.requires_network
+@pytest.mark.temporal
 async def test_correction_apply_rescore_outcome_and_metrics_loop(
     postgres_session_maker: async_sessionmaker[AsyncSession],
+    temporal_env: WorkflowEnvironment,
 ) -> None:
     await _seed_operator(postgres_session_maker)
 
@@ -139,71 +141,71 @@ async def test_correction_apply_rescore_outcome_and_metrics_loop(
 
     app.dependency_overrides[get_session] = override_get_session
 
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        scheduler = TemporalRescoreScheduler(
-            namespace="default",
-            task_queue=_TASK_QUEUE,
-            client=env.client,
-        )
-        app.dependency_overrides[_default_rescore_scheduler] = lambda: scheduler
-        activities = RescoreFromCorrectionActivities(
-            postgres_session_maker,
-            rescore_runner_factory=ChangedRescoreRunner,
-        )
+    env = temporal_env
+    scheduler = TemporalRescoreScheduler(
+        namespace="default",
+        task_queue=_TASK_QUEUE,
+        client=env.client,
+    )
+    app.dependency_overrides[_default_rescore_scheduler] = lambda: scheduler
+    activities = RescoreFromCorrectionActivities(
+        postgres_session_maker,
+        rescore_runner_factory=ChangedRescoreRunner,
+    )
 
-        async with Worker(
-            env.client,
-            task_queue=_TASK_QUEUE,
-            workflows=[RescoreFromCorrectionWorkflow],
-            activities=[activities.run_targeted_rescore],
-        ):
-            transport = httpx.ASGITransport(app=app)
-            async with httpx.AsyncClient(
-                transport=transport,
-                base_url="http://testserver",
-                headers={"X-API-Key": _OPERATOR_KEY},
-            ) as client:
-                create = await client.post(
-                    "/v1/corrections",
-                    json={
-                        "target_entity_type": "document",
-                        "target_entity_id": _DOCUMENT_ID,
-                        "correction_type": "rescore_request",
-                        "payload": {"reason_code": "low_quality_extractions"},
-                    },
-                )
-                assert create.status_code == 201, create.text
-                created = create.json()
-                correction_id = created["correction_id"]
-                assert created["operator_id"] == _OPERATOR_ID
+    async with Worker(
+        env.client,
+        task_queue=_TASK_QUEUE,
+        workflows=[RescoreFromCorrectionWorkflow],
+        activities=[activities.run_targeted_rescore],
+    ):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            headers={"X-API-Key": _OPERATOR_KEY},
+        ) as client:
+            create = await client.post(
+                "/v1/corrections",
+                json={
+                    "target_entity_type": "document",
+                    "target_entity_id": _DOCUMENT_ID,
+                    "correction_type": "rescore_request",
+                    "payload": {"reason_code": "low_quality_extractions"},
+                },
+            )
+            assert create.status_code == 201, create.text
+            created = create.json()
+            correction_id = created["correction_id"]
+            assert created["operator_id"] == _OPERATOR_ID
 
-                applied = await client.patch(
-                    f"/v1/corrections/{correction_id}",
-                    json={"status": "applied", "rationale": "Smoke approved."},
-                )
-                assert applied.status_code == 200, applied.text
-                applied_body = applied.json()
-                assert applied_body["status"] == "applied"
-                assert applied_body["payload"]["triggered_workflow_id"] == rescore_workflow_id(
-                    correction_id
-                )
+            applied = await client.patch(
+                f"/v1/corrections/{correction_id}",
+                json={"status": "applied", "rationale": "Smoke approved."},
+            )
+            assert applied.status_code == 200, applied.text
+            applied_body = applied.json()
+            assert applied_body["status"] == "applied"
+            assert applied_body["payload"]["triggered_workflow_id"] == rescore_workflow_id(
+                correction_id
+            )
 
-                handle = env.client.get_workflow_handle(rescore_workflow_id(correction_id))
-                workflow_result = await handle.result()
-                assert workflow_result["outcome"] == "changed"
-                assert workflow_result["resulting_run_id"] == "run_01jq7rescore000000000001"
+            handle = env.client.get_workflow_handle(rescore_workflow_id(correction_id))
+            workflow_result = await handle.result()
+            assert workflow_result["outcome"] == "changed"
+            assert workflow_result["resulting_run_id"] == "run_01jq7rescore000000000001"
 
-                fetched = await client.get(f"/v1/corrections/{correction_id}")
-                assert fetched.status_code == 200
-                payload = fetched.json()["payload"]
-                assert payload["rescore_outcome"] == "changed"
-                assert payload["resulting_run_id"] == "run_01jq7rescore000000000001"
-                assert payload["completed_at"] is not None
+            fetched = await client.get(f"/v1/corrections/{correction_id}")
+            assert fetched.status_code == 200
+            payload = fetched.json()["payload"]
+            assert payload["rescore_outcome"] == "changed"
+            assert payload["resulting_run_id"] == "run_01jq7rescore000000000001"
+            assert payload["completed_at"] is not None
 
-                metrics = await client.get("/v1/corrections/metrics")
-                assert metrics.status_code == 200
-                outcomes = metrics.json()["rescore_outcomes"]
-                assert outcomes["applied_total"] == 1
-                assert outcomes["changed"] == 1
-                assert outcomes["unchanged"] == 0
-                assert outcomes["failed"] == 0
+            metrics = await client.get("/v1/corrections/metrics")
+            assert metrics.status_code == 200
+            outcomes = metrics.json()["rescore_outcomes"]
+            assert outcomes["applied_total"] == 1
+            assert outcomes["changed"] == 1
+            assert outcomes["unchanged"] == 0
+            assert outcomes["failed"] == 0

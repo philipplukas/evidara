@@ -3,14 +3,16 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from prometheus_client import REGISTRY
 from sqlalchemy import func, select
 
 from platform_control.domain import ProviderJobStatus, RunMode, RunStatus, SourceVersionStatus
-from platform_control.errors import SignatureVerificationError
+from platform_control.errors import SignatureVerificationError, WebhookRetryableError
 from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.provider_job import ProviderJob
@@ -220,3 +222,187 @@ async def test_webhook_processing_rejects_tampered_signature(session, tmp_path: 
             raw_body=b"{}",
             signature="sha256=definitely-wrong",
         )
+
+
+# --- #558: a delivery we did not apply must never spend its dedupe key -------------
+
+
+async def _seed_run_without_provider_job(session) -> Run:
+    """Seed the exact state of the dispatch race: the Run exists, the ProviderJob (whose
+    external_job_id only exists once Firecrawl's POST has returned) does not yet."""
+    session.add(Jurisdiction(jurisdiction_id="jur_ch", name="Switzerland", slug="ch"))
+    session.add(
+        Authority(
+            authority_id="auth_zh_admin",
+            jurisdiction_id="jur_ch",
+            name="Zurich Administrative Court",
+            slug="zh-admin-court",
+        )
+    )
+    await session.commit()
+    source = Source(
+        source_id="src_race",
+        name="Zurich decisions",
+        jurisdiction_id="jur_ch",
+        authority_id="auth_zh_admin",
+    )
+    source_version = SourceVersion(
+        source_version_id="sv_race",
+        source_id="src_race",
+        version_label="v1",
+        status=SourceVersionStatus.APPROVED,
+        acquisition_spec={"seed_url": "https://example.com/decisions", "mode": "crawl"},
+    )
+    run = Run(
+        run_id="run_race",
+        source_id="src_race",
+        source_version_id="sv_race",
+        mode=RunMode.PREVIEW,
+        status=RunStatus.PENDING,
+    )
+    session.add_all([source, source_version, run])
+    await session.commit()
+    return run
+
+
+def _service(session, tmp_path: Path) -> FirecrawlWebhookService:
+    return FirecrawlWebhookService(
+        session=session,
+        artifact_store=LocalArtifactStore(base_dir=tmp_path / "artifacts"),
+        publisher=CollectingPublisher(),
+        webhook_secret="test-secret",
+    )
+
+
+def _unmatched_count(event_type: str, reason: str) -> float:
+    value = REGISTRY.get_sample_value(
+        "platform_control_firecrawl_webhooks_unmatched_total",
+        {"event_type": event_type, "reason": reason},
+    )
+    return 0.0 if value is None else value
+
+
+@pytest.mark.asyncio
+async def test_webhook_racing_the_provider_job_commit_survives_redelivery(
+    session, tmp_path: Path
+) -> None:
+    """The #558 regression: `crawl.started` arrives before the ProviderJob is committed.
+
+    The old code consumed the dedupe key anyway (receipt written as processed) and skipped
+    the event, so Firecrawl's identical retry was deduped away and the run stayed RUNNING
+    forever. The delivery must instead be kept reclaimable and the retry must apply it.
+    """
+    run = await _seed_run_without_provider_job(session)
+    service = _service(session, tmp_path)
+    payload = {"type": "crawl.started", "id": "crawl_race"}
+
+    # 1. The early webhook is refused rather than silently accepted.
+    with pytest.raises(WebhookRetryableError):
+        await service.process_payload(payload)
+
+    receipt = await session.scalar(select(WebhookReceipt))
+    assert receipt is not None, "the delivery must be persisted for forensics"
+    assert receipt.processed_at is None, (
+        "an unapplied delivery must stay unprocessed, or the retry is deduped away"
+    )
+    await session.refresh(run)
+    assert run.status is RunStatus.PENDING
+
+    # 2. The dispatch transaction lands, so the ProviderJob now exists.
+    session.add(
+        ProviderJob(
+            provider_job_id="pjob_race",
+            run_id="run_race",
+            external_job_id="crawl_race",
+            status=ProviderJobStatus.ACCEPTED,
+            request_payload={},
+            response_payload={},
+        )
+    )
+    await session.commit()
+
+    # 3. Firecrawl redelivers the identical payload — it must now be applied.
+    await service.process_payload(payload)
+
+    await session.refresh(run)
+    provider_job = await session.scalar(
+        select(ProviderJob).where(ProviderJob.external_job_id == "crawl_race")
+    )
+    receipt_count = await session.scalar(select(func.count()).select_from(WebhookReceipt))
+    await session.refresh(receipt)
+
+    assert run.status is RunStatus.RUNNING
+    assert provider_job is not None
+    assert provider_job.status is ProviderJobStatus.RUNNING
+    assert provider_job.last_event_type == "crawl.started"
+    assert receipt_count == 1, "the redelivery must reclaim the receipt, not add a second"
+    assert receipt.processed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_processed_delivery_is_still_deduped_after_it_applied(
+    session, tmp_path: Path
+) -> None:
+    """The reclaim window closes once the event is applied: a later replay is a no-op."""
+    await _seed_run_without_provider_job(session)
+    session.add(
+        ProviderJob(
+            provider_job_id="pjob_race",
+            run_id="run_race",
+            external_job_id="crawl_race",
+            status=ProviderJobStatus.ACCEPTED,
+            request_payload={},
+            response_payload={},
+        )
+    )
+    await session.commit()
+    service = _service(session, tmp_path)
+    payload = {"type": "crawl.started", "id": "crawl_race"}
+
+    await service.process_payload(payload)
+    first = await session.scalar(select(WebhookReceipt))
+    assert first is not None
+    processed_at = first.processed_at
+
+    await service.process_payload(payload)
+
+    await session.refresh(first)
+    receipt_count = await session.scalar(select(func.count()).select_from(WebhookReceipt))
+    assert receipt_count == 1
+    assert first.processed_at == processed_at, "an applied delivery must not be re-applied"
+
+
+@pytest.mark.asyncio
+async def test_unknown_job_is_counted_and_logged_rather_than_silently_consumed(
+    session, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    before = _unmatched_count("crawl.page", "unknown_job_id")
+    service = _service(session, tmp_path)
+
+    with (
+        caplog.at_level(
+            logging.WARNING, logger="platform_control.services.firecrawl_webhook_service"
+        ),
+        pytest.raises(WebhookRetryableError),
+    ):
+        await service.process_payload({"type": "crawl.page", "id": "crawl_ghost", "data": []})
+
+    assert _unmatched_count("crawl.page", "unknown_job_id") == before + 1
+    assert any(
+        "firecrawl.webhook.unmatched" in record.message and "crawl_ghost" in record.message
+        for record in caplog.records
+    ), "an unmatched delivery must be observable in the logs"
+
+
+@pytest.mark.asyncio
+async def test_payload_without_a_job_id_is_surfaced(session, tmp_path: Path) -> None:
+    before = _unmatched_count("crawl.page", "missing_job_id")
+    service = _service(session, tmp_path)
+
+    with pytest.raises(WebhookRetryableError):
+        await service.process_payload({"type": "crawl.page", "data": []})
+
+    receipt = await session.scalar(select(WebhookReceipt))
+    assert receipt is not None
+    assert receipt.processed_at is None
+    assert _unmatched_count("crawl.page", "missing_job_id") == before + 1

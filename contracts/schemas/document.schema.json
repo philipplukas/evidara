@@ -77,6 +77,58 @@
       "format": "date",
       "description": "Resolved effective date when available."
     },
+    "level": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": ["constitutional", "international", "federal", "cantonal", "municipal", null],
+      "description": "Rank in the hierarchy of norms (ADR-0033). NORMALLY OMITTED: the projection derives the level from the document's jurisdiction, which is the honest source — the jurisdiction already knows whether it is a commune, a canton or the Confederation. Declare it only for `constitutional`, the one level the jurisdiction cannot supply (the BV is enacted by the same federal jurisdiction as an ordinary statute). A declared level that would rank the norm BELOW its jurisdiction is ignored. See contracts/vocabularies/norm-level.json."
+    },
+    "in_force_from": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "description": "First date the norm was in force. Defaults to `effective_date` at projection time, so producers only set this when entry into force differs from the effective date."
+    },
+    "in_force_until": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "description": "Last date the norm WAS in force — inclusive. Repeal / end of validity. Without it, 'was this in force on 2019-06-01?' is unanswerable, so a `lifecycle_status` of `repealed` with no date here resolves to `unknown` rather than being guessed either way (ADR-0033)."
+    },
+    "delegates_to": {
+      "type": "array",
+      "description": "Competence this norm hands DOWN — e.g. a cantonal Hundegesetz delegating to communes the power to regulate dogs. NOT derivable from the jurisdiction tree: it is an assertion made BY the norm's text, so it requires extraction or curation. UNPOPULATED TODAY; the shape is declared so the edge has a home and producers have a target. `subordinate_to` (which norms outrank this one) IS derived and lives on the search projection, not here — subordination is a fact about the tree, delegation is a fact about the text.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "target_level": {
+            "type": "string",
+            "enum": ["constitutional", "international", "federal", "cantonal", "municipal"],
+            "description": "Level the competence is delegated TO."
+          },
+          "target_jurisdiction_id": {
+            "type": "string",
+            "pattern": "^jur_[a-z0-9_]+$",
+            "description": "Specific jurisdiction the competence is delegated to, when the norm names one."
+          },
+          "section_id": {
+            "type": "string",
+            "description": "Section of THIS document that makes the delegation — the provision an agent must cite when arguing the commune was authorised."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Subject matter of the delegated competence, as stated by the norm."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "processed_at": {
       "type": "string",
       "format": "date-time",

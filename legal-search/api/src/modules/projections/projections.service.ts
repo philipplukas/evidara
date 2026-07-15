@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { deriveDocumentLevel, deriveSubordinateTo } from '../../core/norm-hierarchy';
 import { normalizeDocumentType } from '../../core/vocabularies';
 import {
   DOCUMENT_INTELLIGENCE_CLIENT,
@@ -31,6 +32,14 @@ export type ProjectionApplyResult = {
 @Injectable()
 export class ProjectionsService {
   private readonly logger = new Logger(ProjectionsService.name);
+
+  /**
+   * How far into the body a document may still be stating its own identifier.
+   * Fedlex puts the SR number in the first line ("Vom 18. April 1999 (Stand am
+   * 1. Januar 2024), SR 101."); beyond the masthead, an SR number is a citation
+   * to a different norm, not a self-declaration. See `citationTargetScanText`.
+   */
+  private static readonly MASTHEAD_WINDOW_CHARS = 400;
 
   constructor(
     @Inject(PROJECTION_REPOSITORY)
@@ -163,7 +172,7 @@ export class ProjectionsService {
     const title = extracted.title ?? `Document ${event.payload.document_id}`;
     const preview =
       extracted.previewText ??
-      this.truncateForPreview(extracted.bodyPreviewFallback) ??
+      this.truncateForPreview(extracted.fullText) ??
       event.payload.processing_version;
     const jurisdiction =
       extracted.jurisdictionFromCanonical ?? this.inferJurisdiction(provenance.corpus_id);
@@ -188,16 +197,59 @@ export class ProjectionsService {
       processed_at: event.occurred_at,
       jurisdiction,
       jurisdiction_ids: jurisdictionIds,
-      language: extracted.language ?? this.inferLanguage(provenance.corpus_id),
+      // The searchable `language` facet must describe the expression we
+      // actually acquired (#572). Order matters: the canonical document's
+      // own `language`, then `metadata.original_language` (DI resolves it
+      // from the source HTML `lang` attribute, falling back to the source
+      // version's `language_codes`), and only then the corpus-id guess.
+      // Preferring the guess over `original_language` is what indexed the
+      // German Federal Constitution as Italian.
+      language:
+        extracted.language ??
+        extracted.originalLanguage ??
+        this.inferLanguage(provenance.corpus_id),
       content_preview: preview,
     };
+    if (extracted.fullText) projection.content = extracted.fullText;
     if (extracted.documentType) projection.document_type = extracted.documentType;
     if (extracted.effectiveDate) projection.effective_date = extracted.effectiveDate;
     if (extracted.structuralPath) projection.structural_path = extracted.structuralPath;
     if (extracted.canonicalAuthorityIds && extracted.canonicalAuthorityIds.length > 0) {
       projection.authority_ids = extracted.canonicalAuthorityIds;
     }
+    this.applyNormHierarchy(projection, extracted);
     return projection;
+  }
+
+  /**
+   * Stamp the hierarchy-of-norms fields onto a projection row (ADR-0033).
+   *
+   * `level` and `subordinate_to` are derived from the row's jurisdiction, never
+   * guessed from its text — the jurisdiction already knows whether it is a
+   * commune, a canton or the Confederation, so the ordering of norms falls out
+   * of the tree. A document whose jurisdiction is unknown to the hierarchy
+   * vocabulary gets neither field and is simply unreachable through
+   * `norm_hierarchy()`; that is a coverage gap the endpoint reports, not one it
+   * papers over.
+   *
+   * `in_force_from` coalesces `effective_date` so the index has one field to
+   * range-query. `delegates_to` is NOT set here: it cannot be derived from the
+   * tree.
+   */
+  private applyNormHierarchy(
+    projection: SearchProjectionDocument,
+    extracted: { declaredLevel?: string; inForceFrom?: string; inForceUntil?: string },
+  ): void {
+    const level = deriveDocumentLevel(projection.jurisdiction_ids, extracted.declaredLevel);
+    if (level) {
+      projection.level = level;
+      const subordinateTo = deriveSubordinateTo(projection.jurisdiction_ids);
+      if (subordinateTo.length > 0) projection.subordinate_to = subordinateTo;
+    }
+
+    const inForceFrom = extracted.inForceFrom ?? projection.effective_date;
+    if (inForceFrom) projection.in_force_from = inForceFrom;
+    if (extracted.inForceUntil) projection.in_force_until = extracted.inForceUntil;
   }
 
   /**
@@ -250,6 +302,7 @@ export class ProjectionsService {
     translationStatus?: 'original' | 'machine_translated' | 'translation_unavailable';
     previewText?: string;
     bodyPreviewFallback?: string;
+    fullText?: string;
     sectionsCount: number;
     citationsCount: number;
     documentType?: string;
@@ -258,6 +311,9 @@ export class ProjectionsService {
     jurisdictionFromCanonical?: string;
     canonicalJurisdictionIds?: string[];
     canonicalAuthorityIds?: string[];
+    declaredLevel?: string;
+    inForceFrom?: string;
+    inForceUntil?: string;
   } {
     if (!leanDocument || typeof leanDocument !== 'object') {
       return { sectionsCount: 0, citationsCount: 0 };
@@ -305,6 +361,10 @@ export class ProjectionsService {
         : typeof doc.full_text === 'string' && doc.full_text.trim()
           ? doc.full_text
           : undefined;
+    // The body the highlighter searches. Prefer the document body; when the
+    // lean document carries only structured sections, the concatenated section
+    // text is the full body.
+    const fullText = bodyPreviewFallback ?? this.extractSectionsText(doc);
     const structuredTitle = this.extractStructuredTitle([
       doc.title,
       doc.body_text,
@@ -377,6 +437,25 @@ export class ProjectionsService {
       /^auth_[a-z0-9_]+$/,
     );
 
+    // The only level a document may declare for itself is one the jurisdiction
+    // cannot supply — in practice `constitutional`, because the BV is enacted by
+    // the same federal jurisdiction as an ordinary statute. `deriveDocumentLevel`
+    // rejects a declaration that would demote the norm.
+    const declaredLevel = this.firstNestedString(doc, [['level'], ['metadata', 'level']]);
+    const inForceFrom = this.firstNestedString(doc, [
+      ['in_force_from'],
+      ['metadata', 'in_force_from'],
+    ]);
+    // `repealed_date` is accepted as an alias so a producer that models repeal
+    // as an event date does not silently drop the only field that makes
+    // temporal validity answerable.
+    const inForceUntil = this.firstNestedString(doc, [
+      ['in_force_until'],
+      ['metadata', 'in_force_until'],
+      ['repealed_date'],
+      ['metadata', 'repealed_date'],
+    ]);
+
     return {
       title: fallbackTitle,
       language,
@@ -385,6 +464,7 @@ export class ProjectionsService {
       translationStatus,
       previewText,
       bodyPreviewFallback,
+      fullText,
       sectionsCount,
       citationsCount,
       documentType,
@@ -393,6 +473,9 @@ export class ProjectionsService {
       jurisdictionFromCanonical,
       canonicalJurisdictionIds: resolvedJurisdictionIds,
       canonicalAuthorityIds,
+      declaredLevel,
+      inForceFrom,
+      inForceUntil,
     };
   }
 
@@ -504,6 +587,26 @@ export class ProjectionsService {
       return undefined;
     }
     return title;
+  }
+
+  /**
+   * Concatenate the canonical section bodies into one searchable text. Used
+   * when the lean document has no `body_text` / `full_text` of its own — the
+   * sections then *are* the document body.
+   */
+  private extractSectionsText(doc: Record<string, unknown>): string | undefined {
+    const raw = doc.sections ?? doc.document_sections ?? doc.body_sections;
+    if (!Array.isArray(raw)) return undefined;
+    const parts = raw
+      .filter((s): s is Record<string, unknown> => s != null && typeof s === 'object')
+      .map((s) => {
+        const title = typeof s.title === 'string' ? s.title.trim() : '';
+        const content = typeof s.content === 'string' ? s.content.trim() : '';
+        return [title, content].filter(Boolean).join('\n');
+      })
+      .filter(Boolean);
+    if (parts.length === 0) return undefined;
+    return parts.join('\n\n');
   }
 
   private truncateForPreview(text: string | undefined, maxChars = 400): string | undefined {
@@ -644,10 +747,25 @@ export class ProjectionsService {
     return undefined;
   }
 
+  /**
+   * Last-resort language guess from the corpus id (#572).
+   *
+   * Token-based on purpose: the previous substring match classified
+   * `corpus_public_ch_fedlex_constitution` as Italian because the word
+   * "cons-t-**it**-ution" contains the letters "it" — which is how the
+   * German Federal Constitution ended up indexed with `language: it`.
+   * A corpus id only carries a language when it has an explicit
+   * language *token* (`..._de`), so match whole tokens and return
+   * `undefined` rather than a confidently wrong facet value.
+   */
   private inferLanguage(corpusId: string): string | undefined {
-    if (corpusId.includes('de')) return 'de';
-    if (corpusId.includes('fr')) return 'fr';
-    if (corpusId.includes('it')) return 'it';
+    const tokens = corpusId
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+    for (const code of ['de', 'fr', 'it', 'en', 'rm']) {
+      if (tokens.includes(code)) return code;
+    }
     return undefined;
   }
 
@@ -841,6 +959,27 @@ export class ProjectionsService {
    * Extract identifier→document_id mappings so other documents' citations can
    * resolve against our corpus. Identifiers include official_citation,
    * jurisdiction-specific codes (SR, CELEX, ECLI), and docket numbers.
+   *
+   * This is the NODE half of the citation graph (#582, ADR-0033). A citation
+   * only becomes an edge if the norm it names is addressable here — so every
+   * identifier this method fails to find is an edge that silently never forms.
+   *
+   * Where the identifiers actually live (verified against
+   * `document-intelligence/tests/golden/ch_fedlex_law_html/`):
+   *
+   *   - `official_citation` — set by DI only when the source supplies one. The
+   *     Fedlex SPARQL provider does NOT: it emits title, title_short and an ELI
+   *     URI, and no SR number. So for Swiss federal law this is usually absent.
+   *   - the document's MASTHEAD — Fedlex publishes the SR number in the title
+   *     ("Bundesverfassung ... (SR 101)") and in the opening line of the body
+   *     ("Vom 18. April 1999 (Stand am 1. Januar 2024), SR 101."). That is the
+   *     document stating its own identifier, and it is the only deterministic
+   *     SR source available without re-scraping.
+   *
+   * Scanning only the projection's NORMALIZED title (as this method previously
+   * did) misses both: normalization strips the "(SR 101)" suffix. Result: zero
+   * targets for every Fedlex document, so `citation-targets` was never even
+   * created and all 504 extracted citations stayed unresolved.
    */
   private extractCitationTargets(
     projection: SearchProjectionDocument,
@@ -862,13 +1001,9 @@ export class ProjectionsService {
       });
     }
 
-    // Extract structured identifiers from the content_preview or title
-    // that match deterministic patterns (SR, CELEX, ECLI).
-    const text = [projection.title, projection.official_citation, projection.structural_path]
-      .filter(Boolean)
-      .join(' ');
+    const text = this.citationTargetScanText(projection, leanDocument);
 
-    const srMatch = text.match(/\bSR\s+(\d{3}(?:\.\d+)*)\b/);
+    const srMatch = text.match(/\bSR\s+(\d{3}(?:\.\d+)*)\b/i);
     if (srMatch) {
       targets.push({ ...base, identifier_type: 'sr', identifier_value: srMatch[1] });
     }
@@ -878,9 +1013,13 @@ export class ProjectionsService {
       targets.push({ ...base, identifier_type: 'celex', identifier_value: celexMatch[1] });
     }
 
-    const ecliMatch = text.match(/\bECLI:[A-Z]{2}:[A-Z0-9]+:\d{4}:[A-Z0-9.]+\b/);
+    const ecliMatch = text.match(/\bECLI:[A-Z]{2}:[A-Z0-9]+:\d{4}:[A-Z0-9.]+\b/i);
     if (ecliMatch) {
-      targets.push({ ...base, identifier_type: 'ecli', identifier_value: ecliMatch[0] });
+      targets.push({
+        ...base,
+        identifier_type: 'ecli',
+        identifier_value: ecliMatch[0].toUpperCase(),
+      });
     }
 
     const atBgblRef = this.extractAustrianBgblReference(projection, leanDocument);
@@ -896,6 +1035,61 @@ export class ProjectionsService {
             other.identifier_value === target.identifier_value,
         ) === index,
     );
+  }
+
+  /**
+   * The text a document is allowed to declare its OWN identifier in.
+   *
+   * The distinction that keeps this honest: an SR number in a document's
+   * masthead is that document's identity; the same SR number 40 paragraphs
+   * down is a citation to a different norm. Confusing the two would make a
+   * cantonal decree claim to BE the civil code and corrupt every edge that
+   * points at it — a wrong edge is worse than a missing one.
+   *
+   * So the body is scanned only within a short masthead window, and only for
+   * documents that are legislation (`document_type: 'law'`, DI's normalized
+   * form of `legislation`). Case law and commentary declare no SR number of
+   * their own and would only ever match a citation.
+   */
+  private citationTargetScanText(
+    projection: SearchProjectionDocument,
+    leanDocument?: unknown | null,
+  ): string {
+    const parts = [
+      projection.title,
+      projection.official_citation,
+      projection.structural_path,
+      // The RAW lean-document title, before `normalizeTitle` strips the
+      // parenthetical: this is where Fedlex puts "(SR 101)".
+      this.rawLeanTitle(leanDocument),
+    ];
+
+    if (projection.document_type === 'law') {
+      parts.push(this.mastheadText(leanDocument));
+    }
+
+    return parts.filter(Boolean).join(' ');
+  }
+
+  /** The lean document's untouched `title`, if any. */
+  private rawLeanTitle(leanDocument?: unknown | null): string | undefined {
+    if (!leanDocument || typeof leanDocument !== 'object') return undefined;
+    const doc = leanDocument as Record<string, unknown>;
+    return typeof doc.title === 'string' && doc.title.trim() ? doc.title : undefined;
+  }
+
+  /**
+   * The opening window of the document body, where a statute states its own
+   * identifier. Bounded deliberately: a wider window starts swallowing the
+   * document's citations to OTHER norms.
+   */
+  private mastheadText(leanDocument?: unknown | null): string | undefined {
+    if (!leanDocument || typeof leanDocument !== 'object') return undefined;
+    const doc = leanDocument as Record<string, unknown>;
+    const body = [doc.body_text, doc.full_text, doc.content_text, doc.text].find(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0,
+    );
+    return body?.slice(0, ProjectionsService.MASTHEAD_WINDOW_CHARS);
   }
 
   private extractAustrianBgblReference(

@@ -14,6 +14,8 @@
   --workspace-page-sheen-light: color-mix(in oklab, var(--surface-panel) 45%, transparent);
   --workspace-input-highlight: color-mix(in oklab, var(--surface-panel) 60%, transparent);
 
+  /* Corner radius shared by the three workspace panels. */
+  --radius-panel: 1.35rem;
 }
 
 @theme inline {
@@ -204,13 +206,25 @@
     }
   }
 
+  /*
+   * The shell frame. The header, the context bar, and the workspace panel row
+   * are three separately-scrolling bars that must read as one column: the
+   * search bar has to line up with the panel edges directly beneath it. They
+   * only do that while they share a gutter *and* a max-width, so all three own
+   * exactly this class and nothing else sets those properties. Their
+   * backgrounds still bleed to the viewport edge — only the content is framed.
+   */
+  .shell-frame {
+    @apply mx-auto w-full max-w-[var(--container-max)] px-4 lg:px-6;
+  }
+
   .app-header {
     @apply sticky top-0 z-40 border-b border-border/70 bg-surface-page/78 backdrop-blur-xl supports-[backdrop-filter]:bg-surface-page/72;
     box-shadow: var(--shadow-shell);
   }
 
   .app-header__inner {
-    @apply mx-auto grid max-w-[var(--container-max)] items-center gap-3 px-4 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:gap-4 lg:px-6;
+    @apply grid items-center gap-3 py-3 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:gap-4;
     grid-template-areas:
       "brand utility"
       "search search"
@@ -226,12 +240,12 @@
   }
 
   /*
-   * The BrandMark lattice is drawn in `currentColor`, so the wrapper's `color`
-   * IS the mark's colour. On this light header that must be brand navy; the
-   * accent node stays violet via `--brand-mark-accent`. See `@evidara/shell`.
+   * The shared `BrandMark` draws its lattice in `currentColor` — this rule is
+   * what feeds it navy on the workspace's light header. Admin's `AppBar` sets
+   * a near-white `color` instead, on its dark brand header.
    */
   .app-header__brand-mark {
-    @apply flex h-8 w-8 items-center justify-center;
+    @apply h-8 w-8 shrink-0;
     color: var(--brand);
   }
 
@@ -319,11 +333,11 @@
   }
 
   .context-bar {
-    @apply border-b border-border bg-surface-panel/95 px-4 py-3 backdrop-blur-sm sm:px-5;
+    @apply border-b border-border bg-surface-panel/95 py-3 backdrop-blur-sm;
   }
 
   .context-bar__layout {
-    @apply mx-auto flex max-w-[var(--container-max)] flex-wrap items-center gap-3;
+    @apply flex flex-wrap items-center gap-3;
   }
 
   .context-bar__clusters {

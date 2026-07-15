@@ -7,8 +7,10 @@ import opensearchConfig from './core/config/opensearch.config';
 import { AllExceptionsFilter } from './core/filters/all-exceptions.filter';
 import { MetricsModule } from './core/metrics/metrics.module';
 import { OpenSearchModule } from './core/opensearch/client';
+import { CitationsModule } from './modules/citations/citations.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
+import { NormHierarchyModule } from './modules/norm-hierarchy/norm-hierarchy.module';
 import { ProjectionsModule } from './modules/projections/projections.module';
 import { SearchModule } from './modules/search/search.module';
 
@@ -23,7 +25,9 @@ import { SearchModule } from './modules/search/search.module';
     HealthModule,
     SearchModule,
     DocumentsModule,
+    NormHierarchyModule,
     ProjectionsModule,
+    CitationsModule,
   ],
   providers: [
     {

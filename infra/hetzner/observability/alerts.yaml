@@ -100,6 +100,59 @@ spec:
               The alias/document-count gauges are stale. The alerts that depend on them
               are blind until this clears.
 
+    # The citation graph (#582, ADR-0033). An unresolved citation is a BROKEN EDGE,
+    # and a graph with silently missing edges is worse than no graph: every consumer
+    # reads a missing edge as "no such relation exists". Nothing about a hollow graph
+    # looks like an outage — the API returns 200 and an empty list — so it has to be
+    # alerted on explicitly or it stays invisible, which is exactly how it shipped.
+    - name: evidara.citation-graph
+      rules:
+        # The state this issue found in production: 504 citations extracted, zero
+        # resolved, `citation-targets` not even created.
+        - alert: CitationGraphEmpty
+          expr: legal_search_citations_indexed_count > 0 and legal_search_citations_resolved_count == 0
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: "citations are being extracted but none resolve to an edge"
+            description: >-
+              The citation graph has nodes but no edges. resolve_citation and find_citing
+              return nothing, and the agentic workflow silently falls back to similarity
+              search — the failure ADR-0033 exists to prevent. Check that the
+              citation-targets index exists and that documents are producing targets.
+
+        - alert: CitationResolutionRateLow
+          expr: legal_search_citation_resolution_rate < 0.2 and legal_search_citations_indexed_count >= 50
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "citation resolution rate is {{ $value | humanizePercentage }}"
+            description: >-
+              Fewer than 20% of extracted citations resolve to a norm in the corpus.
+              Either the extractor cannot key the dominant citation form (an extractor
+              gap — see the fuzzy-resolution follow-up) or the cited norms are not
+              ingested (a coverage gap). /v1/citations/stats breaks the number down by
+              cause.
+
+        # Targets are the graph's addressable nodes. If documents keep landing but none
+        # of them register an identifier, every future citation of them is a dead edge.
+        - alert: CitationTargetsNotBeingWritten
+          expr: |
+            sum(increase(legal_search_documents_indexed_total[6h])) > 10
+            and
+            sum(increase(legal_search_citation_targets_indexed_total[6h])) == 0
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "documents are indexing but no citation targets are being produced"
+            description: >-
+              Documents are being projected without any resolvable identifier (SR, CELEX,
+              ECLI). They cannot be cited by anything. This is what an identifier-extraction
+              regression looks like.
+
     - name: evidara.pipeline
       rules:
         # The leak the funnel dashboard exists to make obvious: DI is chewing through
@@ -136,6 +189,24 @@ spec:
           annotations:
             summary: "di-consumer is dead-lettering artifact bundles"
             description: "Runbook: docs/runbooks/dlq-triage-and-replay.md"
+
+        # Firecrawl deliveries we refused because they matched no provider job/run. A
+        # short blip is the dispatch race healing itself (the retry lands after the
+        # provider job commits). A rate that does not drain means the retries will never
+        # match anything, so the crawl's run is stuck. Silent while Firecrawl is dormant
+        # (ADR-0031) — it can only fire once a portal actually uses it.
+        - alert: FirecrawlWebhooksUnmatched
+          expr: |
+            sum(increase(platform_control_firecrawl_webhooks_unmatched_total[30m])) > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Firecrawl webhooks are not matching any run"
+            description: >-
+              Deliveries are being refused and redelivered without ever matching a
+              provider job. Unprocessed deliveries are queryable:
+              SELECT * FROM webhook_receipts WHERE processed_at IS NULL.
 
     - name: evidara.nats
       rules:

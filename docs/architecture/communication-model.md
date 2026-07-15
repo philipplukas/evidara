@@ -32,7 +32,7 @@ Evidara uses two primary communication patterns:
 - IDs and field names use `snake_case`.
 - Corpora and tenants are part of control-plane data, not hidden side channels.
 
-## Asynchronous Communication (Events / Pub/Sub)
+## Asynchronous Communication (Events / NATS JetStream)
 
 ### When to use
 
@@ -65,10 +65,10 @@ Evidara uses two primary communication patterns:
 Different layers should solve different problems:
 
 - `contracts/` owns business payloads, typed refs, identities, and lifecycle semantics.
-- Pub/Sub is the transport, not the business contract.
+- The broker (**NATS JetStream** in the live self-hosted runtime — [ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md)) is the transport, not the business contract. A Pub/Sub adapter still exists in the code and is retained until cutover is confirmed, but it is not what runs.
 - CloudEvents-aligned metadata is the event-envelope standard.
-- Databricks / Unity Catalog should handle DI-internal lineage for tables, jobs, and published views.
-- OpenLineage is optional later if Evidara needs lineage that spans Databricks, Cloud Run, and search operations in one model.
+- DI-internal lineage for tables, jobs, and published views comes from the immutable processing manifests plus Delta table history; there is no external catalog service.
+- OpenLineage is optional later if Evidara needs lineage that spans processing, control plane, and search operations in one model.
 - OpenSearch aliases and versioned indices handle search cutover and rebuild lifecycle inside `legal-search`.
 
 This keeps business contracts small while still allowing strong operational traceability.

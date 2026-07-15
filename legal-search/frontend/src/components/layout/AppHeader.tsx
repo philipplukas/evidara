@@ -247,12 +247,10 @@ export function AppHeader({
   return (
     <>
       <header className="app-header">
-        <div className="app-header__inner">
+        <div className="app-header__inner shell-frame">
           {/* Wordmark */}
           <div className="app-header__brand">
-            <div className="app-header__brand-mark">
-              <BrandMark size={32} />
-            </div>
+            <BrandMark size={32} className="app-header__brand-mark" />
             <span className="app-header__brand-name">Evidara</span>
           </div>
 

@@ -10,7 +10,7 @@
  * logs: every pod was Ready while `documents-read` resolved to nothing.
  */
 import { Injectable } from '@nestjs/common';
-import { Counter, collectDefaultMetrics, Registry } from 'prom-client';
+import { Counter, collectDefaultMetrics, Gauge, Registry } from 'prom-client';
 
 @Injectable()
 export class MetricsService {
@@ -27,6 +27,24 @@ export class MetricsService {
   private readonly documentsIndexed: Counter;
   /** Documents removed from the write alias (withdrawal projections). */
   private readonly documentsDeleted: Counter;
+
+  // ── Citation graph (#582, ADR-0033) ──
+  // An unresolved citation is a BROKEN EDGE. A citation graph with silently
+  // missing edges is worse than no graph, because every consumer downstream
+  // treats absence of an edge as absence of a relation. These metrics exist so
+  // that the miss rate is loud rather than invisible.
+
+  /** Citation-target rows written by projections (the graph's addressable nodes). */
+  private readonly citationTargetsIndexed: Counter;
+  /** Citations projected, labelled by whether DI produced a canonical key. */
+  private readonly citationsProjected: Counter<'keyed'>;
+  /** `resolve_citation` calls, labelled by outcome. */
+  private readonly citationResolutions: Counter<'outcome'>;
+  /** Corpus-wide share of citations that resolve to a real edge (0..1). */
+  private readonly citationResolutionRate: Gauge;
+  /** Corpus-wide citation counts behind the rate, so alerts can require a floor. */
+  private readonly citationsTotal: Gauge;
+  private readonly citationsResolvedTotal: Gauge;
 
   constructor() {
     this.registry = new Registry();
@@ -58,6 +76,39 @@ export class MetricsService {
       help: 'Documents deleted from the OpenSearch write alias by withdrawal projections.',
       registers: [this.registry],
     });
+
+    this.citationTargetsIndexed = new Counter({
+      name: 'legal_search_citation_targets_indexed_total',
+      help: 'Citation-target rows (norm identifiers) written to the citation-targets index.',
+      registers: [this.registry],
+    });
+    this.citationsProjected = new Counter({
+      name: 'legal_search_citations_projected_total',
+      help: 'Citations projected, labelled by whether DI produced a canonical key (keyed=true|false). keyed=false is an extractor gap: the citation can never become an edge.',
+      labelNames: ['keyed'],
+      registers: [this.registry],
+    });
+    this.citationResolutions = new Counter({
+      name: 'legal_search_citation_resolutions_total',
+      help: 'resolve_citation calls by outcome: resolved | not_normalizable (fuzzy citation type) | no_target_in_corpus (key is valid but the norm is not ingested — a coverage gap).',
+      labelNames: ['outcome'],
+      registers: [this.registry],
+    });
+    this.citationResolutionRate = new Gauge({
+      name: 'legal_search_citation_resolution_rate',
+      help: 'Share of citations in the corpus that resolve to a citation-target (0..1). The citation graph edge coverage.',
+      registers: [this.registry],
+    });
+    this.citationsTotal = new Gauge({
+      name: 'legal_search_citations_indexed_count',
+      help: 'Citations in the citations index (the denominator of the resolution rate).',
+      registers: [this.registry],
+    });
+    this.citationsResolvedTotal = new Gauge({
+      name: 'legal_search_citations_resolved_count',
+      help: 'Citations resolving to a citation-target (the numerator of the resolution rate).',
+      registers: [this.registry],
+    });
   }
 
   recordSearch(totalHits: number): void {
@@ -79,5 +130,35 @@ export class MetricsService {
 
   recordDocumentDeleted(): void {
     this.documentsDeleted.inc();
+  }
+
+  /** Citation-target rows written by a projection. */
+  recordCitationTargetsIndexed(count: number): void {
+    if (count > 0) this.citationTargetsIndexed.inc(count);
+  }
+
+  /**
+   * Citations projected for one document, split by whether DI could produce a
+   * canonical key. `keyed=false` citations are permanently un-edgeable with
+   * today's extractor — counting them is how that gap stays visible.
+   */
+  recordCitationsProjected(keyed: number, unkeyed: number): void {
+    if (keyed > 0) this.citationsProjected.inc({ keyed: 'true' }, keyed);
+    if (unkeyed > 0) this.citationsProjected.inc({ keyed: 'false' }, unkeyed);
+  }
+
+  /** One `resolve_citation` outcome. */
+  recordCitationResolution(
+    resolved: boolean,
+    reason: 'not_normalizable' | 'no_target_in_corpus' | null,
+  ): void {
+    this.citationResolutions.inc({ outcome: resolved ? 'resolved' : (reason ?? 'unresolved') });
+  }
+
+  /** Corpus-wide resolution rate, refreshed whenever the stats endpoint runs. */
+  setCitationResolutionRate(rate: number, total: number, resolved: number): void {
+    this.citationResolutionRate.set(rate);
+    this.citationsTotal.set(total);
+    this.citationsResolvedTotal.set(resolved);
   }
 }

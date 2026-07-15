@@ -109,6 +109,14 @@ jobs:
         run: |
           python scripts/check_contract_manifest.py
 
+      # The jurisdiction hierarchy legal-search reads is an EXPORT of
+      # platform-control's reference seed (ADR-0033 / #583). If the seed grows a
+      # jurisdiction and the export is not regenerated, `norm_hierarchy()`
+      # silently reports the new place as ungoverned instead of failing.
+      - name: Check jurisdiction-hierarchy vocabulary matches the seed
+        run: |
+          python scripts/generate_jurisdiction_hierarchy_vocab.py --check
+
       - name: Check staging smoke workflow isolation
         run: |
           python scripts/check-staging-smoke-workflow-isolation.py

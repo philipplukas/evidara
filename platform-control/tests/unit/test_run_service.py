@@ -15,6 +15,7 @@ from platform_control.models.document_lifecycle_event import DocumentLifecycleEv
 from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.raw_artifact import RawArtifact
+from platform_control.models.run import Run
 from platform_control.schemas.run import CreateRunRequest
 from platform_control.schemas.source import (
     CreateSourceRequest,
@@ -957,6 +958,61 @@ async def test_dispatch_pending_runs_promotes_runs_to_running(session) -> None:
     assert dispatched == 1
     assert refreshed.status is RunStatus.RUNNING
     assert provider_job is not None
+
+
+@pytest.mark.asyncio
+async def test_dispatched_provider_job_is_durable_before_the_caller_commits(
+    session, session_maker
+) -> None:
+    """#558: a crawl that is already running upstream must be resolvable from a webhook.
+
+    `dispatch_pending_runs` batches many runs into one transaction, so a ProviderJob left
+    for the caller to commit is invisible to the webhook handler for as long as the batch
+    runs — and is lost entirely if a later dispatch in the batch blows up, even though its
+    crawl is live at Firecrawl. The row must be committed as soon as the run is RUNNING.
+    """
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    provider = StubProvider()
+    run_service = RunService(session, provider, run_dispatch_backend="worker")
+    first = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+    await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+        )
+    )
+
+    # The second dispatch in the batch fails after the first crawl is already live.
+    original_start_run = provider.start_run
+
+    async def start_run(source_arg, source_version_arg, run_arg):
+        if provider.calls >= 1:
+            raise RuntimeError("firecrawl POST failed")
+        return await original_start_run(source_arg, source_version_arg, run_arg)
+
+    provider.start_run = start_run  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError):
+        await run_service.dispatch_pending_runs()
+
+    # A separate session sees only what was actually committed.
+    async with session_maker() as observer:
+        provider_job = await observer.scalar(
+            select(ProviderJob).where(ProviderJob.run_id == first.run_id)
+        )
+        run_status = await observer.scalar(select(Run.status).where(Run.run_id == first.run_id))
+
+    assert provider_job is not None, "the live crawl's provider job must survive the batch failure"
+    assert provider_job.external_job_id
+    assert run_status is RunStatus.RUNNING
 
 
 @pytest.mark.asyncio

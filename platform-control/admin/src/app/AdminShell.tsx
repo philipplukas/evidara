@@ -13,9 +13,7 @@ const AdminApp = dynamic(() => import("./AdminApp"), {
       <section className="evidara-shell__panel" aria-label="Loading Control Plane">
         <header className="evidara-shell__header">
           <div className="evidara-shell__brand">
-            <div className="evidara-shell__mark">
-              <BrandMark size={42} />
-            </div>
+            <div className="evidara-shell__mark">E</div>
             <div>
               <div className="evidara-shell__eyebrow">Evidara</div>
               <div className="evidara-shell__title">Platform control</div>
@@ -72,9 +70,7 @@ export default function AdminShell() {
         <section className="evidara-shell__panel" aria-labelledby="access-denied-title">
           <header className="evidara-shell__header">
             <div className="evidara-shell__brand">
-              <div className="evidara-shell__mark">
-                <BrandMark size={42} />
-              </div>
+              <BrandMark size={42} className="evidara-shell__mark" />
               <div>
                 <div className="evidara-shell__eyebrow">Evidara</div>
                 <div className="evidara-shell__title">Control plane</div>

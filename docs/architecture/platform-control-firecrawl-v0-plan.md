@@ -89,7 +89,7 @@ The React-admin app reads list/detail data via platform-control APIs (no direct 
 - Create Firecrawl preview and production run request mapping.
 - Store provider job IDs and request snapshots.
 - Verify webhook signatures and persist raw webhook payloads.
-- Write raw artifacts to GCS and normalized rows to `captured_resources`.
+- Write raw artifacts to object storage (MinIO/S3 via the `ArtifactStore` port) and normalized rows to `captured_resources`.
 - Publish immutable bundle manifests and emit `artifact_bundle.available` for durable downstream processing.
 
 `raw_artifact.available` can still exist as an internal preview or observability event, but it is not the primary DI handoff contract for M4.
@@ -131,9 +131,9 @@ The React-admin app reads list/detail data via platform-control APIs (no direct 
 | PC-007 | Add Firecrawl provider adapter | Preview and production request mapping | Data |
 | PC-008 | Add provider job persistence | `provider_jobs` table and service | API/data |
 | PC-009 | Add webhook signature verification and dedupe | Verified webhook receipts with idempotency | API |
-| PC-010 | Add artifact store and GCS write path | Raw Firecrawl payloads stored in object storage | Data |
+| PC-010 | Add artifact store and object-storage write path | Raw Firecrawl payloads stored in object storage (MinIO/S3) | Data |
 | PC-011 | Add captured-resource normalization | Provider-neutral fetched resource inventory | Data |
-| PC-012 | Publish bundle manifest + emit `artifact_bundle.available` | Immutable DI handoff plus Pub/Sub progression signal | API/data |
+| PC-012 | Publish bundle manifest + emit `artifact_bundle.available` | Immutable DI handoff plus broker progression signal (NATS JetStream) | API/data |
 | PC-013 | Build React-admin read views | Reference data, sources, versions, runs via API | Eng |
 | PC-014 | Build React-admin action flows | Draft, approve, reject, preview, rerun via API | Eng |
 | PC-015 | Build preview summary screen | Captured-resource review and operator feedback loop | Eng |
@@ -203,7 +203,7 @@ Done when:
 
 - Stub Firecrawl at the provider boundary in CI.
 - Use fixture payloads for webhook tests.
-- Do not depend on live Firecrawl, live operator SaaS UIs, or live GCS in the default CI path.
+- Do not depend on live Firecrawl, live operator SaaS UIs, or live object storage in the default CI path.
 
 ## Documentation Plan
 
@@ -231,7 +231,7 @@ Update these docs in the same PRs as implementation:
 ### Three people
 
 - Person 1: schema, models, and API
-- Person 2: Firecrawl integration, GCS storage, event emission
+- Person 2: Firecrawl integration, object storage, event emission
 - Person 3: AI-assisted setup (post-parity), CLI smoke, operator docs
 
 ## Out of Scope for V0

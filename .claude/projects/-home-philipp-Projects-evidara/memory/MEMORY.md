@@ -1,0 +1,1 @@
+- [ci-image-builds-non-required](ci-image-builds-non-required.md) — image-build checks aren't required; auto-merge fires before they finish, and Dockerfiles must COPY each styles/ shared dir explicitly

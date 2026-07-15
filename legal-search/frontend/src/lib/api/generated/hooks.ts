@@ -12,8 +12,9 @@ See ADR-0011 for contract conventions.
 See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
+See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
 import {
   useQuery
@@ -31,9 +32,16 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CitationGraphStats,
   CitedByResponse,
   DetailView,
+  FindCitingDocumentsParams,
+  FindCitingResponse,
   GetDocumentSections200,
+  GetNormHierarchyParams,
+  NormHierarchyView,
+  ResolveCitationParams,
+  ResolveCitationResponse,
   SearchContextView,
   SearchDocumentsParams,
   SearchResponseView
@@ -506,6 +514,440 @@ export function useGetDocumentCitedBy<TData = Awaited<ReturnType<typeof getDocum
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetDocumentCitedByQueryOptions(documentId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+/**
+ * Returns the legal orders that bind a jurisdiction — constitutional,
+federal, cantonal, municipal — ordered most authoritative first, with the
+norms the corpus actually holds at each level. See ADR-0033.
+
+This is a **traversal, not a search**. The governing chain is derived
+from the jurisdiction tree
+(`contracts/vocabularies/jurisdiction-hierarchy.json`), not from text
+similarity: a communal ordinance is subordinate to its canton's law and
+to federal law because of where the commune sits, not because the
+documents resemble each other.
+
+`coverage.missing_levels` lists the levels that bind this place but for
+which the corpus holds nothing. It is load-bearing: an agent that
+reasons past a missing level is fabricating, and "I do not have the
+communal ordinance for this place" is a correct answer.
+
+ * @summary What governs this place, at each level of the hierarchy of norms
+ */
+export const getNormHierarchy = (
+    jurisdictionId: string,
+    params?: GetNormHierarchyParams,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<NormHierarchyView>(
+      {url: `/v1/norm-hierarchy/${jurisdictionId}`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetNormHierarchyQueryKey = (jurisdictionId?: string,
+    params?: GetNormHierarchyParams,) => {
+    return [
+    `/v1/norm-hierarchy/${jurisdictionId}`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetNormHierarchyQueryOptions = <TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNormHierarchyQueryKey(jurisdictionId,params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNormHierarchy>>> = ({ signal }) => getNormHierarchy(jurisdictionId,params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(jurisdictionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetNormHierarchyQueryResult = NonNullable<Awaited<ReturnType<typeof getNormHierarchy>>>
+export type GetNormHierarchyQueryError = void
+
+
+export function useGetNormHierarchy<TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(
+ jurisdictionId: string,
+    params: undefined |  GetNormHierarchyParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getNormHierarchy>>,
+          TError,
+          Awaited<ReturnType<typeof getNormHierarchy>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetNormHierarchy<TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(
+ jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getNormHierarchy>>,
+          TError,
+          Awaited<ReturnType<typeof getNormHierarchy>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetNormHierarchy<TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(
+ jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary What governs this place, at each level of the hierarchy of norms
+ */
+
+export function useGetNormHierarchy<TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(
+ jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetNormHierarchyQueryOptions(jurisdictionId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+/**
+ * Citation-graph traversal, forward direction (ADR-0033 step 3, "walk up").
+Backs the `resolve_citation` MCP tool.
+
+Accepts either a raw citation string ("SR 210") or a canonical key
+("sr:210") and returns the document(s) that ARE that norm.
+
+Resolution is DETERMINISTIC only: SR numbers, CELEX numbers, ECLIs and
+Austrian BGBl references carry their identifier in the string itself.
+Fuzzy citations ("Art. 36 BV", BGE references) cannot be normalized by
+today's extractor and come back `resolved: false` with
+`unresolved_reason: not_normalizable` — never a similarity-search guess,
+which would return a plausible wrong norm.
+
+ * @summary Resolve a citation string to the norm it points at
+ */
+export const resolveCitation = (
+    params: ResolveCitationParams,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<ResolveCitationResponse>(
+      {url: `/v1/citations/resolve`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getResolveCitationQueryKey = (params?: ResolveCitationParams,) => {
+    return [
+    `/v1/citations/resolve`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getResolveCitationQueryOptions = <TData = Awaited<ReturnType<typeof resolveCitation>>, TError = void>(params: ResolveCitationParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCitation>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getResolveCitationQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof resolveCitation>>> = ({ signal }) => resolveCitation(params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof resolveCitation>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ResolveCitationQueryResult = NonNullable<Awaited<ReturnType<typeof resolveCitation>>>
+export type ResolveCitationQueryError = void
+
+
+export function useResolveCitation<TData = Awaited<ReturnType<typeof resolveCitation>>, TError = void>(
+ params: ResolveCitationParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCitation>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof resolveCitation>>,
+          TError,
+          Awaited<ReturnType<typeof resolveCitation>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useResolveCitation<TData = Awaited<ReturnType<typeof resolveCitation>>, TError = void>(
+ params: ResolveCitationParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCitation>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof resolveCitation>>,
+          TError,
+          Awaited<ReturnType<typeof resolveCitation>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useResolveCitation<TData = Awaited<ReturnType<typeof resolveCitation>>, TError = void>(
+ params: ResolveCitationParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCitation>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Resolve a citation string to the norm it points at
+ */
+
+export function useResolveCitation<TData = Awaited<ReturnType<typeof resolveCitation>>, TError = void>(
+ params: ResolveCitationParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof resolveCitation>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getResolveCitationQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+/**
+ * Citation-graph traversal, reverse direction (ADR-0033 step 4, "walk
+out"). Backs the `find_citing` MCP tool — "which decisions interpret
+this provision?".
+
+`q` is either a document id (`doc_...`) or a citation key / string
+naming the norm ("sr:210", "SR 210"). A document id is first mapped to
+the canonical keys that document IS.
+
+Traversal joins on the canonical key, NOT on the `target_document_id`
+denormalization written at projection time — that field is only set if
+the cited document already existed when the citing document was
+projected, so relying on it drops every edge whose endpoints arrived in
+the wrong order.
+
+ * @summary Find the documents that cite a norm
+ */
+export const findCitingDocuments = (
+    params: FindCitingDocumentsParams,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<FindCitingResponse>(
+      {url: `/v1/citations/citing`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getFindCitingDocumentsQueryKey = (params?: FindCitingDocumentsParams,) => {
+    return [
+    `/v1/citations/citing`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getFindCitingDocumentsQueryOptions = <TData = Awaited<ReturnType<typeof findCitingDocuments>>, TError = void>(params: FindCitingDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findCitingDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getFindCitingDocumentsQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof findCitingDocuments>>> = ({ signal }) => findCitingDocuments(params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof findCitingDocuments>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type FindCitingDocumentsQueryResult = NonNullable<Awaited<ReturnType<typeof findCitingDocuments>>>
+export type FindCitingDocumentsQueryError = void
+
+
+export function useFindCitingDocuments<TData = Awaited<ReturnType<typeof findCitingDocuments>>, TError = void>(
+ params: FindCitingDocumentsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof findCitingDocuments>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof findCitingDocuments>>,
+          TError,
+          Awaited<ReturnType<typeof findCitingDocuments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindCitingDocuments<TData = Awaited<ReturnType<typeof findCitingDocuments>>, TError = void>(
+ params: FindCitingDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findCitingDocuments>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof findCitingDocuments>>,
+          TError,
+          Awaited<ReturnType<typeof findCitingDocuments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindCitingDocuments<TData = Awaited<ReturnType<typeof findCitingDocuments>>, TError = void>(
+ params: FindCitingDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findCitingDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Find the documents that cite a norm
+ */
+
+export function useFindCitingDocuments<TData = Awaited<ReturnType<typeof findCitingDocuments>>, TError = void>(
+ params: FindCitingDocumentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findCitingDocuments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getFindCitingDocumentsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+/**
+ * What share of extracted citations actually resolve to an edge, plus the
+unresolved remainder broken down by cause.
+
+This is reported as a first-class result rather than buried in logs
+because an unresolved citation is a BROKEN EDGE: consumers read a
+missing edge as "no such relation exists". A graph with silently missing
+edges is worse than no graph (ADR-0032), so the miss rate is part of the
+contract.
+
+ * @summary Citation graph resolution rate
+ */
+export const getCitationGraphStats = (
+    
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<CitationGraphStats>(
+      {url: `/v1/citations/stats`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetCitationGraphStatsQueryKey = () => {
+    return [
+    `/v1/citations/stats`
+    ] as const;
+    }
+
+    
+export const getGetCitationGraphStatsQueryOptions = <TData = Awaited<ReturnType<typeof getCitationGraphStats>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCitationGraphStats>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCitationGraphStatsQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCitationGraphStats>>> = ({ signal }) => getCitationGraphStats(requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCitationGraphStats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCitationGraphStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getCitationGraphStats>>>
+export type GetCitationGraphStatsQueryError = unknown
+
+
+export function useGetCitationGraphStats<TData = Awaited<ReturnType<typeof getCitationGraphStats>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCitationGraphStats>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCitationGraphStats>>,
+          TError,
+          Awaited<ReturnType<typeof getCitationGraphStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCitationGraphStats<TData = Awaited<ReturnType<typeof getCitationGraphStats>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCitationGraphStats>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCitationGraphStats>>,
+          TError,
+          Awaited<ReturnType<typeof getCitationGraphStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCitationGraphStats<TData = Awaited<ReturnType<typeof getCitationGraphStats>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCitationGraphStats>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Citation graph resolution rate
+ */
+
+export function useGetCitationGraphStats<TData = Awaited<ReturnType<typeof getCitationGraphStats>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCitationGraphStats>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCitationGraphStatsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -89,13 +89,16 @@ export function AppBar() {
         {/* Brand mark + product */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {/*
-            The lattice is drawn in `currentColor`. This bar is dark navy, so the
-            mark must inherit near-white — `--admin-on-brand`. The accent node stays
-            violet via `--brand-mark-accent`, which admin lifts for this ground.
-          */}
-          <div className="grid place-items-center" style={{ color: "var(--admin-on-brand)" }}>
-            <BrandMark size={42} />
-          </div>
+           * The shared `BrandMark` draws its lattice in `currentColor`. Admin's
+           * header is a dark navy gradient, so it inherits the near-white
+           * `--admin-on-brand` here — the navy the workspace uses would be
+           * invisible against this ground. The accent node is likewise lifted
+           * via `--admin-brand-mark-accent`.
+           */}
+          <BrandMark
+            size={42}
+            className="shrink-0 text-[var(--admin-on-brand)] [--brand-mark-accent:var(--admin-brand-mark-accent)]"
+          />
           <div className="min-w-0">
             <div className="text-[10px] font-semibold tracking-[0.16em] text-[var(--admin-on-brand-muted)] uppercase leading-[1.15]">
               Evidara

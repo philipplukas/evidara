@@ -50,9 +50,9 @@ flowchart LR
   ConfidenceRouter[ConfidenceRouter]
   ArgillaService[Argilla]
   Postgres[(Postgres)]
-  ArtifactStore[(GCSObjectStore)]
+  ArtifactStore[(S3ObjectStore/MinIO)]
   SearchProjection[(SearchProjection)]
-  EventBus[PubSubOrWebhookEvents]
+  EventBus[NatsOrWebhookEvents]
 
   Operator --> WizardUI
   WizardUI --> ApiService

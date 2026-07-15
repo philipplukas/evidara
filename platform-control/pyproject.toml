@@ -62,7 +62,7 @@ asyncio_mode = "auto"
 pythonpath = ["src"]
 testpaths = ["tests"]
 markers = [
-  "requires_network: test needs outbound network access (e.g. temporal-test-server download). Skipped by default; set PYTEST_NETWORK_TESTS=1 to include.",
+  "temporal: test drives a real workflow on the temporalio SDK's local time-skipping test server. Runs by default; set PYTEST_SKIP_TEMPORAL=1 to opt out when offline with a cold binary cache (not honoured in CI). See docs/runbooks/pytest-temporal-marker.md.",
 ]
 
 [tool.ruff]

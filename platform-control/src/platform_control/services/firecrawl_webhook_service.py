@@ -3,15 +3,16 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.domain import ProviderJobStatus, RunStatus
-from platform_control.errors import SignatureVerificationError
+from platform_control.errors import SignatureVerificationError, WebhookRetryableError
 from platform_control.events.artifact_bundle import (
     build_artifact_bundle_available_event,
     build_artifact_bundle_manifest,
@@ -29,8 +30,11 @@ from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.models.webhook_receipt import WebhookReceipt
 from platform_control.observability import metrics
+from platform_control.observability.event_logging import log_event
 from platform_control.services.artifact_store import ArtifactStore
 from platform_control.services.replay_checkpoint import merge_run_replay_checkpoint
+
+logger = logging.getLogger(__name__)
 
 
 class FirecrawlWebhookService:
@@ -77,37 +81,24 @@ class FirecrawlWebhookService:
         HTTP handler's ``process`` wrapper. ``payload_sha256`` is used for idempotent
         dedupe against ``webhook_receipts``; when omitted it is derived from a canonical
         JSON serialization of ``payload``.
+
+        Raises :class:`WebhookRetryableError` when the payload matches no local
+        ``ProviderJob``/``Run``. The delivery is then kept as an *unprocessed* receipt so
+        the sender's retry can still be applied (#558).
         """
         if payload_sha256 is None:
             payload_sha256 = hashlib.sha256(
                 json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
             ).hexdigest()
 
-        # Atomic dedupe: attempt insert and skip if the (provider, payload_sha256)
-        # unique constraint already exists. This keeps webhook replay handling safe
-        # on both local SQLite and production Postgres.
-        insert_fn = self._insert_for_current_dialect()
-        stmt = (
-            insert_fn(WebhookReceipt)
-            .values(
-                webhook_receipt_id=generate_prefixed_id("whr"),
-                provider="firecrawl",
-                payload_sha256=payload_sha256,
-                signature=signature,
-                payload=payload,
-                received_at=datetime.now(UTC),
-                processed_at=datetime.now(UTC),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
-            .on_conflict_do_nothing(
-                index_elements=["provider", "payload_sha256"],
-            )
+        receipt_id = await self._claim_receipt(
+            payload,
+            signature=signature,
+            payload_sha256=payload_sha256,
         )
-        result = await self.session.execute(stmt)
-
-        # If no row was inserted the webhook was already processed — skip.
-        if result.rowcount == 0:
+        # No receipt claimed => an earlier delivery of this exact payload was already
+        # applied. Nothing left to do.
+        if receipt_id is None:
             return
 
         # Mirror the payload to disk when a record directory is configured, so
@@ -126,13 +117,115 @@ class FirecrawlWebhookService:
             if provider_job is not None:
                 run = await self.session.get(Run, provider_job.run_id)
 
-        if provider_job is not None:
-            provider_job.last_event_type = event_type or None
+        if provider_job is None or run is None:
+            await self._reject_unmatched(
+                external_job_id=external_job_id,
+                event_type=event_type,
+                reason=self._unmatched_reason(external_job_id, provider_job),
+            )
 
-        if run is not None:
-            await self._apply_event(payload, event_type, provider_job, run)
+        provider_job.last_event_type = event_type or None
+        await self._apply_event(payload, event_type, provider_job, run)
 
+        # Only now is the delivery genuinely processed. Setting processed_at any earlier
+        # would burn the dedupe key on work we had not done (#558).
+        await self._mark_receipt_processed(receipt_id)
         await self.session.commit()
+
+    async def _claim_receipt(
+        self,
+        payload: dict[str, Any],
+        *,
+        signature: str | None,
+        payload_sha256: str,
+    ) -> str | None:
+        """Claim this delivery, returning the receipt id we own or ``None`` if it is a
+        replay of an already-processed delivery.
+
+        The receipt is written *unprocessed* (``processed_at IS NULL``); ``processed_at``
+        is stamped only once ``_apply_event`` has actually run. A delivery whose dedupe
+        key already exists but is still unprocessed is therefore *re-claimed* rather than
+        skipped, which is what makes an early webhook (one that beat the ``ProviderJob``
+        commit) recoverable on redelivery instead of permanently dropped.
+
+        The claim stays atomic on both SQLite and Postgres: ``INSERT ... ON CONFLICT DO
+        UPDATE ... WHERE processed_at IS NULL ... RETURNING`` returns a row only for the
+        caller that owns the delivery, so concurrent redeliveries cannot double-apply.
+        """
+        now = datetime.now(UTC)
+        insert_fn = self._insert_for_current_dialect()
+        stmt = (
+            insert_fn(WebhookReceipt)
+            .values(
+                webhook_receipt_id=generate_prefixed_id("whr"),
+                provider="firecrawl",
+                payload_sha256=payload_sha256,
+                signature=signature,
+                payload=payload,
+                received_at=now,
+                processed_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+            .on_conflict_do_update(
+                index_elements=["provider", "payload_sha256"],
+                set_={"received_at": now, "updated_at": now},
+                where=WebhookReceipt.processed_at.is_(None),
+            )
+            .returning(WebhookReceipt.webhook_receipt_id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def _mark_receipt_processed(self, receipt_id: str) -> None:
+        now = datetime.now(UTC)
+        await self.session.execute(
+            update(WebhookReceipt)
+            .where(WebhookReceipt.webhook_receipt_id == receipt_id)
+            .values(processed_at=now, updated_at=now)
+        )
+
+    @staticmethod
+    def _unmatched_reason(external_job_id: str, provider_job: ProviderJob | None) -> str:
+        if not external_job_id:
+            return "missing_job_id"
+        if provider_job is None:
+            return "unknown_job_id"
+        return "orphaned_provider_job"
+
+    async def _reject_unmatched(
+        self,
+        *,
+        external_job_id: str,
+        event_type: str,
+        reason: str,
+    ) -> NoReturn:
+        """Commit the unprocessed receipt, surface the miss, and demand a redelivery.
+
+        Committing here is deliberate: the receipt row (``processed_at IS NULL``) keeps
+        the payload inspectable — ``SELECT * FROM webhook_receipts WHERE processed_at IS
+        NULL`` is the dead-letter view — while leaving the dedupe key reclaimable, so the
+        retry that follows the raised error is applied rather than deduped away.
+        """
+        await self.session.commit()
+        metrics.record_firecrawl_webhook_unmatched(
+            event_type=event_type or "unknown",
+            reason=reason,
+        )
+        log_event(
+            logger,
+            logging.WARNING,
+            "firecrawl.webhook.unmatched",
+            event_type=event_type or "unknown",
+            status="retry_requested",
+            external_job_id=external_job_id or None,
+            reason=reason,
+        )
+        raise WebhookRetryableError(
+            f"No provider job/run matches Firecrawl event `{event_type or 'unknown'}` for job "
+            f"`{external_job_id or 'unknown'}` ({reason}); the delivery was stored unprocessed "
+            "and must be redelivered."
+        )
 
     def _verify_signature(self, raw_body: bytes, signature: str | None) -> None:
         if not self.webhook_secret:

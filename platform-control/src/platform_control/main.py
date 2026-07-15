@@ -19,6 +19,7 @@ from platform_control.errors import (
     PlatformControlError,
     ProviderConfigurationError,
     SignatureVerificationError,
+    WebhookRetryableError,
 )
 from platform_control.routers import (
     commentary_insights,
@@ -139,6 +140,19 @@ def create_app() -> FastAPI:
     @app.exception_handler(SignatureVerificationError)
     async def signature_handler(request: Request, exc: SignatureVerificationError) -> JSONResponse:
         return JSONResponse(status_code=401, content=_error_payload(request, str(exc)))
+
+    @app.exception_handler(WebhookRetryableError)
+    async def webhook_retryable_handler(
+        request: Request, exc: WebhookRetryableError
+    ) -> JSONResponse:
+        # 503, not 202: the delivery was stored unprocessed and the sender MUST retry it.
+        # A 2xx would tell the provider the event was accepted while nothing was applied,
+        # and the identical retry would then be deduped away — the #558 drop.
+        return JSONResponse(
+            status_code=503,
+            content=_error_payload(request, str(exc)),
+            headers={"Retry-After": "5"},
+        )
 
     @app.exception_handler(PlatformControlError)
     async def domain_handler(request: Request, exc: PlatformControlError) -> JSONResponse:

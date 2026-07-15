@@ -18,8 +18,8 @@ Reuse standards and platform capabilities where they reduce bespoke infrastructu
 
 - Use JSON Schema and OpenAPI as the contract-definition formats.
 - Keep the event envelope CloudEvents-aligned instead of inventing custom metadata rules per event.
-- Use Databricks / Unity Catalog lineage for table and job lineage inside document-intelligence.
-- Add OpenLineage only if cross-platform lineage becomes a real requirement that Unity Catalog cannot cover alone.
+- Use the immutable processing manifests plus Delta table history for table and job lineage inside document-intelligence; there is no external catalog service (the runtime is self-hosted — see [ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md)).
+- Add OpenLineage only if cross-platform lineage becomes a real requirement that manifests and table history cannot cover alone.
 - Use OpenSearch versioned indices and aliases for rebuild and cutover workflows.
 
 Do not try to push all of that metadata into business payloads. Contracts should capture:

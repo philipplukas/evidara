@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.6.0
+  version: 0.7.0
   contact:
     name: Evidara Team
 
@@ -940,13 +940,24 @@ paths:
               $ref: "#/components/schemas/FirecrawlWebhookEvent"
       responses:
         "200":
-          description: Webhook accepted
+          description: Webhook accepted and applied
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WebhookAcceptedResponse"
         "401":
           description: Signature verification failed
+        "503":
+          description: >-
+            The event matched no provider job or run and was NOT applied, so it must be
+            redelivered. The delivery is stored unprocessed; a 2xx here would let the
+            retry be deduped away and drop the event permanently. Expected transiently
+            when a crawl event overtakes the commit of the provider job it belongs to.
+          headers:
+            Retry-After:
+              schema:
+                type: string
+              description: Seconds to wait before redelivering.
 
   /v1/corrections:
     get:

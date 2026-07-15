@@ -12,7 +12,8 @@ info:
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
     Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
-  version: 0.5.0
+    See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
+  version: 0.6.0
   contact:
     name: Evidara Team
   license:
@@ -29,6 +30,8 @@ security:
   - bearerAuth: []
 
 tags:
+  - name: citations
+    description: Citation-graph traversal — resolve references to norms and walk inbound edges.
   - name: search
     description: Search listing and global search context.
   - name: documents
@@ -253,6 +256,172 @@ paths:
                 $ref: "#/components/schemas/CitedByResponse"
         "404":
           description: Document not found
+
+  /v1/norm-hierarchy/{jurisdiction_id}:
+    get:
+      operationId: getNormHierarchy
+      summary: What governs this place, at each level of the hierarchy of norms
+      description: |
+        Returns the legal orders that bind a jurisdiction — constitutional,
+        federal, cantonal, municipal — ordered most authoritative first, with the
+        norms the corpus actually holds at each level. See ADR-0033.
+
+        This is a **traversal, not a search**. The governing chain is derived
+        from the jurisdiction tree
+        (`contracts/vocabularies/jurisdiction-hierarchy.json`), not from text
+        similarity: a communal ordinance is subordinate to its canton's law and
+        to federal law because of where the commune sits, not because the
+        documents resemble each other.
+
+        `coverage.missing_levels` lists the levels that bind this place but for
+        which the corpus holds nothing. It is load-bearing: an agent that
+        reasons past a missing level is fabricating, and "I do not have the
+        communal ordinance for this place" is a correct answer.
+      tags: [norm-hierarchy, agent-discovery]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: jurisdiction_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^jur_[a-z0-9_]+$'
+          description: Canonical jurisdiction ID (e.g. `jur_ch_gemeinde_261` — the City of Zurich).
+        - name: in_force_at
+          in: query
+          schema:
+            type: string
+            format: date
+          description: |
+            ISO date. Judges the hierarchy against the law in force on that date —
+            a ban enacted in 2019 must be measured against 2019 law.
+
+            Norms **known** to be repealed by, or not yet in force on, this date
+            are excluded. Norms whose dates are unknown are KEPT and reported
+            with `in_force_state: unknown`; dropping them would hide law from the
+            caller, and silence is indistinguishable from absence.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Norms returned per level. `total` reports the full count regardless.
+      responses:
+        "200":
+          description: The hierarchy of norms governing this jurisdiction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormHierarchyView"
+        "400":
+          description: Invalid request
+        "404":
+          description: Jurisdiction not found in the hierarchy
+
+  /v1/citations/resolve:
+    get:
+      operationId: resolveCitation
+      summary: Resolve a citation string to the norm it points at
+      description: |
+        Citation-graph traversal, forward direction (ADR-0033 step 3, "walk up").
+        Backs the `resolve_citation` MCP tool.
+
+        Accepts either a raw citation string ("SR 210") or a canonical key
+        ("sr:210") and returns the document(s) that ARE that norm.
+
+        Resolution is DETERMINISTIC only: SR numbers, CELEX numbers, ECLIs and
+        Austrian BGBl references carry their identifier in the string itself.
+        Fuzzy citations ("Art. 36 BV", BGE references) cannot be normalized by
+        today's extractor and come back `resolved: false` with
+        `unresolved_reason: not_normalizable` — never a similarity-search guess,
+        which would return a plausible wrong norm.
+      tags: [citations, agent-discovery]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: A citation string ("SR 210") or a canonical key ("sr:210").
+          schema:
+            type: string
+          example: SR 210
+      responses:
+        "200":
+          description: Resolution result — resolved or explicitly, attributably not
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolveCitationResponse"
+        "400":
+          description: Missing or empty `q`
+
+  /v1/citations/citing:
+    get:
+      operationId: findCitingDocuments
+      summary: Find the documents that cite a norm
+      description: |
+        Citation-graph traversal, reverse direction (ADR-0033 step 4, "walk
+        out"). Backs the `find_citing` MCP tool — "which decisions interpret
+        this provision?".
+
+        `q` is either a document id (`doc_...`) or a citation key / string
+        naming the norm ("sr:210", "SR 210"). A document id is first mapped to
+        the canonical keys that document IS.
+
+        Traversal joins on the canonical key, NOT on the `target_document_id`
+        denormalization written at projection time — that field is only set if
+        the cited document already existed when the citing document was
+        projected, so relying on it drops every edge whose endpoints arrived in
+        the wrong order.
+      tags: [citations, agent-discovery]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: A document id (`doc_...`), a canonical key (`sr:210`), or a citation string.
+          schema:
+            type: string
+          example: sr:210
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Citing documents (self-citations from the norm's own masthead excluded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindCitingResponse"
+        "400":
+          description: Missing or empty `q`
+
+  /v1/citations/stats:
+    get:
+      operationId: getCitationGraphStats
+      summary: Citation graph resolution rate
+      description: |
+        What share of extracted citations actually resolve to an edge, plus the
+        unresolved remainder broken down by cause.
+
+        This is reported as a first-class result rather than buried in logs
+        because an unresolved citation is a BROKEN EDGE: consumers read a
+        missing edge as "no such relation exists". A graph with silently missing
+        edges is worse than no graph (ADR-0032), so the miss rate is part of the
+        contract.
+      tags: [citations, agent-discovery]
+      responses:
+        "200":
+          description: Corpus-wide citation resolution statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CitationGraphStats"
 
 components:
   parameters:
@@ -653,6 +822,141 @@ components:
         resolved:
           type: boolean
 
+    NormLevel:
+      type: string
+      description: |
+        Rank in the hierarchy of norms. Ordering is authoritative and lives in
+        `contracts/vocabularies/norm-level.json` — lower `rank` = higher
+        authority. `constitutional` is the one level a document declares for
+        itself: the constitution is enacted by the same federal jurisdiction as
+        an ordinary statute, so it cannot be derived from the jurisdiction.
+      enum:
+        - constitutional
+        - international
+        - federal
+        - cantonal
+        - municipal
+
+    InForceState:
+      type: string
+      description: |
+        Temporal validity of a norm on the requested `in_force_at` date.
+        Deliberately four-valued: `unknown` ("marked repealed, but we do not hold
+        the date", or "we hold no start date") is a correct answer, and inventing
+        `in_force` from a missing field is the confident fabrication the platform
+        exists to prevent.
+      enum:
+        - in_force
+        - not_yet_in_force
+        - repealed
+        - unknown
+
+    NormHierarchyView:
+      type: object
+      required: [jurisdiction, levels, coverage]
+      properties:
+        jurisdiction:
+          $ref: "#/components/schemas/NormHierarchyJurisdiction"
+        in_force_at:
+          type: string
+          format: date
+          description: Echoes the requested as-of date when one was given.
+        levels:
+          type: array
+          description: Ordered most authoritative first (ascending `rank`).
+          items:
+            $ref: "#/components/schemas/NormHierarchyLevel"
+        coverage:
+          $ref: "#/components/schemas/NormHierarchyCoverage"
+
+    NormHierarchyJurisdiction:
+      type: object
+      required: [jurisdiction_id, name, slug, level]
+      properties:
+        jurisdiction_id:
+          type: string
+          pattern: '^jur_[a-z0-9_]+$'
+        name:
+          type: string
+        slug:
+          type: string
+        level:
+          $ref: "#/components/schemas/NormLevel"
+
+    NormHierarchyLevel:
+      type: object
+      required: [level, rank, label, jurisdiction_ids, total, documents]
+      properties:
+        level:
+          $ref: "#/components/schemas/NormLevel"
+        rank:
+          type: integer
+          description: Lower = higher authority.
+        label:
+          type: string
+          description: Localized label for the level (Accept-Language).
+        jurisdiction_ids:
+          type: array
+          description: The jurisdictions whose law sits at this level for this place.
+          items:
+            type: string
+            pattern: '^jur_[a-z0-9_]+$'
+        total:
+          type: integer
+          description: Norms held at this level, BEFORE `documents` was capped by `limit`.
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/NormSummary"
+
+    NormHierarchyCoverage:
+      type: object
+      required: [covered_levels, missing_levels]
+      properties:
+        covered_levels:
+          type: array
+          items:
+            $ref: "#/components/schemas/NormLevel"
+        missing_levels:
+          type: array
+          description: |
+            Levels that bind this place but for which the corpus holds nothing.
+            An agent must refuse rather than reason past one of these.
+          items:
+            $ref: "#/components/schemas/NormLevel"
+
+    NormSummary:
+      type: object
+      required: [document_id, title, jurisdiction_ids]
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        document_type:
+          type: string
+        official_citation:
+          type: string
+        jurisdiction_ids:
+          type: array
+          items:
+            type: string
+        effective_date:
+          type: string
+          format: date
+        in_force_from:
+          type: string
+          format: date
+          description: First date the norm was in force. Falls back to `effective_date`.
+        in_force_until:
+          type: string
+          format: date
+          description: |
+            Last date the norm WAS in force (inclusive). Absent means "not known
+            to be repealed" — which is not the same as "never repealed".
+        in_force_state:
+          $ref: "#/components/schemas/InForceState"
+
     Annotation:
       type: object
       required: [id, label, text]
@@ -693,3 +997,131 @@ components:
         content_preview:
           type: string
           description: First 200 characters of section content
+
+    CitationTarget:
+      description: |
+        A norm that citations can address — one row of the `citation-targets`
+        index. `{identifier_type}:{identifier_value}` is the canonical key that
+        document-intelligence's `normalize_citation()` emits, so it is the join
+        key of the whole citation graph.
+      type: object
+      required: [document_id, identifier_type, identifier_value]
+      properties:
+        document_id:
+          description: The document that IS this norm.
+          type: string
+        identifier_type:
+          type: string
+          example: sr
+        identifier_value:
+          type: string
+          example: "210"
+        title:
+          type: string
+        document_type:
+          type: string
+        jurisdiction:
+          type: string
+
+    CitationEdge:
+      description: A citation edge — a citing document, and the reference it carries.
+      type: object
+      required: [citation_id, source_document_id, citation_text]
+      properties:
+        citation_id:
+          type: string
+        source_document_id:
+          description: The document doing the citing.
+          type: string
+        source_section_id:
+          type: string
+        citation_text:
+          type: string
+          example: SR 210
+        citation_type:
+          type: string
+        normalized_reference:
+          description: The canonical key this citation resolves to, if it is a deterministic type.
+          type: [string, "null"]
+          example: sr:210
+        target_document_id:
+          type: string
+        target_title:
+          type: string
+
+    ResolveCitationResponse:
+      type: object
+      required: [query, normalized_reference, resolved, unresolved_reason, targets]
+      properties:
+        query:
+          type: string
+        normalized_reference:
+          description: The canonical key `query` normalizes to; null for a fuzzy citation.
+          type: [string, "null"]
+        resolved:
+          type: boolean
+        unresolved_reason:
+          description: |
+            Why an unresolved citation is unresolved. The distinction is load-bearing:
+            `not_normalizable` is an EXTRACTOR gap (the citation form is fuzzy),
+            `no_target_in_corpus` is a COVERAGE gap (the key is valid, the norm is
+            simply not ingested). Collapsing both into a bare `resolved: false` is how
+            a citation graph ends up with silently missing edges.
+          type: [string, "null"]
+          enum: [not_normalizable, no_target_in_corpus, null]
+        targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/CitationTarget"
+          default: []
+
+    FindCitingResponse:
+      type: object
+      required: [query, normalized_references, citing, total]
+      properties:
+        query:
+          type: string
+        normalized_references:
+          description: The canonical keys the queried norm is addressable by.
+          type: array
+          items:
+            type: string
+          default: []
+        citing:
+          type: array
+          items:
+            $ref: "#/components/schemas/CitationEdge"
+          default: []
+        total:
+          type: integer
+
+    CitationGraphStats:
+      type: object
+      required:
+        - citations_total
+        - citations_with_key
+        - citations_resolved
+        - resolution_rate
+        - unresolved_by_type
+      properties:
+        citations_total:
+          description: Every citation extracted into the citations index.
+          type: integer
+        citations_with_key:
+          description: Citations DI could normalize to a canonical key — the edge candidates.
+          type: integer
+        citations_resolved:
+          description: Citations whose key addresses a norm actually in the corpus — real edges.
+          type: integer
+        resolution_rate:
+          description: citations_resolved / citations_total (0..1). The graph's edge coverage.
+          type: number
+          format: float
+        unresolved_by_type:
+          description: |
+            The unresolved remainder, attributed. Keys are `citation_type` values for
+            citations DI could not normalize, plus `unresolved_target` for citations
+            that carry a valid key addressing a norm not in the corpus.
+          type: object
+          additionalProperties:
+            type: integer

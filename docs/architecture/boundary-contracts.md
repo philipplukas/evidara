@@ -12,15 +12,20 @@ Each boundary has a different purpose:
 - `platform-control` hands off immutable acquisition input and receives operational status back
 - `document-intelligence` publishes canonical-ready document revisions for downstream serving
 
+Async transport in the live runtime is **NATS JetStream** (self-hosted; see
+[ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md)). The broker is an implementation
+detail behind the event contracts — a Pub/Sub adapter still exists in the code and is
+retained until cutover is confirmed, but it is not what runs.
+
 ## Boundary 1: platform-control ↔ document-intelligence
 
 ### What crosses this boundary
 
 | Direction | Payload | Mechanism |
 |-----------|---------|-----------|
-| platform-control → document-intelligence | `artifact_bundle.available` event | Async (Pub/Sub) |
+| platform-control → document-intelligence | `artifact_bundle.available` event | Async (NATS JetStream) |
 | platform-control → document-intelligence | reference snapshot sets | published file or dataset surface |
-| document-intelligence → platform-control | `document.processing_status.updated` event | Async (Pub/Sub) |
+| document-intelligence → platform-control | `document.processing_status.updated` event | Async (NATS JetStream) |
 
 ### Core contract objects
 
@@ -72,8 +77,8 @@ For canonical field-level truth, use the contract files directly:
 
 | Direction | Payload | Mechanism |
 |-----------|---------|-----------|
-| document-intelligence → legal-search | `document.processed` event | Async (Pub/Sub) |
-| document-intelligence → legal-search | `document.withdrawn` event | Async (Pub/Sub) |
+| document-intelligence → legal-search | `document.processed` event | Async (NATS JetStream) |
+| document-intelligence → legal-search | `document.withdrawn` event | Async (NATS JetStream) |
 | legal-search (BFF) → document-intelligence (Document Service) | OpenAPI document-detail reads (lean/full body from published rows) | Sync (HTTPS) |
 | legal-search (search projection) | reads published canonical surfaces referenced by `published_document_ref`, `published_sections_ref`, and `processing_manifest_ref` | Sync (read, bulk indexing) |
 
@@ -175,7 +180,7 @@ Use standards and managed capabilities where they fit, but keep business semanti
 - Event metadata should stay CloudEvents-aligned.
 - Bundle and processing manifests should be immutable JSON objects referenced through `manifest_ref`.
 - Searchable manifest metadata should be mirrored into component-owned query surfaces rather than encoded in Hive-style path semantics.
-- Databricks / Unity Catalog should provide DI-internal lineage for jobs, tables, and published views.
+- DI-internal lineage for jobs, tables, and published views is carried by the processing manifests and the Delta table history itself; there is no external catalog service in the loop.
 - OpenSearch aliases and versioned physical indices should provide search cutover and rebuild mechanics.
 
 Evidara-specific contracts still need to own:

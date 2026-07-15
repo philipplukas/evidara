@@ -64,6 +64,7 @@ _SUPPORTED_PROVIDERS = {
     "bundesland_http",
     "regione_http",
     "canton_http",
+    "gemeinde_http",
     "legifrance",
     "ch_court_decisions",
 }
@@ -180,6 +181,26 @@ def _validate_template(
         ):
             errors.append(
                 f"Overlay '{overlay_id}' template '{template_id}' canton_http requires seed_url or seed_urls."
+            )
+        return errors
+
+    if provider == "gemeinde_http":
+        errors = []
+        # Swiss communes have no ISO 3166-2 code, so the portal allow-list is
+        # keyed on the BFS/OFS Gemeindenummer — the same key the
+        # `jur_ch_gemeinde_<bfs>` jurisdiction seeds are generated from.
+        bfs_number = payload.get("bfs_number")
+        if not isinstance(bfs_number, int) or isinstance(bfs_number, bool) or bfs_number < 1:
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' gemeinde_http requires "
+                "bfs_number (positive int, BFS/OFS Gemeindenummer)."
+            )
+        if not (
+            _has_nonempty_str(payload.get("seed_url"))
+            or _has_nonempty_str_list(payload.get("seed_urls"))
+        ):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' gemeinde_http requires seed_url or seed_urls."
             )
         return errors
 

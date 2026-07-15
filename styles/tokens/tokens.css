@@ -29,8 +29,8 @@
  *   - brand palette (`--brand`, `--brand-hover`, `--brand-strong`,
  *     `--brand-wash-3/4/6/8`, `--brand-focus-ring`)
  *   - brand-mark contract (`--brand-mark-accent`) — the accent node of the
- *     cross-surface `BrandMark` lattice; the rest of the mark is drawn in
- *     `currentColor` and inherits from each surface's header
+ *     shared `BrandMark` lattice (`styles/shell/BrandMark.tsx`). The lattice
+ *     itself draws in `currentColor`, so only this one colour needs a token
  *   - surfaces (`--surface-page`, `--surface-panel`, `--surface-input`,
  *     `--surface-shell`, `--surface-shell-strong`)
  *   - accent core (the single violet action color: `--accent-core`,
@@ -118,23 +118,22 @@
   --brand-strong: #1d293d;
 
   /*
-   * ─── Brand mark (cross-surface; consumed by `AppHeader`, `AppBar`, `AdminShell`) ───
+   * ─── Brand mark (cross-surface) ───
    *
-   * The mark is the `BrandMark` lattice from `@evidara/shell` — a single
-   * component, not two variants. Its strokes and nodes are drawn in
-   * `currentColor`, so it inherits navy on workspace's light header and
-   * near-white on admin's dark navy bar. That inheritance is the whole design:
-   * a hardcoded navy mark would be invisible on the admin bar.
+   * The mark itself is a *component*, not a token: `BrandMark` in
+   * `styles/shell/BrandMark.tsx`, consumed by workspace's `AppHeader` and
+   * admin's `AppBar`. It replaced the two inline copies of the old gradient
+   * tile (a navy square with a serif "E"), which is why `--brand-mark-gradient`
+   * and `--font-brand-mark` no longer exist — the parity tests on both surfaces
+   * assert they have not crept back.
    *
-   * Only the accent node — the authority the search resolved to — needs a token,
-   * because it must stay violet on BOTH grounds. Admin re-points it at a lighter
-   * violet in its local globals.css so it still carries on the brand header.
+   * The lattice draws in `currentColor` so each surface can place it on its own
+   * ground (navy on workspace's light header, near-white on admin's dark brand
+   * header). Only the accent node needs a token, because it must stay violet on
+   * *both* grounds: admin re-points this at a lighter mix in its own
+   * globals.css so the node still carries on the brand header.
    *
-   * The previous placeholder (a navy gradient tile with a serif "E") is gone,
-   * which is why `--brand-mark-gradient` and `--font-brand-mark` no longer exist.
-   * Drift is caught by the brand-mark parity tests on both surfaces — see
-   * `legal-search/frontend/src/__tests__/brand-mark-parity.test.ts` and
-   * `platform-control/admin/src/ui/shell/brand-mark-parity.test.ts`.
+   * Size and surrounding chrome stay surface-local.
    */
   --brand-mark-accent: var(--accent-core);
 

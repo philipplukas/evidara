@@ -79,36 +79,68 @@ The full list and the reasoning is in [ADR-0032](../adr/0032-pipeline-observabil
 what to do when one fires is in
 [the alert-response playbook](../runbooks/alert-response-playbook.md).
 
-### Wiring a receiver
+### Wiring the receivers
 
-**Alertmanager ships with no external receiver.** Alerts land in its UI and nowhere else
-— nobody's phone rings. This is deliberate: the Slack/PagerDuty credential belongs to the
-operator, not to the repo. To wire Slack, add the webhook to the `page` receiver in
-`infra/hetzner/values/kube-prometheus-stack.yaml`:
+Two tiers, one channel — both go to the same Telegram chat:
 
-```yaml
-alertmanager:
-  config:
-    receivers:
-      - name: "page"
-        slack_configs:
-          - api_url_file: /etc/alertmanager/secrets/evidara-alertmanager/slack-webhook
-            channel: "#evidara-alerts"
-            title: '{{ .CommonLabels.alertname }}'
-            text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
-  alertmanagerSpec:
-    secrets: [evidara-alertmanager]
+| Tier | Receiver | Behaviour | Why |
+|---|---|---|---|
+| `critical` | `page` | 🔴 prefix, repeats **hourly** | *The product is down* — read alias unresolved, index empty, every query returning nothing. The June/July outage was exactly this and went unnoticed for weeks, because nothing pushed. It is meant to nag. |
+| `warning` | `default` | ⚠️ prefix, repeats every **4h** | Dead-letters, backlogs, probe flaps. Real, but they can wait for business hours. |
+
+A second channel for warnings (Slack) was considered and dropped. This is a one-operator
+system, and **a channel you check "sometimes" is where alerts go to die** — which is the
+failure this whole stack exists to prevent. What actually changes behaviour is the repeat
+interval and the prefix, not which app the message lands in.
+
+Delivery is deliberately **external to this cluster**. Self-hosting the notifier here
+(ntfy, Gotify) would mean a node failure silences the alerts about the node failure.
+
+The bot token is mounted into Alertmanager as a *file*, so it never enters git and never
+appears in `helm get values`.
+
+**1. Create a Telegram bot** — message [@BotFather](https://t.me/botfather), send
+`/newbot`, and keep the token it gives you. Then send your new bot any message and read
+your chat id back:
+
+```bash
+curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | jq '.result[0].message.chat.id'
 ```
 
-…then create the secret and re-run the deploy script:
+**2. Create the Secret** (all three keys are required):
 
 ```bash
 kubectl -n monitoring create secret generic evidara-alertmanager \
-  --from-literal=slack-webhook='https://hooks.slack.com/services/...'
+  --from-literal=telegram-bot-token='123456:ABC-DEF...' \
+  --from-literal=telegram-chat-id='123456789'
+```
+
+**3. Re-run the deploy script.** It reads `telegram-chat-id` back out of the Secret and
+substitutes it at render time — Alertmanager will not read `chat_id` from a file (it must
+be an inline int64), so this is the one value that has to be rendered rather than mounted.
+It is inert without the bot token.
+
+```bash
 bash infra/hetzner/deploy-observability.sh
 ```
 
-Use `api_url_file` rather than `api_url` so the webhook never lands in the values file.
+If the Secret is absent the script **does not fail** — the dashboards and the rules engine
+still come up — but it prints a loud warning, because alerts that fire into a UI nobody
+watches are indistinguishable from no alerts at all.
+
+**4. Prove it actually delivers.** Do not skip this. An untested receiver is exactly the
+class of thing this stack exists to catch:
+
+```bash
+kubectl -n monitoring port-forward svc/kps-alertmanager 9093:9093 &
+curl -s -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/json' -d '[{
+  "labels": {"alertname": "ReceiverSmokeTest", "severity": "critical"},
+  "annotations": {"summary": "If you can read this on your phone, the page tier works."}
+}]'
+```
+
+Your phone should buzz within ~30s (`group_wait`). Repeat with
+`"severity": "warning"` to prove the Slack tier.
 
 ## Verify after the first rollout
 
