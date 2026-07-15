@@ -12,8 +12,9 @@ See ADR-0011 for contract conventions.
 See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
+See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 
- * OpenAPI spec version: 0.5.0
+ * OpenAPI spec version: 0.6.0
  */
 import type { MetadataRowVisibility } from './metadataRowVisibility';
 

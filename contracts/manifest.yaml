@@ -1,4 +1,4 @@
-version: "2.4.0"
+version: "2.5.0"
 last_reviewed: "2026-07-14"
 owner: "Platform Team"
 
@@ -35,11 +35,12 @@ apis:
     version: "0.1.0"
   legal_search:
     file: "contracts/api/legal-search.openapi.yaml"
-    version: "0.5.0"
+    version: "0.6.0"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"
       - "/v1/documents/{document_id}/cited_by"
+      - "/v1/norm-hierarchy/{jurisdiction_id}"
       - "/v1/projections/events/history"
 
 events:

@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { deriveDocumentLevel, deriveSubordinateTo } from '../../core/norm-hierarchy';
 import { normalizeDocumentType } from '../../core/vocabularies';
 import {
   DOCUMENT_INTELLIGENCE_CLIENT,
@@ -208,7 +209,39 @@ export class ProjectionsService {
     if (extracted.canonicalAuthorityIds && extracted.canonicalAuthorityIds.length > 0) {
       projection.authority_ids = extracted.canonicalAuthorityIds;
     }
+    this.applyNormHierarchy(projection, extracted);
     return projection;
+  }
+
+  /**
+   * Stamp the hierarchy-of-norms fields onto a projection row (ADR-0033).
+   *
+   * `level` and `subordinate_to` are derived from the row's jurisdiction, never
+   * guessed from its text — the jurisdiction already knows whether it is a
+   * commune, a canton or the Confederation, so the ordering of norms falls out
+   * of the tree. A document whose jurisdiction is unknown to the hierarchy
+   * vocabulary gets neither field and is simply unreachable through
+   * `norm_hierarchy()`; that is a coverage gap the endpoint reports, not one it
+   * papers over.
+   *
+   * `in_force_from` coalesces `effective_date` so the index has one field to
+   * range-query. `delegates_to` is NOT set here: it cannot be derived from the
+   * tree.
+   */
+  private applyNormHierarchy(
+    projection: SearchProjectionDocument,
+    extracted: { declaredLevel?: string; inForceFrom?: string; inForceUntil?: string },
+  ): void {
+    const level = deriveDocumentLevel(projection.jurisdiction_ids, extracted.declaredLevel);
+    if (level) {
+      projection.level = level;
+      const subordinateTo = deriveSubordinateTo(projection.jurisdiction_ids);
+      if (subordinateTo.length > 0) projection.subordinate_to = subordinateTo;
+    }
+
+    const inForceFrom = extracted.inForceFrom ?? projection.effective_date;
+    if (inForceFrom) projection.in_force_from = inForceFrom;
+    if (extracted.inForceUntil) projection.in_force_until = extracted.inForceUntil;
   }
 
   /**
@@ -270,6 +303,9 @@ export class ProjectionsService {
     jurisdictionFromCanonical?: string;
     canonicalJurisdictionIds?: string[];
     canonicalAuthorityIds?: string[];
+    declaredLevel?: string;
+    inForceFrom?: string;
+    inForceUntil?: string;
   } {
     if (!leanDocument || typeof leanDocument !== 'object') {
       return { sectionsCount: 0, citationsCount: 0 };
@@ -393,6 +429,25 @@ export class ProjectionsService {
       /^auth_[a-z0-9_]+$/,
     );
 
+    // The only level a document may declare for itself is one the jurisdiction
+    // cannot supply — in practice `constitutional`, because the BV is enacted by
+    // the same federal jurisdiction as an ordinary statute. `deriveDocumentLevel`
+    // rejects a declaration that would demote the norm.
+    const declaredLevel = this.firstNestedString(doc, [['level'], ['metadata', 'level']]);
+    const inForceFrom = this.firstNestedString(doc, [
+      ['in_force_from'],
+      ['metadata', 'in_force_from'],
+    ]);
+    // `repealed_date` is accepted as an alias so a producer that models repeal
+    // as an event date does not silently drop the only field that makes
+    // temporal validity answerable.
+    const inForceUntil = this.firstNestedString(doc, [
+      ['in_force_until'],
+      ['metadata', 'in_force_until'],
+      ['repealed_date'],
+      ['metadata', 'repealed_date'],
+    ]);
+
     return {
       title: fallbackTitle,
       language,
@@ -410,6 +465,9 @@ export class ProjectionsService {
       jurisdictionFromCanonical,
       canonicalJurisdictionIds: resolvedJurisdictionIds,
       canonicalAuthorityIds,
+      declaredLevel,
+      inForceFrom,
+      inForceUntil,
     };
   }
 
