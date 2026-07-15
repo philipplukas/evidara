@@ -185,6 +185,25 @@ class CantonHttpAcquisitionSpec(BaseAcquisitionSpec):
         return self
 
 
+class GemeindeHttpAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.GEMEINDE_HTTP] = AcquisitionProvider.GEMEINDE_HTTP
+    # Swiss municipalities have NO ISO 3166-2 code (that standard stops at the
+    # canton), so — unlike canton_http/bundesland_http/regione_http — this
+    # provider keys its portal allow-list on the BFS/OFS Gemeindenummer, the
+    # federal statistical id. It is the same key the 2,110 `jur_ch_gemeinde_*`
+    # jurisdiction seeds are generated from, so a template's bfs_number maps
+    # 1:1 onto `jur_ch_gemeinde_<bfs_number>` (Zürich = 261).
+    bfs_number: int = Field(ge=1, le=9999)
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_gemeinde_http_config(self) -> GemeindeHttpAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("gemeinde_http provider requires seed_url or seed_urls")
+        return self
+
+
 class BundeslandHttpAcquisitionSpec(BaseAcquisitionSpec):
     provider: Literal[AcquisitionProvider.BUNDESLAND_HTTP] = AcquisitionProvider.BUNDESLAND_HTTP
     # ISO 3166-2:DE Bundesland code (e.g. DE-BY). The provider allow-lists a
@@ -224,6 +243,7 @@ AcquisitionSpec = Annotated[
     | EurLexSparqlAcquisitionSpec
     | ChCourtDecisionsAcquisitionSpec
     | CantonHttpAcquisitionSpec
+    | GemeindeHttpAcquisitionSpec
     | BundeslandHttpAcquisitionSpec
     | RegioneHttpAcquisitionSpec,
     Field(discriminator="provider"),

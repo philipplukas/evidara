@@ -35,6 +35,7 @@ Run a narrow CH Fedlex preview against platform-control on Cloud Run and verify:
   - DI accepted / processing / canonical_ready
   - document.processed lifecycle
   - minimum content quality gates
+  - the indexed `language` facet matches the template's language (needs a legal-search URL)
 
 Options:
   --env <dev|staging|prod>       Target environment (default: dev)
@@ -42,7 +43,8 @@ Options:
   --region <region>              Cloud Run region override
   --impersonate-sa <email>       Service account override
   --pc-url <url>                 Platform-control URL override
-  --ls-url <url>                 Legal-search URL override
+  --ls-url <url>                 Legal-search URL override. Required in self-hosted mode for
+                                 the indexed-language gate (auto-discovered on Cloud Run).
   --api-key <key>                Operator X-API-Key (self-hosted / Hetzner mode).
                                  When set, skips gcloud + Cloud-Run token minting and
                                  authenticates with X-API-Key against --pc-url.
@@ -207,12 +209,35 @@ else
   PC_AUTH_HEADER=(-H "Authorization: Bearer ${EVIDARA_PLATFORM_CONTROL_TOKEN}")
 fi
 
+# legal-search is public-by-default in self-hosted mode; on Cloud Run it needs the
+# minted identity token. Used only by the indexed-language gate below.
+LS_AUTH_HEADER=()
+if [[ -n "${EVIDARA_LEGAL_SEARCH_TOKEN:-}" ]]; then
+  LS_AUTH_HEADER=(-H "Authorization: Bearer ${EVIDARA_LEGAL_SEARCH_TOKEN}")
+fi
+
 curl_json() {
   curl -fsS "${PC_AUTH_HEADER[@]}" "$@"
 }
 
+curl_ls_json() {
+  curl -fsS "${LS_AUTH_HEADER[@]}" "$@"
+}
+
 log() {
   printf '%s\n' "$*" >&2
+}
+
+# Language of the expression the template acquires. Fedlex publishes every act as
+# DE/FR/IT expressions and the templates are per-language, so the template suffix
+# IS the expected language of the indexed document (#572).
+expected_language() {
+  case "${TEMPLATE_ID}" in
+    *_de) printf '%s' 'de' ;;
+    *_fr) printf '%s' 'fr' ;;
+    *_it) printf '%s' 'it' ;;
+    *) printf '%s' '' ;;
+  esac
 }
 
 expected_title_regex() {
@@ -399,16 +424,78 @@ body_max_length="$(jq -r '[.data[]? |
 ] | max // 0' < "${RUN_DIR}/raw-artifacts.json")"
 min_content_length_ok=$(( body_max_length >= 10240 ? 1 : 0 ))
 
-# Language agreement: for German templates, body must contain "Abs." or "Bund" or "Recht"
-lang_agreement_ok=1
+# Body-language hint: for German templates, the acquired body must read as German.
+# NOTE: this only inspects the RAW artifact. It says nothing about the language the
+# document is finally *indexed* with — it reported ok for the run in #572 while the
+# search facet said `it`. Keep it as a cheap provider-side hint; the gate that
+# actually protects the facet is `indexed_language_ok` below.
+body_lang_hint_ok=1
 if [[ "${TEMPLATE_ID}" == *_de ]]; then
-  lang_agreement_ok="$(jq -r '[.data[]? | select(
+  body_lang_hint_ok="$(jq -r '[.data[]? | select(
     ((.artifact_metadata.inline_body // "") | test("Abs\\.|Bund|Recht"))
     or ((.artifact_metadata.body // "") | test("Abs\\.|Bund|Recht"))
     or ((.artifact_metadata.provider_metadata.inline_body // "") | test("Abs\\.|Bund|Recht"))
     or ((.artifact_metadata.provider_metadata.body // "") | test("Abs\\.|Bund|Recht"))
   )] | if length > 0 then 1 else 0 end' < "${RUN_DIR}/raw-artifacts.json")"
 fi
+
+# Indexed language: the search-facing `language` facet of every document this run
+# produced must equal the language of the expression the template acquired (#572).
+# A wrong facet value is worse than a missing one — filtering "Swiss law, German"
+# silently dropped the Federal Constitution while "Italian" surfaced it — so this
+# gate is fail-closed: if it cannot be evaluated, the run is content-suspect.
+expected_lang="$(expected_language)"
+processed_document_ids="$(jq -r '[.data[]? | select(.event_type=="document.processed") | .document_id] | unique | join(" ")' < "${RUN_DIR}/document-lifecycle.json")"
+indexed_language_checked=0
+indexed_language_ok=0
+indexed_language_observed=""
+
+if [[ -z "${expected_lang}" ]]; then
+  log "==> Indexed-language gate: template ${TEMPLATE_ID} has no language suffix — nothing to assert"
+  indexed_language_checked=1
+  indexed_language_ok=1
+elif [[ -z "${LS_URL}" ]]; then
+  log "==> Indexed-language gate: SKIPPED — no legal-search URL."
+  log "    Pass --ls-url (self-hosted: kubectl -n evidara port-forward svc/legal-search-api 3102:3000)"
+  log "    so the run can prove the search facet, not just the raw body."
+elif [[ -z "${processed_document_ids}" ]]; then
+  log "==> Indexed-language gate: no document.processed events to check"
+else
+  log "==> Asserting indexed language=${expected_lang} for: ${processed_document_ids}"
+  read -ra doc_ids <<< "${processed_document_ids}"
+  for attempt in $(seq 1 12); do
+    indexed_language_observed=""
+    mismatches=0
+    all_present=1
+    for doc_id in "${doc_ids[@]}"; do
+      if ! curl_ls_json "${LS_URL}/v1/documents/${doc_id}" > "${RUN_DIR}/ls-document-${doc_id}.json" 2>/dev/null; then
+        all_present=0
+        break
+      fi
+      observed="$(jq -r '.contentLanguage.display // "missing"' < "${RUN_DIR}/ls-document-${doc_id}.json")"
+      indexed_language_observed="${indexed_language_observed}${indexed_language_observed:+,}${doc_id}=${observed}"
+      if [[ "${observed}" != "${expected_lang}" ]]; then
+        mismatches=$(( mismatches + 1 ))
+        log "  language mismatch: ${doc_id} expected=${expected_lang} observed=${observed}"
+      fi
+    done
+    if [[ "${all_present}" -eq 1 ]]; then
+      indexed_language_checked=1
+      indexed_language_ok=$(( mismatches == 0 ? 1 : 0 ))
+      break
+    fi
+    log "  indexed-language poll ${attempt}/12: projection not queryable yet"
+    sleep 5
+  done
+
+  if [[ "${indexed_language_checked}" -ne 1 ]]; then
+    log "  indexed-language gate could not read the projection from legal-search"
+  fi
+fi
+
+# Kept for continuity with older evidence bundles: the language verdict is now the
+# AND of the raw-body hint and the indexed facet, so a `1` here means both.
+lang_agreement_ok=$(( body_lang_hint_ok == 1 && indexed_language_ok == 1 ? 1 : 0 ))
 
 verdict="pass"
 if [[ "${content_type_count}" -lt 1 || "${captured_count}" -lt 1 || "${raw_artifact_count}" -lt 1 ]]; then
@@ -447,6 +534,11 @@ SUMMARY_JSON="$(jq -n \
   --argjson body_max_length "${body_max_length}" \
   --argjson min_content_length_ok "${min_content_length_ok}" \
   --argjson lang_agreement_ok "${lang_agreement_ok}" \
+  --argjson body_lang_hint_ok "${body_lang_hint_ok}" \
+  --argjson indexed_language_checked "${indexed_language_checked}" \
+  --argjson indexed_language_ok "${indexed_language_ok}" \
+  --arg indexed_language_expected "${expected_lang}" \
+  --arg indexed_language_observed "${indexed_language_observed}" \
   '{
     environment: $environment,
     template_id: $template_id,
@@ -473,7 +565,12 @@ SUMMARY_JSON="$(jq -n \
       art_density_ok: $art_density_ok,
       body_max_length: $body_max_length,
       min_content_length_ok: $min_content_length_ok,
-      lang_agreement_ok: $lang_agreement_ok
+      lang_agreement_ok: $lang_agreement_ok,
+      body_lang_hint_ok: $body_lang_hint_ok,
+      indexed_language_expected: $indexed_language_expected,
+      indexed_language_observed: $indexed_language_observed,
+      indexed_language_checked: $indexed_language_checked,
+      indexed_language_ok: $indexed_language_ok
     }
   }')"
 

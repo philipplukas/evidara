@@ -2,6 +2,9 @@
   "name": "@evidara/legal-search-api",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <24"
+  },
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",

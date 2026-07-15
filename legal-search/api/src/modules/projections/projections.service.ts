@@ -189,7 +189,17 @@ export class ProjectionsService {
       processed_at: event.occurred_at,
       jurisdiction,
       jurisdiction_ids: jurisdictionIds,
-      language: extracted.language ?? this.inferLanguage(provenance.corpus_id),
+      // The searchable `language` facet must describe the expression we
+      // actually acquired (#572). Order matters: the canonical document's
+      // own `language`, then `metadata.original_language` (DI resolves it
+      // from the source HTML `lang` attribute, falling back to the source
+      // version's `language_codes`), and only then the corpus-id guess.
+      // Preferring the guess over `original_language` is what indexed the
+      // German Federal Constitution as Italian.
+      language:
+        extracted.language ??
+        extracted.originalLanguage ??
+        this.inferLanguage(provenance.corpus_id),
       content_preview: preview,
     };
     if (extracted.documentType) projection.document_type = extracted.documentType;
@@ -702,10 +712,25 @@ export class ProjectionsService {
     return undefined;
   }
 
+  /**
+   * Last-resort language guess from the corpus id (#572).
+   *
+   * Token-based on purpose: the previous substring match classified
+   * `corpus_public_ch_fedlex_constitution` as Italian because the word
+   * "cons-t-**it**-ution" contains the letters "it" — which is how the
+   * German Federal Constitution ended up indexed with `language: it`.
+   * A corpus id only carries a language when it has an explicit
+   * language *token* (`..._de`), so match whole tokens and return
+   * `undefined` rather than a confidently wrong facet value.
+   */
   private inferLanguage(corpusId: string): string | undefined {
-    if (corpusId.includes('de')) return 'de';
-    if (corpusId.includes('fr')) return 'fr';
-    if (corpusId.includes('it')) return 'it';
+    const tokens = corpusId
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+    for (const code of ['de', 'fr', 'it', 'en', 'rm']) {
+      if (tokens.includes(code)) return code;
+    }
     return undefined;
   }
 

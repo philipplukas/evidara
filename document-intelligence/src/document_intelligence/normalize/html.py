@@ -8,7 +8,14 @@ from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
 
 
 class _SimpleHtmlParser(HTMLParser):
-    _TEXT_TAGS = {"p", "li", "td", "th", "blockquote", "pre", "article", "section", "main"}
+    # Leaf tags: the text they contain becomes exactly one block.
+    _TEXT_TAGS = {"p", "li", "td", "th", "blockquote", "pre"}
+    # Structural containers: transparent. We recurse into them so that nested headings and
+    # paragraphs stay separate blocks (a Fedlex law wraps every provision in
+    # `<article id="art_1"><h6>Art. 1</h6><p>…</p></article>`). Loose text sitting directly
+    # inside a container — with no leaf tag around it — is still captured, and flushed as a
+    # paragraph block when a child block starts or when the container closes.
+    _CONTAINER_TAGS = {"article", "section", "main"}
     _HEADING_TAGS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
     _SKIPPED_TAGS = {
         "script",
@@ -38,7 +45,9 @@ class _SimpleHtmlParser(HTMLParser):
         self._artifact_id = artifact_id
         self._skip_depth = 0
         self._current_target: str | None = None
+        self._current_anchor: str | None = None
         self._buffer: list[str] = []
+        self._containers: list[dict[str, Any]] = []
         self._blocks: list[Block] = []
         self._title_buffer: list[str] = []
         self._in_title = False
@@ -74,9 +83,22 @@ class _SimpleHtmlParser(HTMLParser):
         if lowered_tag == "br" and self._current_target is not None:
             self._buffer.append("\n")
             return
+        if lowered_tag in self._CONTAINER_TAGS:
+            # A child block starts here, so any loose text collected so far stands alone.
+            self._flush_loose_text()
+            self._containers.append(
+                {
+                    "tag": lowered_tag,
+                    "anchor": attrs_map.get("id") or self._container_anchor(),
+                    "loose": [],
+                }
+            )
+            return
         if lowered_tag in self._HEADING_TAGS or lowered_tag in self._TEXT_TAGS:
+            self._flush_loose_text()
             if self._current_target is None:
                 self._current_target = lowered_tag
+                self._current_anchor = attrs_map.get("id") or self._container_anchor()
                 self._buffer = []
 
     def handle_endtag(self, tag: str) -> None:  # type: ignore[override]
@@ -92,10 +114,13 @@ class _SimpleHtmlParser(HTMLParser):
         if lowered_tag == self._current_target:
             text = _normalize_whitespace("".join(self._buffer))
             if text:
-                self._blocks.append(self._build_block(lowered_tag, text))
-                self._block_order += 1
+                self._emit_block(lowered_tag, text, self._current_anchor)
             self._current_target = None
+            self._current_anchor = None
             self._buffer = []
+            return
+        if lowered_tag in self._CONTAINER_TAGS:
+            self._close_container(lowered_tag)
 
     def handle_data(self, data: str) -> None:  # type: ignore[override]
         if self._skip_depth:
@@ -105,8 +130,44 @@ class _SimpleHtmlParser(HTMLParser):
             return
         if self._current_target is not None:
             self._buffer.append(data)
+            return
+        if self._containers:
+            # Loose text directly inside a container (or inside a transparent wrapper such as
+            # `<div>` within one). Held until a sibling block starts or the container closes.
+            self._containers[-1]["loose"].append(data)
 
-    def _build_block(self, tag: str, text: str) -> Block:
+    def finalize(self) -> None:
+        """Flush loose text left over in containers that never received an end tag."""
+        while self._containers:
+            self._close_container(self._containers[-1]["tag"])
+
+    def _container_anchor(self) -> str | None:
+        return self._containers[-1]["anchor"] if self._containers else None
+
+    def _close_container(self, tag: str) -> None:
+        for index in range(len(self._containers) - 1, -1, -1):
+            if self._containers[index]["tag"] != tag:
+                continue
+            # Unwind the (possibly unbalanced) containers opened inside this one.
+            while len(self._containers) > index:
+                self._flush_loose_text()
+                self._containers.pop()
+            return
+
+    def _flush_loose_text(self) -> None:
+        if not self._containers:
+            return
+        container = self._containers[-1]
+        text = _normalize_whitespace("".join(container["loose"]))
+        container["loose"] = []
+        if text:
+            self._emit_block("p", text, container["anchor"])
+
+    def _emit_block(self, tag: str, text: str, anchor: str | None) -> None:
+        self._blocks.append(self._build_block(tag, text, anchor))
+        self._block_order += 1
+
+    def _build_block(self, tag: str, text: str, anchor: str | None = None) -> Block:
         if tag in self._HEADING_TAGS:
             block_type = "heading"
             level = self._HEADING_TAGS[tag]
@@ -119,6 +180,10 @@ class _SimpleHtmlParser(HTMLParser):
             block_type = "paragraph"
             level = None
             attrs = {"tag": tag}
+        if anchor:
+            # Stable in-document anchor (e.g. Fedlex `<article id="art_36">`). Sectioning carries
+            # this into section metadata so a provision stays addressable and citable.
+            attrs["anchor"] = anchor
         return Block(
             id=f"blk_{self._block_order:04d}",
             type=block_type,
@@ -135,6 +200,7 @@ def normalize_html_document(html_text: str, artifact_id: str) -> NormalizedDocum
     parser = _SimpleHtmlParser(artifact_id=artifact_id)
     try:
         parser.feed(html_text)
+        parser.finalize()
     except Exception:
         # Malformed markup should not abort the pipeline; strip tags heuristically.
         text = _normalize_whitespace(_strip_tags_fallback(html_text))
