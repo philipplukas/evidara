@@ -66,6 +66,10 @@ plugins:
 
 nav:
   - Home: index.md
+  - Design:
+      - Overview: design/README.md
+      - Brand brief: design/brand-brief.md
+      - Canva and AI tooling: design/canva-workflow.md
   - Architecture:
       - System Context: architecture/system-context.md
       - Agentic CLI Workflow: architecture/agentic-cli-workflow-architecture.md

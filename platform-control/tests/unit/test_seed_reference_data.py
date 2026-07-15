@@ -7,6 +7,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from platform_control.domain import NORM_LEVEL_RANK, NormLevel
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.extractor_profile import ExtractorProfile
@@ -41,7 +42,14 @@ async def test_seed_reference_data_dry_run_does_not_persist(
         tmp_path / "reference" / "jurisdictions.yaml",
         {
             "version": 1,
-            "items": [{"jurisdiction_id": "jur_ch", "slug": "ch", "name": "Switzerland"}],
+            "items": [
+                {
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "ch",
+                    "name": "Switzerland",
+                    "level": "federal",
+                }
+            ],
         },
     )
     _write_seed_file(
@@ -100,7 +108,14 @@ async def test_seed_reference_data_is_idempotent_and_updates_existing_rows(
         jurisdictions,
         {
             "version": 1,
-            "items": [{"jurisdiction_id": "jur_ch", "slug": "ch", "name": "Switzerland"}],
+            "items": [
+                {
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "ch",
+                    "name": "Switzerland",
+                    "level": "federal",
+                }
+            ],
         },
     )
     _write_seed_file(
@@ -192,10 +207,11 @@ async def test_seed_attaches_compliance_policy_to_jurisdiction(
                     "jurisdiction_id": "jur_ch",
                     "slug": "ch",
                     "name": "Switzerland",
+                    "level": "federal",
                     "compliance_policy_id": "cp_ch_fedlex_open_data",
                 },
                 # Unattached jurisdiction stays unconstrained by design.
-                {"jurisdiction_id": "jur_de", "slug": "de", "name": "Germany"},
+                {"jurisdiction_id": "jur_de", "slug": "de", "name": "Germany", "level": "federal"},
             ],
         },
     )
@@ -238,6 +254,7 @@ async def test_seed_rejects_jurisdiction_with_missing_policy_reference(
                     "jurisdiction_id": "jur_ch",
                     "slug": "ch",
                     "name": "Switzerland",
+                    "level": "federal",
                     "compliance_policy_id": "cp_does_not_exist",
                 }
             ],
@@ -267,7 +284,14 @@ async def test_seeder_raises_when_authority_alias_row_still_exists(
         tmp_path / "reference" / "jurisdictions.yaml",
         {
             "version": 1,
-            "items": [{"jurisdiction_id": "jur_ch", "slug": "ch", "name": "Switzerland"}],
+            "items": [
+                {
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "ch",
+                    "name": "Switzerland",
+                    "level": "federal",
+                }
+            ],
         },
     )
     # First seed: insert under the old ID.
@@ -330,7 +354,14 @@ async def test_seeder_no_ops_when_alias_row_has_already_been_renamed(
         tmp_path / "reference" / "jurisdictions.yaml",
         {
             "version": 1,
-            "items": [{"jurisdiction_id": "jur_ch", "slug": "ch", "name": "Switzerland"}],
+            "items": [
+                {
+                    "jurisdiction_id": "jur_ch",
+                    "slug": "ch",
+                    "name": "Switzerland",
+                    "level": "federal",
+                }
+            ],
         },
     )
     _write_seed_file(
@@ -371,7 +402,14 @@ async def test_seeder_raises_when_jurisdiction_alias_row_still_exists(
         tmp_path / "reference" / "jurisdictions.yaml",
         {
             "version": 1,
-            "items": [{"jurisdiction_id": "jur_old", "slug": "test", "name": "Test Place"}],
+            "items": [
+                {
+                    "jurisdiction_id": "jur_old",
+                    "slug": "test",
+                    "name": "Test Place",
+                    "level": "federal",
+                }
+            ],
         },
     )
     _write_seed_file(
@@ -394,6 +432,7 @@ async def test_seeder_raises_when_jurisdiction_alias_row_still_exists(
                     "jurisdiction_id": "jur_new",
                     "slug": "test",
                     "name": "Test Place",
+                    "level": "federal",
                     "deprecated_aliases": ["jur_old"],
                 }
             ],
@@ -426,3 +465,46 @@ async def test_repo_jurisdictions_and_compliance_policies_are_consistent() -> No
             assert pid in policy_ids, (
                 f"jurisdiction {item['jurisdiction_id']} references unknown policy {pid}"
             )
+
+
+def test_repo_jurisdiction_levels_are_declared_and_coherent() -> None:
+    """Every seeded jurisdiction declares a level, and no child outranks its parent.
+
+    `level` is what makes a document's rank in the hierarchy of norms derivable
+    from its jurisdiction instead of guessed from its text (ADR-0033, #583). A
+    missing or inverted level does not fail loudly at request time — it silently
+    mis-ranks law, which is the failure mode the whole feature exists to prevent.
+
+    The one legitimate equal-rank parent/child pair is a *scope refinement*:
+    `jur_ch_federal` (federal) under `jur_ch` (federal). Equal is allowed;
+    outranking a parent is not.
+    """
+    repo_seed_dir = (
+        Path(__file__).resolve().parents[2] / "src" / "platform_control" / "seeds" / "reference"
+    )
+    jurisdictions = yaml.safe_load((repo_seed_dir / "jurisdictions.yaml").read_text())
+    items = jurisdictions["items"]
+
+    levels = {item["jurisdiction_id"]: NormLevel(item["level"]) for item in items}
+    by_id = {item["jurisdiction_id"]: item for item in items}
+
+    for item in items:
+        parent_id = item.get("parent_id")
+        if parent_id is None:
+            continue
+        assert parent_id in by_id, (
+            f"jurisdiction {item['jurisdiction_id']} references unseeded parent {parent_id}"
+        )
+        child_rank = NORM_LEVEL_RANK[levels[item["jurisdiction_id"]]]
+        parent_rank = NORM_LEVEL_RANK[levels[parent_id]]
+        assert child_rank >= parent_rank, (
+            f"jurisdiction {item['jurisdiction_id']} ({levels[item['jurisdiction_id']]}) "
+            f"outranks its parent {parent_id} ({levels[parent_id]})"
+        )
+
+    # The demo case: a commune sits under its canton, which sits under the
+    # Confederation. If this inverts, the dog question is unanswerable.
+    assert levels["jur_ch_gemeinde_261"] is NormLevel.MUNICIPAL
+    assert by_id["jur_ch_gemeinde_261"]["parent_id"] == "jur_ch_zh"
+    assert levels["jur_ch_zh"] is NormLevel.CANTONAL
+    assert levels["jur_ch_federal"] is NormLevel.FEDERAL

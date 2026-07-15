@@ -104,6 +104,39 @@ class ProcessingStatus(StrEnum):
     SKIPPED_DUPLICATE = "skipped_duplicate"
 
 
+class NormLevel(StrEnum):
+    """Rank of a norm in the hierarchy of norms (ADR-0033).
+
+    A *jurisdiction* carries the level its own legislation sits at; a
+    *document* inherits that level unless the canonical metadata declares a
+    higher rank (only ``CONSTITUTIONAL`` can be declared this way — a
+    constitution is enacted by a federal jurisdiction but outranks its
+    ordinary statutes, so it cannot be derived from the jurisdiction alone).
+
+    Ordering is authoritative and lives in
+    ``contracts/vocabularies/norm-level.json``; ``NORM_LEVEL_RANK`` below is
+    the Python mirror. Lower rank = higher authority.
+    """
+
+    CONSTITUTIONAL = "constitutional"
+    INTERNATIONAL = "international"
+    FEDERAL = "federal"
+    CANTONAL = "cantonal"
+    MUNICIPAL = "municipal"
+
+
+#: Lower rank = higher authority. Mirrors `contracts/vocabularies/norm-level.json`.
+#: `international` is placed above ordinary federal statutes per the monist
+#: reading of BV Art. 5(4); see the vocabulary file for the caveat.
+NORM_LEVEL_RANK: dict[NormLevel, int] = {
+    NormLevel.CONSTITUTIONAL: 10,
+    NormLevel.INTERNATIONAL: 20,
+    NormLevel.FEDERAL: 30,
+    NormLevel.CANTONAL: 40,
+    NormLevel.MUNICIPAL: 50,
+}
+
+
 class DocumentLifecycleStatus(StrEnum):
     ACTIVE = "active"
     SUPERSEDED = "superseded"
