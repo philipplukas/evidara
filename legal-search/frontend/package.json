@@ -2,8 +2,10 @@
   "name": "@evidara/legal-search-frontend",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <24"
+  },
   "scripts": {
-    "postinstall": "node ../../scripts/ensure-monorepo-shared-modules.mjs",
     "generate:icons": "node scripts/generate-subdivision-icons.mjs",
     "predev": "npm run generate:icons",
     "prebuild": "npm run generate:icons",

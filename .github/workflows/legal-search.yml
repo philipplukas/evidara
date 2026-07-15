@@ -13,6 +13,13 @@ on:
       - 'legal-search/**'
       - 'contracts/api/legal-search.openapi.yaml'
       - 'platform-control/admin/**'
+      # `styles/` holds the shared @evidara/* modules — they are compiled
+      # into the frontend bundle, so a change there must run this CI.
+      - 'styles/**'
+      - '.nvmrc'
+      - 'package.json'
+      - 'scripts/check-js-workspace-hygiene.sh'
+      - 'scripts/check-legal-search.sh'
       - 'docs/runbooks/interaction-flow-validation.md'
       - 'scripts/run-interaction-flow-local.sh'
   push:
@@ -21,6 +28,11 @@ on:
       - 'legal-search/**'
       - 'contracts/api/legal-search.openapi.yaml'
       - 'platform-control/admin/**'
+      - 'styles/**'
+      - '.nvmrc'
+      - 'package.json'
+      - 'scripts/check-js-workspace-hygiene.sh'
+      - 'scripts/check-legal-search.sh'
       - 'docs/runbooks/interaction-flow-validation.md'
       - 'scripts/run-interaction-flow-local.sh'
 
@@ -29,6 +41,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─── JS dependency-resolution hygiene ───
+  #
+  # Cheap, repo-wide invariants that keep local runs honest: no root
+  # `node_modules` symlink, no vestigial `legal-search/package.json`, react
+  # deduped for the shared `styles/` modules, and a Node pin that matches
+  # `.nvmrc`. Runs the SAME script as the pre-commit hook. See #588.
+  js-workspace-hygiene:
+    name: JS workspace hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          # Read the pin from `.nvmrc` so CI and local cannot drift.
+          node-version-file: .nvmrc
+
+      - name: Check JS workspace hygiene
+        run: bash scripts/check-js-workspace-hygiene.sh
+
   # ─── API quality gate ───
   api:
     # GitHub-hosted: keeps the Node tool bootstrap (actions/setup-node) stable.
