@@ -12,6 +12,7 @@ Operator-focused entry points (from repo root unless noted).
 | [`sync-github-cd-config.sh`](sync-github-cd-config.sh) | Syncs GitHub Actions variables/secrets from **gcloud**; supports **staging**. |
 | [`smoke-evidara-cli.sh`](smoke-evidara-cli.sh) | Local/API `evidara` pings when `EVIDARA_CLI_SMOKE=1`. |
 | [`analyze_github_actions_queue.py`](analyze_github_actions_queue.py) | Summarize GitHub Actions **queue vs run** time via `gh` (`--csv`, `--per-job`, `--aggregate-jobs`). See [CI Actions duration metrics](../docs/runbooks/ci-actions-duration-metrics.md). |
+| [`generate_brand_assets.py`](generate_brand_assets.py) | Regenerates both apps' `icon.svg`, `apple-icon.png` and `favicon.ico` from the `BrandMark` lattice geometry. The 16px favicon frame uses its own tuned geometry — the standard one renders a sub-pixel stroke and turns to mush. Needs `rsvg-convert` + Pillow. |
 | [`validate_k8s_gitops_kustomize.sh`](validate_k8s_gitops_kustomize.sh) | Renders `k8s/gitops/{dev,staging,prod}` with `kubectl kustomize` (skips if `kubectl` missing locally; required in CI). |
 | [`check_compose_profiles.py`](check_compose_profiles.py) | Fails if any `docker compose --profile <name>` used in scripts, docs, or workflows is not defined by a compose file. Compose silently starts nothing for an unknown profile. |
 | [`run-staging-relevance-query-pack.sh`](run-staging-relevance-query-pack.sh) | Staging `GET /v1/search` top-3 table for **TAR-82** / **TAR-68** (needs `EVIDARA_LEGAL_SEARCH_URL` + token). |

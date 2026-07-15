@@ -8,11 +8,10 @@
  *   "@evidara/shell":   ["../../styles/shell"],
  *   "@evidara/shell/*": ["../../styles/shell/*"]
  *
- * See `docs/adr/0028-shared-shell-module.md` for the rationale and the
- * follow-up plan.
+ * See `docs/adr/0028-shared-shell-module.md` for the rationale.
  */
 
-export { BrandMark, type BrandMarkProps } from "./BrandMark";
+export { BrandMark, BrandMarkCompact, type BrandMarkProps } from "./BrandMark";
 
 /**
  * Sentinel value the scaffolding gate-tests can import to confirm the
