@@ -67,3 +67,24 @@ describe("admin shell brand tokens", () => {
     expect(shellComponentSource).not.toContain("var(--brand-focus-ring)");
   });
 });
+
+describe("admin shell responsive grid", () => {
+  const appShell = readFileSync(join(process.cwd(), "src/ui/shell/AppShell.tsx"), "utf8");
+
+  it("drives the root grid from the responsive class, not a hardcoded inline column", () => {
+    // A fixed `288px 1fr` inline at every width reserved the sidebar column on
+    // mobile — where the sidebar is an overlay drawer — shoving the header and
+    // main content off the right edge. Inline styles can't be overridden by
+    // Tailwind responsive classes, so the grid must live in CSS.
+    expect(appShell).toContain("admin-app-shell");
+    expect(appShell).not.toContain('gridTemplateColumns: "288px 1fr"');
+  });
+
+  it("is a single column on mobile and expands to the sidebar column at md", () => {
+    expect(globalsCss).toContain(".admin-app-shell");
+    // md breakpoint (768px) matches the sidebar's `md:block`.
+    expect(globalsCss).toMatch(
+      /@media \(min-width: 768px\)[\s\S]*?\.admin-app-shell[\s\S]*?288px 1fr/,
+    );
+  });
+});

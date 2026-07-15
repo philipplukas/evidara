@@ -80,14 +80,7 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   return (
-    <div
-      className="min-h-screen grid"
-      style={{
-        gridTemplateColumns: "288px 1fr",
-        gridTemplateRows: "80px 1fr",
-        gridTemplateAreas: `"sidebar header" "sidebar main"`,
-      }}
-    >
+    <div className="admin-app-shell min-h-screen grid">
       {/* Header row (spans the main-content column on desktop) */}
       <div
         style={{ gridArea: "header" }}
