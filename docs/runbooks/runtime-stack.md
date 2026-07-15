@@ -181,7 +181,7 @@ To optimize **main** pushes further (build only what changed), CD would need to 
 
 **Staging:** this workflow has **no** staging deploy job. Use the manual Cloud Run procedure below (or Terraform) for `*-staging` services.
 
-**Prod gate:** in `platform-control-cd.yml`, `deploy-prod` has `needs: deploy-dev`. For **Databricks bundle CD**, `document-intelligence-cd.yml` promotes `dev -> staging -> prod` before `deploy-prod` runs. Add a **manual approval** rule on the GitHub `prod` environment if you want a human promotion step.
+**Prod gate:** in `platform-control-cd.yml`, `deploy-prod` has `needs: deploy-dev`. Add a **manual approval** rule on the GitHub `prod` environment if you want a human promotion step.
 
 **Manual image rebuild:** `runtime-images.yml` also supports `workflow_dispatch` on `main` when you need a full parallel build without a matching push.
 
@@ -228,25 +228,6 @@ gcloud builds submit . \
 **Batch helper:** `scripts/build-runtime-images.sh` runs parallel Cloud Build jobs (see `scripts/cloudbuild.runtime-image.yaml`) for `platform-control`, `platform-control-worker`, `legal-search-api`, `di-consumer`, and `document-intelligence-document-service` with the same tagging defaults.
 
 **DI HTTP ingress only:** the main `document-intelligence/Dockerfile` (used by `runtime-images.yml` for `di-consumer`) now runs the push-based `document_intelligence_runtime_ingress`. `document-intelligence/Dockerfile.runtime-ingress` is equivalent but uses a different build context (for standalone `gcloud builds submit` from the `document-intelligence/` directory; see `cloudbuild.runtime-ingress.yaml`).
-
-### Databricks bundle deploy (document-intelligence-cd.yml)
-
-**Trigger**: Push to `main` (path-filtered) for `document-intelligence/**`, selected `contracts/**` paths, and the workflow file itself.
-
-**Promotion chain:** `dev -> staging -> prod` as separate GitHub Actions jobs:
-
-1. `deploy-dev` (`environment: dev`)
-2. `deploy-staging` (`environment: staging`, `needs: deploy-dev`)
-3. `deploy-prod` (`environment: prod`, `needs: [deploy-dev, deploy-staging]`)
-
-**Auth:** each job uses `DATABRICKS_HOST` + `DATABRICKS_TOKEN` from the active GitHub Environment secrets.
-
-**Targets:** bundle targets live in [`document-intelligence/databricks.yml`](../../document-intelligence/databricks.yml) (`dev`, `staging`, `prod`).
-
-**Operator checklist after merge:**
-
-- Confirm the workflow run for the merge commit is green end-to-end (staging is now a hard prerequisite for prod in this workflow).
-- If prod should require human approval, enforce it via GitHub Environment protection rules on `prod` (and optionally `staging`).
 
 ### Infrastructure (terraform.yml)
 

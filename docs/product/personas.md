@@ -18,7 +18,7 @@ Each persona has a **Grounded** block (what the repo / journeys actually demand 
 |---|---|---|
 | Legal end user | `legal-search/frontend` | [legal-search.md:55](../components/legal-search.md), [interaction-flow-validation.md:35](../runbooks/interaction-flow-validation.md) (Journey 4) |
 | Content operator | `platform-control/admin` + platform-control API | [system-context.md:125](../architecture/system-context.md), [interaction-flow-validation.md](../runbooks/interaction-flow-validation.md) (Journeys 1–3, 5), [multi-country playbook](../runbooks/platform-control-multi-country-operator-playbook.md) |
-| Reviewer (HITL) | Argilla + platform-control rescore loop | [argilla-review-routing-and-sync.md](../runbooks/argilla-review-routing-and-sync.md), [`smoke-hetzner-hitl-rescore.sh`](../runbooks/mvp-acceptance-scenario-pack.md) |
+| Reviewer (HITL) | platform-control admin review queue + rescore loop | [extraction-review-routing.md](../runbooks/extraction-review-routing.md), [`smoke-hetzner-hitl-rescore.sh`](../runbooks/mvp-acceptance-scenario-pack.md) |
 | Platform / SRE operator | platform-control API, infra, runbooks | [phase-5-go-no-go-memo.md](../runbooks/phase-5-go-no-go-memo.md), [DLQ triage](../runbooks/dlq-triage-and-replay.md), [release/rollback](../runbooks/release-rollback.md) |
 | Agent / CLI operator | `tools/evidara-cli`, MCP-style scripted access | [evidara-cli README](../../tools/evidara-cli/README.md), [mvp-acceptance-scenario-pack.md](../runbooks/mvp-acceptance-scenario-pack.md) |
 
@@ -78,7 +78,7 @@ Internal role. Manages the source-to-published pipeline through the admin UI.
 
 ## P3 — Reviewer (HITL)
 
-A specialist sub-role. Today represented by the Argilla review routing + rescore loop.
+A specialist sub-role. Today represented by the confidence-band review routing + rescore loop.
 
 ### Grounded
 
@@ -86,7 +86,9 @@ A specialist sub-role. Today represented by the Argilla review routing + rescore
 - Submits corrections that flow back through `rescore_request` → Temporal → metrics ([smoke-hetzner-hitl-rescore.sh](../runbooks/mvp-acceptance-scenario-pack.md))
 - Operates on **Hetzner staging only** today
 
-This persona is **not yet a product surface** — it is a Temporal + Argilla loop with smokes. Treat as forward-looking.
+This persona is **not yet a fully built product surface** — review tasks land in the `review_tasks`
+queue and are decided through `POST /v1/reviews/tasks/{id}/decision`; the admin screen for working
+that queue is still to come (ADR-0031). Treat as forward-looking.
 
 ---
 

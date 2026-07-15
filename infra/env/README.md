@@ -4,9 +4,6 @@ Per-environment Terraform variable files live here.
 
 Current scaffold:
 
-- [`dev/document_intelligence.databricks.tfvars`](dev/document_intelligence.databricks.tfvars)
-- [`staging/document_intelligence.databricks.tfvars`](staging/document_intelligence.databricks.tfvars)
-- [`prod/document_intelligence.databricks.tfvars`](prod/document_intelligence.databricks.tfvars)
 - [`dev/runtime.gcp.tfvars.example`](dev/runtime.gcp.tfvars.example)
 - [`dev/runtime.gcp.ci.tfvars`](dev/runtime.gcp.ci.tfvars)
 - [`staging/runtime.gcp.tfvars.example`](staging/runtime.gcp.tfvars.example)
@@ -21,10 +18,9 @@ Current scaffold:
 These files contain non-secret environment scaffolding only.
 Do not commit credentials or secret values here.
 
-## Spend and compute guardrails (optional)
+## Spend guardrails (optional)
 
 - **GCP (runtime stack):** set `enable_billing_budget = true` plus `billing_account_id` and amount/currency in `runtime.gcp.tfvars` to create a **project-scoped Cloud Billing budget** with percentage alerts. Billing admins receive alerts by default; set `billing_budget_notification_emails` to also create Monitoring email channels (max five). See `infra/terraform/gcp/runtime_stack/billing_guardrails.tf`. Defaults stay off so CI and fresh clones do not require billing APIs.
-- **Databricks (document intelligence stack):** set `enable_databricks_compute_guardrails = true` in `document_intelligence.databricks.tfvars` to create the workspace cluster policy **`Evidara compute guardrails`**. The `document-intelligence` Asset Bundle resolves it by name and sets `policy_id` on every job `new_cluster`; apply Terraform before `databricks bundle validate` / `deploy`, or pass `--var compute_guardrails_policy_id=...` (see `document_intelligence_stack` README and `document-intelligence-cd.yml`).
 
 ## Secret and env handling flow
 

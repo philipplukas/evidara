@@ -91,10 +91,27 @@ them.
 
 ## Monitoring Stack
 
-- **Metrics source**: Google Cloud Monitoring (Cloud Run, Pub/Sub built-in metrics)
-- **Logs**: Cloud Logging (structured JSON from all services)
-- **Alerting**: Cloud Monitoring alert policies (Terraform-managed)
-- **Notification**: Email + Slack webhook (configurable per environment)
+Since the move to the self-hosted Hetzner runtime (ADR-0029), the signal sources below
+replaced every GCP one. See [ADR-0032](0032-pipeline-observability.md).
+
+- **Metrics source**: Prometheus (kube-prometheus-stack) scraping a `/metrics` endpoint
+  on every service, plus the NATS JetStream exporter
+- **Logs**: structured JSON from all services (`kubectl logs`)
+- **Alerting**: Alertmanager, rules in `infra/hetzner/observability/alerts.yaml`
+- **Dashboards**: Grafana — the **pipeline funnel** is the primary one
+- **Notification**: Alertmanager receivers. **No external receiver is configured by
+  default** — wiring Slack is a one-value change, see
+  [docs/setup/hetzner-observability.md](../setup/hetzner-observability.md)
+
+> The SLIs in the tables above still name Cloud Run / Pub/Sub metrics as their source.
+> The *targets* remain valid; the sources are being ported to their Prometheus
+> equivalents. `documents-read` alias resolution, search zero-result rate, and the
+> pipeline funnel counters are live today (ADR-0032).
+
+### Retired (GCP)
+
+- Google Cloud Monitoring (Cloud Run, Pub/Sub built-in metrics), Cloud Logging,
+  Cloud Monitoring alert policies (Terraform-managed)
 
 ## Related Resources
 

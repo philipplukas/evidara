@@ -6,6 +6,7 @@ import { ShareButton } from "@/components/ui/ShareButton";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
+import { HighlightedSnippet } from "./HighlightedSnippet";
 
 /**
  * Variant of ResultCard for `record_kind=commentary_insight` /
@@ -139,9 +140,7 @@ export function CommentaryResultCard({
       </div>
 
       {/* Snippet */}
-      <p className="mb-3 line-clamp-3 text-[13px] leading-6 text-foreground/80 font-document">
-        {result.snippet}
-      </p>
+      <HighlightedSnippet className="mb-3 line-clamp-3" snippet={result.snippet} />
 
       {/* Source documents — the commentary's "Commentary on:" block. */}
       {sourceDocumentIds.length > 0 && (

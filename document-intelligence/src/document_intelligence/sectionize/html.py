@@ -19,22 +19,37 @@ def build_sections_from_ir(document_ir: NormalizedDocumentIR) -> list[SectionCan
     sections: list[SectionCandidate] = []
     preamble_parts: list[str] = []
     current: dict[str, Any] | None = None
+    # Enclosing headings, outermost first — e.g. an article under "Titel 2 > 1. Kapitel".
+    # Tracked across *all* headings (including structural ones that end up with no direct
+    # content and are dropped below) so a provision keeps its place in the norm hierarchy.
+    ancestry: list[dict[str, Any]] = []
 
     for block in document_ir.blocks:
         if block.type == "heading":
             if current is not None:
                 sections.append(_finalize_section(current))
+            depth = max(0, (block.level or 1) - 1)
+            while ancestry and ancestry[-1]["depth"] >= depth:
+                ancestry.pop()
+            metadata: dict[str, Any] = {
+                "heading_level": block.level,
+                "block_id": block.id,
+                **dict(block.attrs),
+            }
+            if ancestry:
+                metadata["ancestor_titles"] = [entry["title"] for entry in ancestry]
+                metadata["parent_title"] = ancestry[-1]["title"]
+                parent_anchor = ancestry[-1]["anchor"]
+                if parent_anchor:
+                    metadata["parent_anchor"] = parent_anchor
             current = {
                 "title": block.text,
                 "content_parts": [],
-                "depth": max(0, (block.level or 1) - 1),
+                "depth": depth,
                 "section_type": "heading",
-                "metadata": {
-                    "heading_level": block.level,
-                    "block_id": block.id,
-                    **dict(block.attrs),
-                },
+                "metadata": metadata,
             }
+            ancestry.append({"title": block.text, "depth": depth, "anchor": block.attrs.get("anchor")})
             continue
 
         if current is None:

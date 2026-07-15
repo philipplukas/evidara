@@ -12,7 +12,8 @@ info:
     See ADR-0012 for layered contract governance.
     See ADR-0013 for internationalization strategy.
     Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
-  version: 0.4.1
+    See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
+  version: 0.6.0
   contact:
     name: Evidara Team
   license:
@@ -156,6 +157,11 @@ paths:
                 $ref: "#/components/schemas/SearchResponseView"
         "400":
           description: Invalid query parameters
+        "503":
+          description: |
+            The search backend could not execute the query (missing index/alias,
+            connection failure, timeout). Distinct from a query that executed and
+            matched nothing — that is a 200 with an empty `results` array.
 
   /v1/search/context:
     get:
@@ -176,6 +182,8 @@ paths:
                 $ref: "#/components/schemas/SearchContextView"
         "400":
           description: Invalid request
+        "503":
+          description: The search backend could not execute the aggregation query
 
   /v1/documents/{document_id}:
     get:
@@ -246,6 +254,69 @@ paths:
                 $ref: "#/components/schemas/CitedByResponse"
         "404":
           description: Document not found
+
+  /v1/norm-hierarchy/{jurisdiction_id}:
+    get:
+      operationId: getNormHierarchy
+      summary: What governs this place, at each level of the hierarchy of norms
+      description: |
+        Returns the legal orders that bind a jurisdiction — constitutional,
+        federal, cantonal, municipal — ordered most authoritative first, with the
+        norms the corpus actually holds at each level. See ADR-0033.
+
+        This is a **traversal, not a search**. The governing chain is derived
+        from the jurisdiction tree
+        (`contracts/vocabularies/jurisdiction-hierarchy.json`), not from text
+        similarity: a communal ordinance is subordinate to its canton's law and
+        to federal law because of where the commune sits, not because the
+        documents resemble each other.
+
+        `coverage.missing_levels` lists the levels that bind this place but for
+        which the corpus holds nothing. It is load-bearing: an agent that
+        reasons past a missing level is fabricating, and "I do not have the
+        communal ordinance for this place" is a correct answer.
+      tags: [norm-hierarchy, agent-discovery]
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: jurisdiction_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^jur_[a-z0-9_]+$'
+          description: Canonical jurisdiction ID (e.g. `jur_ch_gemeinde_261` — the City of Zurich).
+        - name: in_force_at
+          in: query
+          schema:
+            type: string
+            format: date
+          description: |
+            ISO date. Judges the hierarchy against the law in force on that date —
+            a ban enacted in 2019 must be measured against 2019 law.
+
+            Norms **known** to be repealed by, or not yet in force on, this date
+            are excluded. Norms whose dates are unknown are KEPT and reported
+            with `in_force_state: unknown`; dropping them would hide law from the
+            caller, and silence is indistinguishable from absence.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Norms returned per level. `total` reports the full count regardless.
+      responses:
+        "200":
+          description: The hierarchy of norms governing this jurisdiction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormHierarchyView"
+        "400":
+          description: Invalid request
+        "404":
+          description: Jurisdiction not found in the hierarchy
 
 components:
   parameters:
@@ -645,6 +716,141 @@ components:
           type: string
         resolved:
           type: boolean
+
+    NormLevel:
+      type: string
+      description: |
+        Rank in the hierarchy of norms. Ordering is authoritative and lives in
+        `contracts/vocabularies/norm-level.json` — lower `rank` = higher
+        authority. `constitutional` is the one level a document declares for
+        itself: the constitution is enacted by the same federal jurisdiction as
+        an ordinary statute, so it cannot be derived from the jurisdiction.
+      enum:
+        - constitutional
+        - international
+        - federal
+        - cantonal
+        - municipal
+
+    InForceState:
+      type: string
+      description: |
+        Temporal validity of a norm on the requested `in_force_at` date.
+        Deliberately four-valued: `unknown` ("marked repealed, but we do not hold
+        the date", or "we hold no start date") is a correct answer, and inventing
+        `in_force` from a missing field is the confident fabrication the platform
+        exists to prevent.
+      enum:
+        - in_force
+        - not_yet_in_force
+        - repealed
+        - unknown
+
+    NormHierarchyView:
+      type: object
+      required: [jurisdiction, levels, coverage]
+      properties:
+        jurisdiction:
+          $ref: "#/components/schemas/NormHierarchyJurisdiction"
+        in_force_at:
+          type: string
+          format: date
+          description: Echoes the requested as-of date when one was given.
+        levels:
+          type: array
+          description: Ordered most authoritative first (ascending `rank`).
+          items:
+            $ref: "#/components/schemas/NormHierarchyLevel"
+        coverage:
+          $ref: "#/components/schemas/NormHierarchyCoverage"
+
+    NormHierarchyJurisdiction:
+      type: object
+      required: [jurisdiction_id, name, slug, level]
+      properties:
+        jurisdiction_id:
+          type: string
+          pattern: '^jur_[a-z0-9_]+$'
+        name:
+          type: string
+        slug:
+          type: string
+        level:
+          $ref: "#/components/schemas/NormLevel"
+
+    NormHierarchyLevel:
+      type: object
+      required: [level, rank, label, jurisdiction_ids, total, documents]
+      properties:
+        level:
+          $ref: "#/components/schemas/NormLevel"
+        rank:
+          type: integer
+          description: Lower = higher authority.
+        label:
+          type: string
+          description: Localized label for the level (Accept-Language).
+        jurisdiction_ids:
+          type: array
+          description: The jurisdictions whose law sits at this level for this place.
+          items:
+            type: string
+            pattern: '^jur_[a-z0-9_]+$'
+        total:
+          type: integer
+          description: Norms held at this level, BEFORE `documents` was capped by `limit`.
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/NormSummary"
+
+    NormHierarchyCoverage:
+      type: object
+      required: [covered_levels, missing_levels]
+      properties:
+        covered_levels:
+          type: array
+          items:
+            $ref: "#/components/schemas/NormLevel"
+        missing_levels:
+          type: array
+          description: |
+            Levels that bind this place but for which the corpus holds nothing.
+            An agent must refuse rather than reason past one of these.
+          items:
+            $ref: "#/components/schemas/NormLevel"
+
+    NormSummary:
+      type: object
+      required: [document_id, title, jurisdiction_ids]
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        document_type:
+          type: string
+        official_citation:
+          type: string
+        jurisdiction_ids:
+          type: array
+          items:
+            type: string
+        effective_date:
+          type: string
+          format: date
+        in_force_from:
+          type: string
+          format: date
+          description: First date the norm was in force. Falls back to `effective_date`.
+        in_force_until:
+          type: string
+          format: date
+          description: |
+            Last date the norm WAS in force (inclusive). Absent means "not known
+            to be repealed" — which is not the same as "never repealed".
+        in_force_state:
+          $ref: "#/components/schemas/InForceState"
 
     Annotation:
       type: object

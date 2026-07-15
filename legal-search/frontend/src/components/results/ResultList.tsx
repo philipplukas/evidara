@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorState } from "@/components/ui/error-state";
 import { usePreferences } from "@/hooks/use-preferences";
+import { stripHighlightTags } from "@/lib/highlight";
 import { hasActiveSearchConstraints, useSearchConstraints } from "@/lib/search-constraints-store";
 import type { ResultSetSource, SearchResultViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
@@ -119,7 +120,7 @@ export function ResultList({
   const handleExportCsv = useCallback(() => {
     const header = ["Title", "Type", "Subtitle", "Snippet"].map(escapeCsvField).join(",");
     const rows = results.map((r) =>
-      [r.title, r.type, r.subtitle, r.snippet].map(escapeCsvField).join(","),
+      [r.title, r.type, r.subtitle, stripHighlightTags(r.snippet)].map(escapeCsvField).join(","),
     );
     const csv = [header, ...rows].join("\n");
     const bom = "\uFEFF";

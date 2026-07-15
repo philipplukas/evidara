@@ -80,12 +80,6 @@ class Settings(BaseSettings):
     legifrance_client_id: str | None = None
     legifrance_client_secret: str | None = None
 
-    argilla_api_base_url: str | None = None
-    argilla_api_key: str | None = None
-    argilla_dataset_id: str | None = None
-    argilla_records_path: str = "/api/v1/datasets/{dataset_id}/records/bulk"
-    argilla_http_timeout_seconds: float = 30.0
-
     # Auth — when any of these are set, matching routes require X-API-Key (see auth.py)
     api_key: str | None = Field(
         default=None,
@@ -104,20 +98,12 @@ class Settings(BaseSettings):
         "api_key",
         "operator_api_key",
         "service_api_key",
-        "argilla_api_key",
         "legifrance_client_id",
         "legifrance_client_secret",
         mode="before",
     )
     @classmethod
     def _empty_secret_to_none(cls, value: object) -> str | None:
-        if value is None or value == "":
-            return None
-        return str(value)
-
-    @field_validator("argilla_api_base_url", "argilla_dataset_id", mode="before")
-    @classmethod
-    def _empty_argilla_str_to_none(cls, value: object) -> str | None:
         if value is None or value == "":
             return None
         return str(value)

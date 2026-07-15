@@ -66,6 +66,10 @@ plugins:
 
 nav:
   - Home: index.md
+  - Design:
+      - Overview: design/README.md
+      - Brand brief: design/brand-brief.md
+      - Canva and AI tooling: design/canva-workflow.md
   - Architecture:
       - System Context: architecture/system-context.md
       - Agentic CLI Workflow: architecture/agentic-cli-workflow-architecture.md
@@ -104,6 +108,9 @@ nav:
       - "0022: Agentic CLI Workflow Control Surface": adr/adr-0022-agentic-cli-workflow-control-surface.md
       - "0026: authority_id / jurisdiction_id Naming Policy": adr/adr-0026-id-naming-policy.md
       - "0030: Acquisition Provider Enablement Lifecycle": adr/0030-acquisition-provider-enablement-lifecycle.md
+      - "0031: Temporal / Argilla / Firecrawl Disposition": adr/0031-temporal-argilla-firecrawl-disposition.md
+      - "0032: Pipeline Observability": adr/0032-pipeline-observability.md
+      - "0033: Agentic Legal Reasoning": adr/0033-agentic-legal-reasoning.md
       - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md
@@ -128,6 +135,8 @@ nav:
           - Contracts: components/testing/contracts-testing.md
           - Infrastructure: components/testing/infra-testing.md
   - Runbooks:
+      - Extraction review routing: runbooks/extraction-review-routing.md
+      - Retention sweep (legal hard delete): runbooks/retention-sweep.md
       - Document Service & Detail: runbooks/document-service-document-detail.md
       - Firecrawl Preview Run: runbooks/firecrawl-preview-run.md
       - Evidara CLI environment smoke matrix: runbooks/evidara-cli-environment-smoke-matrix.md
@@ -154,6 +163,7 @@ nav:
       - GCP local Cloud Run auth: setup/gcp-local-cloud-run-auth.md
       - Infrastructure Overview: setup/infrastructure-overview.md
       - Hetzner k3s bootstrap: setup/hetzner-k3s.md
+      - Hetzner observability: setup/hetzner-observability.md
       - Branch Rules: setup/branch-rules.md
       - Zed Setup: setup/zed.md
       - Wizard Temporal Argilla Rollout: setup/platform-control-wizard-temporal-argilla-rollout.md

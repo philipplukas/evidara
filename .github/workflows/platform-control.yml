@@ -44,6 +44,21 @@ jobs:
       - name: Install uv
         run: python -m pip install uv
 
+      # The `temporal` tests drive a real workflow on the temporalio SDK's
+      # time-skipping test server. That server is a *local* binary — it binds a
+      # loopback port and talks to nothing — but the SDK fetches it from
+      # temporal.download once per SDK version. Caching it keeps the tests off
+      # the network on all but the first run after a temporalio bump, without
+      # resorting to skipping them (which is how they came to never run at
+      # all — #564). A cache miss is not fatal: the SDK just re-fetches.
+      - name: Cache Temporal test server binary
+        uses: actions/cache@v4
+        with:
+          path: platform-control/.temporal-test-server
+          key: temporal-test-server-${{ runner.os }}-${{ hashFiles('platform-control/uv.lock') }}
+          restore-keys: |
+            temporal-test-server-${{ runner.os }}-
+
       - name: Install admin dependencies
         run: npm ci
         working-directory: platform-control/admin

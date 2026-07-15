@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
 
-import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 from acquisition_core.providers import ProviderPlan, ProviderResource, ProviderStartResult
-from platform_control.config import get_settings
 from platform_control.domain import ReviewTaskStatus, RunStatus, WizardRunState
 from platform_control.errors import ConflictError, InvalidStateTransitionError
 from platform_control.models.authority import Authority, Jurisdiction
@@ -19,12 +16,10 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.schemas.wizard import (
-    ArgillaReviewSyncItem,
-    ArgillaReviewSyncRequest,
     CreateReviewTaskRequest,
     CreateWizardProjectRequest,
+    ReviewDecisionRequest,
 )
-from platform_control.services.argilla_enqueue_service import ArgillaEnqueueService
 from platform_control.services.orchestrator import InMemoryOrchestrator, TemporalOrchestrator
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.wizard_service import WizardService
@@ -76,184 +71,154 @@ async def test_wizard_state_guards_and_transitions(session) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.requires_network
+@pytest.mark.temporal
 async def test_temporal_orchestrator_starts_workflow_and_signals(
     session_maker: async_sessionmaker[AsyncSession],
+    temporal_env: WorkflowEnvironment,
 ) -> None:
     state_acts, shard_acts, drain_acts = _make_test_activities(session_maker)
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        async with Worker(
-            env.client,
+    env = temporal_env
+    async with Worker(
+        env.client,
+        task_queue="wizard",
+        workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
+        activities=[
+            state_acts.persist_pilot_completed,
+            state_acts.fetch_scope_shards,
+            shard_acts.run_shard_crawl,
+            shard_acts.report_shard_progress,
+            drain_acts.check_review_drain_complete,
+        ],
+    ):
+        orch = TemporalOrchestrator(
+            namespace="default",
             task_queue="wizard",
-            workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
-            activities=[
-                state_acts.persist_pilot_completed,
-                state_acts.fetch_scope_shards,
-                shard_acts.run_shard_crawl,
-                shard_acts.report_shard_progress,
-                drain_acts.enqueue_pending_reviews,
-                drain_acts.check_review_drain_complete,
-            ],
-        ):
-            orch = TemporalOrchestrator(
-                namespace="default",
-                task_queue="wizard",
-                client=env.client,
+            client=env.client,
+        )
+        async with session_maker() as session:
+            service = WizardService(session, orch)
+            project = await service.create_project(CreateWizardProjectRequest(name="Wizard DE"))
+            await service.update_scope(project.wizard_project_id, {"domains": ["example.de"]})
+            await service.update_discovery_plan(
+                project.wizard_project_id,
+                {"seed_urls": ["https://example.de"], "max_depth": 1},
             )
-            async with session_maker() as session:
-                service = WizardService(session, orch)
-                project = await service.create_project(CreateWizardProjectRequest(name="Wizard DE"))
-                await service.update_scope(project.wizard_project_id, {"domains": ["example.de"]})
-                await service.update_discovery_plan(
-                    project.wizard_project_id,
-                    {"seed_urls": ["https://example.de"], "max_depth": 1},
-                )
-                run = await service.start_pilot_run(project.wizard_project_id)
-                assert run.workflow_id is not None
-                assert run.state is WizardRunState.PILOT_RUN
+            run = await service.start_pilot_run(project.wizard_project_id)
+            assert run.workflow_id is not None
+            assert run.state is WizardRunState.PILOT_RUN
 
-            # Allow the workflow's persist_pilot_completed activity to commit the
-            # PilotRun → HumanGateApproval transition before we signal approve.
-            async with session_maker() as session:
-                service = WizardService(session, orch)
-                for _ in range(50):
-                    await asyncio.sleep(0)
-                    session.expire_all()
-                    current = await service.get_run(run.wizard_run_id)
-                    if current.state is WizardRunState.HUMAN_GATE_APPROVAL:
-                        break
+        # Allow the workflow's persist_pilot_completed activity to commit the
+        # PilotRun → HumanGateApproval transition before we signal approve.
+        async with session_maker() as session:
+            service = WizardService(session, orch)
+            for _ in range(50):
+                await asyncio.sleep(0)
+                session.expire_all()
+                current = await service.get_run(run.wizard_run_id)
+                if current.state is WizardRunState.HUMAN_GATE_APPROVAL:
+                    break
 
-                approved = await service.approve_run(run.wizard_run_id, reason="ok")
-                assert approved.state is WizardRunState.SCALED_RUN
+            approved = await service.approve_run(run.wizard_run_id, reason="ok")
+            assert approved.state is WizardRunState.SCALED_RUN
 
-            handle = env.client.get_workflow_handle(approved.workflow_id)
-            assert await handle.result() == "scaled"
+        handle = env.client.get_workflow_handle(approved.workflow_id)
+        assert await handle.result() == "scaled"
 
 
 @pytest.mark.asyncio
-@pytest.mark.requires_network
+@pytest.mark.temporal
 async def test_temporal_orchestrator_starts_standalone_child_workflows(
     session_maker: async_sessionmaker[AsyncSession],
+    temporal_env: WorkflowEnvironment,
 ) -> None:
     state_acts, shard_acts, drain_acts = _make_test_activities(session_maker)
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        async with Worker(
-            env.client,
+    env = temporal_env
+    async with Worker(
+        env.client,
+        task_queue="wizard",
+        workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
+        activities=[
+            state_acts.persist_pilot_completed,
+            state_acts.fetch_scope_shards,
+            shard_acts.run_shard_crawl,
+            shard_acts.report_shard_progress,
+            drain_acts.check_review_drain_complete,
+        ],
+    ):
+        orch = TemporalOrchestrator(
+            namespace="default",
             task_queue="wizard",
-            workflows=[WizardRunWorkflow, ScopeShardWorkflow, ReviewDrainWorkflow],
-            activities=[
-                state_acts.persist_pilot_completed,
-                state_acts.fetch_scope_shards,
-                shard_acts.run_shard_crawl,
-                shard_acts.report_shard_progress,
-                drain_acts.enqueue_pending_reviews,
-                drain_acts.check_review_drain_complete,
-            ],
-        ):
-            orch = TemporalOrchestrator(
-                namespace="default",
-                task_queue="wizard",
-                client=env.client,
-            )
-            scope_id = await orch.start_scope_shard_workflow(
-                "wrn_childtest001",
-                scope_shard_key="de/hamburg",
-            )
-            assert "scope_shard_api" in scope_id
-            scope_resume = await orch.start_scope_shard_workflow(
-                "wrn_childtest001",
-                scope_shard_key="de/hamburg-resume",
-                resume_token="seed:checkpoint=v1",
-            )
-            assert "scope_shard_api" in scope_resume
-            resume_handle = env.client.get_workflow_handle(scope_resume)
-            assert await resume_handle.result() == "shard_complete"
-            drain_id = await orch.start_review_drain_workflow("wrn_childtest001")
-            assert "review_drain_api" in drain_id
+            client=env.client,
+        )
+        scope_id = await orch.start_scope_shard_workflow(
+            "wrn_childtest001",
+            scope_shard_key="de/hamburg",
+        )
+        assert "scope_shard_api" in scope_id
+        scope_resume = await orch.start_scope_shard_workflow(
+            "wrn_childtest001",
+            scope_shard_key="de/hamburg-resume",
+            resume_token="seed:checkpoint=v1",
+        )
+        assert "scope_shard_api" in scope_resume
+        resume_handle = env.client.get_workflow_handle(scope_resume)
+        assert await resume_handle.result() == "shard_complete"
+        drain_id = await orch.start_review_drain_workflow("wrn_childtest001")
+        assert "review_drain_api" in drain_id
 
-            sh = env.client.get_workflow_handle(scope_id)
-            dh = env.client.get_workflow_handle(drain_id)
-            assert await sh.result() == "shard_complete"
-            assert await dh.result() == "drain_complete"
+        sh = env.client.get_workflow_handle(scope_id)
+        dh = env.client.get_workflow_handle(drain_id)
+        assert await sh.result() == "shard_complete"
+        assert await dh.result() == "drain_complete"
 
 
 @pytest.mark.asyncio
-async def test_create_review_task_posts_to_argilla_when_configured(
-    session, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("PLATFORM_CONTROL_ARGILLA_API_BASE_URL", "http://argilla.test")
-    monkeypatch.setenv("PLATFORM_CONTROL_ARGILLA_API_KEY", "secret")
-    monkeypatch.setenv("PLATFORM_CONTROL_ARGILLA_DATASET_ID", "ds1")
-    get_settings.cache_clear()
+async def test_create_review_task_enqueues_by_persisting_it(session) -> None:
+    """Persisting the task *is* the enqueue — the queue is the table (ADR-0031).
 
-    posts: list[httpx.Request] = []
+    No outbound HTTP call, no `enqueue_outcome` side channel: the task comes back
+    PENDING and the admin app picks it up from there.
+    """
+    service = WizardService(session, InMemoryOrchestrator())
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        posts.append(request)
-        return httpx.Response(201, json={"ok": True})
+    project = await service.create_project(CreateWizardProjectRequest(name="Wizard AR"))
+    await service.update_scope(
+        project.wizard_project_id,
+        {"domains": ["example.ar"], "hierarchy": ["country"]},
+    )
+    await service.update_discovery_plan(
+        project.wizard_project_id,
+        {"seed_urls": ["https://example.ar"], "max_depth": 1},
+    )
+    run = await service._get_latest_run_for_project(project.wizard_project_id)
 
-    mock_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    try:
-        argilla = ArgillaEnqueueService(get_settings(), client=mock_client)
-        service = WizardService(session, InMemoryOrchestrator(), argilla_enqueue=argilla)
-
-        project = await service.create_project(CreateWizardProjectRequest(name="Wizard AR"))
-        await service.update_scope(
-            project.wizard_project_id,
-            {"domains": ["example.ar"], "hierarchy": ["country"]},
+    created = await service.create_review_task(
+        CreateReviewTaskRequest(
+            wizard_run_id=run.wizard_run_id,
+            external_id="ext_enqueue_1",
+            record_id="rec_99",
+            payload={"fields": {"title": "Law"}, "metadata": {"recordConfidence": 0.5}},
         )
-        await service.update_discovery_plan(
-            project.wizard_project_id,
-            {"seed_urls": ["https://example.ar"], "max_depth": 1},
-        )
-        run = await service._get_latest_run_for_project(project.wizard_project_id)
+    )
 
-        created = await service.create_review_task(
-            CreateReviewTaskRequest(
-                wizard_run_id=run.wizard_run_id,
-                argilla_external_id="argilla_ext_enqueue_1",
-                record_id="rec_99",
-                payload={"fields": {"title": "Law"}, "metadata": {"recordConfidence": 0.5}},
-            )
-        )
-        assert created.enqueue_outcome == "enqueued"
-        assert created.argilla_enqueued_at is not None
-        assert len(posts) == 1
-        assert b"records" in posts[0].content
-        assert b"argilla_ext_enqueue_1" in posts[0].content
+    assert created.external_id == "ext_enqueue_1"
+    assert created.status is ReviewTaskStatus.PENDING
+    assert created.processed_at is None
 
-        sync = await service.sync_reviews_from_argilla(
-            ArgillaReviewSyncRequest(
-                tasks=[
-                    ArgillaReviewSyncItem(
-                        external_id="argilla_ext_enqueue_1",
-                        annotation_updated_at=datetime(2026, 4, 8, 10, 0, tzinfo=UTC),
-                        decision="accept",
-                        reviewed_by="r1",
-                        payload={"decision": "accept"},
-                    )
-                ]
-            )
-        )
-        assert sync.accepted == 1
-    finally:
-        await mock_client.aclose()
-        monkeypatch.delenv("PLATFORM_CONTROL_ARGILLA_API_BASE_URL", raising=False)
-        monkeypatch.delenv("PLATFORM_CONTROL_ARGILLA_API_KEY", raising=False)
-        monkeypatch.delenv("PLATFORM_CONTROL_ARGILLA_DATASET_ID", raising=False)
-        get_settings.cache_clear()
+    persisted = await service.get_review_task(created.review_task_id)
+    assert persisted.record_id == "rec_99"
 
 
 @pytest.mark.asyncio
 async def test_create_review_task_duplicate_external_id_conflict(session) -> None:
-    service = WizardService(session, InMemoryOrchestrator(), argilla_enqueue=None)
+    service = WizardService(session, InMemoryOrchestrator())
     project = await service.create_project(CreateWizardProjectRequest(name="Wizard UK"))
     await service.update_scope(project.wizard_project_id, {"domains": ["x"]})
     await service.update_discovery_plan(project.wizard_project_id, {"seed_urls": ["https://x"]})
     run = await service._get_latest_run_for_project(project.wizard_project_id)
     req = CreateReviewTaskRequest(
         wizard_run_id=run.wizard_run_id,
-        argilla_external_id="dup_ext",
+        external_id="dup_ext",
         payload={"fields": {}},
     )
     await service.create_review_task(req)
@@ -262,40 +227,54 @@ async def test_create_review_task_duplicate_external_id_conflict(session) -> Non
 
 
 @pytest.mark.asyncio
-async def test_argilla_sync_is_idempotent(session) -> None:
+async def test_record_review_decision_completes_the_task(session) -> None:
+    """The operator's verdict is what closes a task, now that Argilla is gone."""
     service = WizardService(session, InMemoryOrchestrator())
     project = await service.create_project(CreateWizardProjectRequest(name="Wizard FR"))
     run = await service._get_latest_run_for_project(project.wizard_project_id)
 
-    session.add(
-        ReviewTask(
-            wizard_run_id=run.wizard_run_id,
-            argilla_external_id="argilla_task_1",
-            status=ReviewTaskStatus.PENDING,
-            payload={"record_id": "rec_1"},
-        )
+    task = ReviewTask(
+        wizard_run_id=run.wizard_run_id,
+        external_id="task_1",
+        status=ReviewTaskStatus.PENDING,
+        payload={"record_id": "rec_1"},
     )
+    session.add(task)
     await session.commit()
 
-    payload = ArgillaReviewSyncRequest(
-        tasks=[
-            ArgillaReviewSyncItem(
-                external_id="argilla_task_1",
-                annotation_updated_at=datetime(2026, 4, 7, 12, 0, tzinfo=UTC),
-                decision="accept",
-                reviewed_by="reviewer_a",
-                payload={"decision": "accept"},
-            )
-        ]
+    decided = await service.record_review_decision(
+        task.review_task_id,
+        ReviewDecisionRequest(decision="accept", reviewed_by="reviewer_a"),
     )
 
-    first = await service.sync_reviews_from_argilla(payload)
-    second = await service.sync_reviews_from_argilla(payload)
+    assert decided.status is ReviewTaskStatus.COMPLETED
+    assert decided.processed_at is not None
+    assert decided.decision_payload is not None
+    assert decided.decision_payload["decision"] == "accept"
+    assert decided.decision_payload["reviewed_by"] == "reviewer_a"
 
-    assert first.accepted == 1
-    assert first.duplicates == 0
-    assert second.accepted == 0
-    assert second.duplicates == 1
+
+@pytest.mark.asyncio
+async def test_record_review_decision_conflicts_on_an_already_decided_task(session) -> None:
+    """A second verdict is a 409, not a silent overwrite of the first reviewer's call."""
+    service = WizardService(session, InMemoryOrchestrator())
+    project = await service.create_project(CreateWizardProjectRequest(name="Wizard IT"))
+    run = await service._get_latest_run_for_project(project.wizard_project_id)
+
+    task = ReviewTask(
+        wizard_run_id=run.wizard_run_id,
+        external_id="task_2",
+        status=ReviewTaskStatus.PENDING,
+        payload={},
+    )
+    session.add(task)
+    await session.commit()
+
+    request = ReviewDecisionRequest(decision="accept")
+    await service.record_review_decision(task.review_task_id, request)
+
+    with pytest.raises(ConflictError):
+        await service.record_review_decision(task.review_task_id, request)
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,17 @@
 # Temporal + Argilla Wizard Architecture
 
+> **Status note (ADR-0031, 2026-07-13).** This blueprint is retained as the design record for the
+> wizard, but two of its assumptions are no longer true and the Argilla half of it is **gone**:
+>
+> - **Argilla is deleted.** The review surface is `platform-control/admin`, and the queue is the
+>   `review_tasks` table. The confidence-band routing policy it described is **retained** — see
+>   `docs/runbooks/extraction-review-routing.md`. `POST /v1/reviews/sync-from-argilla` no longer
+>   exists; a task is closed with `POST /v1/reviews/tasks/{task_id}/decision`.
+> - **Temporal is deployed in no environment.** The workflow definitions are kept and the
+>   `Orchestrator` abstraction (ADR-0021) stays, but `PLATFORM_CONTROL_WIZARD_ORCHESTRATOR_BACKEND`
+>   is `in_memory` everywhere. Read anything below about Argilla, and anything implying a running
+>   worker, as aspirational rather than as a description of the system.
+
 ## Status
 
 Proposed implementation blueprint for platform-control hybrid discovery and extraction operations.

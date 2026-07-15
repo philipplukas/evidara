@@ -12,21 +12,19 @@ export default defineConfig({
       "@evidara/tokens": path.resolve(__dirname, "../../styles/tokens/tokens"),
       "@evidara/ui": path.resolve(__dirname, "../../styles/ui"),
       "@evidara/shell": path.resolve(__dirname, "../../styles/shell"),
-      // Pin React + lucide-react to admin's own `node_modules`. Without
-      // this, when `@evidara/ui`'s `StatusBadge.tsx` imports `react` or
-      // `lucide-react`, Vite walks up from `styles/ui/` and finds the
-      // monorepo-root `node_modules` symlink (created by the
-      // `ensure-monorepo-shared-modules` postinstall, which points at
-      // whichever surface installed first). That can route React to a
-      // *different* `node_modules` than the rest of the admin tree,
-      // producing two React instances and the "Invalid hook call" error
-      // when admin renders `<StatusBadge>` inside a test. Pinning these
-      // here keeps every dual-surface test on a single React.
-      react: path.resolve(__dirname, "node_modules/react"),
-      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
-      "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime.js"),
-      "lucide-react": path.resolve(__dirname, "node_modules/lucide-react"),
     },
+    // The shared `@evidara/*` modules live at `styles/`, outside any npm
+    // package. Vite resolves a module's bare imports relative to the
+    // IMPORTING file, so `styles/ui/StatusBadge.tsx`'s `react` /
+    // `lucide-react` imports would be resolved by walking UP from `styles/`
+    // — escaping this workspace entirely. `dedupe` forces these specifiers
+    // to resolve from THIS surface's root instead, guaranteeing a single
+    // React instance shared by the app code and the shared modules.
+    //
+    // This replaces a hand-rolled set of absolute `node_modules` aliases:
+    // `dedupe` covers subpath imports (`react/jsx-runtime`) for free, and
+    // the frontend now carries the identical guard. See #588.
+    dedupe: ["react", "react-dom", "lucide-react", "clsx", "tailwind-merge"],
   },
   test: {
     environment: "jsdom",

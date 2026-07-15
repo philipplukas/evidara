@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
+from platform_control.observability import metrics
 from platform_control.observability.event_logging import log_event
 from platform_control.schemas.document_events import (
     DocumentProcessedEvent,
@@ -103,6 +104,9 @@ async def receive_document_processed(
         correlation_id=event.correlation_id,
         document_id=event.payload.document_id,
     )
+    # Funnel stage: document.processed callbacks actually arriving. #550 was exactly
+    # this counter staying at 0 while `pipeline-health` claimed everything was fine.
+    metrics.record_di_event_received(event.event_type)
     start = time.monotonic()
     service = ProcessingStatusService(session)
     outcome = await service.record_document_processed(event)

@@ -6,7 +6,7 @@ Interactive API reference for the platform-control service, generated from the O
 
 ## Wizard API surface (v1 foundation)
 
-The Temporal + Argilla wizard flow now exposes these operator-facing endpoints:
+The wizard flow exposes these operator-facing endpoints:
 
 - `POST /v1/wizard/projects`
 - `GET /v1/wizard/projects/{project_id}`
@@ -16,11 +16,11 @@ The Temporal + Argilla wizard flow now exposes these operator-facing endpoints:
 - `GET /v1/wizard/runs/{run_id}`
 - `POST /v1/wizard/runs/{run_id}/approve`
 - `POST /v1/wizard/runs/{run_id}/reject`
-- `POST /v1/reviews/tasks` — create review task; Argilla HTTP enqueue when configured (see env vars below)
-- `POST /v1/reviews/sync-from-argilla`
+- `POST /v1/reviews/tasks` — route an extraction into the review queue (persisting the task *is* the enqueue)
 - `GET /v1/reviews/tasks/{task_id}`
+- `POST /v1/reviews/tasks/{task_id}/decision` — close a task with an operator's verdict
 
-Argilla outbound (optional): set `PLATFORM_CONTROL_ARGILLA_API_BASE_URL`, `PLATFORM_CONTROL_ARGILLA_API_KEY`, and `PLATFORM_CONTROL_ARGILLA_DATASET_ID`. Override bulk path with `PLATFORM_CONTROL_ARGILLA_RECORDS_PATH` (default `/api/v1/datasets/{dataset_id}/records/bulk`). If unset, tasks are still created and `enqueue_outcome` is `skipped_not_configured`.
+Review queue: there is no external review tool and no Argilla env vars. The queue is the `review_tasks` table, read by `platform-control/admin`; what lands in it is decided by the confidence-band policy in [extraction review routing](../runbooks/extraction-review-routing.md). `POST /v1/reviews/sync-from-argilla` was removed in ADR-0031.
 
 `GET /v1/wizard/runs/{run_id}` returns a `WizardRunStatus` envelope with:
 
@@ -31,8 +31,8 @@ Argilla outbound (optional): set `PLATFORM_CONTROL_ARGILLA_API_BASE_URL`, `PLATF
 
 Reference architecture and runbook:
 
-- `docs/architecture/temporal-argilla-wizard-architecture.md`
-- `docs/runbooks/argilla-review-routing-and-sync.md`
+- `docs/architecture/temporal-argilla-wizard-architecture.md` (Argilla sections superseded by ADR-0031)
+- `docs/runbooks/extraction-review-routing.md`
 
 ### Wizard orchestration environment
 

@@ -12,8 +12,9 @@ See ADR-0011 for contract conventions.
 See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
 Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
+See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 
- * OpenAPI spec version: 0.4.1
+ * OpenAPI spec version: 0.6.0
  */
 import {
   useQuery
@@ -34,6 +35,8 @@ import type {
   CitedByResponse,
   DetailView,
   GetDocumentSections200,
+  GetNormHierarchyParams,
+  NormHierarchyView,
   SearchContextView,
   SearchDocumentsParams,
   SearchResponseView
@@ -506,6 +509,123 @@ export function useGetDocumentCitedBy<TData = Awaited<ReturnType<typeof getDocum
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetDocumentCitedByQueryOptions(documentId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+/**
+ * Returns the legal orders that bind a jurisdiction — constitutional,
+federal, cantonal, municipal — ordered most authoritative first, with the
+norms the corpus actually holds at each level. See ADR-0033.
+
+This is a **traversal, not a search**. The governing chain is derived
+from the jurisdiction tree
+(`contracts/vocabularies/jurisdiction-hierarchy.json`), not from text
+similarity: a communal ordinance is subordinate to its canton's law and
+to federal law because of where the commune sits, not because the
+documents resemble each other.
+
+`coverage.missing_levels` lists the levels that bind this place but for
+which the corpus holds nothing. It is load-bearing: an agent that
+reasons past a missing level is fabricating, and "I do not have the
+communal ordinance for this place" is a correct answer.
+
+ * @summary What governs this place, at each level of the hierarchy of norms
+ */
+export const getNormHierarchy = (
+    jurisdictionId: string,
+    params?: GetNormHierarchyParams,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<NormHierarchyView>(
+      {url: `/v1/norm-hierarchy/${jurisdictionId}`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetNormHierarchyQueryKey = (jurisdictionId?: string,
+    params?: GetNormHierarchyParams,) => {
+    return [
+    `/v1/norm-hierarchy/${jurisdictionId}`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetNormHierarchyQueryOptions = <TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNormHierarchyQueryKey(jurisdictionId,params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNormHierarchy>>> = ({ signal }) => getNormHierarchy(jurisdictionId,params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(jurisdictionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetNormHierarchyQueryResult = NonNullable<Awaited<ReturnType<typeof getNormHierarchy>>>
+export type GetNormHierarchyQueryError = void
+
+
+export function useGetNormHierarchy<TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(
+ jurisdictionId: string,
+    params: undefined |  GetNormHierarchyParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getNormHierarchy>>,
+          TError,
+          Awaited<ReturnType<typeof getNormHierarchy>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetNormHierarchy<TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(
+ jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getNormHierarchy>>,
+          TError,
+          Awaited<ReturnType<typeof getNormHierarchy>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetNormHierarchy<TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(
+ jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary What governs this place, at each level of the hierarchy of norms
+ */
+
+export function useGetNormHierarchy<TData = Awaited<ReturnType<typeof getNormHierarchy>>, TError = void>(
+ jurisdictionId: string,
+    params?: GetNormHierarchyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNormHierarchy>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetNormHierarchyQueryOptions(jurisdictionId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

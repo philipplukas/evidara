@@ -69,6 +69,21 @@ items:
     jurisdiction_id: jur_ch_ti
     slug: ti-cancelleria
     name: Cancelleria dello Stato del Cantone Ticino
+  # ─── Swiss communal authorities ────────────────────────────
+  # The municipal layer: 2,110 `jur_ch_gemeinde_*` jurisdictions are seeded but
+  # had no authority at all until #584 — modelled and unreachable. This is the
+  # first, and deliberately the ONLY, commune: the ADR-0033 acceptance test
+  # ("can the city ban a certain thing for dogs, year-round?") is decided by a
+  # communal ordinance, and Zürich (BFS 261) publishes its Amtliche Sammlung
+  # online. Communal law carries no open-data licence and lives on a municipal
+  # web estate, so it binds the conservative cp_ch_municipal tier rather than
+  # any cantonal/federal open-data policy. National communal coverage is a much
+  # larger problem (~2,000 independent sites) and is explicitly NOT in scope.
+  - authority_id: auth_stadt_zuerich_sk
+    jurisdiction_id: jur_ch_gemeinde_261
+    slug: stadt-zuerich-stadtkanzlei
+    name: Stadtkanzlei Stadt Zürich
+    compliance_policy_id: cp_ch_municipal
   # ─── Swiss cantonal courts ─────────────────────────────────
   # Representative cantonal courts (ZH/BE/BS). Like the federal courts above,
   # cantonal rulings carry no open-data licence, so they bind the public-official

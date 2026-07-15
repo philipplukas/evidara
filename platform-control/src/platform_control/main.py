@@ -9,6 +9,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from acquisition_core.providers import ProviderNotLiveReadyError
 from platform_control.auth import require_control_plane_operator, require_control_plane_service
 from platform_control.config import get_settings
 from platform_control.errors import (
@@ -18,6 +19,7 @@ from platform_control.errors import (
     PlatformControlError,
     ProviderConfigurationError,
     SignatureVerificationError,
+    WebhookRetryableError,
 )
 from platform_control.routers import (
     commentary_insights,
@@ -125,9 +127,32 @@ def create_app() -> FastAPI:
     async def provider_handler(request: Request, exc: ProviderConfigurationError) -> JSONResponse:
         return JSONResponse(status_code=400, content=_error_payload(request, str(exc)))
 
+    @app.exception_handler(ProviderNotLiveReadyError)
+    async def provider_not_live_ready_handler(
+        request: Request, exc: ProviderNotLiveReadyError
+    ) -> JSONResponse:
+        # Provider-side key of the ADR-0030 two-key lock. Same 400 family as
+        # ProviderConfigurationError: the provider cannot serve this request.
+        # BlueprintTemplateNotEnabledError (config-side key) is a
+        # PlatformControlError and lands on the domain handler below, also 400.
+        return JSONResponse(status_code=400, content=_error_payload(request, str(exc)))
+
     @app.exception_handler(SignatureVerificationError)
     async def signature_handler(request: Request, exc: SignatureVerificationError) -> JSONResponse:
         return JSONResponse(status_code=401, content=_error_payload(request, str(exc)))
+
+    @app.exception_handler(WebhookRetryableError)
+    async def webhook_retryable_handler(
+        request: Request, exc: WebhookRetryableError
+    ) -> JSONResponse:
+        # 503, not 202: the delivery was stored unprocessed and the sender MUST retry it.
+        # A 2xx would tell the provider the event was accepted while nothing was applied,
+        # and the identical retry would then be deduped away — the #558 drop.
+        return JSONResponse(
+            status_code=503,
+            content=_error_payload(request, str(exc)),
+            headers={"Retry-After": "5"},
+        )
 
     @app.exception_handler(PlatformControlError)
     async def domain_handler(request: Request, exc: PlatformControlError) -> JSONResponse:

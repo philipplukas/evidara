@@ -26,7 +26,7 @@ See `scripts/analyze_github_actions_queue.py --help` for filters (`--repo`, `--b
 
 | Pool | Org variable | Typical jobs |
 |------|----------------|--------------|
-| Light | `LIGHT_RUNNER_SCALE_SET` | PR title, path detection, docs/contracts, runtime config checks, Cloud Run/Databricks deploy orchestration, Release Readiness (WIF + `gh` API). The light pool must allow `curl`, `sudo`, and apt package installation when workflows bootstrap missing tools. **Dev-first orgs:** set **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** = **`dev`**, **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** = **`E2E Smoke Dev`**, and ensure GitHub **Environment `dev`** has the same OIDC secrets as E2E Smoke Dev — see [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md) §2.1 and [Runtime stack §7](runtime-stack.md#7-release-readiness-go-no-go-operation). |
+| Light | `LIGHT_RUNNER_SCALE_SET` | PR title, path detection, docs/contracts, runtime config checks, Cloud Run deploy orchestration, Release Readiness (WIF + `gh` API). The light pool must allow `curl`, `sudo`, and apt package installation when workflows bootstrap missing tools. **Dev-first orgs:** set **`RELEASE_READINESS_GITHUB_ENVIRONMENT`** = **`dev`**, **`RELEASE_READINESS_E2E_SMOKE_WORKFLOW`** = **`E2E Smoke Dev`**, and ensure GitHub **Environment `dev`** has the same OIDC secrets as E2E Smoke Dev — see [Phase 5 go / no-go memo](phase-5-go-no-go-memo.md) §2.1 and [Runtime stack §7](runtime-stack.md#7-release-readiness-go-no-go-operation). |
 | Heavy | `HEAVY_RUNNER_SCALE_SET` | Docker/image builds, fuller document-intelligence checks, Playwright / interaction-flow, e2e smokes. |
 | GitHub-hosted | `ubuntu-latest` | Emergency fallback only for jobs that cannot yet run on the self-hosted pools. |
 

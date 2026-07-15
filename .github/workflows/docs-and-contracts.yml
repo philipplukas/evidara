@@ -60,6 +60,10 @@ jobs:
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay_at.py"
           python -m unittest discover -s scripts/tests -p "test_check_country_overlay_files.py"
           python -m unittest discover -s scripts/tests -p "test_analyze_github_actions_queue.py"
+          python -m unittest discover -s scripts/tests -p "test_check_compose_profiles.py"
+
+      - name: Check Docker Compose profiles resolve
+        run: python scripts/check_compose_profiles.py
 
       - name: Enforce contract manifest version bump
         run: |
@@ -103,6 +107,14 @@ jobs:
       - name: Validate MVP contract manifest
         run: |
           python scripts/check_contract_manifest.py
+
+      # The jurisdiction hierarchy legal-search reads is an EXPORT of
+      # platform-control's reference seed (ADR-0033 / #583). If the seed grows a
+      # jurisdiction and the export is not regenerated, `norm_hierarchy()`
+      # silently reports the new place as ungoverned instead of failing.
+      - name: Check jurisdiction-hierarchy vocabulary matches the seed
+        run: |
+          python scripts/generate_jurisdiction_hierarchy_vocab.py --check
 
       - name: Check staging smoke workflow isolation
         run: |

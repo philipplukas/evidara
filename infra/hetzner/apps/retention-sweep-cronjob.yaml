@@ -1,0 +1,63 @@
+# Legal-retention hard delete (ADR-0031). Purges RawArtifact rows + their
+# CapturedResource children + the underlying blobs once the jurisdiction's
+# CompliancePolicy.retention_days has elapsed.
+#
+# This is a legal obligation in some jurisdictions. It used to run only as a
+# Temporal workflow behind a Temporal Schedule — and Temporal is deployed in no
+# environment, so it was not running anywhere. It is a cron; it does not need
+# durable execution. See docs/runbooks/retention-sweep.md.
+#
+# The image carries no tag on purpose: this manifest is in kustomization.yaml's
+# `resources:`, so the `images:` transformer pins it to the same SHA as
+# platform-control. Do not hardcode a tag here — migrate-job.yaml has to, because
+# a Job's pod spec is immutable and it is applied out-of-band by deploy-stage4.sh,
+# and that hand-maintained tag is exactly what drifted in #549. A CronJob is a
+# durable, updatable object, so it belongs in `resources:` and gets the pin.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: platform-control-retention-sweep
+  namespace: evidara
+  labels:
+    app.kubernetes.io/name: platform-control-retention-sweep
+    app.kubernetes.io/part-of: evidara
+spec:
+  # Daily at 04:00 UTC — the low-traffic window, and the cron the retired
+  # Temporal schedule used, so the obligation's timing is unchanged.
+  schedule: "0 4 * * *"
+  timeZone: "Etc/UTC"
+  # A sweep must never race itself: two concurrent passes would double-delete
+  # blobs and log misleading counts.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  # Keep failures around — a missed retention sweep is a compliance event and
+  # the operator needs the logs (see the runbook's "verify it ran" section).
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      # Hard cap so a wedged sweep cannot straddle the next scheduled run.
+      activeDeadlineSeconds: 3000
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: platform-control-retention-sweep
+            app.kubernetes.io/part-of: evidara
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: retention-sweep
+              image: ghcr.io/philipplukas/evidara-platform-control
+              command: ["platform-control-retention-sweep"]
+              envFrom:
+                - configMapRef:
+                    name: evidara-config
+                - secretRef:
+                    name: evidara-app-secrets
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 256Mi
+                limits:
+                  memory: 768Mi

@@ -12,6 +12,7 @@
  */
 "use client";
 
+import { BrandMark } from "@evidara/shell";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -87,16 +88,17 @@ export function AppBar() {
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-4 w-full px-3 sm:px-6 py-2 md:py-3 min-w-0">
         {/* Brand mark + product */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div
-            aria-hidden
-            className="w-[42px] h-[42px] rounded-2xl grid place-items-center text-[18px] font-bold leading-none border border-[var(--admin-on-brand-border-subtle)] shadow-[var(--admin-brand-mark-shadow)]"
-            style={{
-              background: "var(--brand-mark-gradient)",
-              fontFamily: "var(--font-brand-mark)",
-            }}
-          >
-            E
-          </div>
+          {/*
+           * The shared `BrandMark` draws its lattice in `currentColor`. Admin's
+           * header is a dark navy gradient, so it inherits the near-white
+           * `--admin-on-brand` here — the navy the workspace uses would be
+           * invisible against this ground. The accent node is likewise lifted
+           * via `--admin-brand-mark-accent`.
+           */}
+          <BrandMark
+            size={42}
+            className="shrink-0 text-[var(--admin-on-brand)] [--brand-mark-accent:var(--admin-brand-mark-accent)]"
+          />
           <div className="min-w-0">
             <div className="text-[10px] font-semibold tracking-[0.16em] text-[var(--admin-on-brand-muted)] uppercase leading-[1.15]">
               Evidara

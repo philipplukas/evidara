@@ -84,6 +84,31 @@ export const DOCUMENTS_INDEX_PROPERTIES = {
   language: facetKeyword,
   jurisdiction_ids: facetKeyword,
   authority_ids: facetKeyword,
+  // Rank in the hierarchy of norms (ADR-0033), derived from the document's
+  // jurisdiction — not from its text. Faceted so `norm_hierarchy()` can bucket
+  // a place's governing law by level in one aggregation.
+  level: facetKeyword,
+
+  // ── Norm-hierarchy relations (ADR-0033) ──
+  // `subordinate_to`: the jurisdictions whose law outranks this document —
+  // derived from the jurisdiction tree. Subordination in law is scope-wide (a
+  // communal ordinance is subordinate to the WHOLE body of cantonal and federal
+  // law, not to one act), so the edge points at superior scopes, not documents.
+  subordinate_to: { type: 'keyword' },
+  // `delegates_to`: the competence a norm hands DOWN — the cantonal statute
+  // that lets a commune legislate at all. NOT derivable from the tree: it is an
+  // assertion made BY a norm's text, so it needs extraction or manual curation
+  // and is UNPOPULATED today. The shape is declared here so the edge has a home
+  // and the index does not need a second migration once it can be filled.
+  delegates_to: {
+    type: 'nested',
+    properties: {
+      target_level: { type: 'keyword' },
+      target_jurisdiction_id: { type: 'keyword' },
+      section_id: { type: 'keyword' },
+      scope: { type: 'text', analyzer: 'legal_text' },
+    },
+  },
 
   // ── Plain keywords ──
   original_language: { type: 'keyword' },
@@ -106,6 +131,12 @@ export const DOCUMENTS_INDEX_PROPERTIES = {
   document_revision: { type: 'long' },
   processed_at: { type: 'date' },
   effective_date: { type: 'date', format: 'strict_date_optional_time||yyyy-MM-dd' },
+  // Temporal validity (ADR-0033). `in_force_from` falls back to
+  // `effective_date` at projection time so there is a single field to
+  // range-query; `in_force_until` is the last date the norm WAS in force
+  // (inclusive) and its absence means "not repealed as far as we know".
+  in_force_from: { type: 'date', format: 'strict_date_optional_time||yyyy-MM-dd' },
+  in_force_until: { type: 'date', format: 'strict_date_optional_time||yyyy-MM-dd' },
 } as const;
 
 /**
