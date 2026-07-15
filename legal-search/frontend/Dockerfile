@@ -7,11 +7,9 @@ WORKDIR /workspace
 
 COPY styles/tokens ./styles/tokens
 COPY styles/ui ./styles/ui
-# postinstall (in package.json) symlinks /workspace/node_modules -> the
-# surface's node_modules so styles/ui's bare imports (clsx, tailwind-merge)
-# resolve during `next build`. Copy the script into the build context so
-# `npm ci` doesn't fail looking for it.
-COPY scripts/ensure-monorepo-shared-modules.mjs ./scripts/ensure-monorepo-shared-modules.mjs
+# styles/ui's bare imports (clsx, lucide-react, tailwind-merge) resolve during
+# `next build` via `turbopack.resolveAlias` in next.config.ts, which pins them
+# to THIS surface's node_modules. No repo-root node_modules is involved. See #588.
 
 COPY legal-search/frontend/package*.json ./legal-search/frontend/
 WORKDIR /workspace/legal-search/frontend

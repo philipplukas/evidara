@@ -80,3 +80,29 @@ items:
     attribution_required: true
     attribution_text: "Source: Swiss Federal Courts (Bundesgericht / Bundesverwaltungsgericht)."
     contact_url: "https://evidara.ai/contact"
+
+  # CH communal law (Gemeinden). Each of the ~2,110 communes publishes its own
+  # legal collection on its own site with no open-data programme, no API and no
+  # common schema. These are small municipal web estates, not federal open-data
+  # endpoints, so they sit in the public-official tier at its most conservative:
+  # robots.txt is honoured (Stadt Zürich's allows the Amtliche Sammlung paths),
+  # and the rate corridor is deliberately flat — no adaptive probing upward
+  # against a city's web server. Governs the gemeinde_http provider (#584).
+  - compliance_policy_id: cp_ch_municipal
+    name: ch-municipal
+    description: >-
+      Swiss communal legal collections (Amtliche Sammlung / Gemeinderecht).
+      Public-official tier, most conservative setting: robots.txt is honoured,
+      requests stay at ~10 rpm with a single connection per host, and raw
+      artifacts are retained for 365 days. The rate ceiling equals the start
+      rate so the adaptive controller cannot probe upward against a municipal
+      server. Attribution names the publishing commune on every bundle.
+    robots_mode: strict
+    min_requests_per_minute_per_host: 6
+    start_requests_per_minute_per_host: 10
+    max_requests_per_minute_per_host: 10
+    max_concurrent_per_host: 1
+    retention_days: 365
+    attribution_required: true
+    attribution_text: "Source: Amtliche Sammlung der Stadt Zürich (Stadtkanzlei)."
+    contact_url: "https://evidara.ai/contact"

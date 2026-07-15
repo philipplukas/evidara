@@ -461,6 +461,40 @@ overlays:
         language_codes: [de]
         document_type_hint: legislation
         enabled: false
+      # ───────────────────────────────────────────────────────────────
+      # Swiss COMMUNAL legislation — Stadt Zürich (BFS 261) — #584 / ADR-0033
+      # The municipal layer the dog question is decided in. 2,110
+      # `jur_ch_gemeinde_*` jurisdictions are seeded; this is the first template
+      # that can reach any of them. Deliberately ONE commune: communal law lives
+      # on ~2,000 independent sites and national coverage is a separate problem.
+      #
+      # Unlike the canton_http seed URLs above, this one is VERIFIED (HTTP 200,
+      # 2026-07-14): it is the Amtliche Sammlung landing page for AS 554.510,
+      # "Vollzugsvorschriften zum Hundegesetz" (Stadtratsbeschluss 31.05.2017,
+      # in force 01.09.2017, not repealed). That page carries the metadata; the
+      # operative text is a PDF.
+      #
+      # STAYS `enabled: false` — and the provider is `live_ready = False` — for a
+      # reason that code in this PR cannot fix: the ordinance has no HTML
+      # manifestation, `ProviderResource.body` is `str`-typed so binary artifacts
+      # cannot be carried, and document-intelligence has no PDF normaliser. Both
+      # keys of the ADR-0030 lock stay shut until a layout-aware PDF pipeline
+      # lands. See the module docstring in gemeinde_http_provider.py.
+      # ───────────────────────────────────────────────────────────────
+      gemeinde_http_zh_stadt_hundevorschriften:
+        provider: gemeinde_http
+        bfs_number: 261
+        seed_urls:
+          - https://www.stadt-zuerich.ch/de/politik-und-verwaltung/politik-und-recht/amtliche-sammlung/5/554/510.html
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_gemeinde_zuerich_legislation
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
   fr:
     provider_templates:
       legifrance_codes:

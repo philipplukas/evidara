@@ -1,0 +1,13 @@
+{
+  "title_contains": "Bundesverfassung der Schweizerischen Eidgenossenschaft",
+  "section_count_min": 197,
+  "key_headings": ["Art. 1 Schweizerische Eidgenossenschaft", "Art. 36 Einschränkungen von Grundrechten"],
+  "key_content_contains": ["Einschränkungen von Grundrechten bedürfen einer gesetzlichen Grundlage"],
+  "key_section_anchors": {
+    "Art. 1 Schweizerische Eidgenossenschaft": "art_1",
+    "Art. 36 Einschränkungen von Grundrechten": "art_36"
+  },
+  "section_max_content_length": 50000,
+  "status_flow": ["accepted", "processing", "canonical_ready"],
+  "html_parse_used_fallback": false
+}

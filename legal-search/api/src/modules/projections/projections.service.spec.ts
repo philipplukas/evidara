@@ -362,6 +362,91 @@ describe('ProjectionsService', () => {
     );
   });
 
+  describe('language facet (#572)', () => {
+    // The CH Fedlex constitution templates are per-language
+    // (`fedlex_sparql_constitution_de`), but they all share the
+    // language-free corpus id `corpus_public_ch_fedlex_constitution`.
+    const constitutionEvent: DocumentProcessedEventDto = {
+      ...baseProcessedEvent,
+      payload: {
+        ...baseProcessedEvent.payload,
+        provenance: {
+          ...baseProcessedEvent.payload.provenance,
+          corpus_id: 'corpus_public_ch_fedlex_constitution',
+        },
+      },
+    };
+
+    it('indexes a German-template acquisition as language=de', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      // Lean document exactly as DI emits it for the German expression:
+      // no top-level `language`, the acquired language lives in
+      // `metadata.original_language`.
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999',
+        jurisdiction_id: 'jur_ch_federal',
+        body_text: 'Bundesverfassung der Schweizerischen Eidgenossenschaft / vom 18. April 1999',
+        metadata: {
+          original_language: 'de',
+          translation_status: 'original',
+        },
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(constitutionEvent);
+
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jurisdiction: 'CH',
+          language: 'de',
+          original_language: 'de',
+        }),
+      );
+    });
+
+    it('never guesses a language from a corpus id without a language token', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft',
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(constitutionEvent);
+
+      // "constitution" contains the substring "it" — it must not be read
+      // as Italian. Absent is correct here; wrong is not.
+      const projection = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as { language?: string };
+      expect(projection.language).toBeUndefined();
+    });
+
+    it('still honours an explicit language token in the corpus id', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Costituzione federale della Confederazione Svizzera',
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed({
+        ...constitutionEvent,
+        payload: {
+          ...constitutionEvent.payload,
+          provenance: {
+            ...constitutionEvent.payload.provenance,
+            corpus_id: 'corpus_public_ch_fedlex_constitution_it',
+          },
+        },
+      });
+
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({ language: 'it' }),
+      );
+    });
+  });
+
   it('indexes citations stored on section metadata', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
