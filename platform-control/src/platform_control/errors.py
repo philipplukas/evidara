@@ -36,6 +36,17 @@ class SignatureVerificationError(PlatformControlError):
     """Raised when a webhook signature cannot be verified."""
 
 
+class WebhookRetryableError(PlatformControlError):
+    """Raised when a webhook was received but could not be applied to any local state.
+
+    The delivery is persisted *unprocessed* (``webhook_receipts.processed_at IS NULL``)
+    and the sender is asked to redeliver (non-2xx) rather than being told the event was
+    accepted. The invariant this protects: a delivery we did not apply never spends its
+    dedupe key. Answering 202 instead would let the identical retry be deduped away, so
+    the event would be dropped forever — see #558.
+    """
+
+
 class IntegrationConfigurationError(PlatformControlError):
     """Raised when storage or event integrations are misconfigured."""
 

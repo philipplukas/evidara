@@ -9,6 +9,7 @@ from platform_control.services.deterministic_http_provider import DeterministicH
 from platform_control.services.eur_lex_sparql_provider import EurLexSparqlProvider
 from platform_control.services.fedlex_sparql_provider import FedlexSparqlProvider
 from platform_control.services.firecrawl_provider import FirecrawlProvider
+from platform_control.services.gemeinde_http_provider import GemeindeHttpProvider
 from platform_control.services.legifrance_provider import LegifranceProvider
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.regione_http_provider import RegioneHttpProvider
@@ -41,6 +42,12 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     # blueprint templates parse but the two-key lock rejects live runs until an
     # operator captures per-canton acceptance-run evidence.
     registry.register(CantonHttpProvider())
+    # Swiss communal (Gemeinde) legal collections. Scaffold: live_ready=false.
+    # The municipal layer is where the ADR-0033 acceptance test lives, but the
+    # operative texts are PDFs and neither ProviderResource.body (str-typed) nor
+    # document-intelligence can carry them yet, so the two-key lock keeps its
+    # templates inert until a layout-aware PDF pipeline lands (#584).
+    registry.register(GemeindeHttpProvider())
     # Fixture-backed replay for SHADOW execution mode.
     registry.register(CassetteProvider(cassette_dir=settings.cassette_dir))
     return registry

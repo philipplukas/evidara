@@ -4,6 +4,8 @@
 #   docker compose up -d                          # Start lite infra (postgres only)
 #   docker compose --profile search up -d         # Add OpenSearch
 #   docker compose --profile full up -d           # Add OpenSearch + Pub/Sub emulator
+#   docker compose --profile lean-stack up -d     # Lean search stack: OpenSearch + Document
+#                                                 # Service + bootstrap + legal-search API (3102)
 #   docker compose down           # Stop
 #   docker compose down -v        # Stop + delete data
 #
@@ -11,6 +13,8 @@
 #   - OpenSearch for legal-search
 #   - Postgres for platform-control
 #   - Pub/Sub emulator for local event-driven runtime flow
+#   - Lean search stack (profile `lean-stack`), driven by scripts/dev-lean-search-stack.sh
+#     and documented in docs/setup/legal-search-lean-local.md
 #
 # After starting platform-control dependencies:
 #   cd platform-control
@@ -44,7 +48,7 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2.17.1
-    profiles: ["search", "full"]
+    profiles: ["search", "full", "lean-stack"]
     environment:
       - discovery.type=single-node
       - DISABLE_SECURITY_PLUGIN=true
@@ -82,6 +86,88 @@ services:
     ports:
       - "${EVIDARA_PUBSUB_HOST_PORT:-8681}:8681"
     mem_limit: 256m
+
+  # --- Lean search stack (profiles `lean` / `lean-stack`) ------------------------
+  # `lean-stack` is the all-in-one path: OpenSearch + Document Service + one-shot
+  # bootstrap + legal-search API on 3102, with DOCUMENT_INTELLIGENCE_BASE_URL wired.
+  # `lean` (used with `search`) starts only the Document Service, so the BFF can run
+  # on the host with hot reload — see `dev-lean-search-stack.sh up-split`.
+
+  # File-backed Document Service serving GET /v1/documents/{id}/lean from the
+  # TAR-89 demo fixture. No Delta/Databricks dependency.
+  document-service:
+    build:
+      context: .
+      dockerfile: document-intelligence/Dockerfile.document-service
+    profiles: ["lean", "lean-stack"]
+    environment:
+      DOCUMENT_SERVICE_CONTENT_DIR: /content
+      PORT: "8090"
+    volumes:
+      - ./scripts/fixtures/tar89-demo-content:/content:ro
+    ports:
+      - "${EVIDARA_DOCUMENT_SERVICE_PORT:-8090}:8090"
+    mem_limit: 512m
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # One-shot: wait for OpenSearch, create the documents index + projection-history
+  # index, point the documents-read alias at documents-write, and seed the stale
+  # projection doc that `dev-lean-search-stack.sh replay` later overwrites.
+  # Installs jq in-container so the host does not need it (see the lean setup doc).
+  lean-bootstrap:
+    image: alpine:3.20
+    profiles: ["lean-stack"]
+    environment:
+      OPENSEARCH_NODE: http://opensearch:9200
+      OPENSEARCH_ALIAS_READ: documents-read
+      OPENSEARCH_ALIAS_WRITE: documents-write
+    volumes:
+      - ./scripts:/repo/scripts:ro
+    working_dir: /repo
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - apk add --no-cache bash curl jq >/dev/null && exec bash scripts/validate-tar89-metadata-local.sh --bootstrap
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: "no"
+
+  # legal-search BFF wired to the lean Document Service. Distinct from the
+  # `legal-search-api` service in docker-compose.local.yml, which seeds from
+  # OpenCaseLaw and does not set DOCUMENT_INTELLIGENCE_BASE_URL.
+  legal-search-api-lean:
+    build:
+      context: .
+      dockerfile: legal-search/api/Dockerfile
+    profiles: ["lean-stack"]
+    environment:
+      NODE_ENV: production
+      PORT: "3102"
+      OPENSEARCH_NODE: http://opensearch:9200
+      OPENSEARCH_ALIAS_READ: documents-read
+      OPENSEARCH_ALIAS_WRITE: documents-write
+      DOCUMENT_INTELLIGENCE_BASE_URL: http://document-service:8090
+    ports:
+      - "${EVIDARA_LEGAL_SEARCH_API_PORT:-3102}:3102"
+    mem_limit: 768m
+    depends_on:
+      lean-bootstrap:
+        condition: service_completed_successfully
+      document-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://localhost:3102/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 12
 
   # Optional: OpenSearch Dashboards for browsing data
   # Uncomment if you want a web UI at http://localhost:5601

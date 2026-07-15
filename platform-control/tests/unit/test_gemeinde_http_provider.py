@@ -1,0 +1,312 @@
+"""Unit tests for the CH communal (Gemeinde) HTTP provider — #584.
+
+WHY THESE TESTS EXIST:
+- The AS landing-page parser is the real, working half of this scaffold. It
+  runs against a fixture captured verbatim from the live City of Zurich page,
+  so it proves we can actually locate a communal ordinance and read its
+  lifecycle metadata — including `in_force_until`, the repeal date ADR-0033
+  records as missing from the corpus.
+- The REFUSAL is the load-bearing behaviour. Zurich's ordinance is PDF-only,
+  and `ProviderResource.body` is `str`-typed, so the provider must NOT fall
+  back to emitting the metadata landing page in place of the ordinance.
+  Indexing a metadata stub as if it were the law is the "demo that lies
+  convincingly" failure ADR-0033 exists to prevent — so it is asserted here.
+- Host allow-list + BFS validation: prevents an operator from pointing a
+  commune template at an arbitrary host.
+- Scaffold guard: `live_ready is False` keeps the ADR-0030 two-key lock shut.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+
+import httpx
+import pytest
+
+from platform_control.errors import ProviderConfigurationError
+from platform_control.services.gemeinde_http_provider import (
+    GemeindeHttpProvider,
+    parse_amtliche_sammlung_page,
+)
+
+FIXTURE = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures"
+    / "gemeinde_http"
+    / "stadt_zuerich_as_554_510.html"
+)
+LANDING_URL = (
+    "https://www.stadt-zuerich.ch/de/politik-und-verwaltung/politik-und-recht"
+    "/amtliche-sammlung/5/554/510.html"
+)
+
+
+def _fixture_html() -> str:
+    return FIXTURE.read_text(encoding="utf-8")
+
+
+# ─── Builders for synthetic landing pages ───────────────────────
+# The live page HTML-escapes a JSON payload into a web-component attribute, and
+# escapes the inner <a href> a second time. These builders reproduce that shape
+# so synthetic cases exercise the same parse path as the captured fixture.
+
+
+def _row(field: str, value: str) -> str:
+    return f"[{{&#34;id&#34;:&#34;{field}&#34;,&#34;value&#34;:&#34;{value}&#34;}}]"
+
+
+def _link(href: str) -> str:
+    return f"&lt;a href=\\&#34;{href}\\&#34;>text&lt;/a>"
+
+
+def _landing_page(*, title: str, rows: list[str]) -> str:
+    payload = ",".join(rows)
+    return (
+        f"<html><head><title>{title} | Stadt Zürich</title></head><body>"
+        f'<x-table rows="[{payload}]"></x-table></body></html>'
+    )
+
+
+class _FakeClient:
+    def __init__(self, responses: dict[str, tuple[int, str, dict[str, str]]]) -> None:
+        self.responses = responses
+        self.calls: list[str] = []
+
+    async def __aenter__(self) -> _FakeClient:
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        del exc_type, exc, tb
+
+    async def get(self, url: str):
+        self.calls.append(url)
+        for prefix, (status, body, headers) in self.responses.items():
+            if url.startswith(prefix):
+                request = httpx.Request("GET", url)
+                return httpx.Response(status, text=body, headers=headers, request=request)
+        raise AssertionError(f"unexpected URL: {url}")
+
+
+def _install_fake_client(
+    monkeypatch: pytest.MonkeyPatch,
+    responses: dict[str, tuple[int, str, dict[str, str]]],
+) -> _FakeClient:
+    captured = _FakeClient(responses)
+
+    def factory(*args, **kwargs):
+        del args, kwargs
+        return captured
+
+    monkeypatch.setattr(httpx, "AsyncClient", factory)
+    return captured
+
+
+# ─── The parser (the working half) ──────────────────────────────
+
+
+def test_parses_real_amtliche_sammlung_landing_page() -> None:
+    record = parse_amtliche_sammlung_page(_fixture_html(), page_url=LANDING_URL)
+
+    assert record["as_number"] == "554.510"
+    assert record["title"] == "Vollzugsvorschriften zum Hundegesetz"
+    assert record["decided_on"] == "2017-05-31"
+    assert record["in_force_from"] == "2017-09-01"
+    # Empty on the live page = still in force. This is exactly the repeal/until
+    # date ADR-0033 says the corpus cannot express; the municipal layer
+    # publishes it, so the provider must surface it rather than drop it.
+    assert record["in_force_until"] is None
+
+    # The operative text is a PDF — there is no HTML manifestation. The href on
+    # the live page contains literal spaces; urljoin must still resolve it.
+    assert record["document_content_type"] == "application/pdf"
+    assert record["document_url"].startswith("https://www.stadt-zuerich.ch/dam/")
+    assert record["document_url"].endswith(".pdf")
+
+
+def test_parser_reads_a_repeal_date_when_the_enactment_is_superseded() -> None:
+    # Superseded versions carry a non-empty Ausserkrafttreten. Synthesised from
+    # the same field ids the live page uses.
+    html = _landing_page(
+        title="Alt",
+        rows=[
+            _row("inkrafttretendatum", "01.07.2015"),
+            _row("ausserkrafttretendatum", "31.08.2017"),
+            _row("rechtstexte", _link("/dam/old.pdf")),
+        ],
+    )
+    record = parse_amtliche_sammlung_page(html, page_url=LANDING_URL)
+    assert record["in_force_from"] == "2015-07-01"
+    assert record["in_force_until"] == "2017-08-31"
+
+
+# ─── The refusal (the load-bearing behaviour) ───────────────────
+
+
+@pytest.mark.asyncio
+async def test_pdf_only_ordinance_is_refused_not_substituted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Zurich case: PDF-only, so the run must fail with an explicit reason.
+
+    It must NOT emit the metadata landing page as a stand-in for the ordinance.
+    """
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                _fixture_html(),
+                {"content-type": "text/html; charset=utf-8"},
+            )
+        },
+    )
+    provider = GemeindeHttpProvider()
+    source_version = SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL})
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_zh_261_1"),
+    )
+
+    # No document acquired, and crucially no landing-page substitute.
+    assert result.inline_resources == []
+    assert result.response_payload["captured"] == 0
+    assert result.response_payload["skipped"] == 1
+
+    # The refusal names the real blocker rather than failing opaquely.
+    assert result.inline_failure_reason is not None
+    assert "binary" in result.inline_failure_reason.lower()
+
+    # What it *would* have fetched is recorded, so an acceptance run can see it.
+    skipped = result.response_payload["skipped_manifestations"][0]
+    assert skipped["reason"] == "binary_artifact_unsupported"
+    assert skipped["content_type"] == "application/pdf"
+    assert skipped["as_number"] == "554.510"
+    assert skipped["in_force_from"] == "2017-09-01"
+
+
+@pytest.mark.asyncio
+async def test_html_manifestation_would_be_acquired_normally(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A commune publishing HTML law acquires fine — the block is PDF, not municipal.
+
+    Guards against the scaffold being written as an unconditional failure: the
+    provider is a real acquisition path that is blocked only on binary bodies.
+    """
+    landing = _landing_page(
+        title="Hundereglement",
+        rows=[
+            _row("ASZ", "554.510"),
+            _row("inkrafttretendatum", "01.09.2017"),
+            _row("rechtstexte", _link("/recht/hunde.html")),
+        ],
+    )
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                landing,
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+            "https://www.stadt-zuerich.ch/recht/hunde.html": (
+                200,
+                "<html><body>Art. 1 Der Stadtrat ...</body></html>",
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    result = await provider.start_run(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL}),
+        SimpleNamespace(run_id="run_zh_261_2"),
+    )
+    assert result.inline_failure_reason is None
+    assert result.response_payload["captured"] == 1
+    resource = result.inline_resources[0]
+    assert "Art. 1" in resource.body
+    # The municipal document carries its level and links up to its canton (#583).
+    assert resource.metadata["level"] == "municipal"
+    assert resource.metadata["jurisdiction_id"] == "jur_ch_gemeinde_261"
+    assert resource.metadata["parent_jurisdiction_id"] == "jur_ch_zh"
+    assert resource.metadata["bfs_number"] == 261
+
+
+# ─── Config validation / safety ─────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_rejects_seed_from_foreign_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fake_client(monkeypatch, {})
+    provider = GemeindeHttpProvider()
+    with pytest.raises(ProviderConfigurationError, match="host must match"):
+        await provider.start_run(
+            SimpleNamespace(),
+            SimpleNamespace(
+                acquisition_spec={
+                    "bfs_number": 261,
+                    "seed_url": "https://attacker.example.com/exfil",
+                }
+            ),
+            SimpleNamespace(run_id="run_x"),
+        )
+
+
+@pytest.mark.asyncio
+async def test_rejects_unknown_bfs_number() -> None:
+    provider = GemeindeHttpProvider()
+    # 2,110 communes are seeded as jurisdictions; only allow-listed ones have a
+    # verified portal. An unlisted commune must fail loudly, not guess a host.
+    with pytest.raises(ProviderConfigurationError, match="no supported portal"):
+        await provider.start_run(
+            SimpleNamespace(),
+            SimpleNamespace(
+                acquisition_spec={"bfs_number": 1, "seed_url": "https://whatever.example/"}
+            ),
+            SimpleNamespace(run_id="run_x"),
+        )
+
+
+@pytest.mark.asyncio
+async def test_requires_bfs_number() -> None:
+    provider = GemeindeHttpProvider()
+    with pytest.raises(ProviderConfigurationError, match="bfs_number"):
+        await provider.start_run(
+            SimpleNamespace(),
+            SimpleNamespace(acquisition_spec={"seed_url": LANDING_URL}),
+            SimpleNamespace(run_id="run_x"),
+        )
+
+
+@pytest.mark.asyncio
+async def test_requires_seed_urls() -> None:
+    provider = GemeindeHttpProvider()
+    with pytest.raises(ProviderConfigurationError, match="seed_url"):
+        await provider.start_run(
+            SimpleNamespace(),
+            SimpleNamespace(acquisition_spec={"bfs_number": 261}),
+            SimpleNamespace(run_id="run_x"),
+        )
+
+
+def test_plan_reports_scaffold_status_without_network_io() -> None:
+    provider = GemeindeHttpProvider()
+    plan = provider.plan(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL}),
+    )
+    assert plan.provider == "gemeinde_http"
+    assert plan.seed_urls == [LANDING_URL]
+    assert any("jur_ch_gemeinde_261" in note for note in plan.notes)
+    assert any("scaffold" in note for note in plan.notes)
+
+
+def test_gemeinde_http_provider_is_not_live_ready() -> None:
+    # Scaffold guard (ADR-0030): communal ordinances are PDFs, and neither
+    # ProviderResource.body (str) nor document-intelligence can carry them.
+    # Flipping this key without a PDF pipeline would fire at a live municipal
+    # portal and acquire nothing usable.
+    assert GemeindeHttpProvider.live_ready is False

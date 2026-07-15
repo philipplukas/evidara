@@ -1,6 +1,8 @@
 # Wizard Discovery and Extraction Contracts
 
-Defines logical contract shapes for the Temporal + Argilla wizard flow used by platform-control for hierarchical discovery and extraction.
+Defines logical contract shapes for the wizard flow used by platform-control for hierarchical discovery and extraction.
+
+> **ADR-0031.** Argilla is deleted; review tasks live in the `review_tasks` table and are worked in `platform-control/admin`. The confidence-band routing policy is retained (`docs/runbooks/extraction-review-routing.md`).
 
 This document is the contract companion for:
 
@@ -79,8 +81,7 @@ This document is the contract companion for:
 | `id` | `uuid` | yes | Internal review task id |
 | `runId` | `uuid` | yes | Run scope |
 | `recordId` | `uuid` | yes | ExtractionRecord reference |
-| `argillaDatasetId` | `string` | yes | Argilla dataset target |
-| `argillaRecordId` | `string` | no | Present after task creation |
+| `externalId` | `string` | yes | Producer-supplied dedupe key (unique). Was `argillaDatasetId` / `argillaRecordId` before ADR-0031 |
 | `disputedFields` | `array` | yes | Fields needing review |
 | `suggestedValues` | `object` | yes | AI-proposed values |
 | `reviewDecision` | `enum` | no | `accept|edit|reject` when complete |

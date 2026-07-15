@@ -2,8 +2,10 @@
   "name": "@evidara/platform-control-admin",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <24"
+  },
   "scripts": {
-    "postinstall": "node ../../scripts/ensure-monorepo-shared-modules.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

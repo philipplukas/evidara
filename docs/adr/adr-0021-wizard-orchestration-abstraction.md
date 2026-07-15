@@ -2,7 +2,17 @@
 
 ## Status
 
-Accepted
+Accepted — **superseded in part by ADR-0031**.
+
+The `Orchestrator` abstraction below stands, and is the reason keeping Temporal is cheap. But
+two of its decisions no longer hold:
+
+- **"Use Argilla for review ingestion and queue lifecycle."** Reversed. The Argilla integration
+  is deleted; the review queue is the `review_tasks` table, worked in `platform-control/admin`.
+  The confidence-band routing policy is retained. See
+  `docs/runbooks/extraction-review-routing.md`.
+- **Temporal is deployed in no environment**, so `PLATFORM_CONTROL_WIZARD_ORCHESTRATOR_BACKEND`
+  stays `in_memory`.
 
 ## Date
 
@@ -58,5 +68,6 @@ Rejected because Argilla already provides review workflows and avoids reimplemen
 ## References
 
 - `docs/architecture/temporal-argilla-wizard-architecture.md`
-- `docs/runbooks/argilla-review-routing-and-sync.md`
+- `docs/runbooks/extraction-review-routing.md`
+- `docs/adr/0031-temporal-argilla-firecrawl-disposition.md`
 - `platform-control/src/platform_control/services/orchestrator.py`

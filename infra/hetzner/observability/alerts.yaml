@@ -137,6 +137,24 @@ spec:
             summary: "di-consumer is dead-lettering artifact bundles"
             description: "Runbook: docs/runbooks/dlq-triage-and-replay.md"
 
+        # Firecrawl deliveries we refused because they matched no provider job/run. A
+        # short blip is the dispatch race healing itself (the retry lands after the
+        # provider job commits). A rate that does not drain means the retries will never
+        # match anything, so the crawl's run is stuck. Silent while Firecrawl is dormant
+        # (ADR-0031) — it can only fire once a portal actually uses it.
+        - alert: FirecrawlWebhooksUnmatched
+          expr: |
+            sum(increase(platform_control_firecrawl_webhooks_unmatched_total[30m])) > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Firecrawl webhooks are not matching any run"
+            description: >-
+              Deliveries are being refused and redelivered without ever matching a
+              provider job. Unprocessed deliveries are queryable:
+              SELECT * FROM webhook_receipts WHERE processed_at IS NULL.
+
     - name: evidara.nats
       rules:
         # Metric names come from prometheus-nats-exporter's `jsz` collector, enabled by
@@ -144,7 +162,7 @@ spec:
         # rollout (docs/setup/hetzner-observability.md has the one-liner) — an alert on a
         # metric name that does not exist is worse than no alert, because it looks like one.
         - alert: JetStreamConsumerBacklogGrowing
-          expr: max by (consumer_name, stream_name) (jetstream_consumer_num_pending) > 100
+          expr: max by (consumer_name, stream_name) (nats_consumer_num_pending) > 100
           for: 15m
           labels:
             severity: warning
@@ -155,7 +173,7 @@ spec:
               is stuck, crash-looping, or slower than the producer.
 
         - alert: JetStreamRedeliveriesClimbing
-          expr: sum by (consumer_name) (increase(jetstream_consumer_num_redelivered[15m])) > 10
+          expr: sum by (consumer_name) (increase(nats_consumer_num_redelivered[15m])) > 10
           for: 15m
           labels:
             severity: warning
