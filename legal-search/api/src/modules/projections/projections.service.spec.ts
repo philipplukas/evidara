@@ -182,6 +182,64 @@ describe('ProjectionsService', () => {
     );
   });
 
+  it('indexes the document body as `content` so the highlighter can build a snippet', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const body =
+      'Die Kündigungsfrist beträgt drei Monate. Ein Konkurrenzverbot ist nur verbindlich, ' +
+      'wenn es schriftlich vereinbart wurde.';
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Obligationenrecht Auszug',
+      body_text: body,
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    expect(repository.upsertProjection).toHaveBeenCalledWith(
+      expect.objectContaining({ content: body }),
+    );
+  });
+
+  it('falls back to the concatenated section bodies when there is no body_text', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Zivilgesetzbuch Auszug',
+      sections: [
+        { section_id: 'sec_1', title: 'Art. 1', content: 'Erster Abschnitt zum Grundsatz.' },
+        { section_id: 'sec_2', title: 'Art. 2', content: 'Zweiter Abschnitt zu Treu und Glauben.' },
+      ],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const projection = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as { content?: string };
+    expect(projection.content).toContain('Erster Abschnitt zum Grundsatz.');
+    expect(projection.content).toContain('Zweiter Abschnitt zu Treu und Glauben.');
+  });
+
+  it('derives content_preview from the indexed body rather than replacing it', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    const body = 'A'.repeat(900);
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Langes Dokument',
+      body_text: body,
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const projection = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as { content?: string; content_preview?: string };
+    // The preview is truncated; the indexed body is not.
+    expect(projection.content).toHaveLength(900);
+    expect(projection.content_preview?.length).toBeLessThan(body.length);
+  });
+
   it('indexes Austrian BGBl citation targets from publication-organ sections', async () => {
     const repository = createRepositoryMock();
     const diClient = createDocumentIntelligenceMock();
@@ -270,6 +328,91 @@ describe('ProjectionsService', () => {
         jurisdiction: 'AT',
       }),
     );
+  });
+
+  describe('language facet (#572)', () => {
+    // The CH Fedlex constitution templates are per-language
+    // (`fedlex_sparql_constitution_de`), but they all share the
+    // language-free corpus id `corpus_public_ch_fedlex_constitution`.
+    const constitutionEvent: DocumentProcessedEventDto = {
+      ...baseProcessedEvent,
+      payload: {
+        ...baseProcessedEvent.payload,
+        provenance: {
+          ...baseProcessedEvent.payload.provenance,
+          corpus_id: 'corpus_public_ch_fedlex_constitution',
+        },
+      },
+    };
+
+    it('indexes a German-template acquisition as language=de', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      // Lean document exactly as DI emits it for the German expression:
+      // no top-level `language`, the acquired language lives in
+      // `metadata.original_language`.
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999',
+        jurisdiction_id: 'jur_ch_federal',
+        body_text: 'Bundesverfassung der Schweizerischen Eidgenossenschaft / vom 18. April 1999',
+        metadata: {
+          original_language: 'de',
+          translation_status: 'original',
+        },
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(constitutionEvent);
+
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jurisdiction: 'CH',
+          language: 'de',
+          original_language: 'de',
+        }),
+      );
+    });
+
+    it('never guesses a language from a corpus id without a language token', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft',
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed(constitutionEvent);
+
+      // "constitution" contains the substring "it" — it must not be read
+      // as Italian. Absent is correct here; wrong is not.
+      const projection = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as { language?: string };
+      expect(projection.language).toBeUndefined();
+    });
+
+    it('still honours an explicit language token in the corpus id', async () => {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+        title: 'Costituzione federale della Confederazione Svizzera',
+      });
+      const service = new ProjectionsService(repository, diClient);
+
+      await service.applyDocumentProcessed({
+        ...constitutionEvent,
+        payload: {
+          ...constitutionEvent.payload,
+          provenance: {
+            ...constitutionEvent.payload.provenance,
+            corpus_id: 'corpus_public_ch_fedlex_constitution_it',
+          },
+        },
+      });
+
+      expect(repository.upsertProjection).toHaveBeenCalledWith(
+        expect.objectContaining({ language: 'it' }),
+      );
+    });
   });
 
   it('indexes citations stored on section metadata', async () => {
@@ -720,6 +863,111 @@ describe('ProjectionsService', () => {
       expect(repository.upsertProjection).toHaveBeenCalledWith(
         expect.objectContaining({ record_kind: 'legal_document' }),
       );
+    });
+  });
+
+  describe('norm hierarchy (#583, ADR-0033)', () => {
+    /** Project a lean document and return the row that was written. */
+    async function project(leanDocument: Record<string, unknown>) {
+      const repository = createRepositoryMock();
+      const diClient = createDocumentIntelligenceMock();
+      (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue(leanDocument);
+      const service = new ProjectionsService(repository, diClient);
+      await service.applyDocumentProcessed(baseProcessedEvent);
+      return (repository.upsertProjection as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    }
+
+    it('gives a federal document the federal level', async () => {
+      const row = await project({
+        title: 'Tierschutzgesetz',
+        jurisdiction_ids: ['jur_ch_federal'],
+      });
+      expect(row.level).toBe('federal');
+    });
+
+    it('gives a cantonal document the cantonal level and makes it subordinate to federal law', async () => {
+      const row = await project({ title: 'Hundegesetz', jurisdiction_ids: ['jur_ch_zh'] });
+      expect(row.level).toBe('cantonal');
+      expect(row.subordinate_to).toContain('jur_ch_federal');
+      expect(row.subordinate_to).not.toContain('jur_ch_zh');
+    });
+
+    it('gives a communal ordinance the municipal level, subordinate to its canton AND the federation', async () => {
+      // The act being challenged in the dog question. Steps 2 and 3 of the walk
+      // — is it authorised, is it preempted — are these two edges.
+      const row = await project({
+        title: 'Hundereglement',
+        jurisdiction_ids: ['jur_ch_gemeinde_261'],
+      });
+      expect(row.level).toBe('municipal');
+      expect(row.subordinate_to).toContain('jur_ch_zh');
+      expect(row.subordinate_to).toContain('jur_ch_federal');
+    });
+
+    it('honours a declared `constitutional` level the jurisdiction cannot supply', async () => {
+      const row = await project({
+        title: 'Bundesverfassung',
+        jurisdiction_ids: ['jur_ch_federal'],
+        level: 'constitutional',
+      });
+      expect(row.level).toBe('constitutional');
+    });
+
+    it('leaves level unset for a jurisdiction the hierarchy does not know', async () => {
+      const row = await project({ title: 'Unknown', jurisdiction_ids: ['jur_atlantis'] });
+      expect(row.level).toBeUndefined();
+      expect(row.subordinate_to).toBeUndefined();
+    });
+
+    it('falls back to effective_date for in_force_from so there is one field to range-query', async () => {
+      const row = await project({
+        title: 'Hundegesetz',
+        jurisdiction_ids: ['jur_ch_zh'],
+        effective_date: '2005-01-01',
+      });
+      expect(row.in_force_from).toBe('2005-01-01');
+    });
+
+    it('carries the repeal date so temporal validity is answerable', async () => {
+      const row = await project({
+        title: 'Altes Hundegesetz',
+        jurisdiction_ids: ['jur_ch_zh'],
+        effective_date: '2005-01-01',
+        in_force_until: '2018-12-31',
+      });
+      expect(row.in_force_until).toBe('2018-12-31');
+    });
+
+    it('accepts `repealed_date` as an alias for the repeal date', async () => {
+      const row = await project({
+        title: 'Altes Hundegesetz',
+        jurisdiction_ids: ['jur_ch_zh'],
+        repealed_date: '2018-12-31',
+      });
+      expect(row.in_force_until).toBe('2018-12-31');
+    });
+
+    it('does not rank commentary in the hierarchy of norms', async () => {
+      // Commentary is not a norm; it governs nothing.
+      const repository = createRepositoryMock();
+      const service = new ProjectionsService(repository, createDocumentIntelligenceMock());
+      await service.applyCommentaryInsight({
+        insight_id: 'doc_01jq7bhgy7g0pkj4f1d03f8f8d',
+        document_id: 'doc_01jq7bhgy7g0pkj4f1d03f8f8c',
+        document_revision: 1,
+        processing_manifest_id: 'pm_01jq7bhgy7g0pkj4f1d03f8f8c',
+        insight_type: 'summary',
+        claim: 'A claim',
+        display_text: 'Some text',
+        jurisdiction_ids: ['jur_ch_zh'],
+        authority_ids: ['auth_fedlex'],
+        source_document_ids: ['doc_01jq7bhgy7g0pkj4f1d03f8f8c'],
+        confidence: 0.9,
+        review_state: 'approved',
+      });
+      const row = (repository.upsertProjection as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(row.level).toBeUndefined();
+      expect(row.subordinate_to).toBeUndefined();
     });
   });
 });

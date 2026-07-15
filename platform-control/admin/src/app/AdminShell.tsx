@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@evidara/shell";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { publicConfig } from "../config/publicConfig";
@@ -69,7 +70,7 @@ export default function AdminShell() {
         <section className="evidara-shell__panel" aria-labelledby="access-denied-title">
           <header className="evidara-shell__header">
             <div className="evidara-shell__brand">
-              <div className="evidara-shell__mark">E</div>
+              <BrandMark size={42} className="evidara-shell__mark" />
               <div>
                 <div className="evidara-shell__eyebrow">Evidara</div>
                 <div className="evidara-shell__title">Control plane</div>

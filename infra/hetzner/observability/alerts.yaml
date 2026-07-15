@@ -1,0 +1,197 @@
+# Day-one alerts for the Evidara pipeline (ADR-0032, #553).
+#
+# Every one of these fires on a failure that was 100% undetected in the June/July
+# outage — the whole cluster was Running, 1/1 Ready, zero restarts, while search
+# returned an empty page for every query.
+#
+# `severity: critical` is the page tier (docs/adr/sli-slo-definitions.md); it routes to
+# the Alertmanager `page` receiver. `severity: warning` is the review tier.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: evidara-pipeline
+  namespace: evidara
+  labels:
+    app.kubernetes.io/part-of: evidara
+spec:
+  groups:
+    - name: evidara.search
+      rules:
+        # THE alert. #549: the physical index did not exist, so `documents-read`
+        # resolved to nothing and every query returned an empty page. Nothing noticed
+        # for weeks. This is a total outage of the core product feature.
+        - alert: DocumentsReadAliasUnresolved
+          expr: legal_search_alias_resolved{alias="documents-read"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "`documents-read` does not resolve — search is dead"
+            description: >-
+              The OpenSearch alias `documents-read` resolves to no physical index, so
+              every search query returns zero results. legal-search-api reports itself
+              healthy regardless. Runbook: docs/runbooks/alert-response-playbook.md
+              (Search Index Outage).
+
+        # #551: read and write aliases pointing at different physical indices. Projections
+        # land in one index, search reads another; both "succeed" forever.
+        - alert: DocumentsAliasesDiverged
+          expr: legal_search_aliases_consistent == 0 and legal_search_alias_resolved{alias="documents-read"} == 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "documents read/write aliases point at different indices"
+            description: >-
+              Projections write to the physical index behind `documents-write` while
+              search reads the one behind `documents-read`. Newly processed documents
+              will never surface. See docs/runbooks/projection-reindex-backfill.md.
+
+        - alert: SearchIndexEmpty
+          expr: legal_search_indexed_documents == 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "zero documents behind `documents-read`"
+            description: >-
+              The alias resolves but the index holds no documents. A wiped index, a
+              failed reindex, or a projection path that has never delivered.
+
+        - alert: SearchZeroResultRateHigh
+          expr: |
+            (
+              sum(increase(legal_search_search_queries_zero_hits_total[15m]))
+              /
+              clamp_min(sum(increase(legal_search_search_queries_total[15m])), 1)
+            ) > 0.95
+            and
+            sum(increase(legal_search_search_queries_total[15m])) >= 5
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "over 95% of searches return no hits"
+            description: >-
+              A broken index, a broken analyzer, or a bad reindex. The volume guard
+              (>= 5 queries in the window) keeps a quiet night from paging.
+
+        # The search adapter degrades a failed OpenSearch call into an empty result page.
+        # Without this alert a dead cluster is indistinguishable from an unlucky query.
+        - alert: SearchBackendErrors
+          expr: sum(increase(legal_search_search_errors_total[10m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "search queries are failing against OpenSearch"
+            description: >-
+              legal-search-api is catching OpenSearch errors and serving empty results.
+              Users see "no matches", not an error.
+
+        - alert: SearchIndexProbeDown
+          expr: legal_search_index_probe_up == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "legal-search cannot reach OpenSearch to probe the index"
+            description: >-
+              The alias/document-count gauges are stale. The alerts that depend on them
+              are blind until this clears.
+
+    - name: evidara.pipeline
+      rules:
+        # The leak the funnel dashboard exists to make obvious: DI is chewing through
+        # messages but nothing is arriving in OpenSearch.
+        - alert: ProjectionPathLeaking
+          expr: |
+            sum(increase(di_messages_total{outcome="processed"}[1h])) > 0
+            and
+            sum(increase(legal_search_documents_indexed_total[1h])) == 0
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: "DI is processing messages but no documents are being indexed"
+            description: >-
+              document-intelligence processed messages in the last hour while
+              legal-search indexed zero documents. The projection path (NATS ->
+              projection-bridge -> /v1/projections/events) is dropping everything.
+
+        - alert: ProjectionBridgeDeadLettering
+          expr: sum(increase(di_projection_forwards_total{outcome="dead_lettered"}[30m])) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "projection-bridge is dead-lettering document.processed events"
+            description: "Runbook: docs/runbooks/dlq-triage-and-replay.md"
+
+        - alert: DiConsumerDeadLettering
+          expr: sum(increase(di_messages_total{outcome="dead_lettered"}[30m])) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "di-consumer is dead-lettering artifact bundles"
+            description: "Runbook: docs/runbooks/dlq-triage-and-replay.md"
+
+        # Firecrawl deliveries we refused because they matched no provider job/run. A
+        # short blip is the dispatch race healing itself (the retry lands after the
+        # provider job commits). A rate that does not drain means the retries will never
+        # match anything, so the crawl's run is stuck. Silent while Firecrawl is dormant
+        # (ADR-0031) — it can only fire once a portal actually uses it.
+        - alert: FirecrawlWebhooksUnmatched
+          expr: |
+            sum(increase(platform_control_firecrawl_webhooks_unmatched_total[30m])) > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Firecrawl webhooks are not matching any run"
+            description: >-
+              Deliveries are being refused and redelivered without ever matching a
+              provider job. Unprocessed deliveries are queryable:
+              SELECT * FROM webhook_receipts WHERE processed_at IS NULL.
+
+    - name: evidara.nats
+      rules:
+        # Metric names come from prometheus-nats-exporter's `jsz` collector, enabled by
+        # `promExporter` in values/nats.yaml. VERIFY THESE RESOLVE after the first
+        # rollout (docs/setup/hetzner-observability.md has the one-liner) — an alert on a
+        # metric name that does not exist is worse than no alert, because it looks like one.
+        - alert: JetStreamConsumerBacklogGrowing
+          expr: max by (consumer_name, stream_name) (nats_consumer_num_pending) > 100
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "JetStream consumer {{ $labels.consumer_name }} is falling behind"
+            description: >-
+              A consumer's pending count has stayed above 100 for 15 minutes — a bridge
+              is stuck, crash-looping, or slower than the producer.
+
+        - alert: JetStreamRedeliveriesClimbing
+          expr: sum by (consumer_name) (increase(nats_consumer_num_redelivered[15m])) > 10
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "JetStream consumer {{ $labels.consumer_name }} is redelivering"
+            description: "Messages are being nak'd and retried — the handler is failing."
+
+    - name: evidara.targets
+      rules:
+        # A service that stops being scraped takes all of its alerts down with it. This
+        # is the alert that keeps the others honest.
+        - alert: EvidaraTargetDown
+          expr: up{namespace="evidara"} == 0
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Prometheus cannot scrape {{ $labels.job }}"
+            description: >-
+              The target is down or its /metrics endpoint is broken. Every alert that
+              depends on this target's metrics is now blind.

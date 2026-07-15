@@ -22,12 +22,8 @@ These are the best first targets once the new light pool is healthy.
   Keep this as the recurring validation entrypoint for both pools.
 - [`release-readiness.yml`](../../.github/workflows/release-readiness.yml)
   Release evidence is lightweight control-plane work and should use the light pool once WIF is validated there.
-- [`document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
-  `document-intelligence-runtime-check` already targets the light runner variable.
 - [`terraform.yml`](../../.github/workflows/terraform.yml)
   Light-weight Terraform fmt/plan/apply jobs are good early candidates.
-- [`terraform-databricks.yml`](../../.github/workflows/terraform-databricks.yml)
-  Similar pattern to the Terraform runtime stack, with light-runner usage today.
 - [`pr-title.yml`](../../.github/workflows/pr-title.yml)
   Cheap policy/validation work on the light pool is low risk.
 
@@ -37,6 +33,8 @@ These should wait until the heavy pool has proven Playwright/integration stabili
 
 - [`runner-pool-smoke.yml`](../../.github/workflows/runner-pool-smoke.yml)
   Heavy smoke should prove browser setup and Playwright readiness first.
+- [`document-intelligence.yml`](../../.github/workflows/document-intelligence.yml)
+  `document-intelligence-check` targets the heavy runner variable today.
 - [`e2e-smoke-dev.yml`](../../.github/workflows/e2e-smoke-dev.yml)
   End-to-end smoke belongs on the heavy pool after the browser/runtime path is stable.
 - [`e2e-smoke-staging.yml`](../../.github/workflows/e2e-smoke-staging.yml)

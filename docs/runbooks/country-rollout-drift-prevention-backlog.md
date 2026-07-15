@@ -268,7 +268,7 @@ and can run in parallel.
 - Enable `regione_http_lombardia` template
 - Runbook: create `docs/runbooks/it-lombardia-regione-fast-loop.md`
 
-### 4.4 Fedlex cantonal SPARQL filter — partially landed
+### 4.4 Fedlex cantonal SPARQL filter — wired, awaiting acceptance run
 
 **Landed (scaffolding):**
 
@@ -278,17 +278,26 @@ and can run in parallel.
 - `_build_canton_discovery_query(code, limit)` renders the
   `jolux:CantonOfOrigin` discovery SPARQL.
 - `_discover_works_by_canton(...)` async method executes the query and
-  returns work URIs; not yet wired into `start_run()`.
+  returns work URIs.
 - 5 unit tests cover the mapping, query shape, default limit, and
   rejection of garbage codes.
 
+**Landed (wiring, #531):**
+
+- `_discover_works_by_canton` is wired into `start_run()` via
+  `acquisition_spec.scope_kind = "canton"` (federal seed path unchanged);
+  discovery routes through `limited_get` for per-host politeness.
+- `FedlexSparqlAcquisitionSpec` gained `scope_kind` / `canton` / `max_works`
+  with a validator; cantonal blueprint templates
+  (`fedlex_sparql_canton_zh` / `_be` / `_bs`) land `enabled: false`.
+- Unit tests cover canton-mode discovery+processing, the missing-canton
+  failure path, and the canton `plan()` output.
+
 **Still needed:**
 
-- Wire `_discover_works_by_canton` into a new
-  `acquisition_spec.scope_kind = "canton"` mode in `start_run()`.
 - Run a live acceptance test against a known cantonal concordat
   (proposal: a Valais inter-cantonal concordat as first target).
-- Flip the scope mode live-ready + land evidence under
+- Flip the cantonal templates to `enabled: true` + land evidence under
   `docs/runbooks/evidence/<date>-ch-fedlex-cantonal-*.md`.
 
 ## Tier 5 — Feature additions

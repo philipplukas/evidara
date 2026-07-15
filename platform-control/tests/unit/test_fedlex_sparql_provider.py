@@ -226,3 +226,101 @@ def test_build_canton_discovery_query_default_limit():
     provider = FedlexSparqlProvider()
     query = provider._build_canton_discovery_query("CH-VS")
     assert "LIMIT 50" in query
+
+
+class CantonDiscoveryAsyncClient(FakeAsyncClient):
+    """Extends the federal fake with a cantonal-discovery response.
+
+    The `jolux:CantonOfOrigin` query resolves to the BV work URI so the
+    discovered work flows through the same member→expression→manifestation
+    pipeline the base fake already serves.
+    """
+
+    async def get(self, url: str, *, params=None, headers=None):
+        query = (params or {}).get("query", "")
+        if "SELECT ?work" in query and "jolux:CantonOfOrigin" in query:
+            request = httpx.Request("GET", url, params=params)
+            return httpx.Response(
+                200,
+                json={
+                    "results": {
+                        "bindings": [
+                            {
+                                "work": {
+                                    "type": "uri",
+                                    "value": "https://fedlex.data.admin.ch/eli/cc/1999/404",
+                                }
+                            }
+                        ]
+                    }
+                },
+                request=request,
+            )
+        return await super().get(url, params=params, headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_canton_scope_discovers_and_processes_works(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", CantonDiscoveryAsyncClient)
+    provider = FedlexSparqlProvider()
+    source_version = SimpleNamespace(
+        acquisition_spec={
+            "scope_kind": "canton",
+            "canton": "CH-ZH",
+            "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+            "preferred_languages": ["de"],
+            "max_expressions": 1,
+            "max_works": 10,
+        }
+    )
+
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_canton_zh"),
+    )
+
+    assert result.response_payload["scope_kind"] == "canton"
+    assert result.response_payload["canton"] == "CH-ZH"
+    assert result.response_payload["captured"] == 1
+    assert result.request_payload["work_uris"] == ["https://fedlex.data.admin.ch/eli/cc/1999/404"]
+    assert result.inline_resources[0].content_type == "text/html"
+    assert result.inline_failure_reason is None
+
+
+@pytest.mark.asyncio
+async def test_canton_scope_without_canton_code_fails_cleanly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", CantonDiscoveryAsyncClient)
+    provider = FedlexSparqlProvider()
+    source_version = SimpleNamespace(
+        acquisition_spec={
+            "scope_kind": "canton",
+            "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+        }
+    )
+
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_canton_missing"),
+    )
+
+    assert result.response_payload["captured"] == 0
+    assert result.response_payload["failed"] == 1
+    assert "requires acquisition_spec.canton" in result.response_payload["failures"][0]["error"]
+    assert "did not capture any resources" in (result.inline_failure_reason or "")
+
+
+def test_plan_canton_mode_needs_no_seed_urls() -> None:
+    provider = FedlexSparqlProvider()
+    plan = provider.plan(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"scope_kind": "canton", "canton": "CH-BE"}),
+    )
+    assert plan.mode == "canton_discovery"
+    assert plan.seed_urls == []
+    assert any("canton=CH-BE" in note for note in plan.notes)

@@ -63,7 +63,10 @@ _SUPPORTED_PROVIDERS = {
     "eur_lex_sparql",
     "bundesland_http",
     "regione_http",
+    "canton_http",
+    "gemeinde_http",
     "legifrance",
+    "ch_court_decisions",
 }
 
 
@@ -102,6 +105,16 @@ def _validate_template(
             ]
         return []
 
+    # Cantonal-discovery Fedlex templates (#531) discover works via
+    # scope_kind=canton and carry a canton instead of seed URIs.
+    if provider == "fedlex_sparql" and str(payload.get("scope_kind") or "").lower() == "canton":
+        if not _has_nonempty_str(payload.get("canton")):
+            return [
+                f"Overlay '{overlay_id}' template '{template_id}' fedlex_sparql "
+                "scope_kind=canton requires canton (ISO 3166-2:CH)."
+            ]
+        return []
+
     if provider in {"deterministic_http", "fedlex_sparql", "eur_lex_sparql"}:
         if not (
             _has_nonempty_str(payload.get("seed_url"))
@@ -109,6 +122,20 @@ def _validate_template(
         ):
             return [
                 f"Overlay '{overlay_id}' template '{template_id}' {provider} requires seed_url or seed_urls."
+            ]
+        return []
+
+    # Swiss federal court decisions (#530): seed URLs, discovery index URLs, or
+    # a single seed URL are all valid targets.
+    if provider == "ch_court_decisions":
+        if not (
+            _has_nonempty_str(payload.get("seed_url"))
+            or _has_nonempty_str_list(payload.get("seed_urls"))
+            or _has_nonempty_str_list(payload.get("index_urls"))
+        ):
+            return [
+                f"Overlay '{overlay_id}' template '{template_id}' ch_court_decisions "
+                "requires seed_url, seed_urls, or index_urls."
             ]
         return []
 
@@ -139,6 +166,41 @@ def _validate_template(
         ):
             errors.append(
                 f"Overlay '{overlay_id}' template '{template_id}' regione_http requires seed_url or seed_urls."
+            )
+        return errors
+
+    if provider == "canton_http":
+        errors = []
+        if not _has_nonempty_str(payload.get("canton_code")):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' canton_http requires canton_code (ISO 3166-2:CH)."
+            )
+        if not (
+            _has_nonempty_str(payload.get("seed_url"))
+            or _has_nonempty_str_list(payload.get("seed_urls"))
+        ):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' canton_http requires seed_url or seed_urls."
+            )
+        return errors
+
+    if provider == "gemeinde_http":
+        errors = []
+        # Swiss communes have no ISO 3166-2 code, so the portal allow-list is
+        # keyed on the BFS/OFS Gemeindenummer — the same key the
+        # `jur_ch_gemeinde_<bfs>` jurisdiction seeds are generated from.
+        bfs_number = payload.get("bfs_number")
+        if not isinstance(bfs_number, int) or isinstance(bfs_number, bool) or bfs_number < 1:
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' gemeinde_http requires "
+                "bfs_number (positive int, BFS/OFS Gemeindenummer)."
+            )
+        if not (
+            _has_nonempty_str(payload.get("seed_url"))
+            or _has_nonempty_str_list(payload.get("seed_urls"))
+        ):
+            errors.append(
+                f"Overlay '{overlay_id}' template '{template_id}' gemeinde_http requires seed_url or seed_urls."
             )
         return errors
 

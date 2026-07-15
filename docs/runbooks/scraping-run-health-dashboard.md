@@ -58,7 +58,7 @@ Start with conservative thresholds and tune after one week of baseline data:
 - duplicate/idempotency count spikes > 3x rolling 7-day median
 - source version without success for > 24 hours (if expected daily)
 
-## Wizard KPIs and SLOs (Temporal + Argilla)
+## Wizard KPIs and SLOs
 
 Track these in the same dashboard for wizard-enabled discovery/extraction runs.
 

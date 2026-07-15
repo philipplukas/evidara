@@ -9,11 +9,13 @@ WORKDIR /workspace
 # token layer (and vice versa).
 COPY styles/tokens ./styles/tokens
 COPY styles/ui ./styles/ui
-# postinstall (in package.json) symlinks /workspace/node_modules -> the
-# surface's node_modules so styles/ui's bare imports (clsx, tailwind-merge)
-# resolve during `next build`. Copy the script into the build context so
-# `npm ci` doesn't fail looking for it.
-COPY scripts/ensure-monorepo-shared-modules.mjs ./scripts/ensure-monorepo-shared-modules.mjs
+# @evidara/shell (shared BrandMark) resolves via the tsconfig path alias to
+# ../../styles/shell; it must exist in the image or `next build` fails with
+# "Can't resolve '@evidara/shell'". See #547.
+COPY styles/shell ./styles/shell
+# styles/ui's bare imports (clsx, lucide-react, tailwind-merge) resolve during
+# `next build` via `turbopack.resolveAlias` in next.config.ts, which pins them
+# to THIS surface's node_modules. No repo-root node_modules is involved. See #588.
 
 COPY platform-control/admin/package*.json ./platform-control/admin/
 WORKDIR /workspace/platform-control/admin

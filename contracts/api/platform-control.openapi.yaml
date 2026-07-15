@@ -4,7 +4,7 @@ info:
   description: |
     API for managing sources, source versions, runs, approvals, and provider webhooks
     in the Evidara platform control plane.
-  version: 0.5.1
+  version: 0.7.0
   contact:
     name: Evidara Team
 
@@ -771,29 +771,14 @@ paths:
         "409":
           description: Invalid wizard state transition
 
-  /v1/reviews/sync-from-argilla:
-    post:
-      operationId: syncReviewsFromArgilla
-      summary: Ingest Argilla review outcomes
-      tags: [reviews]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ArgillaReviewSyncRequest"
-      responses:
-        "200":
-          description: Sync summary
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ArgillaReviewSyncResponse"
-
   /v1/reviews/tasks:
     post:
       operationId: createReviewTask
-      summary: Create a review task and enqueue it to Argilla when configured
+      summary: Route an extraction into the operator review queue
+      description: >-
+        Persisting the task is the enqueue: the queue is the review_tasks table, read by
+        platform-control/admin. What lands here is decided by the confidence-band routing
+        policy (docs/runbooks/extraction-review-routing.md).
       tags: [reviews]
       requestBody:
         required: true
@@ -807,16 +792,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateReviewTaskResponse"
+                $ref: "#/components/schemas/ReviewTask"
         "404":
           description: Wizard run not found
         "409":
-          description: Duplicate Argilla external_id
+          description: Duplicate external_id
 
   /v1/reviews/tasks/{task_id}:
     get:
       operationId: getReviewTask
-      summary: Get a synced review task
+      summary: Get a review task
       tags: [reviews]
       parameters:
         - name: task_id
@@ -834,6 +819,39 @@ paths:
                 $ref: "#/components/schemas/ReviewTask"
         "404":
           description: Review task not found
+
+  /v1/reviews/tasks/{task_id}/decision:
+    post:
+      operationId: recordReviewDecision
+      summary: Close a review task with an operator's verdict
+      description: >-
+        Replaces POST /v1/reviews/sync-from-argilla (ADR-0031). The decision is pushed by
+        the reviewer for one task rather than polled in batches out of an annotation tool.
+      tags: [reviews]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^wrt_[a-z0-9]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewDecisionRequest"
+      responses:
+        "200":
+          description: Decision recorded; the task is now completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTask"
+        "404":
+          description: Review task not found
+        "409":
+          description: Review task already carries a decision
 
   /v1/di/events/document-processing-status-updated:
     post:
@@ -922,13 +940,24 @@ paths:
               $ref: "#/components/schemas/FirecrawlWebhookEvent"
       responses:
         "200":
-          description: Webhook accepted
+          description: Webhook accepted and applied
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WebhookAcceptedResponse"
         "401":
           description: Signature verification failed
+        "503":
+          description: >-
+            The event matched no provider job or run and was NOT applied, so it must be
+            redelivered. The delivery is stored unprocessed; a 2xx here would let the
+            retry be deduped away and drop the event permanently. Expected transiently
+            when a crawl event overtakes the commit of the provider job it belongs to.
+          headers:
+            Retry-After:
+              schema:
+                type: string
+              description: Seconds to wait before redelivering.
 
   /v1/corrections:
     get:
@@ -3270,13 +3299,16 @@ components:
     CreateReviewTaskRequest:
       type: object
       additionalProperties: false
-      required: [wizard_run_id, argilla_external_id, payload]
+      required: [wizard_run_id, external_id, payload]
       properties:
         wizard_run_id:
           type: string
           pattern: "^wrn_[a-z0-9]+$"
-        argilla_external_id:
+        external_id:
           type: string
+          description: >-
+            Producer-supplied dedupe key. Unique: re-routing the same record is a 409,
+            not a second queue entry. (Was argilla_external_id before ADR-0031.)
         record_id:
           oneOf:
             - type: string
@@ -3285,30 +3317,11 @@ components:
           type: object
           additionalProperties: true
 
-    CreateReviewTaskResponse:
-      allOf:
-        - $ref: "#/components/schemas/ReviewTask"
-        - type: object
-          required: [enqueue_outcome]
-          properties:
-            enqueue_outcome:
-              type: string
-              enum: [enqueued, skipped_not_configured, failed]
-            enqueue_detail:
-              oneOf:
-                - type: string
-                - type: "null"
-
-    ArgillaReviewSyncItem:
+    ReviewDecisionRequest:
       type: object
       additionalProperties: false
-      required: [external_id, annotation_updated_at, decision, payload]
+      required: [decision]
       properties:
-        external_id:
-          type: string
-        annotation_updated_at:
-          type: string
-          format: date-time
         decision:
           type: string
         reviewed_by:
@@ -3319,33 +3332,12 @@ components:
           type: object
           additionalProperties: true
 
-    ArgillaReviewSyncRequest:
-      type: object
-      additionalProperties: false
-      required: [tasks]
-      properties:
-        tasks:
-          type: array
-          items:
-            $ref: "#/components/schemas/ArgillaReviewSyncItem"
-
-    ArgillaReviewSyncResponse:
-      type: object
-      required: [accepted, duplicates, failed]
-      properties:
-        accepted:
-          type: integer
-        duplicates:
-          type: integer
-        failed:
-          type: integer
-
     ReviewTask:
       type: object
       required:
         - review_task_id
         - wizard_run_id
-        - argilla_external_id
+        - external_id
         - status
         - payload
         - created_at
@@ -3357,7 +3349,7 @@ components:
         wizard_run_id:
           type: string
           pattern: "^wrn_[a-z0-9]+$"
-        argilla_external_id:
+        external_id:
           type: string
         record_id:
           oneOf:
@@ -3378,15 +3370,6 @@ components:
           oneOf:
             - type: string
               format: date-time
-            - type: "null"
-        argilla_enqueued_at:
-          oneOf:
-            - type: string
-              format: date-time
-            - type: "null"
-        argilla_enqueue_last_error:
-          oneOf:
-            - type: string
             - type: "null"
         created_at:
           type: string

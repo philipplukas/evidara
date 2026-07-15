@@ -1,3 +1,12 @@
+# Blueprint templates for source creation.
+#
+# `enabled` is the config-owner key of the ADR-0030 two-key lock: the
+# run-launch path refuses to dispatch a run for a source version created from a
+# template that is not `enabled: true` (the other key is the provider's
+# `live_ready` flag in code). The flag FAILS CLOSED — a template that omits it
+# is treated as disabled, so a new template is inert until an operator captures
+# acceptance-run evidence and turns it on. Every template therefore states its
+# value explicitly (enforced by tests/unit/test_blueprint_provider_parity.py).
 overlays:
   at:
     provider_templates:
@@ -14,6 +23,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: decision
+        enabled: true
       ris_ogd_bundesrecht_narrow_html:
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
@@ -29,6 +39,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       ris_ogd_bundesrecht_small_batch_html:
         provider: ris_ogd
         base_url: https://data.bka.gv.at/ris/api/v2.6/Bundesrecht
@@ -44,6 +55,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       firecrawl_justice_portal:
         provider: firecrawl
         mode: crawl
@@ -61,6 +73,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: decision
+        enabled: true
       # Sub-federal: Bundesländer LGBl templates. Reuse the existing RIS OGD
       # provider with per-LGBl applikation codes. Live RIS exposes LGBl per
       # Bundesland via the same API shape as Bundesrecht.
@@ -109,6 +122,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       # Major German federal codes — full-text BJNR URLs for proper titles.
       # Index pages give abbreviated titles ("StGB - nichtamtliches
       # Inhaltsverzeichnis"); BJNR pages give full law names.
@@ -165,11 +179,13 @@ overlays:
           - https://www.fedlex.admin.ch/
         tenant_id: tenant_public
         corpus_id: corpus_public_ch_fedlex_legislation
+        extractor_profile_id: exp_legislation_v1
         scope_type: global_public
         source_origin_kind: official_primary
         trust_tier: authoritative
         language_codes: [de, fr, it]
         document_type_hint: legislation
+        enabled: true
       fedlex_sparql_constitution_de:
         provider: fedlex_sparql
         seed_url: https://fedlex.data.admin.ch/eli/cc/1999/404
@@ -179,11 +195,13 @@ overlays:
         max_expressions: 1
         tenant_id: tenant_public
         corpus_id: corpus_public_ch_fedlex_constitution
+        extractor_profile_id: exp_legislation_v1
         scope_type: global_public
         source_origin_kind: official_primary
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       fedlex_sparql_vwvg_de:
         provider: fedlex_sparql
         seed_url: https://fedlex.data.admin.ch/eli/cc/1969/737_757_755
@@ -193,11 +211,13 @@ overlays:
         max_expressions: 1
         tenant_id: tenant_public
         corpus_id: corpus_public_ch_fedlex_vwvg
+        extractor_profile_id: exp_legislation_v1
         scope_type: global_public
         source_origin_kind: official_primary
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       fedlex_sparql_federal_law_batch_de:
         provider: fedlex_sparql
         seed_urls:
@@ -209,11 +229,13 @@ overlays:
         max_expressions: 1
         tenant_id: tenant_public
         corpus_id: corpus_public_ch_fedlex_small_batch
+        extractor_profile_id: exp_legislation_v1
         scope_type: global_public
         source_origin_kind: official_primary
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
+        enabled: true
       # Broad Swiss federal law corpus — major codes and statutes.
       # ELI URIs verified against fedlex.data.admin.ch SPARQL ASK (2026-04-21).
       fedlex_sparql_federal_codes_de:
@@ -236,12 +258,243 @@ overlays:
         max_expressions: 1
         tenant_id: tenant_public
         corpus_id: corpus_public_ch_fedlex_federal_codes
+        extractor_profile_id: exp_legislation_v1
         scope_type: global_public
         source_origin_kind: official_primary
         trust_tier: authoritative
         language_codes: [de]
         document_type_hint: legislation
         enabled: true
+      # ───────────────────────────────────────────────────────────────
+      # Swiss federal court decisions (BGer / BVGer) — CH e2e Stream E (#530)
+      # Provider `ch_court_decisions` is a scaffold (live_ready=false); these
+      # templates stay `enabled: false` until scripts/ch-bger-fast-loop.sh
+      # captures acceptance-run evidence and an operator flips both keys.
+      # seed_urls are placeholder court landing pages; the real discovery
+      # (index_urls) URLs are set at live-enablement. Kept as a trailing block
+      # to minimise merge conflict with the cantonal section added by #531.
+      # ───────────────────────────────────────────────────────────────
+      ch_court_decisions_bger:
+        provider: ch_court_decisions
+        seed_urls:
+          - https://www.bger.ch/
+        court: bger
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_bger_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr, it]
+        document_type_hint: decision
+        enabled: false
+      ch_court_decisions_bvger:
+        provider: ch_court_decisions
+        seed_urls:
+          - https://www.bvger.ch/
+        court: bvger
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_bvger_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr, it]
+        document_type_hint: decision
+        enabled: false
+      # ───────────────────────────────────────────────────────────────
+      # Swiss CANTONAL court decisions (ZH / BE / BS) — CH e2e (#531)
+      # Reuses the ch_court_decisions provider (no new provider/enum): cantonal
+      # rulings are aggregated on entscheidsuche.ch, which is already in the
+      # provider's host allow-list. Each template carries a lowercase cantonal
+      # `court` hint (zh/be/bs) that flows into the decision metadata, and a
+      # cantonal corpus. Provider `ch_court_decisions` is a scaffold
+      # (live_ready=false); these templates stay `enabled: false` until an
+      # operator captures per-canton acceptance-run evidence and flips both keys.
+      # The index_urls below are PLACEHOLDER entscheidsuche.ch canton listings
+      # and need verification at live-enablement (the exact canton-filter path /
+      # or a cantonal court portal host must be confirmed, and a portal host
+      # added to the allow-list if used). Kept as a distinct banner section to
+      # minimise merge conflict with the federal court block above.
+      # ───────────────────────────────────────────────────────────────
+      ch_court_decisions_zh:
+        provider: ch_court_decisions
+        index_urls:
+          - https://entscheidsuche.ch/list/ZH
+        court: zh
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_zh_court_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: decision
+        enabled: false
+      ch_court_decisions_be:
+        provider: ch_court_decisions
+        index_urls:
+          - https://entscheidsuche.ch/list/BE
+        court: be
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_be_court_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr]
+        document_type_hint: decision
+        enabled: false
+      ch_court_decisions_bs:
+        provider: ch_court_decisions
+        index_urls:
+          - https://entscheidsuche.ch/list/BS
+        court: bs
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bs_court_decisions
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: decision
+        enabled: false
+      # ───────────────────────────────────────────────────────────────
+      # Swiss cantonal legislation via Fedlex — CH e2e Stream F (#531)
+      # Uses the federal fedlex_sparql provider in cantonal-discovery mode
+      # (scope_kind=canton + canton), discovering works via jolux:CantonOfOrigin
+      # instead of seed URIs. Templates stay `enabled: false` until the live
+      # cantonal acceptance run per country-rollout-drift-prevention §4.4 lands
+      # evidence. Distinct section from the court block above (#530) to minimise
+      # merge conflict.
+      # ───────────────────────────────────────────────────────────────
+      fedlex_sparql_canton_zh:
+        provider: fedlex_sparql
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        scope_kind: canton
+        canton: CH-ZH
+        preferred_languages: [de]
+        max_works: 50
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_zh_legislation
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      fedlex_sparql_canton_be:
+        provider: fedlex_sparql
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        scope_kind: canton
+        canton: CH-BE
+        preferred_languages: [de, fr]
+        max_works: 50
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_be_legislation
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr]
+        document_type_hint: legislation
+        enabled: false
+      fedlex_sparql_canton_bs:
+        provider: fedlex_sparql
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        scope_kind: canton
+        canton: CH-BS
+        preferred_languages: [de]
+        max_works: 50
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bs_legislation
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      # ───────────────────────────────────────────────────────────────
+      # Swiss cantonal legislation via each canton's OWN portal (canton_http).
+      # Distinct from the Fedlex cantonal-concordat discovery path: this
+      # provider scrapes the cantonal systematic collections directly, which
+      # surface the bulk of cantonal/"state" legislation. Provider
+      # `canton_http` is a scaffold (live_ready=false); these templates stay
+      # `enabled: false` until an operator captures per-canton acceptance-run
+      # evidence and flips both keys. The seed_urls below are placeholder
+      # portal URLs and the portal hosts/paths need verification at
+      # live-enablement. Kept as a trailing block to minimise merge conflict.
+      # ───────────────────────────────────────────────────────────────
+      canton_http_zh:
+        provider: canton_http
+        canton_code: CH-ZH
+        seed_urls:
+          - https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung.html
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_zh_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      canton_http_be:
+        provider: canton_http
+        canton_code: CH-BE
+        seed_urls:
+          - https://www.belex.sites.be.ch/
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_be_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de, fr]
+        document_type_hint: legislation
+        enabled: false
+      canton_http_bs:
+        provider: canton_http
+        canton_code: CH-BS
+        seed_urls:
+          - https://www.gesetzessammlung.bs.ch/
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bs_legislation
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      # ───────────────────────────────────────────────────────────────
+      # Swiss COMMUNAL legislation — Stadt Zürich (BFS 261) — #584 / ADR-0033
+      # The municipal layer the dog question is decided in. 2,110
+      # `jur_ch_gemeinde_*` jurisdictions are seeded; this is the first template
+      # that can reach any of them. Deliberately ONE commune: communal law lives
+      # on ~2,000 independent sites and national coverage is a separate problem.
+      #
+      # Unlike the canton_http seed URLs above, this one is VERIFIED (HTTP 200,
+      # 2026-07-14): it is the Amtliche Sammlung landing page for AS 554.510,
+      # "Vollzugsvorschriften zum Hundegesetz" (Stadtratsbeschluss 31.05.2017,
+      # in force 01.09.2017, not repealed). That page carries the metadata; the
+      # operative text is a PDF.
+      #
+      # STAYS `enabled: false` — and the provider is `live_ready = False` — for a
+      # reason that code in this PR cannot fix: the ordinance has no HTML
+      # manifestation, `ProviderResource.body` is `str`-typed so binary artifacts
+      # cannot be carried, and document-intelligence has no PDF normaliser. Both
+      # keys of the ADR-0030 lock stay shut until a layout-aware PDF pipeline
+      # lands. See the module docstring in gemeinde_http_provider.py.
+      # ───────────────────────────────────────────────────────────────
+      gemeinde_http_zh_stadt_hundevorschriften:
+        provider: gemeinde_http
+        bfs_number: 261
+        seed_urls:
+          - https://www.stadt-zuerich.ch/de/politik-und-verwaltung/politik-und-recht/amtliche-sammlung/5/554/510.html
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_gemeinde_zuerich_legislation
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
   fr:
     provider_templates:
       legifrance_codes:
@@ -273,6 +526,7 @@ overlays:
         trust_tier: authoritative
         language_codes: [it]
         document_type_hint: legislation
+        enabled: true
       # Sub-federal: regione template. Provider scaffold; live adapter
       # lands per-regione alongside its first acceptance run.
       regione_http_lombardia:

@@ -5,6 +5,7 @@ import pytest
 from platform_control.domain import ExecutionMode, SourceVersionStatus
 from platform_control.errors import InvalidStateTransitionError, NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.extractor_profile import ExtractorProfile
 from platform_control.schemas.source import (
     CreateSourceRequest,
     CreateSourceVersionRequest,
@@ -28,6 +29,93 @@ async def test_create_source_requires_existing_reference_data(session) -> None:
                 authority_id="auth_missing",
             )
         )
+
+
+async def _seed_ch_federal(session) -> None:
+    session.add(
+        Jurisdiction(
+            jurisdiction_id="jur_ch_federal", name="Swiss Confederation", slug="ch-federal"
+        )
+    )
+    session.add(
+        Authority(
+            authority_id="auth_fedlex",
+            jurisdiction_id="jur_ch_federal",
+            name="Fedlex",
+            slug="ch-fedlex",
+        )
+    )
+    session.add(
+        ExtractorProfile(
+            extractor_profile_id="exp_legislation_v1",
+            name="Legislation v1",
+            source_family="legislation",
+            version="v1",
+            definition={},
+        )
+    )
+    await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_blueprint_extractor_profile_default_applies(session) -> None:
+    # Creating a Fedlex legislation version from the blueprint (no explicit
+    # extractor_profile_id) picks up the template default exp_legislation_v1.
+    await _seed_ch_federal(session)
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="CH Fedlex constitution",
+            jurisdiction_id="jur_ch_federal",
+            authority_id="auth_fedlex",
+        )
+    )
+
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="2026-07 initial",
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_constitution_de",
+        ),
+    )
+
+    assert version.extractor_profile_id == "exp_legislation_v1"
+
+
+@pytest.mark.asyncio
+async def test_explicit_extractor_profile_overrides_blueprint_default(session) -> None:
+    await _seed_ch_federal(session)
+    session.add(
+        ExtractorProfile(
+            extractor_profile_id="exp_court_decision_v1",
+            name="Court Decision v1",
+            source_family="court_decision",
+            version="v1",
+            definition={},
+        )
+    )
+    await session.commit()
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="CH Fedlex constitution",
+            jurisdiction_id="jur_ch_federal",
+            authority_id="auth_fedlex",
+        )
+    )
+
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="2026-07 explicit",
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_constitution_de",
+            extractor_profile_id="exp_court_decision_v1",
+        ),
+    )
+
+    assert version.extractor_profile_id == "exp_court_decision_v1"
 
 
 @pytest.mark.asyncio

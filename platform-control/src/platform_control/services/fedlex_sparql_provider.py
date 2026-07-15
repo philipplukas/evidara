@@ -53,8 +53,9 @@ WHERE {{
 LIMIT 1
 """.strip()
 
-    # Discover cantonal-concordat works filtered by canton of origin. Not
-    # wired into start_run() yet; awaits the cantonal acceptance run per
+    # Discover cantonal-concordat works filtered by canton of origin. Wired
+    # into start_run() via scope_kind="canton" (#531); the cantonal blueprint
+    # templates stay `enabled: false` until the live acceptance run per
     # docs/runbooks/country-rollout-drift-prevention-backlog.md §4.4.
     # `canton_iri` is a full IRI (e.g. https://fedlex.data.admin.ch/vocabulary/canton/ZH).
     _CANTON_WORK_DISCOVERY_QUERY = """
@@ -77,7 +78,6 @@ LIMIT {limit}
     ) -> ProviderStartResult:
         del source
         acquisition_spec = source_version.acquisition_spec or {}
-        work_uris = self._seed_work_uris(acquisition_spec)
         sparql_endpoint = self._validate_fedlex_url(
             str(acquisition_spec.get("sparql_endpoint") or f"https://{_FEDLEX_HOST}/sparqlendpoint")
         )
@@ -85,11 +85,49 @@ LIMIT {limit}
         max_expressions = int(acquisition_spec.get("max_expressions") or 1)
         timeout_seconds = float(acquisition_spec.get("request_timeout_seconds") or 30.0)
         max_content_bytes = int(acquisition_spec.get("max_content_bytes") or 2_000_000)
+        canton_scope = self._is_canton_scope(acquisition_spec)
+        canton = self._canton_filter(acquisition_spec) if canton_scope else None
+        canton_discovery_limit = int(acquisition_spec.get("max_works") or 50)
 
         resources: list[ProviderResource] = []
         failures: list[dict[str, str]] = []
 
         async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+            # Cantonal-discovery mode (scope_kind="canton") replaces seed URIs
+            # with works discovered via `jolux:CantonOfOrigin`; the federal path
+            # (seed URIs) is unchanged. See country-rollout-drift-prevention
+            # backlog §4.4.
+            if canton_scope:
+                if canton is None:
+                    failures.append(
+                        {
+                            "url": "canton:?",
+                            "error": (
+                                "scope_kind=canton requires acquisition_spec.canton "
+                                "(ISO 3166-2:CH code, e.g. CH-ZH)"
+                            ),
+                        }
+                    )
+                    work_uris = []
+                else:
+                    try:
+                        work_uris = await self._discover_works_by_canton(
+                            client=client,
+                            sparql_endpoint=sparql_endpoint,
+                            iso_3166_2_code=canton,
+                            limit=canton_discovery_limit,
+                        )
+                    except Exception as exc:  # pragma: no cover - defensive capture path
+                        failures.append(
+                            {
+                                "url": f"canton:{canton}",
+                                "error": f"cantonal discovery failed: {exc}",
+                            }
+                        )
+                        work_uris = []
+            else:
+                work_uris = self._seed_work_uris(acquisition_spec)
+
             for work_uri in work_uris:
                 try:
                     concrete_work_uri = await self._resolve_concrete_work_uri(
@@ -178,6 +216,8 @@ LIMIT {limit}
 
         response_payload = {
             "provider": self.provider_name,
+            "scope_kind": "canton" if canton_scope else "seed",
+            "canton": canton,
             "requested": len(work_uris),
             "captured": len(resources),
             "failed": len(failures),
@@ -185,12 +225,20 @@ LIMIT {limit}
         }
         inline_failure_reason = None
         if not resources:
-            inline_failure_reason = "Fedlex SPARQL provider did not capture any resources."
+            if canton_scope:
+                inline_failure_reason = (
+                    f"Fedlex SPARQL provider did not capture any resources for "
+                    f"canton={canton} (discovered_works={len(work_uris)})."
+                )
+            else:
+                inline_failure_reason = "Fedlex SPARQL provider did not capture any resources."
 
         return ProviderStartResult(
             provider=self.provider_name,
             external_job_id=f"fedlexsparql_{run.run_id}",
             request_payload={
+                "scope_kind": "canton" if canton_scope else "seed",
+                "canton": canton,
                 "work_uris": work_uris,
                 "sparql_endpoint": sparql_endpoint,
                 "preferred_languages": preferred_languages,
@@ -209,11 +257,26 @@ LIMIT {limit}
     ) -> ProviderPlan:
         del source
         acquisition_spec = source_version.acquisition_spec or {}
-        work_uris = self._seed_work_uris(acquisition_spec)
         max_expressions = int(acquisition_spec.get("max_expressions") or 1)
         sparql_endpoint = str(
             acquisition_spec.get("sparql_endpoint") or f"https://{_FEDLEX_HOST}/sparqlendpoint"
         )
+        if self._is_canton_scope(acquisition_spec):
+            canton = self._canton_filter(acquisition_spec)
+            canton_discovery_limit = int(acquisition_spec.get("max_works") or 50)
+            return ProviderPlan(
+                provider=self.provider_name,
+                mode="canton_discovery",
+                seed_urls=[],
+                estimated_request_count=canton_discovery_limit * max_expressions,
+                user_agent=acquisition_spec.get("user_agent"),
+                request_timeout_seconds=float(
+                    acquisition_spec.get("request_timeout_seconds") or 30.0
+                ),
+                notes=[f"sparql_endpoint={sparql_endpoint}", f"canton={canton}"],
+                raw=dict(acquisition_spec),
+            )
+        work_uris = self._seed_work_uris(acquisition_spec)
         return ProviderPlan(
             provider=self.provider_name,
             mode="work_to_expression",
@@ -224,6 +287,15 @@ LIMIT {limit}
             notes=[f"sparql_endpoint={sparql_endpoint}"],
             raw=dict(acquisition_spec),
         )
+
+    @staticmethod
+    def _is_canton_scope(acquisition_spec: dict[str, object]) -> bool:
+        """True when the version requests cantonal-discovery mode.
+
+        Triggered by `acquisition_spec.scope_kind == "canton"` per the
+        country-rollout-drift-prevention backlog §4.4 contract.
+        """
+        return str(acquisition_spec.get("scope_kind") or "").strip().lower() == "canton"
 
     def _seed_work_uris(self, acquisition_spec: dict[str, object]) -> list[str]:
         seed_urls = [
@@ -332,14 +404,14 @@ LIMIT {limit}
     ) -> list[str]:
         """Execute the cantonal work-discovery query and return work URIs.
 
-        Kept as a stand-alone helper (not yet called from start_run()) so
-        that unit tests and a future cantonal-slice discovery mode can
-        share the same path. The caller is responsible for wiring the
-        returned URIs into `acquisition_spec.seed_work_uris` for the main
-        work→expression→manifestation flow.
+        Invoked by start_run() when the version runs in cantonal-discovery
+        mode (`acquisition_spec.scope_kind == "canton"`); the discovered work
+        URIs feed the same work→expression→manifestation flow as seed URIs.
+        Kept isolated so unit tests can exercise it without a live endpoint.
         """
         query = self._build_canton_discovery_query(iso_3166_2_code, limit=limit)
-        response = await client.get(
+        response = await limited_get(
+            client,
             sparql_endpoint,
             params={"query": query, "format": "application/sparql-results+json"},
             headers={"Accept": "application/sparql-results+json"},

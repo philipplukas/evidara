@@ -6,7 +6,7 @@ from typing import Any
 
 import yaml
 
-from platform_control.errors import NotFoundError
+from platform_control.errors import BlueprintTemplateNotEnabledError, NotFoundError
 
 _BLUEPRINTS_PATH = Path(__file__).resolve().parent.parent / "hierarchies" / "source_blueprints.yaml"
 
@@ -20,7 +20,72 @@ def _load_blueprints() -> dict[str, Any]:
     return payload
 
 
+# Blueprint-level keys that are NOT provider config and therefore cannot be
+# handed to AcquisitionSpec parsing (which forbids extra fields). They are not
+# dropped — each has a dedicated accessor below that keeps the flag readable
+# outside the spec:
+# - `enabled`  -> is_source_blueprint_enabled / require_source_blueprint_enabled
+#                 (config-owner key of the ADR-0030 two-key lock)
+# - `extractor_profile_id` -> resolve_blueprint_extractor_profile_id
+#                 (source-version default applied by source_service)
+_NON_SPEC_TEMPLATE_KEYS = frozenset({"enabled", "extractor_profile_id"})
+
+
 def resolve_source_blueprint(overlay_id: str, provider_template_id: str) -> dict[str, Any]:
+    """Return the template's acquisition-spec fields (non-spec keys removed)."""
+    template_payload = _resolve_template(overlay_id, provider_template_id)
+    return {k: v for k, v in template_payload.items() if k not in _NON_SPEC_TEMPLATE_KEYS}
+
+
+def is_source_blueprint_enabled(overlay_id: str, provider_template_id: str) -> bool:
+    """Return whether the template is enabled for live acquisition (ADR-0030).
+
+    The flag defaults to the safe value: a template that omits `enabled`, or
+    sets it to anything other than `true`, is NOT enabled. An operator flips it
+    to `true` only after capturing acceptance-run evidence for the template.
+    """
+    template_payload = _resolve_template(overlay_id, provider_template_id)
+    return template_payload.get("enabled") is True
+
+
+def require_source_blueprint_enabled(overlay_id: str, provider_template_id: str) -> None:
+    """Raise BlueprintTemplateNotEnabledError unless the template is enabled.
+
+    Config-owner key of the two-key lock. A template that has been removed from
+    `source_blueprints.yaml` since a source version was created is treated as
+    not enabled (fail closed) rather than as a 404.
+    """
+    try:
+        enabled = is_source_blueprint_enabled(overlay_id, provider_template_id)
+    except NotFoundError as exc:
+        raise BlueprintTemplateNotEnabledError(
+            f"Blueprint template '{overlay_id}/{provider_template_id}' no longer exists, "
+            "so it cannot be launched for live acquisition."
+        ) from exc
+    if not enabled:
+        raise BlueprintTemplateNotEnabledError(
+            f"Blueprint template '{overlay_id}/{provider_template_id}' is not enabled for "
+            "live acquisition (source_blueprints.yaml: enabled is not true). Capture "
+            "acceptance-run evidence and flip `enabled: true` before launching runs "
+            "(ADR-0030)."
+        )
+
+
+def resolve_blueprint_extractor_profile_id(
+    overlay_id: str, provider_template_id: str
+) -> str | None:
+    """Return the template's default extractor_profile_id, if it declares one.
+
+    Blueprint templates do not carry acquisition-spec fields for this; it is a
+    source-version default that source_service applies when the create request
+    does not specify an extractor_profile_id.
+    """
+    template_payload = _resolve_template(overlay_id, provider_template_id)
+    value = template_payload.get("extractor_profile_id")
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _resolve_template(overlay_id: str, provider_template_id: str) -> dict[str, Any]:
     payload = _load_blueprints()
     overlays = payload.get("overlays")
     if not isinstance(overlays, dict):
@@ -39,8 +104,7 @@ def resolve_source_blueprint(overlay_id: str, provider_template_id: str) -> dict
         raise NotFoundError(
             f"Unknown provider_template_id '{provider_template_id}' in overlay '{overlay_id}'."
         )
-    # Strip blueprint-level metadata before handing to AcquisitionSpec parsing.
-    return {k: v for k, v in template_payload.items() if k != "enabled"}
+    return template_payload
 
 
 def list_source_blueprint_templates() -> list[dict[str, str]]:

@@ -27,3 +27,7 @@ Current fixture coverage:
 - `ris_html_decision_vfgh`: same VfGH decision in HTML format
 - `ris_html_decision_vwgh`: same VwGH decision in HTML format
 - `ch_commentary_html`: synthetic Swiss German commentary with provision and case-law anchors
+- `ch_fedlex_law_html`: Swiss Fedlex constitution excerpt (Bundesverfassung, SR 101) — article-level `Art. N` headings, SR + article citation forms
+- `ch_fedlex_bv_html`: the **real, full** Bundesverfassung (SR 101, Stand 3. März 2024) as served by Fedlex — 232 `<article id="art_N">` provisions nested under `<section>` chapters. Guards #573: the whole statute must not collapse into one section. Source: `https://www.fedlex.admin.ch/filestore/fedlex.data.admin.ch/eli/cc/1999/404/20240303/de/html/fedlex-data-admin-ch-eli-cc-1999-404-20240303-de-html-4.html` (public Swiss federal law)
+
+Optional `expected.json` fields **`section_max_content_length`** (no single section may exceed it — catches "the whole document became one section") and **`key_section_anchors`** (section title → in-document anchor id, e.g. `art_36`).

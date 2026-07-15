@@ -6,7 +6,7 @@ Provision and document runtime and deployment environments for all Evidara compo
 
 ## Current state
 
-Terraform scaffolding now exists for the `document-intelligence` Databricks layer, the GCP runtime layer, and a self-managed OpenSearch layer (`infra/terraform/opensearch/gke_stack`). The repo has per-environment tfvars for `dev`, `staging`, and `prod`, including GCS/PubSub plus Cloud SQL/Cloud Run/service-account/secret scaffolding in `infra/terraform/gcp/runtime_stack` and OpenSearch-on-GKE inputs in `infra/env/*/opensearch.gke.tfvars.example`. GitHub, remote state, and CI/CD apply wiring are still pending.
+Terraform scaffolding now exists for the GCP runtime layer and a self-managed OpenSearch layer (`infra/terraform/opensearch/gke_stack`). The repo has per-environment tfvars for `dev`, `staging`, and `prod`, including GCS/PubSub plus Cloud SQL/Cloud Run/service-account/secret scaffolding in `infra/terraform/gcp/runtime_stack` and OpenSearch-on-GKE inputs in `infra/env/*/opensearch.gke.tfvars.example`. The self-hosted Hetzner k3s runtime is provisioned from manifests under `infra/hetzner/` (see [ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md)). Remote state and CI/CD apply wiring are still pending.
 
 ## Source of truth
 
@@ -28,8 +28,8 @@ infra/
   terraform/
     gcp/         # Google Cloud resources
     opensearch/  # OpenSearch stacks (self-managed on GKE)
-    databricks/  # Databricks modules and stacks
     github/      # GitHub repository automation
+  hetzner/       # Self-hosted k3s runtime manifests
   env/
     dev/         # Development environment config
     staging/     # Staging environment config
@@ -39,8 +39,6 @@ infra/
 ## Minimal next tasks
 
 - [x] Define target GCP services and resource names
-- [x] Define target Databricks resources for the initial DI Unity Catalog layer
-- [x] Define Terraform module structure for the initial Databricks path
 - [x] Define environment strategy (dev/staging/prod)
 - [~] Define naming conventions for cloud resources
 - [x] Define secrets strategy (Google Secret Manager)

@@ -1,0 +1,8 @@
+{
+  "title_contains": "Bundesverfassung",
+  "expected_source_family": "legislation",
+  "section_count_min": 3,
+  "key_headings": ["Art. 1", "Art. 2", "Art. 3"],
+  "key_content_contains": ["SR 101", "SR 210", "Art. 5 BV"],
+  "status_flow": ["accepted", "processing", "canonical_ready"]
+}

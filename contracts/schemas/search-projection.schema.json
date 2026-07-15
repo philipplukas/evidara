@@ -102,6 +102,47 @@
       "description": "Lifecycle state copied from the document.processed event payload.",
       "enum": ["active", "superseded", "repealed", "withdrawn"]
     },
+    "level": {
+      "type": "string",
+      "description": "Derived: rank of this norm in the hierarchy of norms (ADR-0033), sourced from the row's jurisdiction — never guessed from its text. When a row carries several jurisdictions the most specific one wins. Absent when the jurisdiction is unknown to contracts/vocabularies/jurisdiction-hierarchy.json (the row is then unreachable through `norm_hierarchy()`, which the endpoint reports as a coverage gap rather than papering over) and absent for `commentary_insight` rows, which are not norms and govern nothing.",
+      "enum": ["constitutional", "international", "federal", "cantonal", "municipal"]
+    },
+    "subordinate_to": {
+      "type": "array",
+      "description": "Derived: the jurisdictions whose law outranks this norm, most authoritative first — a Zurich communal ordinance is subordinate to `jur_ch_zh` and to `jur_ch_federal`. This is what makes preemption answerable by traversal instead of similarity. Note the edge points at SCOPES, not documents: subordination in law is scope-wide (the ordinance is subordinate to the whole body of cantonal and federal law, not to one act), so a document→document edge would be a fiction. Each scope's own level is recoverable from the jurisdiction-hierarchy vocabulary.",
+      "items": {
+        "type": "string",
+        "pattern": "^jur_[a-z0-9_]+$"
+      },
+      "uniqueItems": true
+    },
+    "delegates_to": {
+      "type": "array",
+      "description": "Competence this norm delegates downward — the cantonal clause that lets a commune legislate at all, and therefore the difference between an ordinance that is authorised and one that is ultra vires. UNPOPULATED TODAY: unlike `subordinate_to` it is not derivable from the jurisdiction tree, because it is an assertion made by the norm's text. Shape mirrors `delegates_to` in document.schema.json so the extracted edge can be projected without a schema change.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "target_level": {
+            "type": "string",
+            "enum": ["constitutional", "international", "federal", "cantonal", "municipal"]
+          },
+          "target_jurisdiction_id": { "type": "string", "pattern": "^jur_[a-z0-9_]+$" },
+          "section_id": { "type": "string" },
+          "scope": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "in_force_from": {
+      "type": "string",
+      "format": "date",
+      "description": "First date the norm was in force. Coalesced from the canonical document's `in_force_from`, falling back to `effective_date`, so the index carries ONE field to range-query when answering `check_in_force(id, date)`."
+    },
+    "in_force_until": {
+      "type": "string",
+      "format": "date",
+      "description": "Last date the norm WAS in force — inclusive. Absent means 'not known to be repealed', which is not the same as 'never repealed': a row with `lifecycle_status: repealed` and no date here resolves to `unknown`, never to a guessed boolean."
+    },
     "structural_path": {
       "type": "string",
       "description": "Intrinsic document hierarchy path. Copied from canonical output."

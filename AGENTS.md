@@ -6,7 +6,7 @@ This is the Evidara monorepo — a document intelligence platform for legal rese
 
 - **legal-search** — Next.js frontend + NestJS BFF for search and document detail
 - **platform-control** — Source lifecycle, runs, approvals, reference data (Cloud Run)
-- **document-intelligence** — Raw-to-canonical processing pipelines (Databricks)
+- **document-intelligence** — Raw-to-canonical processing pipelines (containerized NATS JetStream consumer; Spark/Databricks is opt-in only — see ADR-0029)
 - **contracts** — OpenAPI specs, JSON Schemas, event schemas (build-time only)
 - **infra** — Terraform, deployment configs, environment definitions
 - **docs** — Architecture, ADRs, runbooks, testing strategy, component docs
@@ -35,7 +35,7 @@ Every change should be classified as one or more of:
 - `user-visible-behavior` — changes what users see or experience
 - `contract-change` — API specs, event schemas, shared entity shapes
 - `infra-change` — Terraform, deployment, cloud resources
-- `pipeline-change` — Databricks processing, data quality
+- `pipeline-change` — document-intelligence processing, data quality
 - `architecture-change` — domain boundaries, storage decisions, communication patterns
 - `docs-only` — documentation without code
 
@@ -55,7 +55,7 @@ Update as applicable:
 
 - OpenAPI spec in `contracts/api/`
 - JSON Schema in `contracts/schemas/` or `contracts/events/`
-- Generated clients (`npm run openapi:generate` in `legal-search/`)
+- Generated clients (`npm run openapi:generate` in `legal-search/frontend/`)
 - Contract tests and schema validation
 
 ### infra-change
@@ -91,16 +91,40 @@ All shared contracts live at `contracts/` (monorepo root). Never inside a compon
 
 ### legal-search stack
 
-`legal-search/` is an npm workspace with two packages:
+`legal-search/` is a plain directory holding two **independent** npm packages. It is
+**not** an npm workspace root and has no `package.json` — never run `npm install`
+there (it used to hold a vestigial package that ERESOLVEs; see #588). Install and
+run gates inside each package:
 
 - `frontend/` — Next.js application (user-facing search and document detail)
 - `api/` — NestJS application (search and document endpoints, OpenSearch adapter)
 
+### JavaScript dependency resolution (read before touching node_modules)
+
+The repo is **not** an npm workspace. Each JS surface (`legal-search/frontend`,
+`legal-search/api`, `platform-control/admin`) owns its `node_modules`, and CI
+installs them per-surface with `npm ci`.
+
+- **Node is pinned in `.nvmrc` (22)** and enforced via `engines`. Node >= 24 ships an
+  experimental built-in `localStorage` that shadows jsdom's under Vitest, silently
+  breaking tests that pass in CI. Run `nvm use`.
+- **The repo-root `node_modules` must never be a symlink.** The root package
+  (`evidara-doc-tools`) is not a workspace root; nothing should resolve through it.
+- The shared modules under `styles/` (`@evidara/ui`, `@evidara/tokens`,
+  `@evidara/shell`) live **outside any package**, so their bare imports (`react`,
+  `clsx`, `lucide-react`, `tailwind-merge`) must be resolved from the **consuming**
+  surface — via `tsconfig` `paths`, Vitest `resolve.dedupe`, and Turbopack
+  `resolveAlias`. Resolving them anywhere else yields a **second React instance**
+  ("Cannot read properties of null (reading 'useContext')").
+
+`bash scripts/check-js-workspace-hygiene.sh` guards all of the above and runs in both
+pre-commit and CI.
+
 **frontend:**
 
 - **Design tokens** live in `globals.css` as CSS custom properties. Use `var(--token)` everywhere, never hardcoded colors.
-- **Biome** for linting and formatting (not ESLint). Config in `legal-search/biome.json`.
-- **Vitest** for tests. Config in `legal-search/vitest.config.ts`.
+- **Biome** for linting and formatting (not ESLint). Config in `legal-search/frontend/biome.json`.
+- **Vitest** for tests. Config in `legal-search/frontend/vitest.config.ts`.
 - **Orval** generates typed clients from OpenAPI. Two outputs: fetch client (Server Components) and React Query hooks (client components). See ADR-0007.
 - **`npm run check`** is the pre-commit quality gate (typecheck + lint + test).
 - **`npm run openapi:check`** is the CI drift gate (generate + git diff).
@@ -133,7 +157,7 @@ All shared contracts live at `contracts/` (monorepo root). Never inside a compon
 | `legal-search/frontend` | TypeScript / Next.js | User-facing UI |
 | `legal-search/api` | TypeScript / NestJS | Search and document API |
 | `platform-control` | Python / FastAPI | Consistent with data infrastructure |
-| `document-intelligence` | Python / Databricks | Data processing pipelines |
+| `document-intelligence` | Python | Data processing pipelines (containerized consumer; Spark/Databricks opt-in) |
 | `infra` | HCL / Terraform | Infrastructure as code |
 
 The pre-commit hooks and CI workflows must run the same checks. If you add a check to one, add it to the other. `scripts/` is the shared entry point.

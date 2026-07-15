@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evidara.dev/vocabularies/norm-level",
+  "title": "Norm Level Vocabulary",
+  "description": "Single source of truth for the hierarchy of norms (ADR-0033). A norm's `level` says which rank of the legal order it occupies; `rank` orders those levels so that subordination is computable rather than prose. LOWER rank = HIGHER authority: a norm at rank 30 (federal) outranks one at rank 50 (municipal), and a municipal ordinance is therefore subordinate to every level with a lower rank that shares its lineage. Consumers (legal-search projection builder, norm-hierarchy endpoint, platform-control jurisdiction seeds) MUST read the ordering from here and not restate it. Levels are 10 apart so intermediate ranks (e.g. a cantonal-constitutional tier) can be inserted without renumbering.",
+  "vocabulary": "norm-level",
+  "values": {
+    "constitutional": {
+      "rank": 10,
+      "enactedByJurisdictionLevel": "federal",
+      "prefLabel": {
+        "de": "Verfassungsrecht",
+        "fr": "Droit constitutionnel",
+        "it": "Diritto costituzionale",
+        "en": "Constitutional"
+      },
+      "description": "The constitution of a federal jurisdiction (CH: Bundesverfassung, SR 101). NOT derivable from the jurisdiction alone — the BV is enacted by the same federal jurisdiction as an ordinary statute but outranks it — so it is the one level a document declares explicitly, overriding the level inherited from its jurisdiction.",
+      "derivableFromJurisdiction": false
+    },
+    "international": {
+      "rank": 20,
+      "enactedByJurisdictionLevel": "international",
+      "prefLabel": {
+        "de": "Völkerrecht / EU-Recht",
+        "fr": "Droit international",
+        "it": "Diritto internazionale",
+        "en": "International"
+      },
+      "description": "Treaty law and EU law (jur_eu). CAVEAT: the rank of international law relative to ordinary federal statutes is contested in Swiss doctrine. It is placed above federal statutes here per the monist reading of BV Art. 5(4); consumers that need the Schubert-Praxis exception must not read this rank as settled law.",
+      "derivableFromJurisdiction": true
+    },
+    "federal": {
+      "rank": 30,
+      "enactedByJurisdictionLevel": "federal",
+      "prefLabel": {
+        "de": "Bundesrecht",
+        "fr": "Droit fédéral",
+        "it": "Diritto federale",
+        "en": "Federal"
+      },
+      "description": "Statutes and ordinances of a national/federal jurisdiction (CH: jur_ch_federal — TSchG, TSchV; also the national-container jurisdictions jur_ch, jur_de, jur_at, jur_fr, jur_it).",
+      "derivableFromJurisdiction": true
+    },
+    "cantonal": {
+      "rank": 40,
+      "enactedByJurisdictionLevel": "cantonal",
+      "prefLabel": {
+        "de": "Kantonales Recht",
+        "fr": "Droit cantonal",
+        "it": "Diritto cantonale",
+        "en": "Cantonal"
+      },
+      "description": "Law of a sub-federal subdivision: Swiss cantons (jur_ch_zh — Hundegesetz) and German Länder (jur_de_by). The label is Swiss-first; the level covers every ISO 3166-2 subdivision tier in contracts/vocabularies/subdivisions.json.",
+      "derivableFromJurisdiction": true
+    },
+    "municipal": {
+      "rank": 50,
+      "enactedByJurisdictionLevel": "municipal",
+      "prefLabel": {
+        "de": "Kommunales Recht",
+        "fr": "Droit communal",
+        "it": "Diritto comunale",
+        "en": "Municipal"
+      },
+      "description": "Law of a commune (jur_ch_gemeinde_261 — the Zurich Hundereglement). Communal norms hold only delegated competence: they are valid only where a cantonal norm delegates the competence to legislate, which is why `delegates_to` — not merely `subordinate_to` — is what decides whether a municipal ban is authorised.",
+      "derivableFromJurisdiction": true
+    }
+  }
+}

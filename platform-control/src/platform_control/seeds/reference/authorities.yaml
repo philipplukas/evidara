@@ -13,26 +13,33 @@ items:
     # Renamed from auth_ch_fedlex in migration 20260417_0012 — see #264.
     deprecated_aliases:
       - auth_ch_fedlex
+  # Swiss federal courts bind the public-official compliance tier
+  # (cp_ch_court_decisions), overriding jur_ch_federal's Fedlex open-data
+  # policy — court rulings carry no open-data licence. See #530.
   - authority_id: auth_bger
     jurisdiction_id: jur_ch_federal
     slug: ch-bger
     name: Bundesgericht
+    compliance_policy_id: cp_ch_court_decisions
     deprecated_aliases:
       - auth_ch_bundesgericht
   - authority_id: auth_bvger
     jurisdiction_id: jur_ch_federal
     slug: ch-bvger
     name: Bundesverwaltungsgericht
+    compliance_policy_id: cp_ch_court_decisions
     deprecated_aliases:
       - auth_ch_bundesverwaltungsgericht
   - authority_id: auth_bstger
     jurisdiction_id: jur_ch_federal
     slug: ch-bstger
     name: Bundesstrafgericht / Tribunal pénal fédéral
+    compliance_policy_id: cp_ch_court_decisions
   - authority_id: auth_bpger
     jurisdiction_id: jur_ch_federal
     slug: ch-bpger
     name: Bundespatentgericht / Tribunal fédéral des brevets
+    compliance_policy_id: cp_ch_court_decisions
   # ─── Swiss cantonal authorities ────────────────────────────
   - authority_id: auth_zh_sk
     jurisdiction_id: jur_ch_zh
@@ -62,6 +69,42 @@ items:
     jurisdiction_id: jur_ch_ti
     slug: ti-cancelleria
     name: Cancelleria dello Stato del Cantone Ticino
+  # ─── Swiss communal authorities ────────────────────────────
+  # The municipal layer: 2,110 `jur_ch_gemeinde_*` jurisdictions are seeded but
+  # had no authority at all until #584 — modelled and unreachable. This is the
+  # first, and deliberately the ONLY, commune: the ADR-0033 acceptance test
+  # ("can the city ban a certain thing for dogs, year-round?") is decided by a
+  # communal ordinance, and Zürich (BFS 261) publishes its Amtliche Sammlung
+  # online. Communal law carries no open-data licence and lives on a municipal
+  # web estate, so it binds the conservative cp_ch_municipal tier rather than
+  # any cantonal/federal open-data policy. National communal coverage is a much
+  # larger problem (~2,000 independent sites) and is explicitly NOT in scope.
+  - authority_id: auth_stadt_zuerich_sk
+    jurisdiction_id: jur_ch_gemeinde_261
+    slug: stadt-zuerich-stadtkanzlei
+    name: Stadtkanzlei Stadt Zürich
+    compliance_policy_id: cp_ch_municipal
+  # ─── Swiss cantonal courts ─────────────────────────────────
+  # Representative cantonal courts (ZH/BE/BS). Like the federal courts above,
+  # cantonal rulings carry no open-data licence, so they bind the public-official
+  # compliance tier (cp_ch_court_decisions) rather than any open-data policy.
+  # Their decisions are aggregated on entscheidsuche.ch and consumed via the
+  # reused ch_court_decisions provider (canton-hinted). See #531.
+  - authority_id: auth_zh_obergericht
+    jurisdiction_id: jur_ch_zh
+    slug: zh-obergericht
+    name: Obergericht des Kantons Zürich
+    compliance_policy_id: cp_ch_court_decisions
+  - authority_id: auth_be_obergericht
+    jurisdiction_id: jur_ch_be
+    slug: be-obergericht
+    name: Obergericht des Kantons Bern / Cour suprême du canton de Berne
+    compliance_policy_id: cp_ch_court_decisions
+  - authority_id: auth_bs_appellationsgericht
+    jurisdiction_id: jur_ch_bs
+    slug: bs-appellationsgericht
+    name: Appellationsgericht Basel-Stadt
+    compliance_policy_id: cp_ch_court_decisions
 
   # ─── Austria ────────────────────────────────────────────────
   - authority_id: auth_at_ris

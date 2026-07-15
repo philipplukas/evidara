@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from platform_control.domain import RobotsMode
+from platform_control.domain import NormLevel, RobotsMode
 
 
 def _validate_rate_corridor(
@@ -84,6 +84,11 @@ class JurisdictionSeed(BaseModel):
     slug: str
     name: str
     parent_id: str | None = None
+    # Rank of this jurisdiction's own legislation in the hierarchy of norms
+    # (ADR-0033). Required: a jurisdiction whose level we have not declared
+    # cannot answer "what governs this place", and defaulting it would
+    # silently mis-rank municipal law as federal.
+    level: NormLevel
     compliance_policy_id: str | None = None
     # Previously-used jurisdiction_ids for this same logical entity. When
     # the seeder encounters an existing row under one of these aliases,
@@ -100,6 +105,13 @@ class AuthoritySeed(BaseModel):
     jurisdiction_id: str
     slug: str
     name: str
+    # Optional authority-level compliance override. When set, it takes
+    # precedence over the authority's jurisdiction policy at resolution time
+    # (see compliance_policy_service._resolve_policy_for_source). Lets a
+    # single jurisdiction (e.g. jur_ch_federal) carry the Fedlex open-data
+    # policy for legislation while its court authorities bind a stricter
+    # public-official policy.
+    compliance_policy_id: str | None = None
     # Previously-used authority_ids for this same logical entity. See
     # JurisdictionSeed.deprecated_aliases for the contract.
     deprecated_aliases: list[str] = Field(default_factory=list)

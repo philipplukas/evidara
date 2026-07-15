@@ -90,6 +90,30 @@ class ProviderNotLiveReadyError(RuntimeError):
     """
 
 
+def ensure_live_ready(
+    provider: AcquisitionProvider,
+    *,
+    template_id: str | None = None,
+) -> AcquisitionProvider:
+    """Provider-side key of the two-key lock (ADR-0030).
+
+    Raises ProviderNotLiveReadyError when ``provider`` is a scaffold
+    (``live_ready`` falsy or absent). Shared by ``ProviderRegistry`` and by
+    the run-launch path, which holds an already-resolved provider (the
+    SHADOW execution mode swaps in the cassette provider, so the run-launch
+    path must gate the provider it will actually call, not the one the
+    acquisition spec names).
+    """
+    if not getattr(provider, "live_ready", False):
+        provider_name = getattr(provider, "provider_name", type(provider).__name__)
+        raise ProviderNotLiveReadyError(
+            f"Provider {provider_name!r} is a scaffold and cannot run "
+            f"(template_id={template_id!r}). See the provider's runbook for "
+            "live-enablement criteria."
+        )
+    return provider
+
+
 class ProviderRegistry:
     def __init__(self) -> None:
         self._providers: dict[str, AcquisitionProvider] = {}
@@ -128,11 +152,7 @@ class ProviderRegistry:
         keep using resolve_for_spec(); the loader path for launching a run
         should use this method so scaffolds cannot fire at runtime.
         """
-        provider = self.resolve_for_spec(acquisition_spec)
-        if not getattr(provider, "live_ready", False):
-            raise ProviderNotLiveReadyError(
-                f"Provider {provider.provider_name!r} is a scaffold and cannot run "
-                f"(template_id={template_id!r}). See the provider's runbook for "
-                "live-enablement criteria."
-            )
-        return provider
+        return ensure_live_ready(
+            self.resolve_for_spec(acquisition_spec),
+            template_id=template_id,
+        )

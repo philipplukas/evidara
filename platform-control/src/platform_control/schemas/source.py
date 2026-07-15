@@ -23,6 +23,14 @@ from platform_control.domain import (
 
 LanguageCode = Annotated[str, Field(pattern=r"^[a-z]{2}(?:-[A-Z]{2})?$")]
 
+# Court hint for the ch_court_decisions provider. Federal courts use their
+# abbreviation (bger, bvger, bstger, bpger); cantonal courts (aggregated via
+# entscheidsuche.ch) use the lowercase cantonal code (e.g. zh, be, bs). Kept as
+# a validated lowercase token rather than a closed Literal so cantonal coverage
+# does not require an enum edit per canton (#531). The provider passes this hint
+# straight into ProviderResource.metadata["court"].
+CourtHint = Annotated[str, Field(pattern=r"^[a-z]{2,8}$")]
+
 
 class BaseAcquisitionSpec(BaseModel):
     # --- Shared provenance / manifest defaults ---
@@ -91,9 +99,19 @@ class FedlexSparqlAcquisitionSpec(BaseAcquisitionSpec):
     preferred_languages: list[LanguageCode] = Field(default_factory=list)
     query_mode: Literal["work_to_expression"] = "work_to_expression"
     max_expressions: int = Field(default=1, ge=1, le=10)
+    # Cantonal-discovery mode (#531): scope_kind="canton" discovers works via
+    # jolux:CantonOfOrigin instead of seed URIs. See the FedlexSparqlProvider
+    # start_run wiring and country-rollout-drift-prevention §4.4.
+    scope_kind: Literal["seed", "canton"] = "seed"
+    canton: str | None = Field(default=None, pattern=r"^(?:CH-)?[A-Za-z]{2}$")
+    max_works: int = Field(default=50, ge=1, le=500)
 
     @model_validator(mode="after")
     def validate_fedlex_sparql_config(self) -> FedlexSparqlAcquisitionSpec:
+        if self.scope_kind == "canton":
+            if not self.canton:
+                raise ValueError("fedlex_sparql scope_kind=canton requires canton (ISO 3166-2:CH)")
+            return self
         if self.seed_url is None and not self.seed_urls:
             raise ValueError("fedlex_sparql provider requires seed_url or seed_urls")
         return self
@@ -131,13 +149,103 @@ class EurLexSparqlAcquisitionSpec(BaseAcquisitionSpec):
         return self
 
 
+class ChCourtDecisionsAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.CH_COURT_DECISIONS] = (
+        AcquisitionProvider.CH_COURT_DECISIONS
+    )
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+    index_urls: list[HttpUrl] = Field(default_factory=list)
+    court: CourtHint | None = None
+    link_pattern: str | None = None
+    allowed_hosts: list[str] = Field(default_factory=list)
+    max_documents: int = Field(default=50, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def validate_ch_court_decisions_config(self) -> ChCourtDecisionsAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls and not self.index_urls:
+            raise ValueError(
+                "ch_court_decisions provider requires seed_url, seed_urls, or index_urls"
+            )
+        return self
+
+
+class CantonHttpAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.CANTON_HTTP] = AcquisitionProvider.CANTON_HTTP
+    # ISO 3166-2:CH cantonal code (e.g. CH-ZH). The provider allow-lists a
+    # portal host per code, so an unknown or foreign code is rejected at run.
+    canton_code: str = Field(pattern=r"^CH-[A-Z]{2}$")
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_canton_http_config(self) -> CantonHttpAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("canton_http provider requires seed_url or seed_urls")
+        return self
+
+
+class GemeindeHttpAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.GEMEINDE_HTTP] = AcquisitionProvider.GEMEINDE_HTTP
+    # Swiss municipalities have NO ISO 3166-2 code (that standard stops at the
+    # canton), so — unlike canton_http/bundesland_http/regione_http — this
+    # provider keys its portal allow-list on the BFS/OFS Gemeindenummer, the
+    # federal statistical id. It is the same key the 2,110 `jur_ch_gemeinde_*`
+    # jurisdiction seeds are generated from, so a template's bfs_number maps
+    # 1:1 onto `jur_ch_gemeinde_<bfs_number>` (Zürich = 261).
+    bfs_number: int = Field(ge=1, le=9999)
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_gemeinde_http_config(self) -> GemeindeHttpAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("gemeinde_http provider requires seed_url or seed_urls")
+        return self
+
+
+class BundeslandHttpAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.BUNDESLAND_HTTP] = AcquisitionProvider.BUNDESLAND_HTTP
+    # ISO 3166-2:DE Bundesland code (e.g. DE-BY). The provider allow-lists a
+    # portal host per code, so an unknown or foreign code is rejected at run.
+    bundesland: str = Field(pattern=r"^DE-[A-Z]{2}$")
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_bundesland_http_config(self) -> BundeslandHttpAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("bundesland_http provider requires seed_url or seed_urls")
+        return self
+
+
+class RegioneHttpAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.REGIONE_HTTP] = AcquisitionProvider.REGIONE_HTTP
+    # ISO 3166-2:IT regione code (e.g. IT-25). The provider allow-lists a
+    # portal host per code, so an unknown or foreign code is rejected at run.
+    regione: str = Field(pattern=r"^IT-[0-9]{2}$")
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_regione_http_config(self) -> RegioneHttpAcquisitionSpec:
+        if self.seed_url is None and not self.seed_urls:
+            raise ValueError("regione_http provider requires seed_url or seed_urls")
+        return self
+
+
 AcquisitionSpec = Annotated[
     FirecrawlAcquisitionSpec
     | DeterministicHttpAcquisitionSpec
     | FedlexSparqlAcquisitionSpec
     | RisOgdAcquisitionSpec
     | LegifranceAcquisitionSpec
-    | EurLexSparqlAcquisitionSpec,
+    | EurLexSparqlAcquisitionSpec
+    | ChCourtDecisionsAcquisitionSpec
+    | CantonHttpAcquisitionSpec
+    | GemeindeHttpAcquisitionSpec
+    | BundeslandHttpAcquisitionSpec
+    | RegioneHttpAcquisitionSpec,
     Field(discriminator="provider"),
 ]
 AcquisitionSpecAdapter = TypeAdapter(AcquisitionSpec)

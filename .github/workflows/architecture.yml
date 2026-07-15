@@ -1,0 +1,45 @@
+name: Architecture
+
+# structurizr/workspace.dsl is the declared source of truth for system architecture
+# (AGENTS.md), but nothing validated it — so a malformed or dangling-reference DSL
+# could sit on main indefinitely. This gate parses it with the Structurizr CLI.
+#
+# --strict: the script skips when no validator is present, which is right for local
+# dev but would make this job a silent no-op. Strict mode fails instead.
+
+on:
+  pull_request:
+    paths:
+      - "structurizr/**"
+      - "scripts/check-architecture.sh"
+      - ".github/workflows/architecture.yml"
+  push:
+    branches: [main]
+    paths:
+      - "structurizr/**"
+      - "scripts/check-architecture.sh"
+      - ".github/workflows/architecture.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-workspace-dsl:
+    # GitHub-hosted, NOT the self-hosted pools: the Hetzner ARC runners are plain
+    # k8s pods with no Docker daemon (no containerMode: dind in
+    # infra/hetzner/runners/values-*.yaml), so the validator cannot run there.
+    # `--strict` surfaces that as a failure rather than a silent skip — which is
+    # exactly how this was caught. This job is paths-filtered to structurizr/**,
+    # so it runs only when the DSL actually changes. ubuntu-latest is already used
+    # unconditionally by legal-search.yml and platform-control-image.yml.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Validate Structurizr workspace DSL
+        run: bash scripts/check-architecture.sh --strict

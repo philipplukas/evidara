@@ -30,6 +30,8 @@ class GoldenBundleTests(unittest.TestCase):
             "ris_xml_law_consolidated",
             "ris_xml_law_short",
             "ch_commentary_html",
+            "ch_fedlex_law_html",
+            "ch_fedlex_bv_html",
         ]
         for fixture_name in fixture_names:
             with self.subTest(fixture=fixture_name):
@@ -53,6 +55,21 @@ class GoldenBundleTests(unittest.TestCase):
                         headings = [section.title for section in result.sections if section.title]
                         for heading in expected["key_headings"]:
                             self.assertIn(heading, headings)
+                    if "section_max_content_length" in expected:
+                        longest = max((len(section.content) for section in result.sections), default=0)
+                        self.assertLessEqual(
+                            longest,
+                            expected["section_max_content_length"],
+                            "a single section swallowed the document body",
+                        )
+                    if "key_section_anchors" in expected:
+                        anchors = {
+                            section.title: section.metadata.get("anchor")
+                            for section in result.sections
+                            if section.title
+                        }
+                        for title, anchor in expected["key_section_anchors"].items():
+                            self.assertEqual(anchors.get(title), anchor)
                     if "key_content_contains" in expected:
                         full_text = result.document.full_text or ""
                         for fragment in expected["key_content_contains"]:

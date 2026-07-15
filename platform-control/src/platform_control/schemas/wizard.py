@@ -87,16 +87,21 @@ class WizardRunStatusResponse(BaseModel):
 
 class CreateReviewTaskRequest(BaseModel):
     wizard_run_id: str
-    argilla_external_id: str
+    external_id: str
     record_id: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="forbid")
 
 
-class ArgillaReviewSyncItem(BaseModel):
-    external_id: str
-    annotation_updated_at: datetime
+class ReviewDecisionRequest(BaseModel):
+    """An operator's verdict on one review task.
+
+    Replaces the batch ``POST /v1/reviews/sync-from-argilla`` poll-back: the decision
+    is now pushed by whoever reviewed the task (the admin app / an operator) rather
+    than pulled out of an annotation tool (ADR-0031).
+    """
+
     decision: str
     reviewed_by: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -104,35 +109,21 @@ class ArgillaReviewSyncItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class ArgillaReviewSyncRequest(BaseModel):
-    tasks: list[ArgillaReviewSyncItem]
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class ArgillaReviewSyncResponse(BaseModel):
-    accepted: int
-    duplicates: int
-    failed: int
-
-
 class ReviewTaskResponse(BaseModel):
     review_task_id: str
     wizard_run_id: str
-    argilla_external_id: str
+    external_id: str
     record_id: str | None
     status: ReviewTaskStatus
     payload: dict[str, Any]
     decision_payload: dict[str, Any] | None
     processed_at: datetime | None
-    argilla_enqueued_at: datetime | None = None
-    argilla_enqueue_last_error: str | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class CreateReviewTaskResponse(ReviewTaskResponse):
-    enqueue_outcome: str
-    enqueue_detail: str | None = None
+# `CreateReviewTaskResponse` used to add `enqueue_outcome` / `enqueue_detail`, which
+# reported the outcome of the outbound Argilla POST. With Argilla gone (ADR-0031)
+# creation has no side channel to report, so it returns the task itself.

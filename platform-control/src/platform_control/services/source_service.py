@@ -20,6 +20,7 @@ from platform_control.schemas.source import (
 )
 from platform_control.services.source_blueprints import (
     list_source_blueprint_templates,
+    resolve_blueprint_extractor_profile_id,
     resolve_source_blueprint,
 )
 
@@ -76,14 +77,12 @@ class SourceService:
             jurisdiction_id=request.source.jurisdiction_id,
             authority_id=request.source.authority_id,
         )
-        if request.source_version.extractor_profile_id:
-            extractor_profile = await self.session.get(
-                ExtractorProfile, request.source_version.extractor_profile_id
-            )
-            if extractor_profile is None:
-                raise NotFoundError(
-                    f"Extractor profile not found: {request.source_version.extractor_profile_id}"
-                )
+        extractor_profile_id = await self._resolve_extractor_profile_id(
+            requested=request.source_version.extractor_profile_id,
+            acquisition_spec=request.source_version.acquisition_spec,
+            overlay_id=request.source_version.overlay_id,
+            provider_template_id=request.source_version.provider_template_id,
+        )
         acquisition_spec = self._resolve_acquisition_spec(
             acquisition_spec=request.source_version.acquisition_spec,
             overlay_id=request.source_version.overlay_id,
@@ -103,10 +102,15 @@ class SourceService:
 
         source_version = SourceVersion(
             source_id=source.source_id,
-            extractor_profile_id=request.source_version.extractor_profile_id,
+            extractor_profile_id=extractor_profile_id,
             version_label=request.source_version.version_label,
             execution_mode=request.source_version.execution_mode,
             acquisition_spec=acquisition_spec.model_dump(mode="json"),
+            **self._blueprint_provenance(
+                acquisition_spec=request.source_version.acquisition_spec,
+                overlay_id=request.source_version.overlay_id,
+                provider_template_id=request.source_version.provider_template_id,
+            ),
         )
         self.session.add(source_version)
         await self.session.commit()
@@ -142,12 +146,12 @@ class SourceService:
         request: CreateSourceVersionRequest,
     ) -> SourceVersion:
         await self.get_source(source_id)
-        if request.extractor_profile_id:
-            extractor_profile = await self.session.get(
-                ExtractorProfile, request.extractor_profile_id
-            )
-            if extractor_profile is None:
-                raise NotFoundError(f"Extractor profile not found: {request.extractor_profile_id}")
+        extractor_profile_id = await self._resolve_extractor_profile_id(
+            requested=request.extractor_profile_id,
+            acquisition_spec=request.acquisition_spec,
+            overlay_id=request.overlay_id,
+            provider_template_id=request.provider_template_id,
+        )
 
         acquisition_spec = self._resolve_acquisition_spec(
             acquisition_spec=request.acquisition_spec,
@@ -157,10 +161,15 @@ class SourceService:
 
         version = SourceVersion(
             source_id=source_id,
-            extractor_profile_id=request.extractor_profile_id,
+            extractor_profile_id=extractor_profile_id,
             version_label=request.version_label,
             execution_mode=request.execution_mode,
             acquisition_spec=acquisition_spec.model_dump(mode="json"),
+            **self._blueprint_provenance(
+                acquisition_spec=request.acquisition_spec,
+                overlay_id=request.overlay_id,
+                provider_template_id=request.provider_template_id,
+            ),
         )
         self.session.add(version)
         await self.session.commit()
@@ -202,6 +211,15 @@ class SourceService:
                 provider_template_id=request.provider_template_id,
             )
             version.acquisition_spec = acquisition_spec.model_dump(mode="json")
+            # Provenance follows the spec: re-pointing a version at a blueprint
+            # records the template; replacing it with a hand-written spec clears it.
+            provenance = self._blueprint_provenance(
+                acquisition_spec=request.acquisition_spec,
+                overlay_id=request.overlay_id,
+                provider_template_id=request.provider_template_id,
+            )
+            version.overlay_id = provenance["overlay_id"]
+            version.provider_template_id = provenance["provider_template_id"]
         if "extractor_profile_id" in payload:
             version.extractor_profile_id = payload["extractor_profile_id"]
         if request.execution_mode is not None:
@@ -262,6 +280,54 @@ class SourceService:
             raise InvalidStateTransitionError(
                 "Authority does not belong to the requested jurisdiction."
             )
+
+    async def _resolve_extractor_profile_id(
+        self,
+        *,
+        requested: str | None,
+        acquisition_spec: AcquisitionSpec | None,
+        overlay_id: str | None,
+        provider_template_id: str | None,
+    ) -> str | None:
+        """Resolve the effective extractor_profile_id and validate it exists.
+
+        An explicit request value wins and is validated strictly. Otherwise,
+        when the version is created from a blueprint (no explicit
+        acquisition_spec), fall back to the template's default
+        extractor_profile_id — e.g. Fedlex legislation templates default to
+        exp_legislation_v1 (#532). The blueprint default is best-effort
+        enrichment: if that profile is not present it is skipped rather than
+        blocking source creation (blueprint profile ids are integrity-checked
+        against the seed by test_blueprint_provider_parity).
+        """
+        if requested is not None:
+            if await self.session.get(ExtractorProfile, requested) is None:
+                raise NotFoundError(f"Extractor profile not found: {requested}")
+            return requested
+        if acquisition_spec is None and overlay_id and provider_template_id:
+            default_id = resolve_blueprint_extractor_profile_id(overlay_id, provider_template_id)
+            if default_id is not None and await self.session.get(ExtractorProfile, default_id):
+                return default_id
+        return None
+
+    @staticmethod
+    def _blueprint_provenance(
+        *,
+        acquisition_spec: AcquisitionSpec | None,
+        overlay_id: str | None,
+        provider_template_id: str | None,
+    ) -> dict[str, str | None]:
+        """Blueprint provenance to persist on the SourceVersion (ADR-0030).
+
+        Only set when the version is created from a blueprint template; an
+        explicit acquisition_spec wins over blueprint fields in
+        _resolve_acquisition_spec, so it must clear the provenance too — else
+        the run-launch path would gate a hand-written spec on a template the
+        version no longer uses.
+        """
+        if acquisition_spec is None and overlay_id and provider_template_id:
+            return {"overlay_id": overlay_id, "provider_template_id": provider_template_id}
+        return {"overlay_id": None, "provider_template_id": None}
 
     @staticmethod
     def _resolve_acquisition_spec(
