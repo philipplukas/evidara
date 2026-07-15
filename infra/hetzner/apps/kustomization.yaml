@@ -27,22 +27,30 @@ resources:
 # reference here unpullable. Check `gh run list --workflow=runtime-images.yml
 # --commit <sha>` before pinning.
 #
-# 6e1816a is the first SHA carrying the M12 pipeline-trust work: the search
-# adapter that 503s instead of silently returning "no results" (#554), the DI
-# status callbacks (#555), the /metrics endpoints the Prometheus scrape config
-# expects (#565), and the provider live-ready lock (#569). It is also the first
-# SHA whose alembic history is single-headed again (#574) — anything between
-# #571 and #574 ships two migrations numbered 0019 and must not be deployed.
+# a660776 (#600) is the current `main` tip and carries the design + search
+# content/fixes the live UI was missing at 6e1816a: the shared BrandMark and
+# styles/shell baked into the frontend image (#547, #599), the header/context
+# bar/panel-row alignment (#548), search snippets that match the query (#595),
+# the acquired expression's real language on the index (#587), the norm-hierarchy
+# model (#591), and the Stadt Zürich municipal layer (#584, #589). All six images
+# are published at this SHA (verified in GHCR). The alembic delta from 6e1816a is
+# a single clean migration (20260714_0021_jurisdiction_norm_level) — history stays
+# single-headed, so the migrate job applies one forward revision on rollout.
+#
+# (Prior pin 6e1816a was the first SHA carrying the M12 pipeline-trust work —
+# #554 search 503s, #555 DI status callbacks, #565 /metrics, #569 provider
+# live-ready lock — and the first single-headed alembic history after the
+# #571–#574 double-0019 hazard, which stays behind us here.)
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
+    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
+    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
+    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
+    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
+    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 6e1816a7b5b2613d6f0b8f7ad71e0b7bbe69a753
+    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
