@@ -36,6 +36,11 @@ import { useWorkspace } from "@/lib/workspace-store";
  * other total against the sum it is given, so a set totalling 96 renders the
  * filter rail at 18/96 ≈ 18.75% — and it snaps back to 18% the moment the
  * detail panel opens, visibly resizing a panel the user never touched.
+ *
+ * These values are percentages and MUST reach the panels as `%`-suffixed
+ * strings. react-resizable-panels v4 reads a bare number as PIXELS, so passing
+ * `32` renders a 32px sliver instead of 32% of the row (which is what silently
+ * collapsed the filter rail and detail panel after the v4 bump).
  */
 export const DESKTOP_PANEL_SPLIT = {
   detailClosed: { filters: 18, results: 82, detail: 0 },
@@ -290,14 +295,18 @@ export default function WorkspaceClient({
     void executeSearch(urlQuery);
   }, [constraints, createSearchSignature, executeSearch, urlQuery]);
 
-  // Desktop panel sync — use imperative `resize(32)` instead of `expand()` because
-  // `expand()` restores to the last-known size, which with `defaultSize={0}` ends up
-  // being ~0 (see UX-9). `resize` always sets an explicit width that lands inside
-  // the [minSize, maxSize] bounds configured on the panel.
+  // Desktop panel sync — use imperative `resize` instead of `expand()` because
+  // `expand()` restores to the last-known size, which with a collapsed panel ends
+  // up being ~0 (see UX-9). `resize` sets an explicit size inside the
+  // [minSize, maxSize] bounds configured on the panel.
+  //
+  // The size MUST be a percentage STRING: react-resizable-panels v4 reads a bare
+  // number as PIXELS, so `resize(32)` produced a 32px sliver instead of 32% of
+  // the row (≈460px). Same reason the size props below are `%` strings.
   useEffect(() => {
     if (!isDesktop) return;
     if (isDetailOpen) {
-      rightRef.current?.resize(32);
+      rightRef.current?.resize(`${DESKTOP_PANEL_SPLIT.detailOpen.detail}%`);
     } else {
       rightRef.current?.collapse();
     }
@@ -400,11 +409,11 @@ export default function WorkspaceClient({
           {/* Left: Filters */}
           <ResizablePanel
             panelRef={leftRef}
-            defaultSize={split.filters}
-            minSize={12}
-            maxSize={28}
+            defaultSize={`${split.filters}%`}
+            minSize="12%"
+            maxSize="28%"
             collapsible
-            collapsedSize={4}
+            collapsedSize="4%"
           >
             <div
               className="h-full overflow-y-auto rounded-[var(--radius-panel)] border border-border/70 bg-surface-panel"
@@ -417,7 +426,7 @@ export default function WorkspaceClient({
           <ResizableHandle withHandle />
 
           {/* Center: Results */}
-          <ResizablePanel defaultSize={split.results} minSize={30}>
+          <ResizablePanel defaultSize={`${split.results}%`} minSize="30%">
             <div
               className="h-full overflow-y-auto rounded-[var(--radius-panel)] border border-border/70 bg-surface-panel"
               style={{ boxShadow: "var(--shadow-panel)" }}
@@ -453,11 +462,11 @@ export default function WorkspaceClient({
               in the desktop panel sync effect above. */}
           <ResizablePanel
             panelRef={rightRef}
-            defaultSize={split.detail}
-            minSize={25}
-            maxSize={45}
+            defaultSize={`${split.detail}%`}
+            minSize="25%"
+            maxSize="45%"
             collapsible
-            collapsedSize={0}
+            collapsedSize="0%"
           >
             <div
               data-testid="detail-panel"
