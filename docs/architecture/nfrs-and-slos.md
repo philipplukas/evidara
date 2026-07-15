@@ -14,19 +14,19 @@ This page captures **platform-level** expectations for reliability and performan
 
 ## Availability
 
-- **legal-search** and **platform-control** target **multi-instance** Cloud Run (or equivalent) with health checks and zero-downtime deploys where supported.
+- **legal-search** and **platform-control** run as Kubernetes Deployments on the self-hosted Hetzner k3s cluster ([ADR-0029](../adr/0029-self-hosted-hetzner-runtime.md)) with health checks and rolling updates. The cluster is **single-node**, so node loss is an outage: availability targets are best-effort, not HA.
 - **document-intelligence** jobs are **asynchronous**; availability is measured as successful pipeline completion and timely event emission, not HTTP uptime of a single long-lived server.
 
 ## Durability
 
-- **Postgres** (platform-control): RPO/RTO per Cloud SQL / backup policy.
-- **Delta / object storage**: Immutable artifacts and published surfaces; recovery procedures tie to [Disaster Recovery](disaster-recovery.md).
+- **Postgres** (platform-control): self-hosted CloudNativePG; RPO/RTO follow the cluster's own backup configuration — self-managed, not a provider SLA.
+- **Delta / object storage**: Immutable artifacts and published surfaces on in-cluster MinIO; recovery procedures tie to [Disaster Recovery](disaster-recovery.md).
 
 ## Observability
 
 - **Correlation IDs** — Standardize on `X-Correlation-Id` (while still accepting `X-Request-ID`) across `platform-control`, `legal-search/api`, and `document-intelligence` HTTP surfaces; always echo both headers in responses.
 - **Structured logs** — Emit request logs with stable fields (`service`, `method`, `path`, `status_code`, `duration_ms`, `correlation_id`) and include domain IDs (`tenant_id`, `corpus_id`, `document_id`, `run_id`) where applicable.
-- **Metrics** — Request rates, error rates, and latency histograms per service; pipeline job success/failure in Databricks.
+- **Metrics** — Request rates, error rates, and latency histograms per service; processing-job success/failure and NATS JetStream consumer health (redelivery counts, DLQ depth) for `document-intelligence`.
 
 ## Review cadence
 
