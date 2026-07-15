@@ -109,7 +109,7 @@ export function ContextBar({ context }: ContextBarProps) {
 
   return (
     <div className="context-bar">
-      <div className="context-bar__layout">
+      <div className="context-bar__layout shell-frame">
         {/* Desktop: always-visible label */}
         <span className="hidden text-micro shrink-0 font-medium text-text-meta md:block">
           {t("filter.filtersTitle")}

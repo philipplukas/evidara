@@ -38,6 +38,54 @@ The frontend is connected to the live BFF using generated API clients. Projectio
 - **Does own:** frontend, BFF, projection logic, OpenSearch mappings and aliases, indexing workflows
 - **Does NOT own:** canonical truth, source management, parsing, reference data governance
 
+## The hierarchy of norms
+
+`GET /v1/norm-hierarchy/{jurisdiction_id}` answers *what governs this place, at each
+level* — the traversal ADR-0033 builds the agentic layer on. It is not a search: the
+governing chain is derived from the jurisdiction tree, not from text similarity.
+
+**Where each piece comes from.** platform-control owns the jurisdiction tree and each
+jurisdiction's `level` (`constitutional` / `international` / `federal` / `cantonal` /
+`municipal` — ranked in `contracts/vocabularies/norm-level.json`). legal-search must not
+call platform-control at request time for reference data that cannot change between
+deploys, so the tree is **exported at build time** by
+`scripts/generate_jurisdiction_hierarchy_vocab.py` into
+`contracts/vocabularies/jurisdiction-hierarchy.json` and loaded like any other
+vocabulary. CI fails if the export drifts from the seed.
+
+**What the projection derives** (`core/norm-hierarchy`, applied in
+`ProjectionsService.buildProjection`):
+
+| Field | Derived how |
+|---|---|
+| `level` | From the document's **jurisdiction**, never guessed from its text. Most specific jurisdiction wins. A document may declare `constitutional` for itself — the one level no jurisdiction can supply, since the BV is enacted by `jur_ch_federal` exactly like the TSchG. A declared level that would *demote* the norm is ignored. |
+| `subordinate_to` | The jurisdictions whose law outranks it. A Zurich communal ordinance → `jur_ch_zh`, `jur_ch_federal`. The edge points at **scopes, not documents**: subordination in law is scope-wide, so a document→document edge would be a fiction. |
+| `in_force_from` / `in_force_until` | `in_force_from` coalesces `effective_date`, so there is one field to range-query. `in_force_until` is the **last date the norm WAS in force** (inclusive). |
+| `delegates_to` | **Not derived — unpopulated.** Delegation is an assertion made *by a norm's text* (the cantonal clause that lets a commune legislate at all), so it needs extraction or curation. The shape is declared in `contracts/schemas/document.schema.json` so the edge has a home. |
+
+**Why `jur_ch_federal` is reachable from a canton.** In the seed, `jur_ch_federal` is a
+*child* of `jur_ch`, and the cantons are its *siblings* — so walking parents alone would
+never reach federal law from Zurich, and preemption would be unanswerable. The rule is
+therefore: the scopes governing a jurisdiction are its ancestors, **plus each ancestor's
+children at the same level**. A same-level child is a refinement of its parent's scope,
+not a tier beneath it.
+
+**Temporal validity is four-valued, not boolean.** `in_force_state` is `in_force`,
+`not_yet_in_force`, `repealed`, or `unknown`. A norm marked `repealed` with no date
+resolves to `unknown` — inventing `in_force` from a missing field is the confident
+fabrication the platform exists to prevent. `in_force_at` filtering excludes only norms
+*known* to be outside force; unknown-dated norms are kept and flagged, because dropping
+them would hide law and silence is indistinguishable from absence.
+
+**Coverage is load-bearing.** `coverage.missing_levels` names the levels that bind a
+place but for which the corpus holds nothing. "I do not have the communal ordinance for
+this place" is a correct answer (ADR-0033 §2); reasoning past a missing level is not.
+
+**Deployment note.** `level`, `subordinate_to`, `in_force_from` and `in_force_until` are
+new mapping fields. Documents indexed before this change carry none of them and will not
+appear in any level bucket until reprojected — see
+`docs/runbooks/projection-reindex-backfill.md`.
+
 ## Minimal next tasks
 
 - [x] Define search projection schema

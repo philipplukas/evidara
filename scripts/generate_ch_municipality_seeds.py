@@ -77,8 +77,11 @@ def render_seed_block(overlay_entries: list[dict[str, object]]) -> str:
     """Render the seed-block YAML chunk for the given overlay entries.
 
     Output is deterministic: anchor comment, then one block of
-    `jurisdiction_id` / `slug` / `name` / `parent_id` per entry, sorted
-    by `bfs_id`.
+    `jurisdiction_id` / `slug` / `name` / `parent_id` / `level` per entry,
+    sorted by `bfs_id`.
+
+    Every row in this block is a Swiss commune, so `level` is constant —
+    `municipal`, the bottom of the hierarchy of norms (ADR-0033).
     """
     lines: list[str] = [START_MARKER]
     for row in overlay_entries:
@@ -89,6 +92,7 @@ def render_seed_block(overlay_entries: list[dict[str, object]]) -> str:
         lines.append(f"    slug: ch-gemeinde-{bfs_id}\n")
         lines.append(f"    name: {name}\n")
         lines.append(f"    parent_id: {parent}\n")
+        lines.append("    level: municipal\n")
     return "".join(lines)
 
 

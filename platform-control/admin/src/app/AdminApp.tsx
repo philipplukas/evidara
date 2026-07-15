@@ -38,7 +38,9 @@ import JurisdictionCreate from "../resources/reference-data/JurisdictionCreate";
 import JurisdictionEdit from "../resources/reference-data/JurisdictionEdit";
 import { JurisdictionList } from "../resources/reference-data/JurisdictionList";
 import { PreviewReviewList } from "../resources/runs/PreviewReviewList";
+import PreviewReviewListV2 from "../resources/runs/PreviewReviewListV2";
 import { PreviewReviewShow } from "../resources/runs/PreviewReviewShow";
+import PreviewReviewShowV2 from "../resources/runs/PreviewReviewShowV2";
 import { RunList } from "../resources/runs/RunList";
 import RunListV2 from "../resources/runs/RunListV2";
 import { RunShow } from "../resources/runs/RunShow";
@@ -116,12 +118,14 @@ export default function AdminApp() {
       {/*
        * Tailwind + ra-core v2 previews (coexistence window, see ADR-0026).
        * Reference-data forms (authorities, jurisdictions) graduated to the
-       * canonical resource `create`/`edit` routes above (#501 pattern); only
-       * the runs preview still coexists with its MUI resource.
+       * canonical resource `create`/`edit` routes above (#501 pattern); the
+       * runs and preview-review previews still coexist with their MUI resources.
        */}
       <CustomRoutes>
         <Route path="/runs-v2" element={<RunListV2 />} />
         <Route path="/runs-v2/:id" element={<RunShowV2 />} />
+        <Route path="/preview-review-v2" element={<PreviewReviewListV2 />} />
+        <Route path="/preview-review-v2/:id" element={<PreviewReviewShowV2 />} />
       </CustomRoutes>
     </Admin>
   );

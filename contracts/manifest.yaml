@@ -40,6 +40,7 @@ apis:
       - "/v1/search"
       - "/v1/documents/{id}"
       - "/v1/documents/{document_id}/cited_by"
+      - "/v1/norm-hierarchy/{jurisdiction_id}"
       - "/v1/projections/events/history"
 
 events:

@@ -9,6 +9,10 @@ WORKDIR /workspace
 # token layer (and vice versa).
 COPY styles/tokens ./styles/tokens
 COPY styles/ui ./styles/ui
+# @evidara/shell (shared BrandMark) resolves via the tsconfig path alias to
+# ../../styles/shell; it must exist in the image or `next build` fails with
+# "Can't resolve '@evidara/shell'". See #547.
+COPY styles/shell ./styles/shell
 # styles/ui's bare imports (clsx, lucide-react, tailwind-merge) resolve during
 # `next build` via `turbopack.resolveAlias` in next.config.ts, which pins them
 # to THIS surface's node_modules. No repo-root node_modules is involved. See #588.

@@ -29,6 +29,19 @@ import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel, SearchContextViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 
+/**
+ * Desktop split across the filters / results / detail panels, in percent.
+ *
+ * Each state must total exactly 100. react-resizable-panels renormalizes any
+ * other total against the sum it is given, so a set totalling 96 renders the
+ * filter rail at 18/96 ≈ 18.75% — and it snaps back to 18% the moment the
+ * detail panel opens, visibly resizing a panel the user never touched.
+ */
+export const DESKTOP_PANEL_SPLIT = {
+  detailClosed: { filters: 18, results: 82, detail: 0 },
+  detailOpen: { filters: 18, results: 50, detail: 32 },
+} as const;
+
 interface WorkspaceClientProps {
   searchContext: SearchContextViewModel;
   filters: FilterViewModel[];
@@ -66,6 +79,7 @@ export default function WorkspaceClient({
   const searchRequestIdRef = useRef(0);
 
   const isDetailOpen = Boolean(selectedId);
+  const split = isDetailOpen ? DESKTOP_PANEL_SPLIT.detailOpen : DESKTOP_PANEL_SPLIT.detailClosed;
   const {
     data: detail,
     isLoading: isDetailLoading,
@@ -380,20 +394,20 @@ export default function WorkspaceClient({
       />
       <ContextBar context={searchContext} />
 
-      <main id="main-content" className="min-h-0 flex-1 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
+      <main id="main-content" className="shell-frame min-h-0 flex-1 pb-3 pt-2 sm:pb-4">
         <h1 className="sr-only">Evidara Rechtsrecherche</h1>
         <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Left: Filters */}
           <ResizablePanel
             panelRef={leftRef}
-            defaultSize={18}
+            defaultSize={split.filters}
             minSize={12}
             maxSize={28}
             collapsible
             collapsedSize={4}
           >
             <div
-              className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel"
+              className="h-full overflow-y-auto rounded-[var(--radius-panel)] border border-border/70 bg-surface-panel"
               style={{ boxShadow: "var(--shadow-raised)" }}
             >
               <FilterPanel filters={activeFilters} />
@@ -403,9 +417,9 @@ export default function WorkspaceClient({
           <ResizableHandle withHandle />
 
           {/* Center: Results */}
-          <ResizablePanel defaultSize={isDetailOpen ? 50 : 78} minSize={30}>
+          <ResizablePanel defaultSize={split.results} minSize={30}>
             <div
-              className="h-full overflow-y-auto rounded-[1.6rem] border border-border/70 bg-surface-panel"
+              className="h-full overflow-y-auto rounded-[var(--radius-panel)] border border-border/70 bg-surface-panel"
               style={{ boxShadow: "var(--shadow-panel)" }}
             >
               <ResultsControlRegion>
@@ -439,7 +453,7 @@ export default function WorkspaceClient({
               in the desktop panel sync effect above. */}
           <ResizablePanel
             panelRef={rightRef}
-            defaultSize={isDetailOpen ? 32 : 0}
+            defaultSize={split.detail}
             minSize={25}
             maxSize={45}
             collapsible
@@ -447,7 +461,7 @@ export default function WorkspaceClient({
           >
             <div
               data-testid="detail-panel"
-              className="h-full overflow-y-auto rounded-[1.35rem] border border-border/70 bg-surface-panel"
+              className="h-full overflow-y-auto rounded-[var(--radius-panel)] border border-border/70 bg-surface-panel"
               style={{ boxShadow: "var(--shadow-raised)" }}
             >
               {detailContent}
