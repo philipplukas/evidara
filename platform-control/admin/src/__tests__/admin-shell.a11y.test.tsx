@@ -11,10 +11,10 @@
  * resolve. The shell is exercised with the default (preview) extra items so
  * the sidebar's resource-empty + extra-items branch is also covered.
  */
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
 import { CoreAdminContext, testDataProvider } from "ra-core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "../ui/shell/AppShell";
 
 expect.extend(toHaveNoViolations);
@@ -36,5 +36,40 @@ describe("AppShell route-level accessibility", () => {
 
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+});
+
+describe("AppShell mobile drawer keyboard exit", () => {
+  const drawer = () => screen.queryByRole("complementary", { name: "Primary navigation" });
+
+  it("closes on Escape", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    expect(drawer()).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(drawer()).not.toBeInTheDocument();
+  });
+
+  it("ignores other keys", () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+
+    fireEvent.keyDown(document, { key: "a" });
+
+    expect(drawer()).toBeInTheDocument();
+  });
+
+  it("detaches the key listener once closed", () => {
+    renderShell();
+    const add = vi.spyOn(document, "addEventListener");
+    const remove = vi.spyOn(document, "removeEventListener");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    expect(add).toHaveBeenCalledWith("keydown", expect.any(Function));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(remove).toHaveBeenCalledWith("keydown", expect.any(Function));
   });
 });

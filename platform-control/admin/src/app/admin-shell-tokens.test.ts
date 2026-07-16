@@ -67,3 +67,42 @@ describe("admin shell brand tokens", () => {
     expect(shellComponentSource).not.toContain("var(--brand-focus-ring)");
   });
 });
+
+describe("admin shell responsive grid", () => {
+  const appShell = readFileSync(join(process.cwd(), "src/ui/shell/AppShell.tsx"), "utf8");
+
+  it("drives the root grid from the responsive class, not a hardcoded inline column", () => {
+    // A fixed `288px 1fr` inline at every width reserved the sidebar column on
+    // mobile — where the sidebar is an overlay drawer — shoving the header and
+    // main content off the right edge. Inline styles can't be overridden by
+    // Tailwind responsive classes, so the grid must live in CSS.
+    expect(appShell).toContain("admin-app-shell");
+    expect(appShell).not.toContain('gridTemplateColumns: "288px 1fr"');
+  });
+
+  it("is a single column on mobile and expands to the sidebar column at md", () => {
+    expect(globalsCss).toContain(".admin-app-shell");
+    // md breakpoint (768px) matches the sidebar's `md:block`.
+    expect(globalsCss).toMatch(
+      /@media \(min-width: 768px\)[\s\S]*?\.admin-app-shell[\s\S]*?288px 1fr/,
+    );
+  });
+
+  it("lets the header row grow instead of clipping taller chrome to 80px", () => {
+    // A fixed `80px` header track painted the header over the top of `main`
+    // wherever the header wrapped taller (63px of overlap at the md breakpoint).
+    // The row floors at 80px but grows to fit.
+    expect(globalsCss).toMatch(
+      /\.admin-app-shell[\s\S]*?grid-template-rows:\s*minmax\(80px,\s*auto\)/,
+    );
+    expect(globalsCss).not.toMatch(/\.admin-app-shell[\s\S]*?grid-template-rows:\s*80px 1fr/);
+  });
+
+  it("stacks the header brand/title/CTA until lg, where the column has room", () => {
+    const appBar = readFileSync(join(process.cwd(), "src/ui/shell/AppBar.tsx"), "utf8");
+    // Between md (sidebar appears, ~480px content) and lg the three header
+    // blocks can't sit side by side without colliding — row layout waits for lg.
+    expect(appBar).toContain("lg:flex-row");
+    expect(appBar).not.toContain("md:flex-row");
+  });
+});

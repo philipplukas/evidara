@@ -102,6 +102,8 @@
       "noAnnotationsDescription": "Anmerkungen erscheinen hier, sobald das Dokument Kommentare oder Pr\u00fcfhilfen enth\u00e4lt.",
       "noStructureTitle": "Keine lokale Struktur",
       "noStructureDescription": "Dieses Dokument stellt derzeit keine navigierbare Gliederung bereit.",
+      "noContentTitle": "Kein Inhalt verfügbar",
+      "noContentDescription": "Für dieses Dokument ist derzeit kein Dokumenttext verfügbar.",
       "loadFailed": "Dokument konnte nicht geladen werden",
       "loadFailedDescription": "Das Dokument konnte nicht abgerufen werden. Bitte versuchen Sie es erneut.",
       "loadFailedRetry": "Erneut versuchen"
