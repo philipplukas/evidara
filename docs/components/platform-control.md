@@ -105,7 +105,7 @@ Lineage and document semantics that cross boundaries still remain Evidara-owned 
 
 - **Produces:** `artifact_bundle.available`
 - **Consumes:** `document.processing_status.updated`, `document.processed`, `document.withdrawn`
-- **API:** `contracts/api/platform-control.openapi.yaml`
+- **API:** `contracts/api/platform-control.openapi.yaml` — **generated** from this app ([ADR-0034](../adr/0034-generated-platform-control-contract.md)); do not hand-edit
 - **Schemas:** `ArtifactBundleManifest`
 
 ## Authentication
@@ -118,7 +118,9 @@ Unset keys keep local development open. Legacy single-key mode is
 
 ## Developer workflow
 
-- Service check: `bash scripts/check-platform-control.sh`
+- Service check: `bash scripts/check-platform-control.sh` (ruff, pytest, and the OpenAPI contract drift gate)
+- Regenerate the OpenAPI contract after changing routers or schemas:
+  `cd platform-control && uv run python ../scripts/generate_platform_control_contract.py`
 - Docs/contracts checks: `bash scripts/check_docs.sh`
 - Legal-search checks (cross-component CI parity): `bash scripts/check-legal-search.sh`
 

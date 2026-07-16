@@ -142,12 +142,16 @@ repos:
         pass_filenames: false
         files: ^legal-search/
 
+      # Also fires on the generated contract and its generator: the script runs
+      # the OpenAPI drift gate (#618), so hand-editing
+      # contracts/api/platform-control.openapi.yaml must be caught here and not
+      # only in CI. Mirrors the path filters in .github/workflows/platform-control.yml.
       - id: platform-control-check
-        name: Platform Control checks (ruff + pytest)
+        name: Platform Control checks (ruff + pytest + OpenAPI contract drift)
         entry: bash scripts/check-platform-control.sh
         language: system
         pass_filenames: false
-        files: ^platform-control/
+        files: ^(platform-control/|contracts/api/platform-control\.openapi\.yaml$|scripts/(check-platform-control\.sh|generate_platform_control_contract\.py)$)
 
       - id: evidara-cli-check
         name: Evidara CLI (ruff + pytest)

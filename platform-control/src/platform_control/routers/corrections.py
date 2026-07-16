@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from platform_control.auth import Principal, get_current_principal
 from platform_control.config import get_settings
 from platform_control.database import get_session
+from platform_control.openapi import AGENT_DISCOVERY_TAG
 from platform_control.schemas.correction import (
     CorrectionListResponse,
     CorrectionMetricsResponse,
@@ -64,6 +65,7 @@ async def create_correction(
 @router.get(
     "/corrections",
     response_model=CorrectionListResponse,
+    tags=[AGENT_DISCOVERY_TAG],
 )
 async def list_corrections(
     session: SessionDep,
@@ -123,6 +125,7 @@ async def get_correction_metrics(
 @router.get(
     "/corrections/{correction_id}",
     response_model=CorrectionResponse,
+    tags=[AGENT_DISCOVERY_TAG],
 )
 async def get_correction(
     correction_id: str,
@@ -173,6 +176,12 @@ async def update_correction_status(
     session: SessionDep,
     scheduler: RescoreSchedulerDep,
 ) -> CorrectionResponse:
+    """Update a correction's status.
+
+    Transitions the correction status. The server enforces legal transitions
+    (`pending` → `applied` | `rejected`; `applied` → `superseded`) and returns
+    409 on illegal transitions. `applied_at` is server-stamped on `applied`.
+    """
     service = CorrectionService(session)
     row = await service.update_status(correction_id, request)
     if (

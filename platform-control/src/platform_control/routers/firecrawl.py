@@ -27,6 +27,14 @@ async def receive_firecrawl_webhook(
     publisher: PublisherDep,
     signature: str | None = Header(default=None, alias="X-Firecrawl-Signature"),
 ) -> WebhookAcceptedResponse:
+    """Accept a Firecrawl crawl webhook.
+
+    `type` is one of `crawl.started`, `crawl.page`, `crawl.completed`, `crawl.failed`.
+    The body is Firecrawl's payload, taken verbatim: the handler reads the raw bytes
+    because `X-Firecrawl-Signature` is an HMAC over exactly those bytes. It is
+    therefore not a typed request model, and this contract does not describe it — the
+    shape is Firecrawl's to define, not ours.
+    """
     raw_body = await request.body()
     payload = await request.json()
     settings = get_settings()

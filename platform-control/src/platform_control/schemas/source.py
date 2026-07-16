@@ -275,7 +275,7 @@ class SourceBlueprintPreviewRequest(BaseModel):
 
 
 class SourceResponse(BaseModel):
-    source_id: str
+    source_id: str = Field(examples=["src_01hzxk7v3qmjy4t5n2p8r6w9"])
     name: str
     description: str | None
     jurisdiction_id: str
@@ -371,7 +371,7 @@ class UpdateSourceVersionRequest(BaseModel):
 
 
 class SourceVersionResponse(BaseModel):
-    source_version_id: str
+    source_version_id: str = Field(examples=["sv_01hzxk8a2bmne6g4r7j3k9l5"])
     source_id: str
     extractor_profile_id: str | None
     version_label: str

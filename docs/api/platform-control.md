@@ -1,6 +1,16 @@
 # Platform Control API
 
-Interactive API reference for the platform-control service, generated from the OpenAPI spec at `contracts/api/platform-control.openapi.yaml`.
+Interactive API reference for the platform-control service, rendered from the OpenAPI spec at `contracts/api/platform-control.openapi.yaml`.
+
+That spec is itself **generated from the FastAPI app** ([ADR-0034](../adr/0034-generated-platform-control-contract.md)) — it is byte-for-byte what a running instance serves at `/openapi.json`. To change it, change the routers or Pydantic schemas under `platform-control/src/platform_control/` and regenerate:
+
+```bash
+cd platform-control && uv run python ../scripts/generate_platform_control_contract.py
+```
+
+`scripts/check-platform-control.sh` fails the build if the committed file and the app disagree. Do not hand-edit it.
+
+The document declares no `servers`: the base URL is per-deployment (see `infra/env/*` for the Cloud Run URLs, `k8s/gitops/` for the cluster ingress). Point your client at the instance you mean. Auth is the `X-API-Key` header ([ADR-0020](../adr/adr-0020-api-authentication.md)).
 
 <swagger-ui src="https://raw.githubusercontent.com/philipplukas/evidara/main/contracts/api/platform-control.openapi.yaml"/>
 
