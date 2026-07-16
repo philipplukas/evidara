@@ -21,6 +21,14 @@ from platform_control.errors import (
     SignatureVerificationError,
     WebhookRetryableError,
 )
+from platform_control.openapi import (
+    API_CONTACT,
+    API_DESCRIPTION,
+    API_TITLE,
+    API_VERSION,
+    OPENAPI_TAGS,
+    generate_operation_id,
+)
 from platform_control.routers import (
     commentary_insights,
     compliance_policies,
@@ -60,7 +68,20 @@ def _error_payload(request: Request, detail: str) -> dict[str, str]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    # Document metadata lives in platform_control.openapi because this app *is*
+    # the source of truth for contracts/api/platform-control.openapi.yaml — the
+    # contract is generated from `app.openapi()` and gated for drift (#618).
+    # The title was previously `settings.app_name` ("platform-control") and the
+    # version a frozen "0.1.0"; both are now the contract's own identity, which
+    # scripts/check_contract_manifest.py pins to contracts/manifest.yaml.
+    app = FastAPI(
+        title=API_TITLE,
+        version=API_VERSION,
+        description=API_DESCRIPTION,
+        contact=API_CONTACT,
+        openapi_tags=OPENAPI_TAGS,
+        generate_unique_id_function=generate_operation_id,
+    )
     http_logger = logging.getLogger(_HTTP_LOGGER_NAME)
 
     @app.middleware("http")

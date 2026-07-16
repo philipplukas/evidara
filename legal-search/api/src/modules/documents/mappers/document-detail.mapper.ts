@@ -22,6 +22,14 @@ import type { WarnFn } from '../../../core/types/warn';
 import { getDocumentTypeLabel, getJurisdictionMeta } from '../../../core/vocabularies';
 import type { CitationEntity, DocumentEntity, SectionEntity } from '../entities/document.entities';
 
+/**
+ * A body is only a body if it carries text. Whitespace-only `content` would
+ * otherwise advertise an "Inhalt" tab over an empty document.
+ */
+function hasBodyText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 // ─── ViewModel Types ───
 
 export interface DetailView {
@@ -36,7 +44,8 @@ export interface DetailView {
     iconKey?: string;
     visibility?: 'always' | 'default' | 'expanded';
   }[];
-  content?: unknown;
+  /** The document body text — plain text, paragraphs split by blank lines. */
+  content?: string;
   contentLanguage?: {
     display: string;
     original: string;
@@ -188,14 +197,19 @@ function composeMetadata(doc: DocumentEntity, locale: SupportedLocale): Metadata
 }
 
 function composeTabs(
-  _doc: DocumentEntity,
+  doc: DocumentEntity,
   sectionsCount: number,
   citationsCount: number,
   locale: SupportedLocale,
 ): { key: string; label: string; count?: number }[] {
-  const tabs: { key: string; label: string; count?: number }[] = [
-    { key: 'content', label: t('tabs.content', locale) },
-  ];
+  const tabs: { key: string; label: string; count?: number }[] = [];
+
+  // Only advertise "Inhalt" when the response actually carries a body.
+  // This tab used to be unconditional, which promised a document text that
+  // the response never included.
+  if (hasBodyText(doc.content)) {
+    tabs.push({ key: 'content', label: t('tabs.content', locale) });
+  }
 
   if (sectionsCount > 0) {
     tabs.push({ key: 'sections', label: t('tabs.sections', locale), count: sectionsCount });
@@ -304,8 +318,7 @@ export function mapDocumentToDetailView(
     ...(doc.structural_path && {
       breadcrumbs: doc.structural_path.split(' › '),
     }),
-    ...(doc.content_docling !== undefined &&
-      doc.content_docling !== null && { content: doc.content_docling }),
+    ...(hasBodyText(doc.content) && { content: doc.content }),
     ...(composeContentLanguage(doc, locale) && {
       contentLanguage: composeContentLanguage(doc, locale),
     }),

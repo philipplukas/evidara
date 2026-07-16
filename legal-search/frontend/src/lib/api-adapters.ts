@@ -43,6 +43,10 @@ export function mapDetail(detail: DetailView): DetailViewModel {
     subtitle: detail.subtitle,
     breadcrumbs: detail.breadcrumbs ?? [],
     metadata: detail.metadata,
+    // The body. This mapping is the whole of #609: every other field was
+    // carried across and `content` alone was left behind, so the API could
+    // return a full document text and the view would never see it.
+    contentText: detail.content,
     tabs: detail.tabs,
     relatedGroups: detail.relatedGroups.map((group) => ({
       groupLabel: group.label,

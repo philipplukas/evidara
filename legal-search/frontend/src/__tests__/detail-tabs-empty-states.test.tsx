@@ -16,7 +16,7 @@ function buildDetail(overrides: Partial<DetailViewModel> = {}): DetailViewModel 
     subtitle: "Test Subtitle",
     breadcrumbs: [],
     metadata: [],
-    contentHtml: "",
+    contentText: "",
     tabs: [],
     relatedGroups: [],
     references: [],

@@ -1,12 +1,11 @@
 "use client";
 
-import DOMPurify from "dompurify";
 import { useTranslations } from "next-intl";
-import { useMemo } from "react";
 import { MetadataList } from "@/components/detail/MetadataList";
 import { enrichMetadataRows } from "@/lib/metadata-visibility";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
+import { DocumentBody } from "../DocumentBody";
 import { TabEmptyState } from "./TabEmptyState";
 
 interface DetailsTabProps {
@@ -15,14 +14,8 @@ interface DetailsTabProps {
 
 export function DetailsTab({ detail }: DetailsTabProps) {
   const t = useTranslations("detail");
-  const sanitizedContentHtml = useMemo(() => {
-    if (!detail.contentHtml) {
-      return "";
-    }
-    return DOMPurify.sanitize(detail.contentHtml);
-  }, [detail.contentHtml]);
   const hasMetadata = detail.metadata.length > 0;
-  const hasContent = Boolean(sanitizedContentHtml.trim());
+  const hasContent = Boolean(detail.contentText?.trim());
   const showEmptyState = !hasMetadata && !hasContent;
 
   return (
@@ -41,20 +34,10 @@ export function DetailsTab({ detail }: DetailsTabProps) {
         />
       )}
 
-      {hasContent && (
+      {hasContent && detail.contentText && (
         <section className="space-y-3">
           <SectionLabel>{t("tabs.content")}</SectionLabel>
-          <div
-            className="max-w-[72ch] text-sm leading-7 text-foreground/88 prose-sm font-document
-              [&_.article-marginal]:text-micro [&_.article-marginal]:font-semibold [&_.article-marginal]:text-muted-foreground
-              [&_.article-marginal]:mt-3 [&_.article-marginal]:mb-1
-              [&_strong]:text-foreground [&_strong]:font-semibold
-              [&_h4]:text-xs [&_h4]:font-semibold [&_h4]:uppercase [&_h4]:tracking-wider [&_h4]:text-muted-foreground [&_h4]:mt-4 [&_h4]:mb-2
-              [&_p]:mb-3 [&_p:last-child]:mb-0
-              [&_ul]:my-3 [&_ol]:my-3
-              [&_li]:mb-1"
-            dangerouslySetInnerHTML={{ __html: sanitizedContentHtml }}
-          />
+          <DocumentBody text={detail.contentText} />
         </section>
       )}
 

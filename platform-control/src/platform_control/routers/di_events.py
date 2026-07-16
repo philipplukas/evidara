@@ -36,6 +36,13 @@ async def receive_document_processing_status_updated(
     request: Request,
     session: SessionDep,
 ) -> EventAcceptedResponse:
+    """Accept a `document.processing_status.updated` event from document-intelligence.
+
+    The body is either the bare event or a Google Pub/Sub push envelope wrapping it
+    (`{"message": {"data": "<base64 event>"}}`) — see `decode_pubsub_push_json`.
+    The payload contract is `contracts/events/document-processing-status-updated.schema.json`,
+    which is its source of truth (AGENTS.md); it is deliberately not re-declared here.
+    """
     try:
         payload = decode_pubsub_push_json(await request.json())
         event = DocumentProcessingStatusUpdatedEvent.model_validate(payload)
@@ -81,6 +88,13 @@ async def receive_document_processed(
     request: Request,
     session: SessionDep,
 ) -> EventAcceptedResponse:
+    """Accept a `document.processed` event from document-intelligence.
+
+    The body is either the bare event or a Google Pub/Sub push envelope wrapping it
+    (`{"message": {"data": "<base64 event>"}}`) — see `decode_pubsub_push_json`.
+    The payload contract is `contracts/events/document-processed.schema.json`, which
+    is its source of truth (AGENTS.md); it is deliberately not re-declared here.
+    """
     try:
         payload = decode_pubsub_push_json(await request.json())
         event = DocumentProcessedEvent.model_validate(payload)
@@ -134,6 +148,13 @@ async def receive_document_withdrawn(
     request: Request,
     session: SessionDep,
 ) -> EventAcceptedResponse:
+    """Accept a `document.withdrawn` event from document-intelligence.
+
+    The body is either the bare event or a Google Pub/Sub push envelope wrapping it
+    (`{"message": {"data": "<base64 event>"}}`) — see `decode_pubsub_push_json`.
+    The payload contract is `contracts/events/document-withdrawn.schema.json`, which
+    is its source of truth (AGENTS.md); it is deliberately not re-declared here.
+    """
     try:
         payload = decode_pubsub_push_json(await request.json())
         event = DocumentWithdrawnEvent.model_validate(payload)

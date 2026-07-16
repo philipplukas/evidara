@@ -70,18 +70,39 @@ describe('DocumentsService', () => {
     await expect(service.getDetail('doc_missing')).rejects.toThrow(NotFoundException);
   });
 
-  it('should merge lean Docling from Document Service when OpenSearch has no body', async () => {
-    const fetchLeanDocument = vi.fn().mockResolvedValue({ schema_name: 'docling', version: '1' });
+  // The Document Service's `/lean` reply is a canonical row carrying
+  // `body_text`, NOT the DoclingDocument its spec advertises: `service/lean.py`
+  // validates the payload as a DoclingDocument, always fails, and returns the
+  // stripped canonical dict instead. This fixture is that real shape — the
+  // previous one (`{ schema_name: 'docling', version: '1' }`) was a payload the
+  // service cannot emit.
+  it('should take the body text from the Document Service when the index has none', async () => {
+    const fetchLeanDocument = vi.fn().mockResolvedValue({
+      document_id: 'doc_001',
+      title: 'Test Law',
+      body_text: 'Erste Erwägung.\n\nZweite Erwägung.',
+      full_text: 'Test Law\n\nErste Erwägung.\n\nZweite Erwägung.',
+    });
     const repo = createMockRepo();
     const service = new DocumentsService(repo, { fetchLeanDocument });
 
     const detail = await service.getDetail('doc_001', undefined, 'corr-1');
 
     expect(fetchLeanDocument).toHaveBeenCalledWith('doc_001', { correlationId: 'corr-1' });
-    expect(detail.content).toEqual({ schema_name: 'docling', version: '1' });
+    expect(detail.content).toBe('Erste Erwägung.\n\nZweite Erwägung.');
   });
 
-  it('should not call Document Service when content_docling already present', async () => {
+  it('should leave content absent when the Document Service has no body either', async () => {
+    const fetchLeanDocument = vi.fn().mockResolvedValue({ document_id: 'doc_001' });
+    const service = new DocumentsService(createMockRepo(), { fetchLeanDocument });
+
+    const detail = await service.getDetail('doc_001');
+
+    expect(detail.content).toBeUndefined();
+    expect(detail.tabs.map((t) => t.key)).not.toContain('content');
+  });
+
+  it('should not call Document Service when the index already has the body', async () => {
     const fetchLeanDocument = vi.fn();
     const repo = createMockRepo({
       getById: vi.fn().mockResolvedValue({
@@ -92,14 +113,17 @@ describe('DocumentsService', () => {
         effective_date: '2024-01-01',
         sections_count: 2,
         citations_count: 1,
-        content_docling: { existing: true },
+        content: 'Der Volltext des Dokuments.',
       }),
     });
     const service = new DocumentsService(repo, { fetchLeanDocument });
 
-    await service.getDetail('doc_001');
+    const detail = await service.getDetail('doc_001');
 
     expect(fetchLeanDocument).not.toHaveBeenCalled();
+    // The regression from #613: having a body used to be exactly what caused
+    // the body to be dropped.
+    expect(detail.content).toBe('Der Volltext des Dokuments.');
   });
 
   it('should always return arrays per ADR-0011', async () => {
