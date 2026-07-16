@@ -38,7 +38,7 @@ interface DetailViewModel {
   subtitle: string;
   breadcrumbs: string[];           // Jurisdiction > Law > Chapter path
   metadata: MetadataRow[];
-  contentHtml?: string;            // Server-rendered HTML (serif font, article marginals)
+  contentText?: string;            // Document body, plain text; blank lines separate paragraphs
   contentLanguage?: ContentLanguage;
   tabs: TabViewModel[];            // Available detail tabs
   relatedGroups: RelatedGroup[];   // Grouped related items
@@ -92,7 +92,7 @@ Document (polymorphic)    ──►  select type-specific   ──► SearchResu
   + Section[]                                             + structuralContext
 
 Document + Article        ──►  join articles,          ──► DetailViewModel
-  + Chunk (hidden)             render contentHtml,        + contentHtml
+  + Chunk (hidden)             render contentText,        + contentText
   + Citation[]                 group references,          + ReferenceGroup[]
   + Commentary[]               attach annotations         + AnnotationViewModel[]
 

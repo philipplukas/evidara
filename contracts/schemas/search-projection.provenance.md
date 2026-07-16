@@ -19,8 +19,7 @@ Companion to `search-projection.schema.json`. Documents ownership, source, and f
 | `structural_path` | document-intelligence | structural analysis | no | No breadcrumbs in detail view |
 | `effective_date` | document-intelligence | metadata extraction | no | Date metadata row omitted |
 | `lifecycle_status` | document-intelligence | `document.processed` event payload | no | Non-active documents lose explicit trust signal |
-| `content` | document-intelligence | text extraction | no | No search snippets, no preview |
-| `content_docling` | document-intelligence | docling pipeline (ADR-0010) | no | Detail view shows no structured content |
+| `content` | document-intelligence | text extraction (`body_text`/`full_text`) | no | No search snippets, no preview, and no document body in the detail view |
 | `source_id` | document-intelligence | lineage (from platform-control) | no | Lineage broken |
 | `processed_at` | document-intelligence | processing timestamp | no | — |
 
@@ -55,5 +54,4 @@ These appear in citation-type OpenSearch documents, not in document projections.
 
 - **Required integer fields** (counts): always present, default `0`. Never omitted or `null`.
 - **Optional string fields**: omitted when unavailable. Never `null`.
-- **Optional object fields** (`content_docling`): omitted when unavailable.
 - This aligns with ADR-0011 conventions for the BFF layer.

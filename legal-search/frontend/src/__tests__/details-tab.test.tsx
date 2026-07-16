@@ -5,7 +5,7 @@ import type { DetailViewModel } from "@/lib/types";
 import { renderWithProviders } from "./helpers/render-with-providers";
 
 function buildDetail(
-  contentHtml: string,
+  contentText: string,
   metadata: DetailViewModel["metadata"] = [],
 ): DetailViewModel {
   return {
@@ -15,7 +15,7 @@ function buildDetail(
     subtitle: "Test Subtitle",
     breadcrumbs: [],
     metadata,
-    contentHtml,
+    contentText,
     tabs: [],
     relatedGroups: [],
     references: [],
@@ -24,19 +24,27 @@ function buildDetail(
 }
 
 describe("DetailsTab", () => {
-  it("sanitizes unsafe HTML before rendering", () => {
-    const maliciousHtml = `
-      <p>Allowed paragraph</p>
-      <img src="x" onerror="alert('xss')" />
-      <script>alert('xss')</script>
-    `;
-    const detail = buildDetail(maliciousHtml);
+  it("renders the document body text", () => {
+    const detail = buildDetail("Erste Erwägung.\n\nZweite Erwägung.");
+
+    renderWithProviders(<DetailsTab detail={detail} />);
+
+    expect(screen.getByText("Erste Erwägung.")).toBeInTheDocument();
+    expect(screen.getByText("Zweite Erwägung.")).toBeInTheDocument();
+  });
+
+  // The body is plain text, so markup in it is content, not instructions. React
+  // escapes it; there is no sanitizer to get wrong and no `innerHTML` to abuse.
+  it("renders markup-looking body text literally, never as markup", () => {
+    const detail = buildDetail(`<img src="x" onerror="alert('xss')"><script>alert('xss')</script>`);
 
     const { container } = renderWithProviders(<DetailsTab detail={detail} />);
 
-    expect(screen.getByText("Allowed paragraph")).toBeInTheDocument();
     expect(container.querySelector("script")).toBeNull();
-    expect(container.querySelector("img")?.getAttribute("onerror")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+    expect(
+      screen.getByText(`<img src="x" onerror="alert('xss')"><script>alert('xss')</script>`),
+    ).toBeInTheDocument();
   });
 
   it("shows a graceful empty state when no metadata and no content exist", () => {

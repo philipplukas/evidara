@@ -13,7 +13,7 @@ const sparseDetail: DetailViewModel = {
   subtitle: "",
   breadcrumbs: [],
   metadata: [],
-  contentHtml: "",
+  contentText: "",
   contentLanguage: {
     display: "en",
     original: "de",

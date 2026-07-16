@@ -57,7 +57,7 @@ Suggested seed list (TBD: the presenter picks 4–7):
 |---|---|---|
 | `SR 220` | OR | Direct citation lookup; demonstrates SR-number recognition |
 | `Datenschutzgesetz` | FADP | Topical query; shows facet population |
-| `Art. 28 ZGB Persönlichkeitsverletzung` | ZGB | Specific article; rich contentHtml in the body |
+| `Art. 28 ZGB Persönlichkeitsverletzung` | ZGB | Specific article; substantial body text |
 | `Bundesgerichtsgesetz` | BGG | Long German compound; shows tokenizer handles it |
 | `Art. 1 BV` | BV | Constitutional opener; works as a clean opener |
 | `Cartel Act` | KG | English query against German corpus — shows multilingual matching (or fails honestly) |
