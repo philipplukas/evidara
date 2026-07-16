@@ -102,6 +102,8 @@
       "noAnnotationsDescription": "Les annotations appara\u00eetront ici lorsque le document contiendra des commentaires ou des notes de revue.",
       "noStructureTitle": "Aucune structure locale",
       "noStructureDescription": "Ce document ne propose pas encore de plan navigable.",
+      "noContentTitle": "Aucun contenu disponible",
+      "noContentDescription": "Le texte de ce document n'est pas disponible actuellement.",
       "loadFailed": "Impossible de charger le document",
       "loadFailedDescription": "Le document n'a pas pu \u00eatre r\u00e9cup\u00e9r\u00e9. Veuillez r\u00e9essayer.",
       "loadFailedRetry": "R\u00e9essayer"

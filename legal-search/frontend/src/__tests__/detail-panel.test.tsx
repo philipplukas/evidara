@@ -159,6 +159,56 @@ describe("DetailPanel", () => {
     expect(screen.getByText("Obligationenrecht (OR)")).toBeInTheDocument();
   });
 
+  it("renders a graceful empty state for the content tab with no structured content", () => {
+    // The real API emits a tab with key `content` (Inhalt) and, for documents
+    // whose body isn't processed yet, no `localStructure`. Before this was
+    // handled, selecting the tab rendered a blank panel.
+    const contentDetail = {
+      ...articleDetail,
+      tabs: [
+        { key: "content", label: "Inhalt" },
+        { key: "details", label: "Details" },
+      ],
+      localStructure: { items: [] },
+    };
+
+    renderWithProviders(
+      <DetailPanel
+        detail={contentDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+      { searchParams: { tab: "content" } },
+    );
+
+    expect(screen.getByText("Kein Inhalt verfügbar")).toBeInTheDocument();
+  });
+
+  it("never leaves a blank panel for an unknown tab key (contract-drift guard)", () => {
+    const oddDetail = {
+      ...articleDetail,
+      tabs: [
+        { key: "brandNewTab", label: "New" },
+        { key: "details", label: "Details" },
+      ],
+    };
+
+    renderWithProviders(
+      <DetailPanel
+        detail={oddDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+      { searchParams: { tab: "brandNewTab" } },
+    );
+
+    expect(screen.getByText("Kein Inhalt verfügbar")).toBeInTheDocument();
+  });
+
   it("sanitizes unsafe HTML in detail content", () => {
     const unsafeDetail = {
       ...articleDetail,

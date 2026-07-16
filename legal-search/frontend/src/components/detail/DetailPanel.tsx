@@ -11,6 +11,12 @@ import { ReferencesTab } from "./tabs/ReferencesTab";
 import { RelatedTab } from "./tabs/RelatedTab";
 import { StructureTab } from "./tabs/StructureTab";
 
+// Tab keys DetailPanel knows how to render. The contract's `TabView.key` is a
+// free-form string, and the real API emits `content` (Inhalt) — a key the mock
+// never used and this panel did not handle, so selecting it rendered a blank
+// void. Any key not listed here now falls through to a graceful empty state.
+const DETAIL_TAB_KEYS = ["details", "related", "references", "annotation", "structure", "content"];
+
 interface DetailPanelProps {
   detail: DetailViewModel | null;
   onFocus?: (id: string) => void;
@@ -63,15 +69,27 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
           />
         )}
         {activeTab === "annotation" && <AnnotationTab annotations={detail.annotations} />}
-        {activeTab === "structure" &&
+        {(activeTab === "structure" || activeTab === "content") &&
           (detail.localStructure?.items?.length ? (
             <StructureTab items={detail.localStructure.items} onFocus={onFocus} />
           ) : (
             <DetailEmptyState
-              title={t("empty.noStructureTitle")}
-              description={t("empty.noStructureDescription")}
+              title={t(activeTab === "content" ? "empty.noContentTitle" : "empty.noStructureTitle")}
+              description={t(
+                activeTab === "content"
+                  ? "empty.noContentDescription"
+                  : "empty.noStructureDescription",
+              )}
             />
           ))}
+        {/* Contract drift guard: a tab key with no dedicated renderer above
+            shows a graceful empty state instead of a blank panel. */}
+        {!DETAIL_TAB_KEYS.includes(activeTab) && (
+          <DetailEmptyState
+            title={t("empty.noContentTitle")}
+            description={t("empty.noContentDescription")}
+          />
+        )}
       </div>
     </section>
   );
