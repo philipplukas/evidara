@@ -3,16 +3,21 @@
  *
  * react-resizable-panels v4 reads a BARE NUMBER size as PIXELS and a string
  * ("32" / "32%") as a PERCENTAGE. WorkspaceClient's split is authored in
- * percent, so every size that reaches a panel must be a `%` string. When the
- * library was bumped to v4 the props were still bare numbers, so `resize(32)`
- * and `maxSize={28}` became 32px / 28px — silently collapsing the detail panel
- * and the filter rail to unusable slivers (the results panel only looked right
- * because it flexes to fill leftover space).
+ * percent, so every size that reaches a panel must be a `%` string. The library
+ * was added here already at ^4.7.6 — this was never a regression from a working
+ * v3; the props were bare numbers from the start, so `resize(32)` and
+ * `maxSize={28}` rendered as 32px / 28px, collapsing the detail panel and the
+ * filter rail to unusable slivers (the results panel only looked right because
+ * it flexes to fill leftover space).
  *
- * The neighbouring shell-frame test pins the numeric constants (they still sum
- * to 100) but cannot catch a units regression — it never inspects how they are
- * handed to the panels. This test does, by scanning the source for the
- * bare-number anti-pattern that reintroduces the bug.
+ * SCOPE — read before trusting this file. These are cheap source-text checks
+ * that only catch a size written as a LITERAL digit (`minSize={12}`,
+ * `resize(32)`). They do NOT catch a bare number arriving via an identifier —
+ * `defaultSize={split.filters}`, `minSize={MIN_FILTER}`, `resize(CONST)` all
+ * pass this test while reintroducing the bug, and `defaultSize={split.filters}`
+ * is precisely one of the forms that shipped it. Rendered geometry is the real
+ * guard: see "filter rail and detail panel render at usable widths, not px
+ * slivers" in `e2e/workspace-panels.spec.ts`, which measures actual widths.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

@@ -39,8 +39,11 @@ import { useWorkspace } from "@/lib/workspace-store";
  *
  * These values are percentages and MUST reach the panels as `%`-suffixed
  * strings. react-resizable-panels v4 reads a bare number as PIXELS, so passing
- * `32` renders a 32px sliver instead of 32% of the row (which is what silently
- * collapsed the filter rail and detail panel after the v4 bump).
+ * `32` renders a 32px sliver instead of 32% of the row — which is what silently
+ * collapsed the filter rail and detail panel. The library arrived here already
+ * at v4 (added at ^4.7.6), so this was never a regression from a working v3:
+ * the split was authored in percent against an API that reads numbers as pixels,
+ * and the panels rendered as slivers from the start.
  */
 export const DESKTOP_PANEL_SPLIT = {
   detailClosed: { filters: 18, results: 82, detail: 0 },
