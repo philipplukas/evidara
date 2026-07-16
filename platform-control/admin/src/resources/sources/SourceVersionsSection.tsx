@@ -204,6 +204,25 @@ function SourceVersionForm({
             <strong>{formState.provider_template_id || "not selected"}</strong>.
           </InlineAlert>
         </>
+      ) : !formState.spec_editable ? (
+        <>
+          <InlineAlert tone="warning">
+            <div className="space-y-1">
+              <p className="font-semibold text-[var(--foreground)]">
+                This acquisition spec is read-only.
+              </p>
+              <p className="text-[var(--foreground-muted)]">
+                Provider <strong>{formState.original_spec?.provider}</strong> has no editor here, so
+                its spec is shown as-is and saved back unchanged — the version label and extractor
+                profile above are still editable. To replace the spec, tick “Use country overlay +
+                provider template”.
+              </p>
+            </div>
+          </InlineAlert>
+          <pre className="m-0 max-h-64 overflow-auto rounded-md border border-[var(--border-faint)] bg-[var(--surface-input)] p-3 font-mono text-[11px] leading-[1.6] text-[var(--foreground-muted)]">
+            {JSON.stringify(formState.original_spec, null, 2)}
+          </pre>
+        </>
       ) : (
         <>
           <p className="text-[13px] text-[var(--foreground-subtle)]">

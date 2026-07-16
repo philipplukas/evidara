@@ -28,7 +28,47 @@ import type {
   SourceVersionRecord,
 } from "../../lib/admin/dataProvider";
 
+/**
+ * The providers this form renders editable widgets for.
+ *
+ * This is deliberately NOT "the providers that exist" — the API serves eleven
+ * (`AcquisitionProvider` in `platform_control/domain.py`). The list that matters
+ * to the form is the one it can actually round-trip, and that is decided by the
+ * branches in `toFormState`/`toAcquisitionSpec` below, not by a provider
+ * registry. Anything else is preserved verbatim rather than rebuilt — see
+ * `isEditableProvider` (#614).
+ */
 export type ProviderType = "firecrawl" | "deterministic_http" | "ris_ogd" | "fedlex_sparql";
+
+/**
+ * The provider as the record actually reports it.
+ *
+ * `AcquisitionSpec` models only the four providers this form edits, so its
+ * `provider` is typed as those four — but the wire carries eleven. Widening to
+ * `string` at the read keeps that fact in front of the type checker instead of
+ * letting the union's lie justify a firecrawl fallthrough (#614).
+ */
+const specProvider = (spec: AcquisitionSpec): string => spec.provider;
+
+/**
+ * The `BaseAcquisitionSpec` fields every provider carries
+ * (`platform_control/schemas/source.py`). The form renders none of them, so
+ * they survive an edit only by being copied off the spec that was loaded.
+ */
+const BASE_SPEC_FIELDS = [
+  "tenant_id",
+  "corpus_id",
+  "scope_type",
+  "source_origin_kind",
+  "trust_tier",
+  "language_codes",
+  "document_type_hint",
+  "request_timeout_seconds",
+  "user_agent",
+  "max_content_bytes",
+] as const;
+
+const BASE_SPEC_FIELD_SET: ReadonlySet<string> = new Set(BASE_SPEC_FIELDS);
 
 export type SourceVersionFormState = {
   version_label: string;
@@ -36,6 +76,10 @@ export type SourceVersionFormState = {
   use_blueprint: boolean;
   overlay_id: string;
   provider_template_id: string;
+  /**
+   * The provider whose widgets the dialog renders. Meaningless — and never sent
+   * — when `spec_editable` is false.
+   */
   provider: ProviderType;
   seed_url: string;
   seed_urls_text: string;
@@ -55,6 +99,17 @@ export type SourceVersionFormState = {
   preferred_languages_text: string;
   query_mode: "work_to_expression";
   max_expressions: string;
+  /**
+   * The acquisition spec exactly as it was loaded, kept so an edit can be
+   * merged over it instead of rebuilt from the handful of fields that have a
+   * widget. `null` when creating a new version. See `toAcquisitionSpec`.
+   */
+  original_spec: AcquisitionSpec | null;
+  /**
+   * False when `original_spec` uses a provider this form has no widgets for.
+   * The dialog then shows the spec read-only and round-trips it untouched.
+   */
+  spec_editable: boolean;
 };
 
 export const SOURCE_VERSION_LIST_PARAMS = {
@@ -87,6 +142,8 @@ export const emptyFormState = (): SourceVersionFormState => ({
   preferred_languages_text: "de",
   query_mode: "work_to_expression",
   max_expressions: "1",
+  original_spec: null,
+  spec_editable: true,
 });
 
 export const PROVIDER_TEMPLATE_CHOICES: Record<string, Array<{ value: string; label: string }>> = {
@@ -121,6 +178,21 @@ export const PROVIDER_CHOICES: Array<{ value: ProviderType; label: string }> = [
   { value: "fedlex_sparql", label: "Fedlex SPARQL" },
   { value: "ris_ogd", label: "RIS OGD API (Austrian law)" },
 ];
+
+const EDITABLE_PROVIDERS: ReadonlySet<string> = new Set(
+  PROVIDER_CHOICES.map((choice) => choice.value),
+);
+
+/**
+ * Can this form edit a spec with this provider without losing anything?
+ *
+ * Answering from `PROVIDER_CHOICES` — the providers the dialog offers widgets
+ * for — rather than from a list of every provider that exists means a provider
+ * added server-side is unknown here by default, and unknown means preserved
+ * rather than rewritten. There is no list to keep in sync for that to hold.
+ */
+export const isEditableProvider = (provider: string): provider is ProviderType =>
+  EDITABLE_PROVIDERS.has(provider);
 
 export const VERSION_STATUS_META = {
   draft: {
@@ -258,16 +330,26 @@ export const toFormState = (version?: SourceVersionRecord | null): SourceVersion
     return emptyFormState();
   }
   const spec = version.acquisition_spec;
+  const provider = specProvider(spec);
   const common = {
     version_label: version.version_label,
     extractor_profile_id: version.extractor_profile_id ?? "",
     use_blueprint: false,
     overlay_id: "at",
     provider_template_id: "ris_ogd_bundesrecht",
-    provider: spec.provider ?? "firecrawl",
+    original_spec: spec,
   } as const;
 
-  if (spec.provider === "ris_ogd") {
+  // A provider this form has no widgets for (canton_http, gemeinde_http,
+  // legifrance, …). Rebuilding it from form fields would rewrite it as
+  // firecrawl and drop whatever identifies it — canton_code, bfs_number,
+  // court. Every one of those defaults is valid, so the server accepts the
+  // rewrite silently. Hand it back read-only instead (#614).
+  if (!isEditableProvider(provider)) {
+    return { ...emptyFormState(), ...common, spec_editable: false };
+  }
+
+  if (provider === "ris_ogd") {
     const ris = spec as RisOgdAcquisitionSpec;
     return {
       ...emptyFormState(),
@@ -281,17 +363,16 @@ export const toFormState = (version?: SourceVersionRecord | null): SourceVersion
     };
   }
 
-  if (spec.provider === "fedlex_sparql") {
+  if (provider === "fedlex_sparql") {
     const fedlex = spec as FedlexSparqlAcquisitionSpec;
-    const seedUrls = fedlex.seed_url
-      ? [fedlex.seed_url, ...(fedlex.seed_urls ?? [])]
-      : (fedlex.seed_urls ?? []);
     return {
       ...emptyFormState(),
       ...common,
       provider: "fedlex_sparql",
       seed_url: fedlex.seed_url ?? "",
-      seed_urls_text: listToText(seedUrls),
+      // `seed_urls` only. The dialog renders `seed_url` in its own field, so
+      // folding it in here as well round-tripped it into `seed_urls` too (#614).
+      seed_urls_text: listToText(fedlex.seed_urls ?? []),
       sparql_endpoint: fedlex.sparql_endpoint ?? "https://fedlex.data.admin.ch/sparqlendpoint",
       preferred_languages_text: listToText(fedlex.preferred_languages ?? []),
       query_mode: fedlex.query_mode ?? "work_to_expression",
@@ -299,7 +380,7 @@ export const toFormState = (version?: SourceVersionRecord | null): SourceVersion
     };
   }
 
-  if (spec.provider === "deterministic_http") {
+  if (provider === "deterministic_http") {
     const deterministic = spec as DeterministicHttpAcquisitionSpec;
     return {
       ...emptyFormState(),
@@ -346,7 +427,20 @@ export const parseIntegerField = (
   return parsed;
 };
 
-export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<AcquisitionSpec> => {
+/** The `BaseAcquisitionSpec` fields carried by `spec`, and nothing else. */
+const pickBaseSpecFields = (spec: AcquisitionSpec): Partial<AcquisitionSpec> => {
+  const source = spec as Record<string, unknown>;
+  const picked: Record<string, unknown> = {};
+  for (const field of BASE_SPEC_FIELDS) {
+    if (field in source) {
+      picked[field] = source[field];
+    }
+  }
+  return picked as Partial<AcquisitionSpec>;
+};
+
+/** The provider-specific spec described by the form's own fields. */
+const toProviderSpec = (state: SourceVersionFormState): Partial<AcquisitionSpec> => {
   const base: Partial<AcquisitionSpec> = { provider: state.provider };
 
   if (state.provider === "ris_ogd") {
@@ -400,8 +494,72 @@ export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<Acquis
   };
 };
 
+/**
+ * The complete `acquisition_spec` to send for this form state.
+ *
+ * The server REPLACES the spec rather than merging it
+ * (`source_service.update_source_version`: `version.acquisition_spec =
+ * acquisition_spec.model_dump(mode="json")`), so every field omitted here is
+ * reset to its schema default. The dialog renders neither the ten
+ * `BaseAcquisitionSpec` fields nor every provider field, so emitting only what
+ * has a widget silently wiped the rest — renaming a label reset `corpus_id` to
+ * `corpus_public_default` and emptied `language_codes` (#614).
+ *
+ * So: merge the form's edits over the spec that was loaded, rather than
+ * rebuilding the spec from the form alone. Fixing this client-side keeps the
+ * server's replace semantics — switching it to a PATCH-merge would be a
+ * contract change with a much wider blast radius.
+ */
+export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<AcquisitionSpec> => {
+  const original = state.original_spec;
+
+  // A provider the form never modelled: there is nothing to merge, and
+  // rebuilding it would be the corruption. Send back exactly what we loaded.
+  if (original && !state.spec_editable) {
+    return original;
+  }
+
+  const edited = toProviderSpec(state);
+  if (!original) {
+    return edited;
+  }
+
+  // Same provider -> every field without a widget survives, base or otherwise
+  // (fedlex's `scope_kind`/`canton`/`max_works`, say). Provider switched -> only
+  // the base fields carry over: they are provider-independent, whereas the old
+  // provider's own fields are not valid on the new one and the server's spec
+  // models are `extra="forbid"`.
+  const preserved =
+    specProvider(original) === state.provider ? original : pickBaseSpecFields(original);
+
+  return { ...preserved, ...edited };
+};
+
+const formatSpecValue = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return "not set";
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.join(", ") : "none";
+  }
+  return String(value);
+};
+
 export const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
-  const provider = spec.provider ?? "firecrawl";
+  const provider = specProvider(spec);
+
+  // A provider with no renderer here. Reading it as firecrawl printed
+  // "mode: undefined / limit: undefined" over a spec that has neither, and hid
+  // the fields that actually define it — a real canton_http version showed no
+  // canton_code at all (#614). List the spec's own fields instead.
+  if (!isEditableProvider(provider)) {
+    return [
+      `provider: ${provider}`,
+      ...Object.entries(spec as Record<string, unknown>)
+        .filter(([key]) => key !== "provider" && !BASE_SPEC_FIELD_SET.has(key))
+        .map(([key, value]) => `${key}: ${formatSpecValue(value)}`),
+    ];
+  }
 
   if (provider === "ris_ogd") {
     const ris = spec as RisOgdAcquisitionSpec;
