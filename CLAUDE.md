@@ -16,7 +16,7 @@ Run the narrowest gate for the surface you touched before pushing:
 |---|---|
 | `platform-control/` | `cd platform-control && uv run pytest` |
 | `platform-control/admin/` | `cd platform-control/admin && npm run check` |
-| `legal-search/api/` | `cd legal-search/api && npm test` |
+| `legal-search/api/` | `cd legal-search/api && npm run check` |
 | `legal-search/frontend/` | `cd legal-search/frontend && npm run check` |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `python scripts/check_country_overlay_files.py` |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
