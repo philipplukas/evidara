@@ -103,7 +103,7 @@
       "noStructureTitle": "Aucune structure locale",
       "noStructureDescription": "Ce document ne propose pas encore de plan navigable.",
       "noContentTitle": "Aucun contenu disponible",
-      "noContentDescription": "Le texte du document apparaîtra ici une fois le document traité.",
+      "noContentDescription": "Le texte de ce document n'est pas disponible actuellement.",
       "loadFailed": "Impossible de charger le document",
       "loadFailedDescription": "Le document n'a pas pu \u00eatre r\u00e9cup\u00e9r\u00e9. Veuillez r\u00e9essayer.",
       "loadFailedRetry": "R\u00e9essayer"
