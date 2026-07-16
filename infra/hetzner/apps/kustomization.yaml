@@ -27,30 +27,40 @@ resources:
 # reference here unpullable. Check `gh run list --workflow=runtime-images.yml
 # --commit <sha>` before pinning.
 #
-# a660776 (#600) is the current `main` tip and carries the design + search
-# content/fixes the live UI was missing at 6e1816a: the shared BrandMark and
-# styles/shell baked into the frontend image (#547, #599), the header/context
-# bar/panel-row alignment (#548), search snippets that match the query (#595),
-# the acquired expression's real language on the index (#587), the norm-hierarchy
-# model (#591), and the Stadt Zürich municipal layer (#584, #589). All six images
-# are published at this SHA (verified in GHCR). The alembic delta from 6e1816a is
-# a single clean migration (20260714_0021_jurisdiction_norm_level) — history stays
-# single-headed, so the migrate job applies one forward revision on rollout.
+# 5c5c13f5 (#617) is the current `main` tip. All six images built and are
+# published at this SHA (runtime-images.yml run 29495543024 — every image job
+# green). It carries one behaviour change over ac69a83e (#606), and it is the
+# reason this rollout is not batched:
+#   - the source-version editor no longer corrupts acquisition specs on save
+#     (#614 / #617). Renaming a version label used to reset `corpus_id` to the
+#     schema default, empty `language_codes`, and null `document_type_hint`;
+#     opening a `canton_http` version and saving it unchanged rewrote it to
+#     firecrawl and dropped `canton_code`. HTTP 200 every time, and the damaged
+#     record rendered identically to a healthy one. Every operator edit against
+#     the previous image was destroying data invisibly, so this ships on its own
+#     rather than waiting for the next batch.
+# Zero alembic delta from ac69a83e (no new platform-control migrations across
+# this range), so the migrate job applies no forward revision on rollout. The
+# range touches only `platform-control/admin` sources, so every other image is
+# rebuilt but functionally unchanged.
 #
-# (Prior pin 6e1816a was the first SHA carrying the M12 pipeline-trust work —
-# #554 search 503s, #555 DI status callbacks, #565 /metrics, #569 provider
-# live-ready lock — and the first single-headed alembic history after the
-# #571–#574 double-0019 hazard, which stays behind us here.)
+# (Prior pin ac69a83e (#606) carried the UI fix batch: the filter rail and detail
+# panel rendering at all after being 28px/32px wide since 2026-03-29 (#605), the
+# admin shell grid + header overlap (#607), Esc closing the mobile drawer (#608),
+# aria-busy/role=alert on admin lists (#612), and the Inhalt tab's empty state
+# (#606). Zero alembic delta. It was also the first pin to make every workload
+# deterministic — four services had been running untagged `:latest` and three
+# were 29 commits stale at 6e1816a7.)
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
