@@ -6,7 +6,20 @@ Repo-wide conventions live in `AGENTS.md` (imported above). This file only adds 
 
 ### Planning anchor
 
-The original M1–M6 roadmap (issue #279) ran its course by 2026-04-28 and is closed; every M1–M6 issue closed with it. **There is no current roadmap anchor.** Until a successor planning issue lands, source the next-action list from `gh pr list --state open` and `gh issue list --state open` directly. When opening new work, prefer `/issue-execute <number>` if a ticket exists; otherwise scope inline.
+The current anchor is **issue #628 — M13: prove the coverage loop**. It executes
+[ADR-0033](docs/adr/0033-agentic-legal-reasoning.md) (Accepted): the bet is that a thorough data
+platform for law makes AI use cases easy, so the deliverable is the **loop** — blueprint → source
+version → acceptance run → evidence → `enabled: true` → approval — not the corpus, which is its
+output. The vertical slice is iteration 1; breadth is iterations 2..N.
+
+Acceptance test: ADR-0033's dog question, answered over a corpus **assembled through the platform**
+— or refused correctly because the ordinance is not in it.
+
+ADR-0033 §4 is a standing guardrail: **do not build the MCP server first.** Its build order is
+dependency-forced, and #628 tracks which steps are done.
+
+The predecessor M1–M6 roadmap (#279) closed 2026-04-20. When opening new work, prefer
+`/issue-execute <number>` if a ticket exists; otherwise scope inline against #628.
 
 ### Per-surface quality gates
 
@@ -16,7 +29,7 @@ Run the narrowest gate for the surface you touched before pushing:
 |---|---|
 | `platform-control/` | `cd platform-control && uv run pytest` |
 | `platform-control/admin/` | `cd platform-control/admin && npm run check` |
-| `legal-search/api/` | `cd legal-search/api && npm test` |
+| `legal-search/api/` | `cd legal-search/api && npm run check` |
 | `legal-search/frontend/` | `cd legal-search/frontend && npm run check` |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `python scripts/check_country_overlay_files.py` |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
