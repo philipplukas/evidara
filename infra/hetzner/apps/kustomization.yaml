@@ -27,32 +27,36 @@ resources:
 # reference here unpullable. Check `gh run list --workflow=runtime-images.yml
 # --commit <sha>` before pinning.
 #
-# ea087851 (#602) is the current `main` tip. All six images built and are
-# published at this SHA (runtime-images.yml run 29430135072 — every image job
-# green). It advances the live site past a660776 (#600) with:
-#   - real app icons for both apps, generated from the lattice (#593) — brand
-#   - the citation graph resolved into edges + GET /v1/citations stats (#592)
-#   - admin preview-review list/show ported to Tailwind v2 (#519, ADR-0026)
-#   - architecture docs (#562) and a Node>=24 test-gate fix (#602) — no runtime effect
-# Zero alembic delta from a660776 (no new platform-control migrations across this
-# range), so the migrate job applies no forward revision on rollout.
+# ac69a83e (#606) is the current `main` tip. All six images built and are
+# published at this SHA (runtime-images.yml run 29491549367 — every image job
+# green). It advances the live site past ea087851 (#602) with the UI fix batch:
+#   - the filter rail and detail panel actually render (#605) — they had been
+#     28px and 32px wide since the library landed at v4 on 2026-03-29
+#   - admin shell grid: the 288px sidebar column no longer clips mobile, and the
+#     header no longer paints over the top of `main` (#607)
+#   - Esc closes the admin mobile navigation drawer (#608)
+#   - admin list loading/error states expose aria-busy / role=alert (#612)
+#   - the document "Inhalt" tab renders an empty state instead of a blank panel,
+#     with copy that no longer claims the document is unprocessed (#606)
+# Zero alembic delta from ea087851 (no new platform-control migrations across
+# this range), so the migrate job applies no forward revision on rollout. The
+# range touches only frontend + admin sources, so the platform-control, worker,
+# and document-intelligence images are rebuilt but functionally unchanged.
 #
-# (Prior pin a660776 (#600) carried the shared BrandMark + styles/shell in the
-# frontend image (#547, #599), the header/context-bar/panel-row alignment (#548),
-# query-matching search snippets (#595), the acquired expression's real language
-# on the index (#587), the norm-hierarchy model (#591), and the Stadt Zürich
-# municipal scaffolding (#589). Its alembic delta was the single migration
-# 20260714_0021_jurisdiction_norm_level.)
+# (Prior pin ea087851 (#602) carried real app icons for both apps (#593), the
+# citation graph resolved into edges + GET /v1/citations stats (#592), admin
+# preview-review list/show ported to Tailwind v2 (#519, ADR-0026), architecture
+# docs (#562), and a Node>=24 test-gate fix (#602). Zero alembic delta.)
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: ea0878514a70f201249b586941d4b5367d9e8baa
+    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: ea0878514a70f201249b586941d4b5367d9e8baa
+    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: ea0878514a70f201249b586941d4b5367d9e8baa
+    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: ea0878514a70f201249b586941d4b5367d9e8baa
+    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: ea0878514a70f201249b586941d4b5367d9e8baa
+    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: ea0878514a70f201249b586941d4b5367d9e8baa
+    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
