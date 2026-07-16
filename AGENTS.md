@@ -25,7 +25,7 @@ tool manager without an ADR.
 2. **Follow existing patterns.** Before introducing a new abstraction, check if the repo already has one. Grep before you create.
 3. **Edit over duplicate.** Prefer modifying existing files over creating parallel abstractions.
 4. **Generated over handwritten.** Prefer generated reference docs (OpenAPI, terraform-docs, TypeDoc) over manually maintained reference tables.
-5. **Contract-first.** APIs are defined in `contracts/api/`, not invented inline. The spec is the source of truth.
+5. **Contract-first.** APIs are defined in `contracts/api/`, not invented inline. The spec is the source of truth — **except `contracts/api/platform-control.openapi.yaml`, which is generated from the FastAPI app** (ADR-0034). It is still the contract; it is just no longer hand-written. Change the routers/schemas and regenerate — `scripts/check-platform-control.sh` fails the build if the file and the app disagree. Hand-maintaining it is what drifted it to 4 of 11 acquisition providers and caused #614/#616 (see #618).
 
 ## Change classification
 
@@ -167,7 +167,7 @@ The pre-commit hooks and CI workflows must run the same checks. If you add a che
 | Thing | Source of truth |
 |---|---|
 | Architecture | `structurizr/workspace.dsl` |
-| API interfaces | `contracts/api/*.openapi.yaml` |
+| API interfaces | `contracts/api/*.openapi.yaml` — hand-authored, except `platform-control.openapi.yaml`, which is **generated** from the FastAPI app by `scripts/generate_platform_control_contract.py` and drift-gated (ADR-0034) |
 | Entity shapes | `contracts/schemas/*.json` |
 | Event payloads | `contracts/events/*.json` |
 | Infra resources | `infra/terraform/` |

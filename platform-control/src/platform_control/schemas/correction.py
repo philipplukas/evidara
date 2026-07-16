@@ -78,7 +78,46 @@ class CreateCorrectionRequest(BaseModel):
     pipeline_run_id: str | None = Field(default=None, pattern=_PIPELINE_RUN_ID_RE)
     rationale: str | None = Field(default=None, max_length=2000)
 
-    model_config = ConfigDict(extra="forbid")
+    # `payload` is an open dict whose meaningful shape depends on
+    # `correction_type`, so worked examples are the only thing that makes this
+    # body legible. They used to live in the hand-written OpenAPI file; they live
+    # here now because the contract is generated from these models (#618).
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "target_entity_type": "commentary_insight",
+                    "target_entity_id": "ins_01jq7c1ny0ffv8qdr1xwbejqb6",
+                    "correction_type": "field_edit",
+                    "payload": {
+                        "field": "claim",
+                        "value": (
+                            "Article 754 OR establishes director liability toward the company."
+                        ),
+                    },
+                    "original_snapshot": {"claim": "References Art. 754 OR"},
+                    "rationale": (
+                        "Editor sharpened the extracted claim to match the supporting passage."
+                    ),
+                },
+                {
+                    "target_entity_type": "document",
+                    "target_entity_id": "doc_01jq7bdptzqv3xs0c41xpw1ybg",
+                    "correction_type": "rescore_request",
+                    "payload": {
+                        "reason_code": "low_quality_extractions",
+                        "requested_priority": "normal",
+                    },
+                    "pipeline_run_id": "run_01jq7a3s9b7j4dndd9sgv6pb9d",
+                    "rationale": (
+                        "QA gate flagged citation parse-rate below threshold; "
+                        "requesting re-process."
+                    ),
+                },
+            ]
+        },
+    )
 
     def model_post_init(self, _ctx: Any) -> None:
         _validate_target_id(self.target_entity_type, self.target_entity_id)

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from platform_control.config import get_settings
 from platform_control.database import get_session
 from platform_control.domain import RunMode, RunStatus
+from platform_control.openapi import AGENT_DISCOVERY_TAG
 from platform_control.schemas.document_events import DocumentLifecycleEventListResponse
 from platform_control.schemas.lifecycle import RunLifecycleResponse
 from platform_control.schemas.processing_status import ProcessingStatusUpdateListResponse
@@ -58,7 +59,7 @@ def get_provider_registry(provider: ProviderDep) -> ProviderRegistry:
     return registry
 
 
-@router.get("", response_model=RunListResponse)
+@router.get("", response_model=RunListResponse, tags=[AGENT_DISCOVERY_TAG])
 async def list_runs(
     session: SessionDep,
     mode: RunMode | None = None,
@@ -110,7 +111,7 @@ async def get_run_readiness(
     )
 
 
-@router.get("/{run_id}", response_model=RunResponse)
+@router.get("/{run_id}", response_model=RunResponse, tags=[AGENT_DISCOVERY_TAG])
 async def get_run(
     run_id: str,
     session: SessionDep,
@@ -119,7 +120,11 @@ async def get_run(
     return await service.get_run(run_id)
 
 
-@router.get("/{run_id}/captured-resources", response_model=CapturedResourceListResponse)
+@router.get(
+    "/{run_id}/captured-resources",
+    response_model=CapturedResourceListResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+)
 async def list_run_captured_resources(
     run_id: str,
     session: SessionDep,
@@ -130,7 +135,11 @@ async def list_run_captured_resources(
     return await service.list_captured_resources(run_id, limit=limit, offset=offset)
 
 
-@router.get("/{run_id}/raw-artifacts", response_model=RawArtifactListResponse)
+@router.get(
+    "/{run_id}/raw-artifacts",
+    response_model=RawArtifactListResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+)
 async def list_run_raw_artifacts(
     run_id: str,
     session: SessionDep,
@@ -141,7 +150,11 @@ async def list_run_raw_artifacts(
     return await service.list_raw_artifacts(run_id, limit=limit, offset=offset)
 
 
-@router.get("/{run_id}/provider-jobs", response_model=ProviderJobListResponse)
+@router.get(
+    "/{run_id}/provider-jobs",
+    response_model=ProviderJobListResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+)
 async def list_run_provider_jobs(
     run_id: str,
     session: SessionDep,
@@ -171,7 +184,11 @@ async def retry_run(
     return await service.retry_run(run_id)
 
 
-@router.get("/{run_id}/preview-summary", response_model=RunPreviewSummaryResponse)
+@router.get(
+    "/{run_id}/preview-summary",
+    response_model=RunPreviewSummaryResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+)
 async def get_run_preview_summary(
     run_id: str,
     session: SessionDep,
@@ -189,7 +206,11 @@ async def get_run_pipeline_health(
     return await service.get_pipeline_health(run_id)
 
 
-@router.get("/{run_id}/processing-status", response_model=ProcessingStatusUpdateListResponse)
+@router.get(
+    "/{run_id}/processing-status",
+    response_model=ProcessingStatusUpdateListResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+)
 async def list_run_processing_status(
     run_id: str,
     session: SessionDep,
@@ -199,7 +220,11 @@ async def list_run_processing_status(
     return ProcessingStatusUpdateListResponse(data=updates)
 
 
-@router.get("/{run_id}/document-lifecycle", response_model=DocumentLifecycleEventListResponse)
+@router.get(
+    "/{run_id}/document-lifecycle",
+    response_model=DocumentLifecycleEventListResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+)
 async def list_run_document_lifecycle(
     run_id: str,
     session: SessionDep,
