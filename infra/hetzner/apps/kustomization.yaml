@@ -27,40 +27,43 @@ resources:
 # reference here unpullable. Check `gh run list --workflow=runtime-images.yml
 # --commit <sha>` before pinning.
 #
-# 5c5c13f5 (#617) is the current `main` tip. All six images built and are
-# published at this SHA (runtime-images.yml run 29495543024 — every image job
-# green). It carries one behaviour change over ac69a83e (#606), and it is the
-# reason this rollout is not batched:
-#   - the source-version editor no longer corrupts acquisition specs on save
-#     (#614 / #617). Renaming a version label used to reset `corpus_id` to the
-#     schema default, empty `language_codes`, and null `document_type_hint`;
-#     opening a `canton_http` version and saving it unchanged rewrote it to
-#     firecrawl and dropped `canton_code`. HTTP 200 every time, and the damaged
-#     record rendered identically to a healthy one. Every operator edit against
-#     the previous image was destroying data invisibly, so this ships on its own
-#     rather than waiting for the next batch.
-# Zero alembic delta from ac69a83e (no new platform-control migrations across
-# this range), so the migrate job applies no forward revision on rollout. The
-# range touches only `platform-control/admin` sources, so every other image is
-# rebuilt but functionally unchanged.
+# da39660d (#626) is the current `main` tip. All six images built and are
+# published at this SHA (runtime-images.yml run 29498811577 — every image job
+# green; verified published via the packages API, not an anonymous docker probe,
+# which fails closed on an expired credential and looks identical to a missing
+# image). It advances the live site past 5c5c13f5 (#617) with:
+#   - document body text reaches the screen at all (#621 / #613 / #609). The BFF
+#     suppressed `content` for EVERY document that had a body: the docling fetch
+#     was skipped whenever `content` was present, and the mapper emitted `content`
+#     only from `content_docling` — a field the index does not define. Every
+#     document detail served `content: null` while advertising an "Inhalt" tab.
+#   - the platform-control OpenAPI spec is now GENERATED from the FastAPI app and
+#     drift-gated (#618 / #626, ADR-0034). The hand-written spec described 4 of 11
+#     acquisition providers, omitted 14 of 61 paths, pointed at a `servers` host
+#     that exists nowhere in `infra/`, and documented `Bearer <JWT>` auth "from the
+#     identity provider" when the API requires `X-API-Key` — a client built from it
+#     could not authenticate at all. Runtime behaviour is unchanged; `/docs` now
+#     shows the real title/version, and 8 wizard `operationId`s change (fixing a
+#     genuine `get_run` collision). Paths are untouched, so path-based clients are
+#     unaffected.
+# Zero alembic delta from 5c5c13f5 (no new platform-control migrations across this
+# range), so the migrate job applies no forward revision on rollout.
 #
-# (Prior pin ac69a83e (#606) carried the UI fix batch: the filter rail and detail
-# panel rendering at all after being 28px/32px wide since 2026-03-29 (#605), the
-# admin shell grid + header overlap (#607), Esc closing the mobile drawer (#608),
-# aria-busy/role=alert on admin lists (#612), and the Inhalt tab's empty state
-# (#606). Zero alembic delta. It was also the first pin to make every workload
-# deterministic — four services had been running untagged `:latest` and three
-# were 29 commits stale at 6e1816a7.)
+# (Prior pin 5c5c13f5 (#617) stopped the source-version editor corrupting
+# acquisition specs on save — it had been resetting `corpus_id`, emptying
+# `language_codes`, nulling `document_type_hint` and rewriting 7 of 11 providers to
+# firecrawl, HTTP 200 each time, with the damaged record rendering identically to a
+# healthy one. Zero alembic delta.)
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
