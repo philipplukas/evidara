@@ -5,6 +5,9 @@ import { mapDocumentToDetailView } from './document-detail.mapper';
 
 // ─── Fixtures ───
 
+const LAW_BODY_TEXT =
+  'Die Mitglieder des Verwaltungsrates sind der Gesellschaft für den Schaden\nverantwortlich, den sie durch Verletzung ihrer Pflichten verursachen.\n\nWer die Erfüllung einer Aufgabe einem anderen Organ überträgt, haftet für\nden von diesem verursachten Schaden.';
+
 const lawDoc: DocumentEntity = {
   document_id: 'doc_001',
   title: 'Bundesgesetz über das Obligationenrecht',
@@ -18,7 +21,13 @@ const lawDoc: DocumentEntity = {
   language: 'de',
   sections_count: 5,
   citations_count: 3,
-  content_docling: { version: '1.0', body: [] },
+  // The body as the index really holds it: a plain-text string with blank-line
+  // paragraph breaks, exactly as document-intelligence's `body_text` builds it.
+  // This fixture used to be `content_docling: { version: '1.0', body: [] }` — a
+  // DoclingDocument shape no producer in this repo emits and the `text`-mapped
+  // index cannot store. It proved the mapper handled a document that could not
+  // exist, while every real document took the suppressed path.
+  content: LAW_BODY_TEXT,
 };
 
 const sections: SectionEntity[] = [
@@ -67,7 +76,7 @@ describe('mapDocumentToDetailView', () => {
     expect(view.subtitle).toContain('Schweiz');
     expect(view.subtitle).toContain('Fedlex');
     expect(view.breadcrumbs).toEqual(['OR', 'Gesellschaftsrecht', 'Verantwortlichkeit']);
-    expect(view.content).toEqual({ version: '1.0', body: [] });
+    expect(view.content).toBe(LAW_BODY_TEXT);
     expect(view.contentLanguage?.display).toBe('de');
     expect(view.contentLanguage?.label).toBe('Originalsprache');
   });
@@ -141,6 +150,33 @@ describe('mapDocumentToDetailView', () => {
     expect(tabKeys).toContain('sections');
     expect(tabKeys).toContain('citations');
     expect(tabKeys).toContain('details');
+  });
+
+  // The regression the mocked tests could not see: a document shaped like the
+  // ones the index actually holds must carry its body through to the client.
+  it('should emit the indexed body text as `content`', () => {
+    const view = mapDocumentToDetailView(
+      { document_id: 'doc_002', title: 'Entscheid', content: 'Erste Erwägung.\n\nZweite Erwägung.' },
+      [],
+      [],
+    );
+    expect(view.content).toBe('Erste Erwägung.\n\nZweite Erwägung.');
+  });
+
+  it('should not advertise an Inhalt tab for a document with no body', () => {
+    const view = mapDocumentToDetailView(minimalDoc, [], []);
+    expect(view.content).toBeUndefined();
+    expect(view.tabs.map((t) => t.key)).not.toContain('content');
+  });
+
+  it('should treat a whitespace-only body as no body', () => {
+    const view = mapDocumentToDetailView(
+      { document_id: 'doc_003', title: 'Leer', content: '   \n\n  ' },
+      [],
+      [],
+    );
+    expect(view.content).toBeUndefined();
+    expect(view.tabs.map((t) => t.key)).not.toContain('content');
   });
 
   it('should compose references from citations', () => {

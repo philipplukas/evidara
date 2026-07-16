@@ -326,13 +326,15 @@ export const articleDetail: DetailViewModel = {
     { label: "In force since", value: "01.01.2023" },
     { label: "Last revision", value: "Aktienrechtsrevision 2020" },
   ],
-  contentHtml: `<div class="article-text">
-<p class="article-marginal">1</p>
-<p>Die Mitglieder des Verwaltungsrates und alle mit der <strong>Geschäftsführung</strong> oder mit der <strong>Liquidation</strong> befassten Personen sind sowohl der Gesellschaft als den einzelnen Aktionären und Gesellschaftsgläubigern für den <strong>Schaden</strong> verantwortlich, den sie durch absichtliche oder fahrlässige Verletzung ihrer Pflichten verursachen.</p>
-<p class="article-marginal">2</p>
-<p>Wer die Erfüllung einer Aufgabe befugterweise einem anderen Organ überträgt, haftet für den von diesem verursachten Schaden, sofern er nicht nachweist, dass er bei der Auswahl, Unterrichtung und Überwachung die nach den Umständen gebotene Sorgfalt angewendet hat.</p>
-</div>`,
+  // Plain text, as the API really sends it: paragraphs split by blank lines,
+  // no markup. This mock used to hold hand-written HTML with styling classes —
+  // a shape no API response has ever produced — which is precisely why the
+  // missing body went unnoticed for so long (#609).
+  contentText: `Die Mitglieder des Verwaltungsrates und alle mit der Geschäftsführung oder mit der Liquidation befassten Personen sind sowohl der Gesellschaft als den einzelnen Aktionären und Gesellschaftsgläubigern für den Schaden verantwortlich, den sie durch absichtliche oder fahrlässige Verletzung ihrer Pflichten verursachen.
+
+Wer die Erfüllung einer Aufgabe befugterweise einem anderen Organ überträgt, haftet für den von diesem verursachten Schaden, sofern er nicht nachweist, dass er bei der Auswahl, Unterrichtung und Überwachung die nach den Umständen gebotene Sorgfalt angewendet hat.`,
   tabs: [
+    { key: "content", label: "Inhalt" },
     { key: "details", label: "Details" },
     { key: "related", label: "Related", count: 154 },
     { key: "references", label: "References", count: 56 },
@@ -445,13 +447,15 @@ export const decisionDetail: DetailViewModel = {
     { label: "Chamber", value: "I. Civil Law Division" },
     { label: "Outcome", value: "Appeal dismissed" },
   ],
-  contentHtml: `<div class="decision-text">
-<p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-4 mb-2">Regeste</p>
-<p>Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung.</p>
-<p>Das Bundesgericht bestätigt, dass die Verantwortlichkeit nach Art. 754 OR eine Pflichtverletzung, einen Schaden, einen Kausalzusammenhang und ein Verschulden voraussetzt. Die Beweislast für sämtliche Haftungsvoraussetzungen liegt beim Kläger (E. 3.2).</p>
-<p>Die Sorgfaltspflicht der Verwaltungsratsmitglieder bemisst sich nach einem objektiven Massstab unter Berücksichtigung der konkreten Umstände des Einzelfalls (E. 4.1).</p>
-</div>`,
+  contentText: `Regeste
+
+Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung.
+
+Das Bundesgericht bestätigt, dass die Verantwortlichkeit nach Art. 754 OR eine Pflichtverletzung, einen Schaden, einen Kausalzusammenhang und ein Verschulden voraussetzt. Die Beweislast für sämtliche Haftungsvoraussetzungen liegt beim Kläger (E. 3.2).
+
+Die Sorgfaltspflicht der Verwaltungsratsmitglieder bemisst sich nach einem objektiven Massstab unter Berücksichtigung der konkreten Umstände des Einzelfalls (E. 4.1).`,
   tabs: [
+    { key: "content", label: "Inhalt" },
     { key: "details", label: "Details" },
     { key: "related", label: "Related", count: 34 },
     { key: "references", label: "References", count: 12 },

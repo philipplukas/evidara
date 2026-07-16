@@ -6,8 +6,16 @@
 export interface DocumentEntity {
   document_id: string;
   title: string;
+  /**
+   * The document body, as a plain-text string. `ProjectionsService` writes it
+   * from document-intelligence's `body_text`/`full_text` (both `str` in
+   * `canonical/models.py`), and the index maps it as `text` — so a structured
+   * object can never live here. There is deliberately no `content_docling`
+   * sibling: nothing in the pipeline produces a DoclingDocument (ADR-0010 is
+   * still `Proposed`), the index has no such field, and the Document Service's
+   * `/lean` payload is a canonical row, not a DoclingDocument.
+   */
   content?: string;
-  content_docling?: unknown;
   jurisdiction?: string;
   document_type?: string;
   authority_name?: string;

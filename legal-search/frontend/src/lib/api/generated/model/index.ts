@@ -32,7 +32,6 @@ export * from './contentLanguage';
 export * from './contextChip';
 export * from './correlationIdParameter';
 export * from './detailView';
-export * from './detailViewContent';
 export * from './detailViewLocalStructure';
 export * from './filterFacetView';
 export * from './filterFacetViewType';

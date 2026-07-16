@@ -17,7 +17,6 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
  * OpenAPI spec version: 0.6.0
  */
 import type { MetadataRow } from './metadataRow';
-import type { DetailViewContent } from './detailViewContent';
 import type { ContentLanguage } from './contentLanguage';
 import type { TabView } from './tabView';
 import type { RelatedGroup } from './relatedGroup';
@@ -32,10 +31,26 @@ export interface DetailView {
   subtitle: string;
   breadcrumbs?: string[];
   metadata: MetadataRow[];
-  /** Structured DoclingDocument JSON produced by document-intelligence.
-Passed through unchanged by the BFF. See ADR-0010.
+  /** The document's body text as plain text: paragraphs are separated by
+blank lines and the string carries no markup. Absent when the
+document has no body, in which case the `content` tab is also
+omitted from `tabs`.
+
+This is what document-intelligence actually produces:
+`NormalizedDocumentIR.body_text` (`normalize/ir.py`) joins the
+parsed blocks with `\n\n` after stripping tags, the canonical row
+carries it as a `str` (`canonical/models.py`), and the projection
+indexes it verbatim into the `text`-mapped `content` field.
+
+ADR-0010 proposes DoclingDocument JSON here instead, and this field
+was previously typed `object` on that basis. That ADR is still
+`Proposed` and unimplemented — no code path emits a DoclingDocument,
+and the Document Service's `/lean` endpoint returns a canonical row
+despite its own spec. Revisit this type if ADR-0010 is accepted and
+actually built; until then `string` is what the BFF can honestly
+promise.
  */
-  content?: DetailViewContent;
+  content?: string;
   contentLanguage?: ContentLanguage;
   tabs: TabView[];
   relatedGroups: RelatedGroup[];

@@ -56,7 +56,6 @@ export class DocumentsOpenSearchAdapter implements DocumentsRepository {
         document_id: src.document_id as string,
         title: src.title as string,
         content: src.content as string | undefined,
-        content_docling: src.content_docling as unknown,
         jurisdiction: src.jurisdiction as string | undefined,
         document_type: src.document_type as string | undefined,
         authority_name: src.authority_name as string | undefined,

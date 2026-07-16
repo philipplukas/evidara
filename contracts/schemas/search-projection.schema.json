@@ -149,11 +149,7 @@
     },
     "content": {
       "type": "string",
-      "description": "Full text content for search indexing and snippet generation."
-    },
-    "content_docling": {
-      "type": "object",
-      "description": "DoclingDocument JSON (ADR-0010). Stored for detail view pass-through. May be large — consider indexing constraints."
+      "description": "Full text content for search indexing, snippet generation, and the detail view's document body. Plain text: paragraphs separated by blank lines, no markup — this is document-intelligence's `body_text`/`full_text` indexed verbatim."
     },
 
     "sections_count": {
