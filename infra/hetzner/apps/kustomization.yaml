@@ -27,36 +27,40 @@ resources:
 # reference here unpullable. Check `gh run list --workflow=runtime-images.yml
 # --commit <sha>` before pinning.
 #
-# ac69a83e (#606) is the current `main` tip. All six images built and are
-# published at this SHA (runtime-images.yml run 29491549367 — every image job
-# green). It advances the live site past ea087851 (#602) with the UI fix batch:
-#   - the filter rail and detail panel actually render (#605) — they had been
-#     28px and 32px wide since the library landed at v4 on 2026-03-29
-#   - admin shell grid: the 288px sidebar column no longer clips mobile, and the
-#     header no longer paints over the top of `main` (#607)
-#   - Esc closes the admin mobile navigation drawer (#608)
-#   - admin list loading/error states expose aria-busy / role=alert (#612)
-#   - the document "Inhalt" tab renders an empty state instead of a blank panel,
-#     with copy that no longer claims the document is unprocessed (#606)
-# Zero alembic delta from ea087851 (no new platform-control migrations across
+# 5c5c13f5 (#617) is the current `main` tip. All six images built and are
+# published at this SHA (runtime-images.yml run 29495543024 — every image job
+# green). It carries one behaviour change over ac69a83e (#606), and it is the
+# reason this rollout is not batched:
+#   - the source-version editor no longer corrupts acquisition specs on save
+#     (#614 / #617). Renaming a version label used to reset `corpus_id` to the
+#     schema default, empty `language_codes`, and null `document_type_hint`;
+#     opening a `canton_http` version and saving it unchanged rewrote it to
+#     firecrawl and dropped `canton_code`. HTTP 200 every time, and the damaged
+#     record rendered identically to a healthy one. Every operator edit against
+#     the previous image was destroying data invisibly, so this ships on its own
+#     rather than waiting for the next batch.
+# Zero alembic delta from ac69a83e (no new platform-control migrations across
 # this range), so the migrate job applies no forward revision on rollout. The
-# range touches only frontend + admin sources, so the platform-control, worker,
-# and document-intelligence images are rebuilt but functionally unchanged.
+# range touches only `platform-control/admin` sources, so every other image is
+# rebuilt but functionally unchanged.
 #
-# (Prior pin ea087851 (#602) carried real app icons for both apps (#593), the
-# citation graph resolved into edges + GET /v1/citations stats (#592), admin
-# preview-review list/show ported to Tailwind v2 (#519, ADR-0026), architecture
-# docs (#562), and a Node>=24 test-gate fix (#602). Zero alembic delta.)
+# (Prior pin ac69a83e (#606) carried the UI fix batch: the filter rail and detail
+# panel rendering at all after being 28px/32px wide since 2026-03-29 (#605), the
+# admin shell grid + header overlap (#607), Esc closing the mobile drawer (#608),
+# aria-busy/role=alert on admin lists (#612), and the Inhalt tab's empty state
+# (#606). Zero alembic delta. It was also the first pin to make every workload
+# deterministic — four services had been running untagged `:latest` and three
+# were 29 commits stale at 6e1816a7.)
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: ac69a83e1d66b9ca93d4c968535c9264a4c8f8f9
+    newTag: 5c5c13f596512d1d1a00defd958c2c8498aa6eff
