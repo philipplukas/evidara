@@ -81,7 +81,17 @@ export function DataTable<T>({
       ) : null}
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm text-[var(--foreground)]">
+        {/*
+         * `aria-busy` rides on the persistent <table> rather than the loading
+         * cell: a live region has to exist before its content changes to be
+         * announced reliably, and the cell mounts and unmounts with the state
+         * it would describe. Toggling an attribute on an element that never
+         * leaves the DOM is the signal assistive tech can actually observe.
+         */}
+        <table
+          aria-busy={!!isLoading}
+          className="w-full border-collapse text-sm text-[var(--foreground)]"
+        >
           <thead>
             <tr className="bg-[var(--surface-input)]">
               {columns.map((col) => {
@@ -150,7 +160,9 @@ export function DataTable<T>({
                   colSpan={columns.length}
                   className="px-4 py-10 text-center text-[var(--status-critical)]"
                 >
-                  Failed to load records.
+                  {/* `alert` announces on insertion, which is exactly how this
+                      node arrives — no persistent region needed. */}
+                  <span role="alert">Failed to load records.</span>
                 </td>
               </tr>
             ) : !hasRows ? (

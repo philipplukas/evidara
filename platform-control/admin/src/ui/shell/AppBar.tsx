@@ -85,7 +85,14 @@ export function AppBar() {
         background: "var(--admin-header-bg)",
       }}
     >
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-4 w-full px-3 sm:px-6 py-2 md:py-3 min-w-0">
+      {/*
+       * Stack brand / title / CTA vertically until `lg`. Between `md` (768px,
+       * where the sidebar claims a 288px column) and `lg`, the content column
+       * is only ~480px — too narrow for three side-by-side blocks without the
+       * title colliding with the brand and CTA. Row layout waits for `lg`,
+       * where the column is wide enough to breathe.
+       */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 lg:gap-4 w-full px-3 sm:px-6 py-2 lg:py-3 min-w-0">
         {/* Brand mark + product */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {/*
@@ -110,7 +117,7 @@ export function AppBar() {
         </div>
 
         {/* Title block (route-aware) */}
-        <div className="flex flex-col items-start md:items-center text-left md:text-center min-w-0 flex-1 gap-[2px]">
+        <div className="flex flex-col items-start lg:items-center text-left lg:text-center min-w-0 flex-1 gap-[2px]">
           <span className="inline-flex items-center h-[22px] px-2 rounded-full text-[10px] font-semibold tracking-[0.06em] text-[var(--admin-on-brand-faint)] bg-[var(--admin-on-brand-wash)] border border-[var(--admin-header-border)]">
             Operator · Control plane
           </span>
@@ -131,7 +138,7 @@ export function AppBar() {
             {subtitle}
           </p>
           {handoff.hasOrigin ? (
-            <div className="flex flex-wrap justify-start md:justify-center gap-[6px] pt-[4px]">
+            <div className="flex flex-wrap justify-start lg:justify-center gap-[6px] pt-[4px]">
               {handoff.query ? (
                 <span className="inline-flex items-center h-6 px-2 rounded-full text-[11px] text-[var(--admin-on-brand)] bg-[var(--admin-on-brand-subtle)] border border-[var(--admin-on-brand-border)]">
                   Search: {handoff.query}
@@ -152,10 +159,10 @@ export function AppBar() {
         </div>
 
         {/* Back-to-legal-search CTA */}
-        <div className="flex md:items-center self-stretch md:self-auto">
+        <div className="flex lg:items-center self-stretch lg:self-auto">
           <a
             href={handoff.returnToUrl}
-            className="inline-flex items-center justify-center gap-2 rounded-full font-semibold no-underline transition-[background-color,border-color,transform,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 px-4 min-h-11 sm:h-10 text-sm bg-[var(--admin-on-brand-wash)] border border-[var(--admin-on-brand-border)] text-[var(--admin-on-brand)] hover:bg-[var(--admin-on-brand-wash-hover)] hover:border-[var(--admin-on-brand-border-hover)] whitespace-nowrap self-stretch md:self-auto w-full md:w-auto"
+            className="inline-flex items-center justify-center gap-2 rounded-full font-semibold no-underline transition-[background-color,border-color,transform,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 px-4 min-h-11 sm:h-10 text-sm bg-[var(--admin-on-brand-wash)] border border-[var(--admin-on-brand-border)] text-[var(--admin-on-brand)] hover:bg-[var(--admin-on-brand-wash-hover)] hover:border-[var(--admin-on-brand-border-hover)] whitespace-nowrap self-stretch lg:self-auto w-full lg:w-auto"
           >
             <span aria-hidden>
               <ArrowLeft size={14} strokeWidth={2.2} />

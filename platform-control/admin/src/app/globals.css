@@ -171,6 +171,38 @@ a {
 }
 
 /*
+ * Root grid for the booted admin (`AppShell`). Single column on mobile — the
+ * sidebar is an overlay drawer there, not a grid column — so header + main fill
+ * the viewport instead of being squeezed into `1fr` beside a reserved 288px
+ * column (the bug when the columns were hardcoded inline at every width). At the
+ * `md` breakpoint (768px, matching the sidebar's `md:block`) the sidebar becomes
+ * a real 288px column spanning both rows.
+ */
+.admin-app-shell {
+  /*
+   * Header row floors at 80px (the v1 MUI height) but grows to fit taller
+   * chrome — the header stacks its brand/title/CTA below `lg`, and wraps at
+   * narrow widths. A fixed `80px` track clipped that overflow, painting the
+   * header over the top of `main` at every viewport (63px at the md
+   * breakpoint). `auto` lets `main` sit below the real header height.
+   */
+  grid-template-rows: minmax(80px, auto) 1fr;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "header"
+    "main";
+}
+
+@media (min-width: 768px) {
+  .admin-app-shell {
+    grid-template-columns: 288px 1fr;
+    grid-template-areas:
+      "sidebar header"
+      "sidebar main";
+  }
+}
+
+/*
  * Colour context for the shared `BrandMark` on the pre-boot shell (the dynamic
  * loading state and the 403 panel). Unlike `AppBar`, these sit on a *light*
  * panel, so the lattice inherits navy here rather than the on-brand white.

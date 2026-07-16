@@ -1,18 +1,20 @@
 import type { Page } from "@playwright/test";
 
 /**
- * react-resizable-panels can leave the desktop detail panel at sub-`minSize`
- * width in headless Playwright after navigation/tab switches even though the
- * product fix (`resize(32)` in WorkspaceClient) works in real browsers. The
- * race is most reproducible when the detail surface is opened via URL state
- * (`?item=…`) instead of a click — the SSR-hydrated panel boots at width 0
- * and the imperative `resize(32)` from `useEffect` lands after the screenshot
- * settles.
+ * Ensures the desktop detail panel is at a readable width before a visual
+ * capture.
  *
- * This helper forces the panel to ~40% via direct flex manipulation; it's a
- * no-op when the panel is already wide enough. Mirrors the equivalent
- * workaround in `screenshot-pack.spec.ts` so visual baselines and screenshot
- * captures stay framed identically.
+ * Historically the panel opened as a ~32px sliver, mis-attributed here to a
+ * headless-Playwright "race" — it was actually the react-resizable-panels v4
+ * units bug: WorkspaceClient passed bare numbers (`resize(32)`, `minSize={25}`),
+ * which v4 reads as PIXELS, so the panel was 32px in *every* browser, not just
+ * headless. That is now fixed (percent strings), so the panel opens at ~32% on
+ * its own and this helper is a defensive no-op whenever it is already ≥20% wide.
+ *
+ * Kept (as a no-op guard) so that if a future units regression shrinks the
+ * panel again, visual baselines still frame consistently rather than silently
+ * capturing a sliver. The real guard is the width assertion in
+ * `workspace-panels.spec.ts`.
  */
 export async function forceExpandDetailPanel(page: Page) {
   await page.evaluate(() => {
