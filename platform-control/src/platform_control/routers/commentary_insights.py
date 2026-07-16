@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
+from platform_control.openapi import AGENT_DISCOVERY_TAG
 from platform_control.schemas.commentary_insight import (
     CommentaryInsightHistoryEntry,
     CommentaryInsightHistoryResponse,
@@ -31,6 +32,7 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 @router.get(
     "/commentary-insights",
     response_model=CommentaryInsightListResponse,
+    tags=[AGENT_DISCOVERY_TAG],
 )
 async def list_commentary_insights(
     session: SessionDep,
@@ -57,6 +59,7 @@ async def list_commentary_insights(
 @router.get(
     "/commentary-insights/{insight_id}",
     response_model=CommentaryInsightResponse,
+    tags=[AGENT_DISCOVERY_TAG],
 )
 async def get_commentary_insight(
     insight_id: str,
@@ -70,11 +73,18 @@ async def get_commentary_insight(
 @router.get(
     "/commentary-insights/{insight_id}/history",
     response_model=CommentaryInsightHistoryResponse,
+    tags=[AGENT_DISCOVERY_TAG],
 )
 async def get_commentary_insight_history(
     insight_id: str,
     session: SessionDep,
 ) -> CommentaryInsightHistoryResponse:
+    """Read a commentary insight's correction history.
+
+    Returns the corrections that have targeted this insight, ordered
+    oldest-first so the UI renders a forward-in-time timeline. Used
+    by the admin commentary insight detail page for provenance.
+    """
     service = CommentaryInsightService(session)
     insight, corrections = await service.history(insight_id)
     return CommentaryInsightHistoryResponse(

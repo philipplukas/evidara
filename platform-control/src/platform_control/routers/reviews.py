@@ -42,6 +42,12 @@ async def create_review_task(
     request: CreateReviewTaskRequest,
     service: ServiceDep,
 ) -> ReviewTaskResponse:
+    """Enqueue an extraction review task.
+
+    Persisting the task is the enqueue: the queue is the review_tasks table, read by
+    platform-control/admin. What lands here is decided by the confidence-band routing
+    policy (docs/runbooks/extraction-review-routing.md).
+    """
     return await service.create_review_task(request)
 
 

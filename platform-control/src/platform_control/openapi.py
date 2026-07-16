@@ -1,0 +1,131 @@
+"""OpenAPI document metadata and the operation-id policy for platform-control.
+
+``contracts/api/platform-control.openapi.yaml`` is **generated from this app** by
+``scripts/generate_platform_control_contract.py`` and gated for drift by
+``scripts/check-platform-control.sh``. It used to be hand-maintained, and it
+described less than the code did: 4 of 11 acquisition provider variants, no
+``execution_mode``, list responses without their ``{data, limit, offset, total}``
+envelope, and an ``Authorization: Bearer <JWT>`` security scheme this service has
+never implemented. Consumers that believed it shipped bugs (#614, #616); #617
+could not derive the admin provider list from it precisely because it lied. See
+#618.
+
+Everything an OpenAPI document needs that the routes and Pydantic models cannot
+supply themselves lives here, so that ``/openapi.json`` and the committed
+contract are the same document. There is deliberately **no overlay applied at
+generation time**: an overlay is a second source of truth, and a second source of
+truth is where drift lives.
+
+Two things are consciously *not* declared here:
+
+``servers``
+    The base URL is per-deployment (Cloud Run URLs in ``infra/env/*``, a
+    ``REPLACE_ME`` ingress host in ``k8s/gitops/``), and the app cannot know it.
+    Declaring one would also aim Swagger UI's "Try it out" at that URL on every
+    deployment. With no ``servers``, both the docs UI and generated clients
+    resolve against wherever the document was served, which is the truth.
+
+``bearerAuth``
+    Not a loss — a correction. Auth is the ``X-API-Key`` header
+    (:mod:`platform_control.auth`), which FastAPI emits as the ``APIKeyHeader``
+    scheme from the route dependencies.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi.routing import APIRoute
+
+API_TITLE = "Platform Control API"
+
+# Must equal `apis.platform_control.version` in contracts/manifest.yaml —
+# scripts/check_contract_manifest.py compares the manifest against the generated
+# contract's info.version, and the drift gate compares the contract against this
+# app. Bump both together, per contracts/manifest.yaml compatibility_policy
+# (additive -> minor, breaking -> major).
+API_VERSION = "0.8.0"
+
+API_DESCRIPTION = """\
+API for managing sources, source versions, runs, approvals, and provider webhooks
+in the Evidara platform control plane.
+
+This document is generated from the FastAPI application — it is exactly what the
+service serves at `/openapi.json`. Do not hand-edit `contracts/api/platform-control.openapi.yaml`;
+change the models or routes and run `scripts/generate_platform_control_contract.py`.
+"""
+
+API_CONTACT: dict[str, Any] = {"name": "Evidara Team"}
+
+# Tag order drives the render order in Swagger UI and Redoc. Descriptions are
+# part of the contract: they carry semantics the schemas cannot.
+OPENAPI_TAGS: list[dict[str, Any]] = [
+    {"name": "reference-data"},
+    {"name": "sources"},
+    {"name": "source-versions"},
+    {"name": "runs"},
+    {"name": "schedules"},
+    {"name": "wizard"},
+    {"name": "reviews"},
+    {
+        "name": "corpora",
+        "description": (
+            "First-class corpus and tenant/scope management.  A corpus groups source versions\n"
+            "under a shared ``tenant_id`` and ``scope_type`` identity.  Operators create corpora\n"
+            "here and reference them by ``corpus_id`` in acquisition configs.\n"
+        ),
+    },
+    {"name": "compliance-policies"},
+    {"name": "di-events"},
+    {"name": "firecrawl"},
+    {"name": "slack"},
+    {
+        "name": "corrections",
+        "description": (
+            "Human-in-the-loop corrections raised against upstream domain entities (source,\n"
+            "canonical document, commentary insight). Corrections are the durable audit trail\n"
+            "for HITL field edits, annotations, rejections, and rescore requests.\n"
+        ),
+    },
+    {
+        "name": "commentary-insights",
+        "description": (
+            "Operator-facing read surface for commentary insights. Reads are\n"
+            "backed by the `commentary_insights` overlay populated by\n"
+            "document-intelligence runs and amended by applied corrections;\n"
+            "writes flow through `POST /v1/corrections` (no PATCH on\n"
+            "commentary-insights — see PR #440 design).\n"
+        ),
+    },
+    {"name": "health"},
+    {
+        "name": "agent-discovery",
+        "description": (
+            "Read-only operations commonly used by operators and agents for discovery and "
+            "evidence\n"
+            "(`evidara openapi tags`, MVP acceptance, smoke matrices). Does not imply mutating "
+            "workflow APIs.\n"
+        ),
+    },
+]
+
+# ADR-0022: read-heavy operations carry `agent-discovery` as a secondary tag so
+# agents can filter the discovery surface without new endpoints. Apply it in the
+# route decorators (`tags=[..., AGENT_DISCOVERY_TAG]`) — a tag that exists only
+# in the contract is exactly the drift this module exists to end.
+AGENT_DISCOVERY_TAG = "agent-discovery"
+
+
+def generate_operation_id(route: APIRoute) -> str:
+    """Derive a stable camelCase ``operationId`` from the endpoint function name.
+
+    FastAPI's default appends the path and method (``get_run_v1_runs__run_id__get``),
+    which is unique but hostile to generated clients. The endpoint function name
+    is already the operation's name, so ``get_run`` -> ``getRun``.
+
+    This means **the function name is API surface**: renaming an endpoint function
+    renames its ``operationId``, and two endpoint functions may not share a name.
+    ``tests/unit/test_openapi_contract.py`` enforces both.
+    """
+    head, *rest = route.name.split("_")
+    return head + "".join(word.capitalize() for word in rest)

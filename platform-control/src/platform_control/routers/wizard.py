@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.config import get_settings
 from platform_control.database import get_session
+from platform_control.openapi import AGENT_DISCOVERY_TAG
 from platform_control.schemas.wizard import (
     CreateWizardProjectRequest,
     StartWizardPilotRunRequest,
@@ -74,7 +75,7 @@ def _to_status_response(run) -> WizardRunStatusResponse:
 
 
 @router.post("/projects", response_model=WizardProjectResponse, status_code=status.HTTP_201_CREATED)
-async def create_project(
+async def create_wizard_project(
     request: CreateWizardProjectRequest,
     session: SessionDep,
     orchestrator: Annotated[Orchestrator, Depends(get_orchestrator)],
@@ -84,8 +85,12 @@ async def create_project(
     return WizardProjectResponse.model_validate(project)
 
 
-@router.get("/projects/{project_id}", response_model=WizardProjectResponse)
-async def get_project(
+@router.get(
+    "/projects/{project_id}",
+    response_model=WizardProjectResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+)
+async def get_wizard_project(
     project_id: str,
     session: SessionDep,
     orchestrator: Annotated[Orchestrator, Depends(get_orchestrator)],
@@ -96,7 +101,7 @@ async def get_project(
 
 
 @router.post("/projects/{project_id}/scope", response_model=WizardProjectResponse)
-async def save_scope(
+async def save_wizard_scope(
     project_id: str,
     request: UpdateWizardScopeRequest,
     session: SessionDep,
@@ -108,7 +113,7 @@ async def save_scope(
 
 
 @router.post("/projects/{project_id}/discovery-plan", response_model=WizardProjectResponse)
-async def save_discovery_plan(
+async def save_wizard_discovery_plan(
     project_id: str,
     request: UpdateWizardDiscoveryPlanRequest,
     session: SessionDep,
@@ -120,7 +125,7 @@ async def save_discovery_plan(
 
 
 @router.post("/projects/{project_id}/pilot-run", response_model=WizardRunStatusResponse)
-async def start_pilot_run(
+async def start_wizard_pilot_run(
     project_id: str,
     request: StartWizardPilotRunRequest,
     session: SessionDep,
@@ -132,7 +137,7 @@ async def start_pilot_run(
 
 
 @router.get("/runs/{run_id}", response_model=WizardRunStatusResponse)
-async def get_run(
+async def get_wizard_run(
     run_id: str,
     session: SessionDep,
     orchestrator: Annotated[Orchestrator, Depends(get_orchestrator)],
@@ -143,7 +148,7 @@ async def get_run(
 
 
 @router.post("/runs/{run_id}/approve", response_model=WizardRunStatusResponse)
-async def approve_run(
+async def approve_wizard_run(
     run_id: str,
     request: WizardRunDecisionRequest,
     session: SessionDep,
@@ -155,7 +160,7 @@ async def approve_run(
 
 
 @router.post("/runs/{run_id}/reject", response_model=WizardRunStatusResponse)
-async def reject_run(
+async def reject_wizard_run(
     run_id: str,
     request: WizardRunDecisionRequest,
     session: SessionDep,
