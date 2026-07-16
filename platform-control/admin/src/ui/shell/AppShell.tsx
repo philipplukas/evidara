@@ -79,6 +79,18 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
   const openMobile = useCallback(() => setMobileOpen(true), []);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
+  // Esc closes the drawer. The scrim is `tabIndex={-1}`, so it can't be focused
+  // and activated by keyboard; without this the only keyboard exit is tabbing
+  // forward to the drawer's own close button.
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isMobileOpen]);
+
   return (
     <div
       className="min-h-screen grid"
@@ -130,8 +142,8 @@ export function AppShell({ children, extraSidebarItems = DEFAULT_EXTRA_ITEMS }: 
       {/* Mobile drawer + scrim */}
       {isMobileOpen ? (
         <>
-          {/* `<button>` is the accessible equivalent of a click-scrim —
-              keyboard users can Esc or click/space the scrim equally. */}
+          {/* Click-scrim. Deliberately out of the tab order: the drawer's own
+              close button is the keyboard affordance, plus Esc above. */}
           <button
             type="button"
             className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm cursor-default"
