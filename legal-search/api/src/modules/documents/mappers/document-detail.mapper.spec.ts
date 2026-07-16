@@ -156,7 +156,11 @@ describe('mapDocumentToDetailView', () => {
   // ones the index actually holds must carry its body through to the client.
   it('should emit the indexed body text as `content`', () => {
     const view = mapDocumentToDetailView(
-      { document_id: 'doc_002', title: 'Entscheid', content: 'Erste Erwägung.\n\nZweite Erwägung.' },
+      {
+        document_id: 'doc_002',
+        title: 'Entscheid',
+        content: 'Erste Erwägung.\n\nZweite Erwägung.',
+      },
       [],
       [],
     );
