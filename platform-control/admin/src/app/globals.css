@@ -179,7 +179,14 @@ a {
  * a real 288px column spanning both rows.
  */
 .admin-app-shell {
-  grid-template-rows: 80px 1fr;
+  /*
+   * Header row floors at 80px (the v1 MUI height) but grows to fit taller
+   * chrome — the header stacks its brand/title/CTA below `lg`, and wraps at
+   * narrow widths. A fixed `80px` track clipped that overflow, painting the
+   * header over the top of `main` at every viewport (63px at the md
+   * breakpoint). `auto` lets `main` sit below the real header height.
+   */
+  grid-template-rows: minmax(80px, auto) 1fr;
   grid-template-columns: 1fr;
   grid-template-areas:
     "header"

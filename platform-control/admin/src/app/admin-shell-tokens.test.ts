@@ -87,4 +87,22 @@ describe("admin shell responsive grid", () => {
       /@media \(min-width: 768px\)[\s\S]*?\.admin-app-shell[\s\S]*?288px 1fr/,
     );
   });
+
+  it("lets the header row grow instead of clipping taller chrome to 80px", () => {
+    // A fixed `80px` header track painted the header over the top of `main`
+    // wherever the header wrapped taller (63px of overlap at the md breakpoint).
+    // The row floors at 80px but grows to fit.
+    expect(globalsCss).toMatch(
+      /\.admin-app-shell[\s\S]*?grid-template-rows:\s*minmax\(80px,\s*auto\)/,
+    );
+    expect(globalsCss).not.toMatch(/\.admin-app-shell[\s\S]*?grid-template-rows:\s*80px 1fr/);
+  });
+
+  it("stacks the header brand/title/CTA until lg, where the column has room", () => {
+    const appBar = readFileSync(join(process.cwd(), "src/ui/shell/AppBar.tsx"), "utf8");
+    // Between md (sidebar appears, ~480px content) and lg the three header
+    // blocks can't sit side by side without colliding — row layout waits for lg.
+    expect(appBar).toContain("lg:flex-row");
+    expect(appBar).not.toContain("md:flex-row");
+  });
 });
