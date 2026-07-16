@@ -134,6 +134,12 @@ export async function createTestApp(overrides?: {
       structural_path: 'OR › Gesellschaftsrecht',
       sections_count: 2,
       citations_count: 1,
+      // Real projected documents carry a body — the index writes
+      // document-intelligence's `body_text` here as plain text with blank-line
+      // paragraph breaks. This fixture had no body at all, so nothing in the
+      // suite noticed that the body never reached the client (#613).
+      content:
+        'Die Mitglieder des Verwaltungsrates sind der Gesellschaft für den Schaden\nverantwortlich, den sie durch Verletzung ihrer Pflichten verursachen.\n\nWer die Erfüllung einer Aufgabe einem anderen Organ überträgt, haftet für\nden von diesem verursachten Schaden.',
     }),
     getSections: vi.fn().mockResolvedValue([
       {

@@ -85,7 +85,7 @@ class CreateRunRequest(BaseModel):
 
 
 class RunResponse(BaseModel):
-    run_id: str
+    run_id: str = Field(examples=["run_01hzxk9c4dnpf8h6t2m5q7w3"])
     source_id: str
     source_version_id: str
     mode: RunMode

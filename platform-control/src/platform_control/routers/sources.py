@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
+from platform_control.openapi import AGENT_DISCOVERY_TAG
 from platform_control.schemas.source import (
     CreateSourceRequest,
     CreateSourceVersionRequest,
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/v1/sources", tags=["sources", "source-versions"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-@router.get("", response_model=SourceListResponse)
+@router.get("", response_model=SourceListResponse, tags=[AGENT_DISCOVERY_TAG])
 async def list_sources(
     session: SessionDep,
     limit: int = 100,

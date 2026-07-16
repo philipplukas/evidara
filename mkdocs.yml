@@ -111,6 +111,7 @@ nav:
       - "0031: Temporal / Argilla / Firecrawl Disposition": adr/0031-temporal-argilla-firecrawl-disposition.md
       - "0032: Pipeline Observability": adr/0032-pipeline-observability.md
       - "0033: Agentic Legal Reasoning": adr/0033-agentic-legal-reasoning.md
+      - "0034: Generated platform-control Contract": adr/0034-generated-platform-control-contract.md
       - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md

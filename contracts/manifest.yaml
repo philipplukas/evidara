@@ -1,5 +1,5 @@
-version: "2.6.0"
-last_reviewed: "2026-07-14"
+version: "2.8.0"
+last_reviewed: "2026-07-16"
 owner: "Platform Team"
 
 mvp_flow:
@@ -17,8 +17,12 @@ mvp_flow:
 
 apis:
   platform_control:
+    # GENERATED from the FastAPI app by scripts/generate_platform_control_contract.py
+    # (#618) — do not hand-edit the file. `version` must equal
+    # platform_control.openapi.API_VERSION, which is what the app serves as
+    # info.version; check_contract_manifest.py compares the two.
     file: "contracts/api/platform-control.openapi.yaml"
-    version: "0.7.0"
+    version: "0.8.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
@@ -35,7 +39,11 @@ apis:
     version: "0.1.0"
   legal_search:
     file: "contracts/api/legal-search.openapi.yaml"
-    version: "0.6.0"
+    # 0.7.0: `DetailView.content` on the locked `/v1/documents/{id}` path
+    # changed from object (DoclingDocument JSON, ADR-0010) to string (the
+    # document body as plain text). Breaking, and on a 0.x line a breaking
+    # change takes the minor.
+    version: "0.7.0"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"

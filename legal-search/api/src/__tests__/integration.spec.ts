@@ -275,14 +275,32 @@ describe('document detail contract (ADR-0011)', () => {
 
 // ─── Document Service (mocked) ───
 
-describe('document detail with Document Service client (ADR-0010)', () => {
+describe('document detail with Document Service client', () => {
   let diApp: INestApplication;
 
   beforeAll(async () => {
+    // The shape `/lean` really returns: a canonical row with `body_text`, not a
+    // DoclingDocument. `service/lean.py` only ever produces a DoclingDocument
+    // if `DoclingDocument.model_validate` accepts the row, which it never does.
     const mockDi: DocumentIntelligenceClient = {
-      fetchLeanDocument: vi.fn().mockResolvedValue({ schema_name: 'docling', lean: true }),
+      fetchLeanDocument: vi.fn().mockResolvedValue({
+        document_id: 'doc_001',
+        body_text: 'Erste Erwägung.\n\nZweite Erwägung.',
+      }),
     };
-    const testApp = await createTestApp({ documentIntelligenceClient: mockDi });
+    const testApp = await createTestApp({
+      documentIntelligenceClient: mockDi,
+      // The only case the fallback exists for: a document projected without a
+      // body. Documents that have one must never reach the Document Service.
+      documentsRepo: {
+        getById: vi.fn().mockResolvedValue({
+          document_id: 'doc_001',
+          title: 'Obligationenrecht',
+          document_type: 'law',
+          jurisdiction: 'CH',
+        }),
+      },
+    });
     diApp = testApp.app;
   });
 
@@ -290,10 +308,11 @@ describe('document detail with Document Service client (ADR-0010)', () => {
     await diApp?.close();
   });
 
-  it('merges lean Docling into content when OpenSearch has no body fields', async () => {
+  it('takes the body text from the Document Service when OpenSearch has no body', async () => {
     const res = await supertest(diApp.getHttpServer()).get('/v1/documents/doc_001').expect(200);
 
-    expect(res.body.content).toEqual({ schema_name: 'docling', lean: true });
+    expect(res.body.content).toBe('Erste Erwägung.\n\nZweite Erwägung.');
+    expect(res.body.tabs.map((t: { key: string }) => t.key)).toContain('content');
   });
 });
 

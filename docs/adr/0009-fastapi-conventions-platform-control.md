@@ -99,11 +99,18 @@ GET    /health                              ← health check
 
 ### OpenAPI / spec alignment
 
-FastAPI generates an OpenAPI spec automatically from Pydantic schemas. This generated spec must stay compatible with `contracts/api/platform-control.openapi.yaml`.
+**Superseded by [ADR-0034](0034-generated-platform-control-contract.md).** This section
+used to say both "the contract spec in `contracts/api/` remains canonical" and "do not
+hand-edit the generated spec — change the Pydantic schemas and let FastAPI regenerate
+it", and claimed CI validated the two against each other with `redocly lint` or
+`openapi-diff`. It did not. The contradiction resolved itself the way unchecked
+contradictions do: the hand-maintained file drifted to 4 of 11 acquisition providers and
+took two production bugs with it (#614, #616 — see #618).
 
-The contract spec in `contracts/api/` remains canonical. CI validates compatibility using `redocly lint` or `openapi-diff` on the generated spec.
-
-Do not hand-edit the generated spec — change the Pydantic schemas and let FastAPI regenerate it.
+There is now one spec. `contracts/api/platform-control.openapi.yaml` is **generated** from
+this app by `scripts/generate_platform_control_contract.py` and gated for drift by
+`scripts/check-platform-control.sh` (pre-commit + CI). Change the Pydantic schemas or
+routes and regenerate; never hand-edit the file.
 
 ### Validation and error handling
 
@@ -124,7 +131,7 @@ Three testing levels:
 ## Rationale
 
 - **Python** consistency with `document-intelligence` — one runtime for the data/ops side of the platform.
-- **FastAPI + Pydantic** gives automatic OpenAPI generation that closely matches the hand-authored contract spec, avoiding a separate spec-maintenance step.
+- **FastAPI + Pydantic** gives automatic OpenAPI generation, which removes the spec-maintenance step entirely: the contract *is* that output (ADR-0034). "Closely matches the hand-authored contract spec" was the original claim here, and it was never checked — see #618 for how far apart the two actually drifted.
 - **API-backed operator workflow** — the admin UI stays fully code-managed and browser-safe by
   reading through supported endpoints instead of direct Postgres access.
 - **SQLAlchemy + Alembic** is the standard Python/Postgres stack with a long track record and good async support.
@@ -136,4 +143,4 @@ Three testing levels:
 - The React-admin app consumes the platform-control API only; direct database access stays on the
   backend side of the boundary.
 - CI runs separate lint/test pipelines for `platform-control/` (Python/Ruff/pytest) vs `legal-search/` (TypeScript/Biome/Vitest).
-- Any new platform-control endpoint requires updating `contracts/api/platform-control.openapi.yaml` first (contract-first principle from ADR-0004 still applies).
+- A new platform-control endpoint lands in the routers and schemas, then `contracts/api/platform-control.openapi.yaml` is regenerated in the same PR — the drift gate fails the build otherwise (ADR-0034). ADR-0004's contract-first principle still governs contracts designed across a boundary before they are built; it is the wrong tool for a spec whose whole job is to describe a service that already exists.

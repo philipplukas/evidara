@@ -27,30 +27,43 @@ resources:
 # reference here unpullable. Check `gh run list --workflow=runtime-images.yml
 # --commit <sha>` before pinning.
 #
-# a660776 (#600) is the current `main` tip and carries the design + search
-# content/fixes the live UI was missing at 6e1816a: the shared BrandMark and
-# styles/shell baked into the frontend image (#547, #599), the header/context
-# bar/panel-row alignment (#548), search snippets that match the query (#595),
-# the acquired expression's real language on the index (#587), the norm-hierarchy
-# model (#591), and the Stadt Zürich municipal layer (#584, #589). All six images
-# are published at this SHA (verified in GHCR). The alembic delta from 6e1816a is
-# a single clean migration (20260714_0021_jurisdiction_norm_level) — history stays
-# single-headed, so the migrate job applies one forward revision on rollout.
+# da39660d (#626) is the current `main` tip. All six images built and are
+# published at this SHA (runtime-images.yml run 29498811577 — every image job
+# green; verified published via the packages API, not an anonymous docker probe,
+# which fails closed on an expired credential and looks identical to a missing
+# image). It advances the live site past 5c5c13f5 (#617) with:
+#   - document body text reaches the screen at all (#621 / #613 / #609). The BFF
+#     suppressed `content` for EVERY document that had a body: the docling fetch
+#     was skipped whenever `content` was present, and the mapper emitted `content`
+#     only from `content_docling` — a field the index does not define. Every
+#     document detail served `content: null` while advertising an "Inhalt" tab.
+#   - the platform-control OpenAPI spec is now GENERATED from the FastAPI app and
+#     drift-gated (#618 / #626, ADR-0034). The hand-written spec described 4 of 11
+#     acquisition providers, omitted 14 of 61 paths, pointed at a `servers` host
+#     that exists nowhere in `infra/`, and documented `Bearer <JWT>` auth "from the
+#     identity provider" when the API requires `X-API-Key` — a client built from it
+#     could not authenticate at all. Runtime behaviour is unchanged; `/docs` now
+#     shows the real title/version, and 8 wizard `operationId`s change (fixing a
+#     genuine `get_run` collision). Paths are untouched, so path-based clients are
+#     unaffected.
+# Zero alembic delta from 5c5c13f5 (no new platform-control migrations across this
+# range), so the migrate job applies no forward revision on rollout.
 #
-# (Prior pin 6e1816a was the first SHA carrying the M12 pipeline-trust work —
-# #554 search 503s, #555 DI status callbacks, #565 /metrics, #569 provider
-# live-ready lock — and the first single-headed alembic history after the
-# #571–#574 double-0019 hazard, which stays behind us here.)
+# (Prior pin 5c5c13f5 (#617) stopped the source-version editor corrupting
+# acquisition specs on save — it had been resetting `corpus_id`, emptying
+# `language_codes`, nulling `document_type_hint` and rewriting 7 of 11 providers to
+# firecrawl, HTTP 200 each time, with the damaged record rendering identically to a
+# healthy one. Zero alembic delta.)
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: a66077620c9e321c424df8db05ab07a15779c4f3
+    newTag: da39660d0a3014e2829718f877e93ef68b7686b9

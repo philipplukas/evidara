@@ -124,7 +124,13 @@ export interface DetailViewModel {
   subtitle: string;
   breadcrumbs: string[];
   metadata: MetadataRow[];
-  contentHtml?: string;
+  /**
+   * The document body as plain text, straight from `DetailView.content`.
+   * Paragraphs are separated by blank lines; there is no markup. This replaced
+   * `contentHtml`, which no API response ever populated — only `mock-data.ts`
+   * did, which is why the body's absence in production went unnoticed (#609).
+   */
+  contentText?: string;
   contentLanguage?: ContentLanguage;
   tabs: TabViewModel[];
   relatedGroups: RelatedGroup[];

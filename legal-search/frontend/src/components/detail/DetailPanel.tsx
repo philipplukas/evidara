@@ -5,11 +5,31 @@ import { useTranslations } from "next-intl";
 import type { DetailViewModel } from "@/lib/types";
 import { DetailPanelHeader } from "./DetailPanelHeader";
 import { DetailTabs, useActiveTab } from "./DetailTabs";
+import { DocumentBody } from "./DocumentBody";
 import { AnnotationTab } from "./tabs/AnnotationTab";
 import { DetailsTab } from "./tabs/DetailsTab";
 import { ReferencesTab } from "./tabs/ReferencesTab";
 import { RelatedTab } from "./tabs/RelatedTab";
 import { StructureTab } from "./tabs/StructureTab";
+
+// Tab keys DetailPanel knows how to render. The contract's `TabView.key` is a
+// free-form string, and the real API emits `content` (Inhalt) — a key the mock
+// never used and this panel did not handle, so selecting it rendered a blank
+// void. Any key not listed here now falls through to a graceful empty state.
+//
+// `sections` is the key the API uses for a document's local structure, where
+// the mock uses `structure`; both render the outline. They are listed
+// separately rather than reconciled because the mock's vocabulary is the one
+// that drifted, and the API's is the contract.
+const DETAIL_TAB_KEYS = [
+  "details",
+  "related",
+  "references",
+  "annotation",
+  "structure",
+  "sections",
+  "content",
+];
 
 interface DetailPanelProps {
   detail: DetailViewModel | null;
@@ -63,7 +83,21 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
           />
         )}
         {activeTab === "annotation" && <AnnotationTab annotations={detail.annotations} />}
-        {activeTab === "structure" &&
+        {/* Inhalt renders the document body. It used to render the structure
+            outline, so a tab labelled "Inhalt" showed a heading reading
+            "LOKALE STRUKTUR" — the outline, never the text (#609). */}
+        {activeTab === "content" &&
+          (detail.contentText?.trim() ? (
+            <div className="px-5 py-5">
+              <DocumentBody text={detail.contentText} />
+            </div>
+          ) : (
+            <DetailEmptyState
+              title={t("empty.noContentTitle")}
+              description={t("empty.noContentDescription")}
+            />
+          ))}
+        {(activeTab === "structure" || activeTab === "sections") &&
           (detail.localStructure?.items?.length ? (
             <StructureTab items={detail.localStructure.items} onFocus={onFocus} />
           ) : (
@@ -72,6 +106,14 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
               description={t("empty.noStructureDescription")}
             />
           ))}
+        {/* Contract drift guard: a tab key with no dedicated renderer above
+            shows a graceful empty state instead of a blank panel. */}
+        {!DETAIL_TAB_KEYS.includes(activeTab) && (
+          <DetailEmptyState
+            title={t("empty.noContentTitle")}
+            description={t("empty.noContentDescription")}
+          />
+        )}
       </div>
     </section>
   );

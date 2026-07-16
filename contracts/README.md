@@ -14,6 +14,20 @@ contracts/
   schemas/   # Shared domain and manifest schemas
 ```
 
+### Hand-authored vs generated
+
+| File | Authored | Change it by |
+|---|---|---|
+| `api/legal-search.openapi.yaml` | By hand, before the code (ADR-0008) | Editing the file; clients regenerate from it via Orval (ADR-0007) |
+| `api/document-intelligence*.openapi.yaml` | By hand | Editing the file |
+| **`api/platform-control.openapi.yaml`** | **Generated from the FastAPI app** (ADR-0034) | Changing `platform-control/src/platform_control/` and running `scripts/generate_platform_control_contract.py` — **never** by editing the file |
+
+The platform-control spec is generated because hand-maintaining it drifted it to 4 of
+11 acquisition providers and caused two production bugs (#614, #616 — see #618).
+`scripts/check-platform-control.sh` fails the build when it and the app disagree.
+It is no less a contract for being generated; it is more of one, because it is the
+only file here that cannot be wrong about its service.
+
 ## Design Rules
 
 - Contracts define boundaries, not internal implementation classes.

@@ -6,12 +6,14 @@ on:
       - "platform-control/**"
       - "contracts/api/platform-control.openapi.yaml"
       - "scripts/check-platform-control.sh"
+      - "scripts/generate_platform_control_contract.py"
   push:
     branches: [main]
     paths:
       - "platform-control/**"
       - "contracts/api/platform-control.openapi.yaml"
       - "scripts/check-platform-control.sh"
+      - "scripts/generate_platform_control_contract.py"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

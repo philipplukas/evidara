@@ -11,10 +11,11 @@ The frontend is a pure rendering layer — all composition logic
 See ADR-0011 for contract conventions.
 See ADR-0012 for layered contract governance.
 See ADR-0013 for internationalization strategy.
-Document body reads use the Document Service (`contracts/api/document-intelligence.openapi.yaml`; ADR-0010).
+Document body reads fall back to the Document Service
+(`contracts/api/document-intelligence.openapi.yaml`) when the projection carries no body.
 See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 
- * OpenAPI spec version: 0.6.0
+ * OpenAPI spec version: 0.7.0
  */
 
 export * from './acceptLanguageParameter';
@@ -32,7 +33,6 @@ export * from './contentLanguage';
 export * from './contextChip';
 export * from './correlationIdParameter';
 export * from './detailView';
-export * from './detailViewContent';
 export * from './detailViewLocalStructure';
 export * from './filterFacetView';
 export * from './filterFacetViewType';

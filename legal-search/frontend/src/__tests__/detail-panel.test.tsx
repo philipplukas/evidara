@@ -159,11 +159,94 @@ describe("DetailPanel", () => {
     expect(screen.getByText("Obligationenrecht (OR)")).toBeInTheDocument();
   });
 
-  it("sanitizes unsafe HTML in detail content", () => {
+  it("renders a graceful empty state for the content tab when the document has no body", () => {
+    // A document with no body at all. The API omits the `content` tab in that
+    // case, so this is the defensive path: the tab arriving anyway must not
+    // leave a blank panel.
+    const contentDetail = {
+      ...articleDetail,
+      tabs: [
+        { key: "content", label: "Inhalt" },
+        { key: "details", label: "Details" },
+      ],
+      contentText: undefined,
+      localStructure: { items: [] },
+    };
+
+    renderWithProviders(
+      <DetailPanel
+        detail={contentDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+      { searchParams: { tab: "content" } },
+    );
+
+    expect(screen.getByText("Kein Inhalt verfügbar")).toBeInTheDocument();
+  });
+
+  // #609: the Inhalt tab used to render the structure outline whenever
+  // `localStructure` was present — byte-identical to the Struktur tab, with a
+  // heading reading "LOKALE STRUKTUR" under a tab labelled "Inhalt".
+  it("renders the document body — not the structure outline — on the content tab", () => {
+    const contentDetail = {
+      ...articleDetail,
+      tabs: [
+        { key: "content", label: "Inhalt" },
+        { key: "details", label: "Details" },
+      ],
+      contentText: "Erste Erwägung.\n\nZweite Erwägung.",
+      localStructure: { items: [{ id: "sec-1", label: "Allgemeine Bestimmungen", active: false }] },
+    };
+
+    renderWithProviders(
+      <DetailPanel
+        detail={contentDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+      { searchParams: { tab: "content" } },
+    );
+
+    expect(screen.getByText("Erste Erwägung.")).toBeInTheDocument();
+    expect(screen.getByText("Zweite Erwägung.")).toBeInTheDocument();
+    expect(screen.queryByText("Allgemeine Bestimmungen")).not.toBeInTheDocument();
+  });
+
+  it("never leaves a blank panel for an unknown tab key (contract-drift guard)", () => {
+    const oddDetail = {
+      ...articleDetail,
+      tabs: [
+        { key: "brandNewTab", label: "New" },
+        { key: "details", label: "Details" },
+      ],
+    };
+
+    renderWithProviders(
+      <DetailPanel
+        detail={oddDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+      { searchParams: { tab: "brandNewTab" } },
+    );
+
+    expect(screen.getByText("Kein Inhalt verfügbar")).toBeInTheDocument();
+  });
+
+  // The body is plain text — markup inside it is content to be shown, not
+  // markup to be executed. Nothing is interpreted, so nothing needs stripping.
+  it("renders markup-looking detail content as literal text", () => {
     const unsafeDetail = {
       ...articleDetail,
-      contentHtml:
-        '<p>Safe paragraph</p><img src="x" onerror="window.__evidara_test_xss=1"><script>window.__evidara_test_xss=1</script>',
+      contentText:
+        'Safe paragraph<img src="x" onerror="window.__evidara_test_xss=1"><script>window.__evidara_test_xss=1</script>',
     };
 
     const { container } = renderWithProviders(
@@ -176,11 +259,15 @@ describe("DetailPanel", () => {
       />,
     );
 
-    const img = container.querySelector("img");
-    expect(img).not.toBeNull();
-    expect(img?.getAttribute("onerror")).toBeNull();
+    // Scoped to the markup the body text contains — the panel legitimately
+    // renders its own <img> for the jurisdiction flag.
+    expect(container.querySelector('img[src="x"]')).toBeNull();
     expect(container.querySelector("script")).toBeNull();
-    expect(screen.getByText("Safe paragraph")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Safe paragraph<img src="x" onerror="window.__evidara_test_xss=1"><script>window.__evidara_test_xss=1</script>',
+      ),
+    ).toBeInTheDocument();
   });
 
   it("has no accessibility violations (empty state)", async () => {

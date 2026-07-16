@@ -108,7 +108,7 @@ Consistent across all layers:
 - **Observable fallbacks** replace silent degradation. Unknown values produce structured telemetry, not just generic UI.
 - **Projection schema** becomes a first-class artifact. The projection builder (once implemented) will validate its output against this schema.
 - **`structural_path`** is a canonical field representing intrinsic document structure. It may evolve from a delimited string to a structured array representation in the future.
-- **`content_docling`** is a canonical field representing a first-class extraction artifact (ADR-0010). Storage and indexing constraints should be reviewed if documents become large.
+- **`content`** carries the document body as plain text (document-intelligence's `body_text`). A `content_docling` object field was specified here on the strength of ADR-0010, but nothing ever produced or indexed one, so it was removed rather than left as a promise the pipeline could not keep. If ADR-0010 is accepted and built, a structured content field can be reintroduced with a producer behind it.
 
 ## Rationale
 
