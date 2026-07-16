@@ -70,9 +70,9 @@ Run for each document referenced by [`script.md`](script.md). Treat any **❌** 
 
 | # | Check | Pass criterion | Source |
 |---|---|---|---|
-| C1 | Document body renders | `contentHtml` (sanitized by DOMPurify) renders typeset body — no raw HTML, no broken markup | [DetailsTab.tsx:18–23](../../legal-search/frontend/src/components/detail/tabs/DetailsTab.tsx) |
-| C2 | Heading hierarchy | At least one `h4` (article-level) is visible for laws; no orphan `<strong>` blocks | [DetailsTab.tsx:48–55](../../legal-search/frontend/src/components/detail/tabs/DetailsTab.tsx) |
-| C3 | Empty-state guard | If `contentHtml` is absent, the empty-state copy appears instead of a blank pane | [DetailsTab.tsx:61](../../legal-search/frontend/src/components/detail/tabs/DetailsTab.tsx) |
+| C1 | Document body renders | `contentText` renders as typeset paragraphs — the body is plain text, so it is rendered as escaped text nodes, never as markup | [DocumentBody.tsx](../../legal-search/frontend/src/components/detail/DocumentBody.tsx) |
+| C2 | Paragraph structure | Blank lines in the body become separate paragraphs; hard wraps inside a paragraph reflow to the column | [document-body.ts](../../legal-search/frontend/src/lib/document-body.ts) |
+| C3 | Empty-state guard | If `contentText` is absent, the empty-state copy appears instead of a blank pane. The API omits the `content` tab entirely for a body-less document | [DetailsTab.tsx](../../legal-search/frontend/src/components/detail/tabs/DetailsTab.tsx) |
 | C4 | Full metadata list | Repeated below the body in `default` density, showing all the BFF-composed rows | [DetailsTab.tsx:37–42](../../legal-search/frontend/src/components/detail/tabs/DetailsTab.tsx) |
 
 ### D. Other tabs (validate they don't render placeholder)

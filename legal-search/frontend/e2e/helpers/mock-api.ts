@@ -117,8 +117,13 @@ function buildRichDetail(documentId: string) {
       { label: "Chamber", value: "I. Civil Law Division" },
       { label: "Outcome", value: "Appeal dismissed" },
     ],
-    contentHtml:
-      '<div class="decision-text"><p>Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung.</p><p>Das Bundesgericht bestätigt, dass die Verantwortlichkeit nach Art. 754 OR eine Pflichtverletzung, einen Schaden, einen Kausalzusammenhang und ein Verschulden voraussetzt.</p></div>',
+    // `content` — the field the API actually sends, carrying plain text.
+    // This mock used to emit `contentHtml`, which is a *view-model* field that
+    // has never existed on an API response: `mapDetail()` dropped it here for
+    // the same reason it dropped the body in production, so these e2e runs and
+    // their visual baselines were captured with no document text at all (#609).
+    content:
+      "Art. 754 OR; Verantwortlichkeit der Verwaltungsratsmitglieder; Beweislastverteilung.\n\nDas Bundesgericht bestätigt, dass die Verantwortlichkeit nach Art. 754 OR eine Pflichtverletzung, einen Schaden, einen Kausalzusammenhang und ein Verschulden voraussetzt.",
     tabs: [
       { key: "details", label: "Details" },
       { key: "related", label: "Related", count: 34 },
