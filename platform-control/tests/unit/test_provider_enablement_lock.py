@@ -136,8 +136,13 @@ async def test_disabled_template_cannot_launch_a_run(session) -> None:
         await run_service.create_run(_preview_run(source.source_id, version.source_version_id))
 
     assert live["bundesland_http"].calls == []
-    # Rejected before the Run row exists — no PENDING run for a worker to pick up.
-    assert list(await session.scalars(select(Run))) == []
+    # The refusal is recorded as a terminal FAILED run (evidence, #634) — never a
+    # PENDING one, so no worker picks it up.
+    runs = list(await session.scalars(select(Run)))
+    assert len(runs) == 1
+    assert runs[0].status is RunStatus.FAILED
+    assert "not enabled" in (runs[0].failure_reason or "")
+    assert runs[0].run_metadata.get("refused") is True
 
 
 @pytest.mark.asyncio
@@ -157,7 +162,11 @@ async def test_scaffold_provider_cannot_launch_even_if_template_is_enabled(sessi
     with pytest.raises(ProviderNotLiveReadyError):
         await run_service.create_run(_preview_run(source.source_id, version.source_version_id))
 
-    assert list(await session.scalars(select(Run))) == []
+    # Code-key refusal is recorded as a terminal FAILED run (evidence, #634).
+    runs = list(await session.scalars(select(Run)))
+    assert len(runs) == 1
+    assert runs[0].status is RunStatus.FAILED
+    assert runs[0].run_metadata.get("refused") is True
 
 
 @pytest.mark.asyncio

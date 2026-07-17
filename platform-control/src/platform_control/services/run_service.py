@@ -153,6 +153,37 @@ class RunService:
             )
         ensure_live_ready(provider, template_id=source_version.provider_template_id)
 
+    async def _record_refused_run(
+        self,
+        source: Source,
+        source_version: SourceVersion,
+        request: CreateRunRequest,
+        reason: str,
+    ) -> None:
+        """Persist a terminal FAILED run when the two-key lock refuses a dispatch.
+
+        For a platform whose thesis is evidence-gated coverage, a refusal that
+        leaves no trace is a hole: an operator cannot later ask what was attempted
+        and why it was blocked (#634). This records that attempt as an auditable
+        run — status FAILED (terminal, so no worker picks it up), with the lock's
+        reason and a `refused` marker in the metadata — then the caller re-raises
+        so the API still returns the 400.
+        """
+        run = Run(
+            source_id=source.source_id,
+            source_version_id=source_version.source_version_id,
+            mode=request.mode,
+            status=RunStatus.FAILED,
+            failure_reason=reason,
+            completed_at=datetime.now(UTC),
+            run_metadata={
+                "scope": request.scope.model_dump(mode="json"),
+                "refused": True,
+            },
+        )
+        self.session.add(run)
+        await self.session.commit()
+
     def _should_dispatch_via_worker(self, source_version: SourceVersion) -> bool:
         if self.run_dispatch_backend == "worker":
             return True
@@ -225,13 +256,21 @@ class RunService:
             details = "; ".join(check.detail for check in readiness.checks if not check.ok)
             raise InvalidStateTransitionError(f"Run preflight failed: {details}")
 
-        # Two-key lock, checked before the Run row exists: worker-backed dispatch
-        # would otherwise accept a run here and only reject it out-of-band, leaving
-        # a PENDING run the worker can never dispatch. _dispatch_run re-checks, so
-        # scheduler/retry/temporal paths are covered too.
+        # Two-key lock, checked before a launchable Run row exists: worker-backed
+        # dispatch would otherwise accept a run here and only reject it out-of-band,
+        # leaving a PENDING run the worker can never dispatch. _dispatch_run
+        # re-checks, so scheduler/retry/temporal paths are covered too.
+        #
+        # A refusal is recorded as a terminal FAILED run before the 400 propagates,
+        # so "what did we try to onboard and why did it refuse?" is answerable
+        # (#634). It is terminal, not PENDING, so no worker ever picks it up.
         provider = self._resolve_provider_for_source_version(source_version)
         if provider is not None:
-            await self._require_launchable(source_version, provider)
+            try:
+                await self._require_launchable(source_version, provider)
+            except (BlueprintTemplateNotEnabledError, ProviderNotLiveReadyError) as exc:
+                await self._record_refused_run(source, source_version, request, str(exc))
+                raise
 
         run_metadata: dict[str, Any] = {
             "scope": request.scope.model_dump(mode="json"),
