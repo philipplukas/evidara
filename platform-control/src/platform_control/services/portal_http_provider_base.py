@@ -10,7 +10,13 @@ differ in URL shape and markup but share the same acquisition flow:
   2. Fetch each URL with deterministic HTTP, honouring the same safety
      limits as DeterministicHttpProvider (max content bytes, timeout,
      host allow-list).
-  3. Pull the title from `<title>` (or a configured selector) and
+  3. Run the shared legal-text density gate (`acquisition_core.
+     content_gate`): a portal can serve a JavaScript navigation shell in
+     place of the statute, and a 200 with visible chrome indexes fine, so
+     nothing downstream would object. A body with no legal-text markers is
+     refused (recorded as skipped with a reason), never captured as a clean
+     success — the honest refusal `gemeinde_http` already does. See #631.
+  4. Pull the title from `<title>` (or a configured selector) and
      return the raw HTML as `ProviderResource.body`. Document-
      intelligence handles the structural parsing downstream.
 
@@ -40,6 +46,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from acquisition_core.content_gate import assess_legal_text_density
 from platform_control.errors import ProviderConfigurationError
 from platform_control.models.run import Run
 from platform_control.models.source import Source
@@ -78,6 +85,11 @@ class PortalHttpProviderBase:
 
         resources: list[ProviderResource] = []
         failures: list[dict[str, str]] = []
+        # Documents fetched but refused by the legal-text density gate: a 200
+        # that is a navigation/JavaScript shell rather than law. Surfaced so an
+        # acceptance run shows exactly what was rejected, never a clean success
+        # on chrome (see #631). Mirrors gemeinde_http's honest refusal.
+        skipped: list[dict[str, Any]] = []
 
         async with httpx.AsyncClient(
             timeout=timeout_seconds,
@@ -101,6 +113,20 @@ class PortalHttpProviderBase:
                         .strip()
                         .lower()
                     )
+                    # Legal-text density gate: a portal can serve a JS navigation
+                    # shell in place of the statute. Refuse it rather than report
+                    # a clean capture on a nav page (#631).
+                    assessment = assess_legal_text_density(body_text, content_type=content_type)
+                    if not assessment.is_legal_text:
+                        skipped.append(
+                            {
+                                "url": str(response.url),
+                                "reason": "no_legal_text_markers",
+                                "detail": assessment.reason,
+                                **assessment.as_evidence(),
+                            }
+                        )
+                        continue
                     resources.append(
                         ProviderResource(
                             source_url=url,
@@ -127,12 +153,25 @@ class PortalHttpProviderBase:
             "requested": len(seed_urls),
             "captured": len(resources),
             "failed": len(failures),
+            "skipped": len(skipped),
             "failures": failures,
+            "skipped_documents": skipped,
             self.subdivision_spec_key: code,
         }
         inline_failure_reason = None
         if not resources:
-            inline_failure_reason = f"{self.provider_name} did not capture any resources for {code}"
+            if skipped:
+                inline_failure_reason = (
+                    f"{self.provider_name} fetched {len(skipped)} document(s) for {code} "
+                    "but all failed the legal-text density gate (they look like navigation "
+                    "or JavaScript shells, not law). Refusing rather than capturing chrome "
+                    "as acceptance evidence — the portal likely needs SPA rendering or a "
+                    "data endpoint. See #631."
+                )
+            else:
+                inline_failure_reason = (
+                    f"{self.provider_name} did not capture any resources for {code}"
+                )
 
         return ProviderStartResult(
             provider=self.provider_name,
