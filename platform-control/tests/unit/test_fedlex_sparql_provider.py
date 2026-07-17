@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from datetime import date
 from types import SimpleNamespace
 
 import httpx
 import pytest
 
-from platform_control.services.fedlex_sparql_provider import FedlexSparqlProvider
+from platform_control.services.fedlex_sparql_provider import (
+    FedlexSparqlProvider,
+    _ConsolidationMember,
+)
 
 
 class FakeAsyncClient:
@@ -163,6 +167,201 @@ async def test_minimal_work_to_expression_flow_extracts_expression_uris(
     # dated concrete form, so canonical output matches the ELI shape that
     # external ELI consumers expect.
     assert payload.metadata["eli_uri"] == "https://fedlex.data.admin.ch/eli/cc/1999/404"
+
+
+# ─── In-force consolidation selection (#633) ────────────────────────────────
+# The provider must acquire the consolidation *in force* at the requested date,
+# never the newest one — the bug acquired "Stand am 1. Januar 2029".
+
+_BV_PAST = _ConsolidationMember(
+    uri="https://fedlex.data.admin.ch/eli/cc/1999/404/20220213",
+    in_force_from=date(2022, 2, 13),
+    in_force_until=date(2023, 12, 31),
+)
+_BV_CURRENT = _ConsolidationMember(
+    uri="https://fedlex.data.admin.ch/eli/cc/1999/404/20240303",
+    in_force_from=date(2024, 3, 3),
+    in_force_until=date(2028, 12, 31),
+)
+_BV_FUTURE = _ConsolidationMember(
+    uri="https://fedlex.data.admin.ch/eli/cc/1999/404/20290101",
+    in_force_from=date(2029, 1, 1),
+    in_force_until=None,
+)
+
+
+def test_select_member_picks_in_force_today_not_newest_future():
+    provider = FedlexSparqlProvider()
+    selected, in_force = provider._select_consolidation_member(
+        members=[_BV_PAST, _BV_CURRENT, _BV_FUTURE],
+        as_of=date(2026, 7, 17),
+    )
+    assert selected == _BV_CURRENT
+    assert in_force is True
+
+
+def test_select_member_explicit_future_as_of_selects_future_consolidation():
+    provider = FedlexSparqlProvider()
+    selected, in_force = provider._select_consolidation_member(
+        members=[_BV_PAST, _BV_CURRENT, _BV_FUTURE],
+        as_of=date(2029, 6, 1),
+    )
+    assert selected == _BV_FUTURE
+    assert in_force is True
+
+
+def test_select_member_between_windows_uses_last_effective_and_flags_expired():
+    # Newest consolidation whose in_force_from has arrived, but its until has
+    # passed and no successor is yet in force: still not a future one.
+    provider = FedlexSparqlProvider()
+    selected, in_force = provider._select_consolidation_member(
+        members=[_BV_PAST, _BV_CURRENT, _BV_FUTURE],
+        as_of=date(2023, 12, 31),
+    )
+    assert selected == _BV_PAST
+    assert in_force is True
+
+
+def test_select_member_before_any_consolidation_flags_not_in_force():
+    provider = FedlexSparqlProvider()
+    selected, in_force = provider._select_consolidation_member(
+        members=[_BV_CURRENT, _BV_FUTURE],
+        as_of=date(2000, 1, 1),
+    )
+    assert selected == _BV_CURRENT  # earliest available
+    assert in_force is False
+
+
+def test_select_member_without_dates_falls_back_to_newest_by_uri():
+    provider = FedlexSparqlProvider()
+    undated = [
+        _ConsolidationMember(
+            uri="https://fedlex.data.admin.ch/eli/cc/1999/404/20240101",
+            in_force_from=None,
+            in_force_until=None,
+        ),
+        _ConsolidationMember(
+            uri="https://fedlex.data.admin.ch/eli/cc/1999/404/20240303",
+            in_force_from=None,
+            in_force_until=None,
+        ),
+    ]
+    selected, in_force = provider._select_consolidation_member(
+        members=undated,
+        as_of=date(2026, 7, 17),
+    )
+    assert selected.uri.endswith("/20240303")
+    assert in_force is True
+
+
+def test_as_of_date_defaults_to_today():
+    provider = FedlexSparqlProvider()
+    assert provider._as_of_date({}) == date.today()
+
+
+def test_as_of_date_reads_explicit_iso():
+    provider = FedlexSparqlProvider()
+    assert provider._as_of_date({"as_of_date": "2029-01-01"}) == date(2029, 1, 1)
+
+
+def test_as_of_date_rejects_garbage():
+    from platform_control.errors import ProviderConfigurationError
+
+    provider = FedlexSparqlProvider()
+    with pytest.raises(ProviderConfigurationError, match="as_of_date must be ISO"):
+        provider._as_of_date({"as_of_date": "1 Jan 2029"})
+
+
+class DatedMemberAsyncClient(FakeAsyncClient):
+    """Serves consolidation members carrying jolux applicability dates.
+
+    Includes a future consolidation (`20290101`, in force 2029-01-01) so the
+    selector is exercised against the exact shape of the #633 bug. Everything
+    else (expression, title, filestore HTML for `20240303`) is served by the
+    base fake, so the default-today run must resolve to `20240303`.
+    """
+
+    async def get(self, url: str, *, params=None, headers=None):
+        query = (params or {}).get("query", "")
+        if "SELECT ?member" in query:
+            request = httpx.Request("GET", url, params=params)
+
+            def member(uri: str, dfrom: str, dto: str | None) -> dict:
+                row: dict = {"member": {"type": "uri", "value": uri}}
+                row["inForceFrom"] = {
+                    "type": "typed-literal",
+                    "datatype": "http://www.w3.org/2001/XMLSchema#date",
+                    "value": dfrom,
+                }
+                if dto is not None:
+                    row["inForceUntil"] = {
+                        "type": "typed-literal",
+                        "datatype": "http://www.w3.org/2001/XMLSchema#date",
+                        "value": dto,
+                    }
+                return row
+
+            return httpx.Response(
+                200,
+                json={
+                    "results": {
+                        "bindings": [
+                            member(
+                                "https://fedlex.data.admin.ch/eli/cc/1999/404/20220213",
+                                "2022-02-13",
+                                "2023-12-31",
+                            ),
+                            member(
+                                "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303",
+                                "2024-03-03",
+                                "2028-12-31",
+                            ),
+                            member(
+                                "https://fedlex.data.admin.ch/eli/cc/1999/404/20290101",
+                                "2029-01-01",
+                                None,
+                            ),
+                        ]
+                    }
+                },
+                request=request,
+            )
+        return await super().get(url, params=params, headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_start_run_selects_in_force_and_emits_validity_dates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", DatedMemberAsyncClient)
+    provider = FedlexSparqlProvider()
+    source_version = SimpleNamespace(
+        acquisition_spec={
+            "seed_url": "https://fedlex.data.admin.ch/eli/cc/1999/404",
+            "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+            "preferred_languages": ["de"],
+            "max_expressions": 1,
+            # No as_of_date → defaults to today, which must skip the 2029 member.
+        }
+    )
+
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_in_force"),
+    )
+
+    assert result.response_payload["captured"] == 1
+    metadata = result.inline_resources[0].metadata
+    # Selected the consolidation in force today, NOT the 2029 one.
+    assert metadata["concrete_work_uri"] == (
+        "https://fedlex.data.admin.ch/eli/cc/1999/404/20240303"
+    )
+    assert metadata["in_force_from"] == "2024-03-03"
+    assert metadata["in_force_until"] == "2028-12-31"
+    assert metadata["in_force_at_selection"] is True
+    assert metadata["selected_as_of"] == date.today().isoformat()
+    assert result.request_payload["as_of_date"] == date.today().isoformat()
 
 
 def test_eli_uri_for_work_prefers_abstract_seed():

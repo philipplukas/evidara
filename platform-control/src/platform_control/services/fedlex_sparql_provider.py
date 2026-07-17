@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from typing import NamedTuple
 from urllib.parse import urlparse
 
 import httpx
@@ -21,6 +22,57 @@ from platform_control.services.politeness import limited_get
 _FEDLEX_HOST = "fedlex.data.admin.ch"
 _FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
 
+# jolux predicates that carry a consolidation's entry-into-force window.
+# VERIFIED against the live endpoint (https://fedlex.data.admin.ch/sparqlendpoint,
+# 2026-07-17, issue #633): each `jolux:isMemberOf` consolidation of a work exposes
+# `jolux:dateApplicability` (first day the consolidation is in force) and, when the
+# consolidation has been superseded, `jolux:dateEndApplicability` (last day in
+# force). The current/open consolidation may omit the end date. These are the only
+# two predicates the selection + temporal-metadata logic depends on; if Fedlex ever
+# renames them, correct them here and nowhere else.
+_JOLUX_IN_FORCE_FROM_PREDICATE = "jolux:dateApplicability"
+_JOLUX_IN_FORCE_UNTIL_PREDICATE = "jolux:dateEndApplicability"
+
+
+class _ConsolidationMember(NamedTuple):
+    """A single dated consolidation of a Fedlex work.
+
+    `uri` is the concrete (dated) work URI, e.g.
+    `https://fedlex.data.admin.ch/eli/cc/1999/404/20240303`. `in_force_from` /
+    `in_force_until` are the parsed jolux applicability dates and are None when the
+    endpoint does not publish them for this member.
+    """
+
+    uri: str
+    in_force_from: date | None
+    in_force_until: date | None
+
+
+def _parse_sparql_date(binding: object) -> date | None:
+    """Parse a SPARQL JSON binding carrying an xsd:date into a `date`.
+
+    Fedlex publishes applicability dates as `xsd:date` literals (`2024-03-03`).
+    Some values arrive as `xsd:dateTime`; take the leading date component. Returns
+    None for an absent or unparseable binding — the caller treats missing dates as
+    "temporal validity unknown" rather than guessing.
+    """
+    if not isinstance(binding, dict):
+        return None
+    value = binding.get("value")
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    # Tolerate `xsd:dateTime` (`2024-03-03T00:00:00+02:00`) by keeping the date part.
+    date_part = text.split("T", 1)[0]
+    try:
+        return date.fromisoformat(date_part)
+    except ValueError:
+        return None
+
+
+def _iso_date_or_none(value: date | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
 
 class FedlexSparqlProvider:
     provider_name = AcquisitionProvider.FEDLEX_SPARQL.value
@@ -34,11 +86,18 @@ WHERE {{
 ORDER BY ?expr
 """.strip()
 
+    # The consolidation members of a work, each with its entry-into-force window.
+    # The applicability dates drive which consolidation is "in force" as-of a
+    # requested date (#633) — taking the newest member unconditionally acquired a
+    # future consolidation ("Stand am 1. Januar 2029"). `ORDER BY ?member` keeps a
+    # deterministic order for the no-dates fallback path.
     _MEMBER_QUERY = """
 PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
-SELECT ?member
+SELECT ?member ?inForceFrom ?inForceUntil
 WHERE {{
   ?member jolux:isMemberOf <{work_uri}> .
+  OPTIONAL {{ ?member {in_force_from_predicate} ?inForceFrom . }}
+  OPTIONAL {{ ?member {in_force_until_predicate} ?inForceUntil . }}
 }}
 ORDER BY ?member
 """.strip()
@@ -88,6 +147,10 @@ LIMIT {limit}
         canton_scope = self._is_canton_scope(acquisition_spec)
         canton = self._canton_filter(acquisition_spec) if canton_scope else None
         canton_discovery_limit = int(acquisition_spec.get("max_works") or 50)
+        # The consolidation in force at this date is selected — default today, so a
+        # future consolidation is never acquired unless an operator opts in with an
+        # explicit `as_of_date` (#633).
+        as_of = self._as_of_date(acquisition_spec)
 
         resources: list[ProviderResource] = []
         failures: list[dict[str, str]] = []
@@ -130,11 +193,13 @@ LIMIT {limit}
 
             for work_uri in work_uris:
                 try:
-                    concrete_work_uri = await self._resolve_concrete_work_uri(
+                    selected_member, member_in_force = await self._resolve_concrete_work(
                         client=client,
                         sparql_endpoint=sparql_endpoint,
                         work_uri=work_uri,
+                        as_of=as_of,
                     )
+                    concrete_work_uri = selected_member.uri
                     expression_uris = await self._query_expression_uris(
                         client=client,
                         sparql_endpoint=sparql_endpoint,
@@ -208,6 +273,21 @@ LIMIT {limit}
                                 # metadata carry the identifier forward per
                                 # docs/architecture/vocabulary-standards.md.
                                 "eli_uri": self._eli_uri_for_work(work_uri, concrete_work_uri),
+                                # Temporal validity of the selected consolidation
+                                # (#633). Same metadata keys the gemeinde_http
+                                # provider emits, so downstream in-force logic can
+                                # answer instead of reporting `unknown`. None when
+                                # Fedlex does not publish an applicability date
+                                # (the current consolidation omits an end date).
+                                "in_force_from": _iso_date_or_none(selected_member.in_force_from),
+                                "in_force_until": _iso_date_or_none(selected_member.in_force_until),
+                                # Provenance for the selection itself: which date we
+                                # asked "what is in force?" for, and whether the
+                                # chosen consolidation actually covers it. `False`
+                                # means the corpus would hold law not in force as-of
+                                # `selected_as_of` — the canary gates on this.
+                                "selected_as_of": as_of.isoformat(),
+                                "in_force_at_selection": member_in_force,
                             },
                         )
                     )
@@ -244,6 +324,7 @@ LIMIT {limit}
                 "preferred_languages": preferred_languages,
                 "max_expressions": max_expressions,
                 "manifestation_format": "html",
+                "as_of_date": as_of.isoformat(),
             },
             response_payload=response_payload,
             inline_resources=resources,
@@ -426,34 +507,96 @@ LIMIT {limit}
                 work_uris.append(work)
         return work_uris
 
-    async def _resolve_concrete_work_uri(
+    def _as_of_date(self, acquisition_spec: dict[str, object]) -> date:
+        """Return the date at which "in force" is evaluated for this run.
+
+        Defaults to today (UTC). An operator can pin an explicit `as_of_date`
+        (ISO `YYYY-MM-DD`) in the acquisition spec to intentionally acquire a
+        consolidation in force at another date — including a future one. Making
+        future acquisition an explicit, auditable act is the whole point of #633:
+        the default must never reach past today.
+        """
+        raw = acquisition_spec.get("as_of_date")
+        if isinstance(raw, str) and raw.strip():
+            try:
+                return date.fromisoformat(raw.strip())
+            except ValueError as exc:
+                raise ProviderConfigurationError(
+                    f"fedlex_sparql acquisition_spec.as_of_date must be ISO YYYY-MM-DD: {raw!r}"
+                ) from exc
+        return datetime.now(UTC).date()
+
+    async def _resolve_concrete_work(
         self,
         *,
         client: httpx.AsyncClient,
         sparql_endpoint: str,
         work_uri: str,
-    ) -> str:
-        member_uris = await self._query_member_work_uris(
+        as_of: date,
+    ) -> tuple[_ConsolidationMember, bool]:
+        """Resolve the work URI to the consolidation in force at `as_of`.
+
+        Returns the selected `_ConsolidationMember` and whether it is actually in
+        force at `as_of`. When the work has no members, the abstract work URI is
+        returned unchanged (in_force flag True — nothing to assert against).
+        """
+        members = await self._query_consolidation_members(
             client=client,
             sparql_endpoint=sparql_endpoint,
             work_uri=work_uri,
         )
-        if member_uris:
-            return member_uris[-1]
-        return work_uri
+        if not members:
+            return _ConsolidationMember(uri=work_uri, in_force_from=None, in_force_until=None), True
+        return self._select_consolidation_member(members=members, as_of=as_of)
 
-    async def _query_member_work_uris(
+    def _select_consolidation_member(
+        self,
+        *,
+        members: list[_ConsolidationMember],
+        as_of: date,
+    ) -> tuple[_ConsolidationMember, bool]:
+        """Pick the consolidation in force at `as_of`, never a future one.
+
+        The consolidation in force at a date is the newest one whose
+        `in_force_from` has already arrived by that date; it is *in force* when its
+        `in_force_until` has not yet passed (or is open-ended). A future
+        consolidation (`in_force_from > as_of`) is only reachable by moving `as_of`
+        forward — it is never selected for a past/present `as_of`.
+
+        When no member carries applicability dates (endpoint variation), the
+        temporal question cannot be answered, so fall back to the newest member by
+        URI (previous behaviour) and report in-force as unknown-but-not-false.
+        """
+        dated = [member for member in members if member.in_force_from is not None]
+        if not dated:
+            return members[-1], True
+        applicable = [member for member in dated if member.in_force_from <= as_of]
+        if applicable:
+            selected = max(applicable, key=lambda member: member.in_force_from)
+            in_force = selected.in_force_until is None or selected.in_force_until >= as_of
+            return selected, in_force
+        # `as_of` precedes every consolidation: the law did not yet exist then.
+        # Return the earliest so the caller still has a concrete URI, flagged
+        # not-in-force so the acceptance gate can refuse it.
+        earliest = min(dated, key=lambda member: member.in_force_from)
+        return earliest, False
+
+    async def _query_consolidation_members(
         self,
         *,
         client: httpx.AsyncClient,
         sparql_endpoint: str,
         work_uri: str,
-    ) -> list[str]:
+    ) -> list[_ConsolidationMember]:
         response = await limited_get(
             client,
             sparql_endpoint,
             params={
-                "query": self._MEMBER_QUERY.format(work_uri=work_uri),
+                "query": self._MEMBER_QUERY.format(
+                    work_uri=work_uri,
+                    in_force_from_predicate=_JOLUX_IN_FORCE_FROM_PREDICATE,
+                    in_force_until_predicate=_JOLUX_IN_FORCE_UNTIL_PREDICATE,
+                ),
                 "format": "application/sparql-results+json",
             },
             headers={"Accept": "application/sparql-results+json"},
@@ -461,12 +604,19 @@ LIMIT {limit}
         response.raise_for_status()
         payload = response.json()
         bindings = payload.get("results", {}).get("bindings", [])
-        member_uris: list[str] = []
+        members: list[_ConsolidationMember] = []
         for binding in bindings:
             member = binding.get("member", {}).get("value")
-            if isinstance(member, str) and member.startswith(f"https://{_FEDLEX_HOST}/"):
-                member_uris.append(member)
-        return member_uris
+            if not (isinstance(member, str) and member.startswith(f"https://{_FEDLEX_HOST}/")):
+                continue
+            members.append(
+                _ConsolidationMember(
+                    uri=member,
+                    in_force_from=_parse_sparql_date(binding.get("inForceFrom")),
+                    in_force_until=_parse_sparql_date(binding.get("inForceUntil")),
+                )
+            )
+        return members
 
     async def _query_expression_uris(
         self,

@@ -82,7 +82,9 @@ async def test_bayern_end_to_end_fetches_seed_and_emits_resource(
                 200,
                 "<html><head>"
                 "<title>\n  BayVwVfG – Bayerisches\n  Verwaltungsverfahrensgesetz</title>"
-                "</head><body><h1>Art. 1</h1><p>Geltungsbereich</p></body></html>",
+                "</head><body><h1>Art. 1 Geltungsbereich</h1>"
+                "<p>Art. 2 Abs. 1: Dieses Gesetz gilt ...</p>"
+                "<p>Art. 3 Abs. 2 Ziff. 1 ...</p></body></html>",
                 {"content-type": "text/html; charset=utf-8"},
             )
         },
@@ -120,7 +122,8 @@ async def test_bundesland_provider_accepts_subdomain_seed(
         {
             "https://sub.recht.nrw.de/": (
                 200,
-                "<html><head><title>NRW-Landesrecht</title></head><body>...</body></html>",
+                "<html><head><title>NRW-Landesrecht</title></head><body>"
+                "<p>Art. 1</p><p>Art. 2 Abs. 1</p><p>§ 3</p></body></html>",
                 {"content-type": "text/html"},
             )
         },
@@ -231,7 +234,8 @@ async def test_lombardia_end_to_end_fetches_seed_and_emits_resource(
                 200,
                 "<html><head>"
                 "<title>L.R. 12/2005 – Legge per il governo del territorio</title>"
-                "</head><body>...</body></html>",
+                "</head><body><p>art. 1 comma 1</p><p>art. 2 comma 2</p>"
+                "<p>art. 3</p></body></html>",
                 {"content-type": "text/html; charset=utf-8"},
             )
         },
