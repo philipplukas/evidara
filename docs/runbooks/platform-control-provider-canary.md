@@ -124,6 +124,14 @@ The workflow surfaces the same practical verdict categories we use in the local 
   - acquisition completed, but DI/lifecycle proof did not show up
 - `pipeline_pass_content_suspect`
   - transport succeeded, but the captured content does not look trustworthy enough
+- `acquired_law_not_in_force`
+  - the acquisition selected a consolidation that is not in force as-of the run's
+    selection date (default: today) — e.g. a future Fedlex consolidation
+    ("Stand am 1. Januar 2029"). The `fedlex_sparql` provider now selects the
+    consolidation in force at the requested `as_of_date` and emits its validity
+    window (`in_force_from` / `in_force_until` / `in_force_at_selection`) under
+    `provider_metadata`; the CH Fedlex fast loop fails on a future or
+    not-in-force selection. See issue #633.
 - `workflow_error`
   - the canary itself failed before it could produce a normal verdict
 
