@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from platform_control.config import get_settings
 from platform_control.domain import SourceVersionStatus
 from platform_control.errors import InvalidStateTransitionError, NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
@@ -18,6 +19,8 @@ from platform_control.schemas.source import (
     UpdateSourceVersionRequest,
     parse_acquisition_spec,
 )
+from platform_control.services.blueprint_enablement import BlueprintEnablementService
+from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.source_blueprints import (
     list_source_blueprint_templates,
     resolve_blueprint_extractor_profile_id,
@@ -128,8 +131,63 @@ class SourceService:
             provider_template_id=request.provider_template_id,
         )
 
-    async def list_source_blueprint_templates(self) -> list[dict[str, str]]:
-        return list_source_blueprint_templates()
+    async def describe_blueprint_lock(
+        self, overlay_id: str, provider_template_id: str, provider: str
+    ) -> dict[str, object]:
+        """Return the two-key lock state for one template (ADR-0030, #634).
+
+        The panel is blind to whether a template is inert unless the API tells
+        it. This exposes the effective config key (DB override ?? shipped
+        default), the code key (provider `live_ready`), and human-readable notes
+        explaining any closed key so an inert template renders as inert *before*
+        an operator invests in a source.
+        """
+        enablement = BlueprintEnablementService(self.session)
+        enabled = await enablement.is_enabled(overlay_id, provider_template_id)
+        live_ready = self._provider_live_ready(provider)
+        notes: list[str] = []
+        if not live_ready:
+            notes.append(
+                f"Code key closed: provider '{provider}' is not live-ready — it cannot yet "
+                "acquire this format, so runs stay locked (ADR-0030)."
+            )
+        if not enabled:
+            notes.append(
+                "Config key closed: not enabled. Capture acceptance-run evidence, then enable "
+                "this template to launch live runs (ADR-0030)."
+            )
+        return {
+            "enabled": enabled,
+            "live_ready": live_ready,
+            "launchable": enabled and live_ready,
+            "notes": notes,
+        }
+
+    def _provider_live_ready(self, provider: str) -> bool:
+        # Cached per service instance: build_provider_registry instantiates every
+        # provider, so a template listing must not rebuild it once per row.
+        cache = getattr(self, "_live_ready_cache", None)
+        if cache is None:
+            registry = build_provider_registry(get_settings())
+            cache = registry
+            self._live_ready_cache = registry
+        try:
+            resolved = cache.get(provider)
+        except Exception:
+            return False
+        return bool(getattr(resolved, "live_ready", False))
+
+    async def list_source_blueprint_templates(self) -> list[dict[str, object]]:
+        templates = list_source_blueprint_templates()
+        enriched: list[dict[str, object]] = []
+        for template in templates:
+            lock = await self.describe_blueprint_lock(
+                template["overlay_id"],
+                template["provider_template_id"],
+                template["provider"],
+            )
+            enriched.append({**template, **lock})
+        return enriched
 
     async def list_source_versions(self, source_id: str) -> list[SourceVersion]:
         await self.get_source(source_id)

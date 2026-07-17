@@ -29,6 +29,7 @@ from platform_control.models.run import Run
 from platform_control.schemas.run import CreateRunRequest
 from platform_control.schemas.source import CreateSourceRequest, CreateSourceVersionRequest
 from platform_control.services.acquisition_provider import ProviderStartResult
+from platform_control.services.blueprint_enablement import BlueprintEnablementService
 from platform_control.services.canton_http_provider import CantonHttpProvider
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.run_service import RunService
@@ -135,29 +136,37 @@ async def test_disabled_template_cannot_launch_a_run(session) -> None:
         await run_service.create_run(_preview_run(source.source_id, version.source_version_id))
 
     assert live["bundesland_http"].calls == []
-    # Rejected before the Run row exists — no PENDING run for a worker to pick up.
-    assert list(await session.scalars(select(Run))) == []
+    # The refusal is recorded as a terminal FAILED run (evidence, #634) — never a
+    # PENDING one, so no worker picks it up.
+    runs = list(await session.scalars(select(Run)))
+    assert len(runs) == 1
+    assert runs[0].status is RunStatus.FAILED
+    assert "not enabled" in (runs[0].failure_reason or "")
+    assert runs[0].run_metadata.get("refused") is True
 
 
 @pytest.mark.asyncio
-async def test_scaffold_provider_cannot_launch_even_if_template_is_enabled(
-    session, monkeypatch
-) -> None:
-    # Code-owner key: pretend an operator mistakenly flipped `enabled: true` on a
-    # template whose provider is still a scaffold (canton_http, live_ready=False).
-    # The provider key must still refuse to fire at the cantonal portal.
-    monkeypatch.setattr(
-        "platform_control.services.run_service.require_source_blueprint_enabled",
-        lambda overlay_id, provider_template_id: None,
-    )
+async def test_scaffold_provider_cannot_launch_even_if_template_is_enabled(session) -> None:
+    # Code-owner key: an operator flips the config key on (the real, DB-backed
+    # override path, #632) for a template whose provider is still a scaffold
+    # (canton_http, live_ready=False). The provider key must still refuse to fire
+    # at the cantonal portal.
     source, version = await _source_version_from_template(session, SCAFFOLD_TEMPLATE)
+    await BlueprintEnablementService(session).set_enabled(
+        *SCAFFOLD_TEMPLATE, enabled=True, note="operator flipped it", actor="op_local_dev"
+    )
+    await session.commit()
     registry, _ = _registry()
     run_service = RunService(session, provider_registry=registry)
 
     with pytest.raises(ProviderNotLiveReadyError):
         await run_service.create_run(_preview_run(source.source_id, version.source_version_id))
 
-    assert list(await session.scalars(select(Run))) == []
+    # Code-key refusal is recorded as a terminal FAILED run (evidence, #634).
+    runs = list(await session.scalars(select(Run)))
+    assert len(runs) == 1
+    assert runs[0].status is RunStatus.FAILED
+    assert runs[0].run_metadata.get("refused") is True
 
 
 @pytest.mark.asyncio

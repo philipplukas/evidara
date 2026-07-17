@@ -44,7 +44,9 @@ API_TITLE = "Platform Control API"
 # contract's info.version, and the drift gate compares the contract against this
 # app. Bump both together, per contracts/manifest.yaml compatibility_policy
 # (additive -> minor, breaking -> major).
-API_VERSION = "0.8.0"
+# 0.9.0: additive — new blueprint-template enablement endpoint + `enabled`/
+# `live_ready`/`launchable`/`notes` on blueprint responses (#632, #634).
+API_VERSION = "0.9.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks
