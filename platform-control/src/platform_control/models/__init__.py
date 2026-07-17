@@ -1,4 +1,5 @@
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.blueprint_template_override import BlueprintTemplateOverride
 from platform_control.models.captured_resource import CapturedResource
 from platform_control.models.commentary_insight import CommentaryInsight
 from platform_control.models.compliance_policy import CompliancePolicy
@@ -22,6 +23,7 @@ from platform_control.models.wizard_run_ledger import WizardRunLedger
 
 __all__ = [
     "Authority",
+    "BlueprintTemplateOverride",
     "CapturedResource",
     "CommentaryInsight",
     "CompliancePolicy",

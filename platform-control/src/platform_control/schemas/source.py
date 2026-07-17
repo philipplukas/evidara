@@ -397,13 +397,63 @@ class SourceBlueprintPreviewResponse(BaseModel):
     overlay_id: str
     provider_template_id: str
     acquisition_spec: AcquisitionSpec
+    enabled: bool = Field(
+        description="Effective ADR-0030 config key: DB override an operator flipped, "
+        "else the shipped source_blueprints.yaml default (fail-closed).",
+    )
+    live_ready: bool = Field(
+        description="ADR-0030 code key: the resolved provider can physically acquire this "
+        "format. Stays in code — it is an engineering assertion, not operator state.",
+    )
+    launchable: bool = Field(
+        description="Both keys turned — a live run will not be blocked by the two-key lock.",
+    )
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Human-readable explanation of any closed key (why the template is inert).",
+    )
 
 
 class SourceBlueprintTemplateResponse(BaseModel):
     overlay_id: str
     provider_template_id: str
     provider: str
+    enabled: bool = Field(
+        description="Effective ADR-0030 config key: DB override an operator flipped, "
+        "else the shipped source_blueprints.yaml default (fail-closed).",
+    )
+    live_ready: bool = Field(
+        description="ADR-0030 code key: the resolved provider can physically acquire this format.",
+    )
+    launchable: bool = Field(
+        description="Both keys turned — a live run will not be blocked by the two-key lock.",
+    )
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Human-readable explanation of any closed key (why the template is inert).",
+    )
 
 
 class SourceBlueprintTemplateListResponse(BaseModel):
     data: list[SourceBlueprintTemplateResponse]
+
+
+class BlueprintTemplateEnablementRequest(BaseModel):
+    """Operator flip of the ADR-0030 config key (#632)."""
+
+    enabled: bool
+    note: str | None = Field(
+        default=None,
+        description="Why the key was flipped — e.g. a link to captured acceptance-run evidence.",
+    )
+
+
+class BlueprintTemplateEnablementResponse(BaseModel):
+    overlay_id: str
+    provider_template_id: str
+    enabled: bool = Field(description="Effective config key after the flip.")
+    default_enabled: bool = Field(description="The shipped source_blueprints.yaml default.")
+    source: str = Field(description="'override' (an operator flipped it) or 'default' (shipped).")
+    note: str | None = None
+    updated_by: str | None = None
+    updated_at: datetime | None = None

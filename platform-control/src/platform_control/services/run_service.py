@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from acquisition_core.normalization import ArtifactPipeline
 from acquisition_core.providers import ProviderNotLiveReadyError, ensure_live_ready
+from platform_control.config import get_settings
 from platform_control.domain import (
     ExecutionMode,
     ProviderJobStatus,
@@ -63,6 +64,7 @@ from platform_control.schemas.run import (
 )
 from platform_control.services.acquisition_provider import AcquisitionProvider, ProviderResource
 from platform_control.services.artifact_store import ArtifactStore
+from platform_control.services.blueprint_enablement import BlueprintEnablementService
 from platform_control.services.compliance_policy_service import (
     RateLimiterRegistry,
     resolve_rate_limiter_for_source,
@@ -70,9 +72,9 @@ from platform_control.services.compliance_policy_service import (
 )
 from platform_control.services.politeness import current_rate_limiter
 from platform_control.services.provider_registry import ProviderRegistry
+from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.replay_checkpoint import checkpoint_dict_from_parent
 from platform_control.services.robots import RobotsChecker, current_robots_context
-from platform_control.services.source_blueprints import require_source_blueprint_enabled
 
 
 @dataclass(slots=True)
@@ -121,7 +123,7 @@ class RunService:
             provider = self.provider_registry.resolve_for_version(source_version)
         return provider
 
-    def _require_launchable(
+    async def _require_launchable(
         self,
         source_version: SourceVersion,
         provider: AcquisitionProvider,
@@ -130,8 +132,10 @@ class RunService:
 
         A run may only fire at a third-party portal when BOTH keys are turned:
 
-        - config owner: the blueprint template the version came from carries
-          `enabled: true` in source_blueprints.yaml, and
+        - config owner: the blueprint template the version came from is enabled —
+          the effective key resolved by `BlueprintEnablementService` (DB override
+          an operator flipped, else the shipped `source_blueprints.yaml` default),
+          and
         - code owner: the provider that will actually be called declares
           `live_ready = True` (i.e. `start_run` is not a stub).
 
@@ -143,7 +147,7 @@ class RunService:
         if source_version.execution_mode is ExecutionMode.SHADOW:
             return
         if source_version.overlay_id and source_version.provider_template_id:
-            require_source_blueprint_enabled(
+            await BlueprintEnablementService(self.session).require_enabled(
                 source_version.overlay_id,
                 source_version.provider_template_id,
             )
@@ -227,7 +231,7 @@ class RunService:
         # scheduler/retry/temporal paths are covered too.
         provider = self._resolve_provider_for_source_version(source_version)
         if provider is not None:
-            self._require_launchable(source_version, provider)
+            await self._require_launchable(source_version, provider)
 
         run_metadata: dict[str, Any] = {
             "scope": request.scope.model_dump(mode="json"),
@@ -265,12 +269,89 @@ class RunService:
     ) -> RunReadinessResponse:
         source = await self.session.get(Source, source_id)
         source_version = await self.session.get(SourceVersion, source_version_id)
-        return self.assess_run_readiness(
+        readiness = self.assess_run_readiness(
             source=source,
             source_version=source_version,
             source_id=source_id,
             source_version_id=source_version_id,
             mode=mode,
+        )
+        # Readiness is the operator's pre-flight ("can I run this?"). It must
+        # evaluate the two-key lock too, or it reports `ready: true` for a run
+        # that create_run then 400s on the ADR-0030 lock (#634).
+        lock_check = await self._assess_launch_lock(source_version)
+        if lock_check is None:
+            return readiness
+        checks = [*readiness.checks, lock_check]
+        return RunReadinessResponse(
+            source_id=source_id,
+            source_version_id=source_version_id,
+            mode=mode,
+            ready=all(check.ok for check in checks),
+            checks=checks,
+        )
+
+    async def _assess_launch_lock(
+        self, source_version: SourceVersion | None
+    ) -> RunReadinessCheck | None:
+        """Evaluate the ADR-0030 two-key lock as a readiness check.
+
+        Returns None when there is no version to assess (earlier checks already
+        fail). Mirrors `_require_launchable` exactly so pre-flight and dispatch
+        never disagree: SHADOW is exempt, the config key is the effective
+        enablement (DB override ?? shipped default), the code key is the
+        resolved provider's `live_ready`.
+        """
+        if source_version is None:
+            return None
+        if source_version.execution_mode is ExecutionMode.SHADOW:
+            return RunReadinessCheck(
+                code="acquisition_lock_open",
+                ok=True,
+                detail="Shadow mode replays fixtures; the live-portal lock does not apply.",
+            )
+
+        if source_version.overlay_id and source_version.provider_template_id:
+            try:
+                config_enabled = await BlueprintEnablementService(self.session).is_enabled(
+                    source_version.overlay_id, source_version.provider_template_id
+                )
+            except NotFoundError:
+                return RunReadinessCheck(
+                    code="acquisition_lock_open",
+                    ok=False,
+                    detail=(
+                        f"Blueprint template '{source_version.overlay_id}/"
+                        f"{source_version.provider_template_id}' no longer exists."
+                    ),
+                )
+            if not config_enabled:
+                return RunReadinessCheck(
+                    code="acquisition_lock_open",
+                    ok=False,
+                    detail=(
+                        f"Config key closed: template '{source_version.overlay_id}/"
+                        f"{source_version.provider_template_id}' is not enabled. Capture "
+                        "acceptance-run evidence, then enable it (ADR-0030, #632)."
+                    ),
+                )
+
+        provider = self._resolve_provider_for_source_version(source_version)
+        if provider is None and self.provider_registry is None:
+            provider = build_provider_registry(get_settings()).resolve_for_version(source_version)
+        if provider is not None and not getattr(provider, "live_ready", False):
+            return RunReadinessCheck(
+                code="acquisition_lock_open",
+                ok=False,
+                detail=(
+                    f"Code key closed: provider '{getattr(provider, 'provider_name', 'unknown')}' "
+                    "is not live-ready (start_run is still a scaffold)."
+                ),
+            )
+        return RunReadinessCheck(
+            code="acquisition_lock_open",
+            ok=True,
+            detail="Both ADR-0030 keys are turned: template enabled and provider live-ready.",
         )
 
     async def dispatch_pending_runs(self, limit: int = 10) -> int:
@@ -899,7 +980,7 @@ class RunService:
 
         # Last gate before any outbound request: no scaffold provider and no
         # disabled blueprint template may reach a live portal (ADR-0030).
-        self._require_launchable(source_version, provider)
+        await self._require_launchable(source_version, provider)
 
         # Bind the jurisdiction's rate limiter + robots context into the async
         # context so every outbound GET performed by the provider honours them.

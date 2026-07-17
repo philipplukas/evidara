@@ -24,6 +24,22 @@ const previewFor = (
   overlay_id: "ch",
   provider_template_id: "template-1",
   acquisition_spec: spec,
+  enabled: true,
+  live_ready: true,
+  launchable: true,
+  notes: [],
+});
+
+/** Template fixture with the two-key lock open by default (launchable). */
+const mkTemplate = (
+  overrides: Partial<SourceBlueprintTemplate> &
+    Pick<SourceBlueprintTemplate, "overlay_id" | "provider_template_id" | "provider">,
+): SourceBlueprintTemplate => ({
+  enabled: true,
+  live_ready: true,
+  launchable: true,
+  notes: [],
+  ...overrides,
 });
 
 describe("summarizePreview", () => {
@@ -127,9 +143,13 @@ describe("summarizePreview", () => {
 });
 
 const templates: SourceBlueprintTemplate[] = [
-  { overlay_id: "ch", provider_template_id: "fedlex-default", provider: "fedlex_sparql" },
-  { overlay_id: "ch", provider_template_id: "ch-http", provider: "deterministic_http" },
-  { overlay_id: "at", provider_template_id: "ris-default", provider: "ris_ogd" },
+  mkTemplate({
+    overlay_id: "ch",
+    provider_template_id: "fedlex-default",
+    provider: "fedlex_sparql",
+  }),
+  mkTemplate({ overlay_id: "ch", provider_template_id: "ch-http", provider: "deterministic_http" }),
+  mkTemplate({ overlay_id: "at", provider_template_id: "ris-default", provider: "ris_ogd" }),
 ];
 
 describe("buildOverlayChoices", () => {
@@ -142,7 +162,9 @@ describe("buildOverlayChoices", () => {
 
   it("upper-cases unknown overlay ids", () => {
     expect(
-      buildOverlayChoices([{ overlay_id: "xx", provider_template_id: "t", provider: "firecrawl" }]),
+      buildOverlayChoices([
+        mkTemplate({ overlay_id: "xx", provider_template_id: "t", provider: "firecrawl" }),
+      ]),
     ).toEqual([{ id: "xx", name: "XX" }]);
   });
 });
@@ -156,5 +178,23 @@ describe("buildTemplateChoicesByOverlay", () => {
       ],
       at: [{ id: "ris-default", name: "ris-default (ris_ogd)" }],
     });
+  });
+
+  it("marks an inert (non-launchable) template at selection time so it isn't mistaken for live", () => {
+    const grouped = buildTemplateChoicesByOverlay([
+      mkTemplate({
+        overlay_id: "ch",
+        provider_template_id: "canton_http_zh",
+        provider: "deterministic_http",
+        enabled: false,
+        live_ready: false,
+        launchable: false,
+        notes: ["Config key closed", "Code key closed"],
+      }),
+    ]);
+
+    expect(grouped.ch).toEqual([
+      { id: "canton_http_zh", name: "canton_http_zh (deterministic_http) · inert (locked)" },
+    ]);
   });
 });
