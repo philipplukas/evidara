@@ -17,6 +17,14 @@ captures acceptance-run evidence per canton. The portal hosts below are
 placeholder-but-plausible and MUST be verified against the real cantonal
 portals at live-enablement.
 
+`live_ready` stays False for a second, concrete reason (#631): several
+cantonal collections — ZH-Lex among them — are JavaScript SPA portals.
+Deterministic HTTP fetches only their navigation shell, not the statute,
+so acquiring cantonal law from them needs SPA rendering or an underlying
+data endpoint that this provider does not yet have. Until then the shared
+legal-text density gate in `PortalHttpProviderBase` refuses the nav shell
+(captured=0 + reason) rather than reporting a clean success on chrome.
+
 See `PortalHttpProviderBase` for the shared acquisition flow.
 """
 
