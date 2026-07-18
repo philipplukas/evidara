@@ -550,14 +550,27 @@ class ProcessingPipelineTests(unittest.TestCase):
                 parser_backend="docling",
                 enable_spacy=True,
             ).process_event(build_bundle_event(manifest_path))
+            # This test used to assert "docling_fallback_v1" / backend "fallback"
+            # unconditionally — it was pinning a bug. `doc.iterate_items()` yields
+            # (item, level) pairs and the adapter unpacked it as a bare item, so every
+            # block came out empty and the docling backend *always* fell back to the
+            # legacy normaliser. Fixed in ADR-0038; with docling installed the real
+            # backend now runs, and the fallback is only taken when it is absent.
+            try:
+                import docling  # noqa: F401
+
+                expected_profile, expected_backend = "docling_v1", "docling"
+            except ImportError:
+                expected_profile, expected_backend = "docling_fallback_v1", "fallback"
+
             self.assertEqual(
                 result.manifest.selected_profiles["normalization_profile_ref"],
-                "docling_fallback_v1",
+                expected_profile,
             )
             self.assertIn("docling", result.document.metadata)
             self.assertIn("nlp", result.document.metadata)
             self.assertTrue(result.document.metadata["nlp"]["enabled"])
-            self.assertEqual(result.document.metadata["docling"]["backend"], "fallback")
+            self.assertEqual(result.document.metadata["docling"]["backend"], expected_backend)
             self.assertEqual(result.document.metadata["nlp"]["model_name"], "xx_sent_ud_sm")
             self.assertEqual(result.document.metadata["nlp"]["max_chars_per_section"], 100000)
             self.assertEqual(result.document.metadata["nlp"]["batch_size"], 32)
@@ -673,7 +686,9 @@ class ProcessingPipelineTests(unittest.TestCase):
             result = ProcessingPipeline(processing_version="di_2026_07_15").process_event(
                 build_bundle_event(manifest_path)
             )
-            self.assertEqual(result.document.metadata["normalizer"], "pdf_v1")
+            # PDFs normalise through docling (ADR-0038). Without it installed the pipeline
+            # falls back to the pdfplumber normaliser, which is flagged, not silent.
+            self.assertIn(result.document.metadata["normalizer"], {"pdf_docling_v1", "pdf_v1"})
             body = result.document.body_text or result.document.full_text
             self.assertIn("die Fuehrung des Hundeverzeichnisses", body)
             self.assertNotIn("des Organisation Hundeverzeichnisses", body)

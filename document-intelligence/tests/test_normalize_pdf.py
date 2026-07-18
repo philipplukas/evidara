@@ -1,21 +1,21 @@
-"""Regression tests for the layout-aware PDF normaliser (#590).
+"""Regression tests for the PDF normaliser (#590, #650).
 
-The load-bearing test is ``test_marginal_heading_is_not_spliced_into_body``: it builds a
-synthetic multi-column PDF that reproduces the *exact* failure mode from the issue — a
-marginal heading ("Randtitel") that a naive top-to-bottom text dump splices into the body
-sentence beside it, silently corrupting legal text:
+**Read this before trusting a green run here.** The synthetic reportlab fixture below is
+why the splice bug shipped: it puts the Randtitel in the **left** margin with a wide
+gutter, which is not what the real document does. ADR-0037's x-projection normaliser
+passes on it and corrupts the real ordinance. The real-PDF tests that actually pin the
+bug live in ``tests/test_marginalia.py`` and in
+``test_real_ordinance_is_not_spliced_by_the_docling_path`` at the bottom of this file.
 
-    „die Führung des **Organisation** Hundeverzeichnisses"
-
-We could not obtain the real Zurich ordinance PDF (AS 554.510) in the sandbox, so the
-fixture is synthetic — but it reproduces the marginal-splice mode deterministically: the
-test first asserts that a naive extraction *does* splice (proving the fixture is faithful),
-then asserts the layout-aware normaliser does not.
+The synthetic tests are retained, but retargeted at
+``normalize_pdf_document_pdfplumber`` — the legacy normaliser they were written for,
+now a flagged fallback (ADR-0038). ``normalize_pdf_document`` itself routes to docling.
 """
 
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 # reportlab is a declared dependency of the `test` extra, which every path that runs this
 # suite installs (CI job, scripts/check-document-intelligence.sh, the documented local
@@ -28,7 +28,10 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas as reportlab_canvas
 
 from document_intelligence.normalize.ir import NormalizedDocumentIR
-from document_intelligence.normalize.pdf import normalize_pdf_document
+from document_intelligence.normalize.pdf import (
+    normalize_pdf_document,
+    normalize_pdf_document_pdfplumber,
+)
 
 _PAGE_WIDTH, _PAGE_HEIGHT = A4
 _BODY_X = 200.0
@@ -92,7 +95,7 @@ def test_naive_extraction_reproduces_the_splice() -> None:
 def test_marginal_heading_is_not_spliced_into_body() -> None:
     pdf_bytes = _build_marginal_splice_pdf()
 
-    ir = normalize_pdf_document(pdf_bytes, artifact_id="art_dogpdf")
+    ir = normalize_pdf_document_pdfplumber(pdf_bytes, artifact_id="art_dogpdf")
 
     paragraphs = [b for b in ir.blocks if b.type == "paragraph"]
     headings = [b for b in ir.blocks if b.type == "heading"]
@@ -111,7 +114,7 @@ def test_marginal_heading_is_not_spliced_into_body() -> None:
 
 
 def test_pdf_ir_metadata_marks_layout_aware() -> None:
-    ir = normalize_pdf_document(_build_marginal_splice_pdf(), artifact_id="art_meta")
+    ir = normalize_pdf_document_pdfplumber(_build_marginal_splice_pdf(), artifact_id="art_meta")
     assert isinstance(ir, NormalizedDocumentIR)
     assert ir.metadata["normalizer"] == "pdf_v1"
     assert ir.metadata["pdf_layout_aware"] is True
@@ -129,7 +132,7 @@ def test_single_column_pdf_reads_as_one_paragraph() -> None:
     canvas.showPage()
     canvas.save()
 
-    ir = normalize_pdf_document(buffer.getvalue(), artifact_id="art_single")
+    ir = normalize_pdf_document_pdfplumber(buffer.getvalue(), artifact_id="art_single")
     body = ir.body_text
     assert "Der Gemeinderat erlaesst gestuetzt auf das kantonale Hundegesetz" in body
 
@@ -143,6 +146,84 @@ def test_pdf_without_text_layer_is_flagged_not_fabricated() -> None:
     canvas.showPage()
     canvas.save()
 
-    ir = normalize_pdf_document(buffer.getvalue(), artifact_id="art_scan")
+    ir = normalize_pdf_document_pdfplumber(buffer.getvalue(), artifact_id="art_scan")
     assert ir.blocks == []
     assert ir.metadata["pdf_no_text_layer"] is True
+
+
+# --- The real ordinance (AS 554.510) ------------------------------------------------
+#
+# Everything above this line runs against a synthetic fixture that the *broken* normaliser
+# passes. These run against the committed real PDF, which it does not.
+
+_REAL_PDF = Path(__file__).parent / "fixtures" / "zh_as_554_510.pdf"
+
+# The splice as it appears in the real document, and the contiguous text it should be.
+_REAL_SPLICE = "Führung des Organisation Hundeverzeichnisses"
+_REAL_CLEAN = "Führung des Hundeverzeichnisses"
+
+
+def test_legacy_normaliser_really_does_splice_the_real_ordinance() -> None:
+    """Characterisation of ADR-0037's normaliser on the document it was written for.
+
+    This is *not* a regression test — it passes before and after ADR-0038 by design,
+    because the legacy normaliser is retained unchanged as a fallback. It exists to keep
+    the reason for the switch executable: the x-projection approach collapses the page to
+    one column (gutter 5.6pt < p90 word gap 6.5pt) and splices the Randtitel mid-sentence.
+    """
+    ir = normalize_pdf_document_pdfplumber(_REAL_PDF.read_bytes(), artifact_id="art_legacy")
+    body = ir.body_text
+    assert _REAL_SPLICE in body
+    assert _REAL_CLEAN not in body
+
+
+def test_real_ordinance_is_not_spliced_by_the_docling_path() -> None:
+    """The load-bearing regression test for #650.
+
+    Fails on ADR-0037's implementation: ``normalize_pdf_document`` routed to pdfplumber,
+    which produces ``_REAL_SPLICE``.
+    """
+    pytest.importorskip("docling")
+
+    ir = normalize_pdf_document(_REAL_PDF.read_bytes(), artifact_id="art_zh")
+    body = ir.body_text
+
+    # 1. The provision's sentence is contiguous — the Randtitel is not inside it.
+    assert _REAL_SPLICE not in body
+    assert _REAL_CLEAN in body
+
+    # 2. De-hyphenation across the line break.
+    assert "Hundehaltungsvoraussetzungen" in body
+    assert "Hundehaltungsvoraus- setzungen" not in body
+
+    # 3. Every Randtitel is lifted into its own heading block, none left in a paragraph.
+    assert ir.metadata["pdf_extractor"] == "docling"
+    assert ir.metadata["pdf_marginalia"] == {"detected": 8, "lifted": 8, "unmatched": []}
+    headings = {b.text for b in ir.blocks if b.type == "heading"}
+    assert {"Organisation", "Härtefall", "Inkrafttreten", "Aufhebung bisherigen Rechts"} <= headings
+
+    organisation = next(b for b in ir.blocks if b.text == "Organisation")
+    assert organisation.type == "heading"
+    assert organisation.attrs.get("anchor") == "organisation"
+    assert organisation.attrs.get("marginal") is True
+
+    # 4. Document structure docling recovers and the legacy path never did.
+    assert ir.metadata["title"] == "Vollzugsvorschriften zum Hundegesetz"
+    assert any(b.type == "heading" and b.text.startswith("A.") for b in ir.blocks)
+    assert any(b.type == "list_item" for b in ir.blocks)
+
+
+def test_randtitel_heading_precedes_the_provision_it_labels() -> None:
+    """Reading order, not just presence: the label must sit *before* its article."""
+    pytest.importorskip("docling")
+
+    ir = normalize_pdf_document(_REAL_PDF.read_bytes(), artifact_id="art_order")
+    texts = [b.text for b in ir.blocks]
+
+    heading_index = texts.index("Organisation")
+    article_index = next(i for i, t in enumerate(texts) if t.startswith("Art. 1"))
+    assert heading_index == article_index - 1
+
+    # Page 2's labels are emitted by docling *after* the final article; they must be
+    # repositioned, not left dangling at the end of the document.
+    assert texts.index("Inkrafttreten") < next(i for i, t in enumerate(texts) if t.startswith("Art. 8"))

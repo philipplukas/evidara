@@ -3,26 +3,26 @@
 Municipal Swiss law is largely PDF-only (#590, #584): the operative ordinance has no
 HTML manifestation, so the pipeline must normalize the PDF *itself*. A naive text dump
 (``pdftotext``, ``pdfplumber.extract_text`` with default flow) is **not acceptable
-here**: the Amtliche Sammlung PDFs carry marginal headings ("Randtitel") in a left-hand
-margin band, and a left-to-right / top-to-bottom reading order splices them into the
-body sentence beside them — e.g.
+here**: the Amtliche Sammlung PDFs carry marginal headings ("Randtitel") in a margin band
+beside the body, and a top-to-bottom reading order splices them into the body sentence —
 
     „die Führung des **Organisation** Hundeverzeichnisses"
 
 That is silently corrupted legal text: it indexes, it searches, it looks fine, and it is
-wrong. The regression test in ``tests/test_normalize_pdf.py`` pins exactly this failure.
+wrong.
 
-This normaliser is therefore **layout-aware**: it uses word bounding boxes to detect
-vertical gutters, separates the marginal-heading band from the body column, and only
-then reconstructs reading order. A Randtitel becomes its own heading block (carrying an
-anchor, exactly like a Fedlex ``<article id=…>`` heading in the HTML path), so sectioning,
-citations and anchors work unchanged against the same :class:`NormalizedDocumentIR`.
+**Extraction runs through docling** (ADR-0038, amending ADR-0037 §3). ADR-0037 chose
+``pdfplumber`` and separated the margin band by projecting words onto the x-axis and
+splitting on whitespace gutters. Measured on the real ordinance (Zurich AS 554.510) that
+signal does not exist: the gutter between body and Randtitel is **5.6pt**, narrower than
+p90 intra-sentence word spacing (6.5pt). No tolerance separates them, so the page collapses
+to a single column and the splice ships. It is not a tuning problem; x-projection is the
+wrong signal for this document.
 
-Library choice — ``pdfplumber`` (see ADR draft ``docs/adr/0037``): pure-Python, MIT,
-word-level coordinates, no ML model downloads, deterministic and reproducible in CI. The
-alternative, ``docling``, is referenced in the repo but was never installed; it pulls a
-multi-GB Torch stack and downloads models at runtime, which is neither reproducible in CI
-nor justified for coordinate-based margin/column separation.
+The pdfplumber normaliser is retained below as an explicit, *metadata-flagged* fallback for
+when docling cannot run. It is **known to corrupt this document class**, so a fallback
+result is never presented as equivalent: it sets ``pdf_extractor="pdfplumber"`` and
+``pdf_fallback_reason``, which downstream can gate on.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from document_intelligence.errors import ProcessingError
+from document_intelligence.ingest.docling_adapter import normalize_pdf_with_docling
 from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
 
 # Line grouping: words whose vertical mid-points sit within this many points of each
@@ -82,8 +83,26 @@ class _Column:
 def normalize_pdf_document(pdf_bytes: bytes, artifact_id: str) -> NormalizedDocumentIR:
     """Normalize a PDF byte payload into the shared IR, layout-aware.
 
-    Marginal headings are separated from the body column by their x-position and emitted
-    as heading blocks, so they never splice into the body text beside them.
+    Docling does the extraction; a geometry post-pass lifts marginal headings into their
+    own heading blocks. Falls back to the pdfplumber normaliser only when docling cannot
+    run, and flags the result so a degraded extraction is never mistaken for a good one.
+    """
+    try:
+        return normalize_pdf_with_docling(artifact_id=artifact_id, pdf_bytes=pdf_bytes)
+    except ProcessingError as error:
+        fallback = normalize_pdf_document_pdfplumber(pdf_bytes, artifact_id)
+        metadata = dict(fallback.metadata)
+        metadata["pdf_fallback_reason"] = error.code
+        return NormalizedDocumentIR(blocks=list(fallback.blocks), metadata=metadata)
+
+
+def normalize_pdf_document_pdfplumber(pdf_bytes: bytes, artifact_id: str) -> NormalizedDocumentIR:
+    """ADR-0037's x-projection normaliser, retained as a flagged fallback only.
+
+    Known limitation: it detects the margin band by x-axis whitespace gutters and only
+    ever looks *left* of the body column. Both assumptions fail on real Amtliche-Sammlung
+    PDFs (5.6pt gutter; right-hand band on recto pages), so its output must not be treated
+    as trustworthy for that document class. See ADR-0038.
     """
     pdfplumber = _import_pdfplumber()
 
