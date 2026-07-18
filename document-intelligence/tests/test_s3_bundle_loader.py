@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from document_intelligence.contracts.envelope import ManifestRef
+from document_intelligence.contracts.envelope import ArtifactBundleManifestArtifact, ManifestRef
 from document_intelligence.ingest.loaders import (
     BundleLoader,
     BundleLoadError,
@@ -112,6 +112,56 @@ class DispatchRoutingTests(unittest.TestCase):
 
         self.assertEqual(dispatcher.load_bundle(ref), "SENTINEL")
         self.assertEqual(len(recording.loaded), 1)
+
+
+class AcquisitionEnvelopeUnwrapTests(unittest.TestCase):
+    """Artifacts are stored as acquisition envelopes but declared as their body's type (#643).
+
+    `acquisition_core.normalization` writes `{"inline_body": "<html>…"}` while the
+    manifest says `text/html`. Reading the envelope as the document made the HTML
+    normalizer parse JSON-escaped markup, so every non-ASCII character reached
+    search as a literal `\\uXXXX` sequence.
+    """
+
+    def _read(self, payload: bytes) -> str:
+        artifact = ArtifactBundleManifestArtifact.from_dict(
+            {
+                "artifact_id": "art_01jq7ab8x4nm7m3qz3b8e9q2fk",
+                "artifact_role": "primary_document",
+                "storage_ref": {
+                    "uri": f"s3://{_BUCKET}/runs/run_x/artifact.json",
+                    "content_type": "text/html",
+                    "byte_size": len(payload),
+                    "checksum": hashlib.sha256(payload).hexdigest(),
+                    "checksum_algorithm": "sha256",
+                },
+            }
+        )
+        client = FakeS3Client(payload)
+        return S3BundleLoader(client_factory=lambda: client).read_artifact_text(artifact)
+
+    def test_envelope_is_unwrapped_so_non_ascii_survives_as_characters(self) -> None:
+        html = "<p>vom 18. April 1999 (Stand am 3. März 2024)</p>"
+        envelope = json.dumps({"source_url": "https://example.test/de", "final_url": None, "inline_body": html}).encode(
+            "utf-8"
+        )
+        # ensure_ascii escaped the umlaut on the way in — the bug was keeping it escaped.
+        escaped_umlaut = ("M" + chr(92) + "u00e4rz").encode("ascii")
+        self.assertIn(escaped_umlaut, envelope)
+
+        self.assertEqual(self._read(envelope), html)
+
+    def test_plain_html_artifact_is_returned_unchanged(self) -> None:
+        html = "<p>Präambel</p>"
+        self.assertEqual(self._read(html.encode("utf-8")), html)
+
+    def test_json_artifact_without_inline_body_is_returned_unchanged(self) -> None:
+        payload = json.dumps({"source_url": "https://example.test"})
+        self.assertEqual(self._read(payload.encode("utf-8")), payload)
+
+    def test_brace_leading_text_that_is_not_json_is_returned_unchanged(self) -> None:
+        payload = "{not json at all"
+        self.assertEqual(self._read(payload.encode("utf-8")), payload)
 
 
 if __name__ == "__main__":
