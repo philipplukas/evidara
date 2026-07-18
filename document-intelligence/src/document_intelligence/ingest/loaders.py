@@ -3,6 +3,8 @@
 import hashlib
 import importlib
 import json
+from base64 import b64decode
+from binascii import Error as BinasciiError
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -34,6 +36,15 @@ class BundleLoader:
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
         raise NotImplementedError
 
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
+        """Return the artifact's verified raw bytes without decoding.
+
+        Binary modalities (e.g. ``application/pdf``, #590) must not be forced through a
+        text decode, which would corrupt the payload. Text loaders decode these same
+        bytes; the PDF normaliser consumes them raw.
+        """
+        raise NotImplementedError
+
 
 class DispatchingBundleLoader(BundleLoader):
     """Route bundle reads to the appropriate loader based on URI scheme."""
@@ -56,6 +67,10 @@ class DispatchingBundleLoader(BundleLoader):
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
         loader = self._loader_for_uri(artifact.storage_ref.uri)
         return loader.read_artifact_text(artifact)
+
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
+        loader = self._loader_for_uri(artifact.storage_ref.uri)
+        return loader.read_artifact_bytes(artifact)
 
     def _loader_for_uri(self, uri: str) -> BundleLoader:
         if uri.startswith("gs://"):
@@ -95,6 +110,10 @@ class LocalFilesystemBundleLoader(BundleLoader):
         return _build_selected_bundle(manifest)
 
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
+        artifact_bytes = self.read_artifact_bytes(artifact)
+        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
         file_path = _resolve_local_path(artifact.storage_ref.uri)
         try:
             with open(file_path, "rb") as artifact_file:
@@ -111,7 +130,7 @@ class LocalFilesystemBundleLoader(BundleLoader):
             ) from error
 
         _verify_checksum(artifact_bytes, artifact.storage_ref, "artifact")
-        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+        return _unwrap_acquisition_envelope(artifact_bytes)
 
 
 class GcsBundleLoader(BundleLoader):
@@ -132,9 +151,12 @@ class GcsBundleLoader(BundleLoader):
         return _build_selected_bundle(manifest)
 
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
+        return _decode_text(self.read_artifact_bytes(artifact), artifact.storage_ref.uri)
+
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
         artifact_bytes = self._download_bytes(artifact.storage_ref.uri, "artifact")
         _verify_checksum(artifact_bytes, artifact.storage_ref, "artifact")
-        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+        return _unwrap_acquisition_envelope(artifact_bytes)
 
     def _download_bytes(self, uri: str, object_kind: str) -> bytes:
         bucket_name, object_name = _parse_gcs_uri(uri)
@@ -168,9 +190,12 @@ class S3BundleLoader(BundleLoader):
         return _build_selected_bundle(manifest)
 
     def read_artifact_text(self, artifact: ArtifactBundleManifestArtifact) -> str:
+        return _decode_text(self.read_artifact_bytes(artifact), artifact.storage_ref.uri)
+
+    def read_artifact_bytes(self, artifact: ArtifactBundleManifestArtifact) -> bytes:
         artifact_bytes = self._download_bytes(artifact.storage_ref.uri, "artifact")
         _verify_checksum(artifact_bytes, artifact.storage_ref, "artifact")
-        return _decode_text(artifact_bytes, artifact.storage_ref.uri)
+        return _unwrap_acquisition_envelope(artifact_bytes)
 
     def _download_bytes(self, uri: str, object_kind: str) -> bytes:
         bucket_name, object_name = _parse_s3_uri(uri)
@@ -334,39 +359,57 @@ def _verify_checksum(payload: bytes, storage_ref, object_kind: str) -> None:
 
 def _decode_text(payload: bytes, source_uri: str) -> str:
     try:
-        text = payload.decode("utf-8")
+        return payload.decode("utf-8")
     except UnicodeDecodeError as error:
         raise BundleLoadError(
             "invalid_text_encoding",
             f"artifact at {source_uri} was not valid UTF-8 text",
         ) from error
-    return _unwrap_acquisition_envelope(text)
 
 
-def _unwrap_acquisition_envelope(text: str) -> str:
-    """Return the document body from an acquisition envelope, else the text unchanged.
+def _unwrap_acquisition_envelope(payload: bytes) -> bytes:
+    """Return the document's own bytes from an acquisition envelope, else the payload unchanged.
 
     `acquisition_core.normalization` stores each captured resource as a JSON
-    envelope (`{"inline_body": ..., "source_url": ..., ...}`) while the manifest
-    keeps declaring the *resource's* content type (e.g. `text/html`). Handing that
-    envelope to the HTML normalizer parses the JSON-escaped body as markup: the
-    tags survive (they are ASCII) but every non-ASCII character stays as a literal
-    `\\uXXXX` sequence, so `März` reaches search as `M\\u00e4rz` (#643).
+    envelope while the manifest keeps declaring the *resource's* content type
+    (e.g. `text/html`, `application/pdf`). The envelope carries the body one of
+    two ways, because JSON cannot hold raw bytes:
 
-    Unwrapping here keeps every loader backend agreeing on what "artifact text"
-    means, and works on already-stored artifacts without re-acquisition.
+    - text     — verbatim under `inline_body`
+    - binary   — base64 under `inline_body_base64` (#590)
+
+    Both need unwrapping, and both are silent when missed. Handing the envelope
+    to the HTML normalizer parsed JSON-escaped markup, so `März` reached search
+    as `M\\u00e4rz` (#643); handing it to the PDF normalizer means handing JSON
+    to a parser that expects `%PDF-`.
+
+    Unwrapping at the *bytes* layer — below both `read_artifact_text` and
+    `read_artifact_bytes` — is what keeps text and binary agreeing on what "the
+    artifact payload" means, rather than each modality re-deriving it.
     """
-    if not text.lstrip().startswith("{"):
-        return text
+    if not payload.lstrip().startswith(b"{"):
+        return payload
     try:
-        envelope = json.loads(text)
-    except json.JSONDecodeError:
-        return text
-    if isinstance(envelope, dict):
-        body = envelope.get("inline_body")
-        if isinstance(body, str):
-            return body
-    return text
+        envelope = json.loads(payload.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return payload
+    if not isinstance(envelope, dict):
+        return payload
+
+    encoded = envelope.get("inline_body_base64")
+    if isinstance(encoded, str):
+        try:
+            return b64decode(encoded, validate=True)
+        except (BinasciiError, ValueError) as error:
+            raise BundleLoadError(
+                "invalid_inline_body_base64",
+                "artifact envelope carried inline_body_base64 that is not valid base64",
+            ) from error
+
+    body = envelope.get("inline_body")
+    if isinstance(body, str):
+        return body.encode("utf-8")
+    return payload
 
 
 def _resolve_local_path(uri_or_path: str) -> str:

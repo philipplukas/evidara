@@ -40,6 +40,7 @@ from document_intelligence.normalize.html import (
     normalize_plain_text_document,
 )
 from document_intelligence.normalize.ir import NormalizedDocumentIR
+from document_intelligence.normalize.pdf import normalize_pdf_document
 from document_intelligence.normalize.xml import normalize_xml_document
 from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
 from document_intelligence.persist.surfaces import PUBLISHED_DOCUMENTS, PUBLISHED_SECTIONS
@@ -123,7 +124,16 @@ class ProcessingPipeline:
         event = ArtifactBundleAvailableEvent.from_dict(event_data)
         selected_bundle = self._bundle_loader.load_bundle(event.payload.bundle_manifest_ref)
         primary_artifact = selected_bundle.primary_artifact
-        artifact_text = self._bundle_loader.read_artifact_text(primary_artifact)
+        # Binary modalities (PDF, #590) are read as raw bytes and normalised layout-aware;
+        # text modalities keep the existing decode-then-normalise path. Reading a PDF as
+        # text would corrupt it, and normalising the corrupted text would silently splice
+        # marginal headings mid-sentence — the exact failure #590 exists to prevent.
+        primary_content_type = _normalized_content_type(primary_artifact.storage_ref.content_type or "")
+        artifact_text: str | None = None
+        if primary_content_type == "application/pdf":
+            pdf_bytes = self._bundle_loader.read_artifact_bytes(primary_artifact)
+        else:
+            artifact_text = self._bundle_loader.read_artifact_text(primary_artifact)
 
         document_id = stable_prefixed_id(
             "doc",
@@ -165,7 +175,11 @@ class ProcessingPipeline:
             ),
         ]
 
-        normalized_document = self._normalize_artifact(primary_artifact, artifact_text)
+        if primary_content_type == "application/pdf":
+            normalized_document = normalize_pdf_document(pdf_bytes, primary_artifact.artifact_id)
+        else:
+            assert artifact_text is not None  # guaranteed by the content-type branch above
+            normalized_document = self._normalize_artifact(primary_artifact, artifact_text)
         normalized_document = _merge_extraction_hints_into_ir(
             selected_bundle.manifest,
             normalized_document,

@@ -6,14 +6,55 @@ from typing import Any, Protocol
 
 @dataclass(slots=True)
 class ProviderResource:
+    """A single acquired manifestation carried from a provider to the artifact pipeline.
+
+    A manifestation is either **text** (``body``, e.g. HTML/XML/plain text) or
+    **binary** (``body_bytes``, e.g. a PDF). Exactly one of the two is set. Binary
+    support (#590) exists because municipal Swiss law is largely PDF-only: the
+    operative ordinance has no HTML manifestation, so the acquisition interface must
+    be able to carry raw bytes end-to-end, not just decode-able text.
+
+    Downstream code should read :attr:`raw_bytes` (the modality-agnostic payload used
+    for hashing and storage) and branch on :attr:`is_binary` when it needs the text.
+    """
+
     source_url: str
     final_url: str
     content_type: str
-    body: str
+    body: str | None = None
+    body_bytes: bytes | None = None
     title: str | None = None
     http_status: int | None = None
     discovery_depth: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.body is not None and self.body_bytes is not None:
+            raise ValueError(
+                "ProviderResource carries exactly one manifestation: set body (text) "
+                "or body_bytes (binary), not both."
+            )
+        if self.body is None and self.body_bytes is None:
+            raise ValueError(
+                "ProviderResource requires a manifestation: set body (text) or body_bytes (binary)."
+            )
+
+    @property
+    def is_binary(self) -> bool:
+        """True when this resource carries a binary (non-text) manifestation."""
+        return self.body_bytes is not None
+
+    @property
+    def raw_bytes(self) -> bytes:
+        """Modality-agnostic payload bytes — for checksums and durable storage.
+
+        For a text manifestation this is the UTF-8 encoding of ``body``; for a binary
+        manifestation it is ``body_bytes`` verbatim.
+        """
+        if self.body_bytes is not None:
+            return self.body_bytes
+        assert self.body is not None  # guaranteed by __post_init__
+        return self.body.encode("utf-8")
 
 
 @dataclass(slots=True)

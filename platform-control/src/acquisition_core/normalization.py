@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from base64 import b64encode
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
@@ -47,7 +48,23 @@ class ArtifactPipeline:
                 strip_query_params=strip_query_params,
                 collapse_trailing_slash=collapse_trailing_slash,
             )
-            payload_hash = sha256(resource.body.encode("utf-8")).hexdigest()
+            # Hash the modality-agnostic payload bytes so a PDF and an HTML page are
+            # checksummed identically. The inline body is carried JSON-safely: text
+            # verbatim under `inline_body`, binary base64-encoded under
+            # `inline_body_base64` (a JSON payload cannot hold raw bytes). See #590.
+            raw_bytes = resource.raw_bytes
+            payload_hash = sha256(raw_bytes).hexdigest()
+            inline_body_fields: dict[str, Any]
+            if resource.is_binary:
+                inline_body_fields = {
+                    "inline_body_base64": b64encode(raw_bytes).decode("ascii"),
+                    "inline_body_encoding": "base64",
+                }
+            else:
+                inline_body_fields = {
+                    "inline_body": resource.body,
+                    "inline_body_encoding": "utf-8",
+                }
             raw_artifact = RawArtifactRecord(
                 storage_path=f"inline://{run_id}/{idx}",
                 content_type=resource.content_type,
@@ -55,7 +72,7 @@ class ArtifactPipeline:
                     "provider_metadata": resource.metadata,
                     "source_url": resource.source_url,
                     "final_url": resource.final_url,
-                    "inline_body": resource.body,
+                    **inline_body_fields,
                 },
             )
             captured_resource = CapturedResourceRecord(

@@ -498,6 +498,67 @@ class ProcessingPipelineTests(unittest.TestCase):
             os.unlink(artifact_path)
             os.unlink(manifest_path)
 
+    def test_processes_pdf_bundle_layout_aware_without_marginal_splice(self) -> None:
+        # A PDF primary artifact must be read as bytes and normalised layout-aware, so a
+        # marginal heading never splices into the body sentence (#590). This proves the
+        # binary path end-to-end: read_artifact_bytes -> normalize_pdf_document -> sections.
+        reportlab_canvas = __import__("reportlab.pdfgen.canvas", fromlist=["Canvas"])
+        from reportlab.lib.pagesizes import A4
+
+        _, page_height = A4
+        pdf_buffer = tempfile.NamedTemporaryFile("wb", suffix=".pdf", delete=False)
+        canvas = reportlab_canvas.Canvas(pdf_buffer, pagesize=A4)
+
+        def _draw(x, y_top, text, font="Helvetica", size=11):
+            canvas.setFont(font, size)
+            canvas.drawString(x, page_height - y_top, text)
+
+        _draw(200, 120, "Die Gemeinde ist zustaendig fuer")
+        _draw(200, 138, "die Fuehrung des")
+        _draw(45, 150, "Organisation", font="Helvetica-Bold", size=9)
+        _draw(200, 156, "Hundeverzeichnisses und der Hundekontrolle.")
+        canvas.showPage()
+        canvas.save()
+        pdf_buffer.close()
+        artifact_path = pdf_buffer.name
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as manifest_handle:
+            json.dump(
+                build_manifest_payload(
+                    artifact_path,
+                    artifact_role="primary_document",
+                    content_type="application/pdf",
+                    parser_hints={
+                        "expected_modalities": ["pdf"],
+                        "expected_content_types": ["application/pdf"],
+                        "preferred_primary_artifact_roles": ["primary_document"],
+                        "ocr_expected": False,
+                        "attachment_policy": "ignore",
+                    },
+                ),
+                manifest_handle,
+            )
+            manifest_path = manifest_handle.name
+
+        try:
+            result = ProcessingPipeline(processing_version="di_2026_07_15").process_event(
+                build_bundle_event(manifest_path)
+            )
+            self.assertEqual(result.document.metadata["normalizer"], "pdf_v1")
+            body = result.document.body_text or result.document.full_text
+            self.assertIn("die Fuehrung des Hundeverzeichnisses", body)
+            self.assertNotIn("des Organisation Hundeverzeichnisses", body)
+            # No section's body text is corrupted by the marginal splice.
+            for section in result.sections:
+                self.assertNotIn("des Organisation Hundeverzeichnisses", section.content)
+            validate_instance_against_contract(
+                result.document.to_dict(),
+                "schemas/document.schema.json",
+            )
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
     def test_high_confidence_llm_metadata_can_override_title_and_document_type(self) -> None:
         # Use HTML without a <title> tag so structured extraction leaves a gap,
         # triggering the LLM extractor via the cascade conditional check.
