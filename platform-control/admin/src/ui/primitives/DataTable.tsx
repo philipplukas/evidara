@@ -80,16 +80,6 @@ export function DataTable<T>({
         </div>
       ) : null}
 
-      {/*
-       * Horizontal-scroll container. Wide tables (the run queue carries 8
-       * columns) must scroll *inside their own card* rather than clipping at
-       * the shell's `overflow-x-hidden` main or pushing the page body wider —
-       * see AGENTS.md / CLAUDE.md ("wide content scrolls in its own
-       * overflow-x: auto container"). Pairs with `min-w-full` on the table
-       * below: the table grows to its natural content width and this element
-       * scrolls; it does not squeeze columns to fit and clip the rightmost
-       * one.
-       */}
       <div className="overflow-x-auto">
         {/*
          * `aria-busy` rides on the persistent <table> rather than the loading
@@ -97,14 +87,10 @@ export function DataTable<T>({
          * announced reliably, and the cell mounts and unmounts with the state
          * it would describe. Toggling an attribute on an element that never
          * leaves the DOM is the signal assistive tech can actually observe.
-         *
-         * `min-w-full` (not `w-full`): fill the container when the columns are
-         * narrow, but grow past it when they are not — the parent scrolls
-         * instead of cramming every column into 100% width and clipping.
          */}
         <table
           aria-busy={!!isLoading}
-          className="min-w-full border-collapse text-sm text-[var(--foreground)]"
+          className="w-full border-collapse text-sm text-[var(--foreground)]"
         >
           <thead>
             <tr className="bg-[var(--surface-input)]">
