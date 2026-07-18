@@ -193,6 +193,15 @@ services:
     command: ["document_intelligence_nats_consumer", "--servers", "nats://nats:4222"]
     environment:
       PORT: "8092"
+      # Read the raw-artifact bundle from the same MinIO the platform-control API
+      # writes it to. Without these the consumer falls back to real AWS and every
+      # message dead-letters with BundleLoadError ("bundle manifest could not be
+      # read from s3://…"), so DI never runs locally. The loader reads DI_S3_*
+      # (document_intelligence/ingest/loaders.py); mirror the API's S3 defaults.
+      DI_S3_ENDPOINT_URL: ${PLATFORM_CONTROL_S3_ENDPOINT_URL:-http://minio:9000}
+      DI_S3_REGION: ${PLATFORM_CONTROL_S3_REGION:-us-east-1}
+      DI_S3_ACCESS_KEY_ID: ${PLATFORM_CONTROL_S3_ACCESS_KEY_ID:-minioadmin}
+      DI_S3_SECRET_ACCESS_KEY: ${PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY:-minioadmin}
     depends_on:
       nats-init:
         condition: service_completed_successfully

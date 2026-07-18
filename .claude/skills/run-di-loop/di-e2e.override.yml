@@ -1,0 +1,33 @@
+# Port-remap override so the isolated DI-e2e stack never collides with the
+# already-running services (user's :8000 API + :5432 postgres, :3100 admin,
+# my :3000 admin, my legal-search :3101/:3102, my opensearch :9200).
+# `!override` REPLACES the base ports list (plain lists get appended/merged).
+# Project: evidara-di-e2e.
+services:
+  postgres:
+    ports: !override
+      - "15432:5432"
+  platform-control-api:
+    ports: !override
+      - "18000:8000"
+  legal-search-api:
+    ports: !override
+      - "13102:3102"
+  nats:
+    ports: !override
+      - "14222:4222"
+      - "18222:8222"
+  minio:
+    ports: !override
+      - "19000:9000"
+      - "19001:9001"
+  # The di-consumer reads artifact bundles from S3/MinIO via DI_S3_* env vars
+  # (document_intelligence/ingest/loaders.py). The base compose omits them, so
+  # it falls back to real AWS and BundleLoadErrors on the MinIO bundle. Wire it
+  # to the same MinIO the platform-control API writes bundles to.
+  di-consumer:
+    environment:
+      DI_S3_ENDPOINT_URL: http://minio:9000
+      DI_S3_REGION: us-east-1
+      DI_S3_ACCESS_KEY_ID: minioadmin
+      DI_S3_SECRET_ACCESS_KEY: minioadmin
