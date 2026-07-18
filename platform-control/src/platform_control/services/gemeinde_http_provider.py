@@ -30,7 +30,7 @@ The operative text is a **PDF**. There is no HTML manifestation.
 WHY THE PROVIDER SHIPS DISABLED (`live_ready = False`)
 ------------------------------------------------------
 The two *foundational* blockers that made a PDF ordinance unrepresentable
-were resolved by #590 (see ADR-0034):
+were resolved by #590 (see ADR-0037):
 
 1. `acquisition_core.ProviderResource` now carries binary bytes
    (`body_bytes`) alongside text (`body`), so a PDF manifestation can be

@@ -9,6 +9,7 @@ import os
 import sys
 import tempfile
 import unittest
+from base64 import b64encode
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -140,6 +141,23 @@ class AcquisitionEnvelopeUnwrapTests(unittest.TestCase):
         client = FakeS3Client(payload)
         return S3BundleLoader(client_factory=lambda: client).read_artifact_text(artifact)
 
+    def _read_bytes(self, payload: bytes) -> bytes:
+        artifact = ArtifactBundleManifestArtifact.from_dict(
+            {
+                "artifact_id": "art_01jq7ab8x4nm7m3qz3b8e9q2fk",
+                "artifact_role": "primary_document",
+                "storage_ref": {
+                    "uri": f"s3://{_BUCKET}/runs/run_x/artifact.json",
+                    "content_type": "application/pdf",
+                    "byte_size": len(payload),
+                    "checksum": hashlib.sha256(payload).hexdigest(),
+                    "checksum_algorithm": "sha256",
+                },
+            }
+        )
+        client = FakeS3Client(payload)
+        return S3BundleLoader(client_factory=lambda: client).read_artifact_bytes(artifact)
+
     def test_envelope_is_unwrapped_so_non_ascii_survives_as_characters(self) -> None:
         html = "<p>vom 18. April 1999 (Stand am 3. März 2024)</p>"
         envelope = json.dumps({"source_url": "https://example.test/de", "final_url": None, "inline_body": html}).encode(
@@ -162,6 +180,37 @@ class AcquisitionEnvelopeUnwrapTests(unittest.TestCase):
     def test_brace_leading_text_that_is_not_json_is_returned_unchanged(self) -> None:
         payload = "{not json at all"
         self.assertEqual(self._read(payload.encode("utf-8")), payload)
+
+    def test_binary_envelope_is_base64_decoded_to_the_real_payload(self) -> None:
+        # The seam #590 left open: acquisition base64-encodes a PDF into the envelope,
+        # and nothing on the read side decoded it — so the PDF normalizer would have
+        # received JSON bytes instead of `%PDF-`.
+        pdf = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n%%EOF\n"
+        envelope = json.dumps(
+            {
+                "source_url": "https://example.test/as-554-510.pdf",
+                "inline_body_base64": b64encode(pdf).decode("ascii"),
+                "inline_body_encoding": "base64",
+            }
+        ).encode("utf-8")
+
+        self.assertEqual(self._read_bytes(envelope), pdf)
+
+    def test_text_envelope_yields_utf8_bytes_of_the_body(self) -> None:
+        html = "<p>Präambel</p>"
+        envelope = json.dumps({"inline_body": html, "inline_body_encoding": "utf-8"}).encode("utf-8")
+        self.assertEqual(self._read_bytes(envelope), html.encode("utf-8"))
+
+    def test_raw_binary_artifact_passes_through_untouched(self) -> None:
+        # A stored PDF that is not enveloped must not be mangled.
+        pdf = b"%PDF-1.7\nbinary\x00\xff bytes\n%%EOF"
+        self.assertEqual(self._read_bytes(pdf), pdf)
+
+    def test_corrupt_base64_fails_loudly_rather_than_silently(self) -> None:
+        envelope = json.dumps({"inline_body_base64": "not!valid!base64!"}).encode("utf-8")
+        with self.assertRaises(BundleLoadError) as ctx:
+            self._read_bytes(envelope)
+        self.assertEqual(ctx.exception.code, "invalid_inline_body_base64")
 
 
 if __name__ == "__main__":

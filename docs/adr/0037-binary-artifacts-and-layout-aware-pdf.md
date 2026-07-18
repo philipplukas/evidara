@@ -1,4 +1,4 @@
-# ADR-0034: Binary artifacts end-to-end and a layout-aware PDF normaliser
+# ADR-0037: Binary artifacts end-to-end and a layout-aware PDF normaliser
 
 Status: Proposed
 Date: 2026-07-15

@@ -18,7 +18,7 @@ then reconstructs reading order. A Randtitel becomes its own heading block (carr
 anchor, exactly like a Fedlex ``<article id=…>`` heading in the HTML path), so sectioning,
 citations and anchors work unchanged against the same :class:`NormalizedDocumentIR`.
 
-Library choice — ``pdfplumber`` (see ADR draft ``docs/adr/0034``): pure-Python, MIT,
+Library choice — ``pdfplumber`` (see ADR draft ``docs/adr/0037``): pure-Python, MIT,
 word-level coordinates, no ML model downloads, deterministic and reproducible in CI. The
 alternative, ``docling``, is referenced in the repo but was never installed; it pulls a
 multi-GB Torch stack and downloads models at runtime, which is neither reproducible in CI
