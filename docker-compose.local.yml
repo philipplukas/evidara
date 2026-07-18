@@ -106,6 +106,10 @@ services:
       OPENSEARCH_NODE: http://opensearch:9200
       PORT: "3102"
       NODE_ENV: production
+      # Where the BFF fetches a document's canonical body (`fetchLeanDocument`).
+      # `document.processed` carries only refs, so without this legal-search falls
+      # back to the "Document <id>" stub and body-text search finds nothing.
+      DOCUMENT_INTELLIGENCE_BASE_URL: ${DOCUMENT_INTELLIGENCE_BASE_URL:-http://document-service:8090}
     ports:
       - "3102:3102"
     mem_limit: 768m
@@ -203,10 +207,30 @@ services:
       DI_S3_REGION: ${PLATFORM_CONTROL_S3_REGION:-us-east-1}
       DI_S3_ACCESS_KEY_ID: ${PLATFORM_CONTROL_S3_ACCESS_KEY_ID:-minioadmin}
       DI_S3_SECRET_ACCESS_KEY: ${PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY:-minioadmin}
+      # Canonical surface. With this unset the consumer uses the in-memory sink, so
+      # the canonical title/body are never persisted and legal-search can only index
+      # a metadata stub ("Document <id>", no body). Pointing it at a shared volume
+      # makes `document-service` (which prefers the Delta-backed store whenever
+      # DI_SURFACES_ROOT_URI is set) able to serve the real text.
+      DI_SURFACES_ROOT_URI: file:///surfaces
+    volumes:
+      - di-surfaces:/surfaces
     depends_on:
       nats-init:
         condition: service_completed_successfully
     mem_limit: 1024m
+
+  # Serves GET /v1/documents/{id}/lean from the canonical surface the consumer
+  # writes above. Defined in docker-compose.yml for the `lean` profiles; here it
+  # joins the `nats` loop and reads the shared surface instead of the demo
+  # fixtures (store_from_env prefers Delta surfaces over DOCUMENT_SERVICE_CONTENT_DIR).
+  document-service:
+    profiles: ["nats"]
+    environment:
+      DI_SURFACES_ROOT_URI: file:///surfaces
+      PORT: "8090"
+    volumes:
+      - di-surfaces:/surfaces
 
   # document-intelligence NATS→legal-search projection bridge (M0.2, issue #522).
   # di-consumer publishes evidara.document-processed / evidara.document-withdrawn, but
@@ -285,3 +309,8 @@ services:
         done;
         echo 'failed to reach minio'; exit 1
     restart: "no"
+
+volumes:
+  # Canonical surface shared by di-consumer (writer) and document-service (reader),
+  # so the local loop can serve real document text instead of a metadata stub.
+  di-surfaces:
