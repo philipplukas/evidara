@@ -27,30 +27,36 @@ corpus lacks), a version history, and a link to the operative text.
 
 The operative text is a **PDF**. There is no HTML manifestation.
 
-WHY THE PROVIDER SHIPS DISABLED (`live_ready = False`)
-------------------------------------------------------
-The two *foundational* blockers that made a PDF ordinance unrepresentable
-were resolved by #590 (see ADR-0037):
+WHAT THIS PROVIDER NOW DOES (#584)
+----------------------------------
+It fetches the operative text and emits it as a `ProviderResource`, choosing
+the modality from the manifestation's content type:
 
-1. `acquisition_core.ProviderResource` now carries binary bytes
-   (`body_bytes`) alongside text (`body`), so a PDF manifestation can be
-   represented, checksummed and stored end-to-end.
-2. `document_intelligence` now has a layout-aware PDF path
-   (`normalize/pdf.py`) that separates marginal headings ("Randtitel")
-   from the body column by their x-position, so it does not splice them
-   mid-sentence — "die Führung des **Organisation** Hundeverzeichnisses" —
-   the way a naive `pdftotext` dump would.
+- PDF  -> `body_bytes` (raw). Decoding a PDF corrupts it, so it travels as
+          bytes end-to-end (#590 / ADR-0037).
+- HTML -> `body` (decoded), for communes that publish law as HTML.
 
-What remains is the **municipal acquisition slice (#584)**: wiring this
-provider to actually *emit* the PDF manifestation as a binary
-`ProviderResource`, plus a municipal blueprint template and the operator
-evidence to flip `live_ready`/`enabled`. Until that lands, this provider
-deliberately **refuses** a PDF-only manifestation rather than emit the
-metadata landing page in place of the ordinance: indexing a metadata stub
-as if it were the law is precisely the "demo that lies convincingly"
-failure ADR-0033 exists to prevent. When it meets a PDF-only
-manifestation it records what it found and fails the run with an explicit
-reason. A commune that publishes HTML law would acquire normally.
+Anything else is still recorded and skipped rather than guessed at. It never
+emits the metadata landing page as a stand-in for the ordinance: indexing a
+metadata stub as if it were the law is precisely the "demo that lies
+convincingly" failure ADR-0033 exists to prevent.
+
+Verified against live Zürich AS 554.510 ("Vollzugsvorschriften zum
+Hundegesetz", in force 2017-09-01): the landing page parses and the linked
+217 KB PDF is fetched intact.
+
+WHY THE PROVIDER STILL SHIPS DISABLED (`live_ready = False`)
+------------------------------------------------------------
+Acquisition is done; **normalisation is not**. `normalize/pdf.py` separates
+marginal headings ("Randtitel") from the body by x-position, which assumes
+the Randtitel band sits to the *left* of the body column. Zürich puts it on
+the **right**, in a 5.6pt gutter — narrower than the p90 space between two
+words of the same sentence (6.5pt). No join tolerance separates them, so the
+heading splices mid-sentence: "die Führung des **Organisation**
+Hundeverzeichnisses". See #650.
+
+Until that lands, flipping the code-owner key would mean indexing spliced
+legal text — the same class of failure the refusal above guards against.
 
 The design generalises past Zürich: the BFS → host allow-list lives in
 `communal_portals.yaml`, so adding a commune is a config edit to that data
@@ -107,12 +113,15 @@ _CONTENT_TYPE_BY_SUFFIX: dict[str, str] = {
     "xml": "application/xml",
 }
 
-# Text manifestations the acquisition interface can faithfully carry today.
-# Anything else (notably application/pdf) is recorded and skipped — see the
-# module docstring.
-_CARRIABLE_CONTENT_TYPES = frozenset(
+# Text manifestations, carried as decoded `body`.
+_TEXT_CONTENT_TYPES = frozenset(
     {"text/html", "application/xhtml+xml", "application/xml", "text/xml"}
 )
+# Binary manifestations, carried as raw `body_bytes` (#590/ADR-0037). Communal law
+# is largely PDF-only, so this is the common case here rather than the exception.
+_BINARY_CONTENT_TYPES = frozenset({"application/pdf"})
+# Anything outside both sets is still recorded and skipped rather than guessed at.
+_CARRIABLE_CONTENT_TYPES = _TEXT_CONTENT_TYPES | _BINARY_CONTENT_TYPES
 
 _SWISS_DATE_RE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
 
@@ -247,9 +256,13 @@ class GemeindeHttpProvider:
     """Config-driven HTTP provider for Swiss communal legal collections."""
 
     provider_name = AcquisitionProvider.GEMEINDE_HTTP.value
-    # Scaffold: templates stay `enabled: false` and the ADR-0030 two-key lock
-    # rejects live runs until the binary-artifact + PDF-normalisation gaps
-    # close and an operator captures acceptance-run evidence. See #584.
+    # The acquisition half is done (#584): PDF manifestations are fetched and
+    # emitted as binary resources, verified against live Zürich AS 554.510.
+    # The code-owner key stays shut on the *normalisation* half — the layout-aware
+    # PDF path splices right-margin Randtitel into the body on the real Zürich
+    # PDFs (#650). Indexing spliced legal text is the failure ADR-0033 exists to
+    # prevent, so this stays false until that lands and an operator captures
+    # acceptance-run evidence. ADR-0030 two-key lock.
     live_ready: ClassVar[bool] = False
 
     @property
@@ -317,14 +330,14 @@ class GemeindeHttpProvider:
                         continue
 
                     if content_type not in _CARRIABLE_CONTENT_TYPES:
-                        # PDF-only — the common case for communal law. Refuse
-                        # rather than emit the metadata landing page as a stand-in
-                        # for the ordinance. See module docstring.
+                        # Still refuse anything we cannot faithfully represent, rather
+                        # than emit the metadata landing page as a stand-in for the
+                        # ordinance. See module docstring.
                         skipped.append(
                             {
                                 "url": document_url,
                                 "content_type": content_type,
-                                "reason": "binary_artifact_unsupported",
+                                "reason": "unsupported_manifestation_content_type",
                                 "as_number": record.get("as_number"),
                                 "title": record.get("title"),
                                 "in_force_from": record.get("in_force_from"),
@@ -335,15 +348,21 @@ class GemeindeHttpProvider:
 
                     text_response = await client.get(document_url)
                     text_response.raise_for_status()
-                    text_body = (text_response.content or b"")[:max_content_bytes]
+                    manifestation = (text_response.content or b"")[:max_content_bytes]
+                    is_binary = content_type in _BINARY_CONTENT_TYPES
                     resources.append(
                         ProviderResource(
                             source_url=document_url,
                             final_url=str(text_response.url),
                             content_type=content_type,
-                            body=text_body.decode(
+                            # A PDF must travel as bytes: decoding it would corrupt the
+                            # ordinance before it ever reached the normaliser (#590).
+                            body=None
+                            if is_binary
+                            else manifestation.decode(
                                 text_response.charset_encoding or "utf-8", errors="replace"
                             ),
+                            body_bytes=manifestation if is_binary else None,
                             title=record.get("title"),
                             http_status=text_response.status_code,
                             discovery_depth=1,
@@ -409,7 +428,11 @@ class GemeindeHttpProvider:
             notes.append(f"portal_host={portal.host}")
         except ProviderConfigurationError as exc:
             notes.append(f"config_error={exc}")
-        notes.append("scaffold: live_ready=false (PDF manifestations unsupported — #584)")
+        notes.append(
+            "live_ready=false: PDF manifestations are emitted as of #584, but the "
+            "layout-aware normaliser still splices right-margin Randtitel on the real "
+            "Zürich PDFs — see #650"
+        )
         return ProviderPlan(
             provider=self.provider_name,
             seed_urls=seed_urls,

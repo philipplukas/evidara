@@ -79,6 +79,11 @@ def _landing_page(*, title: str, rows: list[str]) -> str:
     )
 
 
+# A minimal well-formed PDF. Content does not matter here — that the *bytes* survive
+# acquisition unmodified does.
+_PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"
+
+
 class _FakeClient:
     def __init__(self, responses: dict[str, tuple[int, str, dict[str, str]]]) -> None:
         self.responses = responses
@@ -95,6 +100,10 @@ class _FakeClient:
         for prefix, (status, body, headers) in self.responses.items():
             if url.startswith(prefix):
                 request = httpx.Request("GET", url)
+                # A PDF manifestation is served as bytes; decoding it here would hide
+                # the very corruption the binary path exists to prevent.
+                if isinstance(body, bytes):
+                    return httpx.Response(status, content=body, headers=headers, request=request)
                 return httpx.Response(status, text=body, headers=headers, request=request)
         raise AssertionError(f"unexpected URL: {url}")
 
@@ -155,12 +164,14 @@ def test_parser_reads_a_repeal_date_when_the_enactment_is_superseded() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pdf_only_ordinance_is_refused_not_substituted(
+async def test_pdf_only_ordinance_is_emitted_as_a_binary_manifestation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The Zurich case: PDF-only, so the run must fail with an explicit reason.
+    """The Zurich case: PDF-only, and since #590 that is carried, not refused.
 
-    It must NOT emit the metadata landing page as a stand-in for the ordinance.
+    The ordinance travels as raw bytes (`body_bytes`); decoding it would corrupt the
+    PDF before it ever reached the normaliser. It must still never emit the metadata
+    landing page as a stand-in for the ordinance.
     """
     _install_fake_client(
         monkeypatch,
@@ -169,7 +180,13 @@ async def test_pdf_only_ordinance_is_refused_not_substituted(
                 200,
                 _fixture_html(),
                 {"content-type": "text/html; charset=utf-8"},
-            )
+            ),
+            # The operative text the landing page links to (Zürich publishes PDF).
+            "https://www.stadt-zuerich.ch/dam/": (
+                200,
+                _PDF_BYTES,
+                {"content-type": "application/pdf"},
+            ),
         },
     )
     provider = GemeindeHttpProvider()
@@ -180,21 +197,23 @@ async def test_pdf_only_ordinance_is_refused_not_substituted(
         SimpleNamespace(run_id="run_zh_261_1"),
     )
 
-    # No document acquired, and crucially no landing-page substitute.
-    assert result.inline_resources == []
-    assert result.response_payload["captured"] == 0
-    assert result.response_payload["skipped"] == 1
+    # The ordinance itself is acquired — nothing skipped, nothing substituted.
+    assert result.response_payload["captured"] == 1
+    assert result.response_payload["skipped"] == 0
+    assert result.inline_failure_reason is None
 
-    # The refusal names the real blocker rather than failing opaquely.
-    assert result.inline_failure_reason is not None
-    assert "binary" in result.inline_failure_reason.lower()
+    resource = result.inline_resources[0]
+    # Binary: bytes, not text. A decoded PDF is a corrupted PDF.
+    assert resource.is_binary
+    assert resource.body is None
+    assert resource.body_bytes == _PDF_BYTES
+    assert resource.raw_bytes.startswith(b"%PDF-")
+    assert resource.content_type == "application/pdf"
 
-    # What it *would* have fetched is recorded, so an acceptance run can see it.
-    skipped = result.response_payload["skipped_manifestations"][0]
-    assert skipped["reason"] == "binary_artifact_unsupported"
-    assert skipped["content_type"] == "application/pdf"
-    assert skipped["as_number"] == "554.510"
-    assert skipped["in_force_from"] == "2017-09-01"
+    # It is the operative text, not the landing page it was discovered through.
+    assert resource.source_url.endswith(".pdf")
+    assert resource.metadata["as_number"] == "554.510"
+    assert resource.metadata["in_force_from"] == "2017-09-01"
 
 
 @pytest.mark.asyncio
@@ -312,7 +331,7 @@ def test_plan_reports_scaffold_status_without_network_io() -> None:
     assert plan.provider == "gemeinde_http"
     assert plan.seed_urls == [LANDING_URL]
     assert any("jur_ch_gemeinde_261" in note for note in plan.notes)
-    assert any("scaffold" in note for note in plan.notes)
+    assert any("live_ready=false" in note for note in plan.notes)
 
 
 def test_gemeinde_http_provider_is_not_live_ready() -> None:
