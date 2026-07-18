@@ -29,6 +29,25 @@ interface PillProps {
   className?: string;
 }
 
+/**
+ * Flatten pill children into the plain `string` the shared `StatusBadge` takes.
+ *
+ * `String(children)` is wrong the moment a caller writes JSX with more than one
+ * child — `<Pill>{status}: {count}</Pill>` hands React the array
+ * `["failed", ": ", 1]`, and `String(...)` on an array joins with commas, which
+ * rendered as `failed,: ,1` on the dashboard status pills. Join recursively
+ * with no separator instead.
+ */
+export function pillLabel(children: ReactNode): string {
+  if (children === null || children === undefined || typeof children === "boolean") {
+    return "";
+  }
+  if (Array.isArray(children)) {
+    return children.map((child) => pillLabel(child as ReactNode)).join("");
+  }
+  return String(children);
+}
+
 export function Pill({ level = "neutral", children, variant = "status", className }: PillProps) {
   if (variant === "meta") {
     return (
@@ -45,5 +64,5 @@ export function Pill({ level = "neutral", children, variant = "status", classNam
     );
   }
 
-  return <StatusBadge status={level} label={String(children)} className={className} />;
+  return <StatusBadge status={level} label={pillLabel(children)} className={className} />;
 }

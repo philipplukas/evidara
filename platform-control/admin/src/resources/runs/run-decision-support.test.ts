@@ -75,4 +75,33 @@ describe("run decision support helpers", () => {
     expect(support.whatChangedRecently).toContain("document intelligence");
     expect(support.whatHappensIfIgnored).toContain("stays blocked");
   });
+
+  it("tells the operator downstream stages are dead once the run terminally failed", () => {
+    const health: RunPipelineHealth = {
+      run_id: baseRun.run_id,
+      source_id: baseRun.source_id,
+      source_version_id: baseRun.source_version_id,
+      mode: baseRun.mode,
+      run_status: "failed",
+      overall_status: "failed",
+      stages: [
+        stage({ stage: "acquisition", status: "failed", detail: "Provider dispatch failed." }),
+        stage({
+          stage: "projection",
+          status: "pending",
+          updated_at: null,
+          detail: "Awaiting DI processing signal before projection stage starts.",
+        }),
+      ],
+      processing_status_event_count: 0,
+      document_lifecycle_event_count: 0,
+    };
+
+    const support = buildPipelineDecisionSupport({ run: { ...baseRun, status: "failed" }, health });
+
+    expect(support.whatIsBlocked).toContain("will never run: projection");
+    expect(support.whatHappensIfIgnored).toContain("already ended as failed");
+    // ...and it must not imply the run will move on its own.
+    expect(support.whatHappensIfIgnored).not.toContain("stays blocked");
+  });
 });

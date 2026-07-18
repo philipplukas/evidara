@@ -1,6 +1,7 @@
 /**
- * `PreviewReviewShowV2` — Tailwind + `ra-core` port of the MUI
- * `PreviewReviewShow`. Renders the preview-run header + operator action stack,
+ * `PreviewReviewShowV2` — the canonical `preview-review` detail (the MUI v1
+ * `PreviewReviewShow` it replaced is deleted; `/preview-review-v2/:id`
+ * redirects here). Renders the preview-run header + operator action stack,
  * a metadata grid, and delegates the lifecycle stack to the shared
  * `RunDetailSectionsV2` (same component the runs v2 detail uses). The
  * dataProvider guards the `PreviewReview` getOne to preview-mode runs, so a

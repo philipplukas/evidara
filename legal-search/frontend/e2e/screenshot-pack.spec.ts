@@ -196,10 +196,17 @@ test.describe("Canonical screenshot evidence pack", () => {
     await saveScreenshot(page, "admin-run-launch-preflight.png");
 
     await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/runs/run_01/show`);
+    // `/runs/:id/show` renders the v2 detail (#520 consolidation), so assert on
+    // what v2 actually shows: the pipeline banner, the decision-support block
+    // that replaced v1's "Operator Checklist", the stage remediation jump, and
+    // the lifecycle evidence accordions. The accordion trigger's accessible
+    // name includes its row-count pill, hence the prefix regexes.
     await expect(page.getByRole("heading", { name: "Pipeline Health" })).toBeVisible();
-    await expect(page.getByText("Operator Checklist")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Pipeline decision support" })).toBeVisible();
+    await expect(page.getByText("What is blocked")).toBeVisible();
     await expect(page.getByRole("button", { name: "Jump to DI processing" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open related evidence runbook" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Provider Jobs/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^DI Processing Status/ })).toBeVisible();
     await saveScreenshot(page, "admin-run-lifecycle-visibility.png");
     await saveOperatorJourneyEvents(page);
     await saveJourneyVideo(page, "cross-surface-journey.webm", VIDEO_MODE === "enabled");

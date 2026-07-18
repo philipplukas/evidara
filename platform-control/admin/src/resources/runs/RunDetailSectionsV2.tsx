@@ -43,9 +43,11 @@ import { pipelineHealthToLevel } from "../shared/statusLevels";
 import {
   buildPipelineDecisionSupport,
   overallSummaryByStatus,
+  projectPipelineStages,
   scrollToInPageSection,
   sectionIdFromAnchor,
   stageActionTarget,
+  stageNeedsAction,
   stageNextAction,
 } from "./RunDetailSections";
 
@@ -202,14 +204,14 @@ function PipelineHealthBanner({
           </div>
 
           <div className="space-y-2">
-            {health.stages.map((stage) => {
+            {projectPipelineStages(health).map((stage) => {
               const level = pipelineHealthToLevel(stage.status);
               const action = stageActionTarget(stage, {
                 legalSearchUrl,
                 evidenceRunbookPath,
               });
               const isInPageAnchor = action.href.startsWith("#");
-              const isHealthy = stage.status === "ok";
+              const needsAction = stageNeedsAction(stage.status);
               return (
                 <div
                   key={stage.stage}
@@ -229,7 +231,7 @@ function PipelineHealthBanner({
                   <p className="mt-1.5 text-[13px] text-[var(--foreground-muted)]">
                     {stage.detail}
                   </p>
-                  {!isHealthy ? (
+                  {needsAction ? (
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[var(--status-degraded)]/20 bg-[var(--status-degraded-subtle)] p-2.5">
                       <p className="text-[12px] font-semibold text-[var(--foreground)]">
                         Next action: {stageNextAction(stage)}
