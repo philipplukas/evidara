@@ -65,6 +65,48 @@ export function titleForPath(pathname: string): string {
   return "Control plane";
 }
 
+/**
+ * Map the current pathname to a subtitle describing *that* page.
+ *
+ * The header previously hardcoded the runs-flavoured "Source lifecycle,
+ * approval state, and run operations." on every route, so Jurisdictions,
+ * Sources and Corrections all described work they do not do. Mirrors
+ * `titleForPath`: each mapped area names itself, everything else falls back to
+ * the (accurate at the whole-app level) default.
+ */
+export const DEFAULT_SUBTITLE = "Source lifecycle, approval state, and run operations.";
+
+export function subtitleForPath(pathname: string): string {
+  if (pathname.startsWith("/runs")) {
+    return /\/runs\/[^/]+/.test(pathname)
+      ? "Pipeline health, provider jobs, and remediation for a single run."
+      : "Launch, monitor, and cancel acquisition runs.";
+  }
+  if (pathname.startsWith("/sources")) {
+    return "Source registration, versions, and approval state.";
+  }
+  if (pathname.startsWith("/authorities")) {
+    return "Reference data: publishing authorities behind each source.";
+  }
+  if (pathname.startsWith("/jurisdictions")) {
+    return "Reference data: the jurisdiction hierarchy sources are scoped to.";
+  }
+  if (pathname.startsWith("/preview-review")) {
+    return "Review preview runs before promoting a source version to production.";
+  }
+  if (pathname.startsWith("/commentary-insights")) {
+    return "Extracted commentary signals awaiting operator review.";
+  }
+  if (pathname.startsWith("/corrections")) {
+    return "Operator corrections raised against canonical documents.";
+  }
+  if (pathname === "/" || pathname === "") {
+    return "Control-plane overview: run throughput and pipeline health.";
+  }
+
+  return DEFAULT_SUBTITLE;
+}
+
 export function AppBar() {
   const location = useLocation();
   const [handoff, setHandoff] = useState<LegalSearchHandoff>(() =>
@@ -81,7 +123,7 @@ export function AppBar() {
   const handoffLabel = describeLegalSearchHandoff(handoff);
   const subtitle = handoff.hasOrigin
     ? `Entered from legal search. ${handoffLabel}.`
-    : "Source lifecycle, approval state, and run operations.";
+    : subtitleForPath(location.pathname);
   const ctaLabel = handoff.query ? "Return to active search" : "Back to legal search";
 
   return (

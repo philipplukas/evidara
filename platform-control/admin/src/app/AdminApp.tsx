@@ -37,9 +37,7 @@ import { AuthorityList } from "../resources/reference-data/AuthorityList";
 import JurisdictionCreate from "../resources/reference-data/JurisdictionCreate";
 import JurisdictionEdit from "../resources/reference-data/JurisdictionEdit";
 import { JurisdictionList } from "../resources/reference-data/JurisdictionList";
-import { PreviewReviewList } from "../resources/runs/PreviewReviewList";
 import PreviewReviewListV2 from "../resources/runs/PreviewReviewListV2";
-import { PreviewReviewShow } from "../resources/runs/PreviewReviewShow";
 import PreviewReviewShowV2 from "../resources/runs/PreviewReviewShowV2";
 import RunListV2 from "../resources/runs/RunListV2";
 import RunShowV2 from "../resources/runs/RunShowV2";
@@ -60,6 +58,20 @@ function AdminLayout({ children }: { children: ReactNode }) {
 function RunsV2DetailRedirect() {
   const { id } = useParams();
   return <Navigate to={id ? `/runs/${encodeURIComponent(id)}/show` : "/runs"} replace />;
+}
+
+/**
+ * Same treatment for the retired `/preview-review-v2/:id` route, now that the
+ * v2 preview list/detail are the canonical `preview-review` resource pages.
+ */
+function PreviewReviewV2DetailRedirect() {
+  const { id } = useParams();
+  return (
+    <Navigate
+      to={id ? `/preview-review/${encodeURIComponent(id)}/show` : "/preview-review"}
+      replace
+    />
+  );
 }
 
 export default function AdminApp() {
@@ -97,8 +109,8 @@ export default function AdminApp() {
       />
       <Resource
         name={ResourceName.PreviewReview}
-        list={PreviewReviewList}
-        show={PreviewReviewShow}
+        list={PreviewReviewListV2}
+        show={PreviewReviewShowV2}
         recordRepresentation="run_id"
         options={{ label: "Preview approvals" }}
       />
@@ -131,14 +143,17 @@ export default function AdminApp() {
        * Runs graduated too (#520): the v2 table/detail are now the canonical
        * `runs` resource `list`/`show` above. The legacy `/runs-v2` routes stay
        * as thin redirects so existing deep links (and legal-search handoffs)
-       * keep resolving to the single runs experience. Only preview-review still
-       * coexists with its MUI resource.
+       * keep resolving to the single runs experience.
+       *
+       * Preview review graduated the same way: `PreviewReviewListV2` /
+       * `PreviewReviewShowV2` are the canonical `preview-review` list/show, and
+       * `/preview-review-v2*` are redirects. The MUI v1 pages were deleted.
        */}
       <CustomRoutes>
         <Route path="/runs-v2" element={<Navigate to="/runs" replace />} />
         <Route path="/runs-v2/:id" element={<RunsV2DetailRedirect />} />
-        <Route path="/preview-review-v2" element={<PreviewReviewListV2 />} />
-        <Route path="/preview-review-v2/:id" element={<PreviewReviewShowV2 />} />
+        <Route path="/preview-review-v2" element={<Navigate to="/preview-review" replace />} />
+        <Route path="/preview-review-v2/:id" element={<PreviewReviewV2DetailRedirect />} />
       </CustomRoutes>
     </Admin>
   );

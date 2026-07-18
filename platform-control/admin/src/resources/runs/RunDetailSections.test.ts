@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RunPipelineHealthStage } from "../../lib/admin/dataProvider";
+import type { RunPipelineHealth, RunPipelineHealthStage } from "../../lib/admin/dataProvider";
 import {
   overallSummaryByStatus,
+  projectPipelineStages,
   scrollToInPageSection,
   sectionIdFromAnchor,
   stageActionTarget,
+  stageNeedsAction,
   stageNextAction,
 } from "./RunDetailSections";
 
@@ -14,6 +16,28 @@ const acquisitionStage: RunPipelineHealthStage = {
   detail: "Provider jobs are waiting on retry.",
   updated_at: "2026-04-07T10:00:00Z",
 };
+
+const health = (
+  runStatus: RunPipelineHealth["run_status"],
+  stages: RunPipelineHealthStage[],
+): RunPipelineHealth => ({
+  run_id: "run_01",
+  source_id: "src_01",
+  source_version_id: "sv_01",
+  mode: "production",
+  run_status: runStatus,
+  overall_status: runStatus === "completed" ? "ok" : "blocked",
+  stages,
+  processing_status_event_count: 0,
+  document_lifecycle_event_count: 0,
+});
+
+const pendingStage = (stage: RunPipelineHealthStage["stage"]): RunPipelineHealthStage => ({
+  stage,
+  status: "pending",
+  detail: "Awaiting DI processing signal before projection stage starts.",
+  updated_at: null,
+});
 
 describe("RunDetailSections helpers", () => {
   it("describes blocked and healthy pipeline status clearly", () => {
@@ -29,6 +53,60 @@ describe("RunDetailSections helpers", () => {
       label: "Jump to provider jobs",
       href: "#provider-jobs-section",
     });
+  });
+});
+
+describe("projectPipelineStages", () => {
+  it("marks stages that can no longer run as not applicable on a failed run", () => {
+    const stages = projectPipelineStages(
+      health("failed", [
+        { ...acquisitionStage, status: "failed" },
+        pendingStage("projection"),
+        pendingStage("search"),
+      ]),
+    );
+
+    expect(stages.map((stage) => stage.status)).toEqual([
+      "failed",
+      "not_applicable",
+      "not_applicable",
+    ]);
+    // The API's "awaiting …" copy implies work is still coming; it is not.
+    expect(stages[1].detail).toBe("Not applicable — the run failed before this stage could start.");
+    expect(stageNeedsAction(stages[1].status)).toBe(false);
+    expect(stageNextAction(stages[1])).toBe("No action — this stage will not run for this run.");
+  });
+
+  it("says cancelled, not failed, for a cancelled run", () => {
+    const [stage] = projectPipelineStages(health("cancelled", [pendingStage("search")]));
+
+    expect(stage.status).toBe("not_applicable");
+    expect(stage.detail).toBe(
+      "Not applicable — the run was cancelled before this stage could start.",
+    );
+  });
+
+  it("leaves pending alone while the run can still progress", () => {
+    // Only terminal failures get the treatment: on a run that is still moving,
+    // "pending" is the honest state and downstream work really is coming.
+    for (const runStatus of ["pending", "running", "completed"] as const) {
+      const stages = projectPipelineStages(health(runStatus, [pendingStage("projection")]));
+      expect(stages[0].status).toBe("pending");
+      expect(stages[0].detail).toContain("Awaiting DI processing signal");
+    }
+  });
+
+  it("never rewrites a stage that already reported real progress", () => {
+    const stages = projectPipelineStages(
+      health("failed", [
+        { ...acquisitionStage, status: "ok" },
+        { ...acquisitionStage, stage: "document_intelligence", status: "blocked" },
+      ]),
+    );
+
+    expect(stages.map((stage) => stage.status)).toEqual(["ok", "blocked"]);
+    expect(stageNeedsAction("blocked")).toBe(true);
+    expect(stageNeedsAction("ok")).toBe(false);
   });
 });
 
