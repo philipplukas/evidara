@@ -203,7 +203,9 @@ test.describe("Canonical screenshot evidence pack", () => {
     // name includes its row-count pill, hence the prefix regexes.
     await expect(page.getByRole("heading", { name: "Pipeline Health" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pipeline decision support" })).toBeVisible();
-    await expect(page.getByText("What is blocked")).toBeVisible();
+    // Both the run-level and the pipeline decision-support blocks carry this
+    // label, so scope to the first match rather than tripping strict mode.
+    await expect(page.getByText("What is blocked").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Jump to DI processing" })).toBeVisible();
     await expect(page.getByRole("button", { name: /^Provider Jobs/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /^DI Processing Status/ })).toBeVisible();
