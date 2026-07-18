@@ -514,6 +514,7 @@ export function Dashboard() {
               columns={recentRunColumns}
               getRowId={(run) => run.run_id}
               onRowClick={(run) => redirect("show", ResourceName.Runs, run.run_id)}
+              getRowLabel={(run) => `Open run ${run.run_id}`}
               empty="No runs found. Create a source and trigger a run to get started."
             />
           </div>

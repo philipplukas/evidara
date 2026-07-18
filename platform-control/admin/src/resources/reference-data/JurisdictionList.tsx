@@ -101,6 +101,7 @@ export function JurisdictionList() {
             sort={controller.sort}
             onSort={(field, order) => controller.setSort({ field, order })}
             onRowClick={(r) => navigate(`/jurisdictions/${encodeURIComponent(String(r.id))}`)}
+            getRowLabel={(r) => `Open jurisdiction ${r.name}`}
             total={controller.total}
             page={controller.page}
             perPage={controller.perPage}

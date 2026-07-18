@@ -183,6 +183,7 @@ export function CommentaryInsightList() {
             onRowClick={(r) =>
               navigate(`/commentary-insights/${encodeURIComponent(String(r.id))}/show`)
             }
+            getRowLabel={(r) => `Open commentary insight ${r.insight_id}`}
             total={controller.total}
             page={controller.page}
             perPage={controller.perPage}

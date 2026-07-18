@@ -290,6 +290,7 @@ export function SourceHealthCard() {
           columns={columns}
           getRowId={(row) => row.source_id}
           onRowClick={(row) => redirect("show", ResourceName.Sources, row.source_id)}
+          getRowLabel={(row) => `Open source ${row.name}`}
           empty="No sources found. Create a source to see health data here."
         />
       </div>
