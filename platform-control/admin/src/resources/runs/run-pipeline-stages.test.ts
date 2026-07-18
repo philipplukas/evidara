@@ -8,7 +8,7 @@ import {
   stageActionTarget,
   stageNeedsAction,
   stageNextAction,
-} from "./RunDetailSections";
+} from "./run-decision-support";
 
 const acquisitionStage: RunPipelineHealthStage = {
   stage: "acquisition",
@@ -39,7 +39,7 @@ const pendingStage = (stage: RunPipelineHealthStage["stage"]): RunPipelineHealth
   updated_at: null,
 });
 
-describe("RunDetailSections helpers", () => {
+describe("run pipeline stage helpers", () => {
   it("describes blocked and healthy pipeline status clearly", () => {
     expect(overallSummaryByStatus("ok")).toBe("Pipeline stages are healthy.");
     expect(overallSummaryByStatus("blocked")).toBe(
