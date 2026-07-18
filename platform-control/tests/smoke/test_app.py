@@ -408,3 +408,108 @@ async def test_two_key_lock_rejects_scaffold_and_disabled_template_with_400(sess
         assert "not enabled" in disabled_run.json()["detail"]
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_operator_can_flip_the_config_key_over_the_api(session_maker) -> None:
+    """#632: the ADR-0030 config key is operator-reachable, with an audit trail.
+
+    #632's central claim was that no operator path flips `enabled` — both keys
+    were source code, so the Nth source cost an engineer and a deploy. This
+    drives the path end to end over HTTP: a disabled template refuses, readiness
+    says so instead of lying (#634), a PUT flips the key and records who/why,
+    and readiness then goes green. No repo edit, no redeploy.
+    """
+    async with session_maker() as seed_session:
+        seed_session.add(Jurisdiction(jurisdiction_id="jur_de", name="Germany", slug="de"))
+        seed_session.add(
+            Authority(
+                authority_id="auth_de_by",
+                jurisdiction_id="jur_de",
+                name="Freistaat Bayern",
+                slug="bayern",
+            )
+        )
+        await seed_session.commit()
+
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        source_response = await client.post(
+            "/v1/sources",
+            json={
+                "name": "Bayern legislation",
+                "jurisdiction_id": "jur_de",
+                "authority_id": "auth_de_by",
+            },
+        )
+        assert source_response.status_code == 201
+        source_id = source_response.json()["source_id"]
+
+        version_response = await client.post(
+            f"/v1/sources/{source_id}/versions",
+            json={
+                "version_label": "bayern-v1",
+                "overlay_id": "de",
+                "provider_template_id": "bundesland_http_bayern",
+            },
+        )
+        assert version_response.status_code == 201
+        source_version_id = version_response.json()["source_version_id"]
+
+        readiness_params = {
+            "source_id": source_id,
+            "source_version_id": source_version_id,
+        }
+        locked = await client.get("/v1/runs/readiness", params=readiness_params)
+        assert locked.status_code == 200
+        locked_body = locked.json()
+        assert locked_body["ready"] is False
+        lock_check = next(
+            check for check in locked_body["checks"] if check["code"] == "acquisition_lock_open"
+        )
+        assert lock_check["ok"] is False
+        assert "not enabled" in lock_check["detail"]
+
+        # Refusals leave evidence: a terminal FAILED run, not silence (#634).
+        refused = await client.post(
+            "/v1/runs",
+            json={
+                "source_id": source_id,
+                "source_version_id": source_version_id,
+                "mode": "preview",
+            },
+        )
+        assert refused.status_code == 400
+        failed_runs = await client.get("/v1/runs", params={"source_id": source_id})
+        assert failed_runs.status_code == 200
+        refused_rows = [row for row in failed_runs.json()["data"] if row["status"] == "failed"]
+        assert len(refused_rows) == 1
+
+        flip = await client.put(
+            "/v1/sources/blueprint-templates/de/bundesland_http_bayern/enablement",
+            json={"enabled": True, "note": "acceptance run 2026-07-18: 42/42 acts parsed"},
+        )
+        assert flip.status_code == 200
+        flipped = flip.json()
+        assert flipped["enabled"] is True
+        assert flipped["default_enabled"] is False
+        assert flipped["source"] == "override"
+        assert flipped["note"] == "acceptance run 2026-07-18: 42/42 acts parsed"
+        assert flipped["updated_by"] == "op_00000000000000000000000001"
+
+        unlocked = await client.get("/v1/runs/readiness", params=readiness_params)
+        assert unlocked.status_code == 200
+        unlocked_check = next(
+            check for check in unlocked.json()["checks"] if check["code"] == "acquisition_lock_open"
+        )
+        assert unlocked_check["ok"] is True
+
+    app.dependency_overrides.clear()
