@@ -241,6 +241,7 @@ export default function PreviewReviewListV2() {
           sort={controller.sort}
           onSort={(field, order) => controller.setSort({ field, order })}
           onRowClick={(r) => navigate(`/preview-review/${encodeURIComponent(String(r.id))}/show`)}
+          getRowLabel={(r) => `Open preview run ${r.run_id}`}
           total={controller.total}
           page={controller.page}
           perPage={controller.perPage}

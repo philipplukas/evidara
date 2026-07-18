@@ -1,5 +1,5 @@
 /**
- * `RunDetailSectionsV2` — Tailwind + `ra-core` port of v1's `RunDetailSections`.
+ * `RunDetailSectionsV2` — the run detail sections, Tailwind + `ra-core`.
  *
  * Pipeline Health renders as an expanded banner at the top (matches v1's
  * default-expanded accordion). The five data stages below — Provider Jobs,
@@ -7,12 +7,14 @@
  * — render as collapsed accordion items; each binds a `useGetList` with the
  * same `run_id` filter v1 used and draws rows via the `DataTable` primitive.
  *
- * Reuses pure helpers from v1 (`buildPipelineDecisionSupport`,
- * `overallSummaryByStatus`, `stageNextAction`, `stageActionTarget`) so the
- * operator cues stay identical while MUI chrome is replaced with primitives.
- * Stateful pieces from v1 that aren't in this slice — operator checklist
- * (`deriveOperatorChecklist`), preview summary, navigation button strip,
- * telemetry emission — stay in the v1 file and port alongside the shell.
+ * Operator cues come from `./run-decision-support` — the framework-free
+ * helpers (`buildPipelineDecisionSupport`, `overallSummaryByStatus`,
+ * `stageNextAction`, `stageActionTarget`, …) that the retired MUI page used to
+ * host (#649).
+ *
+ * Not carried over from that page: the operator checklist
+ * (`deriveOperatorChecklist`, still in `./operatorChecklist`), preview summary,
+ * navigation button strip, and telemetry emission.
  */
 "use client";
 
@@ -49,7 +51,7 @@ import {
   stageActionTarget,
   stageNeedsAction,
   stageNextAction,
-} from "./RunDetailSections";
+} from "./run-decision-support";
 
 /**
  * Maps an in-page anchor id (the `stageActionTarget` targets, shared with v1)
