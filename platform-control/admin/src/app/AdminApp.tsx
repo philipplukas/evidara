@@ -22,7 +22,7 @@
 import { CustomRoutes } from "ra-core";
 import type { ReactNode } from "react";
 import { Admin, Resource } from "react-admin";
-import { Route } from "react-router-dom";
+import { Navigate, Route, useParams } from "react-router-dom";
 import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
 import { adminMuiTheme } from "../lib/admin/muiTheme";
@@ -41,9 +41,7 @@ import { PreviewReviewList } from "../resources/runs/PreviewReviewList";
 import PreviewReviewListV2 from "../resources/runs/PreviewReviewListV2";
 import { PreviewReviewShow } from "../resources/runs/PreviewReviewShow";
 import PreviewReviewShowV2 from "../resources/runs/PreviewReviewShowV2";
-import { RunList } from "../resources/runs/RunList";
 import RunListV2 from "../resources/runs/RunListV2";
-import { RunShow } from "../resources/runs/RunShow";
 import RunShowV2 from "../resources/runs/RunShowV2";
 import SourceCreate from "../resources/sources/SourceCreate";
 import SourceList from "../resources/sources/SourceList";
@@ -53,6 +51,15 @@ import { AppShell } from "../ui/shell";
 /** Thin adapter — ra-core's `LayoutComponent` contract takes `{ children }`. */
 function AdminLayout({ children }: { children: ReactNode }) {
   return <AppShell>{children}</AppShell>;
+}
+
+/**
+ * Redirects the retired `/runs-v2/:id` preview detail route to the canonical
+ * `runs` resource show route, preserving the record id (#520 consolidation).
+ */
+function RunsV2DetailRedirect() {
+  const { id } = useParams();
+  return <Navigate to={id ? `/runs/${encodeURIComponent(id)}/show` : "/runs"} replace />;
 }
 
 export default function AdminApp() {
@@ -97,9 +104,10 @@ export default function AdminApp() {
       />
       <Resource
         name={ResourceName.Runs}
-        list={RunList}
-        show={RunShow}
+        list={RunListV2}
+        show={RunShowV2}
         recordRepresentation="run_id"
+        options={{ label: "Runs" }}
       />
       <Resource
         name={ResourceName.Corrections}
@@ -118,12 +126,17 @@ export default function AdminApp() {
       {/*
        * Tailwind + ra-core v2 previews (coexistence window, see ADR-0026).
        * Reference-data forms (authorities, jurisdictions) graduated to the
-       * canonical resource `create`/`edit` routes above (#501 pattern); the
-       * runs and preview-review previews still coexist with their MUI resources.
+       * canonical resource `create`/`edit` routes above (#501 pattern).
+       *
+       * Runs graduated too (#520): the v2 table/detail are now the canonical
+       * `runs` resource `list`/`show` above. The legacy `/runs-v2` routes stay
+       * as thin redirects so existing deep links (and legal-search handoffs)
+       * keep resolving to the single runs experience. Only preview-review still
+       * coexists with its MUI resource.
        */}
       <CustomRoutes>
-        <Route path="/runs-v2" element={<RunListV2 />} />
-        <Route path="/runs-v2/:id" element={<RunShowV2 />} />
+        <Route path="/runs-v2" element={<Navigate to="/runs" replace />} />
+        <Route path="/runs-v2/:id" element={<RunsV2DetailRedirect />} />
         <Route path="/preview-review-v2" element={<PreviewReviewListV2 />} />
         <Route path="/preview-review-v2/:id" element={<PreviewReviewShowV2 />} />
       </CustomRoutes>
