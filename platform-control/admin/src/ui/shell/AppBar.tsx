@@ -29,17 +29,15 @@ const LEGAL_SEARCH_URL =
  * Map the current pathname to a friendly title. Replaces MUI's `<TitlePortal>`
  * which depended on resource-page `<Title>` wiring we're dropping.
  *
- * Only the canonical resource routes + the runs-v2 preview are covered today;
- * the default (`"Control plane"`) is safe for any future / unknown route.
+ * Every list page sets its own header here so the app-bar title always agrees
+ * with the sidebar nav label; the default (`"Control plane"`) is a safe
+ * fallback for any future / unknown route.
  */
-function titleForPath(pathname: string): string {
-  // Exact matches first (order matters — longer paths before shorter ones).
-  if (pathname.startsWith("/runs-v2")) {
-    return pathname.includes("/") && /\/runs-v2\/[^/]+/.test(pathname) ? "Run detail" : "Run queue";
-  }
-
+export function titleForPath(pathname: string): string {
   if (pathname.startsWith("/runs")) {
-    return /\/runs\/[^/]+/.test(pathname) ? "Run detail" : "Run queue";
+    // Header agrees with the "Runs" nav label; the `/runs-v2` legacy paths
+    // redirect to `/runs`, so no separate "Run queue" title is needed (#520).
+    return /\/runs\/[^/]+/.test(pathname) ? "Run detail" : "Runs";
   }
   if (pathname.startsWith("/sources")) {
     if (pathname.endsWith("/create")) return "Create source";
@@ -54,6 +52,14 @@ function titleForPath(pathname: string): string {
     return /\/jurisdictions\/[^/]+/.test(pathname) ? "Edit jurisdiction" : "Jurisdictions";
   }
   if (pathname.startsWith("/preview-review")) return "Preview approvals";
+  if (pathname.startsWith("/commentary-insights")) {
+    return /\/commentary-insights\/[^/]+/.test(pathname)
+      ? "Commentary insight"
+      : "Commentary insights";
+  }
+  if (pathname.startsWith("/corrections")) {
+    return /\/corrections\/[^/]+/.test(pathname) ? "Correction detail" : "Corrections";
+  }
   if (pathname === "/" || pathname === "") return "Dashboard";
 
   return "Control plane";

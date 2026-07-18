@@ -58,6 +58,22 @@ function labelForResource(name: string, options: { label?: string } | undefined)
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+/**
+ * A resource's top-level link uses a prefix match (`end={false}`), so it also
+ * lights up on the resource's own `/create` route — which is owned by the
+ * matching "… setup" workflow shortcut. Yield to that workflow item on its
+ * exact route so only a single nav item is ever active at once (fixes the
+ * dual-highlight on `/authorities/create`, and the same class of collision on
+ * `/sources/create` and `/jurisdictions/create`).
+ */
+export function resourceLinkIsActive(
+  navIsActive: boolean,
+  pathname: string,
+  workflowExactPaths: readonly string[],
+): boolean {
+  return navIsActive && !workflowExactPaths.includes(pathname);
+}
+
 export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
   const definitions = useResourceDefinitions();
   const location = useLocation();
@@ -72,6 +88,9 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
   }, []);
 
   const resourceEntries = Object.values(definitions).filter((r) => r?.hasList);
+  // Exact routes owned by the "… setup" workflow shortcuts; a resource link
+  // must not stay highlighted when the operator is on one of these.
+  const workflowExactPaths = extraItems.filter((item) => item.exact).map((item) => item.to);
   const footerLabel =
     handoff.hasOrigin && handoff.query ? "Return to active search" : "Back to legal search";
   const footerSecondary = describeLegalSearchHandoff(handoff);
@@ -86,7 +105,9 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
           <li key={resource.name}>
             <NavLink
               to={`/${resource.name}`}
-              className={({ isActive }) => navItemClass(isActive)}
+              className={({ isActive }) =>
+                navItemClass(resourceLinkIsActive(isActive, location.pathname, workflowExactPaths))
+              }
               end={false}
             >
               <span>{labelForResource(resource.name, resource.options)}</span>
