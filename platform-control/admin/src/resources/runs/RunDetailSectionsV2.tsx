@@ -17,7 +17,7 @@
 "use client";
 
 import { type Identifier, useGetList, useRecordContext } from "ra-core";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   CapturedResourceRecord,
   DocumentLifecycleRecord,
@@ -43,9 +43,22 @@ import { pipelineHealthToLevel } from "../shared/statusLevels";
 import {
   buildPipelineDecisionSupport,
   overallSummaryByStatus,
+  scrollToInPageSection,
+  sectionIdFromAnchor,
   stageActionTarget,
   stageNextAction,
 } from "./RunDetailSections";
+
+/**
+ * Maps an in-page anchor id (the `stageActionTarget` targets, shared with v1)
+ * to the `AccordionItem` value it should reveal in this v2 layout, so a jump
+ * expands the collapsed section before scrolling to it.
+ */
+const ANCHOR_TO_ACCORDION_VALUE: Record<string, string> = {
+  "provider-jobs-section": "provider-jobs",
+  "di-processing-status-section": "processing-status",
+  "document-lifecycle-section": "document-lifecycle",
+};
 
 const LIST_PARAMS = {
   pagination: { page: 1, perPage: 50 },
@@ -76,7 +89,13 @@ function CodeBlock({ value }: { value: unknown }) {
 // Pipeline Health (expanded banner, not inside an accordion — matches v1).
 // ---------------------------------------------------------------------------
 
-function PipelineHealthBanner({ run }: { run: RunRecord }) {
+function PipelineHealthBanner({
+  run,
+  onJumpToSection,
+}: {
+  run: RunRecord;
+  onJumpToSection: (href: string) => void;
+}) {
   const [health, setHealth] = useState<RunPipelineHealth | null>(null);
   const [isPending, setIsPending] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -215,14 +234,27 @@ function PipelineHealthBanner({ run }: { run: RunRecord }) {
                       <p className="text-[12px] font-semibold text-[var(--foreground)]">
                         Next action: {stageNextAction(stage)}
                       </p>
-                      <a
-                        href={action.href}
-                        target={isInPageAnchor ? undefined : "_blank"}
-                        rel={isInPageAnchor ? undefined : "noreferrer"}
-                        className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
-                      >
-                        {action.label}
-                      </a>
+                      {isInPageAnchor ? (
+                        // A raw `<a href="#...">` would drive the HashRouter to
+                        // a bad route and eject the operator to Not Found; use a
+                        // button that reveals + scrolls to the target instead.
+                        <button
+                          type="button"
+                          onClick={() => onJumpToSection(action.href)}
+                          className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
+                        >
+                          {action.label}
+                        </button>
+                      ) : (
+                        <a
+                          href={action.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-8 items-center rounded-full border border-[var(--border)] bg-white/80 px-3 text-[12px] font-semibold text-[var(--brand)] hover:bg-white"
+                        >
+                          {action.label}
+                        </a>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -268,6 +300,8 @@ function PrimaryDecisionCell({ label, value }: { label: string; value: string })
 
 interface RunSectionProps<TRecord extends { id: Identifier }> {
   value: string;
+  /** DOM id used as an in-page scroll target for the pipeline jump links. */
+  sectionId?: string;
   title: string;
   description: string;
   rows: TRecord[] | undefined;
@@ -280,6 +314,7 @@ interface RunSectionProps<TRecord extends { id: Identifier }> {
 
 function RunAccordionSection<TRecord extends { id: Identifier }>({
   value,
+  sectionId,
   title,
   description,
   rows,
@@ -291,7 +326,7 @@ function RunAccordionSection<TRecord extends { id: Identifier }>({
 }: RunSectionProps<TRecord>) {
   const count = rows?.length ?? 0;
   return (
-    <AccordionItem value={value}>
+    <AccordionItem value={value} id={sectionId}>
       <AccordionTrigger>
         <span className="text-[15px] font-semibold text-[var(--foreground)]">{title}</span>
         {isPending ? (
@@ -494,6 +529,19 @@ const documentLifecycleColumns: DataTableColumn<DocumentLifecycleRecord>[] = [
 export default function RunDetailSectionsV2() {
   const run = useRecordContext<RunRecord>();
 
+  // Controls which accordion sections are open. The pipeline jump links reveal
+  // their target here and then scroll to it — never via the hash, which the
+  // HashRouter would treat as a (bad) route change.
+  const [openSections, setOpenSections] = useState<string[]>([]);
+
+  const handleJumpToSection = useCallback((href: string) => {
+    const value = ANCHOR_TO_ACCORDION_VALUE[sectionIdFromAnchor(href)];
+    if (value) {
+      setOpenSections((prev) => (prev.includes(value) ? prev : [...prev, value]));
+    }
+    scrollToInPageSection(href);
+  }, []);
+
   const providerJobs = useGetList<ProviderJobRecord>(
     "run-provider-jobs",
     { ...LIST_PARAMS, filter: { run_id: run?.run_id } },
@@ -526,11 +574,17 @@ export default function RunDetailSectionsV2() {
 
   return (
     <div className="space-y-4">
-      <PipelineHealthBanner run={run} />
+      <PipelineHealthBanner run={run} onJumpToSection={handleJumpToSection} />
 
-      <AccordionRoot type="multiple" className="flex flex-col gap-3">
+      <AccordionRoot
+        type="multiple"
+        value={openSections}
+        onValueChange={setOpenSections}
+        className="flex flex-col gap-3"
+      >
         <RunAccordionSection<ProviderJobRecord>
           value="provider-jobs"
+          sectionId="provider-jobs-section"
           title="Provider Jobs"
           description="Provider-level crawl job state and webhook progression for this run."
           rows={providerJobs.data}
@@ -564,6 +618,7 @@ export default function RunDetailSectionsV2() {
         />
         <RunAccordionSection<ProcessingStatusRecord>
           value="processing-status"
+          sectionId="di-processing-status-section"
           title="DI Processing Status"
           description="Document-intelligence processing updates correlated to this run."
           rows={processingStatus.data}
@@ -575,6 +630,7 @@ export default function RunDetailSectionsV2() {
         />
         <RunAccordionSection<DocumentLifecycleRecord>
           value="document-lifecycle"
+          sectionId="document-lifecycle-section"
           title="Document Lifecycle"
           description="Published or withdrawn document lifecycle events emitted by document-intelligence."
           rows={documentLifecycle.data}
