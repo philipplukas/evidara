@@ -15,7 +15,7 @@ import { FlaskConical } from "lucide-react";
 import { useResourceDefinitions } from "ra-core";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
@@ -101,19 +101,27 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
       className="flex flex-col h-full min-h-[calc(100vh-80px)] pt-4 md:pt-6"
     >
       <ul className="flex-shrink-0 list-none m-0 p-0">
-        {resourceEntries.map((resource) => (
-          <li key={resource.name}>
-            <NavLink
-              to={`/${resource.name}`}
-              className={({ isActive }) =>
-                navItemClass(resourceLinkIsActive(isActive, location.pathname, workflowExactPaths))
-              }
-              end={false}
-            >
-              <span>{labelForResource(resource.name, resource.options)}</span>
-            </NavLink>
-          </li>
-        ))}
+        {resourceEntries.map((resource) => {
+          const to = `/${resource.name}`;
+          // Replicate NavLink's prefix match (`end={false}`) ourselves so that
+          // `aria-current` and the active class share one source of truth.
+          // NavLink sets `aria-current` from its own internal match, which we
+          // cannot override — so it would leave two items marked current on a
+          // resource's `/create` route even after the class yields (#6).
+          const prefixActive = location.pathname === to || location.pathname.startsWith(`${to}/`);
+          const active = resourceLinkIsActive(prefixActive, location.pathname, workflowExactPaths);
+          return (
+            <li key={resource.name}>
+              <Link
+                to={to}
+                className={navItemClass(active)}
+                aria-current={active ? "page" : undefined}
+              >
+                <span>{labelForResource(resource.name, resource.options)}</span>
+              </Link>
+            </li>
+          );
+        })}
         {extraItems.length > 0 ? (
           <li className="mx-[10px] my-2">
             <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--text-meta)] px-[14px]">
