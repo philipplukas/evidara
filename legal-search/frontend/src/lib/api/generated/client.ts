@@ -15,7 +15,7 @@ Document body reads fall back to the Document Service
 (`contracts/api/document-intelligence.openapi.yaml`) when the projection carries no body.
 See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 
- * OpenAPI spec version: 0.7.0
+ * OpenAPI spec version: 0.8.0
  */
 import type {
   CitationGraphStats,
@@ -25,6 +25,8 @@ import type {
   FindCitingResponse,
   GetDocumentSections200,
   GetNormHierarchyParams,
+  IndexedProjectionDocumentPage,
+  ListIndexedProjectionDocumentsParams,
   NormHierarchyView,
   ResolveCitationParams,
   ResolveCitationResponse,
@@ -508,6 +510,77 @@ export const getGetCitationGraphStatsUrl = () => {
 export const getCitationGraphStats = async ( options?: RequestInit): Promise<getCitationGraphStatsResponse> => {
   
   return customFetch<getCitationGraphStatsResponse>(getGetCitationGraphStatsUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+/**
+ * Index-side enumeration for the ADR-0005 reconcile diff.
+
+ADR-0005 makes OpenSearch a serving layer only — canonical Delta is the system
+of record and the index is derived from it. Keeping that true needs the diff in
+BOTH directions: `document_intelligence_delta_projection_backfill` re-derives
+index rows from canonical (adding what is missing), and
+`document_intelligence_projection_reconcile` walks this endpoint to find indexed
+documents with no canonical row behind them (removing what should not be there).
+Without this endpoint nothing could list the derived side, so orphaned rows from
+earlier runs stayed user-visible indefinitely.
+
+Read-only. Rows are returned in `document_id` order and paged with an exclusive
+`after` cursor, so the walk is resumable and unaffected by the deep-paging
+window. `commentary_insight` rows are excluded: they are keyed by an `ins_*`
+insight id and have no `published_documents` row, so a canonical diff would
+classify every one of them as an orphan.
+
+The provenance ids on each entry are the ones the originating
+`document.processed` event carried; they are echoed back so a caller can build
+the `document.withdrawn` event that de-indexes the row.
+
+ * @summary Enumerate the documents currently in the search index
+ */
+export type listIndexedProjectionDocumentsResponse200 = {
+  data: IndexedProjectionDocumentPage
+  status: 200
+}
+
+export type listIndexedProjectionDocumentsResponse400 = {
+  data: void
+  status: 400
+}
+    
+export type listIndexedProjectionDocumentsResponseSuccess = (listIndexedProjectionDocumentsResponse200) & {
+  headers: Headers;
+};
+export type listIndexedProjectionDocumentsResponseError = (listIndexedProjectionDocumentsResponse400) & {
+  headers: Headers;
+};
+
+export type listIndexedProjectionDocumentsResponse = (listIndexedProjectionDocumentsResponseSuccess | listIndexedProjectionDocumentsResponseError)
+
+export const getListIndexedProjectionDocumentsUrl = (params?: ListIndexedProjectionDocumentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/projections/documents?${stringifiedParams}` : `/v1/projections/documents`
+}
+
+export const listIndexedProjectionDocuments = async (params?: ListIndexedProjectionDocumentsParams, options?: RequestInit): Promise<listIndexedProjectionDocumentsResponse> => {
+  
+  return customFetch<listIndexedProjectionDocumentsResponse>(getListIndexedProjectionDocumentsUrl(params),
   {      
     ...options,
     method: 'GET'

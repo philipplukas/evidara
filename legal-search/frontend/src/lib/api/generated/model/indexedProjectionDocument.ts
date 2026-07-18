@@ -18,21 +18,15 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
  * OpenAPI spec version: 0.8.0
  */
 
-/**
- * Temporal validity of a norm on the requested `in_force_at` date.
-Deliberately four-valued: `unknown` ("marked repealed, but we do not hold
-the date", or "we hold no start date") is a correct answer, and inventing
-`in_force` from a missing field is the confident fabrication the platform
-exists to prevent.
-
- */
-export type InForceState = typeof InForceState[keyof typeof InForceState];
-
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const InForceState = {
-  in_force: 'in_force',
-  not_yet_in_force: 'not_yet_in_force',
-  repealed: 'repealed',
-  unknown: 'unknown',
-} as const;
+export interface IndexedProjectionDocument {
+  /** @pattern ^doc_[0-9a-hjkmnp-tv-z]{26}$ */
+  document_id: string;
+  /** @minimum 1 */
+  document_revision?: number;
+  processing_manifest_id?: string;
+  source_id?: string;
+  source_version_id?: string;
+  run_id?: string;
+  /** Indexed title, so a dry-run reconcile report names the document a human would recognize. */
+  title?: string;
+}

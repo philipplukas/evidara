@@ -10,6 +10,7 @@ import { ProjectionsService } from './projections.service';
 function createRepositoryMock(): ProjectionRepository {
   return {
     hasHistoryEvent: vi.fn().mockResolvedValue(false),
+    listIndexedDocuments: vi.fn().mockResolvedValue({ data: [], limit: 500 }),
     getLatestRevision: vi.fn().mockResolvedValue(null),
     upsertProjection: vi.fn().mockResolvedValue(undefined),
     deleteProjection: vi.fn().mockResolvedValue(undefined),

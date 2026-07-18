@@ -15,7 +15,7 @@ Document body reads fall back to the Document Service
 (`contracts/api/document-intelligence.openapi.yaml`) when the projection carries no body.
 See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 
- * OpenAPI spec version: 0.7.0
+ * OpenAPI spec version: 0.8.0
  */
 
 export * from './acceptLanguageParameter';
@@ -42,6 +42,9 @@ export * from './findCitingResponse';
 export * from './getDocumentSections200';
 export * from './getNormHierarchyParams';
 export * from './inForceState';
+export * from './indexedProjectionDocument';
+export * from './indexedProjectionDocumentPage';
+export * from './listIndexedProjectionDocumentsParams';
 export * from './localStructureItem';
 export * from './metadataRow';
 export * from './metadataRowVisibility';
