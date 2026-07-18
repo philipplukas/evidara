@@ -47,7 +47,7 @@ function WeeklySeriesTable({ title, series }: SeriesProps) {
     <div>
       <h3 className="text-sm font-semibold text-[var(--foreground)]">{title}</h3>
       <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--border)]">
-        <table className="min-w-full border-collapse text-sm text-[var(--foreground)]">
+        <table className="w-full border-collapse text-sm text-[var(--foreground)]">
           <thead className="bg-[var(--surface-input)]">
             <tr>
               <th className="border-b border-[var(--border)] px-4 py-3 text-left text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-meta)]">
@@ -185,7 +185,7 @@ export function CorrectionMetricsCard() {
               </p>
             ) : (
               <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--border)]">
-                <table className="min-w-full border-collapse text-sm text-[var(--foreground)]">
+                <table className="w-full border-collapse text-sm text-[var(--foreground)]">
                   <thead className="bg-[var(--surface-input)]">
                     <tr>
                       <MetricHead>Operator</MetricHead>
@@ -219,7 +219,7 @@ export function CorrectionMetricsCard() {
               back onto correction payloads.
             </p>
             <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--border)]">
-              <table className="min-w-full border-collapse text-sm text-[var(--foreground)]">
+              <table className="w-full border-collapse text-sm text-[var(--foreground)]">
                 <thead className="bg-[var(--surface-input)]">
                   <tr>
                     <MetricHead>Pending</MetricHead>
