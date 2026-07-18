@@ -46,6 +46,7 @@ from platform_control.routers import (
     wizard,
 )
 from platform_control.routers.corpora import router as corpora_router
+from platform_control.schemas.errors import ErrorResponse
 
 _HTTP_LOGGER_NAME = "platform_control.http"
 
@@ -59,11 +60,11 @@ def _correlation_id_from_request(request: Request) -> str:
 
 
 def _error_payload(request: Request, detail: str) -> dict[str, str]:
+    # Built through ErrorResponse so the body the handlers send and the body the
+    # routes declare (`error_responses(...)`) cannot drift apart — see #627.
     correlation_id = getattr(request.state, "correlation_id", None)
-    payload = {"detail": detail}
-    if correlation_id:
-        payload["correlation_id"] = correlation_id
-    return payload
+    payload = ErrorResponse(detail=detail, correlation_id=correlation_id or None)
+    return payload.model_dump(exclude_none=True)
 
 
 def create_app() -> FastAPI:
