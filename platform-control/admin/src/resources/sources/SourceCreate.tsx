@@ -232,24 +232,52 @@ function SourceBlueprintPreviewPanel() {
   }
 
   return (
-    <InlineAlert tone="info" testId="blueprint-preview">
-      <div className="space-y-2">
-        <p className="font-semibold text-[var(--foreground)]">Expanded acquisition spec preview</p>
-        <div className="space-y-0.5 text-[13px] text-[var(--foreground)]">
-          {summarizePreview(preview).map((line) => (
-            <p key={line}>{line}</p>
-          ))}
+    <div className="space-y-2">
+      <InlineAlert tone={preview.launchable ? "success" : "warning"} testId="blueprint-lock">
+        <div className="space-y-1">
+          <p className="font-semibold">
+            {preview.launchable
+              ? "Both ADR-0030 keys open — this template can launch live runs."
+              : "Inert template — the two-key lock will block live runs."}
+          </p>
+          <p className="text-[12px]">
+            Config key (enabled): <strong>{preview.enabled ? "on" : "off"}</strong> · Code key
+            (live_ready): <strong>{preview.live_ready ? "on" : "off"}</strong>
+          </p>
+          {preview.notes.length > 0 ? (
+            <ul className="m-0 list-disc space-y-0.5 pl-4 text-[12px]">
+              {preview.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
-        <Button variant="secondary" size="sm" onClick={() => setShowRawJson((current) => !current)}>
-          {showRawJson ? "Hide raw JSON" : "Show raw JSON"}
-        </Button>
-        {showRawJson ? (
-          <pre className="m-0 mt-1 whitespace-pre-wrap text-[12px] text-[var(--foreground)]">
-            {JSON.stringify(preview.acquisition_spec, null, 2)}
-          </pre>
-        ) : null}
-      </div>
-    </InlineAlert>
+      </InlineAlert>
+      <InlineAlert tone="info" testId="blueprint-preview">
+        <div className="space-y-2">
+          <p className="font-semibold text-[var(--foreground)]">
+            Expanded acquisition spec preview
+          </p>
+          <div className="space-y-0.5 text-[13px] text-[var(--foreground)]">
+            {summarizePreview(preview).map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowRawJson((current) => !current)}
+          >
+            {showRawJson ? "Hide raw JSON" : "Show raw JSON"}
+          </Button>
+          {showRawJson ? (
+            <pre className="m-0 mt-1 whitespace-pre-wrap text-[12px] text-[var(--foreground)]">
+              {JSON.stringify(preview.acquisition_spec, null, 2)}
+            </pre>
+          ) : null}
+        </div>
+      </InlineAlert>
+    </div>
   );
 }
 

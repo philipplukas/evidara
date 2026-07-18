@@ -21,7 +21,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Identifier, useGetList, useRecordContext } from "react-admin";
 import { publicConfig } from "../../config/publicConfig";
 import type {
@@ -31,6 +31,7 @@ import type {
   ProviderJobRecord,
   RawArtifactRecord,
   RunPipelineHealth,
+  RunPipelineHealthStage,
   RunPreviewSummary,
   RunRecord,
 } from "../../lib/admin/dataProvider";
@@ -73,6 +74,14 @@ type RunTableSectionProps<TRecord extends { id: Identifier }> = {
   emptyMessage: string;
   columns: SectionColumn<TRecord>[];
   defaultExpanded?: boolean;
+  /**
+   * When both `expanded` and `onExpandedChange` are supplied the accordion is
+   * controlled — this lets the jump links reveal a collapsed section before
+   * scrolling to it. Sections without a jump target stay uncontrolled and use
+   * `defaultExpanded`.
+   */
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 };
 
 const formatDateTime = (value: string | null | undefined): string =>
@@ -99,7 +108,7 @@ export const overallSummaryByStatus = (status: RunPipelineHealth["overall_status
   return "At least one stage is still moving through the pipeline.";
 };
 
-const stageBorderColorByStatus = (status: RunPipelineHealth["stages"][number]["status"]): string =>
+const stageBorderColorByStatus = (status: DisplayStageStatus): string =>
   adminLevelBorder(pipelineHealthToLevel(status));
 
 function checklistStateToLevel(state: ChecklistState): AdminStatusLevel {
@@ -141,13 +150,65 @@ export type PipelineDecisionSupport = {
   whatHappensIfIgnored: string;
 };
 
-const stageLabel = (stage: RunPipelineHealth["stages"][number]): string =>
-  stage.stage.replaceAll("_", " ");
+/**
+ * Stage status *as rendered*. The API only knows the five lifecycle values; the
+ * admin adds `not_applicable` for stages that can no longer run (see
+ * `projectPipelineStages`).
+ */
+export type DisplayStageStatus = RunPipelineHealthStage["status"] | "not_applicable";
 
-const mostRecentStage = (
-  stages: RunPipelineHealth["stages"],
-): RunPipelineHealth["stages"][number] | null =>
-  stages.reduce<RunPipelineHealth["stages"][number] | null>((latest, stage) => {
+export type DisplayPipelineStage = Omit<RunPipelineHealthStage, "status"> & {
+  status: DisplayStageStatus;
+};
+
+const TERMINAL_FAILURE_RUN_STATUSES: readonly string[] = ["failed", "cancelled"];
+
+/**
+ * A run that ended as `failed` / `cancelled` will never advance again, so the
+ * stages it never reached are dead, not queued.
+ */
+export function isTerminalFailureRunStatus(status: RunPipelineHealth["run_status"]): boolean {
+  return TERMINAL_FAILURE_RUN_STATUSES.includes(status);
+}
+
+const notApplicableDetail = (runStatus: RunPipelineHealth["run_status"]): string =>
+  runStatus === "cancelled"
+    ? "Not applicable — the run was cancelled before this stage could start."
+    : "Not applicable — the run failed before this stage could start.";
+
+/**
+ * `projectPipelineStages` — render-time projection of the API stage list.
+ *
+ * On a run that terminally failed (or was cancelled), the API still reports the
+ * downstream stages it never reached as `pending`, with copy like "Awaiting DI
+ * processing signal before projection stage starts." That reads as "work is
+ * still coming" and makes a dead run look like it needs watching. Those stages
+ * are re-labelled `not_applicable` instead.
+ *
+ * Runs that are still progressing (pending / running / completed) are returned
+ * untouched — `pending` is genuinely correct there, and a healthy completed run
+ * legitimately reports every stage `ok`.
+ */
+export function projectPipelineStages(health: RunPipelineHealth): DisplayPipelineStage[] {
+  if (!isTerminalFailureRunStatus(health.run_status)) {
+    return health.stages;
+  }
+  return health.stages.map((stage) =>
+    stage.status === "pending"
+      ? { ...stage, status: "not_applicable", detail: notApplicableDetail(health.run_status) }
+      : stage,
+  );
+}
+
+/** A stage needs operator attention only when it is neither healthy nor dead. */
+export function stageNeedsAction(status: DisplayStageStatus): boolean {
+  return status !== "ok" && status !== "not_applicable";
+}
+
+const stageLabel = (stage: DisplayPipelineStage): string => stage.stage.replaceAll("_", " ");
+
+const mostRecentStage = (stages: DisplayPipelineStage[]): DisplayPipelineStage | null =>
+  stages.reduce<DisplayPipelineStage | null>((latest, stage) => {
     if (!stage.updated_at) {
       return latest;
     }
@@ -181,24 +242,32 @@ export function buildPipelineDecisionSupport(options: {
     };
   }
 
-  const blockedStages = health.stages.filter(
+  const stages = projectPipelineStages(health);
+  const blockedStages = stages.filter(
     (stage) => stage.status === "blocked" || stage.status === "failed",
   );
-  const latestStage = mostRecentStage(health.stages);
+  const skippedStages = stages.filter((stage) => stage.status === "not_applicable");
+  const latestStage = mostRecentStage(stages);
 
-  const whatIsBlocked =
+  const blockedSummary =
     health.overall_status === "ok"
       ? "No stage is blocked right now."
       : blockedStages.length > 0
         ? `Blocked stages: ${blockedStages.map(stageLabel).join(", ")}.`
         : "No stage is blocked, but the pipeline is still moving and may need operator attention soon.";
 
+  const whatIsBlocked =
+    skippedStages.length > 0
+      ? `${blockedSummary} Downstream stages that will never run: ${skippedStages.map(stageLabel).join(", ")}.`
+      : blockedSummary;
+
   const whatChangedRecently = latestStage
     ? `Most recent stage update: ${stageLabel(latestStage)} is ${latestStage.status.replaceAll("_", " ")}.`
     : `Health snapshot recorded ${health.processing_status_event_count} processing events and ${health.document_lifecycle_event_count} lifecycle events.`;
 
-  const whatHappensIfIgnored =
-    health.overall_status === "ok"
+  const whatHappensIfIgnored = isTerminalFailureRunStatus(health.run_status)
+    ? `The run already ended as ${health.run_status}; the stages it never reached will not start on their own, so remediate and relaunch to make progress.`
+    : health.overall_status === "ok"
       ? "Nothing urgent happens; the run remains a completed audit trail unless someone investigates it later."
       : health.overall_status === "blocked"
         ? "The run stays blocked until the relevant stage is remediated."
@@ -426,7 +495,7 @@ function PreviewSummarySection({ run }: { run: RunRecord }) {
   );
 }
 
-function RunSectionNav() {
+function RunSectionNav({ onJump }: { onJump: (href: string) => void }) {
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack spacing={1.5}>
@@ -437,18 +506,21 @@ function RunSectionNav() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          <Button component="a" href="#provider-jobs-section" variant="outlined" size="small">
+          <Button onClick={() => onJump("#provider-jobs-section")} variant="outlined" size="small">
             Provider jobs
           </Button>
           <Button
-            component="a"
-            href="#di-processing-status-section"
+            onClick={() => onJump("#di-processing-status-section")}
             variant="outlined"
             size="small"
           >
             DI processing
           </Button>
-          <Button component="a" href="#document-lifecycle-section" variant="outlined" size="small">
+          <Button
+            onClick={() => onJump("#document-lifecycle-section")}
+            variant="outlined"
+            size="small"
+          >
             Document lifecycle
           </Button>
         </Stack>
@@ -457,8 +529,11 @@ function RunSectionNav() {
   );
 }
 
-export function stageNextAction(stage: RunPipelineHealth["stages"][number]): string {
+export function stageNextAction(stage: DisplayPipelineStage): string {
   if (stage.status === "ok") return "No action required.";
+  if (stage.status === "not_applicable") {
+    return "No action — this stage will not run for this run.";
+  }
   if (stage.stage === "acquisition") {
     return "Check provider jobs for dispatch/crawl status and retry or cancel when stuck.";
   }
@@ -472,7 +547,7 @@ export function stageNextAction(stage: RunPipelineHealth["stages"][number]): str
 }
 
 export function stageActionTarget(
-  stage: RunPipelineHealth["stages"][number],
+  stage: DisplayPipelineStage,
   options: { legalSearchUrl?: string; evidenceRunbookPath: string },
 ): { label: string; href: string } {
   if (stage.stage === "acquisition") {
@@ -490,7 +565,41 @@ export function stageActionTarget(
   return { label: "Open evidence runbook", href: options.evidenceRunbookPath };
 }
 
-function PipelineHealthSection({ run }: { run: RunRecord }) {
+/**
+ * `sectionIdFromAnchor` — strip the leading `#` from an in-page anchor href so
+ * it can be resolved with `document.getElementById`. Callers pass the raw
+ * `stageActionTarget` href (e.g. `#di-processing-status-section`).
+ */
+export function sectionIdFromAnchor(href: string): string {
+  return href.startsWith("#") ? href.slice(1) : href;
+}
+
+/**
+ * `scrollToInPageSection` — smooth-scroll to the element behind an in-page
+ * anchor **without** letting the click reach react-admin's HashRouter.
+ *
+ * These detail pages render under a `HashRouter`, so a plain `<a href="#foo">`
+ * click mutates `location.hash` to `#foo`, which the router parses as a route
+ * change and bounces the operator to the "Not Found" page (issue: jump links
+ * left the run detail entirely). Resolving the target element and calling
+ * `scrollIntoView` ourselves keeps navigation entirely client-side and never
+ * touches the hash. No-ops safely if the element is not in the DOM.
+ */
+export function scrollToInPageSection(href: string): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const target = document.getElementById(sectionIdFromAnchor(href));
+  target?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function PipelineHealthSection({
+  run,
+  onJump,
+}: {
+  run: RunRecord;
+  onJump: (href: string) => void;
+}) {
   const [health, setHealth] = useState<RunPipelineHealth | null>(null);
   const [isPending, setIsPending] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -545,9 +654,10 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
     [run, health, readinessConfirmed, readinessBlockedCodes, verificationOpened],
   );
 
+  const displayStages = useMemo(() => (health ? projectPipelineStages(health) : null), [health]);
   const stageSummary = useMemo(
     () =>
-      health?.stages.reduce(
+      displayStages?.reduce(
         (counts, stage) => {
           counts[stage.status] = (counts[stage.status] ?? 0) + 1;
           return counts;
@@ -558,9 +668,10 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
           failed: 0,
           in_progress: 0,
           pending: 0,
+          not_applicable: 0,
         } as Record<string, number>,
       ) ?? null,
-    [health],
+    [displayStages],
   );
   const decisionSupport = useMemo(
     () => buildPipelineDecisionSupport({ run, health }),
@@ -713,6 +824,13 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                       label={`Pending ${stageSummary.pending ?? 0}`}
                       emphasis="subtle"
                     />
+                    {(stageSummary.not_applicable ?? 0) > 0 ? (
+                      <StatusBadge
+                        level="neutral"
+                        label={`Not applicable ${stageSummary.not_applicable}`}
+                        emphasis="subtle"
+                      />
+                    ) : null}
                   </Stack>
                 </Stack>
               </Paper>
@@ -773,13 +891,29 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
             </Paper>
 
             <Stack spacing={1.5}>
-              {health.stages.map((stage) => {
+              {(displayStages ?? health.stages).map((stage) => {
                 const actionTarget = stageActionTarget(stage, {
                   legalSearchUrl,
                   evidenceRunbookPath,
                 });
                 const isInPageAnchor = actionTarget.href.startsWith("#");
                 const isHealthy = stage.status === "ok";
+                const isNotApplicable = stage.status === "not_applicable";
+                const needsAction = stageNeedsAction(stage.status);
+                const emitRemediationClick = () => {
+                  if (!firstRemediationEventEmittedRef.current) {
+                    emitOperatorJourneyEvent("remediation_action_clicked", {
+                      run_id: run.run_id,
+                      source_id: run.source_id,
+                      source_version_id: run.source_version_id,
+                      mode: run.mode,
+                      stage: stage.stage,
+                      action_label: actionTarget.label,
+                      action_href: actionTarget.href,
+                    });
+                    firstRemediationEventEmittedRef.current = true;
+                  }
+                };
                 return (
                   <Paper
                     key={stage.stage}
@@ -814,17 +948,29 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                             label={stage.status.replaceAll("_", " ")}
                           />
                           <StatusBadge
-                            level={isHealthy ? "healthy" : "degraded"}
-                            label={isHealthy ? "No action required" : "Action required"}
+                            level={needsAction ? "degraded" : isHealthy ? "healthy" : "neutral"}
+                            label={
+                              needsAction
+                                ? "Action required"
+                                : isHealthy
+                                  ? "No action required"
+                                  : "Will not run"
+                            }
+                            {...(isNotApplicable ? { emphasis: "subtle" as const } : {})}
                           />
                         </Stack>
                       </Stack>
                       <Typography variant="body2" color="text.secondary">
                         {stage.detail}
                       </Typography>
-                      {isHealthy ? (
-                        <Typography variant="caption" color="success.main">
-                          No remediation required.
+                      {!needsAction ? (
+                        <Typography
+                          variant="caption"
+                          color={isHealthy ? "success.main" : "text.secondary"}
+                        >
+                          {isHealthy
+                            ? "No remediation required."
+                            : "No remediation possible — this stage will not run for this run."}
                         </Typography>
                       ) : (
                         <Paper
@@ -851,30 +997,34 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                                 The button on the right opens the most relevant remediation surface.
                               </Typography>
                             </Box>
-                            <Button
-                              component="a"
-                              href={actionTarget.href}
-                              target={isInPageAnchor ? undefined : "_blank"}
-                              rel={isInPageAnchor ? undefined : "noreferrer"}
-                              size="small"
-                              variant="contained"
-                              onClick={() => {
-                                if (!firstRemediationEventEmittedRef.current) {
-                                  emitOperatorJourneyEvent("remediation_action_clicked", {
-                                    run_id: run.run_id,
-                                    source_id: run.source_id,
-                                    source_version_id: run.source_version_id,
-                                    mode: run.mode,
-                                    stage: stage.stage,
-                                    action_label: actionTarget.label,
-                                    action_href: actionTarget.href,
-                                  });
-                                  firstRemediationEventEmittedRef.current = true;
-                                }
-                              }}
-                            >
-                              {actionTarget.label}
-                            </Button>
+                            {isInPageAnchor ? (
+                              // In-page jumps must NOT be `<a href="#...">`:
+                              // under the HashRouter that rewrites the route
+                              // and drops the operator on the Not Found page.
+                              // Scroll (and reveal) the target section instead.
+                              <Button
+                                size="small"
+                                variant="contained"
+                                onClick={() => {
+                                  emitRemediationClick();
+                                  onJump(actionTarget.href);
+                                }}
+                              >
+                                {actionTarget.label}
+                              </Button>
+                            ) : (
+                              <Button
+                                component="a"
+                                href={actionTarget.href}
+                                target="_blank"
+                                rel="noreferrer"
+                                size="small"
+                                variant="contained"
+                                onClick={emitRemediationClick}
+                              >
+                                {actionTarget.label}
+                              </Button>
+                            )}
                           </Stack>
                         </Paper>
                       )}
@@ -942,16 +1092,23 @@ function RunTableSection<TRecord extends { id: Identifier }>({
   emptyMessage,
   columns,
   defaultExpanded = false,
+  expanded,
+  onExpandedChange,
 }: RunTableSectionProps<TRecord>) {
   const rowCount = rows?.length ?? 0;
   const summaryChip = !isPending && !error && (
     <Chip label={`${rowCount} ${rowCount === 1 ? "row" : "rows"}`} size="small" sx={{ ml: 1 }} />
   );
 
+  const controlProps =
+    expanded !== undefined && onExpandedChange !== undefined
+      ? { expanded, onChange: (_event: unknown, isOpen: boolean) => onExpandedChange(isOpen) }
+      : { defaultExpanded };
+
   return (
     <Accordion
       id={sectionId}
-      defaultExpanded={defaultExpanded}
+      {...controlProps}
       disableGutters
       sx={{ "&::before": { display: "none" } }}
     >
@@ -1060,18 +1217,35 @@ export function RunDetailSections() {
     { enabled: Boolean(run?.run_id) },
   );
 
+  // Tracks which jump-target accordions the operator has revealed. The jump
+  // links open the section here (so a collapsed target is visible) and then
+  // scroll to it — see `scrollToInPageSection` for why we never use the hash.
+  const [revealedSections, setRevealedSections] = useState<Record<string, boolean>>({});
+
+  const handleJump = useCallback((href: string) => {
+    setRevealedSections((prev) => ({ ...prev, [sectionIdFromAnchor(href)]: true }));
+    scrollToInPageSection(href);
+  }, []);
+
+  const sectionControls = (sectionId: string) => ({
+    expanded: revealedSections[sectionId] ?? false,
+    onExpandedChange: (isOpen: boolean) =>
+      setRevealedSections((prev) => ({ ...prev, [sectionId]: isOpen })),
+  });
+
   if (!run) {
     return null;
   }
 
   return (
     <Stack spacing={3} sx={{ pt: 2 }}>
-      <RunSectionNav />
-      <PipelineHealthSection run={run} />
+      <RunSectionNav onJump={handleJump} />
+      <PipelineHealthSection run={run} onJump={handleJump} />
       <PreviewSummarySection run={run} />
 
       <RunTableSection
         sectionId="provider-jobs-section"
+        {...sectionControls("provider-jobs-section")}
         title="Provider Jobs"
         description="Provider-level crawl job state and webhook progression for this run."
         rows={providerJobs.data}
@@ -1157,6 +1331,7 @@ export function RunDetailSections() {
 
       <RunTableSection
         sectionId="di-processing-status-section"
+        {...sectionControls("di-processing-status-section")}
         title="DI Processing Status"
         description="Document-intelligence processing updates correlated to this run."
         rows={processingStatus.data}
@@ -1188,6 +1363,7 @@ export function RunDetailSections() {
 
       <RunTableSection
         sectionId="document-lifecycle-section"
+        {...sectionControls("document-lifecycle-section")}
         title="Document Lifecycle"
         description="Published or withdrawn document lifecycle events emitted by document-intelligence."
         rows={documentLifecycle.data}

@@ -27,6 +27,7 @@ import pytest
 from platform_control.errors import ProviderConfigurationError
 from platform_control.services.gemeinde_http_provider import (
     GemeindeHttpProvider,
+    load_communal_portals,
     parse_amtliche_sammlung_page,
 )
 
@@ -44,6 +45,16 @@ LANDING_URL = (
 
 def _fixture_html() -> str:
     return FIXTURE.read_text(encoding="utf-8")
+
+
+def test_supported_portals_are_loaded_from_config() -> None:
+    # #632: the BFS -> host allow-list is data (communal_portals.yaml), not a
+    # Python ClassVar. Registering commune #2 is an edit to that file, not code.
+    portals = GemeindeHttpProvider().supported_portals
+    assert portals is load_communal_portals()  # same cached config object
+    assert 261 in portals
+    assert portals[261].host == "www.stadt-zuerich.ch"
+    assert portals[261].canton_jurisdiction_id == "jur_ch_zh"
 
 
 # ─── Builders for synthetic landing pages ───────────────────────

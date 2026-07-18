@@ -497,11 +497,42 @@ fi
 # AND of the raw-body hint and the indexed facet, so a `1` here means both.
 lang_agreement_ok=$(( body_lang_hint_ok == 1 && indexed_language_ok == 1 ? 1 : 0 ))
 
+# In-force gate (#633): the acquired consolidation must be in force as-of the
+# run's selection date. The fedlex_sparql provider emits the selected
+# consolidation's validity window under `provider_metadata` (in_force_from /
+# in_force_until / in_force_at_selection). A future `in_force_from`, or an
+# explicit `in_force_at_selection=false`, means the corpus would hold law not yet
+# in force — the exact defect that let "Stand am 1. Januar 2029" through as
+# title_ok=1. Fail-closed on those; a missing in_force_from is only a loud warn,
+# since not every provider/document publishes applicability dates.
+today_utc="$(date -u +%Y-%m-%d)"
+in_force_from_present="$(jq -r '[.data[]? |
+  (.artifact_metadata.provider_metadata // {}) |
+  select((.in_force_from // "") != "")] | length' < "${RUN_DIR}/raw-artifacts.json")"
+future_dated_count="$(jq -r --arg today "${today_utc}" '[.data[]? |
+  (.artifact_metadata.provider_metadata // {}) |
+  select((.in_force_from // "") != "" and (.in_force_from > $today))] | length' \
+  < "${RUN_DIR}/raw-artifacts.json")"
+not_in_force_count="$(jq -r '[.data[]? |
+  (.artifact_metadata.provider_metadata // {}) |
+  select(.in_force_at_selection == false)] | length' < "${RUN_DIR}/raw-artifacts.json")"
+in_force_ok=$(( future_dated_count == 0 && not_in_force_count == 0 ? 1 : 0 ))
+if [[ "${future_dated_count}" -gt 0 || "${not_in_force_count}" -gt 0 ]]; then
+  log "==> IN-FORCE GATE FAILED: acquired law not in force as-of ${today_utc}"
+  log "    future_dated_artifacts=${future_dated_count} not_in_force_artifacts=${not_in_force_count}"
+  log "    A future consolidation was selected — see issue #633."
+elif [[ "${in_force_from_present}" -lt 1 ]]; then
+  log "==> IN-FORCE GATE: WARN — no in_force_from published on any artifact; temporal"
+  log "    validity is unknown for this run (in-force state cannot be asserted)."
+fi
+
 verdict="pass"
 if [[ "${content_type_count}" -lt 1 || "${captured_count}" -lt 1 || "${raw_artifact_count}" -lt 1 ]]; then
   verdict="provider_failed"
 elif [[ "${accepted_count}" -lt 1 || "${processing_count}" -lt 1 || "${canonical_ready_count}" -lt 1 || "${processed_count}" -lt 1 ]]; then
   verdict="downstream_failed"
+elif [[ "${in_force_ok}" -lt 1 ]]; then
+  verdict="acquired_law_not_in_force"
 elif [[ "${title_ok}" -lt 1 || "${fedlex_html_ok}" -lt 1 || "${art1_ok}" -lt 1 ]]; then
   verdict="pipeline_pass_content_suspect"
 elif [[ "${art_density_ok}" -lt 1 || "${min_content_length_ok}" -lt 1 || "${lang_agreement_ok}" -lt 1 ]]; then
@@ -539,6 +570,11 @@ SUMMARY_JSON="$(jq -n \
   --argjson indexed_language_ok "${indexed_language_ok}" \
   --arg indexed_language_expected "${expected_lang}" \
   --arg indexed_language_observed "${indexed_language_observed}" \
+  --arg as_of_utc "${today_utc}" \
+  --argjson in_force_from_present "${in_force_from_present}" \
+  --argjson future_dated_count "${future_dated_count}" \
+  --argjson not_in_force_count "${not_in_force_count}" \
+  --argjson in_force_ok "${in_force_ok}" \
   '{
     environment: $environment,
     template_id: $template_id,
@@ -570,7 +606,12 @@ SUMMARY_JSON="$(jq -n \
       indexed_language_expected: $indexed_language_expected,
       indexed_language_observed: $indexed_language_observed,
       indexed_language_checked: $indexed_language_checked,
-      indexed_language_ok: $indexed_language_ok
+      indexed_language_ok: $indexed_language_ok,
+      as_of_utc: $as_of_utc,
+      in_force_from_present: $in_force_from_present,
+      future_dated_count: $future_dated_count,
+      not_in_force_count: $not_in_force_count,
+      in_force_ok: $in_force_ok
     }
   }')"
 

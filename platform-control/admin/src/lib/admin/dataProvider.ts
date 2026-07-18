@@ -199,15 +199,43 @@ export type SourceBlueprintPreviewInput = {
   provider_template_id: string;
 };
 
+/**
+ * The ADR-0030 two-key lock, as the API now reports it (#634). Without these
+ * fields the panel cannot tell an inert template from a live one — it would
+ * render `canton_http_zh` identically to the working Fedlex entry, then let an
+ * operator walk four green steps into a 400. `enabled` is the config-owner key
+ * (an operator flips it via `setBlueprintTemplateEnablement`, #632); `live_ready`
+ * is the code-owner key; `launchable` is both turned; `notes` explains any
+ * closed key.
+ */
+export type BlueprintTwoKeyLock = {
+  enabled: boolean;
+  live_ready: boolean;
+  launchable: boolean;
+  notes: string[];
+};
+
+/** Result of flipping the config key (#632) — carries the audit trail. */
+export type BlueprintTemplateEnablement = {
+  overlay_id: string;
+  provider_template_id: string;
+  enabled: boolean;
+  default_enabled: boolean;
+  source: "override" | "default";
+  note: string | null;
+  updated_by: string | null;
+  updated_at: string | null;
+};
+
 export type SourceBlueprintPreview = SourceBlueprintPreviewInput & {
   acquisition_spec: AcquisitionSpec;
-};
+} & BlueprintTwoKeyLock;
 
 export type SourceBlueprintTemplate = {
   overlay_id: string;
   provider_template_id: string;
   provider: "firecrawl" | "deterministic_http" | "ris_ogd" | "fedlex_sparql";
-};
+} & BlueprintTwoKeyLock;
 
 type CapturedResource = {
   captured_resource_id: string;
@@ -354,7 +382,7 @@ type SourceCreateWithVersionMutationData = {
 };
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "PUT";
   body?: unknown;
   /** Additional request headers (e.g. `X-Operator-Id` for corrections). */
   headers?: Record<string, string>;
@@ -948,6 +976,26 @@ export const controlPlaneActions = {
       "/v1/sources/blueprint-templates",
     );
     return response.data;
+  },
+
+  /**
+   * Flip the operator-reachable ADR-0030 config key for one template (#632).
+   *
+   * This is the key an operator turns after capturing acceptance-run evidence —
+   * over the API, with an audit trail, no repo edit and no deploy. The code key
+   * (`live_ready`) is unaffected: a run at a scaffold provider still refuses.
+   */
+  async setBlueprintTemplateEnablement(
+    overlayId: string,
+    providerTemplateId: string,
+    input: { enabled: boolean; note?: string | null },
+  ): Promise<BlueprintTemplateEnablement> {
+    return requestJson<BlueprintTemplateEnablement>(
+      `/v1/sources/blueprint-templates/${encodeURIComponent(overlayId)}/${encodeURIComponent(
+        providerTemplateId,
+      )}/enablement`,
+      { method: "PUT", body: input },
+    );
   },
 
   /**

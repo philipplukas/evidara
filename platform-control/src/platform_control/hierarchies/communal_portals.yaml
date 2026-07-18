@@ -1,0 +1,17 @@
+# Swiss communal (Gemeinde) legal-collection portals — the gemeinde_http host
+# allow-list, as config rather than code (#632).
+#
+# BFS/OFS Gemeindenummer -> the commune's legal-collection portal. A blueprint
+# template's seed_urls must resolve to the registered `host` (or a subdomain);
+# `canton_jurisdiction_id` is the commune's parent canton, which the ADR-0033
+# norm-hierarchy walk links municipal documents up to ("which cantonal law
+# delegates this competence?"). It varies per commune, so it is registered here.
+#
+# Adding commune #2 is an edit to this data file — NOT a Python change. This is
+# what makes gemeinde_http_provider's "adding a commune is a config change, not
+# code" claim true. (Operator-reachable DB registration, like blueprint
+# enablement in #632, is a further step tracked separately.)
+portals:
+  261:
+    host: www.stadt-zuerich.ch # Stadt Zürich — Amtliche Sammlung (verified)
+    canton_jurisdiction_id: jur_ch_zh

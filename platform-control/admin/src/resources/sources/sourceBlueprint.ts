@@ -93,16 +93,24 @@ export const buildOverlayChoices = (templates: SourceBlueprintTemplate[]): Bluep
     name: OVERLAY_NAMES[overlayId] ?? overlayId.toUpperCase(),
   }));
 
-/** Provider-template choices grouped by overlay id, labelled `id (provider)`. */
+/**
+ * Provider-template choices grouped by overlay id, labelled `id (provider)`.
+ *
+ * Inert templates (either ADR-0030 key still closed — not `launchable`) are
+ * marked at selection time so an operator sees the lock *before* investing in a
+ * source, instead of walking four green steps into a 400 (#634). The panel isn't
+ * wrong today; it simply had nothing to render — the API now reports the lock.
+ */
 export const buildTemplateChoicesByOverlay = (
   templates: SourceBlueprintTemplate[],
 ): Record<string, BlueprintChoice[]> => {
   const grouped: Record<string, BlueprintChoice[]> = {};
   for (const template of templates) {
     const list = grouped[template.overlay_id] ?? [];
+    const marker = template.launchable ? "" : " · inert (locked)";
     list.push({
       id: template.provider_template_id,
-      name: `${template.provider_template_id} (${template.provider})`,
+      name: `${template.provider_template_id} (${template.provider})${marker}`,
     });
     grouped[template.overlay_id] = list;
   }

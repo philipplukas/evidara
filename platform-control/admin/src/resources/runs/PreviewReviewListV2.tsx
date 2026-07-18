@@ -1,6 +1,7 @@
 /**
- * `PreviewReviewListV2` — Tailwind + `ra-core` port of the MUI
- * `PreviewReviewList`. The preview-approval queue is the preview-mode slice of
+ * `PreviewReviewListV2` — the canonical `preview-review` list (the MUI v1
+ * `PreviewReviewList` it replaced is deleted; `/preview-review-v2` redirects
+ * here). The preview-approval queue is the preview-mode slice of
  * the runs list: the dataProvider forces `mode: "preview"` for the
  * `PreviewReview` resource, so this page only exposes the status filter (no
  * mode presets) plus the preview-scoped launch CTA and the shared
@@ -239,7 +240,7 @@ export default function PreviewReviewListV2() {
           error={controller.error}
           sort={controller.sort}
           onSort={(field, order) => controller.setSort({ field, order })}
-          onRowClick={(r) => navigate(`/preview-review-v2/${encodeURIComponent(String(r.id))}`)}
+          onRowClick={(r) => navigate(`/preview-review/${encodeURIComponent(String(r.id))}/show`)}
           total={controller.total}
           page={controller.page}
           perPage={controller.perPage}

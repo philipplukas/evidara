@@ -73,7 +73,9 @@ async def test_zurich_end_to_end_fetches_seed_and_emits_resource(
                 200,
                 "<html><head>"
                 "<title>\n  LS 131.1 – Verfassung des\n  Kantons Zürich</title>"
-                "</head><body><h1>Art. 1</h1></body></html>",
+                "</head><body><h1>Art. 1</h1>"
+                "<p>Art. 2 Abs. 1: Der Kanton ...</p>"
+                "<p>Art. 3 Abs. 2 ...</p></body></html>",
                 {"content-type": "text/html; charset=utf-8"},
             )
         },
@@ -111,7 +113,8 @@ async def test_canton_provider_accepts_subdomain_seed(
         {
             "https://www.belex.sites.be.ch/": (
                 200,
-                "<html><head><title>BELEX</title></head><body>...</body></html>",
+                "<html><head><title>BELEX</title></head><body>"
+                "<p>Art. 1</p><p>Art. 2 Abs. 1</p><p>Art. 3</p></body></html>",
                 {"content-type": "text/html"},
             )
         },
@@ -204,6 +207,64 @@ async def test_canton_provider_requires_seed_urls() -> None:
             source_version,
             SimpleNamespace(run_id="run_x"),
         )
+
+
+# ─── Legal-text density gate (#631) ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_canton_provider_refuses_javascript_navigation_shell(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A JS SPA nav shell (no legal-text markers) must be refused, not captured.
+
+    Regression for #631: canton_http fetched the live zh.ch portal, captured a
+    177 KB navigation shell that is ~95% script/style with zero Art./§/Abs.
+    markers, and reported a clean success (captured=1, failed=0). It must refuse
+    honestly — like gemeinde_http does — rather than poison the corpus.
+    """
+    nav_shell = (
+        "<html><head><title>Kanton Zürich</title>"
+        "<style>.nav{color:red}</style>"
+        "<script>window.__APP__={routes:['/home','/politik-staat']};</script>"
+        "</head><body>"
+        "<nav>Startseite Politik &amp; Staat Verwaltung Kontakt Suche Login</nav>"
+        "<script>document.getElementById('app').render();</script>"
+        "<script>function track(){/* analytics chrome, no law here */}</script>"
+        "</body></html>"
+    )
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.zh.ch/": (
+                200,
+                nav_shell,
+                {"content-type": "text/html; charset=utf-8"},
+            )
+        },
+    )
+    provider = CantonHttpProvider()
+    source_version = SimpleNamespace(
+        acquisition_spec={
+            "canton_code": "CH-ZH",
+            "seed_url": "https://www.zh.ch/de/politik-staat/gesetze.html",
+        }
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_ch_zh_shell"),
+    )
+    # Honest refusal: nothing captured, the shell recorded as skipped with a
+    # reason — never a clean success on chrome.
+    assert result.response_payload["captured"] == 0
+    assert result.response_payload["skipped"] == 1
+    assert result.inline_resources == []
+    assert result.inline_failure_reason is not None
+    assert "density gate" in result.inline_failure_reason
+    skipped = result.response_payload["skipped_documents"][0]
+    assert skipped["reason"] == "no_legal_text_markers"
+    assert skipped["legal_marker_count"] == 0
 
 
 def test_canton_http_provider_is_not_live_ready() -> None:

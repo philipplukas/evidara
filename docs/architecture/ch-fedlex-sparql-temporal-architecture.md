@@ -119,6 +119,30 @@ Given a source version acquisition spec, the provider should:
    - title / metadata when available
    - provenance metadata including work URI, expression URI, language, and query mode
 
+### In-force expression selection (#633)
+
+A work resolves to many dated consolidations (`jolux:isMemberOf`), each carrying
+its entry-into-force window:
+
+- `jolux:dateApplicability` — first day the consolidation is in force (VERIFIED
+  against the live endpoint, 2026-07-17)
+- `jolux:dateEndApplicability` — last day in force; absent/open on the current
+  consolidation
+
+The provider selects the consolidation **in force at a requested date**, defaulting
+to today — never simply the newest member. Taking the newest unconditionally
+acquired a future consolidation ("Stand am 1. Januar 2029") on a platform whose
+differentiator is temporal validity. Acquiring a future consolidation is now an
+explicit, auditable act: set `acquisition_spec.as_of_date` (ISO `YYYY-MM-DD`) to a
+future date.
+
+The selected consolidation's validity window is emitted into resource metadata as
+`in_force_from` / `in_force_until` (plus `selected_as_of` and
+`in_force_at_selection`), so downstream four-valued in-force logic can answer
+instead of reporting `unknown`. The CH Fedlex fast loop (`ch-fedlex-fast-loop.sh`)
+gates on this: a future-dated or not-in-force selection fails with verdict
+`acquired_law_not_in_force`.
+
 ### Acquisition spec shape
 
 The current union contains:

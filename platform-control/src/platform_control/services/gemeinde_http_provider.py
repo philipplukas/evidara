@@ -52,10 +52,11 @@ failure ADR-0033 exists to prevent. When it meets a PDF-only
 manifestation it records what it found and fails the run with an explicit
 reason. A commune that publishes HTML law would acquire normally.
 
-The design generalises past Zürich: `supported_portals` is a
-BFS → host allow-list, so adding a commune is a config change, not code.
-Landing one city is deliberate (#584) — communal law lives on ~2,000
-independent sites and full coverage is a separate, much larger problem.
+The design generalises past Zürich: the BFS → host allow-list lives in
+`communal_portals.yaml`, so adding a commune is a config edit to that data
+file, not a code change (#632). Landing one city is deliberate (#584) —
+communal law lives on ~2,000 independent sites and full coverage is a separate,
+much larger problem.
 """
 
 from __future__ import annotations
@@ -64,10 +65,13 @@ import html as html_module
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import urljoin, urlparse
 
 import httpx
+import yaml
 
 from platform_control.domain import AcquisitionProvider
 from platform_control.errors import ProviderConfigurationError
@@ -124,6 +128,51 @@ class CommunalPortal:
 
     host: str
     canton_jurisdiction_id: str
+
+
+_COMMUNAL_PORTALS_PATH = (
+    Path(__file__).resolve().parent.parent / "hierarchies" / "communal_portals.yaml"
+)
+
+
+@lru_cache(maxsize=1)
+def load_communal_portals() -> dict[int, CommunalPortal]:
+    """Load the BFS -> portal registry from config (#632).
+
+    The registry used to be a Python ``ClassVar`` dict, so adding commune #2 was
+    a code change — contradicting this provider's own "adding a commune is a
+    config change, not code" claim. It now lives in ``communal_portals.yaml``:
+    editing that data file is all it takes to register a new commune.
+    """
+    with _COMMUNAL_PORTALS_PATH.open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    portals_raw = payload.get("portals")
+    if not isinstance(portals_raw, dict):
+        raise ProviderConfigurationError(
+            "communal_portals.yaml must contain a 'portals' mapping of BFS number -> portal."
+        )
+    portals: dict[int, CommunalPortal] = {}
+    for bfs_raw, entry in portals_raw.items():
+        try:
+            bfs = int(bfs_raw)
+        except (TypeError, ValueError) as exc:
+            raise ProviderConfigurationError(
+                f"communal_portals.yaml: BFS key {bfs_raw!r} is not an integer."
+            ) from exc
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("host"), str)
+            or not isinstance(entry.get("canton_jurisdiction_id"), str)
+        ):
+            raise ProviderConfigurationError(
+                f"communal_portals.yaml: BFS {bfs} needs string 'host' and "
+                "'canton_jurisdiction_id' fields."
+            )
+        portals[bfs] = CommunalPortal(
+            host=entry["host"],
+            canton_jurisdiction_id=entry["canton_jurisdiction_id"],
+        )
+    return portals
 
 
 def _iso_date(raw: str | None) -> str | None:
@@ -203,19 +252,17 @@ class GemeindeHttpProvider:
     # close and an operator captures acceptance-run evidence. See #584.
     live_ready: ClassVar[bool] = False
 
-    # BFS/OFS Gemeindenummer → the commune's legal-collection portal. Seed URLs
-    # in a blueprint template must resolve to the registered host (or a
-    # subdomain). `canton_jurisdiction_id` is the commune's parent canton: the
-    # municipal document must link up to it for the ADR-0033 norm-hierarchy walk
-    # ("which cantonal law delegates this competence?"), and it varies per
-    # commune, so it is registered here rather than assumed.
-    # Zürich (261) is verified; further communes are a config change, not code.
-    supported_portals: ClassVar[dict[int, CommunalPortal]] = {
-        261: CommunalPortal(
-            host="www.stadt-zuerich.ch",  # Stadt Zürich — Amtliche Sammlung
-            canton_jurisdiction_id="jur_ch_zh",
-        ),
-    }
+    @property
+    def supported_portals(self) -> dict[int, CommunalPortal]:
+        """BFS/OFS Gemeindenummer → the commune's legal-collection portal.
+
+        Backed by ``communal_portals.yaml`` (#632): seed URLs in a blueprint
+        template must resolve to the registered host (or a subdomain), and
+        `canton_jurisdiction_id` is the commune's parent canton for the ADR-0033
+        norm-hierarchy walk. Zürich (261) is verified; registering further
+        communes is a config edit to that data file, not a code change.
+        """
+        return load_communal_portals()
 
     async def start_run(
         self,

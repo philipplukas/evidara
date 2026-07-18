@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.8.0
+  version: 0.9.0
 paths:
   /health:
     get:
@@ -392,6 +392,54 @@ paths:
                 $ref: '#/components/schemas/SourceBlueprintTemplateListResponse'
       security:
       - APIKeyHeader: []
+  /v1/sources/blueprint-templates/{overlay_id}/{provider_template_id}/enablement:
+    put:
+      tags:
+      - sources
+      - source-versions
+      summary: Set Blueprint Template Enablement
+      description: |-
+        Flip the operator-reachable ADR-0030 config key for one template (#632).
+
+        This is the key an operator turns after capturing acceptance-run evidence —
+        reachable over the API, with an audit trail (who/when/why), no repo edit and
+        no deploy. The code key (`live_ready`) is unaffected: a run at a scaffold
+        provider still refuses even once this is enabled.
+      operationId: setBlueprintTemplateEnablement
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: overlay_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Overlay Id
+      - name: provider_template_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Provider Template Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlueprintTemplateEnablementRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlueprintTemplateEnablementResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/sources/{source_id}:
     get:
       tags:
@@ -2476,6 +2524,66 @@ components:
       - created_at
       - updated_at
       title: AuthorityResponse
+    BlueprintTemplateEnablementRequest:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+          description: Why the key was flipped — e.g. a link to captured acceptance-run evidence.
+      type: object
+      required:
+      - enabled
+      title: BlueprintTemplateEnablementRequest
+      description: Operator flip of the ADR-0030 config key (#632).
+    BlueprintTemplateEnablementResponse:
+      properties:
+        overlay_id:
+          type: string
+          title: Overlay Id
+        provider_template_id:
+          type: string
+          title: Provider Template Id
+        enabled:
+          type: boolean
+          title: Enabled
+          description: Effective config key after the flip.
+        default_enabled:
+          type: boolean
+          title: Default Enabled
+          description: The shipped source_blueprints.yaml default.
+        source:
+          type: string
+          title: Source
+          description: '''override'' (an operator flipped it) or ''default'' (shipped).'
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+        updated_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated By
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+      type: object
+      required:
+      - overlay_id
+      - provider_template_id
+      - enabled
+      - default_enabled
+      - source
+      title: BlueprintTemplateEnablementResponse
     BundeslandHttpAcquisitionSpec:
       properties:
         tenant_id:
@@ -6298,11 +6406,34 @@ components:
               legifrance: '#/components/schemas/LegifranceAcquisitionSpec'
               regione_http: '#/components/schemas/RegioneHttpAcquisitionSpec'
               ris_ogd: '#/components/schemas/RisOgdAcquisitionSpec'
+        enabled:
+          type: boolean
+          title: Enabled
+          description: 'Effective ADR-0030 config key: DB override an operator flipped, else the shipped
+            source_blueprints.yaml default (fail-closed).'
+        live_ready:
+          type: boolean
+          title: Live Ready
+          description: 'ADR-0030 code key: the resolved provider can physically acquire this format. Stays
+            in code — it is an engineering assertion, not operator state.'
+        launchable:
+          type: boolean
+          title: Launchable
+          description: Both keys turned — a live run will not be blocked by the two-key lock.
+        notes:
+          items:
+            type: string
+          type: array
+          title: Notes
+          description: Human-readable explanation of any closed key (why the template is inert).
       type: object
       required:
       - overlay_id
       - provider_template_id
       - acquisition_spec
+      - enabled
+      - live_ready
+      - launchable
       title: SourceBlueprintPreviewResponse
     SourceBlueprintTemplateListResponse:
       properties:
@@ -6326,11 +6457,33 @@ components:
         provider:
           type: string
           title: Provider
+        enabled:
+          type: boolean
+          title: Enabled
+          description: 'Effective ADR-0030 config key: DB override an operator flipped, else the shipped
+            source_blueprints.yaml default (fail-closed).'
+        live_ready:
+          type: boolean
+          title: Live Ready
+          description: 'ADR-0030 code key: the resolved provider can physically acquire this format.'
+        launchable:
+          type: boolean
+          title: Launchable
+          description: Both keys turned — a live run will not be blocked by the two-key lock.
+        notes:
+          items:
+            type: string
+          type: array
+          title: Notes
+          description: Human-readable explanation of any closed key (why the template is inert).
       type: object
       required:
       - overlay_id
       - provider_template_id
       - provider
+      - enabled
+      - live_ready
+      - launchable
       title: SourceBlueprintTemplateResponse
     SourceListResponse:
       properties:

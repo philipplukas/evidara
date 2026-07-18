@@ -5,8 +5,9 @@ import { expect, type Page, test } from "@playwright/test";
 // (PreviewReviewListV2 / PreviewReviewShowV2). The preview pages are the
 // preview-mode slice of the runs surface: the dataProvider forces
 // `mode: "preview"` on the list and guards the detail getOne to preview runs.
-// This spec drives the canonical `/#/preview-review-v2` preview routes, reusing
-// the shared operator-action stack and RunDetailSectionsV2.
+// This spec drives the canonical `/#/preview-review` routes (v2 consolidated
+// onto the resource routes; `/preview-review-v2` redirects), reusing the shared
+// operator-action stack and RunDetailSectionsV2.
 // ---------------------------------------------------------------------------
 
 const PREVIEW_RUNNING = {
@@ -111,7 +112,7 @@ test.describe("Preview review v2 (ADR-0026 Tailwind port)", () => {
 
   test("list surfaces the Create Preview Run CTA and opens the launch dialog", async ({ page }) => {
     await mockPreviewReviewApi(page);
-    await page.goto("/#/preview-review-v2");
+    await page.goto("/#/preview-review");
 
     await page.getByRole("button", { name: "Create Preview Run" }).first().click();
 
@@ -124,7 +125,7 @@ test.describe("Preview review v2 (ADR-0026 Tailwind port)", () => {
 
   test("running preview run exposes a Cancel row action", async ({ page }) => {
     await mockPreviewReviewApi(page);
-    await page.goto("/#/preview-review-v2");
+    await page.goto("/#/preview-review");
 
     const runningRow = page.getByRole("row", { name: /preview_running/ });
     await expect(runningRow.getByRole("button", { name: "Cancel" })).toBeVisible();
@@ -137,7 +138,7 @@ test.describe("Preview review v2 (ADR-0026 Tailwind port)", () => {
     page,
   }) => {
     await mockPreviewReviewApi(page);
-    await page.goto("/#/preview-review-v2/preview_running");
+    await page.goto("/#/preview-review/preview_running/show");
 
     await expect(page.getByRole("heading", { name: /Run\s+preview_running/ })).toBeVisible();
     await expect(page.getByText("Operator actions")).toBeVisible();

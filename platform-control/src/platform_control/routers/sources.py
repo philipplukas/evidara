@@ -3,9 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from platform_control.auth import Principal, get_current_principal
 from platform_control.database import get_session
 from platform_control.openapi import AGENT_DISCOVERY_TAG
 from platform_control.schemas.source import (
+    BlueprintTemplateEnablementRequest,
+    BlueprintTemplateEnablementResponse,
     CreateSourceRequest,
     CreateSourceVersionRequest,
     CreateSourceWithVersionRequest,
@@ -18,10 +21,12 @@ from platform_control.schemas.source import (
     SourceVersionListResponse,
     SourceVersionResponse,
 )
+from platform_control.services.blueprint_enablement import BlueprintEnablementService
 from platform_control.services.source_service import SourceService
 
 router = APIRouter(prefix="/v1/sources", tags=["sources", "source-versions"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+PrincipalDep = Annotated[Principal, Depends(get_current_principal)]
 
 
 @router.get("", response_model=SourceListResponse, tags=[AGENT_DISCOVERY_TAG])
@@ -68,10 +73,19 @@ async def preview_source_blueprint(
 ) -> SourceBlueprintPreviewResponse:
     service = SourceService(session)
     acquisition_spec = await service.preview_source_blueprint(request)
+    lock = await service.describe_blueprint_lock(
+        request.overlay_id,
+        request.provider_template_id,
+        acquisition_spec.provider,
+    )
     return SourceBlueprintPreviewResponse(
         overlay_id=request.overlay_id,
         provider_template_id=request.provider_template_id,
         acquisition_spec=acquisition_spec,
+        enabled=bool(lock["enabled"]),
+        live_ready=bool(lock["live_ready"]),
+        launchable=bool(lock["launchable"]),
+        notes=list(lock["notes"]),
     )
 
 
@@ -81,6 +95,45 @@ async def list_source_blueprint_templates(
 ) -> SourceBlueprintTemplateListResponse:
     service = SourceService(session)
     return SourceBlueprintTemplateListResponse(data=await service.list_source_blueprint_templates())
+
+
+@router.put(
+    "/blueprint-templates/{overlay_id}/{provider_template_id}/enablement",
+    response_model=BlueprintTemplateEnablementResponse,
+)
+async def set_blueprint_template_enablement(
+    overlay_id: str,
+    provider_template_id: str,
+    request: BlueprintTemplateEnablementRequest,
+    session: SessionDep,
+    principal: PrincipalDep,
+) -> BlueprintTemplateEnablementResponse:
+    """Flip the operator-reachable ADR-0030 config key for one template (#632).
+
+    This is the key an operator turns after capturing acceptance-run evidence —
+    reachable over the API, with an audit trail (who/when/why), no repo edit and
+    no deploy. The code key (`live_ready`) is unaffected: a run at a scaffold
+    provider still refuses even once this is enabled.
+    """
+    service = BlueprintEnablementService(session)
+    state = await service.set_enabled(
+        overlay_id,
+        provider_template_id,
+        enabled=request.enabled,
+        note=request.note,
+        actor=principal.operator_id,
+    )
+    await session.commit()
+    return BlueprintTemplateEnablementResponse(
+        overlay_id=state.overlay_id,
+        provider_template_id=state.provider_template_id,
+        enabled=state.enabled,
+        default_enabled=state.default_enabled,
+        source=state.source,
+        note=state.note,
+        updated_by=state.updated_by,
+        updated_at=state.updated_at,
+    )
 
 
 @router.get("/{source_id}", response_model=SourceResponse)
