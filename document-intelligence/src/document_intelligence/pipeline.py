@@ -31,7 +31,11 @@ from document_intelligence.extractors.metadata import (
     MetadataExtractor,
 )
 from document_intelligence.ingest.docling_adapter import normalize_with_docling
-from document_intelligence.ingest.loaders import BundleLoader, DispatchingBundleLoader
+from document_intelligence.ingest.loaders import (
+    BundleLoader,
+    DispatchingBundleLoader,
+    SelectedArtifactBundle,
+)
 from document_intelligence.nlp.citation_extractor import extract_citations, normalize_citation
 from document_intelligence.nlp.spacy_pipeline import enrich_with_spacy
 from document_intelligence.normalize.html import (
@@ -79,6 +83,29 @@ _DOCUMENT_TYPE_ALIASES = {
     "legal principle": "rechtssatz",
     "leitsatz": "rechtssatz",
 }
+
+
+def _document_identity_key(bundle: SelectedArtifactBundle) -> str:
+    """The stable per-document component of ``document_id`` (#652).
+
+    ``upstream_locator`` is the document's permalink at the authority — an ELI for
+    Fedlex (``https://fedlex.data.admin.ch/eli/cc/1999/404``), the AS landing page
+    for a communal ordinance. It identifies *the law*, so re-acquiring it yields
+    another **revision** of the same document, which is what the surface and
+    ``_pick_latest_row`` were always built for.
+
+    This used to key on ``primary_artifact.artifact_id``, a per-run ULID. That
+    minted a brand-new document on every acquisition run, so the index accumulated
+    a fresh copy of the same law each time it was fetched — and pipeline fixes
+    never reached the already-indexed copies, because they were different
+    documents rather than superseded revisions (#652).
+
+    Falls back to the artifact id when a source publishes no stable locator: that
+    preserves the old behaviour for those sources rather than collapsing genuinely
+    distinct documents onto one id, which would be the worse failure.
+    """
+    locator = (bundle.manifest.upstream_locator or "").strip()
+    return locator or bundle.primary_artifact.artifact_id
 
 
 class ProcessingPipeline:
@@ -140,7 +167,7 @@ class ProcessingPipeline:
             selected_bundle.manifest.provenance.tenant_id,
             selected_bundle.manifest.provenance.corpus_id,
             selected_bundle.manifest.provenance.source_id,
-            primary_artifact.artifact_id,
+            _document_identity_key(selected_bundle),
         )
         document_revision = 1
         processing_manifest_id = random_prefixed_id("pm")
