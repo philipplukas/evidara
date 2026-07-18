@@ -21,6 +21,7 @@ from platform_control.schemas.commentary_insight import (
     CommentaryInsightListResponse,
     CommentaryInsightResponse,
 )
+from platform_control.schemas.errors import error_responses
 from platform_control.services.commentary_insight_service import (
     CommentaryInsightService,
 )
@@ -60,6 +61,7 @@ async def list_commentary_insights(
     "/commentary-insights/{insight_id}",
     response_model=CommentaryInsightResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def get_commentary_insight(
     insight_id: str,
@@ -74,6 +76,7 @@ async def get_commentary_insight(
     "/commentary-insights/{insight_id}/history",
     response_model=CommentaryInsightHistoryResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def get_commentary_insight_history(
     insight_id: str,

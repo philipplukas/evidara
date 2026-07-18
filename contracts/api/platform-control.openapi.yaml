@@ -2388,6 +2388,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CorrectionResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -2554,6 +2560,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CorrectionResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -2593,6 +2605,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CorrectionResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -2636,6 +2660,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RescoreTriggerResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -2721,6 +2757,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommentaryInsightResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -2756,6 +2798,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommentaryInsightHistoryResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
