@@ -22,7 +22,14 @@ type ListResponse<T> = {
   data: T[];
 };
 
-type RunScopedPaginatedList<T> = {
+/**
+ * The `{data, limit, offset, total}` envelope every server-paginated
+ * platform-control list returns (`/v1/sources`, `/v1/runs`, and the run-scoped
+ * detail lists). `total` is the hit count, not the page length — see #616,
+ * where the client re-derived it from the page and capped every list at the
+ * server's default `limit=100`.
+ */
+type PaginatedListResponse<T> = {
   data: T[];
   total: number;
   limit: number;
@@ -346,7 +353,13 @@ export type RunPreviewSummary = {
   drift_checks: RunPreviewSummaryDriftCheck[];
 };
 
-type SimpleListResourceName = "jurisdictions" | "authorities" | "sources";
+/**
+ * Endpoints that genuinely return an unbounded array under `data` — no
+ * `limit`/`offset`/`total`, the whole table every time. These are the only
+ * lists the client may sort and page itself. `sources` used to be listed here
+ * and is not unbounded (#616).
+ */
+type SimpleListResourceName = "jurisdictions" | "authorities";
 type RunDetailResourceName =
   | "run-captured-resources"
   | "run-raw-artifacts"
@@ -406,8 +419,10 @@ const EMPTY_FILTER_VALUE = "__none__";
 const SIMPLE_LIST_PATHS: Record<SimpleListResourceName, string> = {
   jurisdictions: "/v1/reference-data/jurisdictions",
   authorities: "/v1/reference-data/authorities",
-  sources: "/v1/sources",
 };
+
+/** Server-side ceiling on `limit` for the paginated lists (`max(1, min(limit, 500))`). */
+const MAX_SERVER_PAGE_SIZE = 500;
 
 const RUN_DETAIL_RESOURCE_CONFIG: {
   [key in RunDetailResourceName]: {
@@ -534,7 +549,25 @@ const findInSimpleList = async <TResource extends SimpleListResourceName>(
   return match;
 };
 
-const toQueryString = (params: GetListParams): string => {
+/**
+ * Translate ra-core's 1-based `{page, perPage}` into the server's
+ * `{limit, offset}`, clamped the same way the API clamps it.
+ */
+const toLimitOffset = (params: GetListParams): { limit: number; offset: number } => {
+  const page = params.pagination?.page ?? 1;
+  const perPage = params.pagination?.perPage ?? 25;
+  const limit = Math.min(Math.max(perPage, 1), MAX_SERVER_PAGE_SIZE);
+  const offset = Math.max((page - 1) * limit, 0);
+  return { limit, offset };
+};
+
+const setPaginationParams = (query: URLSearchParams, params: GetListParams): void => {
+  const { limit, offset } = toLimitOffset(params);
+  query.set("limit", String(limit));
+  query.set("offset", String(offset));
+};
+
+const toRunsQueryString = (params: GetListParams): string => {
   const query = new URLSearchParams();
   const { filter } = params;
 
@@ -544,9 +577,22 @@ const toQueryString = (params: GetListParams): string => {
   if (typeof filter.status === "string" && filter.status.length > 0) {
     query.set("status", filter.status);
   }
+  if (typeof filter.source_id === "string" && !isMissingFilterValue(filter.source_id)) {
+    query.set("source_id", filter.source_id);
+  }
+  setPaginationParams(query, params);
 
-  const queryString = query.toString();
-  return queryString.length > 0 ? `?${queryString}` : "";
+  return `?${query.toString()}`;
+};
+
+const toSourcesQueryString = (params: GetListParams): string => {
+  const query = new URLSearchParams();
+  const search = params.filter.q;
+  if (typeof search === "string" && search.trim().length > 0) {
+    query.set("q", search.trim());
+  }
+  setPaginationParams(query, params);
+  return `?${query.toString()}`;
 };
 
 const compareSortValues = (left: unknown, right: unknown): number => {
@@ -568,27 +614,48 @@ const compareSortValues = (left: unknown, right: unknown): number => {
   return String(left).localeCompare(String(right));
 };
 
-/** Sort + page full list responses when the API returns an unbounded array. */
+const applyClientSort = <T extends Record<string, unknown>>(
+  records: T[],
+  params: GetListParams,
+): T[] => {
+  const sortField = params.sort?.field ?? "id";
+  const sortOrder = params.sort?.order ?? "ASC";
+  return [...records].sort((left, right) => {
+    const cmp = compareSortValues(left[sortField as keyof T], right[sortField as keyof T]);
+    return sortOrder === "DESC" ? -cmp : cmp;
+  });
+};
+
+/**
+ * Sort + page a list response **only** for endpoints that genuinely return the
+ * whole collection in one unbounded array — `SIMPLE_LIST_PATHS` (reference
+ * data) and `/v1/sources/{id}/versions`. Server-paginated endpoints must not
+ * come through here: windowing a page re-derives `total` from the page length
+ * and silently caps the list at the server default (#616).
+ */
 const applyClientListWindow = <T extends Record<string, unknown>>(
   records: T[],
   params: GetListParams,
 ): { data: T[]; total: number } => {
-  const sortField = params.sort?.field ?? "id";
-  const sortOrder = params.sort?.order ?? "ASC";
-  const page = params.pagination?.page ?? 1;
-  const perPage = params.pagination?.perPage ?? 25;
-
-  const sorted = [...records].sort((left, right) => {
-    const cmp = compareSortValues(left[sortField as keyof T], right[sortField as keyof T]);
-    return sortOrder === "DESC" ? -cmp : cmp;
-  });
-
-  const total = sorted.length;
-  const limit = Math.min(Math.max(perPage, 1), 500);
-  const start = Math.max((page - 1) * limit, 0);
-  const data = sorted.slice(start, start + limit);
-  return { data, total };
+  const sorted = applyClientSort(records, params);
+  const { limit, offset } = toLimitOffset(params);
+  return { data: sorted.slice(offset, offset + limit), total: sorted.length };
 };
+
+/**
+ * Sort the records the server already selected for this page. Ordering is
+ * page-local by design: `/v1/sources` and `/v1/runs` order by `created_at DESC`
+ * server-side and accept no sort parameter, so a column sort can only reorder
+ * the rows in hand. `total` comes from the server.
+ */
+const toServerPagedResult = <T extends Record<string, unknown>>(
+  records: T[],
+  total: number | undefined,
+  params: GetListParams,
+): { data: T[]; total: number } => ({
+  data: applyClientSort(records, params),
+  total: total ?? records.length,
+});
 
 const normalizeDriftStatus = (status: string): "ok" | "warn" => (status === "warn" ? "warn" : "ok");
 
@@ -891,14 +958,31 @@ const getSimpleListResult = async <TResource extends SimpleListResourceName>(
 };
 
 const buildRunScopedListQuery = (params: GetListParams): string => {
-  const page = params.pagination?.page ?? 1;
-  const perPage = params.pagination?.perPage ?? 100;
-  const limit = Math.min(Math.max(perPage, 1), 500);
-  const offset = Math.max((page - 1) * limit, 0);
   const query = new URLSearchParams();
-  query.set("limit", String(limit));
-  query.set("offset", String(offset));
+  setPaginationParams(query, params);
   return `?${query.toString()}`;
+};
+
+/**
+ * Walk every page of `/v1/sources` so `getMany` can resolve ids beyond the
+ * server's default page. Reference lookups ask for specific ids, so silently
+ * stopping at the first page would blank the label for any source past it.
+ */
+const fetchAllSources = async (): Promise<Source[]> => {
+  const collected: Source[] = [];
+  let offset = 0;
+  for (;;) {
+    const query = new URLSearchParams({
+      limit: String(MAX_SERVER_PAGE_SIZE),
+      offset: String(offset),
+    });
+    const response = await requestJson<PaginatedListResponse<Source>>(`/v1/sources?${query}`);
+    collected.push(...response.data);
+    offset += MAX_SERVER_PAGE_SIZE;
+    if (response.data.length === 0 || collected.length >= response.total) {
+      return collected;
+    }
+  }
 };
 
 const getRunDetailList = async <TResource extends RunDetailResourceName>(
@@ -913,7 +997,7 @@ const getRunDetailList = async <TResource extends RunDetailResourceName>(
     };
   }
   const config = RUN_DETAIL_RESOURCE_CONFIG[resource];
-  const response = await requestJson<RunScopedPaginatedList<ResourceRecordMap[TResource]>>(
+  const response = await requestJson<PaginatedListResponse<ResourceRecordMap[TResource]>>(
     `${config.path(runId)}${buildRunScopedListQuery(params)}`,
   );
   return {
@@ -1040,7 +1124,11 @@ export const controlPlaneDataProvider: DataProvider = {
     }
 
     if (resource === ResourceName.Sources) {
-      return getSimpleListResult(ResourceName.Sources, "source_id", params);
+      const response = await requestJson<PaginatedListResponse<Source>>(
+        `/v1/sources${toSourcesQueryString(params)}`,
+      );
+      const records = response.data.map((item) => toRecord(item, "source_id"));
+      return toServerPagedResult(records, response.total, params);
     }
 
     if (resource === "source-versions") {
@@ -1059,11 +1147,11 @@ export const controlPlaneDataProvider: DataProvider = {
     }
 
     if (resource === ResourceName.Runs) {
-      const response = await requestJson<ListResponse<RunListItem>>(
-        `/v1/runs${toQueryString(params)}`,
+      const response = await requestJson<PaginatedListResponse<RunListItem>>(
+        `/v1/runs${toRunsQueryString(params)}`,
       );
       const records = response.data.map((item) => toRecord(item, "run_id"));
-      return applyClientListWindow(records, params);
+      return toServerPagedResult(records, response.total, params);
     }
 
     if (resource === ResourceName.PreviewReview) {
@@ -1074,11 +1162,11 @@ export const controlPlaneDataProvider: DataProvider = {
           mode: "preview",
         },
       };
-      const response = await requestJson<ListResponse<RunListItem>>(
-        `/v1/runs${toQueryString(previewParams)}`,
+      const response = await requestJson<PaginatedListResponse<RunListItem>>(
+        `/v1/runs${toRunsQueryString(previewParams)}`,
       );
       const records = response.data.map((item) => toRecord(item, "run_id"));
-      return applyClientListWindow(records, params);
+      return toServerPagedResult(records, response.total, params);
     }
 
     if (isRunDetailResource(resource)) {
@@ -1188,7 +1276,7 @@ export const controlPlaneDataProvider: DataProvider = {
     }
 
     if (resource === ResourceName.Sources) {
-      const items = await fetchSimpleList(ResourceName.Sources);
+      const items = await fetchAllSources();
       return {
         data: items
           .filter((item) => params.ids.includes(item.source_id))
