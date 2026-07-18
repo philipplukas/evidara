@@ -418,6 +418,192 @@ def _default_delta_writer() -> Callable[..., object]:
     return deltalake_module.write_deltalake
 
 
+@dataclass(frozen=True)
+class IcebergSinkConfig:
+    """Catalog-addressed canonical surfaces (ADR-0036).
+
+    The Delta config names each surface by *URI*; this names it by **table** in a
+    catalog (``namespace.table``), which is the whole point of the move: consumers
+    resolve surfaces through the catalog and can query them with SQL, instead of
+    every reader hardcoding a storage path.
+    """
+
+    namespace: str = "evidara"
+    published_documents_table: str = "published_documents"
+    published_sections_table: str = "published_sections"
+    processing_manifests_table: str = "processing_manifests"
+    published_commentary_insights_table: str | None = "published_commentary_insights"
+    catalog_name: str = "nessie"
+    catalog_properties: Mapping[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_environment(cls, environ: Mapping[str, str] | None = None) -> "IcebergSinkConfig | None":
+        """Build the config from env, or ``None`` when no catalog is configured.
+
+        Storage credentials reuse the ``DI_S3_*`` vars the bundle loader already
+        uses, so one set of MinIO/S3 settings serves both reads and writes.
+        """
+        env = os.environ if environ is None else environ
+        uri = (env.get("DI_ICEBERG_CATALOG_URI") or "").strip()
+        if not uri:
+            return None
+
+        properties: dict[str, str] = {"type": "rest", "uri": uri}
+        warehouse = (env.get("DI_ICEBERG_WAREHOUSE") or "").strip()
+        if warehouse:
+            properties["warehouse"] = warehouse
+        s3_endpoint = (env.get("DI_S3_ENDPOINT_URL") or "").strip()
+        if s3_endpoint:
+            properties["s3.endpoint"] = s3_endpoint
+            # Path-style is required for MinIO and harmless elsewhere.
+            properties["s3.path-style-access"] = "true"
+        access_key = (env.get("DI_S3_ACCESS_KEY_ID") or "").strip()
+        secret_key = (env.get("DI_S3_SECRET_ACCESS_KEY") or "").strip()
+        if access_key and secret_key:
+            properties["s3.access-key-id"] = access_key
+            properties["s3.secret-access-key"] = secret_key
+        region = (env.get("DI_S3_REGION") or "").strip()
+        if region:
+            properties["s3.region"] = region
+
+        return cls(
+            namespace=(env.get("DI_ICEBERG_NAMESPACE") or "evidara").strip(),
+            catalog_name=(env.get("DI_ICEBERG_CATALOG_NAME") or "nessie").strip(),
+            catalog_properties=properties,
+        )
+
+
+class IcebergCanonicalSink(CanonicalSink):
+    """Append canonical rows to Iceberg tables registered in a catalog (ADR-0036).
+
+    Deliberately mirrors :class:`DeltaCanonicalSink`: identical canonical row
+    shapes and the same normalisation helpers — only the *destination* changes,
+    from a hardcoded table URI to a named table in a catalog (Nessie), which is
+    what lets Trino/SQL read the surfaces without any delta-rs coupling.
+    """
+
+    def __init__(
+        self,
+        config: IcebergSinkConfig,
+        *,
+        catalog: object | None = None,
+    ) -> None:
+        self._config = config
+        self._catalog = catalog
+        self.status_events: list[dict[str, object]] = []
+        self.document_processed_events: list[dict[str, object]] = []
+
+    def persist(
+        self,
+        document: Document,
+        sections: list[Section],
+        manifest: ProcessingManifest,
+    ) -> None:
+        self._write_rows(
+            self._config.published_documents_table,
+            [_document_dict_for_delta(document)],
+            always_present_keys=_PUBLISHED_DOCUMENTS_DELTA_KEYS,
+        )
+        # Mirrors the Delta sink: published surfaces predate `parent_section_id`.
+        section_rows = []
+        for section in sections:
+            row = section.to_dict()
+            row.pop("parent_section_id", None)
+            section_rows.append(row)
+        self._write_rows(
+            self._config.published_sections_table,
+            section_rows,
+            always_present_keys=_PUBLISHED_SECTIONS_DELTA_KEYS,
+        )
+        self._write_rows(
+            self._config.processing_manifests_table,
+            [_manifest_dict_for_delta(manifest)],
+            always_present_keys=_PROCESSING_MANIFESTS_DELTA_KEYS,
+        )
+
+    def record_status_events(self, status_events: list[dict[str, object]]) -> None:
+        self.status_events.extend(status_events)
+
+    def record_document_processed_event(self, document_processed_event: dict[str, object]) -> None:
+        self.document_processed_events.append(document_processed_event)
+
+    def persist_commentary_insights(self, commentary_insights: list[CommentaryInsight]) -> None:
+        if not commentary_insights:
+            return
+        if not self._config.published_commentary_insights_table:
+            raise ProcessingError(
+                "missing_commentary_insights_surface",
+                "published commentary insights table is required when commentary insights are emitted",
+            )
+        self._write_rows(
+            self._config.published_commentary_insights_table,
+            [_commentary_insight_dict_for_delta(insight) for insight in commentary_insights],
+            always_present_keys=_PUBLISHED_COMMENTARY_INSIGHTS_DELTA_KEYS,
+            schema_override=_COMMENTARY_INSIGHTS_ARROW_SCHEMA,
+        )
+
+    def _load_catalog(self) -> object:
+        if self._catalog is None:
+            try:
+                catalog_module = importlib.import_module("pyiceberg.catalog")
+            except ModuleNotFoundError as error:  # pragma: no cover - depends on env
+                raise ProcessingError(
+                    "missing_iceberg_dependency",
+                    "pyiceberg is required for Iceberg-backed canonical persistence",
+                ) from error
+            self._catalog = catalog_module.load_catalog(
+                self._config.catalog_name, **dict(self._config.catalog_properties)
+            )
+        return self._catalog
+
+    def _write_rows(
+        self,
+        table_name: str,
+        rows: Sequence[dict[str, object]],
+        *,
+        always_present_keys: frozenset[str] | None = None,
+        schema_override: pa.Schema | None = None,
+    ) -> None:
+        if not rows:
+            return
+        identifier = f"{self._config.namespace}.{table_name}"
+        try:
+            ready = _delta_ready_rows(
+                rows,
+                always_present_keys=_projection_keys_for_rows(rows, always_present_keys),
+            )
+            catalog = self._load_catalog()
+            catalog.create_namespace_if_not_exists(self._config.namespace)
+
+            if catalog.table_exists(identifier):
+                table = catalog.load_table(identifier)
+                # Conform to the table's committed schema so appends stay valid as
+                # canonical shapes evolve; fall back to inference when a new column
+                # is present (the catalog rejects it loudly rather than silently).
+                arrow_schema = table.schema().as_arrow()
+                incoming = {key for row in ready for key in row}
+                schema = arrow_schema if incoming.issubset(set(arrow_schema.names)) else None
+            else:
+                schema = schema_override
+                table = None
+
+            arrow_table = (
+                pa.Table.from_pylist(ready, schema=schema)
+                if schema is not None
+                else pa.Table.from_pylist(ready)
+            )
+            if table is None:
+                table = catalog.create_table(identifier, schema=arrow_table.schema)
+            table.append(arrow_table)
+        except ProcessingError:
+            raise
+        except Exception as error:  # pragma: no cover - library-specific
+            raise ProcessingError(
+                "iceberg_write_failed",
+                f"failed to write canonical rows to Iceberg table {identifier}",
+            ) from error
+
+
 class SparkDeltaCanonicalSink(CanonicalSink):
     """Append canonical rows to Delta tables using the PySpark DataFrame writer.
 

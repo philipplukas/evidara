@@ -1,0 +1,77 @@
+# ADR-0036 Phase 0 spike — Nessie (Iceberg REST catalog) + Trino (SQL) + MinIO (S3).
+#
+# Proves the claim behind the lakehouse move: a canonical surface can be written
+# with pyiceberg through a *catalog* (named table, not a hardcoded URI) and read
+# back with plain SQL — no delta-rs, no file paths.
+#
+# Isolated on its own project + ports so it runs ALONGSIDE the M13 loop stack
+# (which owns 9000/9001 for its MinIO).
+#
+#   docker compose -p lakehouse-spike -f spikes/lakehouse/docker-compose.spike.yml up -d
+#
+# Ports: MinIO 9010/9011 · Nessie 19120 · Trino 18080
+name: lakehouse-spike
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+
+  # One-shot: create the Iceberg warehouse bucket.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        mc alias set local http://minio:9000 minioadmin minioadmin &&
+        mc mb --ignore-existing local/warehouse &&
+        echo 'warehouse bucket ready'
+    restart: "no"
+
+  # Nessie — Iceberg REST catalog with git-like refs. In-memory version store is
+  # fine for a spike; the point is the catalog + branch semantics, not durability.
+  nessie:
+    image: ghcr.io/projectnessie/nessie:latest
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      nessie.version.store.type: IN_MEMORY
+      # Iceberg REST catalog warehouse, backed by MinIO.
+      nessie.catalog.default-warehouse: warehouse
+      nessie.catalog.warehouses.warehouse.location: s3://warehouse/
+      nessie.catalog.service.s3.default-options.region: us-east-1
+      nessie.catalog.service.s3.default-options.endpoint: http://minio:9000/
+      nessie.catalog.service.s3.default-options.path-style-access: "true"
+      nessie.catalog.service.s3.default-options.access-key: urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
+      nessie.catalog.secrets.access-key.name: minioadmin
+      nessie.catalog.secrets.access-key.secret: minioadmin
+    ports:
+      - "19120:19120"
+    mem_limit: 1g
+
+  # Trino — SQL over the Nessie-managed Iceberg tables.
+  trino:
+    image: trinodb/trino:latest
+    depends_on:
+      - nessie
+    ports:
+      - "18080:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+    mem_limit: 2g

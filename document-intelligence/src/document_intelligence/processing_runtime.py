@@ -19,6 +19,8 @@ from document_intelligence.ingest import resolve_artifact_bundle_event
 from document_intelligence.ingest.loaders import BundleLoader
 from document_intelligence.persist.sinks import (
     DeltaCanonicalSink,
+    IcebergCanonicalSink,
+    IcebergSinkConfig,
     InMemoryCanonicalSink,
     SparkDeltaCanonicalSink,
 )
@@ -50,7 +52,13 @@ def build_processing_pipeline(
     runtime_settings: RuntimeSettings,
     bundle_loader: BundleLoader | None = None,
 ) -> ProcessingPipeline:
-    if runtime_settings.surface_uris is None:
+    # ADR-0036: an Iceberg catalog (Nessie) takes precedence when one is configured
+    # via DI_ICEBERG_CATALOG_URI. Delta stays the default so this is opt-in per
+    # environment and reversible by unsetting one variable.
+    iceberg_config = IcebergSinkConfig.from_environment()
+    if iceberg_config is not None:
+        sink = IcebergCanonicalSink(iceberg_config)
+    elif runtime_settings.surface_uris is None:
         sink = InMemoryCanonicalSink()
     elif runtime_settings.use_spark_delta:
         sink = SparkDeltaCanonicalSink(runtime_settings.surface_uris.to_delta_sink_config())
