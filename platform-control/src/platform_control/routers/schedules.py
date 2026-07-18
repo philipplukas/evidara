@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
+from platform_control.schemas.errors import error_responses
 from platform_control.schemas.schedule import (
     CreateScheduleRequest,
     ScheduleListResponse,
@@ -32,13 +33,13 @@ async def list_schedules(
     return await service.list_schedules(enabled_only=enabled_only)
 
 
-@router.get("/{schedule_id}", response_model=ScheduleResponse)
+@router.get("/{schedule_id}", response_model=ScheduleResponse, responses=error_responses(404))
 async def get_schedule(schedule_id: str, session: Session) -> ScheduleResponse:
     service = ScheduleService(session)
     return await service.get_schedule(schedule_id)
 
 
-@router.patch("/{schedule_id}", response_model=ScheduleResponse)
+@router.patch("/{schedule_id}", response_model=ScheduleResponse, responses=error_responses(404))
 async def update_schedule(
     schedule_id: str, request: UpdateScheduleRequest, session: Session
 ) -> ScheduleResponse:
@@ -46,7 +47,11 @@ async def update_schedule(
     return await service.update_schedule(schedule_id, request)
 
 
-@router.delete("/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{schedule_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(404),
+)
 async def delete_schedule(schedule_id: str, session: Session) -> None:
     service = ScheduleService(session)
     await service.delete_schedule(schedule_id)

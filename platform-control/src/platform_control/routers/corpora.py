@@ -12,6 +12,7 @@ from platform_control.schemas.corpus import (
     CreateCorpusRequest,
     UpdateCorpusRequest,
 )
+from platform_control.schemas.errors import error_responses
 from platform_control.services.corpus_service import CorpusService
 
 router = APIRouter(prefix="/v1/corpora", tags=["corpora"])
@@ -41,7 +42,12 @@ async def list_corpora(
     )
 
 
-@router.post("", response_model=CorpusResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CorpusResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(409),
+)
 async def create_corpus(
     request: CreateCorpusRequest,
     session: SessionDep,
@@ -51,7 +57,7 @@ async def create_corpus(
     return CorpusResponse.model_validate(corpus)
 
 
-@router.get("/{corpus_id}", response_model=CorpusResponse)
+@router.get("/{corpus_id}", response_model=CorpusResponse, responses=error_responses(404))
 async def get_corpus(
     corpus_id: str,
     session: SessionDep,
@@ -61,7 +67,7 @@ async def get_corpus(
     return CorpusResponse.model_validate(corpus)
 
 
-@router.patch("/{corpus_id}", response_model=CorpusResponse)
+@router.patch("/{corpus_id}", response_model=CorpusResponse, responses=error_responses(404, 409))
 async def update_corpus(
     corpus_id: str,
     request: UpdateCorpusRequest,
@@ -72,7 +78,7 @@ async def update_corpus(
     return CorpusResponse.model_validate(corpus)
 
 
-@router.post("/{corpus_id}/archive", response_model=CorpusResponse)
+@router.post("/{corpus_id}/archive", response_model=CorpusResponse, responses=error_responses(404))
 async def archive_corpus(
     corpus_id: str,
     session: SessionDep,

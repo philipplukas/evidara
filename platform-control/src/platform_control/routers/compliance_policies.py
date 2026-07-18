@@ -14,6 +14,7 @@ from platform_control.schemas.compliance_policy import (
     JurisdictionPolicyAttachmentResponse,
     UpdateCompliancePolicyRequest,
 )
+from platform_control.schemas.errors import error_responses
 from platform_control.services.compliance_policy_service import CompliancePolicyService
 
 router = APIRouter(prefix="/v1", tags=["compliance-policies"])
@@ -46,6 +47,7 @@ async def create_compliance_policy(
 @router.get(
     "/compliance-policies/{compliance_policy_id}",
     response_model=CompliancePolicyResponse,
+    responses=error_responses(404),
 )
 async def get_compliance_policy(
     compliance_policy_id: str,
@@ -58,6 +60,7 @@ async def get_compliance_policy(
 @router.patch(
     "/compliance-policies/{compliance_policy_id}",
     response_model=CompliancePolicyResponse,
+    responses=error_responses(404, 409),
 )
 async def update_compliance_policy(
     compliance_policy_id: str,
@@ -71,6 +74,7 @@ async def update_compliance_policy(
 @router.post(
     "/jurisdictions/{jurisdiction_id}/compliance-policy",
     response_model=JurisdictionPolicyAttachmentResponse,
+    responses=error_responses(404),
 )
 async def attach_compliance_policy(
     jurisdiction_id: str,
@@ -91,6 +95,7 @@ async def attach_compliance_policy(
 @router.delete(
     "/jurisdictions/{jurisdiction_id}/compliance-policy",
     response_model=JurisdictionPolicyAttachmentResponse,
+    responses=error_responses(404),
 )
 async def detach_compliance_policy(
     jurisdiction_id: str,
