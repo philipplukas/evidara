@@ -15,7 +15,7 @@ import { FlaskConical } from "lucide-react";
 import { useResourceDefinitions } from "ra-core";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   describeLegalSearchHandoff,
   type LegalSearchHandoff,
@@ -58,6 +58,22 @@ function labelForResource(name: string, options: { label?: string } | undefined)
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+/**
+ * A resource's top-level link uses a prefix match (`end={false}`), so it also
+ * lights up on the resource's own `/create` route — which is owned by the
+ * matching "… setup" workflow shortcut. Yield to that workflow item on its
+ * exact route so only a single nav item is ever active at once (fixes the
+ * dual-highlight on `/authorities/create`, and the same class of collision on
+ * `/sources/create` and `/jurisdictions/create`).
+ */
+export function resourceLinkIsActive(
+  navIsActive: boolean,
+  pathname: string,
+  workflowExactPaths: readonly string[],
+): boolean {
+  return navIsActive && !workflowExactPaths.includes(pathname);
+}
+
 export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
   const definitions = useResourceDefinitions();
   const location = useLocation();
@@ -72,6 +88,9 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
   }, []);
 
   const resourceEntries = Object.values(definitions).filter((r) => r?.hasList);
+  // Exact routes owned by the "… setup" workflow shortcuts; a resource link
+  // must not stay highlighted when the operator is on one of these.
+  const workflowExactPaths = extraItems.filter((item) => item.exact).map((item) => item.to);
   const footerLabel =
     handoff.hasOrigin && handoff.query ? "Return to active search" : "Back to legal search";
   const footerSecondary = describeLegalSearchHandoff(handoff);
@@ -82,17 +101,27 @@ export function SidebarMenu({ extraItems = [] }: SidebarMenuProps) {
       className="flex flex-col h-full min-h-[calc(100vh-80px)] pt-4 md:pt-6"
     >
       <ul className="flex-shrink-0 list-none m-0 p-0">
-        {resourceEntries.map((resource) => (
-          <li key={resource.name}>
-            <NavLink
-              to={`/${resource.name}`}
-              className={({ isActive }) => navItemClass(isActive)}
-              end={false}
-            >
-              <span>{labelForResource(resource.name, resource.options)}</span>
-            </NavLink>
-          </li>
-        ))}
+        {resourceEntries.map((resource) => {
+          const to = `/${resource.name}`;
+          // Replicate NavLink's prefix match (`end={false}`) ourselves so that
+          // `aria-current` and the active class share one source of truth.
+          // NavLink sets `aria-current` from its own internal match, which we
+          // cannot override — so it would leave two items marked current on a
+          // resource's `/create` route even after the class yields (#6).
+          const prefixActive = location.pathname === to || location.pathname.startsWith(`${to}/`);
+          const active = resourceLinkIsActive(prefixActive, location.pathname, workflowExactPaths);
+          return (
+            <li key={resource.name}>
+              <Link
+                to={to}
+                className={navItemClass(active)}
+                aria-current={active ? "page" : undefined}
+              >
+                <span>{labelForResource(resource.name, resource.options)}</span>
+              </Link>
+            </li>
+          );
+        })}
         {extraItems.length > 0 ? (
           <li className="mx-[10px] my-2">
             <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--text-meta)] px-[14px]">

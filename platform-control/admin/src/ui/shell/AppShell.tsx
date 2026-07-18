@@ -31,16 +31,15 @@ interface AppShellProps {
 
 /**
  * Workflow shortcuts rendered below the auto-registered resource links. The
- * "setup" entries jump straight to a resource's create page; the remaining
- * `kind: "preview"` entries advertise the coexisting Tailwind ports until they
- * graduate and replace the v1 MUI resources.
+ * "setup" entries jump straight to a resource's create page.
  *
- * Sources and reference data (authorities, jurisdictions) have graduated
- * (ADR-0026 / #501): their resource links and create shortcuts are canonical
- * Tailwind, so only the runs preview remains.
+ * Sources, reference data (authorities, jurisdictions), and runs have all
+ * graduated (ADR-0026 / #501 / #520): their resource links are canonical
+ * Tailwind, so no `kind: "preview"` entries remain — the runs table is now
+ * reached through the single "Runs" resource link, not a separate "Run queue"
+ * preview entry.
  */
-const DEFAULT_EXTRA_ITEMS: SidebarMenuExtraItem[] = [
-  { to: "/runs-v2", label: "Run queue", kind: "preview" },
+export const DEFAULT_EXTRA_ITEMS: SidebarMenuExtraItem[] = [
   {
     to: "/sources/create",
     label: "Source setup",

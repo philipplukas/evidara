@@ -130,7 +130,7 @@ export default function RunListV2() {
         attentionButtonRef.current?.focus();
         return;
       }
-      navigate(`/runs-v2/${encodeURIComponent(shortcut.runId)}`);
+      navigate(`/runs/${encodeURIComponent(shortcut.runId)}/show`);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -297,7 +297,7 @@ export default function RunListV2() {
               <button
                 ref={attentionButtonRef}
                 type="button"
-                onClick={() => navigate(`/runs-v2/${encodeURIComponent(attentionRun.run_id)}`)}
+                onClick={() => navigate(`/runs/${encodeURIComponent(attentionRun.run_id)}/show`)}
                 className="inline-flex items-center rounded-full border border-[var(--status-degraded)]/40 bg-[var(--status-degraded-subtle)] px-3 h-9 text-[12px] font-semibold text-[var(--status-degraded)] hover:bg-[var(--status-degraded-subtle)]/80"
               >
                 Open attention run · {attentionRun.source_name}
@@ -319,7 +319,7 @@ export default function RunListV2() {
           error={controller.error}
           sort={controller.sort}
           onSort={(field, order) => controller.setSort({ field, order })}
-          onRowClick={(r) => navigate(`/runs-v2/${encodeURIComponent(String(r.id))}`)}
+          onRowClick={(r) => navigate(`/runs/${encodeURIComponent(String(r.id))}/show`)}
           total={controller.total}
           page={controller.page}
           perPage={controller.perPage}
