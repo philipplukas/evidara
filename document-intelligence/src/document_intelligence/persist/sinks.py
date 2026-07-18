@@ -588,9 +588,7 @@ class IcebergCanonicalSink(CanonicalSink):
                 table = None
 
             arrow_table = (
-                pa.Table.from_pylist(ready, schema=schema)
-                if schema is not None
-                else pa.Table.from_pylist(ready)
+                pa.Table.from_pylist(ready, schema=schema) if schema is not None else pa.Table.from_pylist(ready)
             )
             if table is None:
                 table = catalog.create_table(identifier, schema=arrow_table.schema)
