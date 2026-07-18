@@ -111,6 +111,14 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     const body = {
       from,
       size: pageSize,
+      // Without this, OpenSearch stops counting at 10 000 and reports
+      // `hits.total = {value: 10000, relation: "gte"}`. `total` feeds
+      // `SearchResponseView.totalResults` — the hit count on screen — so the
+      // default silently under-reports every query that matches more than
+      // 10 000 documents. Under-reporting hits is a correctness problem for
+      // legal research ("is there any case on X"), not a cosmetic one (#615).
+      // The citations and projections adapters already set this.
+      track_total_hits: true,
       query: {
         bool: {
           must:

@@ -200,6 +200,7 @@ function composeTabs(
   doc: DocumentEntity,
   sectionsCount: number,
   citationsCount: number,
+  hasReferences: boolean,
   locale: SupportedLocale,
 ): { key: string; label: string; count?: number }[] {
   const tabs: { key: string; label: string; count?: number }[] = [];
@@ -214,7 +215,13 @@ function composeTabs(
   if (sectionsCount > 0) {
     tabs.push({ key: 'sections', label: t('tabs.sections', locale), count: sectionsCount });
   }
-  if (citationsCount > 0) {
+  // Same honesty rule as "Inhalt" above: only advertise the citations tab when
+  // the response actually carries the reference groups that render it.
+  // `citations_count` comes from the documents index while the citations
+  // themselves come from a separate query, so the two can disagree — a lagging
+  // or empty citations index otherwise produced a confident "Zitate (15)" tab
+  // over an empty payload (#622).
+  if (hasReferences) {
     tabs.push({
       key: 'citations',
       label: t('tabs.citations', locale),
@@ -303,6 +310,7 @@ export function mapDocumentToDetailView(
 ): DetailView {
   const sectionsCount = doc.sections_count ?? sections.length;
   const citationsCount = doc.citations_count ?? citations.length;
+  const references = composeReferences(citations, locale);
 
   return {
     id: doc.document_id,
@@ -310,9 +318,9 @@ export function mapDocumentToDetailView(
     title: doc.title,
     subtitle: composeSubtitle(doc, locale, warn),
     metadata: composeMetadata(doc, locale),
-    tabs: composeTabs(doc, sectionsCount, citationsCount, locale),
+    tabs: composeTabs(doc, sectionsCount, citationsCount, references.length > 0, locale),
     relatedGroups: [],
-    references: composeReferences(citations, locale),
+    references,
     annotations: [],
     // Optional fields — omit when absent (ADR-0011)
     ...(doc.structural_path && {

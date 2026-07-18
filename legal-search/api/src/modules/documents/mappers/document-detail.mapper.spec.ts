@@ -183,6 +183,20 @@ describe('mapDocumentToDetailView', () => {
     expect(view.tabs.map((t) => t.key)).not.toContain('content');
   });
 
+  it('should not advertise a citations tab when no references back it', () => {
+    // The index says the document has 3 citations, but the citations query
+    // returned none — a lagging or empty citations index. Advertising the tab
+    // here yields a confident "Zitate (3)" over an empty payload (#622).
+    const view = mapDocumentToDetailView(lawDoc, sections, []);
+    expect(view.references).toHaveLength(0);
+    expect(view.tabs.map((t) => t.key)).not.toContain('citations');
+  });
+
+  it('should advertise a citations tab when references back it', () => {
+    const view = mapDocumentToDetailView(lawDoc, sections, citations);
+    expect(view.tabs.map((t) => t.key)).toContain('citations');
+  });
+
   it('should compose references from citations', () => {
     const view = mapDocumentToDetailView(lawDoc, sections, citations);
     expect(view.references).toHaveLength(1);
