@@ -178,8 +178,45 @@ export type CitationTargetMatch = {
   document_type?: string;
 };
 
+/**
+ * One indexed projection row, reduced to the identity a reconcile pass needs.
+ *
+ * ADR-0005 makes the index a derived view of canonical Delta, but nothing could
+ * previously *enumerate* the derived side — so an index row whose canonical row no
+ * longer exists (an orphan from an earlier run) stayed user-visible forever. This is
+ * the index-side enumeration that makes the diff possible.
+ *
+ * The provenance fields are carried because a de-index goes through the
+ * `document.withdrawn` path, whose payload contract requires them. They are read back
+ * off the projection rather than invented: the row was written from a validated
+ * `document.processed` event, so the ids it carries are the real ones.
+ */
+export type IndexedDocumentEntry = {
+  document_id: string;
+  document_revision?: number;
+  processing_manifest_id?: string;
+  source_id?: string;
+  source_version_id?: string;
+  run_id?: string;
+  title?: string;
+};
+
+export type IndexedDocumentQuery = {
+  /** Exclusive cursor — the last `document_id` of the previous page. */
+  after?: string;
+  limit?: number;
+};
+
+export type IndexedDocumentPage = {
+  data: IndexedDocumentEntry[];
+  limit: number;
+  /** Cursor for the next page; absent when the walk is complete. */
+  next_after?: string;
+};
+
 export interface ProjectionRepository {
   hasHistoryEvent(eventId: string): Promise<boolean>;
+  listIndexedDocuments(query: IndexedDocumentQuery): Promise<IndexedDocumentPage>;
   getLatestRevision(documentId: string): Promise<number | null>;
   upsertProjection(document: SearchProjectionDocument): Promise<void>;
   deleteProjection(documentId: string): Promise<void>;

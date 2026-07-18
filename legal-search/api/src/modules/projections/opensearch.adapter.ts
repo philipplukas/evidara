@@ -7,6 +7,9 @@ import type {
   CitationProjection,
   CitationTargetEntry,
   CitationTargetMatch,
+  IndexedDocumentEntry,
+  IndexedDocumentPage,
+  IndexedDocumentQuery,
   ProjectionHistoryEntry,
   ProjectionHistoryPage,
   ProjectionHistoryQuery,
@@ -24,6 +27,9 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
   private readonly indexCitations: string;
   private readonly indexCitationTargets: string;
   private readonly indexProjectionHistory: string;
+
+  private static readonly DEFAULT_INDEXED_PAGE_SIZE = 500;
+  private static readonly MAX_INDEXED_PAGE_SIZE = 1000;
 
   constructor(
     @Inject(OPENSEARCH_CLIENT)
@@ -75,6 +81,88 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
       this.logger.warn(`Failed to read latest revision for ${documentId}`, err as Error);
       return null;
     }
+  }
+
+  /**
+   * Walk the write alias in `document_id` order so a reconcile pass can diff the
+   * derived index against canonical Delta.
+   *
+   * `search_after` rather than `from`/`size`: deep paging past `index.max_result_window`
+   * (10k by default) silently 400s, and an enumeration that stops early would report
+   * every document past the cutoff as absent from the index — the opposite of the truth.
+   *
+   * `commentary_insight` rows are excluded. Their `document_id` is an `ins_*` insight id
+   * with no `published_documents` row behind it, so a canonical diff would classify every
+   * one of them as an orphan and a reconcile pass would delete the lot. Rows written
+   * before `record_kind` existed carry no such field and are legal documents, which is
+   * why this is a `must_not` on commentary rather than a `must` on legal_document.
+   */
+  async listIndexedDocuments(query: IndexedDocumentQuery): Promise<IndexedDocumentPage> {
+    const limit = Math.min(
+      Math.max(query.limit ?? ProjectionOpenSearchAdapter.DEFAULT_INDEXED_PAGE_SIZE, 1),
+      ProjectionOpenSearchAdapter.MAX_INDEXED_PAGE_SIZE,
+    );
+
+    const body: Record<string, unknown> = {
+      size: limit,
+      sort: [{ document_id: { order: 'asc' } }],
+      _source: [
+        'document_id',
+        'document_revision',
+        'processing_manifest_id',
+        'source_id',
+        'source_version_id',
+        'run_id',
+        'title',
+      ],
+      query: {
+        bool: { must_not: [{ term: { record_kind: 'commentary_insight' } }] },
+      },
+    };
+    if (query.after) {
+      body.search_after = [query.after];
+    }
+
+    const runSearch = () => this.client.search({ index: this.indexDocumentsWrite, body });
+    let response: Awaited<ReturnType<typeof runSearch>>;
+    try {
+      response = await runSearch();
+    } catch (err) {
+      const message = String((err as { message?: string }).message ?? '');
+      // An absent index means nothing is indexed, which is a complete and honest
+      // answer. Every other failure must surface: a caller that treats a failed
+      // enumeration as "the index is empty" would conclude nothing is orphaned.
+      if (message.includes('index_not_found_exception')) {
+        return { data: [], limit };
+      }
+      throw err;
+    }
+
+    const hits = (response.body.hits?.hits ?? []) as Array<{
+      _source: Record<string, unknown>;
+    }>;
+    const data: IndexedDocumentEntry[] = [];
+    for (const hit of hits) {
+      const src = hit._source ?? {};
+      const documentId = typeof src.document_id === 'string' ? src.document_id : undefined;
+      if (!documentId) continue;
+      data.push({
+        document_id: documentId,
+        document_revision:
+          typeof src.document_revision === 'number' ? src.document_revision : undefined,
+        processing_manifest_id:
+          typeof src.processing_manifest_id === 'string' ? src.processing_manifest_id : undefined,
+        source_id: typeof src.source_id === 'string' ? src.source_id : undefined,
+        source_version_id:
+          typeof src.source_version_id === 'string' ? src.source_version_id : undefined,
+        run_id: typeof src.run_id === 'string' ? src.run_id : undefined,
+        title: typeof src.title === 'string' ? src.title : undefined,
+      });
+    }
+
+    // A short page is the last page. Only a full page can have more behind it.
+    const nextAfter = hits.length === limit ? data.at(-1)?.document_id : undefined;
+    return nextAfter ? { data, limit, next_after: nextAfter } : { data, limit };
   }
 
   async upsertProjection(document: SearchProjectionDocument): Promise<void> {

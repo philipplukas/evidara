@@ -1,4 +1,4 @@
-version: "2.9.0"
+version: "2.10.0"
 last_reviewed: "2026-07-17"
 owner: "Platform Team"
 
@@ -43,7 +43,7 @@ apis:
     # changed from object (DoclingDocument JSON, ADR-0010) to string (the
     # document body as plain text). Breaking, and on a 0.x line a breaking
     # change takes the minor.
-    version: "0.7.0"
+    version: "0.8.0"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"

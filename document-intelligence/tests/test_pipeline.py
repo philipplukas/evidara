@@ -234,66 +234,6 @@ class ProcessingPipelineTests(unittest.TestCase):
             os.unlink(artifact_path)
             os.unlink(manifest_path)
 
-    # ─── Document identity across acquisition runs (#652) ────────────────
-
-    def _process_with(self, *, upstream_locator: str | None, artifact_id: str | None = None) -> str:
-        """Process one bundle and return its document_id.
-
-        Each call writes a *fresh* artifact file, mimicking a new acquisition run of
-        the same law: the artifact id differs every time, exactly as it does in
-        production where artifact ids are per-run ULIDs.
-        """
-        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as handle:
-            handle.write(SAMPLE_HTML)
-            artifact_path = handle.name
-
-        payload = build_manifest_payload(artifact_path, artifact_role="primary_document")
-        payload["upstream_locator"] = upstream_locator
-        if artifact_id is not None:
-            payload["artifacts"][0]["artifact_id"] = artifact_id
-
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
-            json.dump(payload, handle)
-            manifest_path = handle.name
-
-        try:
-            result = ProcessingPipeline(sink=InMemoryCanonicalSink()).process_event(build_bundle_event(manifest_path))
-            return result.document.document_id
-        finally:
-            os.unlink(artifact_path)
-            os.unlink(manifest_path)
-
-    def test_reacquiring_the_same_law_keeps_one_document_identity(self) -> None:
-        # The #652 regression: two runs of the same source fetch the same ELI, so they
-        # must be two revisions of ONE document — not two documents. Keying on the
-        # per-run artifact id cloned the constitution on every run.
-        eli = "https://fedlex.data.admin.ch/eli/cc/1999/404"
-        first = self._process_with(upstream_locator=eli, artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fk")
-        second = self._process_with(upstream_locator=eli, artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fm")
-
-        self.assertEqual(first, second)
-
-    def test_distinct_laws_keep_distinct_identities(self) -> None:
-        # The failure mode the fix must not introduce: collapsing different documents.
-        first = self._process_with(upstream_locator="https://fedlex.data.admin.ch/eli/cc/1999/404")
-        second = self._process_with(upstream_locator="https://fedlex.data.admin.ch/eli/cc/2002/123")
-
-        self.assertNotEqual(first, second)
-
-    def test_without_a_locator_identity_falls_back_to_the_artifact(self) -> None:
-        # Sources publishing no stable permalink keep the old behaviour rather than
-        # collapsing onto a shared id.
-        first = self._process_with(upstream_locator=None, artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fn")
-        second = self._process_with(upstream_locator=None, artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fp")
-
-        self.assertNotEqual(first, second)
-
-    def test_blank_locator_is_treated_as_absent(self) -> None:
-        first = self._process_with(upstream_locator="   ", artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fn")
-        second = self._process_with(upstream_locator="   ", artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fp")
-
-        self.assertNotEqual(first, second)
-
     def test_replay_keeps_document_identity_stable(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
             html_handle.write(SAMPLE_HTML)

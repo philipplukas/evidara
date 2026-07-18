@@ -14,6 +14,8 @@ import {
   type CitationTargetEntry,
   type CitationTargetMatch,
   type CommentaryInsightInput,
+  type IndexedDocumentPage,
+  type IndexedDocumentQuery,
   PROJECTION_REPOSITORY,
   type ProjectionHistoryEntry,
   type ProjectionHistoryPage,
@@ -153,6 +155,14 @@ export class ProjectionsService {
     const projection = this.buildCommentaryProjection(insight);
     await this.repository.upsertProjection(projection);
     return { insightId: insight.insight_id, status: 'applied' };
+  }
+
+  /**
+   * Enumerate what is actually indexed, so an operator (or the DI reconcile job) can
+   * diff the derived index against canonical Delta. Read-only — it deletes nothing.
+   */
+  async listIndexedDocuments(query: IndexedDocumentQuery): Promise<IndexedDocumentPage> {
+    return this.repository.listIndexedDocuments(query);
   }
 
   async queryHistory(query: ProjectionHistoryQuery): Promise<ProjectionHistoryPage> {
