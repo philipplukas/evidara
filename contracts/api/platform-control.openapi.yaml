@@ -314,6 +314,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -340,6 +352,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreateSourceWithVersionResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -368,6 +392,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceBlueprintPreviewResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -434,6 +470,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlueprintTemplateEnablementResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -463,6 +505,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -492,6 +540,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceVersionListResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -526,6 +580,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceVersionResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -554,6 +620,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceVersionResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -588,6 +666,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceVersionResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -616,6 +706,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceVersionResponse'
+        '404':
+          description: A referenced entity does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -4130,6 +4232,23 @@ components:
       - created_at
       - updated_at
       title: DocumentLifecycleEventResponse
+    ErrorResponse:
+      properties:
+        detail:
+          type: string
+          title: Detail
+          description: Human-readable explanation of the failure.
+        correlation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Correlation Id
+          description: Correlation id for the request, echoed as the X-Correlation-Id header.
+      type: object
+      required:
+      - detail
+      title: ErrorResponse
+      description: Uniform error body. `correlation_id` echoes `X-Correlation-Id` when present.
     EurLexSparqlAcquisitionSpec:
       properties:
         tenant_id:
