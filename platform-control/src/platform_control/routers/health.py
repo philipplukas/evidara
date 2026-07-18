@@ -28,7 +28,19 @@ async def get_metrics() -> Response:
     return Response(content=render_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@router.get("/ready", response_model=ReadinessResponse)
+@router.get(
+    "/ready",
+    response_model=ReadinessResponse,
+    responses={
+        503: {
+            "model": ReadinessResponse,
+            "description": (
+                "At least one dependency check failed. The body is the same readiness "
+                "report as the 200, with `status: degraded`."
+            ),
+        }
+    },
+)
 async def get_readiness() -> JSONResponse:
     settings = get_settings()
     session_maker = get_session_maker()

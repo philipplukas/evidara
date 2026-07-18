@@ -53,6 +53,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: 'At least one dependency check failed. The body is the same readiness report as
+            the 200, with `status: degraded`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
   /stats:
     get:
       tags:
@@ -2850,6 +2857,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WebhookAcceptedResponse'
+        '401':
+          description: Webhook signature missing or could not be verified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: The delivery was stored unprocessed and must be redelivered — never a 2xx, or the
+            identical retry would be deduped away (#558).
+          headers:
+            Retry-After:
+              description: Seconds to wait before redelivering.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Validation Error
           content:
@@ -2876,6 +2901,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventAcceptedResponse'
+        '400':
+          description: The body could not be decoded as a bare event or a Pub/Sub push envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: The event payload failed schema validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
       security:
       - APIKeyHeader: []
   /v1/di/events/document-processed:
@@ -2898,6 +2935,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventAcceptedResponse'
+        '400':
+          description: The body could not be decoded as a bare event or a Pub/Sub push envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: The event payload failed schema validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
       security:
       - APIKeyHeader: []
   /v1/di/events/document-withdrawn:
@@ -2920,6 +2969,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventAcceptedResponse'
+        '400':
+          description: The body could not be decoded as a bare event or a Pub/Sub push envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: The event payload failed schema validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
       security:
       - APIKeyHeader: []
   /webhooks/slack/interactions:
@@ -2942,6 +3003,13 @@ paths:
                 additionalProperties: true
                 type: object
                 title: Response Slackinteraction
+        '400':
+          description: A domain rule rejected the request (misconfigured provider, orchestration failure,
+            or a blueprint template that is not enabled for live acquisition).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     AttachCompliancePolicyRequest:

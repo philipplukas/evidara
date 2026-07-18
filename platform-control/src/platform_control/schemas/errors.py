@@ -52,3 +52,21 @@ def error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
         code: {"model": ErrorResponse, "description": ERROR_DESCRIPTIONS[code]}
         for code in status_codes
     }
+
+
+#: 422 for routes that validate a *raw* body themselves rather than through a
+#: typed request model, so FastAPI never documents one for them: the three
+#: `/v1/di/events/*` receivers read `Request` (the body may be a Pub/Sub push
+#: envelope) and re-raise the pydantic failure as `HTTPException(422, detail=
+#: error.errors())`. That body is a list of validation errors, not this module's
+#: `{detail: str}` — it is the same shape FastAPI's own validation handler sends,
+#: so this points at the component FastAPI already emits instead of adding a
+#: near-duplicate schema for it.
+VALIDATION_ERROR_RESPONSE: dict[int | str, dict[str, Any]] = {
+    422: {
+        "description": "The event payload failed schema validation.",
+        "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}
+        },
+    }
+}

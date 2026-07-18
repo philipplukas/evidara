@@ -141,3 +141,147 @@ def test_no_list_response_documents_half_an_envelope(schema: dict) -> None:
             "Either the endpoint paginates and must expose the whole envelope, or it "
             "does not and must expose none of it."
         )
+
+
+#: The 4xx/5xx each operation can actually produce, keyed by operationId.
+#:
+#: `main.py` maps the domain errors to status codes centrally (NotFoundError ->
+#: 404, ConflictError/InvalidStateTransitionError -> 409,
+#: SignatureVerificationError -> 401, WebhookRetryableError -> 503, every other
+#: PlatformControlError -> 400), but the *routes* have to declare them: the
+#: contract is an export of this app, and an export cannot invent a response the
+#: route never declared. That is #627 — ~45 operations silently stopped
+#: documenting errors the hand-written spec used to list.
+#:
+#: Absence is a claim too. An operation missing here claims it cannot fail with a
+#: domain error: `GET /v1/sources` cannot 404, `GET /v1/runs/readiness` reports an
+#: unknown source as a failed *check* rather than a 404, and `POST /v1/schedules`
+#: validates no foreign key. Adding a code that cannot happen is the same class of
+#: lie as omitting one that can — see #618.
+#:
+#: 422 is excluded: FastAPI documents it from the request models.
+EXPECTED_ERROR_RESPONSES = {
+    "approveSourceVersion": {"404", "409"},
+    "approveWizardRun": {"400", "404", "409"},
+    "archiveCorpus": {"404"},
+    "attachCompliancePolicy": {"404"},
+    "cancelRun": {"404", "409"},
+    "createAuthority": {"404"},
+    "createCorpus": {"409"},
+    "createCorrection": {"404"},
+    "createReviewTask": {"404", "409"},
+    "createRun": {"400", "404", "409"},
+    "createSource": {"404", "409"},
+    "createSourceVersion": {"404", "409"},
+    "createSourceWithInitialVersion": {"404", "409"},
+    "detachCompliancePolicy": {"404"},
+    "deleteSchedule": {"404"},
+    "getCommentaryInsight": {"404"},
+    "getCommentaryInsightHistory": {"404"},
+    "getCompliancePolicy": {"404"},
+    "getCorpus": {"404"},
+    "getCorrection": {"404"},
+    "getReadiness": {"503"},
+    "getReviewTask": {"404"},
+    "getRun": {"404"},
+    "getRunLifecycle": {"404"},
+    "getRunPipelineHealth": {"404"},
+    "getRunPreviewSummary": {"404"},
+    "getSchedule": {"404"},
+    "getSource": {"404"},
+    "getWizardProject": {"404"},
+    "getWizardRun": {"404"},
+    "listRunCapturedResources": {"404"},
+    "listRunDocumentLifecycle": {"404"},
+    "listRunProcessingStatus": {"404"},
+    "listRunProviderJobs": {"404"},
+    "listRunRawArtifacts": {"404"},
+    "listSourceVersions": {"404"},
+    "previewSourceBlueprint": {"404", "409"},
+    "receiveDocumentProcessed": {"400"},
+    "receiveDocumentProcessingStatusUpdated": {"400"},
+    "receiveDocumentWithdrawn": {"400"},
+    "receiveFirecrawlWebhook": {"401", "503"},
+    "recordReviewDecision": {"404", "409"},
+    "rejectSourceVersion": {"404", "409"},
+    "rejectWizardRun": {"400", "404", "409"},
+    "retryRun": {"400", "404", "409"},
+    "saveWizardDiscoveryPlan": {"404", "409"},
+    "saveWizardScope": {"404", "409"},
+    "setBlueprintTemplateEnablement": {"404"},
+    "slackInteraction": {"400"},
+    "startWizardPilotRun": {"400", "404", "409"},
+    "triggerRescoreFromCorrection": {"404", "409"},
+    "updateAuthority": {"404"},
+    "updateCompliancePolicy": {"404", "409"},
+    "updateCorpus": {"404", "409"},
+    "updateCorrectionStatus": {"404", "409"},
+    "updateJurisdiction": {"404"},
+    "updateSchedule": {"404"},
+    "updateSourceVersion": {"404", "409"},
+}
+
+#: `GET /ready` answers 503 with the readiness *report* (`status: degraded`), not
+#: an error body — it is a health verdict, not a raised exception.
+NON_ERROR_BODY_RESPONSES = {("getReadiness", "503")}
+
+_DOMAIN_ERROR_CODES = {"400", "401", "403", "404", "409", "500", "503"}
+
+
+def _declared_error_codes(schema: dict) -> dict[str, set[str]]:
+    return {
+        operation["operationId"]: {
+            code for code in operation["responses"] if code in _DOMAIN_ERROR_CODES
+        }
+        for operations in schema["paths"].values()
+        for operation in operations.values()
+    }
+
+
+def test_routes_declare_the_errors_their_handlers_return(schema: dict) -> None:
+    """#627: the app must declare what `main.py`'s exception handlers really send."""
+    declared = {op: codes for op, codes in _declared_error_codes(schema).items() if codes}
+    assert declared == EXPECTED_ERROR_RESPONSES
+
+
+def test_error_responses_use_the_shared_error_body(schema: dict) -> None:
+    """Every declared error is `{detail, correlation_id?}` — what `_error_payload` sends."""
+    offenders = []
+    checked = 0
+    for operations in schema["paths"].values():
+        for operation in operations.values():
+            operation_id = operation["operationId"]
+            for code, response in operation["responses"].items():
+                if code not in _DOMAIN_ERROR_CODES:
+                    continue
+                if (operation_id, code) in NON_ERROR_BODY_RESPONSES:
+                    continue
+                checked += 1
+                ref = response["content"]["application/json"]["schema"].get("$ref")
+                if ref != "#/components/schemas/ErrorResponse":
+                    offenders.append(f"{operation_id} {code}: {ref}")
+    assert checked, "No error responses were checked — this assertion would pass vacuously."
+    assert not offenders, (
+        "Error responses must reference ErrorResponse (platform_control.schemas.errors), "
+        "which is the body platform_control.main._error_payload builds:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_di_event_validation_errors_reference_an_existing_component(schema: dict) -> None:
+    """The three `/v1/di/events/*` receivers point their 422 at FastAPI's own component.
+
+    They validate a raw body themselves (the payload may be a Pub/Sub push
+    envelope), so FastAPI documents no 422 for them and
+    `VALIDATION_ERROR_RESPONSE` supplies one by `$ref`. If nothing else in the
+    app emits `HTTPValidationError`, that ref dangles.
+    """
+    assert "HTTPValidationError" in schema["components"]["schemas"]
+    for path in (
+        "/v1/di/events/document-processing-status-updated",
+        "/v1/di/events/document-processed",
+        "/v1/di/events/document-withdrawn",
+    ):
+        response = schema["paths"][path]["post"]["responses"]["422"]
+        ref = response["content"]["application/json"]["schema"]["$ref"]
+        assert ref == "#/components/schemas/HTTPValidationError"

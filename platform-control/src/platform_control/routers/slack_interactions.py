@@ -14,11 +14,15 @@ from urllib.parse import parse_qs
 from fastapi import APIRouter, HTTPException, Request
 
 from platform_control.config import get_settings
+from platform_control.schemas.errors import ERROR_DESCRIPTIONS, ErrorResponse
 
 router = APIRouter(tags=["slack"])
 
 
-@router.post("/webhooks/slack/interactions")
+@router.post(
+    "/webhooks/slack/interactions",
+    responses={400: {"model": ErrorResponse, "description": ERROR_DESCRIPTIONS[400]}},
+)
 async def slack_interaction(request: Request) -> dict[str, Any]:
     """Handle Slack interactive message payloads.
 
