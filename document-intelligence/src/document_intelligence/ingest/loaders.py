@@ -334,12 +334,39 @@ def _verify_checksum(payload: bytes, storage_ref, object_kind: str) -> None:
 
 def _decode_text(payload: bytes, source_uri: str) -> str:
     try:
-        return payload.decode("utf-8")
+        text = payload.decode("utf-8")
     except UnicodeDecodeError as error:
         raise BundleLoadError(
             "invalid_text_encoding",
             f"artifact at {source_uri} was not valid UTF-8 text",
         ) from error
+    return _unwrap_acquisition_envelope(text)
+
+
+def _unwrap_acquisition_envelope(text: str) -> str:
+    """Return the document body from an acquisition envelope, else the text unchanged.
+
+    `acquisition_core.normalization` stores each captured resource as a JSON
+    envelope (`{"inline_body": ..., "source_url": ..., ...}`) while the manifest
+    keeps declaring the *resource's* content type (e.g. `text/html`). Handing that
+    envelope to the HTML normalizer parses the JSON-escaped body as markup: the
+    tags survive (they are ASCII) but every non-ASCII character stays as a literal
+    `\\uXXXX` sequence, so `März` reaches search as `M\\u00e4rz` (#643).
+
+    Unwrapping here keeps every loader backend agreeing on what "artifact text"
+    means, and works on already-stored artifacts without re-acquisition.
+    """
+    if not text.lstrip().startswith("{"):
+        return text
+    try:
+        envelope = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    if isinstance(envelope, dict):
+        body = envelope.get("inline_body")
+        if isinstance(body, str):
+            return body
+    return text
 
 
 def _resolve_local_path(uri_or_path: str) -> str:
