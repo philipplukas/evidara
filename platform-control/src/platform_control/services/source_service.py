@@ -263,18 +263,29 @@ class SourceService:
             or "overlay_id" in request.model_fields_set
             or "provider_template_id" in request.model_fields_set
         ):
+            # A partial update must not reconstruct provenance from the request
+            # alone: fields the client left unset still hold on the row (#619).
+            overlay_id = (
+                request.overlay_id
+                if "overlay_id" in request.model_fields_set
+                else version.overlay_id
+            )
+            provider_template_id = (
+                request.provider_template_id
+                if "provider_template_id" in request.model_fields_set
+                else version.provider_template_id
+            )
             acquisition_spec = self._resolve_acquisition_spec(
                 acquisition_spec=request.acquisition_spec,
-                overlay_id=request.overlay_id,
-                provider_template_id=request.provider_template_id,
+                overlay_id=overlay_id,
+                provider_template_id=provider_template_id,
             )
-            version.acquisition_spec = acquisition_spec.model_dump(mode="json")
-            # Provenance follows the spec: re-pointing a version at a blueprint
-            # records the template; replacing it with a hand-written spec clears it.
-            provenance = self._blueprint_provenance(
-                acquisition_spec=request.acquisition_spec,
-                overlay_id=request.overlay_id,
-                provider_template_id=request.provider_template_id,
+            spec_payload = acquisition_spec.model_dump(mode="json")
+            version.acquisition_spec = spec_payload
+            provenance = self._blueprint_provenance_for_spec(
+                spec_payload=spec_payload,
+                overlay_id=overlay_id,
+                provider_template_id=provider_template_id,
             )
             version.overlay_id = provenance["overlay_id"]
             version.provider_template_id = provenance["provider_template_id"]
@@ -386,6 +397,40 @@ class SourceService:
         if acquisition_spec is None and overlay_id and provider_template_id:
             return {"overlay_id": overlay_id, "provider_template_id": provider_template_id}
         return {"overlay_id": None, "provider_template_id": None}
+
+    @staticmethod
+    def _blueprint_provenance_for_spec(
+        *,
+        spec_payload: dict[str, object],
+        overlay_id: str | None,
+        provider_template_id: str | None,
+    ) -> dict[str, str | None]:
+        """Provenance for an *edited* version, judged by the spec itself (#619).
+
+        `_blueprint_provenance` keys off "was an explicit spec supplied?", which
+        is the right question at creation time but the wrong one on update: the
+        admin editor cannot express "I did not touch the spec" and sends a full
+        one on every save, so an unrelated label edit looked like a hand-written
+        replacement and silently dropped the template id.
+
+        Here the rule is stated directly instead: provenance survives exactly
+        while the persisted spec still *is* the blueprint's output. Editing the
+        spec away from the template still clears it, so the run-launch path can
+        never gate a hand-written spec on a template it no longer follows.
+        """
+        if not (overlay_id and provider_template_id):
+            return {"overlay_id": None, "provider_template_id": None}
+        try:
+            blueprint = resolve_source_blueprint(
+                overlay_id=overlay_id,
+                provider_template_id=provider_template_id,
+            )
+            expected = parse_acquisition_spec(blueprint).model_dump(mode="json")
+        except Exception:
+            return {"overlay_id": None, "provider_template_id": None}
+        if expected != spec_payload:
+            return {"overlay_id": None, "provider_template_id": None}
+        return {"overlay_id": overlay_id, "provider_template_id": provider_template_id}
 
     @staticmethod
     def _resolve_acquisition_spec(

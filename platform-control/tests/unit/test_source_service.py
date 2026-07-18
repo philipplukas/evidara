@@ -717,3 +717,103 @@ async def test_update_source_version_can_toggle_execution_mode(session) -> None:
     )
 
     assert updated.execution_mode is ExecutionMode.OFF
+
+
+@pytest.mark.asyncio
+async def test_update_source_version_keeps_provenance_when_spec_round_trips(session) -> None:
+    """#619: a label edit that re-sends the blueprint's own spec keeps provenance.
+
+    The admin editor cannot express "I did not touch the spec" — it sends a full
+    spec on every save. Provenance must survive while the spec still *is* the
+    blueprint's output.
+    """
+    session.add(Jurisdiction(jurisdiction_id="jur_at", name="Austria", slug="at"))
+    session.add(
+        Authority(
+            authority_id="auth_at_ris",
+            jurisdiction_id="jur_at",
+            name="RIS",
+            slug="ris",
+        )
+    )
+    await session.commit()
+
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="AT RIS decisions",
+            jurisdiction_id="jur_at",
+            authority_id="auth_at_ris",
+        )
+    )
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="at-template-v1",
+            overlay_id="at",
+            provider_template_id="ris_ogd_bundesrecht",
+        ),
+    )
+    assert version.overlay_id == "at"
+    assert version.provider_template_id == "ris_ogd_bundesrecht"
+
+    round_tripped = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="at",
+            provider_template_id="ris_ogd_bundesrecht",
+        )
+    )
+    updated = await service.update_source_version(
+        version.source_version_id,
+        UpdateSourceVersionRequest(
+            version_label="at-template-v2",
+            acquisition_spec=round_tripped,
+        ),
+    )
+
+    assert updated.version_label == "at-template-v2"
+    assert updated.overlay_id == "at"
+    assert updated.provider_template_id == "ris_ogd_bundesrecht"
+
+
+@pytest.mark.asyncio
+async def test_update_source_version_clears_provenance_when_spec_edited(session) -> None:
+    """#619 counterpart: a genuinely hand-written spec still drops provenance."""
+    session.add(Jurisdiction(jurisdiction_id="jur_at", name="Austria", slug="at"))
+    session.add(
+        Authority(
+            authority_id="auth_at_ris",
+            jurisdiction_id="jur_at",
+            name="RIS",
+            slug="ris",
+        )
+    )
+    await session.commit()
+
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="AT RIS decisions",
+            jurisdiction_id="jur_at",
+            authority_id="auth_at_ris",
+        )
+    )
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="at-template-v1",
+            overlay_id="at",
+            provider_template_id="ris_ogd_bundesrecht",
+        ),
+    )
+
+    updated = await service.update_source_version(
+        version.source_version_id,
+        UpdateSourceVersionRequest(
+            acquisition_spec=FirecrawlAcquisitionSpec(seed_url="https://example.com/at"),
+        ),
+    )
+
+    assert updated.acquisition_spec["provider"] == "firecrawl"
+    assert updated.overlay_id is None
+    assert updated.provider_template_id is None
