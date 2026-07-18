@@ -21,7 +21,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Identifier, useGetList, useRecordContext } from "react-admin";
 import { publicConfig } from "../../config/publicConfig";
 import type {
@@ -73,6 +73,14 @@ type RunTableSectionProps<TRecord extends { id: Identifier }> = {
   emptyMessage: string;
   columns: SectionColumn<TRecord>[];
   defaultExpanded?: boolean;
+  /**
+   * When both `expanded` and `onExpandedChange` are supplied the accordion is
+   * controlled — this lets the jump links reveal a collapsed section before
+   * scrolling to it. Sections without a jump target stay uncontrolled and use
+   * `defaultExpanded`.
+   */
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 };
 
 const formatDateTime = (value: string | null | undefined): string =>
@@ -426,7 +434,7 @@ function PreviewSummarySection({ run }: { run: RunRecord }) {
   );
 }
 
-function RunSectionNav() {
+function RunSectionNav({ onJump }: { onJump: (href: string) => void }) {
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack spacing={1.5}>
@@ -437,18 +445,21 @@ function RunSectionNav() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-          <Button component="a" href="#provider-jobs-section" variant="outlined" size="small">
+          <Button onClick={() => onJump("#provider-jobs-section")} variant="outlined" size="small">
             Provider jobs
           </Button>
           <Button
-            component="a"
-            href="#di-processing-status-section"
+            onClick={() => onJump("#di-processing-status-section")}
             variant="outlined"
             size="small"
           >
             DI processing
           </Button>
-          <Button component="a" href="#document-lifecycle-section" variant="outlined" size="small">
+          <Button
+            onClick={() => onJump("#document-lifecycle-section")}
+            variant="outlined"
+            size="small"
+          >
             Document lifecycle
           </Button>
         </Stack>
@@ -490,7 +501,41 @@ export function stageActionTarget(
   return { label: "Open evidence runbook", href: options.evidenceRunbookPath };
 }
 
-function PipelineHealthSection({ run }: { run: RunRecord }) {
+/**
+ * `sectionIdFromAnchor` — strip the leading `#` from an in-page anchor href so
+ * it can be resolved with `document.getElementById`. Callers pass the raw
+ * `stageActionTarget` href (e.g. `#di-processing-status-section`).
+ */
+export function sectionIdFromAnchor(href: string): string {
+  return href.startsWith("#") ? href.slice(1) : href;
+}
+
+/**
+ * `scrollToInPageSection` — smooth-scroll to the element behind an in-page
+ * anchor **without** letting the click reach react-admin's HashRouter.
+ *
+ * These detail pages render under a `HashRouter`, so a plain `<a href="#foo">`
+ * click mutates `location.hash` to `#foo`, which the router parses as a route
+ * change and bounces the operator to the "Not Found" page (issue: jump links
+ * left the run detail entirely). Resolving the target element and calling
+ * `scrollIntoView` ourselves keeps navigation entirely client-side and never
+ * touches the hash. No-ops safely if the element is not in the DOM.
+ */
+export function scrollToInPageSection(href: string): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const target = document.getElementById(sectionIdFromAnchor(href));
+  target?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function PipelineHealthSection({
+  run,
+  onJump,
+}: {
+  run: RunRecord;
+  onJump: (href: string) => void;
+}) {
   const [health, setHealth] = useState<RunPipelineHealth | null>(null);
   const [isPending, setIsPending] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -780,6 +825,20 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                 });
                 const isInPageAnchor = actionTarget.href.startsWith("#");
                 const isHealthy = stage.status === "ok";
+                const emitRemediationClick = () => {
+                  if (!firstRemediationEventEmittedRef.current) {
+                    emitOperatorJourneyEvent("remediation_action_clicked", {
+                      run_id: run.run_id,
+                      source_id: run.source_id,
+                      source_version_id: run.source_version_id,
+                      mode: run.mode,
+                      stage: stage.stage,
+                      action_label: actionTarget.label,
+                      action_href: actionTarget.href,
+                    });
+                    firstRemediationEventEmittedRef.current = true;
+                  }
+                };
                 return (
                   <Paper
                     key={stage.stage}
@@ -851,30 +910,34 @@ function PipelineHealthSection({ run }: { run: RunRecord }) {
                                 The button on the right opens the most relevant remediation surface.
                               </Typography>
                             </Box>
-                            <Button
-                              component="a"
-                              href={actionTarget.href}
-                              target={isInPageAnchor ? undefined : "_blank"}
-                              rel={isInPageAnchor ? undefined : "noreferrer"}
-                              size="small"
-                              variant="contained"
-                              onClick={() => {
-                                if (!firstRemediationEventEmittedRef.current) {
-                                  emitOperatorJourneyEvent("remediation_action_clicked", {
-                                    run_id: run.run_id,
-                                    source_id: run.source_id,
-                                    source_version_id: run.source_version_id,
-                                    mode: run.mode,
-                                    stage: stage.stage,
-                                    action_label: actionTarget.label,
-                                    action_href: actionTarget.href,
-                                  });
-                                  firstRemediationEventEmittedRef.current = true;
-                                }
-                              }}
-                            >
-                              {actionTarget.label}
-                            </Button>
+                            {isInPageAnchor ? (
+                              // In-page jumps must NOT be `<a href="#...">`:
+                              // under the HashRouter that rewrites the route
+                              // and drops the operator on the Not Found page.
+                              // Scroll (and reveal) the target section instead.
+                              <Button
+                                size="small"
+                                variant="contained"
+                                onClick={() => {
+                                  emitRemediationClick();
+                                  onJump(actionTarget.href);
+                                }}
+                              >
+                                {actionTarget.label}
+                              </Button>
+                            ) : (
+                              <Button
+                                component="a"
+                                href={actionTarget.href}
+                                target="_blank"
+                                rel="noreferrer"
+                                size="small"
+                                variant="contained"
+                                onClick={emitRemediationClick}
+                              >
+                                {actionTarget.label}
+                              </Button>
+                            )}
                           </Stack>
                         </Paper>
                       )}
@@ -942,16 +1005,23 @@ function RunTableSection<TRecord extends { id: Identifier }>({
   emptyMessage,
   columns,
   defaultExpanded = false,
+  expanded,
+  onExpandedChange,
 }: RunTableSectionProps<TRecord>) {
   const rowCount = rows?.length ?? 0;
   const summaryChip = !isPending && !error && (
     <Chip label={`${rowCount} ${rowCount === 1 ? "row" : "rows"}`} size="small" sx={{ ml: 1 }} />
   );
 
+  const controlProps =
+    expanded !== undefined && onExpandedChange !== undefined
+      ? { expanded, onChange: (_event: unknown, isOpen: boolean) => onExpandedChange(isOpen) }
+      : { defaultExpanded };
+
   return (
     <Accordion
       id={sectionId}
-      defaultExpanded={defaultExpanded}
+      {...controlProps}
       disableGutters
       sx={{ "&::before": { display: "none" } }}
     >
@@ -1060,18 +1130,35 @@ export function RunDetailSections() {
     { enabled: Boolean(run?.run_id) },
   );
 
+  // Tracks which jump-target accordions the operator has revealed. The jump
+  // links open the section here (so a collapsed target is visible) and then
+  // scroll to it — see `scrollToInPageSection` for why we never use the hash.
+  const [revealedSections, setRevealedSections] = useState<Record<string, boolean>>({});
+
+  const handleJump = useCallback((href: string) => {
+    setRevealedSections((prev) => ({ ...prev, [sectionIdFromAnchor(href)]: true }));
+    scrollToInPageSection(href);
+  }, []);
+
+  const sectionControls = (sectionId: string) => ({
+    expanded: revealedSections[sectionId] ?? false,
+    onExpandedChange: (isOpen: boolean) =>
+      setRevealedSections((prev) => ({ ...prev, [sectionId]: isOpen })),
+  });
+
   if (!run) {
     return null;
   }
 
   return (
     <Stack spacing={3} sx={{ pt: 2 }}>
-      <RunSectionNav />
-      <PipelineHealthSection run={run} />
+      <RunSectionNav onJump={handleJump} />
+      <PipelineHealthSection run={run} onJump={handleJump} />
       <PreviewSummarySection run={run} />
 
       <RunTableSection
         sectionId="provider-jobs-section"
+        {...sectionControls("provider-jobs-section")}
         title="Provider Jobs"
         description="Provider-level crawl job state and webhook progression for this run."
         rows={providerJobs.data}
@@ -1157,6 +1244,7 @@ export function RunDetailSections() {
 
       <RunTableSection
         sectionId="di-processing-status-section"
+        {...sectionControls("di-processing-status-section")}
         title="DI Processing Status"
         description="Document-intelligence processing updates correlated to this run."
         rows={processingStatus.data}
@@ -1188,6 +1276,7 @@ export function RunDetailSections() {
 
       <RunTableSection
         sectionId="document-lifecycle-section"
+        {...sectionControls("document-lifecycle-section")}
         title="Document Lifecycle"
         description="Published or withdrawn document lifecycle events emitted by document-intelligence."
         rows={documentLifecycle.data}

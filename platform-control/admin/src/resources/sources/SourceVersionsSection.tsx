@@ -653,7 +653,7 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
 
         {rows.length > 0 ? (
           <div className="overflow-x-auto rounded-[12px] border border-[var(--border)]">
-            <table className="w-full border-collapse text-sm text-[var(--foreground)]">
+            <table className="min-w-full border-collapse text-sm text-[var(--foreground)]">
               <thead>
                 <tr className="bg-[var(--surface-input)] text-left">
                   {[
