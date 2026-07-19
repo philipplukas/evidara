@@ -16,7 +16,8 @@
     "metadata": {
       "sourceURL": "https://www.fedlex.admin.ch/eli/cc/24/233_245_233/de",
       "statusCode": 200,
-      "title": "Schweizerisches Zivilgesetzbuch"
+      "title": "Schweizerisches Zivilgesetzbuch",
+      "inline_body_omitted": true
     }
   }
 }

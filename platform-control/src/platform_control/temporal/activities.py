@@ -195,14 +195,20 @@ async def _dispatch_provider_run(
     await session.refresh(run)
 
     # Publish artifact-bundle events outside the DB transaction.
-    try:
-        await run_service._publish_pending_dispatch_events([pending_publications])
-    except Exception:
-        logger.warning(
-            "Post-dispatch event publishing failed for run %s (non-fatal)",
+    #
+    # A publish failure is NOT non-fatal, and treating it as such is how this path
+    # reported the #707 lie too: nothing reaches document-intelligence, yet the
+    # activity returned `run.status` == completed with zero fatal errors.
+    # `_publish_pending_dispatch_events` now rewrites the run to FAILED with a
+    # reason before returning, so re-reading the run below reports the truth.
+    publish_failures = await run_service._publish_pending_dispatch_events([pending_publications])
+    if publish_failures:
+        logger.error(
+            "Post-dispatch event publishing failed for run %s; run recorded as failed: %s",
             run.run_id,
-            exc_info=True,
+            "; ".join(publish_failures),
         )
+        await session.refresh(run)
 
     return {
         "status": run.status.value,
