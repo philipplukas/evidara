@@ -51,17 +51,13 @@ jobs:
           echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
           echo "head_ref=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
 
-      - name: Run contract guard unit tests
-        run: |
-          python -m unittest discover -s scripts/tests -p "test_check_contract_version_bump.py"
-          python -m unittest discover -s scripts/tests -p "test_check_contract_manifest.py"
-          python -m unittest discover -s scripts/tests -p "test_check_platform_contract_vendor.py"
-          python -m unittest discover -s scripts/tests -p "test_check_country_overlay.py"
-          python -m unittest discover -s scripts/tests -p "test_check_country_overlay_at.py"
-          python -m unittest discover -s scripts/tests -p "test_check_country_overlay_files.py"
-          python -m unittest discover -s scripts/tests -p "test_analyze_github_actions_queue.py"
-          python -m unittest discover -s scripts/tests -p "test_generate_brand_assets.py"
-          python -m unittest discover -s scripts/tests -p "test_check_compose_profiles.py"
+      - name: Run guard unit tests
+        # Discover the WHOLE directory rather than enumerating one -p pattern per
+        # file. The enumerated form silently orphaned test_check_connector_worker_runtime.py
+        # and test_lawyer_journey_kpis.py: committed, linted, maintained, executed
+        # nowhere. Prefer running the directory and arguing for exclusions over
+        # enumerating inclusions (#688, #686).
+        run: python -m unittest discover -s scripts/tests -p "test_*.py"
 
       - name: Check Docker Compose profiles resolve
         run: python scripts/check_compose_profiles.py

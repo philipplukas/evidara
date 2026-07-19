@@ -15,13 +15,28 @@
 
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# `JS_HYGIENE_REPO_ROOT` exists so the guard's own self-test
+# (scripts/tests/test_check_js_workspace_hygiene.py) can point it at a fixture
+# tree and assert BOTH directions. Unset in every real invocation.
+repo_root="${JS_HYGIENE_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$repo_root"
 
 fail=0
 err() {
   echo "FAIL: $*" >&2
   fail=1
+}
+
+# Paths matching a pattern, EXCLUDING anything under node_modules. Prints one
+# path per line; prints nothing when there is no match.
+#
+# Callers must test the OUTPUT for emptiness, never a pipeline's exit status.
+# The obvious-looking `grep -rl … | grep -qv node_modules` is INVERTED: on empty
+# input `grep -qv` returns 0 under some implementations (ugrep among them) and 1
+# under GNU grep, so the guard fires precisely when the violation is ABSENT.
+# That mis-fired for real — it reported a Dockerfile that does not exist.
+matches_outside_node_modules() {
+  grep -rl "$@" . 2>/dev/null | grep -v '/node_modules/' || true
 }
 
 # 1. The root `node_modules` must never be a symlink into a surface.
@@ -40,15 +55,18 @@ if [ -L node_modules ]; then
 fi
 
 # 2. No package may re-introduce a postinstall that links the root.
-if grep -rn '"postinstall".*ensure-monorepo-shared-modules' \
-  --include=package.json . 2>/dev/null | grep -qv node_modules; then
-  err "a package.json re-introduced the 'ensure-monorepo-shared-modules' postinstall."
+offenders="$(matches_outside_node_modules '"postinstall".*ensure-monorepo-shared-modules' --include=package.json)"
+if [ -n "$offenders" ]; then
+  err "a package.json re-introduced the 'ensure-monorepo-shared-modules' postinstall:
+$offenders"
 fi
 
 # 2b. No Dockerfile may still COPY the deleted symlink script (the image build
 #     fails on a missing COPY source, which the unit gates never exercise).
-if grep -rln 'ensure-monorepo-shared-modules' --include='Dockerfile*' . 2>/dev/null | grep -qv node_modules; then
-  err "a Dockerfile still COPYs scripts/ensure-monorepo-shared-modules.mjs, which no longer exists."
+offenders="$(matches_outside_node_modules 'ensure-monorepo-shared-modules' --include='Dockerfile*')"
+if [ -n "$offenders" ]; then
+  err "a Dockerfile still COPYs scripts/ensure-monorepo-shared-modules.mjs, which no longer exists:
+$offenders"
 fi
 
 # 3. `legal-search/` must not carry a package.json.
