@@ -69,9 +69,19 @@ and the readiness pre-flight both consult it, so dispatch and pre-flight never d
   precondition for the #628 metric to trend down.
 - The generated contract (ADR-0034) gains the enablement route and the lock fields; the
   drift gate keeps them honest.
+- A *refused* dispatch is recorded as a terminal FAILED run carrying a `refused` marker,
+  and that marker is readable back: `refused` on the run detail and list responses, and
+  `GET /v1/runs?refused=true` to audit refusals without them polluting failure triage
+  (#634, item 4). Attribution is deliberately **key-shaped, not person-shaped** — `auth.py`
+  resolves every human sharing an operator key to the same `Operator` row, so a refusal
+  records *what* was attempted and *why* it was blocked, and does not claim to record who.
+- `blueprint-preview` also returns `plan_notes` — the provider's own `plan()` output
+  (seed URLs, config errors, provider-specific caveats), which until then was reachable
+  only from the `plan` CLI (#634, item 3).
 - **Not yet addressed (follow-ups):** `supported_portals` is still a provider `ClassVar`,
-  so a second commune on an existing provider is still a code change (#632, second half);
-  and a *refused* dispatch still leaves no evidence artifact (#634, item 4). Both are
-  tracked and deliberately out of this ADR's scope, which is the config key's home.
+  so a second commune on an existing provider is still a code change (#632, second half).
+  A refusal also produces no *raw artifact* — correctly, since nothing was fetched; the
+  run row is the evidence. Tracked and deliberately out of this ADR's scope, which is the
+  config key's home.
 - SHADOW execution mode remains the operator's rehearsal path and is unaffected: it is
   routed to the cassette provider and never reaches the portal the lock protects.

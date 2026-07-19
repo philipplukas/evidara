@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from acquisition_core.normalization import ArtifactPipeline
@@ -197,6 +197,7 @@ class RunService:
         mode: RunMode | None = None,
         status: RunStatus | None = None,
         source_id: str | None = None,
+        refused: bool | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> tuple[list[RunListItemResponse], int]:
@@ -212,6 +213,7 @@ class RunService:
                 Run.artifacts_count,
                 Run.captured_resources_count,
                 Run.failure_reason,
+                Run.run_metadata.label("run_metadata"),
                 Run.created_at,
                 Run.updated_at,
                 Source.name.label("source_name"),
@@ -227,6 +229,15 @@ class RunService:
             base_query = base_query.where(Run.status == status)
         if source_id is not None:
             base_query = base_query.where(Run.source_id == source_id)
+        if refused is not None:
+            # The marker is only written on refusals, so "not refused" must also
+            # match rows where the key is absent (every run predating #634).
+            is_refused = Run.run_metadata["refused"].as_boolean()
+            base_query = base_query.where(
+                is_refused.is_(True)
+                if refused
+                else or_(is_refused.is_(None), is_refused.is_(False))
+            )
 
         count_result = await self.session.execute(
             select(func.count()).select_from(base_query.subquery())
@@ -234,7 +245,15 @@ class RunService:
         total = count_result.scalar() or 0
 
         rows = await self.session.execute(base_query.limit(limit).offset(offset))
-        data = [RunListItemResponse.model_validate(dict(row._mapping)) for row in rows]
+        data = [
+            RunListItemResponse.model_validate(
+                {
+                    **{k: v for k, v in row._mapping.items() if k != "run_metadata"},
+                    "refused": (row._mapping["run_metadata"] or {}).get("refused") is True,
+                }
+            )
+            for row in rows
+        ]
         return data, total
 
     async def create_run(self, request: CreateRunRequest) -> Run:

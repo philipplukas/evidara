@@ -412,6 +412,15 @@ class SourceBlueprintPreviewResponse(BaseModel):
         default_factory=list,
         description="Human-readable explanation of any closed key (why the template is inert).",
     )
+    plan_notes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The provider's own `plan()` notes for this spec (#634) — seed URLs it would "
+            "hit, config errors, and provider-specific caveats. Distinct from `notes`, "
+            "which explains the two-key lock; these describe the acquisition itself. "
+            "Empty when the provider exposes no plan or plan computation failed."
+        ),
+    )
 
 
 class SourceBlueprintTemplateResponse(BaseModel):

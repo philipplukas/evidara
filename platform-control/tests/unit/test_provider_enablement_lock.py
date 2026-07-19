@@ -227,3 +227,49 @@ async def test_worker_dispatch_fails_locked_runs_instead_of_retrying_them(sessio
     await session.refresh(run)
     assert run.status is RunStatus.FAILED
     assert "not enabled" in (run.failure_reason or "")
+
+
+@pytest.mark.asyncio
+async def test_a_refusal_is_auditable_through_the_run_collection(session) -> None:
+    """A refusal recorded but not readable back is not evidence (#634, item 4).
+
+    #637 began writing a terminal FAILED run when the lock refuses a dispatch,
+    but the `refused` marker lived only in `metadata` and no response schema
+    exposed it — so "what did we try to onboard and why did it refuse?" was
+    still unanswerable over the API. This pins the readback and the filter.
+    """
+    source, version = await _source_version_from_template(session, DISABLED_TEMPLATE)
+    registry, _ = _registry()
+    run_service = RunService(session, provider_registry=registry)
+
+    with pytest.raises(BlueprintTemplateNotEnabledError):
+        await run_service.create_run(_preview_run(source.source_id, version.source_version_id))
+
+    # A genuine (non-refused) run alongside it, so the filter has to discriminate
+    # rather than trivially returning everything.
+    session.add(
+        Run(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PREVIEW,
+            status=RunStatus.FAILED,
+            failure_reason="upstream 503",
+        )
+    )
+    await session.commit()
+
+    everything, total = await run_service.list_runs()
+    assert total == 2
+    assert sorted(item.refused for item in everything) == [False, True]
+
+    refusals, refused_total = await run_service.list_runs(refused=True)
+    assert refused_total == 1
+    assert refusals[0].refused is True
+    assert "not enabled" in (refusals[0].failure_reason or "")
+
+    # `refused=False` must also match rows with no marker at all — every run
+    # that predates the refusal record, plus the ordinary failure above.
+    genuine, genuine_total = await run_service.list_runs(refused=False)
+    assert genuine_total == 1
+    assert genuine[0].refused is False
+    assert genuine[0].failure_reason == "upstream 503"

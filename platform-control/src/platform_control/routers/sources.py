@@ -97,6 +97,7 @@ async def preview_source_blueprint(
         live_ready=bool(lock["live_ready"]),
         launchable=bool(lock["launchable"]),
         notes=list(lock["notes"]),
+        plan_notes=service.describe_blueprint_plan_notes(acquisition_spec),
     )
 
 
