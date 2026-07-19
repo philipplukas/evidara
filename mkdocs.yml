@@ -113,6 +113,7 @@ nav:
       - "0033: Agentic Legal Reasoning": adr/0033-agentic-legal-reasoning.md
       - "0034: Generated platform-control Contract": adr/0034-generated-platform-control-contract.md
       - "0039: Public Marketing Surface": adr/0039-public-marketing-surface.md
+      - "0038: What Makes a Test Result Trustworthy": adr/0038-test-result-trust.md
       - "SLI / SLO definitions": adr/sli-slo-definitions.md
   - Components:
       - Platform Control: components/platform-control.md

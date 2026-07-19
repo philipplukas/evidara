@@ -4,6 +4,15 @@
 
 Define what tests run in CI, when they run, and how they gate deployments.
 
+> **The tables below describe intent. What CI actually runs is decided by
+> `.github/workflows/` and the `scripts/check-*.sh` gates.** Where the two
+> disagree, the workflows win and this document is wrong.
+> [ADR-0038](../adr/0038-test-result-trust.md) exists because that gap was real:
+> specs were committed, linted, and typechecked while no job could reach them.
+> `scripts/check_test_reachability.py` now derives the answer from the workflows
+> and fails the build on any unregistered unreachable test file — consult it,
+> not this page, for the current truth.
+
 ## Guiding Principles
 
 - **Do not block development with expensive flaky tests.** A flaky test that blocks CI is worse than no test.

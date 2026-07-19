@@ -130,6 +130,16 @@ repos:
         pass_filenames: false
         files: ^(package\.json|\.nvmrc|scripts/check-js-workspace-hygiene\.sh|\.github/workflows/.*\.yml|(legal-search|platform-control/admin|marketing)/.*/?(package\.json|package-lock\.json|tsconfig\.json|vitest\.config\.ts|next\.config\.ts))$
 
+      # A test file that no CI job collects is not coverage. Fires when a spec
+      # is added/renamed, when a runner config changes, or when the wiring that
+      # selects specs (package.json scripts, workflows) changes. See ADR-0038.
+      - id: test-reachability
+        name: Test reachability (every spec is collected by some CI job)
+        entry: python3 scripts/check_test_reachability.py
+        language: system
+        pass_filenames: false
+        files: ^(scripts/check_test_reachability\.py|\.github/workflows/.*\.yml|scripts/check-.*\.sh|.*/(package\.json|vitest\.config\.ts|playwright\.config\.ts)|.*(\.spec\.tsx?|\.test\.tsx?)|.*/tests?/.*\.py|.*/test_[^/]*\.py)$
+
       # `legal-search/` is NOT an npm workspace root — the real packages are
       # `legal-search/frontend` and `legal-search/api`. This hook used to run
       # `cd legal-search && npm run check` against a vestigial package.json,
