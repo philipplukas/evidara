@@ -32,8 +32,22 @@ export default defineConfig({
   expect: {
     toHaveScreenshot: {
       animations: "disabled",
-      // Full-page Next dev + webfonts: small sub-pixel drift between runs; keep CI/local usable.
-      maxDiffPixelRatio: 0.06,
+      // NO `maxDiffPixelRatio` HERE — deliberately. See #611.
+      //
+      // A project-level `maxDiffPixelRatio: 0.06` used to sit on this object,
+      // so all 15 `toHaveScreenshot` calls in `e2e/visual.spec.ts` silently
+      // inherited a 6% tolerance. On a 1600x900 full-page shot that is ~86k
+      // pixels of licensed drift — enough to absorb an entire mislaid layout
+      // region. It did exactly that: the filter rail rendered ~260px too
+      // narrow for ~3.5 months (#605) and this suite stayed green through the
+      // bug AND through its fix, because the tolerance ate the difference in
+      // both directions. A VRT suite that cannot go red is worse than none,
+      // because its greenness is read as evidence.
+      //
+      // The default (undefined) means zero differing pixels are allowed. If a
+      // single snapshot genuinely needs slack for platform font rendering,
+      // scope it to that one `toHaveScreenshot` call with a comment
+      // justifying the specific number — never widen the default again.
     },
   },
   use: {
