@@ -121,6 +121,29 @@ describe("summarizePreview", () => {
     expect(lines).toContain("Formats: markdown");
   });
 
+  it("renders n/a for a spec with no mode instead of the literal 'undefined'", () => {
+    // Live repro: picking overlay `ch` / template `canton_http_zh` in the create
+    // wizard rendered "Mode: undefined" to the operator, because the canton_http
+    // spec carries no `mode`. Match the "n/a" convention the sibling lines use.
+    const lines = summarizePreview(
+      previewFor({
+        provider: "firecrawl",
+        seed_url: "https://zh.ch/gesetzessammlung",
+        seed_urls: [],
+        mode: undefined as unknown as "crawl",
+        include_paths: [],
+        exclude_paths: [],
+        limit: 10,
+        max_discovery_depth: 1,
+        scrape_formats: [],
+        zero_data_retention: false,
+      }),
+    );
+
+    expect(lines).toContain("Mode: n/a");
+    expect(lines.join("\n")).not.toContain("undefined");
+  });
+
   it("renders n/a when a firecrawl spec has no seeds", () => {
     const lines = summarizePreview(
       previewFor({
