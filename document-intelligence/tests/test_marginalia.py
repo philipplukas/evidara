@@ -127,6 +127,31 @@ def test_two_column_body_is_not_shredded_into_headings() -> None:
     assert detect_marginal_blocks(buffer.getvalue()) == []
 
 
+def test_right_aligned_fee_column_is_not_a_marginal_band() -> None:
+    """A right-aligned amount is body content, not a Randtitel.
+
+    This is what makes *line starts* the right signal rather than word positions: the
+    amounts sit far right on every line, but they never *begin* a line, so they form no
+    line-start cluster. A word-position signal would see a column here and shred the
+    fee table into headings.
+    """
+    reportlab_canvas = pytest.importorskip("reportlab.pdfgen.canvas")
+
+    from reportlab.lib.pagesizes import A4
+
+    buffer = io.BytesIO()
+    canvas = reportlab_canvas.Canvas(buffer, pagesize=A4)
+    canvas.setFont("Helvetica", 11)
+    for index in range(15):
+        y = A4[1] - 100 - index * 16
+        canvas.drawString(80, y, f"Einschreibegebuehr bei Neueintragung Position {index}")
+        canvas.drawString(470, y, "Fr. 20.-")
+    canvas.showPage()
+    canvas.save()
+
+    assert detect_marginal_blocks(buffer.getvalue()) == []
+
+
 def test_hyphen_healing_keeps_an_elided_compound() -> None:
     # "Halter- und Hundedaten" is an elision, not a wrap: healing it would fabricate the
     # word "Halterund". The conjunction is the signal that distinguishes the two.

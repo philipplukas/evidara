@@ -177,8 +177,18 @@ place.
 ### Scope and honest limits
 
 - **This is one document class.** The line-start signal is validated on AS 554.510 and on
-  synthetic single- and two-column fixtures. Other cantons' typesetting is unproven; each
-  new source needs its real PDF added to the fixtures before `live_ready` flips.
+  synthetic single-column, two-column, and right-aligned-fee-table fixtures. Other
+  cantons' typesetting is unproven; each new source needs its real PDF added to the
+  fixtures before `live_ready` flips.
+- **The band must begin at least two lines of its own.** Detection keys on a *line-start*
+  cluster, so a label that always shares its line with body text and never wraps
+  contributes no line start and would be missed. In AS 554.510 the labels are multi-word
+  and wrap inside the narrow band (5 such lines on page 1), so the cluster is strong.
+  This is the deliberate trade for rejecting right-aligned body content — a fee table's
+  amounts sit far right on *every* line but never begin one, and a word-position signal
+  would shred them into headings. If a source is found whose Randtitel never wrap, the
+  fix is a density signal (few lines carry the band, versus a table's every line), not a
+  loosened threshold.
 - **No OCR.** An image-only PDF still yields an empty IR flagged `pdf_no_text_layer`,
   never fabricated body text. Unchanged from ADR-0037.
 - **Footnote markers stay inline** as bare digits (`…vom 14. April 2008 1 und…`). They are
