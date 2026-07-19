@@ -15,6 +15,14 @@ agent-tools
 **/dist
 **/dist-test
 **/coverage
+# ...but NOT a source directory that happens to be called `coverage`. The
+# pattern above targets istanbul/vitest REPORT output at package roots; without
+# this negation it also silently drops `legal-search/api/src/modules/coverage/`
+# from the build context, and the image build fails with "Cannot find module"
+# for files that are present and committed in git. Local gates cannot see it —
+# only the container build can.
+!**/src/**/coverage
+!**/src/**/coverage/**
 **/playwright-report
 **/test-results
 **/.pytest_cache

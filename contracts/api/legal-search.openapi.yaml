@@ -14,7 +14,9 @@ info:
     Document body reads fall back to the Document Service
     (`contracts/api/document-intelligence.openapi.yaml`) when the projection carries no body.
     See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
-  version: 0.8.0
+    See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
+    particular, for what a coverage answer may and may not be read to mean.
+  version: 0.9.0
   contact:
     name: Evidara Team
   license:
@@ -43,6 +45,11 @@ tags:
       specified here — the `document.processed` / `document.withdrawn` intake routes
       under `/v1/projections/events` are internal event delivery, contracted by
       `contracts/events/*.schema.json` rather than by this API spec.
+  - name: coverage
+    description: |
+      What the corpus holds, for a scope the caller names — the surface ADR-0033 §2's
+      refusal capability needs. Every statement here is about **our holdings**. Nothing
+      in this tag is, or can become, evidence about what the law contains.
   - name: agent-discovery
     description: |
       Read-only search and document reads commonly used by operators, agents, and smoke flows
@@ -429,6 +436,128 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CitationGraphStats"
+
+  /v1/coverage:
+    get:
+      operationId: getCorpusCoverage
+      summary: What the corpus holds for a named scope — and, explicitly, what that does not mean
+      description: |
+        ADR-0033 §2 makes explicit coverage "the only real cure for confident
+        fabrication": an agent that can check whether the governing norm is in the
+        corpus can refuse instead of reaching for the nearest plausible text. This
+        endpoint is that check. See ADR-0042.
+
+        Before this path existed, the only signal about absence was
+        `totalResults: 0`, which conflates at least four different situations —
+        we do not hold the norm, we hold it but the query missed it, a filter bug
+        dropped it (#672 did exactly this), or the norm does not exist. An agent
+        cannot refuse safely on evidence that ambiguous.
+
+        ## What a `not_held` answer means
+
+        **`not_held` means: the search index contains no document matching this
+        scope.** That is a statement about our holdings, in the first person.
+
+        It does **NOT** mean the norm does not exist, that no such law was enacted,
+        or that the platform has determined the law to be absent. The corpus is a
+        subset of the law by construction, and no endpoint over it can ever be
+        evidence of what the law does not contain.
+
+        The `holding` enum is therefore exactly `held | not_held`. There is no
+        value meaning "confirmed absent in law", and none will be added — a
+        requirement for one is a requirement to revisit ADR-0042.
+
+        The strongest claim this endpoint supports is a refusal: *"I do not hold
+        the governing norm for this question, so I will not answer it."* Per
+        ADR-0033 §2 that is a **correct** answer.
+
+        ## What it also cannot tell you
+
+        - **Whether the corpus is current.** `last_processed_at` is when the newest
+          document in the group entered the corpus — NOT evidence that the source
+          was re-checked then. A jurisdiction whose law changed last week and whose
+          last acquisition ran a year ago reports a year-old timestamp and no
+          indication of staleness. "When did we last check?" is run history, which
+          lives in platform-control (ADR-0042 §4/§5).
+        - **Completeness within a scope.** "We hold 41 federal acts" is not "we hold
+          all federal acts". Nothing in the platform knows the denominator, so no
+          percentage or completeness score is reported — inventing one is the single
+          most dangerous field this endpoint could carry.
+        - **Anything at instrument granularity.** A group reporting `held` may still
+          be missing the one act that governs the caller's question — this is the
+          measured #709 failure, where the federal level was covered by the
+          Bundesverfassung while TSchG/TSchV were absent. Use
+          `/v1/citations/resolve` to ask about a specific norm.
+      tags: [coverage, agent-discovery]
+      parameters:
+        - name: group_by
+          in: query
+          required: false
+          description: The dimension coverage is bucketed by.
+          schema:
+            $ref: "#/components/schemas/CoverageDimension"
+        - name: jurisdiction_id
+          in: query
+          required: false
+          description: |
+            Comma-separated jurisdiction IDs to scope to. **Naming ids here is what
+            makes absence reportable**: a named jurisdiction with nothing indexed comes
+            back as a group with `documents: 0, holding: not_held`, whereas an
+            unnamed one simply never produces a bucket. Ask about `jur_ch_zh`
+            explicitly to be told, positively, that we hold nothing for it.
+          schema:
+            type: string
+          example: jur_ch_federal,jur_ch_zh
+        - name: authority_id
+          in: query
+          required: false
+          description: Comma-separated authority IDs to scope to.
+          schema:
+            type: string
+        - name: document_type
+          in: query
+          required: false
+          description: Comma-separated document types to scope to.
+          schema:
+            type: string
+        - name: level
+          in: query
+          required: false
+          description: Comma-separated norm levels to scope to.
+          schema:
+            type: string
+          example: federal,cantonal
+        - name: in_force_at
+          in: query
+          required: false
+          description: |
+            ISO date. Counts only norms not known to be outside force on that date.
+
+            Follows `/v1/norm-hierarchy`: norms whose dates are unknown are KEPT,
+            because dropping them would hide law from the caller and make silence
+            indistinguishable from absence. `documents_without_repeal_date` reports
+            how much of the count rests on that assumption.
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          required: false
+          description: Maximum groups returned. Explicitly requested keys are always returned.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: Coverage of the corpus over the requested scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorpusCoverageView"
+        "400":
+          description: Invalid `group_by`, `level`, `in_force_at` or `limit`
 
   /v1/projections/documents:
     get:
@@ -983,6 +1112,155 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NormSummary"
+
+    CoverageDimension:
+      type: string
+      description: |
+        The dimension coverage is bucketed by. `authority` is backed by
+        `authority_ids`, which is sparse on legal documents — see
+        `documents_without_group_key`.
+      enum: [jurisdiction, authority, document_type, level]
+      default: jurisdiction
+
+    CoverageHolding:
+      type: string
+      description: |
+        Whether the corpus holds anything for the group.
+
+        `not_held` means **the search index contains no document matching this
+        scope** — a claim about our holdings and nothing more. It is NOT a claim
+        that the norm does not exist or that no such law was enacted (ADR-0042).
+
+        This enum has exactly two values by design. No value meaning "confirmed
+        absent in law" exists, and adding one requires revisiting ADR-0042.
+      enum: [held, not_held]
+
+    CorpusCoverageView:
+      type: object
+      required:
+        [basis, as_of, group_by, scope, total_documents, groups, documents_without_group_key]
+      properties:
+        basis:
+          type: string
+          enum: [index]
+          description: |
+            The evidentiary base of this answer. `index` = derived solely from the
+            search index — what we hold. It does not incorporate acquisition intent,
+            source configuration or run history, which are platform-control's
+            (ADR-0042 §4). Present as a field, not only as prose, so a caller can
+            check the basis without reading documentation.
+        as_of:
+          type: string
+          format: date-time
+          description: When this answer was computed. The index may have changed since.
+        group_by:
+          $ref: "#/components/schemas/CoverageDimension"
+        scope:
+          $ref: "#/components/schemas/CoverageScope"
+        total_documents:
+          type: integer
+          description: |
+            Documents in the index matching the scope. This is NOT the sum of the
+            groups' counts: `jurisdiction_ids` and `authority_ids` are multi-valued,
+            so one document can land in several groups, and a document missing the
+            grouping field lands in none.
+        documents_without_group_key:
+          type: integer
+          description: |
+            Documents matching the scope that carry no value for `group_by` and so
+            appear in no group. Reported rather than dropped: `authority_ids` is
+            optional on legal documents, so grouping by `authority` can silently
+            omit a large share of the corpus, and a caller summing groups would
+            otherwise under-count without being told.
+        unrecognized_jurisdiction_ids:
+          type: array
+          description: |
+            Requested `jurisdiction_id`s the platform does not recognize. They
+            produce **no group** — returning `not_held` for them would answer a
+            coverage question that was never asked, when the truth is that the id
+            is unknown (a typo, or a jurisdiction we do not model). "We hold
+            nothing for `jur_ch_zurich`" reads as a coverage fact; it is not one.
+          items:
+            type: string
+        groups:
+          type: array
+          description: |
+            One entry per explicitly requested key (even when empty — that is the
+            refusal signal) plus one per non-empty bucket. Ordered by `documents`
+            descending, then by `key`.
+          items:
+            $ref: "#/components/schemas/CoverageGroup"
+
+    CoverageScope:
+      type: object
+      description: Echoes the filters this answer was computed under.
+      properties:
+        jurisdiction_ids:
+          type: array
+          items: { type: string }
+        authority_ids:
+          type: array
+          items: { type: string }
+        document_types:
+          type: array
+          items: { type: string }
+        levels:
+          type: array
+          items:
+            $ref: "#/components/schemas/NormLevel"
+        in_force_at:
+          type: string
+          format: date
+
+    CoverageGroup:
+      type: object
+      required: [key, documents, holding, documents_without_repeal_date]
+      properties:
+        key:
+          type: string
+          description: The bucket value — a jurisdiction id, authority id, document type, or norm level.
+        label:
+          type: string
+          description: |
+            Human-readable name, when the platform has one (jurisdictions and levels
+            resolve against the vocabularies; authorities and document types do not).
+            Absent means no label is known — never a fallback to `key` dressed up as one.
+        documents:
+          type: integer
+          description: Documents held in this group under the scope. `0` when `holding` is `not_held`.
+        holding:
+          $ref: "#/components/schemas/CoverageHolding"
+        last_processed_at:
+          type: string
+          format: date-time
+          description: |
+            When the newest document in this group entered the corpus
+            (`max(processed_at)`).
+
+            **This is not a currency guarantee.** It says when we last ingested
+            something here, not when we last checked the source, and therefore not
+            whether newer law exists that we have missed. Absent when the group holds
+            nothing. Named `last_processed_at` rather than `last_updated_at` because
+            the field is exactly as strong as its name (ADR-0042 §3).
+        documents_without_repeal_date:
+          type: integer
+          description: |
+            Documents in this group with no `in_force_until`. Absence of that date
+            means "not known to be repealed", which is not the same as "never
+            repealed" — so this number is how much of the group's in-force standing
+            is assumed rather than known. Under `in_force_at` it is the size of the
+            benefit of the doubt.
+        source_version_ids:
+          type: array
+          description: |
+            Source versions that produced the documents in this group — the
+            provenance half of #709's "as of when, from which source version".
+            Capped at 25; `source_version_count` reports the true total.
+          items:
+            type: string
+        source_version_count:
+          type: integer
+          description: Distinct source versions behind this group, before `source_version_ids` was capped.
 
     NormHierarchyCoverage:
       type: object

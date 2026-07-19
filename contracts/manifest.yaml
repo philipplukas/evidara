@@ -1,4 +1,4 @@
-version: "2.16.0"
+version: "2.17.0"
 last_reviewed: "2026-07-19"
 owner: "Platform Team"
 
@@ -43,7 +43,11 @@ apis:
     # changed from object (DoclingDocument JSON, ADR-0010) to string (the
     # document body as plain text). Breaking, and on a 0.x line a breaking
     # change takes the minor.
-    version: "0.8.0"
+    # 0.9.0: adds `/v1/coverage` (ADR-0042) — the corpus-coverage read model
+    # ADR-0033 §2's refusal capability needs. Additive, so a minor. Deliberately
+    # NOT locked while its shape is validated against real agent use; lock it
+    # once an MCP tool (ADR-0033 §3) depends on it.
+    version: "0.9.0"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"
