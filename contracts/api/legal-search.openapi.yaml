@@ -338,12 +338,20 @@ paths:
         Accepts either a raw citation string ("SR 210") or a canonical key
         ("sr:210") and returns the document(s) that ARE that norm.
 
-        Resolution is DETERMINISTIC only: SR numbers, CELEX numbers, ECLIs and
-        Austrian BGBl references carry their identifier in the string itself.
-        Fuzzy citations ("Art. 36 BV", BGE references) cannot be normalized by
-        today's extractor and come back `resolved: false` with
-        `unresolved_reason: not_normalizable` — never a similarity-search guess,
-        which would return a plausible wrong norm.
+        Resolution is DETERMINISTIC only, and deliberately so. SR numbers, CELEX
+        numbers, ECLIs and Austrian BGBl references carry their identifier in the
+        string itself. Article references ("Art. 36 BV") are resolved via the
+        short title the corpus itself publishes (`abbrev_art:BV/36`), NOT by
+        ranking search results — no confidence score is computed anywhere in this
+        path, because a threshold is just a place to hide a guess.
+
+        Everything else (BGE references, German statute paragraphs) comes back
+        `resolved: false` with `unresolved_reason: not_normalizable` — never a
+        similarity-search guess, which would return a plausible wrong norm.
+
+        When a key names SEVERAL different documents the answer is
+        `unresolved_reason: ambiguous` with every candidate returned unranked.
+        Narrowing is not resolving.
       tags: [citations, agent-discovery]
       parameters:
         - name: q
@@ -1097,6 +1105,17 @@ components:
           type: string
         jurisdiction:
           type: string
+        section_id:
+          description: |
+            The section this identifier addresses, on PROVISION-level targets
+            (`abbrev_art:BV/36`). Absent on document-level targets (`sr:101`).
+            This is what lets "Art. 36 BV" resolve to an openable provision
+            rather than to the whole statute.
+          type: string
+        section_anchor:
+          description: In-document anchor for `section_id`.
+          type: string
+          example: art_36
 
     CitationEdge:
       description: A citation edge — a citing document, and the reference it carries.
@@ -1137,14 +1156,21 @@ components:
           type: boolean
         unresolved_reason:
           description: |
-            Why an unresolved citation is unresolved. The distinction is load-bearing:
+            Why an unresolved citation is unresolved. The distinctions are load-bearing:
             `not_normalizable` is an EXTRACTOR gap (the citation form is fuzzy),
             `no_target_in_corpus` is a COVERAGE gap (the key is valid, the norm is
-            simply not ingested). Collapsing both into a bare `resolved: false` is how
-            a citation graph ends up with silently missing edges.
+            simply not ingested), and `ambiguous` means several DIFFERENT documents
+            are addressable by this key — short titles are not globally unique, so
+            this is a real state, not an error. Collapsing these into a bare
+            `resolved: false` is how a citation graph ends up with silently missing
+            edges; collapsing `ambiguous` by ranking is how it ends up with wrong ones.
           type: [string, "null"]
-          enum: [not_normalizable, no_target_in_corpus, null]
+          enum: [not_normalizable, no_target_in_corpus, ambiguous, null]
         targets:
+          description: |
+            On `ambiguous`, every norm the key could mean — returned UNRANKED so the
+            caller can disambiguate on evidence the API does not have. Otherwise the
+            resolved target list.
           type: array
           items:
             $ref: "#/components/schemas/CitationTarget"

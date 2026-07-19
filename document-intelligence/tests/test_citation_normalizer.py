@@ -114,6 +114,58 @@ class TestNormalizeCitationSemiDeterministic:
         assert normalize_citation(c) == "it_codice:codicecivile"
 
 
+class TestNormalizeCitationArticle:
+    """`Art. 36 BV` -> `abbrev_art:BV/36` (#594).
+
+    The key is minted from the short title the citation itself names. Whether
+    a norm with that key EXISTS is a separate question, answered by
+    `citation-targets` at resolution time.
+    """
+
+    def test_article_with_abbreviation(self) -> None:
+        c = Citation(
+            text="Art. 36 BV",
+            citation_type="article",
+            metadata={"article": "36", "abbrev": "BV"},
+        )
+        assert normalize_citation(c) == "abbrev_art:BV/36"
+
+    def test_absatz_does_not_change_the_key(self) -> None:
+        """Abs./lit. subdivide WITHIN an article; the article is the unit."""
+        plain = Citation(
+            text="Art. 36 BV",
+            citation_type="article",
+            metadata={"article": "36", "abbrev": "BV"},
+        )
+        with_absatz = Citation(
+            text="Art. 36 Abs. 2 BV",
+            citation_type="article",
+            metadata={"article": "36", "abbrev": "BV", "paragraph": "2"},
+        )
+        assert normalize_citation(with_absatz) == normalize_citation(plain)
+
+    def test_numbered_variant_is_a_distinct_provision(self) -> None:
+        c = Citation(
+            text="Art. 261bis StGB",
+            citation_type="article",
+            metadata={"article": "261bis", "abbrev": "StGB"},
+        )
+        assert normalize_citation(c) == "abbrev_art:StGB/261bis"
+
+    def test_non_abbreviation_trailing_word_returns_none(self) -> None:
+        """The BV's own headings must never mint a key.
+
+        "Art. 36 Einschränkungen von Grundrechten" is a heading, not a
+        citation to a statute called "Einschränkungen".
+        """
+        c = Citation(
+            text="Art. 36 Einschränkungen",
+            citation_type="article",
+            metadata={"article": "36", "abbrev": "Einschränkungen"},
+        )
+        assert normalize_citation(c) is None
+
+
 class TestNormalizeCitationFuzzy:
     @pytest.mark.parametrize(
         "citation_type",
@@ -123,10 +175,7 @@ class TestNormalizeCitationFuzzy:
         c = Citation(text="some reference", citation_type=citation_type)
         assert normalize_citation(c) is None
 
-    def test_generic_article_returns_none(self) -> None:
-        c = Citation(text="Art. 8 EMRK", citation_type="article")
-        assert normalize_citation(c) is None
-
     def test_bge_returns_none(self) -> None:
+        """BGE references are deliberately still unresolved (#594)."""
         c = Citation(text="BGE 147 III 49", citation_type="bge")
         assert normalize_citation(c) is None

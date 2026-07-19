@@ -33,4 +33,12 @@ export interface CitationTarget {
   title?: string;
   document_type?: string;
   jurisdiction?: string;
+  /** The section this identifier addresses, on PROVISION-level targets
+(`abbrev_art:BV/36`). Absent on document-level targets (`sr:101`).
+This is what lets "Art. 36 BV" resolve to an openable provision
+rather than to the whole statute.
+ */
+  section_id?: string;
+  /** In-document anchor for `section_id`. */
+  section_anchor?: string;
 }

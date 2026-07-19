@@ -27,6 +27,18 @@ const ZGB: CitationTarget = {
   jurisdiction: 'CH',
 };
 
+/** BV Art. 36 as a PROVISION-level target — the shape #594 adds. */
+const BV_ART_36: CitationTarget = {
+  document_id: 'doc_bv',
+  identifier_type: 'abbrev_art',
+  identifier_value: 'BV/36',
+  title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft',
+  document_type: 'law',
+  jurisdiction: 'CH',
+  section_id: 'sec_bv_art36',
+  section_anchor: 'art_36',
+};
+
 /** The BV's citation of the ZGB — "Ergaenzend gilt das ZGB (SR 210)." */
 const BV_CITES_ZGB: CitationEdge = {
   citation_id: 'cit_1',
@@ -94,7 +106,9 @@ describe('CitationsService', () => {
     });
 
     it('reports a fuzzy citation as not_normalizable rather than guessing', async () => {
-      const result = await service.resolve('Art. 36 BV');
+      // `Art. 36 BV` used to be this test's example. It is no longer fuzzy
+      // (#594) — it keys to `abbrev_art:BV/36`. A BGE reference still is.
+      const result = await service.resolve('BGE 145 I 73');
 
       expect(result).toMatchObject({
         normalized_reference: null,
@@ -104,6 +118,68 @@ describe('CitationsService', () => {
       });
       // It must not have even tried to search — a guess here is worse than a miss.
       expect(repository.findTargetsByKey).not.toHaveBeenCalled();
+    });
+
+    it('resolves an article reference to the provision, not the statute', async () => {
+      (repository.findTargetsByKey as ReturnType<typeof vi.fn>).mockResolvedValue([BV_ART_36]);
+
+      const result = await service.resolve('Art. 36 BV');
+
+      expect(repository.findTargetsByKey).toHaveBeenCalledWith('abbrev_art:BV/36');
+      expect(result).toMatchObject({
+        normalized_reference: 'abbrev_art:BV/36',
+        resolved: true,
+        unresolved_reason: null,
+      });
+      // The point of provision-level targets: an openable section, not a 525KB
+      // statute. ADR-0033 turns on "BV Art. 36 as a citable unit".
+      expect(result.targets[0].section_id).toBe('sec_bv_art36');
+      expect(result.targets[0].section_anchor).toBe('art_36');
+    });
+
+    it('REFUSES when a short title names several different documents', async () => {
+      // The failure mode this design exists to prevent. Short titles are not
+      // globally unique; picking the top-scoring candidate would be a guess
+      // wearing a `resolved: true` flag.
+      const cantonalEg: CitationTarget = {
+        document_id: 'doc_zh_eg',
+        identifier_type: 'abbrev',
+        identifier_value: 'EG',
+        title: 'Einführungsgesetz (Zürich)',
+        document_type: 'law',
+        jurisdiction: 'CH-ZH',
+      };
+      const bernEg: CitationTarget = {
+        ...cantonalEg,
+        document_id: 'doc_be_eg',
+        jurisdiction: 'CH-BE',
+      };
+      (repository.findTargetsByKey as ReturnType<typeof vi.fn>).mockResolvedValue([
+        cantonalEg,
+        bernEg,
+      ]);
+
+      const result = await service.resolve('Art. 12 EG');
+
+      expect(result.resolved).toBe(false);
+      expect(result.unresolved_reason).toBe('ambiguous');
+      // Both candidates come back, UNRANKED, so the caller can disambiguate on
+      // evidence we do not have.
+      expect(result.targets).toHaveLength(2);
+      expect(result.targets.map((t) => t.document_id)).toEqual(['doc_zh_eg', 'doc_be_eg']);
+    });
+
+    it('does not call several rows of ONE document ambiguous', async () => {
+      // A statute and its article section are two rows, one norm.
+      (repository.findTargetsByKey as ReturnType<typeof vi.fn>).mockResolvedValue([
+        BV_ART_36,
+        { ...BV_ART_36, identifier_type: 'abbrev', identifier_value: 'BV', section_id: undefined },
+      ]);
+
+      const result = await service.resolve('Art. 36 BV');
+
+      expect(result.resolved).toBe(true);
+      expect(result.unresolved_reason).toBeNull();
     });
 
     it('distinguishes a coverage gap from an extractor gap', async () => {
@@ -188,10 +264,32 @@ describe('CitationsService', () => {
     });
 
     it('returns nothing for a fuzzy query rather than a similarity fallback', async () => {
-      const result = await service.findCiting('Art. 36 BV');
+      // `Art. 36 BV` now keys (#594); a BGE reference is still genuinely fuzzy.
+      const result = await service.findCiting('BGE 145 I 73');
 
       expect(result).toMatchObject({ normalized_references: [], citing: [], total: 0 });
       expect(repository.findCitingEdges).not.toHaveBeenCalled();
+    });
+
+    it('answers find_citing for an article reference (#594 definition of done)', async () => {
+      // "Which decisions interpret BV Art. 36?" — step 4 of ADR-0033's agentic
+      // workflow, and the question the issue was opened to make answerable.
+      (repository.findTargetsByKey as ReturnType<typeof vi.fn>).mockResolvedValue([BV_ART_36]);
+      (repository.findCitingEdges as ReturnType<typeof vi.fn>).mockResolvedValue([
+        {
+          citation_id: 'cit_bger',
+          source_document_id: 'doc_bger_2019',
+          citation_text: 'Art. 36 Abs. 2 BV',
+          citation_type: 'article',
+          normalized_reference: 'abbrev_art:BV/36',
+        },
+      ]);
+
+      const result = await service.findCiting('Art. 36 BV');
+
+      expect(result.normalized_references).toEqual(['abbrev_art:BV/36']);
+      expect(result.total).toBe(1);
+      expect(result.citing[0].source_document_id).toBe('doc_bger_2019');
     });
   });
 
