@@ -5,6 +5,7 @@
 This is the Evidara monorepo — a document intelligence platform for legal research. It contains:
 
 - **legal-search** — Next.js frontend + NestJS BFF for search and document detail
+- **marketing** — public waitlist / positioning page (Next.js static export; the only public surface — see ADR-0039)
 - **platform-control** — Source lifecycle, runs, approvals, reference data (Cloud Run)
 - **document-intelligence** — Raw-to-canonical processing pipelines (containerized NATS JetStream consumer; Spark/Databricks is opt-in only — see ADR-0029)
 - **contracts** — OpenAPI specs, JSON Schemas, event schemas (build-time only)
@@ -102,8 +103,8 @@ run gates inside each package:
 ### JavaScript dependency resolution (read before touching node_modules)
 
 The repo is **not** an npm workspace. Each JS surface (`legal-search/frontend`,
-`legal-search/api`, `platform-control/admin`) owns its `node_modules`, and CI
-installs them per-surface with `npm ci`.
+`legal-search/api`, `platform-control/admin`, `marketing`) owns its
+`node_modules`, and CI installs them per-surface with `npm ci`.
 
 - **Node is pinned in `.nvmrc` (22)** and enforced via `engines`. Node >= 24 ships an
   experimental built-in `localStorage` that shadows jsdom's under Vitest, silently
@@ -185,7 +186,8 @@ The pre-commit hooks and CI workflows must run the same checks. If you add a che
 | Entity shapes | `contracts/schemas/*.json` |
 | Event payloads | `contracts/events/*.json` |
 | Infra resources | `infra/terraform/` |
-| Design tokens | `styles/tokens/tokens.css` (shared; see ADR-0027 — "two products, shared brand"). Workspace-local extensions: `legal-search/frontend/src/app/globals.css`; admin-local: `platform-control/admin/src/app/globals.css`. |
+| Design tokens | `styles/tokens/tokens.css` (shared; see ADR-0027 — "two products, shared brand"). Workspace-local extensions: `legal-search/frontend/src/app/globals.css`; admin-local: `platform-control/admin/src/app/globals.css`; marketing-local: `marketing/src/app/globals.css`. |
+| Public marketing copy | `marketing/src/lib/content.ts` — every claim carries an `evidence` code path; `content.test.ts` fails the build on a claim without one (ADR-0039) |
 | Tests | Test files adjacent to code |
 | Narrative docs | `docs/` |
 
