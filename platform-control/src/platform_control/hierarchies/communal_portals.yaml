@@ -9,8 +9,16 @@
 #
 # Adding commune #2 is an edit to this data file — NOT a Python change. This is
 # what makes gemeinde_http_provider's "adding a commune is a config change, not
-# code" claim true. (Operator-reachable DB registration, like blueprint
-# enablement in #632, is a further step tracked separately.)
+# code" claim true.
+#
+# It is NOT, however, operator-reachable the way blueprint enablement became in
+# #632/ADR-0035: this file ships inside the Python package, so editing it is
+# still a repo edit and a deploy. Moving *this* file to the database would not
+# by itself change that, because a commune also needs a `source_blueprints.yaml`
+# provider template (`bfs_number`, `seed_urls`, `corpus_id`) and a seeded corpus
+# — both also in-repo. The blueprint template is the binding constraint, so
+# operator-reachable commune registration is a larger move than this file. No
+# issue tracks it yet; do not assume one does.
 portals:
   261:
     host: www.stadt-zuerich.ch # Stadt Zürich — Amtliche Sammlung (verified)

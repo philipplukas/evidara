@@ -78,10 +78,21 @@ and the readiness pre-flight both consult it, so dispatch and pre-flight never d
 - `blueprint-preview` also returns `plan_notes` — the provider's own `plan()` output
   (seed URLs, config errors, provider-specific caveats), which until then was reachable
   only from the `plan` CLI (#634, item 3).
-- **Not yet addressed (follow-ups):** `supported_portals` is still a provider `ClassVar`,
-  so a second commune on an existing provider is still a code change (#632, second half).
-  A refusal also produces no *raw artifact* — correctly, since nothing was fetched; the
-  run row is the evidence. Tracked and deliberately out of this ADR's scope, which is the
-  config key's home.
+- **`supported_portals` also moved to config in this same change** (#632, second half).
+  The `gemeinde_http` BFS → host allow-list now loads from `communal_portals.yaml`
+  rather than a provider `ClassVar`, so registering a further commune is a data edit,
+  not a Python change. (An earlier revision of this ADR listed it as an unaddressed
+  follow-up; that was stale on the day it merged.) Note the narrower remaining limit:
+  a data edit is still a **repo** edit. Adding commune #2 end-to-end also needs a
+  `source_blueprints.yaml` provider template (`bfs_number`, `seed_urls`, `corpus_id`)
+  and a seeded corpus, so commune registration is not yet *operator-reachable* the way
+  the enablement key now is. Closing that gap means moving blueprint templates
+  themselves out of the repo — a larger move than this ADR's, and not scoped here.
+  This applies to `gemeinde_http` only: `supported_portals` remains a `ClassVar` on
+  `PortalHttpProviderBase`, so cantonal, Bundesland, and regione portals are still a
+  code change.
+- **Not yet addressed:** a refusal produces no *raw artifact* — correctly, since nothing
+  was fetched; the run row is the evidence. Deliberately out of this ADR's scope, which
+  is the config key's home.
 - SHADOW execution mode remains the operator's rehearsal path and is unaffected: it is
   routed to the cassette provider and never reaches the portal the lock protects.
