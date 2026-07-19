@@ -81,6 +81,44 @@ them would hide law and silence is indistinguishable from absence.
 place but for which the corpus holds nothing. "I do not have the communal ordinance for
 this place" is a correct answer (ADR-0033 §2); reasoning past a missing level is not.
 
+## Corpus coverage
+
+`GET /v1/coverage` (ADR-0042) answers *what do we hold for this scope* — grouped by
+jurisdiction, authority, document type or norm level, optionally as of a date. It exists
+because `coverage.missing_levels` above, while real, is **level-granular**, and the
+failure it must prevent is instrument-granular: in the M13 iteration-2 measurement the
+federal level was covered by the Bundesverfassung while TSchG and TSchV were absent, so
+`missing_levels` was correct and silent about the only thing that mattered (#709).
+
+**What it may be read to mean.** `holding: not_held` means *the search index contains no
+document matching this scope*. It is a claim about our holdings, in the first person. It
+is **not** a claim that the norm does not exist. The enum has exactly two members —
+`held` and `not_held` — precisely so no caller can find a value meaning "confirmed absent
+in law", and no such value will be added. The corpus is a subset of the law by
+construction; no endpoint over it can be evidence of what the law does not contain. The
+strongest claim it supports is a refusal, which per ADR-0033 §2 is a *correct* answer.
+
+**Absence is reported, not inferred.** A terms aggregation produces no bucket for a value
+absent from the index, so a jurisdiction the caller names explicitly always comes back as
+a group — `documents: 0, holding: not_held` when we hold nothing. That positive statement
+of absence is the point; without it a caller is back to inferring absence from emptiness,
+which #672 showed is one filter bug away from being wrong.
+
+**An unrecognized id is not a coverage answer.** A jurisdiction id the platform does not
+know produces no group and is listed in `unrecognized_jurisdiction_ids`. Answering "we
+hold nothing for `jur_ch_zurich`" would read as a coverage fact when the truth is that
+the caller misspelled `jur_ch_zh`.
+
+**Freshness is not currency.** `last_processed_at` is when the newest document in the
+group entered the corpus — *not* when the source was last checked, and therefore not
+evidence that no newer law exists. A jurisdiction whose law changed last week and whose
+last acquisition ran a year ago reports a year-old timestamp with no staleness signal.
+"When did we last check?" is run history, and it lives in platform-control (ADR-0042 §4).
+
+**No completeness score.** "We hold 41 federal acts" is not "we hold all federal acts".
+Nothing in the platform knows the denominator, so no percentage is reported; inventing
+one would be the most dangerous field this endpoint could carry.
+
 **Deployment note.** `level`, `subordinate_to`, `in_force_from` and `in_force_until` are
 new mapping fields. Documents indexed before this change carry none of them and will not
 appear in any level bucket until reprojected — see

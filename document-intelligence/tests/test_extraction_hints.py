@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from document_intelligence.contracts.envelope import ArtifactBundleManifest
 from document_intelligence.extractors.extraction_hints import coerce_extraction_hints
-from document_intelligence.pipeline import ProcessingPipeline
+from document_intelligence.pipeline import ProcessingPipeline, _resolve_in_force_window
 from support import build_bundle_event, build_manifest_payload
 
 
@@ -204,6 +204,7 @@ class TestInForceWindowFromHints(unittest.TestCase):
         assert metadata["in_force_until"] == "2028-12-31"
         fp = metadata.get("field_provenance", {})
         assert fp.get("in_force_from", {}).get("source") == "manifest"
+        assert fp.get("in_force_until", {}).get("source") == "manifest"
 
     def test_open_ended_consolidation_sets_only_the_start(self):
         result = self._process_with_hints({"in_force_from_hint": "2024-03-03"})
@@ -218,3 +219,26 @@ class TestInForceWindowFromHints(unittest.TestCase):
         # being able to answer `unknown` rather than being handed a guess.
         assert "in_force_from" not in metadata
         assert "in_force_until" not in metadata
+
+
+class TestInForceWindowPrecedence(unittest.TestCase):
+    """Acquisition (manifest) outranks the normalizer (structured).
+
+    Both can establish the window for RIS: the OGD listing publishes it as ISO,
+    and the document XML repeats it as `ct="ikra"`/`ct="akra"`. The provider's
+    copy wins because it is read from the publisher's structured metadata.
+    """
+
+    def test_manifest_hint_wins_over_extracted_metadata(self):
+        window = _resolve_in_force_window(
+            {"in_force_from_hint": "1998-04-24"},
+            {"in_force_from": "1990-01-01"},
+        )
+        assert window["in_force_from"] == ("1998-04-24", "manifest")
+
+    def test_extracted_metadata_is_used_when_no_hint_exists(self):
+        window = _resolve_in_force_window({}, {"in_force_from": "1998-04-24"})
+        assert window["in_force_from"] == ("1998-04-24", "structured")
+
+    def test_nothing_is_produced_when_neither_source_knows(self):
+        assert _resolve_in_force_window({}, {}) == {}

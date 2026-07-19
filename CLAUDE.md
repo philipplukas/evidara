@@ -27,13 +27,22 @@ Run the narrowest gate for the surface you touched before pushing:
 
 | Surface | Gate |
 |---|---|
-| `platform-control/` | `cd platform-control && uv run ruff check . && uv run ruff format --check . && uv run pytest` |
-| `platform-control/admin/` | `cd platform-control/admin && npm run check` |
+| `platform-control/` | `bash scripts/check-platform-control.sh` — ruff check + ruff format --check + pytest **and** the OpenAPI contract-drift gate **and** the full admin gate. A bare `uv run pytest` is narrower than CI. |
+| `platform-control/admin/` | `cd platform-control/admin && npm run check && npm run build` |
 | `document-intelligence/` | `cd document-intelligence && uv run --extra dev --extra service --extra test pytest && uv run ruff check . && uv run ruff format --check .` |
 | `legal-search/api/` | `cd legal-search/api && npm run check` |
-| `legal-search/frontend/` | `cd legal-search/frontend && npm run check` |
+| `legal-search/frontend/` | `cd legal-search/frontend && npm run check && npm run build` — build is a separate CI step; it catches SSR issues `tsc` misses |
+| `legal-search/` (both surfaces) | `bash scripts/check-legal-search.sh` |
+| `legal-search/frontend/e2e/` | `bash scripts/check-e2e-spec-coverage.sh` — asserts every spec is selected by some CI command (#686) |
+| `marketing/` | `cd marketing && npm run check` (then `npm run build` — the static export is the deploy artifact) |
+| `tools/evidara-cli/` | `bash scripts/check-evidara-cli.sh` |
+| `eval/` | see `.github/workflows/eval-ris.yml` — two `-k`-filtered pytest selections |
+| `scripts/` | `python3 -m unittest discover -s scripts/tests -p "test_*.py"` |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `python scripts/check_country_overlay_files.py` |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
+
+Rows here must not be narrower than what CI runs: a clean local run against a
+narrower gate means nothing, and the gap surfaces as a surprise red (#664, #688).
 
 For `document-intelligence/`, the extras are not optional: a bare `uv run pytest` cannot collect
 `test_instructor_extractor` or `test_eval_docling_extractor` and reports green over a smaller suite

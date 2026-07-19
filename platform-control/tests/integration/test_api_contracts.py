@@ -380,6 +380,44 @@ async def test_list_source_blueprint_templates_returns_data(client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_blueprint_template_inventory_reports_config_key_provenance(client) -> None:
+    """The inventory must distinguish "never touched" from "an operator flipped it" (#668).
+
+    Without `source`, the admin inventory cannot tell a template running on the
+    shipped default from one an operator deliberately turned on (or off) — which
+    is the whole point of an evidence-gated coverage surface.
+    """
+    before = await client.get("/v1/sources/blueprint-templates")
+    assert before.status_code == 200
+    row = next(
+        r
+        for r in before.json()["data"]
+        if (r["overlay_id"], r["provider_template_id"]) == ("de", "bundesland_http_bayern")
+    )
+    assert row["source"] == "default"
+    assert row["note"] is None
+    assert row["updated_by"] is None
+
+    flip = await client.put(
+        "/v1/sources/blueprint-templates/de/bundesland_http_bayern/enablement",
+        json={"enabled": True, "note": "acceptance run 2026-07-19"},
+    )
+    assert flip.status_code == 200
+
+    after = await client.get("/v1/sources/blueprint-templates")
+    flipped = next(
+        r
+        for r in after.json()["data"]
+        if (r["overlay_id"], r["provider_template_id"]) == ("de", "bundesland_http_bayern")
+    )
+    assert flipped["source"] == "override"
+    assert flipped["enabled"] is True
+    assert flipped["default_enabled"] is False
+    assert flipped["note"] == "acceptance run 2026-07-19"
+    assert flipped["updated_at"] is not None
+
+
+@pytest.mark.asyncio
 async def test_create_source_version_rejects_mixed_spec_and_blueprint(
     client, seed_reference_data
 ) -> None:

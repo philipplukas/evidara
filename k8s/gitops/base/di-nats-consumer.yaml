@@ -30,9 +30,18 @@ spec:
                 name: evidara-config
             - secretRef:
                 name: document-intelligence-secrets
-          readinessProbe:
+          # liveness = process alive (stays green while retrying a downed broker);
+          # readiness = broker reachable, so a waiting consumer is visibly not working (#722).
+          livenessProbe:
             httpGet:
               path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10

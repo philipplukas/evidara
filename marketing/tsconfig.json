@@ -1,0 +1,49 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@evidara/tokens": ["../styles/tokens/tokens"],
+      "@evidara/shell": ["../styles/shell"],
+      "@evidara/shell/*": ["../styles/shell/*"],
+      // The shared `@evidara/*` modules live at `styles/`, outside any npm
+      // package. When tsc follows the alias into `styles/shell/`, it resolves
+      // that file's bare imports (`react`, `clsx`, ...) by walking UP from
+      // `styles/` — which finds no `node_modules` at the repo root. Pin them
+      // to THIS surface's `node_modules` so the shared modules type-check
+      // against the same React this surface ships. See #588.
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "lucide-react": ["./node_modules/lucide-react"],
+      "clsx": ["./node_modules/clsx"],
+      "tailwind-merge": ["./node_modules/tailwind-merge"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}

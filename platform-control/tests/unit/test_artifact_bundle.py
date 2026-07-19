@@ -71,9 +71,10 @@ def test_build_bundle_extraction_hints_prefers_short_title_and_skips_placeholder
 def test_build_bundle_extraction_hints_carries_provider_in_force_window() -> None:
     """The in-force window must survive into the manifest DI actually receives.
 
-    Before #628 the provider established the window and the manifest dropped it,
-    so every federal norm answered `in_force_state: unknown` downstream even
-    though acquisition knew the answer.
+    Before #628 the provider established the window and the manifest dropped it
+    — DI's artifact loader keeps only the body bytes — so every federal norm
+    answered `in_force_state: unknown` downstream even though acquisition knew
+    the answer.
     """
     hints = build_bundle_extraction_hints(
         artifact_metadata={
@@ -90,9 +91,34 @@ def test_build_bundle_extraction_hints_carries_provider_in_force_window() -> Non
     assert hints["in_force_until_hint"] == "2028-12-31"
 
 
+def test_build_bundle_extraction_hints_carries_ris_in_force_window() -> None:
+    """The same hop, exercised on the Austrian RIS path (#663).
+
+    ``ris_ogd`` reads the window from `BrKons.Inkrafttretensdatum` /
+    `Ausserkrafttretensdatum`; the helper is provider-agnostic, and this pins
+    that the AT path is carried identically to the CH federal one.
+    """
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "provider_metadata": {
+                "provider": "ris_ogd",
+                "short_title": "Test-Verordnung",
+                "in_force_from": "1998-04-24",
+                "in_force_until": "2018-12-31",
+            }
+        }
+    )
+
+    assert hints["in_force_from_hint"] == "1998-04-24"
+    assert hints["in_force_until_hint"] == "2018-12-31"
+
+
 def test_build_bundle_extraction_hints_omits_unknown_in_force_window() -> None:
-    """An unknown window is omitted, never defaulted — in-force logic must be
-    free to answer `unknown` rather than be handed a guess."""
+    """An unknown window is omitted, never defaulted.
+
+    In-force logic is four-valued so it can answer `unknown`; handing it a guess
+    defeats the design (ADR-0033).
+    """
     hints = build_bundle_extraction_hints(
         artifact_metadata={
             "provider_metadata": {
@@ -106,4 +132,21 @@ def test_build_bundle_extraction_hints_omits_unknown_in_force_window() -> None:
     )
 
     assert hints["in_force_from_hint"] == "2024-03-03"
+    assert "in_force_until_hint" not in hints
+
+
+def test_build_bundle_extraction_hints_omits_unknown_ris_end_date() -> None:
+    """Still-in-force RIS norms publish no `Ausserkrafttretensdatum` (#663)."""
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "provider_metadata": {
+                "provider": "ris_ogd",
+                "short_title": "Test-Verordnung",
+                "in_force_from": "2020-01-01",
+                "in_force_until": None,
+            }
+        }
+    )
+
+    assert hints["in_force_from_hint"] == "2020-01-01"
     assert "in_force_until_hint" not in hints

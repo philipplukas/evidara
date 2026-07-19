@@ -61,6 +61,8 @@ def get_raw_artifact_publisher(settings: SettingsSeam = None) -> RawArtifactPubl
             servers=active_settings.nats_servers,
             raw_artifact_subject=active_settings.nats_raw_artifact_subject,
             artifact_bundle_subject=active_settings.nats_artifact_bundle_subject,
+            connect_timeout_seconds=active_settings.nats_connect_timeout_seconds,
+            publish_timeout_seconds=active_settings.nats_publish_timeout_seconds,
         )
     if active_settings.event_publisher_backend == "local_outbox":
         return LocalOutboxRawArtifactPublisher(base_dir=active_settings.raw_artifact_local_dir)

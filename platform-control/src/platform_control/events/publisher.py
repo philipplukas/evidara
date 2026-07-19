@@ -71,6 +71,16 @@ class NatsRawArtifactPublisher:
 
     A JetStream stream binding the configured subjects (e.g. ``evidara.>``) must exist
     in the broker; stream provisioning is a deployment concern (ADR-0029 Slice 5).
+
+    **Connecting is bounded** (#722). This publisher sits on the synchronous dispatch
+    path, which answers an operator over HTTP, so an unreachable broker must fail in
+    seconds. nats-py's default budget is 60 reconnect attempts x 2s, and a hostname that
+    no longer resolves is retried *outside* ``connect_timeout`` — measured at 120s in
+    docker-compose and ~7min against a real DNS resolver. The publish path therefore
+    disables reconnect entirely (a one-shot publish has nothing to reconnect *for*) and
+    wraps the connect in :func:`asyncio.wait_for` as a hard ceiling that also covers DNS.
+    The resulting exception propagates unchanged, so #707's behaviour is preserved: the
+    run is recorded ``failed`` with a reason and the caller answers 502 — just quickly.
     """
 
     def __init__(
@@ -80,12 +90,19 @@ class NatsRawArtifactPublisher:
         raw_artifact_subject: str,
         artifact_bundle_subject: str,
         jetstream: Any | None = None,
+        connect_timeout_seconds: float = 5.0,
+        publish_timeout_seconds: float = 5.0,
+        connect_cooldown_seconds: float = 30.0,
     ) -> None:
         self.servers = servers
         self.raw_artifact_subject = raw_artifact_subject
         self.artifact_bundle_subject = artifact_bundle_subject
+        self.connect_timeout_seconds = connect_timeout_seconds
+        self.publish_timeout_seconds = publish_timeout_seconds
+        self.connect_cooldown_seconds = connect_cooldown_seconds
         self._jetstream = jetstream
         self._connection: Any | None = None
+        self._connect_failed_until: float | None = None
 
     async def publish_raw_artifact_available(self, artifact: RawArtifact) -> None:
         event = build_raw_artifact_event(artifact)
@@ -126,7 +143,9 @@ class NatsRawArtifactPublisher:
         msg_headers = dict(headers)
         if isinstance(event_id, str) and event_id:
             msg_headers["Nats-Msg-Id"] = event_id
-        await jetstream.publish(subject, data, headers=msg_headers)
+        await jetstream.publish(
+            subject, data, headers=msg_headers, timeout=self.publish_timeout_seconds
+        )
 
     async def _ensure_jetstream(self) -> Any:
         if self._jetstream is not None:
@@ -137,8 +156,52 @@ class NatsRawArtifactPublisher:
             raise IntegrationConfigurationError(
                 "nats-py is required for the 'nats' event publisher backend."
             ) from exc
-        self._connection = await nats.connect(self.servers)
-        self._jetstream = self._connection.jetstream()
+
+        # Bounding a *single* connect is not enough. `_publish_pending_dispatch_events`
+        # publishes each event independently so one bad event cannot strand its siblings
+        # (#707), which means a down broker would pay the connect ceiling once per event
+        # — a 500-artifact run would spend 500 x 5s and be slower than the bug this fixes.
+        # After a failed connect, fail the rest of the batch instantly and re-arm after a
+        # short cooldown, so the *next* dispatch still gets a real attempt.
+        now = asyncio.get_running_loop().time()
+        if self._connect_failed_until is not None and now < self._connect_failed_until:
+            raise TimeoutError(
+                f"NATS connect to {self.servers} is in cooldown after a recent failure "
+                f"(retrying in {self._connect_failed_until - now:.1f}s)"
+            )
+
+        try:
+            connection = await asyncio.wait_for(
+                nats.connect(
+                    self.servers,
+                    # A dispatch publish is one-shot: there is no long-lived subscription
+                    # to preserve, so reconnect only converts "broker is down" into a
+                    # multi-minute hang. The consumers do the opposite (#722).
+                    allow_reconnect=False,
+                    max_reconnect_attempts=0,
+                    connect_timeout=self.connect_timeout_seconds,
+                ),
+                timeout=self.connect_timeout_seconds,
+            )
+        except TimeoutError as exc:
+            # asyncio.wait_for's TimeoutError is the DNS backstop: getaddrinfo retries
+            # are not covered by nats-py's own connect_timeout.
+            self._connect_failed_until = (
+                asyncio.get_running_loop().time() + self.connect_cooldown_seconds
+            )
+            raise TimeoutError(
+                f"NATS connect to {self.servers} exceeded {self.connect_timeout_seconds}s"
+            ) from exc
+        except Exception:
+            # A refused connection / auth failure is just as batch-wide as a timeout.
+            self._connect_failed_until = (
+                asyncio.get_running_loop().time() + self.connect_cooldown_seconds
+            )
+            raise
+
+        self._connect_failed_until = None
+        self._connection = connection
+        self._jetstream = connection.jetstream()
         return self._jetstream
 
 

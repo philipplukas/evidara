@@ -29,6 +29,7 @@ from document_intelligence.extractors.metadata import (
     FieldProvenanceAudit,
     MetadataExtractionCandidate,
     MetadataExtractor,
+    SourceTier,
 )
 from document_intelligence.ingest.docling_adapter import normalize_with_docling
 from document_intelligence.ingest.loaders import (
@@ -213,6 +214,11 @@ class ProcessingPipeline:
         ]
 
         if primary_content_type == "application/pdf":
+            # PDFs always normalise geometrically (ADR-0041); ``parser_backend`` selects
+            # between legacy and docling for *text* modalities only. Deliberately not
+            # configurable: a text-order extractor splices marginal headings into body
+            # sentences, and no environment variable should be able to silently select
+            # silently-corrupted legal text.
             normalized_document = normalize_pdf_document(pdf_bytes, primary_artifact.artifact_id)
         else:
             assert artifact_text is not None  # guaranteed by the content-type branch above
@@ -516,24 +522,42 @@ def _compute_llm_invoked(
     return True
 
 
-def _in_force_window_from_hints(hints: Any) -> dict[str, str]:
-    """Extract `{in_force_from, in_force_until}` from v1 extraction hints.
+def _resolve_in_force_window(
+    hints: Any,
+    extracted_metadata: dict[str, Any],
+) -> dict[str, tuple[str, SourceTier]]:
+    """Resolve `{field: (value, provenance_source)}` for the in-force window.
 
-    Returns only the keys acquisition actually established. Values are passed
-    through as-is (already sanitized to non-empty strings by
-    ``coerce_extraction_hints``); no parsing or defaulting happens here,
-    because a wrong date is worse than a missing one for in-force reasoning.
+    Two independent sources can establish it, in precedence order:
+
+    1. ``extraction_hints`` from acquisition (``manifest``) — authoritative,
+       because the provider read it from the publisher's own structured
+       metadata (Fedlex ``jolux`` applicability dates, ``gemeinde_http``
+       ``inkrafttretendatum``, RIS ``Inkrafttretensdatum``).
+    2. The normalizer's ``extracted_metadata`` (``structured``) — for RIS, the
+       ``ct="ikra"``/``ct="akra"`` fields in the document XML itself, already
+       reformatted to ISO by the XML normalizer.
+
+    Values are passed through as-is (hints are already sanitized to non-empty
+    strings by ``coerce_extraction_hints``). Returns only the fields that were
+    actually established: nothing is parsed, inferred or defaulted here, because
+    a wrong date is worse than a missing one — a missing window must stay
+    missing so the four-valued in-force model can answer ``unknown`` instead of
+    being handed a guess (ADR-0033).
     """
-    if not isinstance(hints, dict):
-        return {}
-    window: dict[str, str] = {}
+    window: dict[str, tuple[str, SourceTier]] = {}
+    hints_dict = hints if isinstance(hints, dict) else {}
     for field_name, hint_key in (
         ("in_force_from", "in_force_from_hint"),
         ("in_force_until", "in_force_until_hint"),
     ):
-        value = hints.get(hint_key)
-        if isinstance(value, str) and value.strip():
-            window[field_name] = value.strip()
+        hinted = hints_dict.get(hint_key)
+        if isinstance(hinted, str) and hinted.strip():
+            window[field_name] = (hinted.strip(), "manifest")
+            continue
+        extracted = extracted_metadata.get(field_name)
+        if isinstance(extracted, str) and extracted.strip():
+            window[field_name] = (extracted.strip(), "structured")
     return window
 
 
@@ -564,14 +588,15 @@ def _build_document(
     eh = normalized_document.metadata.get("extraction_hints")
     if isinstance(eh, dict) and eh:
         metadata["extraction_hints"] = dict(eh)
-    # Temporal validity (#628/#633): promote the acquisition-established
+    # Temporal validity (#628/#633, extended to AT RIS by #663): promote the
     # in-force window onto the document's own metadata. The search projection
     # already reads `metadata.in_force_from` / `metadata.in_force_until`, so
     # this is the hop that lets four-valued in-force logic answer instead of
-    # reporting `unknown`. Only set when acquisition actually knew — an absent
-    # window stays absent rather than being inferred from a nearby date.
-    in_force_window = _in_force_window_from_hints(eh)
-    metadata.update(in_force_window)
+    # reporting `unknown`. Only set when it was actually established upstream —
+    # an absent window stays absent rather than being inferred from a nearby date.
+    in_force_window = _resolve_in_force_window(eh, extracted_metadata)
+    for field_name, (value, _source) in in_force_window.items():
+        metadata[field_name] = value
     official_citation = _resolve_official_citation(normalized_document.metadata, extracted_metadata)
     if official_citation:
         metadata["official_citation"] = official_citation
@@ -656,8 +681,11 @@ def _build_document(
         if val:
             provenance_audit.set(field_name, val, "structured")
 
-    for field_name, value in in_force_window.items():
-        provenance_audit.set(field_name, value, "manifest")
+    # The source is carried through rather than hardcoded to "manifest": once the
+    # XML fallback can establish the window, labelling it "manifest" would be a
+    # provenance lie about where the date actually came from.
+    for field_name, (value, source) in in_force_window.items():
+        provenance_audit.set(field_name, value, source)
 
     metadata["field_provenance"] = provenance_audit.to_dict()
 

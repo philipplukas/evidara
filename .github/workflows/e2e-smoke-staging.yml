@@ -65,26 +65,20 @@ jobs:
       - name: Preflight OpenSearch alias wiring
         run: |
           set -euo pipefail
+          # Self-healing used to call os-alias-bootstrap-${TARGET_ENV}, which created
+          # the index with no mappings at all and so "healed" staging into a
+          # dynamically-mapped index that silently returned empty facets (#713).
+          # The index and both aliases are created by the legal-search-api startup
+          # bootstrap from the canonical mapping; failing the preflight loudly is
+          # correct, because self-healing here can only re-create the drift.
           if gcloud run jobs execute "os-alias-check-${TARGET_ENV}" \
             --project "${GCP_PROJECT_ID}" \
             --region "${GCP_REGION}" \
             --wait; then
             echo "OpenSearch alias check passed."
           else
-            echo "::warning::OpenSearch alias check failed — running bootstrap to self-heal."
-            gcloud run jobs execute "os-alias-bootstrap-${TARGET_ENV}" \
-              --project "${GCP_PROJECT_ID}" \
-              --region "${GCP_REGION}" \
-              --wait
-            echo "Bootstrap complete. Retrying alias check…"
-            if ! gcloud run jobs execute "os-alias-check-${TARGET_ENV}" \
-              --project "${GCP_PROJECT_ID}" \
-              --region "${GCP_REGION}" \
-              --wait; then
-              echo "::error::OpenSearch alias check still failing after bootstrap. Manual intervention required."
-              exit 1
-            fi
-            echo "OpenSearch alias check passed after bootstrap."
+            echo "::error::OpenSearch alias check failed. The documents index and aliases are created by the legal-search-api startup bootstrap — redeploy or restart legal-search-api-${TARGET_ENV} (OPENSEARCH_BOOTSTRAP_ON_STARTUP must not be false) and rerun. Do not hand-create the index: see AGENTS.md on the single source of truth for the documents mapping."
+            exit 1
           fi
 
       - name: Resolve Cloud Run service URLs

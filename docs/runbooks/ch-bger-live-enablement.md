@@ -170,12 +170,33 @@ With committed `pass` evidence for each court you are enabling:
    `live_ready is False`) in the same PR, or remove it — otherwise the unit suite
    fails by design, which is the intended tripwire.
 
-2. **Template keys** — in
-   `platform-control/src/platform_control/hierarchies/source_blueprints.yaml`,
-   set `enabled: true` on the template(s) you produced evidence for, and replace
-   the placeholder `seed_urls` (`https://www.bger.ch/` /
+2. **Template config keys** — **from the admin panel, not from YAML.** ADR-0035
+   moved this key out of the repo and into the database, and #668 gave it a
+   screen: open **Blueprints** in the admin sidebar, filter to *Awaiting
+   evidence*, and use **Enable** on the template(s) you produced evidence for.
+   The dialog requires an evidence note — paste the canary verdict and the path
+   of the evidence file you committed in Step 2. This writes a
+   `blueprint_template_overrides` row with `updated_by`/`updated_at`; no repo
+   edit and no deploy.
+
+   > `updated_by` records the **operator API key**, not an individual — everyone
+   > sharing a key writes the same value. If you need per-person attribution,
+   > name yourself in the note.
+
+   Enable BVGer only if you captured BVGer `pass` evidence; the two courts are
+   independent and may be enabled separately.
+
+   The `enabled:` values still in
+   `platform-control/src/platform_control/hierarchies/source_blueprints.yaml`
+   remain the **shipped fail-closed default** — an override wins over them, and
+   their absence means "use the shipped value". Edit them only when you want a
+   *fresh* deployment to ship the template already on; do not edit them as the
+   way to enable a template you have evidence for.
+
+3. **Real URLs** — replace the placeholder `seed_urls` (`https://www.bger.ch/` /
    `https://www.bvger.ch/`) with the confirmed `index_urls` / `seed_urls` from
-   Step 0:
+   Step 0. This half is still a repo change; it is blueprint content, not the
+   lock:
 
    ```yaml
    ch_court_decisions_bger:
@@ -184,13 +205,9 @@ With committed `pass` evidence for each court you are enabling:
        - https://www.bger.ch/…   # confirmed weekly-rulings listing
      court: bger
      …
-     enabled: true               # was false
    ```
 
-   Enable BVGer only if you captured BVGer `pass` evidence; the two courts are
-   independent and may be enabled in separate PRs.
-
-3. **Do not touch** `cp_ch_court_decisions`, `auth_bger`, or `auth_bvger` — the
+4. **Do not touch** `cp_ch_court_decisions`, `auth_bger`, or `auth_bvger` — the
    compliance policy and authority-level binding are already correct.
 
 ## Step 4 — Confirm searchability
@@ -212,8 +229,9 @@ After the flip is deployed:
 
 If a live court run misbehaves after enablement:
 
-1. Set the affected template back to `enabled: false` (fastest, per-court) and
-   redeploy — this re-arms the two-key lock without touching the provider.
+1. Hit **Disable** on the affected template in the admin **Blueprints** screen
+   (fastest, per-court, no deploy) — this re-arms the two-key lock without
+   touching the provider, and records the reason alongside the flip.
 2. If the provider itself regresses, set `live_ready = False` to disable all
    court templates at once.
 3. Re-run the canary to confirm runs are blocked again, and capture a short
@@ -224,6 +242,7 @@ If a live court run misbehaves after enablement:
 - [ ] Step 0 — permitted source confirmed (robots, rate, link pattern, attribution)
 - [ ] Step 1 — canary `pass` for BGer (and BVGer if enabling)
 - [ ] Step 2 — evidence committed under `docs/runbooks/evidence/`
-- [ ] Step 3 — `live_ready=True` + template `enabled: true` + real seed/index URLs
+- [ ] Step 3 — `live_ready=True` (code) + template enabled from the admin
+      **Blueprints** screen with an evidence note (no deploy) + real seed/index URLs
 - [ ] Step 4 — post-flip canary `pass` + searchability confirmed
 - [ ] Promotion to staging/prod scheduled

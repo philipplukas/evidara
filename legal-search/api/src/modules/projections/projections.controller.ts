@@ -13,10 +13,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PubSubUnwrapInterceptor } from '../../core/interceptors/pubsub-unwrap.interceptor';
-// biome-ignore lint/style/useImportType: DTO classes are needed for runtime validation metadata.
+// Value imports, deliberately: `import type` erases these classes, and ValidationPipe
+// then has no metatype to instantiate — the handler receives an empty object and every
+// field is silently dropped (#728). `useImportType` is off for controllers in
+// biome.json so `npm run format` cannot rewrite them.
 import { DocumentProcessedEventDto, DocumentWithdrawnEventDto } from './dto/projection-events.dto';
 import type { ProjectionHistoryStatus } from './projections.repository';
-// biome-ignore lint/style/useImportType: Nest DI needs runtime class metadata.
 import { type ProjectionApplyResult, ProjectionsService } from './projections.service';
 
 @ApiTags('projections')
