@@ -1,6 +1,8 @@
 import { Controller, Get, Headers, Inject, Query } from '@nestjs/common';
 import { resolveLocale } from '../../core/i18n';
-// biome-ignore lint/style/useImportType: value import so ValidationPipe sees class-validator metadata on SearchQueryDto
+// Value import, deliberately: `import type` erases the class and ValidationPipe
+// stops seeing SearchQueryDto's class-validator metadata (#728). `useImportType`
+// is off for controllers in biome.json so `npm run format` cannot rewrite this.
 import { SearchQueryDto } from './dto/search-query.dto';
 import { SearchService } from './search.service';
 
