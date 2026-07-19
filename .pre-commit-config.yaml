@@ -123,6 +123,17 @@ repos:
         pass_filenames: false
         files: ^(docs|legal-search/frontend/docs)/.*\.md$
 
+      # A committed VRT baseline is an assertion about what the product looks
+      # like. Three of them silently certified live bugs because they were
+      # re-blessed locally with no record of why (#611). Mirrored in CI as the
+      # `visual-baseline-provenance` job.
+      - id: visual-baseline-provenance
+        name: Visual baseline provenance (no unrecorded re-bless)
+        entry: python3 scripts/check_visual_baseline_provenance.py
+        language: system
+        pass_filenames: false
+        files: ^legal-search/frontend/e2e/visual\.spec\.ts-snapshots/.*$
+
       - id: js-workspace-hygiene
         name: JS workspace hygiene (no root node_modules symlink, react deduped)
         entry: bash scripts/check-js-workspace-hygiene.sh

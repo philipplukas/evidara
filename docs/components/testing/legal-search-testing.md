@@ -142,6 +142,47 @@ The frontend is a thin layer over well-validated APIs. A handful of behavior tes
 
 ---
 
+## Visual regression baselines
+
+> The "do not invest in visual regression testing" guidance above describes the
+> **early** project stage. A Playwright pixel suite now exists
+> (`legal-search/frontend/e2e/visual.spec.ts`), and this section is the current
+> contract for it.
+
+**Zero pixel tolerance.** `toHaveScreenshot` runs at Playwright's default, which
+allows zero differing pixels. A project-level `maxDiffPixelRatio: 0.06` used to
+sit in `playwright.config.ts`; on a full-page 1600x900 shot that licensed ~86,000
+pixels of drift, and the suite consequently stayed green across a ~260px layout
+error for 3.5 months (#605), a replaced brand mark, and the #674 filter-badge
+bug. Do not reintroduce a default tolerance. If one snapshot genuinely needs
+slack, scope it to that `toHaveScreenshot` call with a comment justifying the
+number (#611).
+
+**Baselines are generated in CI.** Add the `visual-baseline-refresh` label to a
+PR and push; the job regenerates on `ubuntu-latest` — the same runner that
+verifies — and appends an entry to
+`legal-search/frontend/e2e/visual.spec.ts-snapshots/PROVENANCE.md`. Generation
+and verification must share an environment, because font rasterisation differs
+between machines and zero tolerance does not forgive it.
+
+**Every baseline change needs a recorded reason.**
+`scripts/check_visual_baseline_provenance.py` fails CI and pre-commit if a
+`*.png` under the snapshot directory changes without a matching `PROVENANCE.md`
+entry. "The tests were red" is not a reason — re-blessing to restore green is
+precisely how three baselines came to certify live bugs.
+
+**Pixels are the wrong tool for geometry.** A collapsed panel or a 1px drag
+handle is small in pixel terms but fatal in use. Assert those with bounding-box
+checks (`e2e/workspace-panels.spec.ts`), which state the invariant outright,
+and reserve screenshots for styling.
+
+**Beware `reuseExistingServer`.** Playwright will attach to whatever already
+listens on port 3101 — including a stale dev server or a docker-compose
+container from another checkout. Confirm what you are hitting before trusting
+either a red or a green run.
+
+---
+
 ## Drift Checks
 
 | Check | What it catches |
