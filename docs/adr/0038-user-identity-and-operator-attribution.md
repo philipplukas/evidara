@@ -344,7 +344,7 @@ subset.
 
 ## Consequences
 
-**Positive**
+### Positive
 
 - An approval in the coverage loop names a person. #628's evidence gate produces evidence.
 - The shared BasicAuth password stops being the only thing between the internet and a
@@ -352,7 +352,7 @@ subset.
 - Demo accounts become safe to hand out.
 - ADR-0020's Future Work items (RBAC, OIDC) are closed rather than perpetually deferred.
 
-**Negative / accepted**
+### Negative / accepted
 
 - A third-party dependency on the login path. If WorkOS is down, nobody logs in. Mitigated
   only by the fact that sessions outlive brief outages.
@@ -364,6 +364,6 @@ subset.
   hardening change fixes.
 - One Alembic migration and a role check on every write route.
 
-**Neutral**
+### Neutral
 
 - `X-API-Key` and ADR-0020's scoped-key model are unchanged. This is additive.
