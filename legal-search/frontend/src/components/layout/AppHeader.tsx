@@ -27,6 +27,7 @@ import { ShareButton } from "@/components/ui/ShareButton";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { buildControlPanelHref } from "@/lib/control-plane-entry";
 import { SUPPORTED_LOCALES, useLocale } from "@/lib/locale-context";
+import { describeResultSetScope } from "@/lib/scope-label";
 import { useWorkspace } from "@/lib/workspace-store";
 
 const RECENT_QUERIES_STORAGE_KEY = "evidara.recent-queries";
@@ -104,7 +105,9 @@ export function AppHeader({
         controlPanelUrl: resolvedControlPanelUrl,
         returnTo: returnToUrl,
         query: urlQuery || storeQuery,
-        scopeLabel: state.resultSet.scopeLabel,
+        scopeLabel: describeResultSetScope(state.resultSet, (key, values) =>
+          t(`results.scope.${key}`, values),
+        ),
         selectedId,
       }) ?? resolvedControlPanelUrl)
     : resolvedControlPanelUrl;

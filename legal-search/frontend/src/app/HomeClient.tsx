@@ -24,6 +24,13 @@ export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: H
     results: SearchResultViewModel[];
     totalResults?: number;
   } | null>(null);
+  // A *rejected* boot (network failure, DNS failure, CORS rejection, aborted
+  // request) used to be swallowed by `void load()`, leaving `bootState` null and
+  // the skeleton below rendering forever — indistinguishable from a slow
+  // network, so the user waits instead of retrying (#678). Re-thrown during
+  // render so `app/error.tsx` handles it: a failed boot is an error, not an
+  // empty result set, and the two must not look identical.
+  const [bootError, setBootError] = useState<Error | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -54,11 +61,18 @@ export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: H
       });
     };
 
-    void load();
+    load().catch((error: unknown) => {
+      if (!active) return;
+      setBootError(error instanceof Error ? error : new Error(String(error)));
+    });
     return () => {
       active = false;
     };
   }, [urlQuery]);
+
+  if (bootError) {
+    throw bootError;
+  }
 
   if (!bootState) {
     return (

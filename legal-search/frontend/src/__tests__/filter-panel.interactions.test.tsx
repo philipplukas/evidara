@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FilterPanel } from "@/components/filters/FilterPanel";
 import type { FilterViewModel } from "@/lib/types";
 import { renderWithProviders } from "./helpers/render-with-providers";
@@ -88,5 +88,39 @@ describe("FilterPanel interaction matrix", () => {
     fireEvent.click(resetButton);
     expect(austriaChip.className).not.toContain("bg-accent-core");
     expect(civilCheckbox.getAttribute("aria-checked")).toBe("false");
+  });
+});
+
+/**
+ * #610 — dragging the rail below `minSize` collapses it to a ~56px sliver. The
+ * panel had no collapsed rendering, so it rendered the *full* panel clipped:
+ * a truncated "FILT" heading and orphaned checkbox labels ("S C", "A C").
+ */
+describe("FilterPanel collapsed rail", () => {
+  it("renders an expand affordance instead of clipped filter content", () => {
+    renderWithProviders(<FilterPanel filters={filters} collapsed onExpand={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "Filterbereich einblenden" })).toBeInTheDocument();
+    // None of the full-panel controls may render into a 56px rail.
+    expect(screen.queryByRole("button", { name: /Switzerland/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Civil law/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /alles zurücksetzen/i })).not.toBeInTheDocument();
+  });
+
+  it("calls onExpand when the rail affordance is activated", () => {
+    const onExpand = vi.fn();
+    renderWithProviders(<FilterPanel filters={filters} collapsed onExpand={onExpand} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filterbereich einblenden" }));
+    expect(onExpand).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the full panel when not collapsed", () => {
+    renderWithProviders(<FilterPanel filters={filters} />);
+
+    expect(screen.getByRole("button", { name: /Switzerland/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Filterbereich einblenden" }),
+    ).not.toBeInTheDocument();
   });
 });

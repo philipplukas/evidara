@@ -50,6 +50,23 @@ export const DESKTOP_PANEL_SPLIT = {
   detailOpen: { filters: 18, results: 50, detail: 32 },
 } as const;
 
+/**
+ * Width of the collapsed filter rail, in px.
+ *
+ * Expressed in pixels rather than the previous `4%` so the collapsed rail is a
+ * fixed, designed size at every viewport instead of 40px on a laptop and 77px
+ * on an ultrawide. `FilterPanel` renders a purpose-built icon rail at this
+ * width (see #610); it used to render the full panel clipped into a sliver.
+ */
+export const FILTER_RAIL_COLLAPSED_PX = 56;
+
+/**
+ * Below this width the filter rail is considered collapsed. Sits well above
+ * `FILTER_RAIL_COLLAPSED_PX` and well below `minSize` (12% ≈ 173px at 1440),
+ * so no legitimate dragged width lands in the gap.
+ */
+const FILTER_RAIL_COLLAPSED_THRESHOLD_PX = FILTER_RAIL_COLLAPSED_PX + 8;
+
 interface WorkspaceClientProps {
   searchContext: SearchContextViewModel;
   filters: FilterViewModel[];
@@ -71,6 +88,7 @@ export default function WorkspaceClient({
   const { state: constraints } = useSearchConstraints();
   const [activeFilters, setActiveFilters] = useState(filters);
   const [searchError, setSearchError] = useState(false);
+  const [isFilterRailCollapsed, setIsFilterRailCollapsed] = useState(false);
 
   useEffect(() => {
     setActiveFilters(filters);
@@ -103,6 +121,19 @@ export default function WorkspaceClient({
   const handleCloseDetail = useCallback(() => {
     void setSelectedId(null);
   }, [setSelectedId]);
+
+  // `Panel` exposes no onCollapse/onExpand in react-resizable-panels v4 — the
+  // rendered size is the only signal, so derive collapse from it.
+  const handleFilterRailResize = useCallback((panelSize: { inPixels: number }) => {
+    setIsFilterRailCollapsed(panelSize.inPixels < FILTER_RAIL_COLLAPSED_THRESHOLD_PX);
+  }, []);
+
+  // `expand()` restores the last-known size, which after a drag-to-collapse is
+  // the collapsed size — so resize to the designed default instead (same
+  // reasoning as the detail-panel sync effect below).
+  const handleExpandFilterRail = useCallback(() => {
+    leftRef.current?.resize(`${DESKTOP_PANEL_SPLIT.detailClosed.filters}%`);
+  }, []);
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -264,11 +295,17 @@ export default function WorkspaceClient({
           parentSource: state.resultSet.source,
         },
         results,
-        scopeLabel: `${label} for ${state.resultSet.items.find((r) => r.id === sourceId)?.title ?? sourceId}`,
+        // Localized here rather than in the reducer: the reducer is pure and
+        // cannot translate, which is how the sibling search label shipped as
+        // English `Results for "…"` into the German UI (#648).
+        scopeLabel: t("results.scope.pivotFor", {
+          label,
+          title: state.resultSet.items.find((r) => r.id === sourceId)?.title ?? sourceId,
+        }),
         totalResults,
       });
     },
-    [dispatch, state.resultSet, constraints, preferences.resultsPerPage],
+    [dispatch, state.resultSet, constraints, preferences.resultsPerPage, t],
   );
 
   const handleSearch = executeSearch;
@@ -425,13 +462,20 @@ export default function WorkspaceClient({
             minSize="12%"
             maxSize="28%"
             collapsible
-            collapsedSize="4%"
+            collapsedSize={`${FILTER_RAIL_COLLAPSED_PX}px`}
+            onResize={handleFilterRailResize}
           >
             <div
-              className="h-full overflow-y-auto rounded-[var(--radius-panel)] border border-border/70 bg-surface-panel"
+              className={`h-full rounded-[var(--radius-panel)] border border-border/70 bg-surface-panel ${
+                isFilterRailCollapsed ? "overflow-hidden" : "overflow-y-auto"
+              }`}
               style={{ boxShadow: "var(--shadow-raised)" }}
             >
-              <FilterPanel filters={activeFilters} />
+              <FilterPanel
+                filters={activeFilters}
+                collapsed={isFilterRailCollapsed}
+                onExpand={handleExpandFilterRail}
+              />
             </div>
           </ResizablePanel>
 

@@ -3,7 +3,9 @@
 import { ArrowRight, BookOpen, FileText, Globe, Link as LinkIcon, MapPin } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ShareButton } from "@/components/ui/ShareButton";
+import { useResultHrefBuilder } from "@/hooks/use-result-href";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { isModifiedClick } from "@/lib/result-href";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
 import { HighlightedSnippet } from "./HighlightedSnippet";
@@ -63,6 +65,8 @@ export function CommentaryResultCard({
 }: CommentaryResultCardProps) {
   const t = useTranslations("results.card");
   const tCommentary = useTranslations("results.commentaryCard");
+  const buildHref = useResultHrefBuilder();
+  const href = buildHref(result.id);
   const sourceDocumentIds = result.sourceDocumentIds ?? [];
 
   return (
@@ -101,18 +105,25 @@ export function CommentaryResultCard({
       {/* Title row */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <h3 className="min-w-0 flex-1">
-          <button
-            type="button"
+          {/* See ResultCard: a real anchor so the row is linkable/citable (#648). */}
+          <a
+            href={href}
             onClick={(e) => {
               e.stopPropagation();
+              if (isModifiedClick(e.nativeEvent)) return;
+              e.preventDefault();
               onFocus(result.id);
             }}
             className="text-left text-[15px] font-semibold leading-5 text-foreground hover:text-attention focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:rounded"
           >
             {result.title}
-          </button>
+          </a>
         </h3>
-        <ShareButton size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" />
+        <ShareButton
+          size="sm"
+          url={href}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+        />
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
           {isSelected && (
             <span className="inline-flex items-center rounded-full border border-attention/20 bg-attention/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-attention">

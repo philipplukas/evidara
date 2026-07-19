@@ -12,11 +12,49 @@ import { FilterBar } from "./FilterBar";
 
 interface FilterPanelProps {
   filters: FilterViewModel[];
+  /**
+   * The surrounding resizable rail has been dragged below its `minSize` and is
+   * now rendering at `collapsedSize`. Without this the full panel was simply
+   * clipped into an unreadable ~56px sliver — a truncated "FILT" heading and
+   * orphaned checkbox labels (see #610). Collapsed renders a purpose-built icon
+   * rail instead.
+   */
+  collapsed?: boolean;
+  /** Restores the rail to its default width. Only meaningful when collapsed. */
+  onExpand?: () => void;
 }
 
-export function FilterPanel({ filters }: FilterPanelProps) {
-  const { dispatch } = useSearchConstraints();
+export function FilterPanel({ filters, collapsed = false, onExpand }: FilterPanelProps) {
+  const { state: constraints, dispatch } = useSearchConstraints();
   const t = useTranslations();
+
+  if (collapsed) {
+    const activeCount = constraints.refinements.length;
+    return (
+      <div className="flex h-full flex-col items-center gap-3 overflow-hidden py-3">
+        <button
+          type="button"
+          onClick={onExpand}
+          aria-label={t("filter.expandPanel")}
+          title={t("filter.expandPanel")}
+          className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-surface-shell/45 text-muted-foreground shadow-inset-surface transition-colors hover:border-accent-core/40 hover:text-accent-core focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          {activeCount > 0 && (
+            <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-core px-1 text-tiny font-semibold text-white">
+              {activeCount}
+            </span>
+          )}
+        </button>
+        <span
+          aria-hidden="true"
+          className="select-none text-tiny font-semibold uppercase tracking-[0.16em] text-muted-foreground [writing-mode:vertical-rl]"
+        >
+          {t("filter.filtersTitle")}
+        </span>
+      </div>
+    );
+  }
 
   if (filters.length === 0) {
     return (

@@ -2,6 +2,7 @@
 
 import { ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { describeResultSetScope } from "@/lib/scope-label";
 import type { ResultSetSource } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 
@@ -40,7 +41,7 @@ export function ResultSetScopeBar() {
           {sourceKindLabel}
         </span>
         <span className="truncate text-sm font-semibold text-foreground">
-          {state.resultSet.scopeLabel}
+          {describeResultSetScope(state.resultSet, t)}
         </span>
       </div>
       {currentSource.type === "pivot" && (

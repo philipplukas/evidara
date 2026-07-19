@@ -53,6 +53,7 @@
     },
     "loadFailed": "Filter konnten nicht geladen werden",
     "loadFailedDescription": "Filteroptionen konnten nicht abgerufen werden.",
+    "expandPanel": "Filterbereich einblenden",
     "tooltip": {
       "checkbox": "W\u00e4hlen Sie eine oder mehrere Optionen aus der Liste.",
       "chip": "Klicken Sie auf die Chips, um Ergebnisse einzugrenzen.",
@@ -135,6 +136,8 @@
       "back": "Zum vorherigen Bereich",
       "searchFor": "Suche nach \u201E{query}\u201C",
       "reopen": "{scope} erneut \u00f6ffnen",
+      "resultsFor": "Ergebnisse f\u00fcr \u201E{query}\u201C",
+      "pivotFor": "{label} zu {title}",
       "pivotDescription": "Der Bereich wurde gegen\u00fcber der vorherigen Ergebnismenge eingegrenzt, damit die aktuellen Belege fokussierter bleiben."
     },
     "sourceTypes": {
