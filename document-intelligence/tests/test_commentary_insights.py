@@ -69,7 +69,14 @@ class CommentaryInsightExtractorTests(unittest.TestCase):
         insight = insights[0]
         self.assertEqual(insight.insight_type, "referenced_provision")
         self.assertEqual(insight.display_text, passage)
-        self.assertIn("Art. 754 OR", insight.claim)
+        # `Art. 754 OR` now mints a canonical key (#594), so the passage is
+        # backed by a RESOLVABLE authority rather than a bare string. The claim
+        # carries the key, matching how every other keyed type already reads
+        # ("References sr:210"); the human-readable form stays in
+        # `display_text` and in the authority's own `text`.
+        self.assertIn("abbrev_art:OR/754", insight.claim)
+        self.assertEqual(insight.referenced_authorities[0]["text"], "Art. 754 OR")
+        self.assertEqual(insight.referenced_authorities[0]["normalized_reference"], "abbrev_art:OR/754")
         self.assertEqual(insight.support[0]["ref_type"], "passage")
         self.assertEqual(insight.support[0]["passage"], passage)
         self.assertEqual(insight.language, "de")
@@ -84,14 +91,30 @@ class CommentaryInsightExtractorTests(unittest.TestCase):
 
         self.assertEqual(insights, [])
 
-    def test_min_confidence_filters_fuzzy_article_references(self) -> None:
+    def test_min_confidence_filters_fuzzy_references(self) -> None:
+        """A citation that mints no key stays below the high-confidence bar.
+
+        `Art. 754 OR` used to be the example here, but it is no longer fuzzy
+        (#594): it resolves to `abbrev_art:OR/754`. A BGE reference is still
+        genuinely unresolvable, so it is what now exercises the filter.
+        """
+        insights = extract_commentary_insights(
+            document=_document(),
+            sections=[_section("BGE 147 III 49 wird in der Lehre erlaeutert.")],
+            min_confidence=0.9,
+        )
+
+        self.assertEqual(insights, [])
+
+    def test_keyed_article_reference_clears_the_high_confidence_bar(self) -> None:
+        """The flip side: a resolvable article reference is NOT filtered out."""
         insights = extract_commentary_insights(
             document=_document(),
             sections=[_section("Art. 754 OR wird in der Lehre erlaeutert.")],
             min_confidence=0.9,
         )
 
-        self.assertEqual(insights, [])
+        self.assertEqual(len(insights), 1)
 
 
 if __name__ == "__main__":

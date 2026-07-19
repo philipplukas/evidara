@@ -48,6 +48,8 @@ export class CitationsOpenSearchAdapter implements CitationsRepository {
       title: src.title as string | undefined,
       document_type: src.document_type as string | undefined,
       jurisdiction: src.jurisdiction as string | undefined,
+      section_id: src.section_id as string | undefined,
+      section_anchor: src.section_anchor as string | undefined,
     };
   }
 

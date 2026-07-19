@@ -26,12 +26,19 @@ export interface ResolveCitationResponse {
   /** The canonical key `query` normalizes to; null for a fuzzy citation. */
   normalized_reference: ResolveCitationResponseNormalizedReference;
   resolved: boolean;
-  /** Why an unresolved citation is unresolved. The distinction is load-bearing:
+  /** Why an unresolved citation is unresolved. The distinctions are load-bearing:
 `not_normalizable` is an EXTRACTOR gap (the citation form is fuzzy),
 `no_target_in_corpus` is a COVERAGE gap (the key is valid, the norm is
-simply not ingested). Collapsing both into a bare `resolved: false` is how
-a citation graph ends up with silently missing edges.
+simply not ingested), and `ambiguous` means several DIFFERENT documents
+are addressable by this key — short titles are not globally unique, so
+this is a real state, not an error. Collapsing these into a bare
+`resolved: false` is how a citation graph ends up with silently missing
+edges; collapsing `ambiguous` by ranking is how it ends up with wrong ones.
  */
   unresolved_reason: ResolveCitationResponseUnresolvedReason;
+  /** On `ambiguous`, every norm the key could mean — returned UNRANKED so the
+caller can disambiguate on evidence the API does not have. Otherwise the
+resolved target list.
+ */
   targets: CitationTarget[];
 }

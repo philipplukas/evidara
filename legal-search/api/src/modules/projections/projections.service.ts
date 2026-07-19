@@ -5,6 +5,10 @@ import {
   DOCUMENT_INTELLIGENCE_CLIENT,
   type DocumentIntelligenceClient,
 } from '../../lib/document-intelligence/document-intelligence.client';
+// The abbreviation SHAPE test is shared with the resolver on purpose: minting
+// a node the resolver's key format cannot address is the drift that silently
+// loses edges.
+import { isLegalAbbreviation } from '../citations/citation-key';
 import type {
   DocumentProcessedEventDto,
   DocumentWithdrawnEventDto,
@@ -1037,6 +1041,8 @@ export class ProjectionsService {
       targets.push({ ...base, identifier_type: 'at_bgbl', identifier_value: atBgblRef });
     }
 
+    targets.push(...this.extractAbbreviationTargets(base, projection, leanDocument));
+
     return targets.filter(
       (target, index, all) =>
         all.findIndex(
@@ -1045,6 +1051,97 @@ export class ProjectionsService {
             other.identifier_value === target.identifier_value,
         ) === index,
     );
+  }
+
+  /**
+   * Mint the short-title nodes: `abbrev:BV` for the statute, and
+   * `abbrev_art:BV/36` for each of its article-level sections.
+   *
+   * This is what makes "Art. 36 BV" resolvable WITHOUT search. The corpus
+   * supplies the abbreviation itself — Fedlex's `title_short` is literally the
+   * short title — so the mapping from short form to norm is a fact we hold,
+   * not an inference. Nothing here consults a dictionary of what `BV` "means";
+   * if a document does not publish a `title_short`, it mints no abbreviation
+   * node and citations to it stay honestly unresolved.
+   *
+   * Only legislation mints these. A decision that merely discusses the BV must
+   * never become addressable AS the BV.
+   */
+  private extractAbbreviationTargets(
+    base: Omit<CitationTargetEntry, 'identifier_type' | 'identifier_value'>,
+    projection: SearchProjectionDocument,
+    leanDocument?: unknown | null,
+  ): CitationTargetEntry[] {
+    if (projection.document_type !== 'law') return [];
+
+    const shortTitle = this.extractShortTitle(leanDocument);
+    if (!shortTitle || !isLegalAbbreviation(shortTitle)) return [];
+
+    const targets: CitationTargetEntry[] = [
+      { ...base, identifier_type: 'abbrev', identifier_value: shortTitle },
+    ];
+
+    for (const section of this.asArrayOfRecords(
+      this.asRecord(leanDocument)?.sections ??
+        this.asRecord(leanDocument)?.document_sections ??
+        this.asRecord(leanDocument)?.body_sections,
+    )) {
+      const title = typeof section.title === 'string' ? section.title : '';
+      // Article-level sections announce themselves: "Art. 36 Einschränkungen
+      // von Grundrechten". The number is taken from the HEAD of the section
+      // title only — a number anywhere else in the heading is not the
+      // article's own number.
+      const match = title.match(/^\s*Art\.?\s+(\d+(?:bis|ter|quater|quinquies|sexies)?)\b/);
+      if (!match) continue;
+
+      const sectionId = typeof section.section_id === 'string' ? section.section_id : undefined;
+      if (!sectionId) continue;
+
+      const anchor = [section.anchor, section.anchor_id, section.section_anchor].find(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0,
+      );
+
+      targets.push({
+        ...base,
+        identifier_type: 'abbrev_art',
+        identifier_value: `${shortTitle}/${match[1]}`,
+        section_id: sectionId,
+        section_anchor: anchor ?? `art_${match[1]}`,
+      });
+    }
+
+    return targets;
+  }
+
+  /**
+   * The document's own short title (`BV`), as published by the source.
+   *
+   * Fedlex delivers it inside the provider payload nested in `body_text`,
+   * which is the same place `extractStructuredTitleFromValue` reads the real
+   * title from.
+   */
+  private extractShortTitle(leanDocument?: unknown | null): string | undefined {
+    const direct = this.asRecord(leanDocument)?.title_short;
+    if (typeof direct === 'string' && direct.trim()) return direct.trim();
+
+    const bodyText = this.asRecord(leanDocument)?.body_text;
+    return this.extractShortTitleFromValue(bodyText);
+  }
+
+  private extractShortTitleFromValue(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return undefined;
+    try {
+      const record = this.asRecord(JSON.parse(trimmed) as unknown);
+      if (!record) return undefined;
+      if (typeof record.title_short === 'string' && record.title_short.trim()) {
+        return record.title_short.trim();
+      }
+      return this.extractShortTitleFromValue(record.inline_body);
+    } catch {
+      return undefined;
+    }
   }
 
   /**

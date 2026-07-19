@@ -72,13 +72,25 @@ export const CITATIONS_INDEX_PROPERTIES = {
 export const CITATION_TARGETS_INDEX_PROPERTIES = {
   /** The document that IS this norm. */
   document_id: dualKeyword,
-  /** `sr` | `celex` | `ecli` | `at_bgbl` | `official_citation` | ... */
+  /** `sr` | `celex` | `ecli` | `at_bgbl` | `abbrev` | `abbrev_art` | ... */
   identifier_type: dualKeyword,
-  /** `101`, `32016R0679`, `ECLI:CH:BGER:2023:...` */
+  /** `101`, `32016R0679`, `ECLI:CH:BGER:2023:...`, `BV`, `BV/36` */
   identifier_value: dualKeyword,
   title: { type: 'text', fields: { keyword: { type: 'keyword' } } },
   document_type: dualKeyword,
   jurisdiction: dualKeyword,
+
+  /**
+   * The section this identifier addresses, for PROVISION-level targets
+   * (`abbrev_art:BV/36`). Null on document-level targets (`sr:101`).
+   *
+   * This is what makes "Art. 36 BV" resolve to an openable provision rather
+   * than to a 525KB statute — the granularity ADR-0033's acceptance question
+   * turns on ("BV Art. 36 as a citable unit").
+   */
+  section_id: dualKeyword,
+  /** In-document anchor for the section, e.g. `art_36`. */
+  section_anchor: dualKeyword,
 } as const;
 
 function definition(

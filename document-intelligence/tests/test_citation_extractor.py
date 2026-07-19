@@ -338,3 +338,56 @@ class TestEdgeCases:
         assert "bge" in types
         assert "eu_regulation" in types
         assert "article" in types
+
+
+class TestArticleCitationPrecision:
+    """The precision gate on `article` citations (#594).
+
+    `_ARTICLE_PATTERN`'s trailing token is positional, so before this gate the
+    extractor read a statute's own article headings as citations to statutes
+    named after the first word of the heading. On the real Bundesverfassung
+    fixture that manufactured 187 phantom citations out of 188 matches, which
+    padded the denominator of the citation graph's resolution rate until the
+    metric measured mostly noise.
+    """
+
+    def test_real_bundesverfassung_yields_no_phantom_citations(self):
+        """Regression against the FULL, REAL BV — the document that exposed it.
+
+        The BV's headings ("Art. 36 Einschränkungen von Grundrechten") must
+        contribute zero `article` citations. Asserting against the real
+        fixture rather than a synthetic string is the point: the synthetic
+        tests above passed throughout, because they only ever fed the shape
+        the code already handled.
+        """
+        import re
+        from pathlib import Path
+
+        fixture = Path(__file__).parent / "golden" / "ch_fedlex_bv_html" / "document.html"
+        text = re.sub(r"<[^>]+>", " ", fixture.read_text(encoding="utf-8", errors="ignore"))
+
+        articles = [c for c in extract_citations(text) if c.citation_type == "article"]
+
+        # Every surviving article citation names an abbreviation-shaped
+        # statute. None is a German heading word.
+        assert articles, "the BV genuinely cites other statutes; expected some to survive"
+        for citation in articles:
+            assert normalize_citation(citation) is not None, f"{citation.text!r} survived extraction but mints no key"
+
+        # The specific phantoms this gate exists to kill.
+        texts = " | ".join(c.text for c in articles)
+        for heading_word in ("Einschränkungen", "Schweizerische", "Zweck", "Grundsätze"):
+            assert heading_word not in texts
+
+    def test_genuine_citation_survives(self):
+        citations = extract_citations("Die Zuständigkeit richtet sich nach Art. 58 Abs. 1 ParlG.")
+        articles = [c for c in citations if c.citation_type == "article"]
+        assert len(articles) == 1
+        assert articles[0].metadata["abbrev"] == "ParlG"
+        assert articles[0].metadata["article"] == "58"
+        assert articles[0].metadata["paragraph"] == "1"
+        assert normalize_citation(articles[0]) == "abbrev_art:ParlG/58"
+
+    def test_heading_is_not_a_citation(self):
+        citations = extract_citations("Art. 36 Einschränkungen von Grundrechten")
+        assert [c for c in citations if c.citation_type == "article"] == []

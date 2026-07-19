@@ -245,13 +245,37 @@ export class ProjectionOpenSearchAdapter implements ProjectionRepository {
     }
   }
 
+  /**
+   * The `_id` a citation target is written under.
+   *
+   * For the deterministic identifier types the id stays `{type}:{value}`, so
+   * re-projecting a document is idempotent.
+   *
+   * For `abbrev` / `abbrev_art` the document id is appended, because short
+   * titles are NOT globally unique — a cantonal and a federal act can both be
+   * abbreviated `EG`, and the BV's own `title_short` differs per language.
+   * Under a bare `{type}:{value}` id those rows would silently overwrite each
+   * other and the last writer would win, which is precisely the silent
+   * disambiguation #594 must not do. Keeping them as separate rows lets
+   * `findTargetsByKey` return BOTH, and the resolver refuse as `ambiguous`.
+   */
+  private static citationTargetId(target: CitationTargetEntry): string {
+    const key = `${target.identifier_type}:${target.identifier_value}`;
+    if (target.identifier_type !== 'abbrev' && target.identifier_type !== 'abbrev_art') {
+      return key;
+    }
+    return target.section_id
+      ? `${key}#${target.document_id}#${target.section_id}`
+      : `${key}#${target.document_id}`;
+  }
+
   async bulkIndexCitationTargets(targets: CitationTargetEntry[]): Promise<void> {
     if (targets.length === 0) return;
     const body = targets.flatMap((target) => [
       {
         index: {
           _index: this.indexCitationTargets,
-          _id: `${target.identifier_type}:${target.identifier_value}`,
+          _id: ProjectionOpenSearchAdapter.citationTargetId(target),
         },
       },
       target,

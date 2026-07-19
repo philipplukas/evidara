@@ -12,12 +12,22 @@
  * drift, the graph silently loses edges, so the shapes are deliberately kept
  * dumb and literal, and `citation-key.spec.ts` pins the exact keys DI emits.
  *
- * DELIBERATE SCOPE (#582): only the DETERMINISTIC citation types are ported —
- * the ones where the string itself contains the identifier. Fuzzy types (bare
- * "Art. 36 BV", BGE references, German statute paragraphs) need search-based
- * resolution against the corpus; DI returns `None` for them too, and they are
- * reported honestly as unresolved rather than guessed at. See the follow-up
- * issue referenced in the PR.
+ * SCOPE (#582, extended by #594): the deterministic citation types, plus
+ * article references ("Art. 36 BV") via `abbrev_art:`.
+ *
+ * #594 asked for SEARCH-BASED resolution of article references. Measuring
+ * first showed that was the wrong tool. "Art. 36 BV" needs no ranking: the
+ * short title is an identifier, and Fedlex already publishes it as
+ * `title_short`. So resolution here is a deterministic lookup against
+ * `citation-targets`, and the corpus — not a similarity score — decides
+ * whether the norm exists. A ranking-based resolver would have produced a
+ * confident edge for every one of the 187 phantom "citations" the extractor
+ * was manufacturing from the BV's own article headings.
+ *
+ * Still NOT resolved here, and reported unresolved rather than guessed: BGE
+ * references, German statute paragraphs (`de_statute:BGB` names a statute but
+ * not a provision), and cross-lingual short titles (`Cst.`/`Cost.` are the
+ * BV's French and Italian names; nothing yet links them to `BV`).
  */
 
 /** Swiss SR (Systematische Rechtssammlung) number: "SR 210", "SR 311.0". */
@@ -38,6 +48,33 @@ const EU_DIRECTIVE_PATTERN = /\b(?:directive|richtlinie)\b[^\d]{0,20}(\d{4})\/(\
 
 /** Austrian Bundesgesetzblatt: "BGBl. I Nr. 43/1975". */
 const AT_BGBL_PATTERN = /\bBGBl\.\s*(?:[IVX]+\s+)?Nr\.\s*(\d+)\/(\d{4})\b/i;
+
+/**
+ * Article reference against a statute short title: "Art. 36 BV",
+ * "Art. 36 Abs. 2 BV", "Art. 261bis StGB".
+ *
+ * Mirrors `_ARTICLE_PATTERN` in `nlp/citation_extractor.py`. Abs./lit. are
+ * matched so they do not break the parse, but are NOT part of the key: they
+ * subdivide within an article, and the article is the addressable unit (#573).
+ */
+const ARTICLE_PATTERN =
+  /\bArt\.?\s+(\d+(?:bis|ter|quater|quinquies|sexies)?)(?:\s+(?:Abs|al|cpv)\.?\s+\d+)?(?:\s+(?:lit|let)\.?\s+[a-z])?\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöü]*)\b/;
+
+/**
+ * A statute short title carries AT LEAST TWO capitals: BV, OR, ZGB, StGB,
+ * SchKG, EMRK, LugÜ. Mirrors `_LEGAL_ABBREVIATION_SHAPE` in DI.
+ *
+ * This is a SHAPE test, never a dictionary — we do not assert what an
+ * abbreviation means, only that it is shaped like one. It is what stops
+ * "Art. 36 Einschränkungen von Grundrechten" (the BV's own heading) from
+ * being read as a citation to a statute called "Einschränkungen".
+ */
+const LEGAL_ABBREVIATION_SHAPE = /^(?=(?:.*[A-ZÄÖÜ]){2})[A-ZÄÖÜ][A-Za-zÄÖÜäöü]*$/;
+
+/** True when `token` is SHAPED like a statute short title (>= 2 capitals). */
+export function isLegalAbbreviation(token: string): boolean {
+  return LEGAL_ABBREVIATION_SHAPE.test(token);
+}
 
 /**
  * Turn a raw citation string into the canonical `{type}:{value}` key, or
@@ -76,6 +113,16 @@ export function normalizeCitationText(text: string): string | null {
   const celex = input.match(CELEX_PATTERN);
   if (celex) return `celex:${celex[1]}`;
 
+  // "Art. 36 BV" — the short title plus the article number IS an identifier,
+  // PROVIDED the corpus knows what the short title abbreviates. This function
+  // only mints the key; whether a node with that key exists is answered by
+  // `citation-targets`, and a miss is reported as `no_target_in_corpus`
+  // (a coverage gap) rather than guessed at.
+  const article = input.match(ARTICLE_PATTERN);
+  if (article && isLegalAbbreviation(article[2])) {
+    return `abbrev_art:${article[2]}/${article[1]}`;
+  }
+
   // Fuzzy — needs search-based resolution. Reported, never guessed.
   return null;
 }
@@ -94,6 +141,10 @@ const KNOWN_IDENTIFIER_TYPES = new Set([
   'it_cds',
   'it_codice',
   'official_citation',
+  /** A statute by its short title: `abbrev:BV` -> the Bundesverfassung. */
+  'abbrev',
+  /** A PROVISION: `abbrev_art:BV/36` -> the BV's Art. 36 section. */
+  'abbrev_art',
 ]);
 
 /**
