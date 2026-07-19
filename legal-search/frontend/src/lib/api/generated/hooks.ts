@@ -657,12 +657,20 @@ Backs the `resolve_citation` MCP tool.
 Accepts either a raw citation string ("SR 210") or a canonical key
 ("sr:210") and returns the document(s) that ARE that norm.
 
-Resolution is DETERMINISTIC only: SR numbers, CELEX numbers, ECLIs and
-Austrian BGBl references carry their identifier in the string itself.
-Fuzzy citations ("Art. 36 BV", BGE references) cannot be normalized by
-today's extractor and come back `resolved: false` with
-`unresolved_reason: not_normalizable` — never a similarity-search guess,
-which would return a plausible wrong norm.
+Resolution is DETERMINISTIC only, and deliberately so. SR numbers, CELEX
+numbers, ECLIs and Austrian BGBl references carry their identifier in the
+string itself. Article references ("Art. 36 BV") are resolved via the
+short title the corpus itself publishes (`abbrev_art:BV/36`), NOT by
+ranking search results — no confidence score is computed anywhere in this
+path, because a threshold is just a place to hide a guess.
+
+Everything else (BGE references, German statute paragraphs) comes back
+`resolved: false` with `unresolved_reason: not_normalizable` — never a
+similarity-search guess, which would return a plausible wrong norm.
+
+When a key names SEVERAL different documents the answer is
+`unresolved_reason: ambiguous` with every candidate returned unranked.
+Narrowing is not resolving.
 
  * @summary Resolve a citation string to the norm it points at
  */

@@ -57,13 +57,36 @@ describe('normalizeCitationText', () => {
     // edge, and it must surface as such. Returning a plausible norm here would
     // be the exact "confidently wrong" failure ADR-0033 exists to prevent.
     it.each([
-      ['Art. 36 BV', 'bare article reference — needs the corpus to disambiguate'],
       ['BGE 145 I 73', 'Swiss case reporter citation'],
       ['§ 823 BGB', 'German statute paragraph'],
       ['', 'empty input'],
       ['   ', 'whitespace only'],
     ])('returns null for %s (%s)', (input) => {
       expect(normalizeCitationText(input)).toBeNull();
+    });
+  });
+
+  describe('article references (#594)', () => {
+    // These MUST stay byte-identical to `normalize_citation`'s output in
+    // `nlp/citation_extractor.py`. Drift here silently loses edges, which is
+    // why the keys are asserted literally rather than via a shared helper.
+    it('keys an article reference by short title and article number', () => {
+      expect(normalizeCitationText('Art. 36 BV')).toBe('abbrev_art:BV/36');
+      expect(normalizeCitationText('Art. 754 OR')).toBe('abbrev_art:OR/754');
+      expect(normalizeCitationText('Art. 261bis StGB')).toBe('abbrev_art:StGB/261bis');
+    });
+
+    it('ignores Abs./lit. — the article is the addressable unit', () => {
+      expect(normalizeCitationText('Art. 36 Abs. 2 BV')).toBe('abbrev_art:BV/36');
+      expect(normalizeCitationText('Art. 36 Abs. 2 lit. a BV')).toBe('abbrev_art:BV/36');
+    });
+
+    it('refuses a trailing word that is not abbreviation-shaped', () => {
+      // The BV's own headings. Keying these is how 187 phantom citations got
+      // into the graph; a ranking resolver would have turned each into an edge.
+      expect(normalizeCitationText('Art. 36 Einschränkungen')).toBeNull();
+      expect(normalizeCitationText('Art. 1 Schweizerische')).toBeNull();
+      expect(normalizeCitationText('Art. 2 Zweck')).toBeNull();
     });
   });
 });

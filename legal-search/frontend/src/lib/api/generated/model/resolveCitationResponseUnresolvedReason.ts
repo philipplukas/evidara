@@ -21,11 +21,14 @@ particular, for what a coverage answer may and may not be read to mean.
  */
 
 /**
- * Why an unresolved citation is unresolved. The distinction is load-bearing:
+ * Why an unresolved citation is unresolved. The distinctions are load-bearing:
 `not_normalizable` is an EXTRACTOR gap (the citation form is fuzzy),
 `no_target_in_corpus` is a COVERAGE gap (the key is valid, the norm is
-simply not ingested). Collapsing both into a bare `resolved: false` is how
-a citation graph ends up with silently missing edges.
+simply not ingested), and `ambiguous` means several DIFFERENT documents
+are addressable by this key — short titles are not globally unique, so
+this is a real state, not an error. Collapsing these into a bare
+`resolved: false` is how a citation graph ends up with silently missing
+edges; collapsing `ambiguous` by ranking is how it ends up with wrong ones.
 
  */
-export type ResolveCitationResponseUnresolvedReason = 'not_normalizable' | 'no_target_in_corpus' | null;
+export type ResolveCitationResponseUnresolvedReason = 'not_normalizable' | 'no_target_in_corpus' | 'ambiguous' | null;

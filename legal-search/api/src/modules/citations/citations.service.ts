@@ -21,13 +21,24 @@ export type ResolveCitationResult = {
   normalized_reference: string | null;
   resolved: boolean;
   /**
-   * Why an unresolved citation is unresolved. The distinction matters: a
-   * `not_normalizable` citation is an extractor gap, a `no_target_in_corpus`
-   * citation is a COVERAGE gap (the norm simply is not ingested). Collapsing
-   * them into a bare `resolved: false` is how a graph ends up with silently
-   * missing edges.
+   * Why an unresolved citation is unresolved. The distinctions matter:
+   *
+   *   `not_normalizable`    — extractor gap: the string names no identifier.
+   *   `no_target_in_corpus` — COVERAGE gap: the norm simply is not ingested.
+   *   `ambiguous`           — several DIFFERENT documents in the corpus are
+   *                           addressable by this key. Short titles are not
+   *                           globally unique, so this is a real state and not
+   *                           an error.
+   *
+   * Collapsing them into a bare `resolved: false` is how a graph ends up with
+   * silently missing edges.
    */
-  unresolved_reason: 'not_normalizable' | 'no_target_in_corpus' | null;
+  unresolved_reason: 'not_normalizable' | 'no_target_in_corpus' | 'ambiguous' | null;
+  /**
+   * On `ambiguous`, every norm the key could mean — returned UNRANKED and
+   * unfiltered so the caller can disambiguate on evidence it has and we do
+   * not. On any other outcome this is the resolved target list.
+   */
   targets: CitationTarget[];
 };
 
@@ -82,14 +93,44 @@ export class CitationsService {
     }
 
     const targets = await this.repository.findTargetsByKey(normalized);
-    const resolved = targets.length > 0;
-    this.metrics.recordCitationResolution(resolved, resolved ? null : 'no_target_in_corpus');
 
+    if (targets.length === 0) {
+      this.metrics.recordCitationResolution(false, 'no_target_in_corpus');
+      return {
+        query,
+        normalized_reference: normalized,
+        resolved: false,
+        unresolved_reason: 'no_target_in_corpus',
+        targets: [],
+      };
+    }
+
+    // AMBIGUITY REFUSAL. A key that names several distinct documents has not
+    // been resolved — it has been narrowed. Returning the best-scoring one
+    // would be a guess wearing a resolved flag, and a wrong edge is worse than
+    // a missing one (ADR-0033). So we refuse and hand back the candidates.
+    //
+    // Multiplicity is counted over DOCUMENTS, not rows: one document can hold
+    // several rows for the same key (a statute and its article section), and
+    // that is not ambiguity.
+    const distinctDocuments = new Set(targets.map((t) => t.document_id));
+    if (distinctDocuments.size > 1) {
+      this.metrics.recordCitationResolution(false, 'ambiguous');
+      return {
+        query,
+        normalized_reference: normalized,
+        resolved: false,
+        unresolved_reason: 'ambiguous',
+        targets,
+      };
+    }
+
+    this.metrics.recordCitationResolution(true, null);
     return {
       query,
       normalized_reference: normalized,
-      resolved,
-      unresolved_reason: resolved ? null : 'no_target_in_corpus',
+      resolved: true,
+      unresolved_reason: null,
       targets,
     };
   }

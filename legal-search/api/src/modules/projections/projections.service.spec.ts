@@ -293,6 +293,94 @@ describe('ProjectionsService', () => {
     ]);
   });
 
+  // ── Short-title nodes (#594): what makes "Art. 36 BV" resolvable ──
+
+  it('indexes a law under its short title and each of its articles', async () => {
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft',
+      document_type: 'legislation',
+      // Fedlex nests the provider payload — `title_short` IS the abbreviation.
+      body_text: JSON.stringify({
+        inline_body: JSON.stringify({ provider: 'fedlex_sparql', title_short: 'BV' }),
+      }),
+      sections: [
+        { section_id: 'sec_1', title: 'Art. 1 Schweizerische Eidgenossenschaft', anchor: 'art_1' },
+        {
+          section_id: 'sec_36',
+          title: 'Art. 36 Einschränkungen von Grundrechten',
+          anchor: 'art_36',
+        },
+        { section_id: 'sec_x', title: 'Titel 2: Grundrechte' },
+      ],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const targets = (repository.bulkIndexCitationTargets as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+
+    expect(targets).toContainEqual(
+      expect.objectContaining({ identifier_type: 'abbrev', identifier_value: 'BV' }),
+    );
+    expect(targets).toContainEqual(
+      expect.objectContaining({
+        identifier_type: 'abbrev_art',
+        identifier_value: 'BV/36',
+        section_id: 'sec_36',
+        section_anchor: 'art_36',
+      }),
+    );
+    // A chapter heading is not an article and mints no provision node.
+    expect(targets).not.toContainEqual(
+      expect.objectContaining({ identifier_value: expect.stringContaining('Titel') }),
+    );
+  });
+
+  it('mints no short-title node when the source publishes no short title', async () => {
+    // No dictionary, no inference: if the corpus does not supply the
+    // abbreviation, citations to it stay honestly unresolved.
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'Bundesverfassung der Schweizerischen Eidgenossenschaft (SR 101)',
+      document_type: 'legislation',
+      sections: [{ section_id: 'sec_36', title: 'Art. 36 Einschränkungen', anchor: 'art_36' }],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const targets = (repository.bulkIndexCitationTargets as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    expect(
+      targets.every((t: { identifier_type: string }) => !t.identifier_type.startsWith('abbrev')),
+    ).toBe(true);
+  });
+
+  it('does NOT let a decision become addressable AS the statute it discusses', async () => {
+    // The mirror of the SR masthead hazard, for short titles.
+    const repository = createRepositoryMock();
+    const diClient = createDocumentIntelligenceMock();
+    (diClient.fetchLeanDocument as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: 'BGer 1C_123/2022',
+      document_type: 'decision',
+      body_text: JSON.stringify({ title_short: 'BV' }),
+      sections: [{ section_id: 'sec_1', title: 'Art. 36 BV wird ausgelegt' }],
+    });
+    const service = new ProjectionsService(repository, diClient);
+
+    await service.applyDocumentProcessed(baseProcessedEvent);
+
+    const calls = (repository.bulkIndexCitationTargets as ReturnType<typeof vi.fn>).mock.calls;
+    const targets = calls.length > 0 ? calls[0][0] : [];
+    expect(
+      targets.some((t: { identifier_type: string }) => t.identifier_type.startsWith('abbrev')),
+    ).toBe(false);
+  });
+
   it('does NOT let a document claim to BE a norm it merely cites', async () => {
     // The hazard the masthead window exists to prevent. A wrong edge is worse
     // than a missing one: if this decision registered itself as `sr:210`, every

@@ -206,9 +206,33 @@ _IT_ECLI_PATTERN = re.compile(
 )
 
 # Article references: "Art. 8 EMRK", "Art. 261bis StGB", "Art. 1 Abs. 2 OR"
+#
+# The trailing token is the statute's SHORT TITLE (`BV`, `ZGB`, `StGB`), which
+# is what makes the reference addressable — see `_LEGAL_ABBREVIATION_SHAPE`.
+# `article` and `abbrev` are captured so `normalize_citation` can mint an
+# `abbrev_art:` key without re-parsing the matched text.
 _ARTICLE_PATTERN = re.compile(
-    r"\bArt\.?\s+\d+(?:bis|ter|quater|quinquies|sexies)?(?:\s+(?:Abs|al|cpv)\.?\s+\d+)?(?:\s+(?:lit|let)\.?\s+[a-z])?\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöü]+\b",
+    r"\bArt\.?\s+(?P<article>\d+(?:bis|ter|quater|quinquies|sexies)?)"
+    r"(?:\s+(?:Abs|al|cpv)\.?\s+(?P<paragraph>\d+))?"
+    r"(?:\s+(?:lit|let)\.?\s+(?P<letter>[a-z]))?"
+    r"\s+(?P<abbrev>[A-ZÄÖÜ][A-Za-zÄÖÜäöü]+)\b",
 )
+
+# A statute short title carries AT LEAST TWO capitals: BV, OR, ZGB, StGB,
+# SchKG, EMRK, LugÜ, MWSTG. This is a SHAPE test, not a dictionary — we never
+# assert what an abbreviation means, only that it is shaped like one.
+#
+# Why it is needed: `_ARTICLE_PATTERN`'s trailing token is positional, so an
+# article reference at the end of a clause ("... nach Art. 5 Dieses Gesetz ...")
+# captures an ordinary capitalized German word. Those have exactly one capital
+# and are rejected here, so they never mint a key and never become an edge.
+_LEGAL_ABBREVIATION_SHAPE = re.compile(r"^(?=(?:.*[A-ZÄÖÜ]){2})[A-ZÄÖÜ][A-Za-zÄÖÜäöü]*$")
+
+
+def is_legal_abbreviation(token: str) -> bool:
+    """True when `token` is SHAPED like a statute short title (>= 2 capitals)."""
+    return bool(_LEGAL_ABBREVIATION_SHAPE.match(token))
+
 
 # Named Swiss statutes (standalone abbreviations)
 _STATUTE_ABBREVIATIONS = frozenset(
@@ -491,12 +515,43 @@ def extract_citations(text: str) -> list[Citation]:
         )
 
     for m in _ARTICLE_PATTERN.finditer(text):
+        # PRECISION GATE. `_ARTICLE_PATTERN`'s trailing token is positional, so
+        # it matches a statute's OWN article headings as readily as a citation
+        # to another statute: in the real Bundesverfassung fixture, "Art. 36
+        # Einschränkungen von Grundrechten" scored as a citation to a statute
+        # called "Einschränkungen". 187 of the BV's 188 `article` matches were
+        # its own headings, and 98.5% of all `article` matches across the
+        # golden corpus were false positives.
+        #
+        # Those phantoms are not harmless. They inflate `citations_count`, they
+        # pad the denominator of `resolution_rate` until the graph's headline
+        # honesty metric measures mostly noise, and under any ranking-based
+        # resolver they would have become WRONG EDGES -- which ADR-0033 treats
+        # as worse than missing ones.
+        #
+        # So a match that does not name an abbreviation-shaped statute is not
+        # recorded as a citation at all. It is not an unresolved citation; it
+        # was never a citation.
+        if not is_legal_abbreviation(m.group("abbrev")):
+            continue
+        metadata: dict[str, Any] = {
+            "article": m.group("article"),
+            "abbrev": m.group("abbrev"),
+        }
+        # Abs./lit. subdivide WITHIN an article. They are recorded so the
+        # citation text stays reconstructable, but they are deliberately not
+        # part of the key: the article is the addressable unit (#573).
+        if m.group("paragraph"):
+            metadata["paragraph"] = m.group("paragraph")
+        if m.group("letter"):
+            metadata["letter"] = m.group("letter")
         citations.append(
             Citation(
                 text=m.group(0),
                 citation_type="article",
                 start=m.start(),
                 end=m.end(),
+                metadata=metadata,
             )
         )
 
@@ -561,6 +616,22 @@ def normalize_citation(citation: Citation) -> str | None:
         return f"it_cds:{meta['number']}/{meta['year']}"
     if ct == "it_codice_article" and "codice" in meta:
         return f"it_codice:{meta['codice'].lower().replace(' ', '')}"
+
+    # Article references ("Art. 36 BV") -- the short title plus the article
+    # number IS an identifier, provided the corpus knows what the short title
+    # abbreviates. That question is answered by `citation-targets`, not here:
+    # this function mints the KEY, and resolution decides whether a node with
+    # that key exists. Minting a key for a norm we do not hold is correct and
+    # is reported as `no_target_in_corpus`, which is a coverage gap -- not a
+    # guess, and not a silent miss.
+    #
+    # Abs./lit. are dropped: `Art. 36 Abs. 2 BV` and `Art. 36 BV` address the
+    # same article-level section, which is the finest unit sectioning produces.
+    if ct == "article":
+        abbrev = str(meta.get("abbrev") or "")
+        article = str(meta.get("article") or "")
+        if article and is_legal_abbreviation(abbrev):
+            return f"abbrev_art:{abbrev}/{article}"
 
     # Fuzzy -- needs search-based resolution
     return None

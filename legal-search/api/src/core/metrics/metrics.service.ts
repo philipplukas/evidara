@@ -150,7 +150,7 @@ export class MetricsService {
   /** One `resolve_citation` outcome. */
   recordCitationResolution(
     resolved: boolean,
-    reason: 'not_normalizable' | 'no_target_in_corpus' | null,
+    reason: 'not_normalizable' | 'no_target_in_corpus' | 'ambiguous' | null,
   ): void {
     this.citationResolutions.inc({ outcome: resolved ? 'resolved' : (reason ?? 'unresolved') });
   }

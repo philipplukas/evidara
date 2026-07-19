@@ -25,6 +25,10 @@ export type CitationTarget = {
   title?: string;
   document_type?: string;
   jurisdiction?: string;
+  /** Set on PROVISION-level targets (`abbrev_art:BV/36`); absent otherwise. */
+  section_id?: string;
+  /** In-document anchor for `section_id`, e.g. `art_36`. */
+  section_anchor?: string;
 };
 
 /** A citation edge — one row of the `citations` index. */
