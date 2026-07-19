@@ -13,7 +13,7 @@
  * Both exist so the caller is told what the grouping did not see, rather than
  * having to infer it from sums that cannot balance over multi-valued fields.
  */
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
 import { inForceExclusionClauses } from '../../core/norm-hierarchy';
@@ -86,7 +86,7 @@ export class CoverageOpenSearchAdapter implements CoverageRepository {
     // indistinguishable from absence (ADR-0033 §2).
     const mustNot = options.inForceAt ? inForceExclusionClauses(options.inForceAt) : [];
 
-    const response = await this.client.search({
+    const response = await this.runAggregation({
       index: this.indexDocuments,
       body: {
         size: 0,
@@ -125,7 +125,7 @@ export class CoverageOpenSearchAdapter implements CoverageRepository {
       sourceVersionCount: bucket.source_version_count?.value ?? 0,
     }));
 
-    const total = response.body.hits?.total;
+    const total = (response.body.hits?.total ?? 0) as number | { value?: number };
     const totalDocuments = typeof total === 'number' ? total : (total?.value ?? 0);
 
     this.logger.debug(
@@ -137,5 +137,45 @@ export class CoverageOpenSearchAdapter implements CoverageRepository {
       documentsWithoutGroupKey: aggregations?.missing_key?.doc_count ?? 0,
       buckets,
     };
+  }
+
+  /**
+   * Run the aggregation, translating a mapping-shaped failure into an explicit
+   * "coverage is unavailable" rather than a generic 500.
+   *
+   * When the live index has drifted from the canonical mapping — a field
+   * dynamically mapped as `text`, or missing outright — the aggregation throws.
+   * Verified against the local stack on 2026-07-19, where `documents-read` is
+   * fully dynamic: `authority_ids` and `in_force_until` do not exist and
+   * `source_version_id` is `text`.
+   *
+   * **Failing loudly here is the correct behaviour, not a rough edge.** The
+   * alternative — weakening the query to whatever the drifted index supports —
+   * is the wrong fix #675 first shipped, and for a COVERAGE endpoint it is far
+   * worse than for search: a query that quietly returns empty buckets reports
+   * "the corpus holds nothing", which an agent would faithfully relay as a
+   * refusal. A false refusal is a lie the caller cannot detect; an error is one
+   * they can. Per AGENTS.md the fix is to reindex against the canonical mapping
+   * (`npm run mapping:check-drift`), never to soften the query.
+   */
+  private async runAggregation(request: Parameters<Client['search']>[0]): Promise<{
+    body: Record<string, unknown> & { aggregations?: unknown; hits?: { total?: unknown } };
+  }> {
+    try {
+      return (await this.client.search(request)) as never;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/fielddata|not optimised|illegal_argument/i.test(message)) throw error;
+
+      this.logger.error(`coverage aggregation rejected by the index mapping: ${message}`);
+      throw new ServiceUnavailableException(
+        'Coverage cannot be computed: the search index mapping does not support the ' +
+          'aggregation this endpoint requires, which means the index has drifted from ' +
+          'the canonical mapping. This is reported as an error rather than as an empty ' +
+          'result, because an empty coverage answer would read as "the corpus holds ' +
+          'nothing" — a refusal the caller could not tell from a true one. ' +
+          'Reindex against the canonical mapping; see `npm run mapping:check-drift`.',
+      );
+    }
   }
 }

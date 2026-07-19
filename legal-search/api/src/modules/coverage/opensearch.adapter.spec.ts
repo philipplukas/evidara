@@ -8,6 +8,7 @@
  * agg fields, the `record_kind` filter and the `must_not` temporal form are
  * asserted literally.
  */
+import { ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { describe, expect, it, vi } from 'vitest';
 import { CoverageOpenSearchAdapter } from './opensearch.adapter';
@@ -212,5 +213,50 @@ describe('CoverageOpenSearchAdapter', () => {
         sourceVersionCount: 2,
       },
     ]);
+  });
+
+  describe('when the index has drifted from the canonical mapping', () => {
+    it('fails loudly rather than reporting an empty corpus', async () => {
+      // Reproduced against the local stack on 2026-07-19: `documents-read` is
+      // dynamically mapped, so `source_version_id` is `text` and the
+      // aggregation is rejected.
+      //
+      // The alternative — softening the query until the drifted index accepts
+      // it — returns EMPTY BUCKETS, which this endpoint would report as "the
+      // corpus holds nothing". An agent would relay that as a refusal, and a
+      // false refusal is a lie the caller cannot detect. An error is one they can.
+      const search = vi
+        .fn()
+        .mockRejectedValue(
+          new Error(
+            'search_phase_execution_exception: [illegal_argument_exception] Reason: Text ' +
+              'fields are not optimised for operations that require per-document field data ' +
+              'like aggregations and sorting, so these operations are disabled by default.',
+          ),
+        );
+
+      await expect(
+        makeAdapter(search).countCoverage({ dimension: 'jurisdiction', limit: 100 }),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('names the drift as the cause, so the operator is not left guessing', async () => {
+      const search = vi
+        .fn()
+        .mockRejectedValue(new Error('illegal_argument_exception: fielddata is disabled'));
+
+      await expect(
+        makeAdapter(search).countCoverage({ dimension: 'jurisdiction', limit: 100 }),
+      ).rejects.toThrow(/drifted from the canonical mapping/);
+    });
+
+    it('does not swallow unrelated failures', async () => {
+      // A connection error is not a mapping problem and must surface as itself.
+      const search = vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+      await expect(
+        makeAdapter(search).countCoverage({ dimension: 'jurisdiction', limit: 100 }),
+      ).rejects.toThrow(/ECONNREFUSED/);
+    });
   });
 });

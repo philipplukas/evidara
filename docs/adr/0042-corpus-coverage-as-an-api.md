@@ -174,6 +174,22 @@ Named here so they are visible as gaps rather than discovered as surprises:
   Nothing in the platform knows the denominator. Any future attempt at this must state the
   denominator's source, or it is fabrication with a percentage attached.
 
+### 6. A broken coverage endpoint must fail loudly, never quietly
+
+Coverage has a uniquely bad failure mode. When search breaks it returns no results and
+someone notices. When *coverage* breaks it reports **"we hold nothing"** — and an agent
+faithfully relays that as a refusal. A false refusal is a lie the caller cannot detect.
+
+So when the index cannot support the aggregation, the endpoint answers **503 with the
+cause named**, rather than degrading to empty buckets. This is not a rough edge; it is the
+decision. Softening the query until a drifted index accepts it is the wrong fix #675 first
+shipped, and AGENTS.md already forbids it: fix the index, never the query.
+
+This was verified live, not theorized. Against the local stack on 2026-07-19,
+`documents-read` is entirely dynamically mapped — `authority_ids` and `in_force_until` do
+not exist and `source_version_id` is `text` — and the endpoint correctly refused to
+answer. Reindexed into a canonically-mapped copy of the same 77 documents, it answered.
+
 ## Consequences
 
 - ADR-0033 §2's refusal capability becomes reachable, and `check_in_force` / `norm_hierarchy`

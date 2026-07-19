@@ -1,7 +1,8 @@
 import { Controller, Get, Headers, Inject, Query } from '@nestjs/common';
 import { resolveLocale } from '../../core/i18n';
 import { CoverageService } from './coverage.service';
-import type { CoverageQueryDto } from './dto/coverage-query.dto';
+// biome-ignore lint/style/useImportType: value import so ValidationPipe sees class-validator metadata on CoverageQueryDto
+import { CoverageQueryDto } from './dto/coverage-query.dto';
 
 /**
  * Corpus coverage (ADR-0042) — the surface ADR-0033 §2's refusal capability needs.
