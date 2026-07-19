@@ -105,6 +105,54 @@ class PlaywrightSelectionTests(unittest.TestCase):
             )
 
 
+class VitestConfigSelectionTests(unittest.TestCase):
+    """`legal-search/api` runs three vitest projects off three configs.
+
+    Modelling only `vitest.config.ts` reported the #697 integration specs as
+    unreachable — a false positive, and in the direction that wastes review
+    time rather than hiding problems, but wrong either way.
+    """
+
+    def surface(self, name, include, exclude=()):
+        root = checker.REPO_ROOT / "legal-search" / "api"
+        return checker.Surface(
+            "vitest", root / name, root, [], include=list(include), exclude=list(exclude)
+        )
+
+    def inv(self, argv):
+        return checker.Invocation(
+            cwd=checker.REPO_ROOT / "legal-search" / "api", argv=argv, source="t"
+        )
+
+    def test_config_flag_selects_the_matching_surface_only(self):
+        default = self.surface(
+            "vitest.config.ts", ["src/**/*.spec.ts"], ["src/**/*.integration.spec.ts"]
+        )
+        integration = self.surface("vitest.integration.config.ts", ["src/**/*.integration.spec.ts"])
+        spec = checker.REPO_ROOT / "legal-search/api/src/modules/search/search.integration.spec.ts"
+
+        bare = self.inv(["vitest", "run"])
+        flagged = self.inv(["vitest", "run", "--config", "vitest.integration.config.ts"])
+
+        # The default run excludes it; the --config run collects it.
+        self.assertFalse(checker.vitest_reaches(bare, default, spec))
+        self.assertTrue(checker.vitest_reaches(flagged, integration, spec))
+        # A --config run must NOT be evaluated against the default config.
+        self.assertFalse(checker.vitest_reaches(flagged, default, spec))
+        self.assertFalse(checker.vitest_reaches(bare, integration, spec))
+
+    def test_config_arg_parsing_handles_both_spellings(self):
+        self.assertEqual(checker.vitest_config_arg(self.inv(["vitest", "run"])), "vitest.config.ts")
+        self.assertEqual(
+            checker.vitest_config_arg(self.inv(["vitest", "run", "--config", "a.config.ts"])),
+            "a.config.ts",
+        )
+        self.assertEqual(
+            checker.vitest_config_arg(self.inv(["vitest", "run", "--config=b.config.ts"])),
+            "b.config.ts",
+        )
+
+
 class WorkflowParsingTests(unittest.TestCase):
     """The directory a command runs in decides which package.json resolves it."""
 

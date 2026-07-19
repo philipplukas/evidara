@@ -1,4 +1,4 @@
-# ADR-0038: What Makes a Test Result Trustworthy
+# ADR-0040: What Makes a Test Result Trustworthy
 
 ## Status
 
@@ -107,6 +107,14 @@ Article 12" when it does not know is worse than one that refuses. ADR-0033 makes
 refusal a first-class outcome; the acceptance test is explicitly satisfied by a
 **correct refusal**.
 
+This ADR's own number is an instance. It was first written as 0038, because
+0037 was the highest on `main` and the next integer was therefore "free". Two
+other in-flight lanes reasoned identically and had already taken 0038 and 0039.
+Three lanes each substituted a plausible number for a verified one, and git
+would have merged all three without a conflict — the files have different
+names. Hence `scripts/check_adr_numbers.py`, and hence this paragraph, which is
+cheaper than the next collision.
+
 Every failure above is that same substitution, one level up: a test harness that
 does not know whether the code works, emitting "pass". A skipped test that
 reports green, an untagged spec that inflates an apparent suite, a 6% pixel
@@ -163,6 +171,7 @@ building a machine to refuse to guess, using tooling that guesses.
 | "CI may not skip" generalised from the #564 Temporal site to the whole platform-control suite | #704 (`platform-control/tests/ci_skip_guard.py`) |
 | Visual baselines re-blessed outside the bug window | #700 |
 | Reachability check — enumerates specs, enumerates what CI invokes, fails on any spec no job can reach | #706 (`scripts/check_test_reachability.py`) |
+| ADR number-collision guard — two files may not claim one number | #706 (`scripts/check_adr_numbers.py`) |
 
 **In flight:**
 

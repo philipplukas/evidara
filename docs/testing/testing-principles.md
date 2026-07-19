@@ -8,7 +8,7 @@ Define the core testing philosophy for Evidara.
 
 ### A test result must be trustworthy before it is useful
 
-This document says what to test. [ADR-0038](../adr/0038-test-result-trust.md) says
+This document says what to test. [ADR-0040](../adr/0040-test-result-trust.md) says
 when to believe the answer, and it takes precedence where the two disagree.
 
 Its three conditions, which must hold **in this order**:

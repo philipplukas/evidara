@@ -78,9 +78,10 @@ KNOWN_UNREACHABLE: dict[str, str] = {
         "rehearsal, never wired to a job."
     ),
     "legal-search/api/src/modules/health/health.smoke.spec.ts": (
-        "Explicitly excluded in `vitest.config.ts` and documents `npm run test:smoke`, "
-        "a script that does not exist in `legal-search/api/package.json`. Needs a "
-        "running app on :3102, so it needs a job that starts one."
+        "Excluded from `vitest.config.ts`. A `vitest.smoke.config.ts` that would collect "
+        "it does exist — but no npm script passes `--config` to it, and the "
+        "`npm run test:smoke` the spec's own header documents is not in package.json. "
+        "Needs a running app on :3102, so it needs a job that starts one."
     ),
     "platform-control/admin/e2e/preview-review-v2.spec.ts": (
         "`platform-control/admin` has an `e2e` script but no workflow invokes it. "
@@ -468,8 +469,16 @@ class Surface:
 
 
 def discover_vitest_surfaces() -> list[Surface]:
+    """Every `vitest*.config.ts`, not just the default one.
+
+    `legal-search/api` runs three vitest projects off three configs — the
+    default, `vitest.integration.config.ts` (Testcontainers, selected with
+    `--config`), and `vitest.smoke.config.ts`. Modelling only `vitest.config.ts`
+    made the integration specs look unreachable, because the default config
+    excludes exactly what the integration config includes.
+    """
     surfaces = []
-    for cfg in sorted(REPO_ROOT.rglob("vitest.config.ts")):
+    for cfg in sorted(REPO_ROOT.rglob("vitest*.config.ts")):
         if any(part in PRUNE_DIRS for part in cfg.parts):
             continue
         text = cfg.read_text(encoding="utf-8")
@@ -582,8 +591,22 @@ def is_within(path: Path, base: Path) -> bool:
     return True
 
 
+def vitest_config_arg(inv: Invocation) -> str:
+    """Which config this invocation selects; vitest defaults to `vitest.config.ts`."""
+    args = inv.argv[1:]
+    for idx, arg in enumerate(args):
+        if arg in {"-c", "--config"} and idx + 1 < len(args):
+            return Path(args[idx + 1]).name
+        if arg.startswith("--config="):
+            return Path(arg.split("=", 1)[1]).name
+    return "vitest.config.ts"
+
+
 def vitest_reaches(inv: Invocation, surface: Surface, spec: Path) -> bool:
     if surface.root != inv.cwd:
+        return False
+    # A `--config` invocation only collects through THAT config's include/exclude.
+    if vitest_config_arg(inv) != surface.config.name:
         return False
     # `os.path.relpath`, not `Path.relative_to`: include patterns may escape the
     # surface (the frontend collects `../../styles/ui/**`).
@@ -666,15 +689,24 @@ def main() -> int:
             ):
                 unreachable.append((rel(spec), "playwright: no CI command selects this spec"))
 
+    # A surface may see a file another surface owns (`legal-search/api` has
+    # three vitest configs over one `src/`), so reachability is the union over
+    # every (surface, invocation) pair and each file is counted exactly once.
+    vitest_files: dict[Path, list[Surface]] = {}
     for surface in vitest_surfaces:
         for spec in surface.files:
-            total += 1
-            if not any(
-                vitest_reaches(inv, surface, spec) for inv in invocations if inv.tool == "vitest"
-            ):
-                unreachable.append(
-                    (rel(spec), f"vitest: not collected by {rel(surface.config)} include/exclude")
-                )
+            vitest_files.setdefault(spec, []).append(surface)
+
+    for spec, surfaces in sorted(vitest_files.items()):
+        total += 1
+        if not any(
+            vitest_reaches(inv, surface, spec)
+            for surface in surfaces
+            for inv in invocations
+            if inv.tool == "vitest"
+        ):
+            configs = ", ".join(rel(s.config) for s in surfaces)
+            unreachable.append((rel(spec), f"vitest: not collected by any of {configs}"))
 
     claimed = {f for s in playwright_surfaces + vitest_surfaces for f in s.files}
     for test_file in discover_python_tests(claimed):
@@ -711,7 +743,7 @@ def main() -> int:
             "of coverage, which is worse, because it stops anyone from looking.\n"
             "Either wire it into a CI job (tag it, add it to a script's path list, or\n"
             "give its surface a job), or register it in KNOWN_UNREACHABLE in\n"
-            "scripts/check_test_reachability.py with a reason. See ADR-0038.\n",
+            "scripts/check_test_reachability.py with a reason. See ADR-0040.\n",
             file=sys.stderr,
         )
 

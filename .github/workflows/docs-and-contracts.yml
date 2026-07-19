@@ -122,10 +122,16 @@ jobs:
           python3 scripts/check_workflow_vars.py
 
       # Every committed test file must be collectable by some CI job. See
-      # ADR-0038 (coverage honesty) and #706.
+      # ADR-0040 (coverage honesty) and #706.
       - name: Check every test file is reachable from some CI job
         run: |
           python3 scripts/check_test_reachability.py
+
+      # Two branches adding `0038-a.md` and `0038-b.md` merge without a git
+      # conflict. This is the first point both are observable in one tree.
+      - name: Check no two ADRs claim the same number
+        run: |
+          python3 scripts/check_adr_numbers.py
 
       - name: Check Austria overlay consistency
         run: |
