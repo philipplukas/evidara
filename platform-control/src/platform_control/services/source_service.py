@@ -163,6 +163,34 @@ class SourceService:
             "notes": notes,
         }
 
+    def describe_blueprint_plan_notes(self, acquisition_spec: AcquisitionSpec) -> list[str]:
+        """Return the provider's own `plan()` notes for a previewed spec (#634).
+
+        Every provider already computes exactly the caveats an operator needs
+        before investing in a source — seed URLs it would hit, config errors in
+        the spec, and provider-specific warnings such as the gemeinde note about
+        Randtitel splicing (#650). Until now `plan()` was reachable only from the
+        `plan` CLI, so `blueprint-preview` returned a spec that looked correct
+        while the system already knew better. This is that answer, said out loud.
+
+        `plan()` is pure and network-free, and every provider reads only
+        `source_version.acquisition_spec`, so a transient unpersisted
+        `SourceVersion` carrying the previewed spec is enough to call it.
+        """
+        try:
+            registry = build_provider_registry(get_settings())
+            provider = registry.resolve_for_spec(acquisition_spec.model_dump(mode="json"))
+            plan = provider.plan(
+                None,
+                SourceVersion(acquisition_spec=acquisition_spec.model_dump(mode="json")),
+            )
+            return [str(note) for note in (getattr(plan, "notes", None) or [])]
+        except Exception:
+            # A preview is a read-only pre-flight: it must degrade to "no notes"
+            # rather than 500 because one provider's plan() raised. The lock
+            # fields carry the load-bearing verdict regardless.
+            return []
+
     def _provider_live_ready(self, provider: str) -> bool:
         # Cached per service instance: build_provider_registry instantiates every
         # provider, so a template listing must not rebuild it once per row.

@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.10.0
+  version: 0.11.0
 paths:
   /health:
     get:
@@ -783,6 +783,20 @@ paths:
           - type: string
           - type: 'null'
           title: Source Id
+      - name: refused
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Filter on ADR-0030 two-key-lock refusals (#634). `true` returns only refused dispatches
+            — what an operator tried to onboard and why it was blocked; `false` excludes them so they
+            do not pollute failure triage.
+          title: Refused
+        description: Filter on ADR-0030 two-key-lock refusals (#634). `true` returns only refused dispatches
+          — what an operator tried to onboard and why it was blocked; `false` excludes them so they do
+          not pollute failure triage.
       - name: limit
         in: query
         required: false
@@ -6157,6 +6171,12 @@ components:
           - type: string
           - type: 'null'
           title: Failure Reason
+        refused:
+          type: boolean
+          title: Refused
+          description: True when the ADR-0030 two-key lock blocked this dispatch (#634). Filter the collection
+            with `?refused=true` to audit refusals.
+          default: false
         created_at:
           type: string
           format: date-time
@@ -6539,6 +6559,13 @@ components:
           - type: string
           - type: 'null'
           title: Failure Reason
+        refused:
+          type: boolean
+          title: Refused
+          description: True when the ADR-0030 two-key lock blocked this dispatch. The run is a refusal
+            record — terminal FAILED, never dispatched — kept so an operator can ask what was attempted
+            and why it was refused (#634).
+          default: false
         created_at:
           type: string
           format: date-time
@@ -6984,6 +7011,15 @@ components:
           type: array
           title: Notes
           description: Human-readable explanation of any closed key (why the template is inert).
+        plan_notes:
+          items:
+            type: string
+          type: array
+          title: Plan Notes
+          description: The provider's own `plan()` notes for this spec (#634) — seed URLs it would hit,
+            config errors, and provider-specific caveats. Distinct from `notes`, which explains the two-key
+            lock; these describe the acquisition itself. Empty when the provider exposes no plan or plan
+            computation failed.
       type: object
       required:
       - overlay_id
