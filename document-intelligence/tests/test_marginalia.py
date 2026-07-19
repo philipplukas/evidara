@@ -1,4 +1,4 @@
-"""Randtitel detection and lifting, measured against the real ordinance (ADR-0038).
+"""Randtitel detection and body/margin partition, measured against the real ordinance.
 
 ``tests/test_normalize_pdf.py`` used a *synthetic* reportlab fixture with the marginal
 heading in the **left** margin and a generous gutter. That is why ADR-0037's normaliser
@@ -12,14 +12,16 @@ The fixture here is therefore the **real PDF**, committed at
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pytest
 
-from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
 from document_intelligence.normalize.marginalia import (
     detect_marginal_blocks,
-    lift_marginal_headings,
+    extract_page_words,
+    join_wrapped_lines,
+    split_page_words,
 )
 
 pytest.importorskip("pdfplumber")
@@ -52,17 +54,39 @@ def test_real_ordinance_marginal_bands_are_detected() -> None:
 
 def test_wrapped_randtitel_is_dehyphenated() -> None:
     # "Aufhebung bis-" / "herigen Rechts" wraps inside the narrow band. Unless the two
-    # lines rejoin as one word, the lifted heading cannot match the extractor's text.
+    # lines rejoin as one word, the lifted heading is not the label the document carries.
     blocks = detect_marginal_blocks(_pdf_bytes())
     texts = [b.text for b in blocks]
     assert "Aufhebung bisherigen Rechts" in texts
     assert not any("bis- herigen" in t for t in texts)
 
 
+def test_band_words_are_removed_from_the_body_stream() -> None:
+    """The partition is set subtraction, not string matching.
+
+    This is the property that makes the splice impossible rather than repaired: once the
+    band's words are gone from the word stream, no downstream layout pass can put them
+    back inside a sentence.
+    """
+    import pdfplumber
+
+    with pdfplumber.open(io.BytesIO(_pdf_bytes())) as pdf:
+        page = pdf.pages[0]
+        words = extract_page_words(page)
+        split = split_page_words(words=words, page_width=float(page.width), page_no=1)
+
+    body_text = " ".join(w.text for w in split.body_words)
+    assert "Organisation" not in body_text
+    assert "Härtefall" in body_text, "the word occurs in the body too and must survive there"
+    assert len(split.body_words) < len(words)
+    # Nothing is invented and nothing is lost: body + band accounts for every word.
+    band_word_count = sum(len(b.text.split()) for b in split.marginal_blocks)
+    assert len(split.body_words) + band_word_count == len(words)
+
+
 def test_single_column_document_yields_no_marginal_blocks() -> None:
     # The guards must not invent Randtitel in an ordinary one-column PDF.
     reportlab_canvas = pytest.importorskip("reportlab.pdfgen.canvas")
-    import io
 
     from reportlab.lib.pagesizes import A4
 
@@ -83,86 +107,28 @@ def test_single_column_document_yields_no_marginal_blocks() -> None:
     assert detect_marginal_blocks(buffer.getvalue()) == []
 
 
-def _block(order: int, text: str, *, page_no: int, top: float, bottom: float, block_type: str = "paragraph") -> Block:
-    return Block(
-        id=f"blk_{order:04d}",
-        type=block_type,
-        text=text,
-        order=order,
-        artifact_id="art_test",
-        attrs={"page_no": page_no, "bbox_top": top, "bbox_bottom": bottom},
-    )
+def test_two_column_body_is_not_shredded_into_headings() -> None:
+    # A genuine two-column layout must fail the band guards. Mistaking a body column for
+    # a margin would corrupt far more text than the splice this module prevents.
+    reportlab_canvas = pytest.importorskip("reportlab.pdfgen.canvas")
+
+    from reportlab.lib.pagesizes import A4
+
+    buffer = io.BytesIO()
+    canvas = reportlab_canvas.Canvas(buffer, pagesize=A4)
+    canvas.setFont("Helvetica", 11)
+    for index in range(20):
+        y = A4[1] - 100 - index * 16
+        canvas.drawString(60, y, "Die Gemeinde ist zustaendig fuer die Fuehrung")
+        canvas.drawString(320, y, "des Verzeichnisses und der Kontrolle im Gebiet")
+    canvas.showPage()
+    canvas.save()
+
+    assert detect_marginal_blocks(buffer.getvalue()) == []
 
 
-def test_lift_strips_randtitel_appended_to_paragraph() -> None:
-    """Docling's actual failure mode: the label is appended to the paragraph's END.
-
-    Sentence integrity survives (docling never interleaves mid-clause), but the label
-    still lands inside the body block, so it would index as body text.
-    """
-    ir = NormalizedDocumentIR(
-        blocks=[
-            _block(
-                0,
-                "Art. 1 1 Die Aufsicht über das Hundewesen, die Führung des "
-                "Hundeverzeichnisses sind Sache des Sicherheitsdepartements. Organisation",
-                page_no=1,
-                top=302.0,
-                bottom=372.0,
-            )
-        ],
-        metadata={},
-    )
-    marginals = [b for b in detect_marginal_blocks(_pdf_bytes()) if b.text == "Organisation"]
-    assert marginals, "fixture must contain the Organisation Randtitel"
-
-    lifted, diagnostics = lift_marginal_headings(ir, marginals)
-
-    assert diagnostics == {"detected": 1, "lifted": 1, "unmatched": []}
-    assert [(b.type, b.text) for b in lifted.blocks][0] == ("heading", "Organisation")
-    body = lifted.blocks[1]
-    assert body.type == "paragraph"
-    assert "Organisation" not in body.text
-    assert body.text.endswith("Sache des Sicherheitsdepartements.")
-    assert "Führung des Hundeverzeichnisses" in body.text
-
-
-def test_lift_repositions_standalone_randtitel_into_reading_order() -> None:
-    """Docling's second failure mode: page 2's labels are emitted after the last article.
-
-    The label is not spliced, but it is in the wrong place — it must move to just before
-    the provision it labels, or the heading structure is nonsense.
-    """
-    ir = NormalizedDocumentIR(
-        blocks=[
-            _block(0, "Art. 8 Diese Vollzugsvorschriften treten in Kraft.", page_no=2, top=629.0, bottom=657.0),
-            _block(1, "Inkrafttreten", page_no=2, top=629.1, bottom=640.1),
-        ],
-        metadata={},
-    )
-    marginals = [b for b in detect_marginal_blocks(_pdf_bytes()) if b.text == "Inkrafttreten"]
-    assert marginals
-
-    lifted, diagnostics = lift_marginal_headings(ir, marginals)
-
-    assert diagnostics["lifted"] == 1
-    assert [(b.type, b.text) for b in lifted.blocks] == [
-        ("heading", "Inkrafttreten"),
-        ("paragraph", "Art. 8 Diese Vollzugsvorschriften treten in Kraft."),
-    ]
-    assert [b.order for b in lifted.blocks] == [0, 1]
-
-
-def test_lift_never_strips_text_from_an_unrelated_page() -> None:
-    # Geometry gates every match: a phrase that recurs on another page must survive.
-    ir = NormalizedDocumentIR(
-        blocks=[_block(0, "Ein Satz über die Organisation der Kontrolle.", page_no=2, top=10.0, bottom=30.0)],
-        metadata={},
-    )
-    marginals = [b for b in detect_marginal_blocks(_pdf_bytes()) if b.text == "Organisation"]
-
-    lifted, diagnostics = lift_marginal_headings(ir, marginals)
-
-    assert diagnostics["lifted"] == 0
-    assert diagnostics["unmatched"] == ["Organisation"]
-    assert lifted.blocks[0].text == "Ein Satz über die Organisation der Kontrolle."
+def test_hyphen_healing_keeps_an_elided_compound() -> None:
+    # "Halter- und Hundedaten" is an elision, not a wrap: healing it would fabricate the
+    # word "Halterund". The conjunction is the signal that distinguishes the two.
+    assert join_wrapped_lines(["Halter-", "und Hundedaten"]) == "Halter- und Hundedaten"
+    assert join_wrapped_lines(["Hundehaltungsvoraus-", "setzungen sind"]) == "Hundehaltungsvoraussetzungen sind"

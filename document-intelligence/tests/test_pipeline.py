@@ -686,9 +686,7 @@ class ProcessingPipelineTests(unittest.TestCase):
             result = ProcessingPipeline(processing_version="di_2026_07_15").process_event(
                 build_bundle_event(manifest_path)
             )
-            # PDFs normalise through docling (ADR-0038). Without it installed the pipeline
-            # falls back to the pdfplumber normaliser, which is flagged, not silent.
-            self.assertIn(result.document.metadata["normalizer"], {"pdf_docling_v1", "pdf_v1"})
+            self.assertEqual(result.document.metadata["normalizer"], "pdf_v1")
             body = result.document.body_text or result.document.full_text
             self.assertIn("die Fuehrung des Hundeverzeichnisses", body)
             self.assertNotIn("des Organisation Hundeverzeichnisses", body)

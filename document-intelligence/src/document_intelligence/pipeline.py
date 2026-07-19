@@ -213,11 +213,11 @@ class ProcessingPipeline:
         ]
 
         if primary_content_type == "application/pdf":
-            # PDF always normalises through docling (ADR-0038); ``parser_backend`` selects
+            # PDFs always normalise geometrically (ADR-0038); ``parser_backend`` selects
             # between legacy and docling for *text* modalities only. Deliberately not
-            # configurable: the alternative PDF extractor is known to splice marginal
-            # headings into body sentences, and no environment variable should be able to
-            # silently select silently-corrupted legal text.
+            # configurable: a text-order extractor splices marginal headings into body
+            # sentences, and no environment variable should be able to silently select
+            # silently-corrupted legal text.
             normalized_document = normalize_pdf_document(pdf_bytes, primary_artifact.artifact_id)
         else:
             assert artifact_text is not None  # guaranteed by the content-type branch above

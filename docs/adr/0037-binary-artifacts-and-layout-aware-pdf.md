@@ -1,14 +1,18 @@
 # ADR-0037: Binary artifacts end-to-end and a layout-aware PDF normaliser
 
-> **Amended by [ADR-0038](0038-docling-pdf-normalisation.md) (2026-07-18).**
-> §1 (binary `ProviderResource`) and §2 (PDF as a pipeline modality) stand.
-> **§3 is superseded**: measured on the real AS 554.510 PDF, the body/Randtitel gutter is
-> 5.6pt against a p90 intra-sentence word gap of 6.5pt, so the x-projection column
-> detection this ADR chose cannot separate them and splices the marginal heading into the
-> sentence. PDF normalisation now runs through docling. §4's synthetic fixture is the
-> reason that defect shipped green — see ADR-0038.
+> **Amended by [ADR-0038](0038-geometric-pdf-marginalia.md) (2026-07-19).**
+> §1 (binary `ProviderResource`), §2 (PDF as a pipeline modality) and the choice of
+> **pdfplumber** all stand.
+> **The x-projection column detection in §3 is superseded**: measured on the real
+> AS 554.510 PDF, the body/Randtitel gutter is 5.6pt against a p90 intra-sentence word gap
+> of 6.5pt, so projecting words onto the x-axis cannot separate them and splices the
+> marginal heading into the sentence. It also only looked *left* of the body, while the
+> booklet layout puts recto Randtitel on the right. ADR-0038 replaces the signal with
+> line-start clustering and subtracts the band from the word stream.
+> **§4's synthetic fixture is the reason that defect shipped green** — the regression
+> fixture is now the real PDF.
 
-Status: Proposed (§3–§4 superseded by ADR-0038)
+Status: Proposed (§3 signal and §4 gate superseded by ADR-0038)
 Date: 2026-07-15
 Deciders: Contracts / Platform / Document-intelligence
 Related: ADR-0033 (agentic legal reasoning — the corpus must be trustworthy),

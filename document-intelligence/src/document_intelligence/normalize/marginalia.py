@@ -1,15 +1,15 @@
-"""Geometric detection of marginal headings ("Randtitel") in legal PDFs.
+"""Page geometry for legal PDFs: separating the marginal-heading band from the body.
 
-Swiss ordinances set a provision's short label in a narrow band beside the body column
-rather than above it. Every text-order extractor — ``pdftotext``, ``pdfplumber``'s default
-flow, and (partially) docling — therefore risks emitting that label *inside* the sentence
-it labels, silently corrupting legal text.
+Swiss ordinances set a provision's short label ("Randtitel") in a narrow band beside the
+body column rather than above it. Every text-order extractor — ``pdftotext``,
+``pdfplumber``'s default flow, and docling — therefore risks emitting that label *inside*
+the sentence it labels, silently corrupting legal text:
 
-This module answers one narrow question: **which words on a page are marginal?** It does
-not extract reading order (docling does that, see ``ingest/docling_adapter.py``); it only
-supplies the geometry that lets a post-pass lift a Randtitel out of the paragraph docling
-appended it to. Keeping the two concerns apart is deliberate — the extractor may change
-again, the page geometry will not.
+    „die Führung des **Organisation** Hundeverzeichnisses"
+
+This module answers one narrow question: **which words on a page are marginal, and which
+are body?** Everything downstream (``normalize/pdf.py``) is ordinary single-column layout
+once that partition is made, because subtracting the band leaves a single column behind.
 
 ### Why not x-projection gutters (ADR-0037's approach)
 
@@ -36,15 +36,21 @@ independent reason it could not have worked on this document.
 
 from __future__ import annotations
 
+import io
 import re
 from collections import Counter
-from dataclasses import dataclass, replace
+from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any
 
-from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
-
-# Words whose vertical mid-points sit within this many points belong to one visual line.
-_LINE_TOLERANCE_PT = 3.0
+# Two words belong to the same visual line when their vertical spans overlap by more than
+# this fraction of the shorter span. Overlap (not centre distance) is what pulls a
+# superscript — the Absatz number in "Art. 1 ¹ Die Aufsicht…", or a footnote marker —
+# onto the body line it belongs to, while still keeping consecutive body lines apart.
+_LINE_OVERLAP_RATIO = 0.5
+# Words whose vertical mid-points sit within this many points share a baseline. Used only
+# for the line-start histogram that finds the marginal band (see _line_start_histogram).
+_BASELINE_TOLERANCE_PT = 3.0
 # A marginal band must start at least this fraction of the page width right of the body
 # edge, so an indented body line (a list item, a quotation) is never mistaken for a band.
 _RIGHT_BAND_MIN_OFFSET_RATIO = 0.4
@@ -61,6 +67,28 @@ _EDGE_TOLERANCE_PT = 2.0
 
 
 @dataclass(frozen=True)
+class Word:
+    """One extracted word with the geometry and font attributes layout needs."""
+
+    text: str
+    x0: float
+    x1: float
+    top: float
+    bottom: float
+    size: float = 0.0
+    fontname: str = ""
+
+    @property
+    def height(self) -> float:
+        return max(0.1, self.bottom - self.top)
+
+    @property
+    def bold(self) -> bool:
+        name = self.fontname.lower()
+        return "bold" in name or "black" in name or "heavy" in name
+
+
+@dataclass(frozen=True)
 class MarginalBlock:
     """One Randtitel: its text plus where it sits, in top-origin page coordinates."""
 
@@ -72,72 +100,132 @@ class MarginalBlock:
 
 
 @dataclass(frozen=True)
-class _Word:
-    text: str
-    x0: float
-    x1: float
-    top: float
-    bottom: float
+class PageSplit:
+    """A page partitioned into body words and the marginal blocks lifted out of it."""
 
-    @property
-    def cy(self) -> float:
-        return (self.top + self.bottom) / 2.0
+    body_words: list[Word]
+    marginal_blocks: list[MarginalBlock]
 
 
-def detect_marginal_blocks(pdf_bytes: bytes) -> list[MarginalBlock]:
-    """Return every marginal-heading block in the document, in reading order.
-
-    Returns an empty list for documents with no marginal band (the common case) and for
-    anything the guards judge to be a genuine multi-column layout rather than a margin.
-    """
-    import io
-
-    import pdfplumber
-
-    blocks: list[MarginalBlock] = []
-    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for index, page in enumerate(pdf.pages):
-            words = _extract_words(page)
-            if not words:
-                continue
-            blocks.extend(
-                _blocks_for_page(
-                    words=words,
-                    page_width=float(page.width or 0.0),
-                    page_no=index + 1,
-                )
+def extract_page_words(page: Any) -> list[Word]:
+    """Extract a pdfplumber page's words with font size and name attached."""
+    raw = page.extract_words(
+        use_text_flow=False,
+        keep_blank_chars=False,
+        x_tolerance=1.5,
+        y_tolerance=1.5,
+        extra_attrs=["size", "fontname"],
+    )
+    words: list[Word] = []
+    for item in raw:
+        text = str(item.get("text", "")).strip()
+        if not text:
+            continue
+        words.append(
+            Word(
+                text=text,
+                x0=float(item["x0"]),
+                x1=float(item["x1"]),
+                top=float(item["top"]),
+                bottom=float(item["bottom"]),
+                size=float(item.get("size") or 0.0),
+                fontname=str(item.get("fontname") or ""),
             )
-    return blocks
+        )
+    return words
 
 
-def _blocks_for_page(*, words: list[_Word], page_width: float, page_no: int) -> list[MarginalBlock]:
-    lines = _group_lines(words)
-    if not lines or not page_width:
+def group_lines(words: list[Word]) -> list[list[Word]]:
+    """Group words into visual lines, ordered top-to-bottom, each left-to-right.
+
+    Lines are formed by vertical *span overlap* against the line's tallest word so far.
+    Comparing against the tallest word — rather than the line's growing bounding box —
+    keeps a small superscript from stretching the line and swallowing the next one.
+    """
+    if not words:
         return []
+    ordered = sorted(words, key=lambda w: (w.top, w.x0))
+    lines: list[list[Word]] = []
+    current: list[Word] = [ordered[0]]
+    anchor = ordered[0]
+    for word in ordered[1:]:
+        overlap = min(word.bottom, anchor.bottom) - max(word.top, anchor.top)
+        if overlap > _LINE_OVERLAP_RATIO * min(word.height, anchor.height):
+            current.append(word)
+            if word.height > anchor.height:
+                anchor = word
+        else:
+            lines.append(current)
+            current = [word]
+            anchor = word
+    lines.append(current)
+    for line in lines:
+        line.sort(key=lambda w: w.x0)
+    return lines
 
-    starts = Counter(round(min(w.x0 for w in line)) for line in lines)
+
+def _line_start_histogram(words: list[Word]) -> Counter[int]:
+    """Count how many visual lines begin at each x position.
+
+    This deliberately does **not** use :func:`group_lines`. That function merges by
+    vertical span overlap so a superscript joins its body line — but a Randtitel sitting
+    beside a body line overlaps it just as much, so overlap-grouping would absorb the band
+    into the body line and erase the very cluster this histogram exists to find. Baseline
+    proximity keeps the band's lines separate, which is what the signal requires.
+    """
+    if not words:
+        return Counter()
+    ordered = sorted(words, key=lambda w: ((w.top + w.bottom) / 2.0, w.x0))
+    starts: Counter[int] = Counter()
+    current: list[Word] = [ordered[0]]
+    centre = (ordered[0].top + ordered[0].bottom) / 2.0
+    for word in ordered[1:]:
+        word_centre = (word.top + word.bottom) / 2.0
+        if abs(word_centre - centre) <= _BASELINE_TOLERANCE_PT:
+            current.append(word)
+            centre = sum((w.top + w.bottom) / 2.0 for w in current) / len(current)
+        else:
+            starts[round(min(w.x0 for w in current))] += 1
+            current = [word]
+            centre = word_centre
+    starts[round(min(w.x0 for w in current))] += 1
+    return starts
+
+
+def split_page_words(*, words: list[Word], page_width: float, page_no: int) -> PageSplit:
+    """Partition a page's words into body text and marginal-heading blocks.
+
+    Returns every word as body when the page carries no marginal band (the common case)
+    and when the guards judge the candidate band to be a genuine multi-column layout
+    rather than a margin — shredding a real second column into "headings" would be a
+    worse corruption than the one this module exists to prevent.
+    """
+    if not words or not page_width:
+        return PageSplit(body_words=list(words), marginal_blocks=[])
+
+    starts = _line_start_histogram(words)
+    if not starts:
+        return PageSplit(body_words=list(words), marginal_blocks=[])
     body_left = starts.most_common(1)[0][0]
 
     # A right-hand band is a secondary line-start cluster far right of the body edge.
-    right_band_x0: float | None = None
     candidates = [
         x
         for x, support in starts.items()
         if x > body_left + _RIGHT_BAND_MIN_OFFSET_RATIO * page_width and support >= _MIN_BAND_LINE_SUPPORT
     ]
-    if candidates:
-        right_band_x0 = float(min(candidates))
+    right_band_x0 = float(min(candidates)) if candidates else None
 
-    def _is_marginal(word: _Word) -> str | None:
+    def _side(word: Word) -> str | None:
         if word.x1 < body_left - _EDGE_TOLERANCE_PT:
             return "left"
         if right_band_x0 is not None and word.x0 >= right_band_x0 - _EDGE_TOLERANCE_PT:
             return "right"
         return None
 
-    marginal = [(side, w) for w in words if (side := _is_marginal(w)) is not None]
+    marginal = [(side, w) for w in words if (side := _side(w)) is not None]
     if not marginal:
-        return []
+        return PageSplit(body_words=list(words), marginal_blocks=[])
 
     # Guards: a Randtitel band is narrow and text-poor. A genuine second body column is
     # neither, and must be left alone rather than shredded into "headings".
@@ -146,18 +234,42 @@ def _blocks_for_page(*, words: list[_Word], page_width: float, page_no: int) -> 
     total_mass = sum(len(w.text) for w in words)
     band_mass = sum(len(w.text) for w in band_words)
     if band_width > _MAX_BAND_WIDTH_RATIO * page_width:
-        return []
+        return PageSplit(body_words=list(words), marginal_blocks=[])
     if total_mass and band_mass / total_mass > _MAX_BAND_MASS_RATIO:
-        return []
+        return PageSplit(body_words=list(words), marginal_blocks=[])
 
-    return _group_blocks(marginal, page_no=page_no)
+    band = {id(w) for w in band_words}
+    body_words = [w for w in words if id(w) not in band]
+    return PageSplit(
+        body_words=body_words,
+        marginal_blocks=_group_blocks(marginal, page_no=page_no),
+    )
 
 
-def _group_blocks(marginal: list[tuple[str, _Word]], *, page_no: int) -> list[MarginalBlock]:
+def detect_marginal_blocks(pdf_bytes: bytes) -> list[MarginalBlock]:
+    """Return every marginal-heading block in the document, in reading order."""
+    import pdfplumber
+
+    blocks: list[MarginalBlock] = []
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        for index, page in enumerate(pdf.pages):
+            words = extract_page_words(page)
+            if not words:
+                continue
+            split = split_page_words(
+                words=words,
+                page_width=float(page.width or 0.0),
+                page_no=index + 1,
+            )
+            blocks.extend(split.marginal_blocks)
+    return blocks
+
+
+def _group_blocks(marginal: list[tuple[str, Word]], *, page_no: int) -> list[MarginalBlock]:
     """Coalesce band words into blocks separated by vertical whitespace."""
     ordered = sorted(marginal, key=lambda pair: (pair[1].top, pair[1].x0))
-    groups: list[list[tuple[str, _Word]]] = []
-    current: list[tuple[str, _Word]] = []
+    groups: list[list[tuple[str, Word]]] = []
+    current: list[tuple[str, Word]] = []
     for side, word in ordered:
         if current and word.top - max(w.bottom for _, w in current) > _BLOCK_GAP_PT:
             groups.append(current)
@@ -168,8 +280,8 @@ def _group_blocks(marginal: list[tuple[str, _Word]], *, page_no: int) -> list[Ma
 
     blocks: list[MarginalBlock] = []
     for group in groups:
-        lines = _group_lines([w for _, w in group])
-        text = _join_wrapped_lines(" ".join(w.text for w in sorted(line, key=lambda w: w.x0)) for line in lines)
+        lines = group_lines([w for _, w in group])
+        text = join_wrapped_lines(" ".join(w.text for w in line) for line in lines)
         if not text:
             continue
         blocks.append(
@@ -184,17 +296,25 @@ def _group_blocks(marginal: list[tuple[str, _Word]], *, page_no: int) -> list[Ma
     return blocks
 
 
-_SOFT_HYPHEN_RE = re.compile(r"(\w)[-­]$")
+# A wrap hyphen may be extracted as part of the word ("Hundehaltungsvoraus-") or as a
+# detached token ("ob -"), depending on the PDF's character spacing. Both are the same
+# typographic event and both must heal, or the joined word stays unsearchable.
+_SOFT_HYPHEN_RE = re.compile(r"(\w)\s*[-­]$")
+# German sets an elided compound as "Halter- und Hundedaten". When such an ellipsis falls
+# at a line end the trailing hyphen must be kept, not healed away into "Halterund".
+_ELLIPSIS_CONTINUATIONS = {"und", "oder", "bzw", "sowie", "beziehungsweise"}
 
 
-def _join_wrapped_lines(lines: Any) -> str:
-    """Join a block's lines, healing words hyphenated across the line break.
+def join_wrapped_lines(lines: Iterable[str]) -> str:
+    """Join lines, healing words hyphenated across the line break.
 
-    A narrow margin band wraps aggressively, so "Aufhebung bis-" / "herigen Rechts" must
-    rejoin as "Aufhebung bisherigen Rechts" — otherwise the lifted heading will not match
-    the text the extractor produced. Only a hyphen following a word character and preceding
-    a lower-case continuation is healed, so a genuine compound ("Halter- und Hundedaten")
-    keeps its hyphen.
+    Legal PDFs hyphenate aggressively — "Hundehaltungsvoraus-" / "setzungen". Unless the
+    two halves rejoin, a search for ``Hundehaltungsvoraussetzungen`` cannot match the text
+    at all, which is silent corruption of the same class as the marginal splice (#643).
+
+    Only a hyphen following a word character and preceding a lower-case continuation is
+    healed, and never when that continuation is a conjunction — so a genuine elided
+    compound ("Halter- und Hundedaten") keeps its hyphen.
     """
     out = ""
     for line in lines:
@@ -205,176 +325,9 @@ def _join_wrapped_lines(lines: Any) -> str:
             out = line
             continue
         match = _SOFT_HYPHEN_RE.search(out)
-        if match and line[:1].islower():
+        first_word = line.split(" ", 1)[0].strip(".,;:").lower()
+        if match and line[:1].islower() and first_word not in _ELLIPSIS_CONTINUATIONS:
             out = out[: match.start(1) + 1] + line
         else:
             out = f"{out} {line}"
     return " ".join(out.split())
-
-
-def _group_lines(words: list[_Word]) -> list[list[_Word]]:
-    if not words:
-        return []
-    ordered = sorted(words, key=lambda w: (w.cy, w.x0))
-    lines: list[list[_Word]] = []
-    current: list[_Word] = [ordered[0]]
-    running_cy = ordered[0].cy
-    for word in ordered[1:]:
-        if abs(word.cy - running_cy) <= _LINE_TOLERANCE_PT:
-            current.append(word)
-            running_cy = sum(w.cy for w in current) / len(current)
-        else:
-            lines.append(current)
-            current = [word]
-            running_cy = word.cy
-    lines.append(current)
-    return lines
-
-
-def _extract_words(page: Any) -> list[_Word]:
-    raw = page.extract_words(
-        use_text_flow=False,
-        keep_blank_chars=False,
-        x_tolerance=1.5,
-        y_tolerance=1.5,
-    )
-    words: list[_Word] = []
-    for item in raw:
-        text = str(item.get("text", "")).strip()
-        if not text:
-            continue
-        words.append(
-            _Word(
-                text=text,
-                x0=float(item["x0"]),
-                x1=float(item["x1"]),
-                top=float(item["top"]),
-                bottom=float(item["bottom"]),
-            )
-        )
-    return words
-
-
-def lift_marginal_headings(
-    ir: NormalizedDocumentIR,
-    marginal_blocks: list[MarginalBlock],
-) -> tuple[NormalizedDocumentIR, dict[str, Any]]:
-    """Lift each detected Randtitel out of the paragraph an extractor merged it into.
-
-    Docling preserves the *sentence* (it never interleaves the label mid-clause the way a
-    top-to-bottom dump does) but it appends the label to the end of the paragraph it sits
-    beside — "…Sache des Sicherheitsdepartements. Organisation". Sometimes it emits the
-    label as a standalone text item instead, but at the wrong point in reading order
-    (page 2's Randtitel all land after the last article).
-
-    Both cases are repaired the same way, and geometry decides every step:
-
-    1. A candidate IR block must sit on the **same page** and its vertical span must
-       overlap the Randtitel's. Nothing else is eligible, so a phrase that merely happens
-       to recur elsewhere in the document can never be stripped.
-    2. Among candidates, an **exact** text match wins (docling emitted the label on its
-       own), then a **suffix** match (docling appended it), then a **containment** match.
-    3. The label is removed from the body text and re-emitted as its own heading block,
-       positioned immediately before the block it labels.
-
-    A Randtitel that matches nothing is left alone rather than invented into the output —
-    if the extractor already handled it, or dropped it, that is not this pass's business
-    to guess about.
-    """
-    blocks = list(ir.blocks)
-    lifted = 0
-    unmatched: list[str] = []
-
-    for marginal in marginal_blocks:
-        target = _match_marginal(blocks, marginal)
-        if target is None:
-            unmatched.append(marginal.text)
-            continue
-        index, remainder, was_exact = target
-        heading = _as_heading(blocks[index], marginal.text)
-        if was_exact:
-            blocks.pop(index)
-            insert_at = _reading_order_slot(blocks, marginal, fallback=index)
-        else:
-            blocks[index] = replace(blocks[index], text=remainder)
-            insert_at = index
-        blocks.insert(insert_at, heading)
-        lifted += 1
-
-    renumbered = [replace(block, order=order) for order, block in enumerate(blocks)]
-    diagnostics: dict[str, Any] = {
-        "detected": len(marginal_blocks),
-        "lifted": lifted,
-        "unmatched": unmatched,
-    }
-    return NormalizedDocumentIR(blocks=renumbered, metadata=dict(ir.metadata)), diagnostics
-
-
-def _match_marginal(
-    blocks: list[Block],
-    marginal: MarginalBlock,
-) -> tuple[int, str, bool] | None:
-    """Find the block carrying this Randtitel: (index, text without it, was_exact)."""
-    needle = " ".join(marginal.text.split())
-    if not needle:
-        return None
-
-    candidates = [i for i, block in enumerate(blocks) if _overlaps(block, marginal)]
-    for index in candidates:
-        if " ".join(blocks[index].text.split()) == needle:
-            return index, "", True
-    for index in candidates:
-        collapsed = " ".join(blocks[index].text.split())
-        if collapsed.endswith(needle):
-            return index, collapsed[: -len(needle)].strip(), False
-    for index in candidates:
-        collapsed = " ".join(blocks[index].text.split())
-        if needle in collapsed:
-            return index, " ".join(collapsed.replace(needle, " ", 1).split()), False
-    return None
-
-
-def _overlaps(block: Block, marginal: MarginalBlock) -> bool:
-    attrs = block.attrs or {}
-    if attrs.get("page_no") != marginal.page_no:
-        return False
-    top, bottom = attrs.get("bbox_top"), attrs.get("bbox_bottom")
-    if top is None or bottom is None:
-        return False
-    return float(top) - _LINE_TOLERANCE_PT <= marginal.bottom and float(bottom) + _LINE_TOLERANCE_PT >= marginal.top
-
-
-def _reading_order_slot(blocks: list[Block], marginal: MarginalBlock, *, fallback: int) -> int:
-    """Where a standalone Randtitel belongs: before the first block it could label."""
-    for index, block in enumerate(blocks):
-        attrs = block.attrs or {}
-        if attrs.get("page_no") != marginal.page_no:
-            continue
-        bottom = attrs.get("bbox_bottom")
-        if bottom is not None and float(bottom) + _LINE_TOLERANCE_PT >= marginal.top:
-            return index
-    return min(fallback, len(blocks))
-
-
-def _as_heading(neighbour: Block, text: str) -> Block:
-    attrs = dict(neighbour.attrs or {})
-    attrs["marginal"] = True
-    anchor = _slugify(text)
-    if anchor:
-        attrs["anchor"] = anchor
-    return replace(
-        neighbour,
-        id=f"{neighbour.id}_randtitel",
-        type="heading",
-        text=text,
-        level=3,
-        attrs=attrs,
-    )
-
-
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
-
-
-def _slugify(value: str) -> str | None:
-    slug = _SLUG_RE.sub("_", value.strip().lower()).strip("_")
-    return slug or None

@@ -944,7 +944,6 @@ source = { editable = "." }
 dependencies = [
     { name = "boto3" },
     { name = "deltalake" },
-    { name = "docling" },
     { name = "google-cloud-pubsub" },
     { name = "google-cloud-storage" },
     { name = "jsonschema" },
@@ -958,6 +957,9 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "ruff" },
+]
+docling = [
+    { name = "docling" },
 ]
 it = [
     { name = "pytest" },
@@ -992,7 +994,7 @@ dev = [
 requires-dist = [
     { name = "boto3", specifier = ">=1.34.0,<2" },
     { name = "deltalake", specifier = ">=0.18.0" },
-    { name = "docling", specifier = ">=2.0.0" },
+    { name = "docling", marker = "extra == 'docling'", specifier = ">=2.0.0" },
     { name = "dspy", marker = "extra == 'llm'", specifier = ">=2.5.0" },
     { name = "fastapi", marker = "extra == 'service'", specifier = ">=0.111.0" },
     { name = "google-cloud-aiplatform", marker = "extra == 'llm'", specifier = ">=1.60.0" },

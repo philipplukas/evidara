@@ -1,135 +1,158 @@
 """Layout-aware PDF normalization into the shared intermediate representation.
 
-Municipal Swiss law is largely PDF-only (#590, #584): the operative ordinance has no
-HTML manifestation, so the pipeline must normalize the PDF *itself*. A naive text dump
-(``pdftotext``, ``pdfplumber.extract_text`` with default flow) is **not acceptable
-here**: the Amtliche Sammlung PDFs carry marginal headings ("Randtitel") in a margin band
-beside the body, and a top-to-bottom reading order splices them into the body sentence —
+Municipal Swiss law is largely PDF-only (#590, #584): the operative ordinance has no HTML
+manifestation, so the pipeline must normalize the PDF *itself*. A naive text dump
+(``pdftotext``, ``pdfplumber.extract_text`` with default flow) is **not acceptable here**:
+the Amtliche Sammlung PDFs carry marginal headings ("Randtitel") in a band beside the body,
+and a top-to-bottom reading order splices them into the body sentence —
 
     „die Führung des **Organisation** Hundeverzeichnisses"
 
 That is silently corrupted legal text: it indexes, it searches, it looks fine, and it is
 wrong.
 
-**Extraction runs through docling** (ADR-0038, amending ADR-0037 §3). ADR-0037 chose
-``pdfplumber`` and separated the margin band by projecting words onto the x-axis and
-splitting on whitespace gutters. Measured on the real ordinance (Zurich AS 554.510) that
-signal does not exist: the gutter between body and Randtitel is **5.6pt**, narrower than
-p90 intra-sentence word spacing (6.5pt). No tolerance separates them, so the page collapses
-to a single column and the splice ships. It is not a tuning problem; x-projection is the
-wrong signal for this document.
+**The fix is geometric, not a better extractor** (ADR-0038, amending ADR-0037 §3).
+``normalize/marginalia.py`` decides which words on a page are marginal; this module
+subtracts them from the word stream and lays out what remains. Subtracting the band leaves
+an ordinary single column behind, so reading order becomes trivial and the splice is
+impossible by construction rather than repaired after the fact.
 
-The pdfplumber normaliser is retained below as an explicit, *metadata-flagged* fallback for
-when docling cannot run. It is **known to corrupt this document class**, so a fallback
-result is never presented as equivalent: it sets ``pdf_extractor="pdfplumber"`` and
-``pdf_fallback_reason``, which downstream can gate on.
+ADR-0037's own margin detector projected words onto the x-axis and split on whitespace
+gutters. Measured on the real ordinance (Zurich AS 554.510) that signal does not exist —
+the gutter is 5.6pt against a p90 intra-sentence word gap of 6.5pt — and it only ever
+looked *left* of the body while the booklet layout puts recto Randtitel on the right.
+Both defects are fixed here; see ``marginalia`` for the signal that replaced it.
 """
 
 from __future__ import annotations
 
 import io
 import re
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
 from document_intelligence.errors import ProcessingError
-from document_intelligence.ingest.docling_adapter import normalize_pdf_with_docling
 from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
+from document_intelligence.normalize.marginalia import (
+    MarginalBlock,
+    Word,
+    extract_page_words,
+    group_lines,
+    join_wrapped_lines,
+    split_page_words,
+)
 
-# Line grouping: words whose vertical mid-points sit within this many points of each
-# other belong to the same visual line.
-_LINE_TOLERANCE_PT = 3.0
-# A body paragraph breaks when the vertical gap to the next line exceeds this multiple of
-# the running line height (a blank line / stanza break in the source).
-_PARAGRAPH_GAP_FACTOR = 1.8
-
-
-@dataclass(frozen=True)
-class _Word:
-    text: str
-    x0: float
-    x1: float
-    top: float
-    bottom: float
-
-    @property
-    def cx(self) -> float:
-        return (self.x0 + self.x1) / 2.0
-
-    @property
-    def cy(self) -> float:
-        return (self.top + self.bottom) / 2.0
-
-    @property
-    def height(self) -> float:
-        return max(1.0, self.bottom - self.top)
+# Running headers and folios sit in the outermost slice of the page. Anything wholly
+# inside these bands is furniture, not text: emitting it splices the document's own title
+# and page numbers into the body ("…in Kraft. 2 554.510 Vollzugsvorschriften…").
+_HEADER_BAND_RATIO = 0.08
+_FOOTER_BAND_RATIO = 0.92
+# A new paragraph starts when the baseline-to-baseline step exceeds this multiple of the
+# page's own modal line pitch. Measured on AS 554.510: pitch 14.0pt, within-paragraph
+# steps 14.0-14.7, between-paragraph steps 20.7-25.6.
+_PARAGRAPH_PITCH_FACTOR = 1.4
+# Type smaller than this fraction of the body size is apparatus (footnotes), not body.
+_FOOTNOTE_SIZE_RATIO = 0.85
+# Swiss legal literas: "a. Abgabe an die Gemeinde…". Deliberately narrow — a numeric
+# pattern would swallow body lines that merely begin with a year or an article number.
+_LIST_MARKER_RE = re.compile(r"^[a-z]\.\s")
 
 
 @dataclass(frozen=True)
-class _Column:
-    x0: float
-    x1: float
-    words: list[_Word]
+class _Line:
+    words: list[Word]
 
     @property
-    def cx(self) -> float:
-        return (self.x0 + self.x1) / 2.0
+    def text(self) -> str:
+        return " ".join(w.text for w in self.words)
 
     @property
-    def char_count(self) -> int:
-        return sum(len(w.text) for w in self.words)
+    def top(self) -> float:
+        return min(w.top for w in self.words)
+
+    @property
+    def bottom(self) -> float:
+        return max(w.bottom for w in self.words)
+
+    @property
+    def size(self) -> float:
+        """The dominant type size — the tallest word, ignoring superscript apparatus."""
+        return max(w.size for w in self.words)
+
+    @property
+    def bold(self) -> bool:
+        significant = [w for w in self.words if w.size >= self.size - 0.5]
+        return bool(significant) and all(w.bold for w in significant)
+
+
+@dataclass
+class _Section:
+    """A run of body lines that will become one IR block."""
+
+    type: str
+    lines: list[_Line]
+    level: int | None = None
+
+    @property
+    def top(self) -> float:
+        return min(line.top for line in self.lines)
+
+    @property
+    def bottom(self) -> float:
+        return max(line.bottom for line in self.lines)
+
+    @property
+    def text(self) -> str:
+        return join_wrapped_lines(line.text for line in self.lines)
 
 
 def normalize_pdf_document(pdf_bytes: bytes, artifact_id: str) -> NormalizedDocumentIR:
     """Normalize a PDF byte payload into the shared IR, layout-aware.
 
-    Docling does the extraction; a geometry post-pass lifts marginal headings into their
-    own heading blocks. Falls back to the pdfplumber normaliser only when docling cannot
-    run, and flags the result so a degraded extraction is never mistaken for a good one.
-    """
-    try:
-        return normalize_pdf_with_docling(artifact_id=artifact_id, pdf_bytes=pdf_bytes)
-    except ProcessingError as error:
-        fallback = normalize_pdf_document_pdfplumber(pdf_bytes, artifact_id)
-        metadata = dict(fallback.metadata)
-        metadata["pdf_fallback_reason"] = error.code
-        return NormalizedDocumentIR(blocks=list(fallback.blocks), metadata=metadata)
-
-
-def normalize_pdf_document_pdfplumber(pdf_bytes: bytes, artifact_id: str) -> NormalizedDocumentIR:
-    """ADR-0037's x-projection normaliser, retained as a flagged fallback only.
-
-    Known limitation: it detects the margin band by x-axis whitespace gutters and only
-    ever looks *left* of the body column. Both assumptions fail on real Amtliche-Sammlung
-    PDFs (5.6pt gutter; right-hand band on recto pages), so its output must not be treated
-    as trustworthy for that document class. See ADR-0038.
+    Marginal headings are lifted into their own heading blocks *preceding* the provision
+    they label, hyphenation across line breaks is healed, and running headers/folios are
+    dropped from the reading flow.
     """
     pdfplumber = _import_pdfplumber()
 
     blocks: list[Block] = []
-    order = 0
     title: str | None = None
     page_count = 0
     any_text = False
+    marginal_total = 0
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
+        for index, page in enumerate(pdf.pages):
             page_count += 1
-            words = _extract_words(page)
+            page_no = index + 1
+            words = extract_page_words(page)
             if not words:
                 continue
             any_text = True
-            page_blocks = _blocks_for_page(
+
+            split = split_page_words(
                 words=words,
                 page_width=float(page.width or 0.0),
+                page_no=page_no,
+            )
+            marginal_total += len(split.marginal_blocks)
+
+            sections = _sections_for_page(
+                body_words=split.body_words,
+                page_height=float(page.height or 0.0),
+            )
+            page_blocks = _emit_page(
+                sections=sections,
+                marginal_blocks=split.marginal_blocks,
                 artifact_id=artifact_id,
-                start_order=order,
+                page_no=page_no,
+                start_order=len(blocks),
             )
             for block in page_blocks:
-                if title is None and block.type == "heading":
+                if title is None and block.type == "heading" and not block.attrs.get("marginal"):
                     title = block.text
                 blocks.append(block)
-                order += 1
 
     metadata: dict[str, Any] = {
         "title": title,
@@ -141,6 +164,7 @@ def normalize_pdf_document_pdfplumber(pdf_bytes: bytes, artifact_id: str) -> Nor
         "pdf_page_count": page_count,
         "pdf_extractor": "pdfplumber",
         "pdf_layout_aware": True,
+        "pdf_marginal_headings": marginal_total,
     }
     if not any_text:
         # A scanned / image-only PDF has no text layer. Emitting an empty IR is the
@@ -151,145 +175,105 @@ def normalize_pdf_document_pdfplumber(pdf_bytes: bytes, artifact_id: str) -> Nor
     return NormalizedDocumentIR(blocks=blocks, metadata=metadata)
 
 
-def _blocks_for_page(
-    *,
-    words: list[_Word],
-    page_width: float,
-    artifact_id: str,
-    start_order: int,
-) -> list[Block]:
-    columns = _detect_columns(words, page_width)
-    if not columns:
+def _sections_for_page(*, body_words: list[Word], page_height: float) -> list[_Section]:
+    """Lay out one page's body words into typed sections, in reading order."""
+    lines = [_Line(words=line) for line in group_lines(body_words)]
+    lines = [line for line in lines if line.text.strip()]
+    if page_height:
+        header = page_height * _HEADER_BAND_RATIO
+        footer = page_height * _FOOTER_BAND_RATIO
+        lines = [line for line in lines if line.bottom > header and line.top < footer]
+    if not lines:
         return []
 
-    body_column = max(columns, key=lambda c: (c.char_count, c.x1 - c.x0))
-    # Marginal-heading bands are the columns entirely to the left of the body column
-    # (Swiss Randtitel convention). Anything to the right of the body (page numbers,
-    # stray footnote marks) is dropped from the reading flow rather than spliced in.
-    marginal_columns = [c for c in columns if c is not body_column and c.x1 <= body_column.x0 + 1.0]
+    body_size = _modal_size(lines)
+    pitch = _modal_pitch(lines)
 
-    body_lines = _group_lines(body_column.words)
-    marginal_lines = [line for column in marginal_columns for line in _group_lines(column.words)]
+    # Footnote apparatus is the trailing run of small type at the foot of the page. It is
+    # kept (it carries the legal citations) but never merged into a body paragraph.
+    body_lines = list(lines)
+    footnotes: list[_Line] = []
+    while body_lines and body_lines[-1].size < body_size * _FOOTNOTE_SIZE_RATIO:
+        footnotes.insert(0, body_lines.pop())
 
-    return _interleave(
-        body_lines=body_lines,
-        marginal_lines=marginal_lines,
-        artifact_id=artifact_id,
-        start_order=start_order,
-    )
-
-
-@dataclass
-class _Line:
-    text: str
-    top: float
-    bottom: float
-    height: float
-
-    @property
-    def cy(self) -> float:
-        return (self.top + self.bottom) / 2.0
-
-
-def _group_lines(words: list[_Word]) -> list[_Line]:
-    """Group a column's words into visual lines, ordered top-to-bottom."""
-    if not words:
-        return []
-    ordered = sorted(words, key=lambda w: (round(w.cy, 1), w.x0))
-    lines: list[list[_Word]] = []
-    current: list[_Word] = [ordered[0]]
-    current_cy = ordered[0].cy
-    for word in ordered[1:]:
-        if abs(word.cy - current_cy) <= _LINE_TOLERANCE_PT:
-            current.append(word)
-            # Track the running centre so a gently sloping baseline still coheres.
-            current_cy = sum(w.cy for w in current) / len(current)
-        else:
-            lines.append(current)
-            current = [word]
-            current_cy = word.cy
-    lines.append(current)
-
-    result: list[_Line] = []
-    for line_words in lines:
-        line_words.sort(key=lambda w: w.x0)
-        text = _normalize_whitespace(" ".join(w.text for w in line_words))
-        if not text:
-            continue
-        top = min(w.top for w in line_words)
-        bottom = max(w.bottom for w in line_words)
-        height = sum(w.height for w in line_words) / len(line_words)
-        result.append(_Line(text=text, top=top, bottom=bottom, height=height))
-    result.sort(key=lambda line: line.top)
-    return result
-
-
-@dataclass
-class _Paragraph:
-    text: str
-    top: float
-    bottom: float
-
-
-def _paragraphs_from_body(body_lines: list[_Line]) -> list[_Paragraph]:
-    """Coalesce body lines into paragraphs using vertical gaps only.
-
-    Marginal headings are ignored here: a Randtitel labels a provision but must never
-    break the provision's sentence, so paragraph boundaries come solely from the body
-    column's own line spacing.
-    """
-    paragraphs: list[_Paragraph] = []
-    buffer: list[str] = []
-    top = 0.0
-    bottom = 0.0
-    prev_bottom: float | None = None
-    prev_height: float | None = None
-
-    def _flush() -> None:
-        nonlocal buffer
-        if buffer:
-            paragraphs.append(_Paragraph(text=_normalize_whitespace(" ".join(buffer)), top=top, bottom=bottom))
-            buffer = []
-
+    sections: list[_Section] = []
     for line in body_lines:
-        if prev_bottom is not None:
-            gap = line.top - prev_bottom
-            reference = prev_height or line.height
-            if gap > reference * _PARAGRAPH_GAP_FACTOR:
-                _flush()
-        if not buffer:
-            top = line.top
-        buffer.append(line.text)
-        bottom = line.bottom
-        prev_bottom = line.bottom
-        prev_height = line.height
-    _flush()
-    return paragraphs
+        kind, level = _classify(line, body_size=body_size)
+        previous = sections[-1] if sections else None
+        # A wrapped continuation line keeps the type of the item it continues: the second
+        # line of a litera ("(§ 17 Abs. 2 lit. a Hundeverordnung) Fr. 20.–;") is not a
+        # paragraph of its own, and splitting it off would strip the litera of its content.
+        adjacent = previous is not None and line.top - previous.bottom <= pitch * (_PARAGRAPH_PITCH_FACTOR - 1.0)
+        if previous is None:
+            starts_new = True
+        elif kind == "heading" or previous.type == "heading":
+            # A heading that wraps ("B. Abgabe an die Gemeinde, Kantonsbeitrag und" /
+            # "Gebühren") is one heading, so an adjacent heading line of the same rank
+            # continues it. Any other type change across a heading boundary breaks.
+            starts_new = not (kind == "heading" and previous.type == "heading" and previous.level == level and adjacent)
+        elif kind == "list_item" and _LIST_MARKER_RE.match(line.text):
+            starts_new = True
+        else:
+            starts_new = not adjacent
+        if starts_new:
+            sections.append(_Section(type=kind, lines=[line], level=level))
+        else:
+            previous.lines.append(line)
+
+    for line in footnotes:
+        sections.append(_Section(type="paragraph", lines=[line]))
+    return sections
 
 
-def _interleave(
+def _classify(line: _Line, *, body_size: float) -> tuple[str, int | None]:
+    if line.bold and line.size >= body_size - 0.5:
+        return "heading", 1 if line.size > body_size + 0.5 else 2
+    if _LIST_MARKER_RE.match(line.text):
+        return "list_item", None
+    return "paragraph", None
+
+
+def _modal_size(lines: list[_Line]) -> float:
+    counts = Counter(round(line.size, 1) for line in lines)
+    return float(counts.most_common(1)[0][0]) if counts else 0.0
+
+
+def _modal_pitch(lines: list[_Line]) -> float:
+    """The page's dominant baseline-to-baseline step, used to detect paragraph breaks."""
+    steps = Counter(round(b.top - a.top) for a, b in zip(lines, lines[1:], strict=False) if b.top > a.top)
+    if steps:
+        return float(steps.most_common(1)[0][0])
+    heights = [line.bottom - line.top for line in lines]
+    return float(sum(heights) / len(heights)) if heights else 12.0
+
+
+def _emit_page(
     *,
-    body_lines: list[_Line],
-    marginal_lines: list[_Line],
+    sections: list[_Section],
+    marginal_blocks: list[MarginalBlock],
     artifact_id: str,
+    page_no: int,
     start_order: int,
 ) -> list[Block]:
-    """Emit body paragraphs with marginal headings attached to the provision they label.
+    """Emit a page's blocks, each Randtitel heading placed before the section it labels.
 
-    A Randtitel is emitted as a heading block **before** the whole body paragraph whose
-    vertical span it sits within — never spliced into that paragraph's sentence. This is
-    the exact corruption #590 exists to prevent.
+    A Randtitel is positioned by geometry: it precedes the first section whose vertical
+    span reaches its own. That is what makes the label a *heading of* the provision rather
+    than a fragment inside it.
     """
-    blocks: list[Block] = []
     order = start_order
+    blocks: list[Block] = []
 
-    def _emit(block_type: str, text: str, level: int | None, anchor: str | None) -> None:
+    def _emit(block_type: str, text: str, level: int | None, *, marginal: bool, top: float) -> None:
         nonlocal order
         if not text:
             return
-        attrs: dict[str, Any] = {"tag": "pdf"}
+        attrs: dict[str, Any] = {"tag": "pdf", "page_no": page_no, "bbox_top": top}
+        anchor = _slugify(text) if block_type == "heading" else None
         if anchor:
             attrs["anchor"] = anchor
+        if marginal:
+            attrs["marginal"] = True
         blocks.append(
             Block(
                 id=f"blk_{order:04d}",
@@ -304,96 +288,17 @@ def _interleave(
         )
         order += 1
 
-    paragraphs = _paragraphs_from_body(body_lines)
-    marginals = sorted(marginal_lines, key=lambda line: line.cy)
+    pending = sorted(marginal_blocks, key=lambda m: m.top)
+    for section in sections:
+        while pending and pending[0].top < section.bottom:
+            marginal = pending.pop(0)
+            _emit("heading", marginal.text, 3, marginal=True, top=marginal.top)
+        _emit(section.type, section.text, section.level, marginal=False, top=section.top)
 
-    if not paragraphs:
-        # No body text: still surface the marginal headings rather than dropping them.
-        for marginal in marginals:
-            _emit("heading", marginal.text, 3, _slugify(marginal.text))
-        return blocks
-
-    # Assign each marginal heading to the paragraph whose vertical span best contains it
-    # (or the nearest following paragraph when it sits in the leading above the block).
-    attached: dict[int, list[_Line]] = {i: [] for i in range(len(paragraphs))}
-
-    def _paragraph_for(marginal: _Line) -> int:
-        cy = marginal.cy
-        for index, para in enumerate(paragraphs):
-            if para.top - _LINE_TOLERANCE_PT <= cy <= para.bottom + _LINE_TOLERANCE_PT:
-                return index
-        # Not inside any paragraph — attach to the first paragraph starting at/after it.
-        for index, para in enumerate(paragraphs):
-            if para.top >= cy:
-                return index
-        return len(paragraphs) - 1
-
-    for marginal in marginals:
-        attached[_paragraph_for(marginal)].append(marginal)
-
-    for index, para in enumerate(paragraphs):
-        for marginal in attached[index]:
-            _emit("heading", marginal.text, 3, _slugify(marginal.text))
-        _emit("paragraph", para.text, None, None)
-
+    # A Randtitel below the last section still belongs to the document, not the floor.
+    for marginal in pending:
+        _emit("heading", marginal.text, 3, marginal=True, top=marginal.top)
     return blocks
-
-
-def _detect_columns(words: list[_Word], page_width: float) -> list[_Column]:
-    """Split a page's words into vertical columns separated by whitespace gutters.
-
-    Words are projected onto the x-axis; their bounding intervals are merged with a small
-    join tolerance. Runs of merged coverage are columns; the whitespace between them are
-    gutters. A join tolerance larger than intra-column word spacing but smaller than a
-    margin gutter keeps the Randtitel band separate from the body column.
-    """
-    if not words:
-        return []
-    # Join tolerance scales with page width so it holds across A4 / Letter / cropped pages.
-    join_tol = max(18.0, page_width * 0.04) if page_width else 18.0
-
-    ordered = sorted(words, key=lambda w: w.x0)
-    bands: list[list[float]] = [[ordered[0].x0, ordered[0].x1]]
-    for word in ordered[1:]:
-        current = bands[-1]
-        if word.x0 - current[1] <= join_tol:
-            current[1] = max(current[1], word.x1)
-        else:
-            bands.append([word.x0, word.x1])
-
-    if len(bands) == 1:
-        return [_Column(x0=bands[0][0], x1=bands[0][1], words=list(words))]
-
-    columns: list[_Column] = []
-    for x0, x1 in bands:
-        band_words = [w for w in words if x0 - 0.5 <= w.cx <= x1 + 0.5]
-        if band_words:
-            columns.append(_Column(x0=x0, x1=x1, words=band_words))
-    return columns
-
-
-def _extract_words(page: Any) -> list[_Word]:
-    raw = page.extract_words(
-        use_text_flow=False,
-        keep_blank_chars=False,
-        x_tolerance=1.5,
-        y_tolerance=1.5,
-    )
-    words: list[_Word] = []
-    for item in raw:
-        text = str(item.get("text", "")).strip()
-        if not text:
-            continue
-        words.append(
-            _Word(
-                text=text,
-                x0=float(item["x0"]),
-                x1=float(item["x1"]),
-                top=float(item["top"]),
-                bottom=float(item["bottom"]),
-            )
-        )
-    return words
 
 
 def _import_pdfplumber() -> Any:
@@ -414,7 +319,3 @@ _SLUG_RE = re.compile(r"[^a-z0-9]+")
 def _slugify(value: str) -> str | None:
     slug = _SLUG_RE.sub("_", value.strip().lower()).strip("_")
     return slug or None
-
-
-def _normalize_whitespace(value: str) -> str:
-    return " ".join(value.split())
