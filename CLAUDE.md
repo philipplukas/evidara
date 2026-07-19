@@ -29,10 +29,17 @@ Run the narrowest gate for the surface you touched before pushing:
 |---|---|
 | `platform-control/` | `cd platform-control && uv run pytest` |
 | `platform-control/admin/` | `cd platform-control/admin && npm run check` |
+| `document-intelligence/` | `cd document-intelligence && uv run --extra dev --extra service --extra test pytest && uv run ruff check . && uv run ruff format --check .` |
 | `legal-search/api/` | `cd legal-search/api && npm run check` |
 | `legal-search/frontend/` | `cd legal-search/frontend && npm run check` |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `python scripts/check_country_overlay_files.py` |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
+
+For `document-intelligence/`, the extras are not optional: a bare `uv run pytest` cannot collect
+`test_instructor_extractor` or `test_eval_docling_extractor` and reports green over a smaller suite
+than CI runs. `ruff format --check` is likewise part of the CI job, not just `ruff check`. The full
+CI gate is `scripts/check-document-intelligence.sh`, but it installs into the ambient `python3`
+rather than a uv environment, so prefer the command above locally.
 
 ### ID contract (see #264)
 
