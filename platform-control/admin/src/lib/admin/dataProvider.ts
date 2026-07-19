@@ -16,6 +16,7 @@ import {
   type UpdateManyResult,
   type UpdateResult,
 } from "react-admin";
+import { classifyTemplate } from "../../domain/blueprintLock";
 import { ResourceName } from "../../domain/resourceNames";
 
 type ListResponse<T> = {
@@ -238,10 +239,30 @@ export type SourceBlueprintPreview = SourceBlueprintPreviewInput & {
   acquisition_spec: AcquisitionSpec;
 } & BlueprintTwoKeyLock;
 
+/**
+ * One row of the operator's coverage inventory (#668).
+ *
+ * `provider` is a plain `string`, not a union: eleven providers exist and a
+ * four-member union was how the contract drifted in the first place (#618).
+ * Narrowing it here would make `gemeinde_http` — the municipal path the whole
+ * ADR-0033 dog axis runs on — a type error in the panel that lists it.
+ *
+ * The provenance fields say where the config key's current value came from:
+ * `source: "default"` means nobody has ever touched it (the shipped
+ * `source_blueprints.yaml` value is in force), `"override"` means an operator
+ * deliberately flipped it and `note`/`updated_by`/`updated_at` carry the audit
+ * trail. `updated_by` is **key-shaped, not person-shaped** — every human
+ * sharing an operator API key resolves to the same identity.
+ */
 export type SourceBlueprintTemplate = {
   overlay_id: string;
   provider_template_id: string;
-  provider: "firecrawl" | "deterministic_http" | "ris_ogd" | "fedlex_sparql";
+  provider: string;
+  default_enabled: boolean;
+  source: "override" | "default";
+  note: string | null;
+  updated_by: string | null;
+  updated_at: string | null;
 } & BlueprintTwoKeyLock;
 
 type CapturedResource = {
@@ -1142,6 +1163,33 @@ export const controlPlaneDataProvider: DataProvider = {
       );
       const records = response.data.map((item) => toRecord(item, "source_id"));
       return toServerPagedResult(records, response.total, params);
+    }
+
+    if (resource === ResourceName.BlueprintTemplates) {
+      // `/v1/sources/blueprint-templates` returns the whole collection (31 rows
+      // today) in one unbounded array and takes no query parameters, so filter
+      // and page client-side. `applyClientListWindow` is the sanctioned helper
+      // for genuinely-unbounded endpoints; it derives `total` from the full
+      // list, not from a server page, which is exactly right here.
+      const templates = await controlPlaneActions.listSourceBlueprintTemplates();
+      const overlay = params.filter?.overlay_id;
+      const lockClass = params.filter?.lock_class;
+      const filtered = templates.filter((template) => {
+        if (typeof overlay === "string" && !isMissingFilterValue(overlay)) {
+          if (template.overlay_id !== overlay) return false;
+        }
+        if (typeof lockClass === "string" && !isMissingFilterValue(lockClass)) {
+          if (classifyTemplate(template).id !== lockClass) return false;
+        }
+        return true;
+      });
+      // Composite id: the API keys a template on (overlay, template), and
+      // react-admin needs a single scalar identifier per row.
+      const records = filtered.map((template) => ({
+        ...template,
+        id: `${template.overlay_id}/${template.provider_template_id}`,
+      }));
+      return applyClientListWindow(records, params);
     }
 
     if (resource === "source-versions") {

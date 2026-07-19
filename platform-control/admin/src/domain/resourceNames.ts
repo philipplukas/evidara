@@ -14,6 +14,7 @@ export const ResourceName = {
   Jurisdictions: "jurisdictions",
   Authorities: "authorities",
   Sources: "sources",
+  BlueprintTemplates: "blueprint-templates",
   PreviewReview: "preview-review",
   Runs: "runs",
   Corrections: "corrections",
