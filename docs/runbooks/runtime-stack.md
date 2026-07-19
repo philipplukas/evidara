@@ -342,25 +342,43 @@ bash scripts/run-runtime-bootstrap.sh staging
 What it does:
 
 1. Executes `platform-control-db-migrate-{env}`
-2. Executes `os-alias-bootstrap-{env}`
-3. Executes `os-alias-check-{env}`
+2. Executes `os-alias-check-{env}`
 
-If staging smoke fails with:
+There is no `os-alias-bootstrap-{env}` job any more (#713). It created the documents
+index with settings and **no mappings**, so every field fell back to dynamic mapping —
+facets aggregated to nothing and the German `legal_text` analyzer was absent entirely.
+Because it ran before the API and index creation is first-writer-wins, it permanently
+pre-empted the API's own correct bootstrap.
 
-`OpenSearch alias preflight failed. Run job os-alias-bootstrap-staging and retry smoke.`
+The documents index and both aliases are now created by **one** path: the
+`legal-search-api` startup bootstrap (`bootstrapDocumentsIndex()`), which derives from
+the canonical mapping. This is the same mechanism the live Hetzner runtime uses.
 
-remediation is:
+If the alias preflight fails, remediation is to get the API to bootstrap — **not** to
+hand-create the index:
 
 ```bash
-gcloud run jobs execute os-alias-bootstrap-staging \
-  --project "${GCP_PROJECT_ID}" \
-  --region "${GCP_REGION}" \
-  --wait
+# Ensure the API is allowed to bootstrap (must not be "false"), then roll it.
+gcloud run services describe legal-search-api-staging \
+  --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
+  --format='value(spec.template.spec.containers[0].env)' | grep -o 'OPENSEARCH_BOOTSTRAP_ON_STARTUP[^,]*' || true
+
+gcloud run services update legal-search-api-staging \
+  --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" \
+  --update-env-vars=BOOTSTRAP_NUDGE="$(date +%s)"   # forces a new revision
 
 gcloud run jobs execute os-alias-check-staging \
   --project "${GCP_PROJECT_ID}" \
   --region "${GCP_REGION}" \
   --wait
+```
+
+Then confirm the result matches canonical:
+
+```bash
+cd legal-search/api
+OPENSEARCH_NODE=... OPENSEARCH_INDEX=evidara-documents-read-staging \
+  npm run mapping:check-drift   # exit 0 is the acceptance criterion
 ```
 
 ### 7. Release Readiness Go/No-Go Operation
@@ -486,7 +504,8 @@ git push origin main
 | Terraform plan drift | Manual changes outside Terraform | Run `terraform plan` to see drift, then `terraform apply` |
 | Image not found on deploy | Image not pushed to Artifact Registry | Check `runtime-images.yml` workflow run, verify AR tag exists |
 | Health check timeout | Service startup too slow | Increase `startup_probe.initial_delay_seconds` in tfvars |
-| OpenSearch alias preflight fails in smoke | Missing or broken read/write aliases | Run `scripts/run-runtime-bootstrap.sh <env>` or execute `os-alias-bootstrap-<env>` then `os-alias-check-<env>` |
+| OpenSearch alias preflight fails in smoke | Missing or broken read/write aliases | Roll `legal-search-api-<env>` so its startup bootstrap re-creates index + aliases from the canonical mapping, then `os-alias-check-<env>`. Never hand-create the index (#713). |
+| Facets return empty buckets / umlaut variants do not match | Index created by something other than the canonical bootstrap | `npm run mapping:check-drift` against the cluster; if drifted, reindex via `scripts/opensearch-alias-cutover.ts --stage-write` → backfill → `--promote-read`. Do not weaken the query. |
 
 ## Related
 
