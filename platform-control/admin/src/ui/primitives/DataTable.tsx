@@ -44,7 +44,17 @@ export interface DataTableProps<T> {
    * ASC/DESC (matches ra-core's `setSort` semantics).
    */
   onSort?: (field: string, order: SortOrder) => void;
+  /**
+   * Activating a row. Wired to pointer click *and* keyboard (Enter / Space) —
+   * on the canonical v2 pages this is the only path to a record's detail, so a
+   * mouse-only handler locked keyboard operators out of every record (#624).
+   */
   onRowClick?: (record: T) => void;
+  /**
+   * Accessible name for an activatable row, e.g. `(r) => \`Open run ${r.run_id}\``.
+   * Optional: without it a focused row is announced by its cell contents.
+   */
+  getRowLabel?: (record: T) => string;
   total?: number;
   page?: number;
   perPage?: number;
@@ -62,6 +72,7 @@ export function DataTable<T>({
   sort,
   onSort,
   onRowClick,
+  getRowLabel,
   total,
   page,
   perPage,
@@ -123,25 +134,32 @@ export function DataTable<T>({
                     className={cn(
                       "text-left px-4 py-3 border-b border-[var(--border)]",
                       "text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-meta)]",
-                      canSort && "cursor-pointer select-none hover:text-[var(--accent-core)]",
                       col.headerClassName,
                     )}
-                    onClick={
-                      canSort
-                        ? () => {
-                            const nextOrder: SortOrder =
-                              isSorted && sort?.order === "ASC" ? "DESC" : "ASC";
-                            onSort!(col.sortField!, nextOrder);
-                          }
-                        : undefined
-                    }
                     aria-sort={
                       isSorted ? (sort!.order === "ASC" ? "ascending" : "descending") : "none"
                     }
                   >
-                    <span className="inline-flex items-center gap-1">
-                      {col.header}
-                      {canSort ? (
+                    {/*
+                     * A sortable header is a real <button>, not an onClick on
+                     * the <th> — the bare handler was mouse-only for the same
+                     * reason the rows were (#624).
+                     */}
+                    {canSort ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextOrder: SortOrder =
+                            isSorted && sort?.order === "ASC" ? "DESC" : "ASC";
+                          onSort!(col.sortField!, nextOrder);
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-1 select-none uppercase tracking-[0.08em]",
+                          "hover:text-[var(--accent-core)]",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] rounded-sm",
+                        )}
+                      >
+                        {col.header}
                         <SortIcon
                           size={12}
                           strokeWidth={2.5}
@@ -151,8 +169,10 @@ export function DataTable<T>({
                           )}
                           aria-hidden
                         />
-                      ) : null}
-                    </span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">{col.header}</span>
+                    )}
                   </th>
                 );
               })}
@@ -190,12 +210,44 @@ export function DataTable<T>({
               </tr>
             ) : (
               records!.map((record) => (
+                /*
+                 * An activatable row is a real tab stop: `tabIndex={0}` plus an
+                 * Enter/Space handler, because `onClick` on a <tr> never fires
+                 * from the keyboard (#624). Space is `preventDefault`ed so it
+                 * activates the row instead of scrolling the page.
+                 *
+                 * The `<tr>` deliberately keeps its implicit `row` role rather
+                 * than taking `role="button"` — overriding it would strip the
+                 * row/cell relationship from every cell inside and make the
+                 * table harder to navigate than it is today. The stronger fix,
+                 * a real <a> in the first cell (which also buys middle-click
+                 * and open-in-new-tab), needs an href at each call site.
+                 */
                 <tr
                   key={getRowId(record)}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={onRowClick && getRowLabel ? getRowLabel(record) : undefined}
                   onClick={onRowClick ? () => onRowClick(record) : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.key !== "Enter" && event.key !== " ") {
+                            return;
+                          }
+                          // Let controls inside a cell keep their own keys.
+                          if (event.target !== event.currentTarget) {
+                            return;
+                          }
+                          event.preventDefault();
+                          onRowClick(record);
+                        }
+                      : undefined
+                  }
                   className={cn(
                     "border-b border-[var(--border)] last:border-b-0 align-top",
                     onRowClick && "cursor-pointer hover:bg-[var(--interactive-accent-subtle)]",
+                    onRowClick &&
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]",
                   )}
                 >
                   {columns.map((col) => (

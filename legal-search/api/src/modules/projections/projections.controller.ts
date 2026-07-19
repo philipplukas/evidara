@@ -20,14 +20,17 @@ import type { ProjectionHistoryStatus } from './projections.repository';
 import { type ProjectionApplyResult, ProjectionsService } from './projections.service';
 
 @ApiTags('projections')
-@Controller('/v1/projections/events')
+// Base is `/v1/projections` so the projection *reads* (`/documents`) sit beside the
+// event intake (`/events/...`) instead of being forced under an `events/` prefix they
+// have nothing to do with. Every existing route keeps its exact URL.
+@Controller('/v1/projections')
 @UseInterceptors(PubSubUnwrapInterceptor)
 export class ProjectionsController {
   private readonly logger = new Logger(ProjectionsController.name);
 
   constructor(private readonly service: ProjectionsService) {}
 
-  @Post('/document-processed')
+  @Post('/events/document-processed')
   @HttpCode(HttpStatus.ACCEPTED)
   async receiveDocumentProcessed(
     @Body() event: DocumentProcessedEventDto,
@@ -78,7 +81,7 @@ export class ProjectionsController {
     }
   }
 
-  @Post('/document-withdrawn')
+  @Post('/events/document-withdrawn')
   @HttpCode(HttpStatus.ACCEPTED)
   async receiveDocumentWithdrawn(
     @Body() event: DocumentWithdrawnEventDto,
@@ -128,7 +131,23 @@ export class ProjectionsController {
     }
   }
 
-  @Get('/history')
+  /**
+   * Enumerate the indexed documents, `document_id`-ordered and cursor-paged.
+   *
+   * This is the index side of the ADR-0005 reconcile diff. It lives here, behind the
+   * projection repository, because `legal-search/api` owns every OpenSearch call
+   * (ADR-0008); document-intelligence reads canonical Delta and asks this endpoint what
+   * is derived, exactly as the Delta backfill already does in the other direction.
+   */
+  @Get('/documents')
+  async listIndexedDocuments(
+    @Query('after') after?: string,
+    @Query('limit', new DefaultValuePipe(500), ParseIntPipe) limit?: number,
+  ) {
+    return this.service.listIndexedDocuments({ after, limit });
+  }
+
+  @Get('/events/history')
   async queryHistory(
     @Query('document_id') documentId?: string,
     @Query('run_id') runId?: string,
@@ -145,7 +164,7 @@ export class ProjectionsController {
     });
   }
 
-  @Get('/history/stats')
+  @Get('/events/history/stats')
   async getHistoryStats() {
     return this.service.getHistoryStats();
   }

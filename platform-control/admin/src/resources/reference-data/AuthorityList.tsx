@@ -106,6 +106,7 @@ export function AuthorityList() {
             sort={controller.sort}
             onSort={(field, order) => controller.setSort({ field, order })}
             onRowClick={(r) => navigate(`/authorities/${encodeURIComponent(String(r.id))}`)}
+            getRowLabel={(r) => `Open authority ${r.name}`}
             total={controller.total}
             page={controller.page}
             perPage={controller.perPage}

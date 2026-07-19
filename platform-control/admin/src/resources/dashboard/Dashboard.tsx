@@ -35,6 +35,49 @@ type DashboardStats = {
   }>;
 };
 
+/**
+ * `/stats` is only usable if it actually carries the counters the dashboard
+ * reads. A bare `res.json()` was not enough (#623): FastAPI's 500 returns valid
+ * JSON (`{"detail": "Internal Server Error"}`), so the parse resolved, the
+ * truthy object slipped past the `if (!stats)` guard, and `stats.run_by_status`
+ * threw — taking down the whole SPA through react-admin's error boundary. A
+ * healthy `200 {}` did the same. Anything that is not a well-formed payload is
+ * mapped to `null`, which is what the InlineAlert branch renders.
+ */
+const isDashboardStats = (payload: unknown): payload is DashboardStats => {
+  if (typeof payload !== "object" || payload === null) {
+    return false;
+  }
+  const candidate = payload as Partial<DashboardStats>;
+  return (
+    typeof candidate.source_count === "number" &&
+    typeof candidate.total_runs === "number" &&
+    typeof candidate.total_artifacts === "number" &&
+    typeof candidate.run_by_status === "object" &&
+    candidate.run_by_status !== null &&
+    Array.isArray(candidate.recent_runs)
+  );
+};
+
+/**
+ * Fetch the dashboard counters, resolving to `null` for every failure mode —
+ * non-2xx, unparseable body, well-formed JSON of the wrong shape, and network
+ * error. Exported so the failure modes can be tested without mounting the
+ * react-admin tree.
+ */
+export const loadDashboardStats = async (): Promise<DashboardStats | null> => {
+  try {
+    const response = await fetch("/api/platform-control/stats");
+    if (!response.ok) {
+      return null;
+    }
+    const payload: unknown = await response.json();
+    return isDashboardStats(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+};
+
 type RecentRunHealth = {
   run_id: string;
   health: RunPipelineHealth | null;
@@ -162,11 +205,17 @@ export function Dashboard() {
   const redirect = useRedirect();
 
   useEffect(() => {
-    fetch("/api/platform-control/stats")
-      .then((res) => res.json())
-      .then(setStats)
-      .catch(() => setStats(null))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void loadDashboardStats().then((payload) => {
+      if (cancelled) {
+        return;
+      }
+      setStats(payload);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -465,6 +514,7 @@ export function Dashboard() {
               columns={recentRunColumns}
               getRowId={(run) => run.run_id}
               onRowClick={(run) => redirect("show", ResourceName.Runs, run.run_id)}
+              getRowLabel={(run) => `Open run ${run.run_id}`}
               empty="No runs found. Create a source and trigger a run to get started."
             />
           </div>

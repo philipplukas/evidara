@@ -18,21 +18,14 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
  * OpenAPI spec version: 0.8.0
  */
 
+export type ListIndexedProjectionDocumentsParams = {
 /**
- * Temporal validity of a norm on the requested `in_force_at` date.
-Deliberately four-valued: `unknown` ("marked repealed, but we do not hold
-the date", or "we hold no start date") is a correct answer, and inventing
-`in_force` from a missing field is the confident fabrication the platform
-exists to prevent.
-
+ * Exclusive cursor — the `document_id` that ended the previous page.
  */
-export type InForceState = typeof InForceState[keyof typeof InForceState];
-
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const InForceState = {
-  in_force: 'in_force',
-  not_yet_in_force: 'not_yet_in_force',
-  repealed: 'repealed',
-  unknown: 'unknown',
-} as const;
+after?: string;
+/**
+ * @minimum 1
+ * @maximum 1000
+ */
+limit?: number;
+};

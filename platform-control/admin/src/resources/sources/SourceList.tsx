@@ -183,6 +183,7 @@ export default function SourceList() {
             sort={controller.sort}
             onSort={(field, order) => controller.setSort({ field, order })}
             onRowClick={(r) => navigate(`/sources/${encodeURIComponent(String(r.id))}/show`)}
+            getRowLabel={(r) => `Open source ${r.name}`}
             total={controller.total}
             page={controller.page}
             perPage={controller.perPage}

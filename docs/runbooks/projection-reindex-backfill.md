@@ -57,6 +57,11 @@ Two rebuild sources, two different tools:
 | Previous **index** | `opensearch-alias-cutover.ts --reindex` | The old index is healthy; you only want a new mapping. Fast (server-side `_reindex`). |
 | Canonical **Delta** | `document_intelligence_delta_projection_backfill` | The index is lost/empty/degraded, or you want to re-derive projections from truth. The only path that works when OpenSearch has nothing to read from. |
 
+Rebuilding only ever *adds*. The backfill upserts on `document_id`, so it cannot remove
+an indexed document whose canonical row is gone — see
+[Reconcile](#procedure-reconcile--remove-indexed-documents-canonical-does-not-back)
+for the other direction of the same invariant.
+
 The cutover script creates a new versioned index and atomically swaps the
 read/write aliases. Zero-downtime.
 
@@ -187,6 +192,109 @@ curl -s "$OS/evidara-documents-read-dev/_count" -H 'Content-Type: application/js
 
 If the shell count is non-zero, Step 0's preconditions were not met: fix the DI
 read API wiring and re-run the backfill (it will overwrite the shells in place).
+
+## Procedure: Reconcile — remove indexed documents canonical does not back
+
+**Use this when the index contains documents that canonical Delta no longer has** —
+duplicates from a pre-fix identity key, test artifacts, contentless stubs, anything
+a user can search for but the platform cannot account for.
+
+The Delta backfill above cannot do this. It is idempotent **by upsert on
+`document_id`**, so it only ever adds or overwrites; a projection whose canonical row
+is gone survives every rebuild. Reconciliation is the other half of ADR-0005's
+"the index is derived from canonical": it diffs *index minus canonical* and de-indexes
+the remainder.
+
+```text
+   canonical truth (Delta)        derived view (OpenSearch)
+   published_documents            documents-write
+            │                              │
+            │  backfill: canonical-index   │  GET /v1/projections/documents
+            │  (adds what is missing)      │  (enumerates what is indexed)
+            ▼                              ▼
+        ───────────  document_intelligence_projection_reconcile  ───────────
+                        POST /v1/projections/events/document-withdrawn
+                        (deletes projection + sections + citations)
+```
+
+Removal goes through the **existing** `document.withdrawn` path, so it inherits
+legal-search's revision guard: if a live event has re-projected a newer revision of a
+document since enumeration, the withdrawal is marked `stale` and dropped.
+
+### Step 1: Dry run (this is the default)
+
+The job deletes nothing unless `--delete-orphans` is passed.
+
+```bash
+cd document-intelligence
+export DI_SURFACES_ROOT_URI=s3://evidara-lakehouse/canonical
+export DI_S3_ENDPOINT_URL=... DI_S3_ACCESS_KEY_ID=... DI_S3_SECRET_ACCESS_KEY=...
+export LEGAL_SEARCH_API_URL=http://legal-search-api:3001
+export LEGAL_SEARCH_API_KEY=...          # only if the projections endpoints are guarded
+document_intelligence_projection_reconcile
+```
+
+```json
+{
+  "canonical_documents": 2,
+  "deleted": 0,
+  "dry_run": true,
+  "indexed_scanned": 24,
+  "orphan_document_ids": ["doc_3xky3kc486ey3ycm9354q8ccs1", "…"],
+  "orphaned": 22,
+  "skipped_unwithdrawable": 0
+}
+```
+
+**Read `orphan_document_ids` before going further.** These documents disappear from
+search. Spot-check a few against canonical:
+
+```bash
+curl -s "$LS_URL/v1/documents/<one-of-the-ids>" | jq '.title'
+```
+
+`skipped_unwithdrawable` counts orphans whose index row lacks the provenance ids a
+contract-valid `document.withdrawn` needs (`processing_manifest_id`, `source_id`,
+`source_version_id`, `run_id`). The job will not invent them; those ids are listed in
+`unwithdrawable_document_ids` and must be deleted by hand from OpenSearch.
+
+### Step 2: Delete
+
+```bash
+document_intelligence_projection_reconcile --delete-orphans
+```
+
+Two guardrails run **before** anything is deleted, both aimed at the same failure —
+a canonical side that reads as empty because it is misconfigured, not because the
+index is wrong:
+
+| Guardrail | Behaviour |
+|---|---|
+| Canonical enumerated 0 documents | Refuses outright. Check `DI_SURFACES_ROOT_URI` / `DI_S3_*`. |
+| Orphans exceed `--max-orphan-fraction` (default `0.25`) | Refuses and prints the diff. Raise the bound only after reading the dry-run list. |
+
+A large legitimate cleanup therefore needs the bound raised deliberately, e.g. the
+22-of-24 case above:
+
+```bash
+document_intelligence_projection_reconcile --delete-orphans --max-orphan-fraction 1.0
+```
+
+`--resume` continues from the last withdrawn `document_id` after an interruption.
+
+### Step 3: Verify
+
+```bash
+# Index count should now equal the canonical count from the dry run
+curl -s "$OS/evidara-documents-read-dev/_count" | jq '.count'
+
+# The withdrawals are auditable in projection history
+curl -s "$LS_URL/v1/projections/events/history?status=applied&limit=50" \
+  | jq '[.data[] | select(.eventType == "document.withdrawn")] | length'
+```
+
+If the count is still high, re-run the dry run: a document re-projected by live traffic
+between enumeration and withdrawal is dropped as `stale` by design.
 
 ## Procedure: Delta-sourced versioned reindex (zero-downtime)
 
@@ -327,6 +435,8 @@ curl -X POST "http://localhost:9200/_aliases" -H 'Content-Type: application/json
 | Check `sections_count: 0` is empty | After a Delta backfill — a non-zero count means projections came back as shells |
 | Keep old index for 24h | Don't delete immediately |
 | Check projection-history | Verify recent events are present |
+| Read `orphan_document_ids` before `--delete-orphans` | Reconcile removes user-visible documents; the dry run is the only preview |
+| Never raise `--max-orphan-fraction` to clear a refusal | A near-total diff usually means canonical is misconfigured, not that the index is wrong |
 | Monitor error rates | After cutover via Cloud Monitoring |
 | Never rebuild from JetStream replay | It silently drops everything past the retention window |
 
@@ -356,10 +466,22 @@ Delta backfill (`document_intelligence_delta_projection_backfill`):
 Useful flags: `--dry-run`, `--limit N`, `--resume`, `--after-document-id <id>`,
 `--max-retries`, `--retry-backoff-seconds`.
 
+Reconcile (`document_intelligence_projection_reconcile`) takes the same environment,
+plus:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DI_RECONCILE_CHECKPOINT_PATH` | `/tmp/evidara-projection-reconcile.checkpoint` | Resume cursor for `--resume` |
+
+Useful flags: `--delete-orphans` (**required to delete anything**),
+`--max-orphan-fraction`, `--limit N`, `--resume`, `--after-document-id <id>`,
+`--page-size`.
+
 ## Related Resources
 
 - [ADR-0005: Search Strategy](../adr/0005-search-strategy.md) — why the index is derived, not authoritative
 - [delta_projection_backfill.py](../../document-intelligence/src/document_intelligence/jobs/delta_projection_backfill.py)
+- [projection_reconcile.py](../../document-intelligence/src/document_intelligence/jobs/projection_reconcile.py)
 - [opensearch-alias-cutover.ts](../../legal-search/api/scripts/opensearch-alias-cutover.ts)
 - [OpenSearch GKE rollout runbook](./opensearch-gke-rollout.md)
 - [DLQ triage runbook](./dlq-triage-and-replay.md)

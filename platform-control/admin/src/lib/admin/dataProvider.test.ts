@@ -31,6 +31,9 @@ describe("controlPlaneDataProvider", () => {
               version_label: "v1",
             },
           ],
+          total: 137,
+          limit: 25,
+          offset: 0,
         }),
         {
           status: 200,
@@ -48,7 +51,7 @@ describe("controlPlaneDataProvider", () => {
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/platform-control/v1/runs?mode=production&status=running",
+      "/api/platform-control/v1/runs?mode=production&status=running&limit=25&offset=0",
       expect.objectContaining({
         cache: "no-store",
         headers: {
@@ -56,7 +59,8 @@ describe("controlPlaneDataProvider", () => {
         },
       }),
     );
-    expect(result.total).toBe(1);
+    // #616: the hit count comes from the server, not from the page length.
+    expect(result.total).toBe(137);
     expect(result.data[0]).toMatchObject({
       id: "run_01",
       run_id: "run_01",
@@ -65,13 +69,20 @@ describe("controlPlaneDataProvider", () => {
     });
   });
 
-  it("applies client pagination and sort to unbounded run lists", async () => {
+  /**
+   * #616 — `/v1/runs` is server-paginated (`{data, limit, offset, total}`,
+   * default `limit=100`). This test previously asserted the opposite premise
+   * ("unbounded run lists") and so pinned the bug: the provider sent no
+   * pagination and re-derived `total` from the page, making run 101+
+   * unreachable. It now asserts the paginated contract.
+   */
+  it("sends limit/offset for run list pages and trusts the server total", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           data: [
             {
-              run_id: "run_old",
+              run_id: "run_page_3",
               source_id: "src_01",
               source_version_id: "sv_01",
               mode: "preview",
@@ -86,23 +97,10 @@ describe("controlPlaneDataProvider", () => {
               source_name: "Older",
               version_label: "v0",
             },
-            {
-              run_id: "run_new",
-              source_id: "src_01",
-              source_version_id: "sv_01",
-              mode: "preview",
-              status: "completed",
-              started_at: "2026-04-03T10:00:00Z",
-              completed_at: "2026-04-03T10:05:00Z",
-              artifacts_count: 2,
-              captured_resources_count: 2,
-              failure_reason: null,
-              created_at: "2026-04-03T10:00:00Z",
-              updated_at: "2026-04-03T10:05:00Z",
-              source_name: "Newer",
-              version_label: "v1",
-            },
           ],
+          total: 512,
+          limit: 50,
+          offset: 100,
         }),
         {
           status: 200,
@@ -114,14 +112,63 @@ describe("controlPlaneDataProvider", () => {
     ) as typeof fetch;
 
     const result = await controlPlaneDataProvider.getList("runs", {
-      pagination: { page: 1, perPage: 1 },
+      pagination: { page: 3, perPage: 50 },
       sort: { field: "created_at", order: "DESC" },
       filter: {},
     });
 
-    expect(result.total).toBe(2);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/runs?limit=50&offset=100",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(result.total).toBe(512);
     expect(result.data).toHaveLength(1);
-    expect(result.data[0]?.run_id).toBe("run_new");
+    expect(result.data[0]?.run_id).toBe("run_page_3");
+  });
+
+  it("sends limit/offset and the q search for source list pages", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              source_id: "src_page_2",
+              name: "Gemeinde Adliswil",
+              description: null,
+              jurisdiction_id: "jur_ch_zh",
+              authority_id: "auth_zh",
+              source_type: "website",
+              document_family: null,
+              status: "active",
+              created_at: "2026-04-03T08:00:00Z",
+              updated_at: "2026-04-03T08:05:00Z",
+            },
+          ],
+          total: 2110,
+          limit: 50,
+          offset: 50,
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("sources", {
+      pagination: { page: 2, perPage: 50 },
+      sort: { field: "updated_at", order: "DESC" },
+      filter: { q: "  Adliswil  " },
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/platform-control/v1/sources?q=Adliswil&limit=50&offset=50",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(result.total).toBe(2110);
+    expect(result.data[0]).toMatchObject({ id: "src_page_2", source_id: "src_page_2" });
   });
 
   it("maps run-scoped diagnostics resources onto run detail endpoints", async () => {
@@ -218,7 +265,7 @@ describe("controlPlaneDataProvider", () => {
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/platform-control/v1/runs?mode=preview&status=completed",
+      "/api/platform-control/v1/runs?mode=preview&status=completed&limit=25&offset=0",
       expect.objectContaining({
         headers: {
           Accept: "application/json",

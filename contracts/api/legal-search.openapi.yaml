@@ -14,7 +14,7 @@ info:
     Document body reads fall back to the Document Service
     (`contracts/api/document-intelligence.openapi.yaml`) when the projection carries no body.
     See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
-  version: 0.7.0
+  version: 0.8.0
   contact:
     name: Evidara Team
   license:
@@ -37,6 +37,12 @@ tags:
     description: Search listing and global search context.
   - name: documents
     description: Document detail and section reads.
+  - name: projections
+    description: |
+      Operator/pipeline surface for the derived search index. Only the read side is
+      specified here — the `document.processed` / `document.withdrawn` intake routes
+      under `/v1/projections/events` are internal event delivery, contracted by
+      `contracts/events/*.schema.json` rather than by this API spec.
   - name: agent-discovery
     description: |
       Read-only search and document reads commonly used by operators, agents, and smoke flows
@@ -423,6 +429,58 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CitationGraphStats"
+
+  /v1/projections/documents:
+    get:
+      operationId: listIndexedProjectionDocuments
+      summary: Enumerate the documents currently in the search index
+      description: |
+        Index-side enumeration for the ADR-0005 reconcile diff.
+
+        ADR-0005 makes OpenSearch a serving layer only — canonical Delta is the system
+        of record and the index is derived from it. Keeping that true needs the diff in
+        BOTH directions: `document_intelligence_delta_projection_backfill` re-derives
+        index rows from canonical (adding what is missing), and
+        `document_intelligence_projection_reconcile` walks this endpoint to find indexed
+        documents with no canonical row behind them (removing what should not be there).
+        Without this endpoint nothing could list the derived side, so orphaned rows from
+        earlier runs stayed user-visible indefinitely.
+
+        Read-only. Rows are returned in `document_id` order and paged with an exclusive
+        `after` cursor, so the walk is resumable and unaffected by the deep-paging
+        window. `commentary_insight` rows are excluded: they are keyed by an `ins_*`
+        insight id and have no `published_documents` row, so a canonical diff would
+        classify every one of them as an orphan.
+
+        The provenance ids on each entry are the ones the originating
+        `document.processed` event carried; they are echoed back so a caller can build
+        the `document.withdrawn` event that de-indexes the row.
+      tags: [projections]
+      parameters:
+        - name: after
+          in: query
+          required: false
+          description: Exclusive cursor — the `document_id` that ended the previous page.
+          schema:
+            type: string
+          example: doc_01jq7bdptzqv3xs0c41xpw1ybg
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 500
+      responses:
+        "200":
+          description: One page of indexed documents, ordered by `document_id`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndexedProjectionDocumentPage"
+        "400":
+          description: "`limit` is not an integer"
 
 components:
   parameters:
@@ -1111,6 +1169,45 @@ components:
           default: []
         total:
           type: integer
+
+    IndexedProjectionDocument:
+      type: object
+      required:
+        - document_id
+      properties:
+        document_id:
+          type: string
+          pattern: "^doc_[0-9a-hjkmnp-tv-z]{26}$"
+        document_revision:
+          type: integer
+          minimum: 1
+        processing_manifest_id:
+          type: string
+        source_id:
+          type: string
+        source_version_id:
+          type: string
+        run_id:
+          type: string
+        title:
+          description: Indexed title, so a dry-run reconcile report names the document a human would recognize.
+          type: string
+
+    IndexedProjectionDocumentPage:
+      type: object
+      required:
+        - data
+        - limit
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/IndexedProjectionDocument"
+        limit:
+          type: integer
+        next_after:
+          description: Cursor to pass as `after` for the next page. Absent when the walk is complete.
+          type: string
 
     CitationGraphStats:
       type: object

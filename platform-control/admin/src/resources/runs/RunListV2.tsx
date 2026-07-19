@@ -320,6 +320,7 @@ export default function RunListV2() {
           sort={controller.sort}
           onSort={(field, order) => controller.setSort({ field, order })}
           onRowClick={(r) => navigate(`/runs/${encodeURIComponent(String(r.id))}/show`)}
+          getRowLabel={(r) => `Open run ${r.run_id}`}
           total={controller.total}
           page={controller.page}
           perPage={controller.perPage}

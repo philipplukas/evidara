@@ -433,6 +433,26 @@ describe('projections event ingestion', () => {
 
     expect(res.body.status).toBe('applied');
   });
+
+  // Index-side enumeration for the ADR-0005 reconcile diff (#652). Routed here rather
+  // than under `events/` because it is a read, not an intake.
+  it('enumerates indexed documents with a cursor', async () => {
+    (projectionsRepo.listIndexedDocuments as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      data: [{ document_id: 'doc_01jq7bhgy7g0pkj4f1d03f8f8c', document_revision: 2 }],
+      limit: 2,
+      next_after: 'doc_01jq7bhgy7g0pkj4f1d03f8f8c',
+    });
+
+    const res = await supertest(app.getHttpServer())
+      .get('/v1/projections/documents?after=doc_01jq7bhgy7g0pkj4f1d03f8f8b&limit=2')
+      .expect(200);
+
+    expect(projectionsRepo.listIndexedDocuments).toHaveBeenCalledWith({
+      after: 'doc_01jq7bhgy7g0pkj4f1d03f8f8b',
+      limit: 2,
+    });
+    expect(res.body.next_after).toBe('doc_01jq7bhgy7g0pkj4f1d03f8f8c');
+  });
 });
 
 // ─── Readiness (#551) ───
