@@ -23,7 +23,10 @@ describe("AppHeader", () => {
     expect(`${url.origin}${url.pathname}`).toBe("https://ops.example/admin");
     expect(url.searchParams.get("from")).toBe("legal-search");
     expect(url.searchParams.get("ls_query")).toBe("Art 754 OR");
-    expect(url.searchParams.get("ls_scope")).toBe('Results for "Art 754 OR"');
+    // Localized: the scope label handed to the control plane is human-readable
+    // context, and it is derived through the same translator the workspace
+    // renders (#648 — it used to be a hardcoded English `Results for "…"`).
+    expect(url.searchParams.get("ls_scope")).toBe("Ergebnisse für „Art 754 OR“");
     expect(controlPlaneLink).not.toHaveAttribute("target");
     expect(controlPlaneLink).not.toHaveAttribute("rel");
   });

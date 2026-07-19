@@ -205,13 +205,21 @@ export function ResultList({
 
   return (
     <div>
-      <div aria-live="polite" aria-atomic="true" className="sr-only">
-        {resultsSummary}
-      </div>
-      {/* Result summary */}
+      {/* Result summary.
+          The live-region attributes sit on the visible heading rather than on a
+          parallel `sr-only` copy: the copy rendered the same string twice into
+          the accessibility tree and into the page text ("1 Ergebnis 1 Ergebnis",
+          see #648) while announcing nothing the heading could not announce
+          itself. */}
       <div className="flex flex-col gap-1 border-b border-border/60 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-5">
         <div className="min-w-0">
-          <h2 className="block text-xs font-semibold text-foreground">{resultsSummary}</h2>
+          <h2
+            aria-live="polite"
+            aria-atomic="true"
+            className="block text-xs font-semibold text-foreground"
+          >
+            {resultsSummary}
+          </h2>
           <span className="block truncate text-[11px] text-muted-foreground">{scopeTrail}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">

@@ -83,7 +83,12 @@ test.describe("@contract RBAC cross-surface (legal-search header + admin denial)
     }, [ADMIN_LOCAL_STORAGE_ROLE_KEY, "admin"]);
 
     const query = "Art 754 OR";
-    const scopeLabel = `Results for "${query}"`;
+    // Localized (#648). The scope label handed to the control plane is
+    // human-readable context and is now derived through the same translator the
+    // workspace renders with, instead of being fabricated in English by the pure
+    // reducer. The app's default locale is German — see `results.scope.resultsFor`
+    // in `src/i18n/messages/de.json`.
+    const scopeLabel = `Ergebnisse für „${query}“`;
 
     if (!USE_REAL_BACKEND) {
       await mockSearchApi(page);

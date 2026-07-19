@@ -118,7 +118,10 @@ describe("ResultList", () => {
       />,
     );
 
-    expect(screen.getAllByText("3 Ergebnisse").length).toBeGreaterThanOrEqual(1);
+    // Exactly once. The summary used to render twice — a visible <h2> plus an
+    // `sr-only` live region carrying the identical string — which read out as
+    // "3 Ergebnisse 3 Ergebnisse" in the page text and to screen readers (#648).
+    expect(screen.getAllByText("3 Ergebnisse")).toHaveLength(1);
     expect(screen.getByText("Result 1")).toBeInTheDocument();
     expect(screen.getByText("Result 2")).toBeInTheDocument();
     expect(screen.getByText("Result 3")).toBeInTheDocument();
@@ -140,7 +143,9 @@ describe("ResultList", () => {
       { initialResults: makeResults(20), initialTotalResults: 25 },
     );
 
-    expect(screen.getAllByText("20 von 25 Ergebnissen angezeigt").length).toBeGreaterThanOrEqual(1);
+    // Exactly once, for the same reason as the full-count case above (#648):
+    // the summary used to be mirrored into an `sr-only` live region.
+    expect(screen.getAllByText("20 von 25 Ergebnissen angezeigt")).toHaveLength(1);
     expect(screen.queryByText("20 Ergebnisse")).not.toBeInTheDocument();
   });
 

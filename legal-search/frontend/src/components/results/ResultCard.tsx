@@ -3,7 +3,9 @@
 import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ShareButton } from "@/components/ui/ShareButton";
+import { useResultHrefBuilder } from "@/hooks/use-result-href";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
+import { isModifiedClick } from "@/lib/result-href";
 import type { SearchResultViewModel } from "@/lib/types";
 import { AccentButton, Badge } from "../primitives";
 import { HighlightedSnippet } from "./HighlightedSnippet";
@@ -54,6 +56,8 @@ export function ResultCard({
   isPinned,
 }: ResultCardProps) {
   const t = useTranslations("results.card");
+  const buildHref = useResultHrefBuilder();
+  const href = buildHref(result.id);
   return (
     <article
       aria-current={isSelected ? "true" : undefined}
@@ -76,16 +80,22 @@ export function ResultCard({
       {/* Title row */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <h3 className="min-w-0 flex-1">
-          <button
-            type="button"
+          {/* A real anchor, not a button: middle-click, cmd/ctrl-click and
+              "copy link address" have to work on a legal-research result
+              (#648). Unmodified left clicks are still handled client-side so
+              the workspace does not do a full navigation. */}
+          <a
+            href={href}
             onClick={(e) => {
               e.stopPropagation();
+              if (isModifiedClick(e.nativeEvent)) return;
+              e.preventDefault();
               onFocus(result.id);
             }}
             className="text-left text-[15px] font-semibold leading-5 text-foreground hover:text-accent-core focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:rounded"
           >
             {result.title}
-          </button>
+          </a>
         </h3>
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
           {isSelected && (
@@ -156,6 +166,7 @@ export function ResultCard({
         <div className="flex flex-wrap items-center gap-1">
           <ShareButton
             size="sm"
+            url={href}
             className="border border-border/70 bg-background shadow-sm"
             label={t("shareResult")}
           />
