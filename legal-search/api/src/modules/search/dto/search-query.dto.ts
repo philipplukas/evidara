@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 import {
@@ -19,12 +19,38 @@ type SearchRefinementDto = {
   value?: boolean | string;
 };
 
+/**
+ * Lowercasing normalizer for genuinely lower-case vocabularies:
+ * `languages` (`de`, `fr`) and `document_types` (`law`, `decision`).
+ * Do NOT use it for jurisdictions — see `normalizeIsoCsv` (#672).
+ */
 function normalizeCsv(raw: unknown): string[] | undefined {
   if (typeof raw !== 'string') return undefined;
   return raw
     .split(',')
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
+}
+
+/**
+ * Case-normalizer for ISO 3166 jurisdiction tokens (#672).
+ *
+ * The documents index maps `jurisdiction` as a `keyword` — exact and
+ * case-SENSITIVE — and stores the ISO code uppercase (`CH`). Lowercasing
+ * the token here made `terms: { jurisdiction: ["ch"] }` match zero
+ * documents for every jurisdiction, so every deep-linked search returned
+ * "no results". Uppercase to match the stored convention.
+ *
+ * Kept separate from `normalizeCsv` because `languages` really is
+ * lowercase in the index and must keep working.
+ */
+function normalizeIsoCsv(raw: unknown): string[] | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const tokens = raw
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+  return tokens.length > 0 ? tokens : undefined;
 }
 
 function parseRefinements(raw: unknown): SearchRefinementDto[] | undefined {
@@ -102,8 +128,17 @@ export class SearchQueryDto {
   @IsString()
   document_types?: string;
 
+  /**
+   * `@Type(() => Boolean)` used to sit here, and it is why
+   * `official_only=false` filtered as if it were `true` (#673):
+   * class-transformer applies the `Boolean` constructor, and
+   * `Boolean('false')` is `true`. `@Transform` with an explicit
+   * `'true'`/`'false'` parse is the only correct coercion for a
+   * query-string boolean — a truthiness check on the raw string can
+   * never distinguish the two.
+   */
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }) => (typeof value === 'boolean' ? value : parseBoolean(value)))
   @IsBoolean()
   official_only?: boolean;
 
@@ -124,8 +159,12 @@ export class SearchQueryDto {
   @Max(100)
   page_size?: number = 20;
 
+  /**
+   * ISO jurisdiction filter, uppercased to match the case-sensitive
+   * `jurisdiction` keyword field in the documents index (#672).
+   */
   getNormalizedJurisdictions(): string[] | undefined {
-    return normalizeCsv(this.jurisdictions) ?? normalizeCsv(this.jurisdiction);
+    return normalizeIsoCsv(this.jurisdictions) ?? normalizeIsoCsv(this.jurisdiction);
   }
 
   /**

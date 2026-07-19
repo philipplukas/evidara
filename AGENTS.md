@@ -136,6 +136,20 @@ pre-commit and CI.
 - **Spec-first** — `contracts/api/legal-search.openapi.yaml` is canonical. Swagger decorators are additive for dev UI only.
 - **Global pipes/filters** — ValidationPipe (whitelist, transform), AllExceptionsFilter, CorrelationIdMiddleware.
 - Test layers: unit (fast, mocked), integration (Testcontainers OpenSearch), smoke (HTTP-level).
+  The integration layer (`src/**/*.integration.spec.ts`, run by `npm run test:integration`, which
+  `npm run check` invokes) needs a running **Docker daemon**. It is the only layer that meets a real
+  index mapping — see [docs/testing/testing-levels.md](docs/testing/testing-levels.md) Level 4 and
+  #672/#673/#675 for why mocking it away is not an option.
+- **The documents-index mapping has one source of truth**:
+  `legal-search/api/src/core/opensearch/documents-index.mapping.ts`. Every producer derives from it —
+  `documents-bootstrap.ts` (runtime + seed + cutover) directly, and non-TypeScript producers via the
+  generated `scripts/opensearch/documents-index.mapping.json` (`npm run mapping:generate`, drift-gated
+  by `documents-index.mapping-json.spec.ts`). Never hand-maintain a parallel copy: a drifted copy in
+  `scripts/validate-tar89-metadata-local.sh` is what caused #675, and because OpenSearch returns empty
+  buckets rather than an error for a missing field, it presented as a query bug for months.
+  When a live index disagrees with the canonical mapping, **fix the index** (reindex/cutover) — never
+  weaken the query to match the drift. `npm run mapping:check-drift` reports the difference against a
+  live cluster; `mapping-drift.integration.spec.ts` guards the creation path in CI.
 
 ### platform-control stack
 
