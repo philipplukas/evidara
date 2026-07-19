@@ -133,6 +133,7 @@ nav:
       - Golden Datasets: testing/golden-datasets.md
       - Minimal Test Matrix: testing/minimal-test-matrix.md
       - First E2E Slice: testing/first-end-to-end-slice.md
+      - E2E Run Isolation: testing/e2e-run-isolation.md
       - Component Testing:
           - Platform Control: components/testing/platform-control-testing.md
           - Document Intelligence: components/testing/document-intelligence-testing.md

@@ -19,6 +19,7 @@ This directory contains Evidara's testing strategy, principles, and guides. Test
 | [CI Testing Strategy](ci-testing-strategy.md) | What runs in CI and when |
 | [Minimal Test Matrix](minimal-test-matrix.md) | Smallest credible test set for the whole platform |
 | [First End-to-End Slice](first-end-to-end-slice.md) | The first full-path E2E test |
+| [E2E Run Isolation](e2e-run-isolation.md) | How a Playwright run proves it is talking to the server it started (per-run nonce, opt-in reuse, per-lane ports) |
 | [Scraping QA Standard](scraping-qa-standard.md) | Team-realistic quality gate for acquisition/scraping, including temporary manual merge enforcement when required checks are unavailable |
 | [First Vertical Slice Exit Gates](../runbooks/first-vertical-slice-exit-gates.md) | Runtime pass/fail gate and latest evidence for source -> DI -> search |
 
