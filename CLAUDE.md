@@ -32,6 +32,7 @@ Run the narrowest gate for the surface you touched before pushing:
 | `document-intelligence/` | `cd document-intelligence && uv run --extra dev --extra service --extra test pytest && uv run ruff check . && uv run ruff format --check .` |
 | `legal-search/api/` | `cd legal-search/api && npm run check` |
 | `legal-search/frontend/` | `cd legal-search/frontend && npm run check` |
+| `marketing/` | `cd marketing && npm run check` (then `npm run build` — the static export is the deploy artifact) |
 | `country-overlays/` or `platform-control/src/platform_control/seeds/` | `python scripts/check_country_overlay_files.py` |
 | Any scraping-touching PR | `bash scripts/check-scraping-qa.sh` |
 
