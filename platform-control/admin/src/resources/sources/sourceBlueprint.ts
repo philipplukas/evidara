@@ -79,7 +79,7 @@ export const summarizePreview = (preview: SourceBlueprintPreview): string[] => {
   const seeds = spec.seed_url ? [spec.seed_url, ...(spec.seed_urls ?? [])] : (spec.seed_urls ?? []);
   return [
     `Provider: ${spec.provider}`,
-    `Mode: ${spec.mode}`,
+    `Mode: ${spec.mode ?? "n/a"}`,
     `Seeds: ${seeds.join(", ") || "n/a"}`,
     `Limit/depth: ${spec.limit ?? "n/a"} / ${spec.max_discovery_depth ?? "n/a"}`,
     `Formats: ${(spec.scrape_formats ?? []).join(", ") || "n/a"}`,

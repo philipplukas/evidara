@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  formatDuration,
   loadDashboardStats,
   selectDashboardAttentionRun,
   summarizeRecentHealth,
@@ -115,5 +116,28 @@ describe("Dashboard helpers", () => {
       run_id: "run-3",
       reason: "pending run status",
     });
+  });
+});
+
+describe("formatDuration", () => {
+  it("formats a normal elapsed time", () => {
+    expect(formatDuration("2026-07-18T17:43:04.966Z", "2026-07-18T17:45:24.685Z")).toBe("2m 20s");
+    expect(formatDuration("2026-07-18T17:43:04.000Z", "2026-07-18T17:43:04.273Z")).toBe("273ms");
+  });
+
+  it("returns a placeholder when either endpoint is missing", () => {
+    expect(formatDuration(null, "2026-07-18T17:45:24.685Z")).toBe("-");
+    expect(formatDuration("2026-07-18T17:43:04.966Z", null)).toBe("-");
+  });
+
+  it("refuses to render a negative duration", () => {
+    // Live repro on the failed ZH run: completed_at (…944165Z) preceded
+    // created_at (…945184Z) by 1ms, and the dashboard printed "-1ms" as if it
+    // were a real measurement. A negative elapsed time is not a duration.
+    expect(formatDuration("2026-07-17T20:16:20.945184Z", "2026-07-17T20:16:20.944165Z")).toBe("-");
+  });
+
+  it("refuses to render a duration from an unparseable timestamp", () => {
+    expect(formatDuration("not-a-date", "2026-07-18T17:45:24.685Z")).toBe("-");
   });
 });

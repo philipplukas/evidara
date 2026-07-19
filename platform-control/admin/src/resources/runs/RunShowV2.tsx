@@ -29,9 +29,13 @@ import { RunActionStack } from "./RunActions";
 import RunDetailSectionsV2 from "./RunDetailSectionsV2";
 import { buildRunDecisionSupport, buildRunHandoffGuidance } from "./RunShow";
 
-function formatDuration(run: RunRecord): string {
+export function formatDuration(run: RunRecord): string {
   if (!run.started_at || !run.completed_at) return "—";
   const ms = new Date(run.completed_at).getTime() - new Date(run.started_at).getTime();
+  // See the sibling guard in `Dashboard.tsx`: a run whose `completed_at`
+  // precedes its `started_at` has no duration we can state. Rendering the raw
+  // difference produced "Duration -1ms" on the failed ZH repro run.
+  if (!Number.isFinite(ms) || ms < 0) return "—";
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;

@@ -99,9 +99,14 @@ type AttentionRun = {
 
 const MAX_HEALTH_PROBES = 5;
 
-const formatDuration = (start: string | null, end: string | null): string => {
+export const formatDuration = (start: string | null, end: string | null): string => {
   if (!start || !end) return "-";
   const ms = new Date(end).getTime() - new Date(start).getTime();
+  // Clock skew between the writers of `started_at`/`completed_at` can land the
+  // end before the start (seen live on the ZH repro run: completed_at was 1ms
+  // before created_at, rendering a confident "-1ms"). A negative elapsed time
+  // is not a duration we know — say so rather than print an impossible number.
+  if (!Number.isFinite(ms) || ms < 0) return "-";
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
