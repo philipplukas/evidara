@@ -1,4 +1,10 @@
-"""Docling parser adapter with deterministic fallback behavior."""
+"""Docling parser adapter with deterministic fallback behavior.
+
+Text modalities only (HTML/XML/plain). ``application/pdf`` does **not** route through
+here: PDFs are normalised geometrically by ``normalize/pdf.py`` (ADR-0041), which
+subtracts the marginal-heading band using word coordinates. Docling was evaluated for
+that job and rejected — see the ADR for the measurements.
+"""
 
 from __future__ import annotations
 
@@ -126,7 +132,11 @@ def _convert_with_docling(
         if placeholder:
             title = "Untitled document"
         blocks: list[Block] = []
-        for order, item in enumerate(doc.iterate_items()):
+        # ``iterate_items`` yields ``(item, tree_level)`` pairs, not bare items. Unpacking
+        # it as a single value made ``_item_text`` return "" for every node, so this
+        # function always produced zero blocks and silently fell back to the legacy
+        # normaliser — i.e. the docling backend had never actually run (ADR-0041).
+        for order, (item, _tree_level) in enumerate(doc.iterate_items()):
             text = _item_text(item)
             if not text:
                 continue

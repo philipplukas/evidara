@@ -1,21 +1,19 @@
-"""Regression tests for the layout-aware PDF normaliser (#590).
+"""Regression tests for the PDF normaliser (#590, #650).
 
-The load-bearing test is ``test_marginal_heading_is_not_spliced_into_body``: it builds a
-synthetic multi-column PDF that reproduces the *exact* failure mode from the issue — a
-marginal heading ("Randtitel") that a naive top-to-bottom text dump splices into the body
-sentence beside it, silently corrupting legal text:
+**Read this before trusting a green run here.** The synthetic reportlab fixture below is
+why the splice bug shipped: it puts the Randtitel in the **left** margin with a wide
+gutter, which is not what the real document does. ADR-0037's x-projection normaliser
+passes on it and corrupts the real ordinance.
 
-    „die Führung des **Organisation** Hundeverzeichnisses"
-
-We could not obtain the real Zurich ordinance PDF (AS 554.510) in the sandbox, so the
-fixture is synthetic — but it reproduces the marginal-splice mode deterministically: the
-test first asserts that a naive extraction *does* splice (proving the fixture is faithful),
-then asserts the layout-aware normaliser does not.
+The synthetic tests are retained — they still pin a real property — but the tests that
+actually hold the line for #650 are the real-PDF ones at the bottom of this file and in
+``tests/test_marginalia.py``. When in doubt, trust those.
 """
 
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 # reportlab is a declared dependency of the `test` extra, which every path that runs this
 # suite installs (CI job, scripts/check-document-intelligence.sh, the documented local
@@ -146,3 +144,88 @@ def test_pdf_without_text_layer_is_flagged_not_fabricated() -> None:
     ir = normalize_pdf_document(buffer.getvalue(), artifact_id="art_scan")
     assert ir.blocks == []
     assert ir.metadata["pdf_no_text_layer"] is True
+
+
+# --- The real ordinance (AS 554.510) ------------------------------------------------
+#
+# Everything above this line runs against a synthetic fixture that the *broken* normaliser
+# passes. These run against the committed real PDF, which it does not.
+
+_REAL_PDF = Path(__file__).parent / "fixtures" / "zh_as_554_510.pdf"
+
+# The splice as it appears in the real document, and the contiguous text it should be.
+_REAL_SPLICE = "Führung des Organisation Hundeverzeichnisses"
+_REAL_CLEAN = "Führung des Hundeverzeichnisses"
+
+
+def test_real_ordinance_is_not_spliced() -> None:
+    """The load-bearing regression test for #650.
+
+    Fails on ADR-0037's x-projection normaliser, which collapses the page to one column
+    (gutter 5.6pt < p90 word gap 6.5pt) and splices the Randtitel mid-sentence.
+    """
+    ir = normalize_pdf_document(_REAL_PDF.read_bytes(), artifact_id="art_zh")
+    body = ir.body_text
+
+    # 1. The provision's sentence is contiguous — the Randtitel is not inside it.
+    assert _REAL_SPLICE not in body
+    assert _REAL_CLEAN in body
+
+    # 2. De-hyphenation across the line break. Without this a query for the compound
+    #    cannot match the document at all — silent corruption of the same class as #643.
+    assert "Hundehaltungsvoraussetzungen" in body
+    assert "Hundehaltungsvoraus- setzungen" not in body
+    assert "Kalenderjahr" in body
+    assert "Gebührenrückerstattung" in body
+
+    # 3. Every Randtitel is lifted into its own heading block, none left in a paragraph.
+    assert ir.metadata["pdf_marginal_headings"] == 8
+    headings = {b.text for b in ir.blocks if b.type == "heading"}
+    assert {"Organisation", "Härtefall", "Inkrafttreten", "Aufhebung bisherigen Rechts"} <= headings
+    assert all("Organisation" not in b.text for b in ir.blocks if b.type == "paragraph")
+
+    organisation = next(b for b in ir.blocks if b.text == "Organisation")
+    assert organisation.type == "heading"
+    assert organisation.attrs.get("anchor") == "organisation"
+    assert organisation.attrs.get("marginal") is True
+
+    # 4. Document structure, recovered from type geometry rather than a layout model.
+    assert ir.metadata["title"] == "Vollzugsvorschriften zum Hundegesetz"
+    assert any(b.type == "heading" and b.text.startswith("A.") for b in ir.blocks)
+    assert any(b.type == "list_item" for b in ir.blocks)
+
+
+def test_running_headers_and_folios_stay_out_of_the_body() -> None:
+    # The page furniture repeats on every page. Left in the flow it splices the document's
+    # own title into the middle of a provision ("…in Kraft. 2 554.510 Vollzugs…").
+    ir = normalize_pdf_document(_REAL_PDF.read_bytes(), artifact_id="art_furniture")
+    paragraphs = [b.text for b in ir.blocks if b.type == "paragraph"]
+    assert not any(t.strip() in {"1", "2", "554.510"} for t in paragraphs)
+    assert sum(1 for b in ir.blocks if b.text == "Vollzugsvorschriften zum Hundegesetz") == 1
+
+
+def test_wrapped_section_heading_is_one_block() -> None:
+    # "B. Abgabe an die Gemeinde, Kantonsbeitrag und" / "Gebühren" is a single heading
+    # that happens to wrap; split in two it reads as a section named "Gebühren".
+    ir = normalize_pdf_document(_REAL_PDF.read_bytes(), artifact_id="art_wrap")
+    headings = [b.text for b in ir.blocks if b.type == "heading"]
+    assert "B. Abgabe an die Gemeinde, Kantonsbeitrag und Gebühren" in headings
+
+
+def test_randtitel_heading_precedes_the_provision_it_labels() -> None:
+    """Reading order, not just presence: the label must sit *before* its article."""
+    ir = normalize_pdf_document(_REAL_PDF.read_bytes(), artifact_id="art_order")
+    texts = [b.text for b in ir.blocks]
+
+    for label, article in [
+        ("Organisation", "Art. 1"),
+        ("Abgabe an die Gemeinde und Kantonsbeitrag", "Art. 2"),
+        ("Ermässigung Kursbesuch", "Art. 3"),
+        ("Härtefall", "Art. 4"),
+        ("Gebühren", "Art. 5"),
+        ("Zuständigkeiten", "Art. 6"),
+        ("Aufhebung bisherigen Rechts", "Art. 7"),
+        ("Inkrafttreten", "Art. 8"),
+    ]:
+        article_index = next(i for i, t in enumerate(texts) if t.startswith(article))
+        assert texts[article_index - 1] == label, f"{label} must directly precede {article}"

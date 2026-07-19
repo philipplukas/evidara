@@ -15,9 +15,11 @@ dependencies = [
   "google-cloud-storage>=2.16.0",
   "jsonschema>=4.14.0",
   "nats-py>=2.9.0,<3",
-  # Layout-aware PDF normalisation (#590): pure-Python, MIT, word-level coordinates,
-  # no ML model downloads. See docs/adr/0037 and normalize/pdf.py for the rationale
-  # (evaluated against docling, which is heavier and not reproducible in CI).
+  # Layout-aware PDF normalisation (#590, #650). Core, not an extra: `application/pdf`
+  # is a first-class modality. Pure-Python, MIT, word-level coordinates, no ML models and
+  # no network at runtime — which is what makes the marginal-band geometry pass
+  # (normalize/marginalia.py) reproducible in CI. Docling was evaluated as a replacement
+  # and rejected; see docs/adr/0038 for the measurements.
   "pdfplumber>=0.11.0,<0.12",
   "prometheus-client>=0.21.0,<1",
   "pyarrow>=14.0.0",
@@ -33,6 +35,8 @@ service = [
   "httpx>=0.27.0",
   "uvicorn>=0.30.0",
 ]
+# Optional parser backend for *text* modalities (HTML/XML/plain), selected by
+# DI_PARSER_BACKEND=docling. Never used for PDFs — see docs/adr/0038.
 docling = [
   "docling>=2.0.0",
 ]
