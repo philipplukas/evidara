@@ -8,7 +8,8 @@ API-key layer is retained verbatim)
 Related: ADR-0029 (self-hosted Hetzner runtime), ADR-0030 (acquisition provider enablement
 lifecycle — the two-key lock), ADR-0033 (agentic legal reasoning — the coverage loop),
 ADR-0034 (generated platform-control contract), ADR-0035 (operator-reachable blueprint
-enablement), #628 (M13), #632, #634
+enablement), ADR-0036 (Nessie/Trino lakehouse — the self-hosted-OSS precedent), #628
+(M13), #632, #634
 
 ## Context
 
@@ -54,6 +55,29 @@ it says so ("legal-search remains single-tenant, single-role"; "Multi-tenant RBA
 this split is still deferred"). Its own Future Work names the gap and names Google
 Identity Platform as the likely answer. This ADR takes that Future Work item and decides it.
 
+### Tenancy is declared but not enforced
+
+The scope of this ADR is authentication, authorization, **and tenancy**, so the third one
+deserves its own honest baseline.
+
+`tenant_id` and `scope_type` exist as columns on `Corpus`
+(`platform_control/models/corpus.py:33-39`, with `scope_type` constrained to
+`global_public` / `tenant_private` / `tenant_shared`) and appear across several schemas.
+**There is no `tenants` table anywhere** — not in the models, not in any migration. Nothing
+resolves a `tenant_id` to an entity, nothing validates one, and no query filters by one:
+they are data labels a writer sets and a reader ignores.
+`docs/architecture/security-and-tenancy.md` describes them as an enforced boundary
+("Must not leak tenant-private configuration across tenants"; "Every search and
+document-detail path must apply tenant and corpus filters derived from authenticated
+identity"). That enforcement does not exist, and it cannot exist while there is no
+authenticated identity to derive it from — which is the dependency this ADR unblocks.
+
+Enforcing tenancy is **not** in this ADR's scope; it is a larger piece of work with its own
+data-model questions. What is in scope is not painting ourselves into a corner: the
+identity backend chosen in §2 must have a credible organization/tenant concept to map onto
+`tenant_id` later, so that the eventual enforcement work is a mapping rather than an
+invention. That requirement materially shapes §2's recommendation.
+
 ### Why this is in scope for M13, not after it
 
 The strict reading of #628 is that M13 is about the coverage loop, not about auth, and
@@ -97,52 +121,138 @@ Real login on **both** applications, plus real per-person operator identity, rol
 genuine attribution on runs and approvals. This ADR covers the design; implementation is
 sequenced in §8 and is deliberately not part of the change that introduces this file.
 
-### 2. Identity backend: managed OIDC — **WorkOS AuthKit**
+### 2. Identity backend: self-hosted open source — **Zitadel**
 
-We do not build password storage, reset flows, MFA, or session revocation. We buy an
-OIDC provider and treat it as replaceable.
+We do not build password storage, reset flows, MFA, or session revocation. We also do not
+*rent* them. We run an OIDC provider on the node we already own, and treat it as
+replaceable.
 
-| | Google Identity Platform | WorkOS AuthKit |
-|---|---|---|
-| Protocol | OIDC (+ Firebase-flavoured SDKs) | OIDC, standards-first |
-| Cost at our scale (<20 humans + demo accounts) | $0 (free MAU tier) | $0 (free MAU tier) |
-| Cost at 10k MAU | low single-digit $/1k MAU beyond the free tier | free MAU tier is generous; enterprise SSO/SCIM is priced **per connection**, which is the real cost driver |
-| Enterprise SSO (SAML) / SCIM directory sync | build it or bolt on | first-class, the product's core |
-| Runtime coupling | **requires a GCP project and billing account** | none — HTTPS to a third party |
-| Lock-in | moderate; Firebase-flavoured client SDKs pull you off plain OIDC | low; plain OIDC in, plain OIDC out |
+**Why not managed SaaS at all.** The first draft of this ADR recommended WorkOS AuthKit
+over Google Identity Platform on the grounds that ADR-0029 is in the middle of
+`terraform destroy`-ing the GCP runtime, and "do not re-open the door you are closing."
+That argument was right and stopped one step short: it generalises past GCP to **managed
+identity as a category**. Every other technology in this runtime is self-hosted OSS —
+k3s on a dedicated Hetzner box (ADR-0029), MinIO, NATS JetStream, OpenSearch, Postgres
+via CloudNativePG, Nessie/Trino (ADR-0036). A managed IdP would be the **sole SaaS
+dependency in the runtime path**, and its per-connection enterprise-SSO pricing is
+exactly the lock-in shape the rest of the architecture exists to avoid. Self-hosting also
+makes the demo-account question free: no per-seat or per-MAU cost for accounts whose
+entire purpose is to be handed out (§5).
 
-*(Pricing tiers move. Both vendors' current published rates must be re-checked before the
-implementation PR; the ranking below does not depend on the exact numbers, because at
-Evidara's headcount both are free.)*
+#### Candidates
 
-**Recommendation: WorkOS AuthKit.** Three reasons, in order of weight:
+| | Zitadel | Keycloak | Authentik | Ory (Kratos+Hydra) | Dex |
+|---|---|---|---|---|---|
+| Licence / language | Apache 2.0, Go | Apache 2.0, Java/Quarkus | MIT, Python/Django | Apache 2.0, Go | Apache 2.0, Go |
+| Datastore | **Postgres** | Postgres (or others) | Postgres + **Redis** | Postgres (×2 services) | Postgres/CRDs |
+| Idle RSS, single instance | ~150–300 MB | **~700 MB–1 GB+** (JVM) | ~400–600 MB across web/worker/redis | ~150 MB × 2 services | ~50 MB |
+| Multi-tenancy | **Organizations, first-class** — every user belongs to an org, one instance serves many | Realms — strong isolation, but a realm is heavyweight and cross-realm admin is awkward | Tenants exist, less mature | Build it yourself in your own schema | none |
+| Protocols | OIDC, OAuth2, SAML, SCIM | OIDC, OAuth2, SAML, SCIM | OIDC, OAuth2, SAML, SCIM | OIDC/OAuth2 (Hydra) | OIDC federation only |
+| Login UI | shipped, themeable | shipped, themeable | shipped, good UX | **you build it** | none |
+| Local user store | yes | yes | yes | yes (Kratos) | **no — federation only** |
+| Ops burden, solo operator | moderate | high (JVM tuning, realm/version migrations) | moderate | high (two services + your own UI) | low but insufficient |
+| Maturity / ecosystem | good, growing | **highest** | moderate | good, niche | high but narrow |
 
-1. **ADR-0029 just spent a milestone removing GCP.** It retires Cloud Run, Cloud SQL and
-   the rest for self-hosted Hetzner k3s, and its wind-down plan ends in
-   `terraform destroy` of the GCP runtime stack. Adopting Google Identity Platform
-   re-introduces a live GCP project, billing account, and IAM surface that we are in the
-   middle of destroying. That is not a cost argument — it is a "do not re-open the door
-   you are closing" argument, and it is why ADR-0020's Future Work suggestion should not
-   simply be inherited: it was written when GCP was the runtime.
-2. **Evidara sells to law firms.** SAML SSO and SCIM deprovisioning are table stakes in
-   that segment and are the exact thing WorkOS exists to sell. Choosing it now avoids a
-   re-platform at the first enterprise deal.
-3. **Lower lock-in in practice.** Both are OIDC on paper; only one is OIDC in its
-   idiomatic client path. Because the app-side layer is Auth.js (§3), the IdP is a
-   provider-config swap.
+**Dex is disqualified outright, not merely ranked last.** It is a federation proxy with
+**no local identity store**. It can only delegate to an upstream IdP, so it cannot satisfy
+the demo-account requirement — there is nothing to seed a demo `viewer` *into*, and the
+whole point of a demo account is that it does not belong to a corporate directory. Any
+Dex design implies a second IdP behind it, at which point Dex is an extra hop rather than
+the decision. Listed here so it is not proposed again.
 
-**Cost and lock-in noted honestly:** WorkOS's per-connection enterprise SSO pricing is
-materially more expensive than Google's per-MAU pricing *if* we ever end up with many
-small tenants each wanting their own SSO connection. That is the scenario in which this
-decision should be revisited. Google Identity Platform remains the correct fallback and
-should be reconsidered if (a) GCP re-enters the runtime for other reasons, or (b) the
-product turns out to be B2C-shaped with a large low-value MAU tail.
+**Ory** is the most composable and the most work: Kratos and Hydra are two services and
+neither ships a login UI, so a demo timeline would be spent building screens we would
+otherwise get for free. Correct choice for a team that wants identity as a library;
+wrong choice for a solo operator with a milestone.
+
+**Authentik** is pleasant at small scale and would work, but it adds a **Redis**
+dependency this runtime does not otherwise have, runs a heavier Python/Django footprint
+than Zitadel's Go binary, and is the least proven of the three viable options in
+enterprise settings — which matters because §"what we are optimising for" below is
+partly about the first law-firm deal.
+
+**Keycloak is the serious alternative** and the honest runner-up. It is the most mature,
+has the widest ecosystem, and nobody was ever fired for choosing it. Two things cost it
+the recommendation, both specific to *this* deployment rather than to Keycloak:
+
+1. **Footprint on a single shared node.** The whole runtime — Postgres, OpenSearch, NATS,
+   MinIO, Nessie, Trino, both apps, both BFFs, and the CI runners (`infra/hetzner/README.md`
+   notes ARC runners share this "near-idle" node) — lives on one dedicated server. A JVM
+   idling at ~1 GB is a real fraction of that budget, spent on the least
+   differentiated component in the stack.
+2. **Upgrade ergonomics for one person.** Keycloak's realm/version migrations are the part
+   operators complain about, and there is exactly one operator here.
+
+**Recommendation: Zitadel.** Three reasons, in order of weight:
+
+1. **Multi-tenancy is the shape of the problem, and Zitadel's organizations are the
+   closest fit.** `tenant_id` and `scope_type` already exist as *unenforced data labels*
+   (`models/corpus.py:33-39`) with **no `tenants` table anywhere** — the tenancy model is
+   currently a naming convention. Zitadel's organizations give us an identity-side notion
+   of "which org does this human belong to" that platform-control can map onto `tenant_id`
+   when it becomes enforced, without inventing a bespoke user↔tenant join first, and
+   without Keycloak's per-realm heaviness (a realm per law firm is a lot of realm).
+2. **It reuses the datastore we already run.** `infra/hetzner/postgres-cluster.yaml` is a
+   CloudNativePG `Cluster`, and it **already hosts a second database for Nessie** —
+   the file documents `CREATE DATABASE nessie OWNER platform_control` as the pattern.
+   Zitadel gets a `zitadel` database in the same instance by the same precedent: no new
+   stateful component, no new backup target, no new failure mode. Authentik would add
+   Redis; Keycloak would add a JVM.
+3. **Cost per unit of ops.** A single Go binary with a shipped, themeable login UI, OIDC +
+   OAuth2 + SAML + SCIM, and a usable admin console is the most capability per megabyte
+   and per operator-hour on this list.
+
+**When to revisit.** Choose Keycloak instead if (a) an enterprise customer requires an
+identity integration only Keycloak's ecosystem has, or (b) the node grows enough that the
+JVM footprint stops mattering and ecosystem maturity dominates. Reconsider managed SaaS
+only if operating the IdP demonstrably costs more attention than it saves — see
+§2b, which is the honest bill for this decision.
+
+### 2b. What self-hosting costs us
+
+OSS is not free; it is differently priced. Stated plainly rather than buried:
+
+- **A login outage takes down both apps.** Today there is no login, so there is nothing
+  to be down. After this ADR, Zitadel is on the critical path for every human session on
+  both `admin.` and `search.`. A managed IdP would have someone else's on-call rota
+  behind it; this one has ours.
+- **It is now our patch problem.** An IdP is a high-value target and a CVE in it is a
+  credential-compromise event, not a degraded feature. Somebody has to actually watch
+  releases and apply them — which, on a one-person team, is the commitment most likely to
+  quietly lapse. This is the single strongest argument for the managed option, and it is
+  the one being knowingly accepted.
+- **It is now our backup problem.** The `zitadel` database joins `platform_control` as
+  data whose loss is unrecoverable-by-rebuild: losing it means every user, org, and
+  credential is gone. It must be in the same backup and *restore-tested* path as
+  platform-control's database, not merely in the same Postgres instance. Sharing the
+  CNPG cluster helps here — one backup story, not two — but only if that story is
+  exercised.
+- **Single-node availability is the real ceiling.** One CNPG instance
+  (`postgres-cluster.yaml:9` — `instances: 1`) on one dedicated server means the IdP
+  inherits exactly the availability of everything else. That is acceptable for the
+  current stage and would not be for a paying enterprise tenant; note it before promising
+  anyone an SLA.
+- **Upgrades can break login specifically.** A bad platform-control deploy degrades a
+  feature; a bad IdP deploy locks everyone out of both apps, including the operator who
+  needs to fix it. Keep a break-glass path (direct DB/admin access, or the ability to
+  re-enable the API key path) documented in the runbook before the first upgrade.
+
+The counterweight: no per-seat cost, no per-connection SSO pricing, no vendor able to
+change terms on a product that gates all human access, no third party holding the
+credentials of a legal-research corpus, and full control of the demo-account lifecycle.
+For a self-hosted-everything runtime with one operator and no external users yet, that
+trade is worth taking — but it is a trade, not a free win.
 
 ### 3. App-side layer: Auth.js (NextAuth v5) in both Next.js frontends
 
 Both frontends are already Next.js with a `middleware.ts` doing server-side header
 injection, which is exactly the shape Auth.js expects. Auth.js gives us the OIDC dance,
 an encrypted `httpOnly` session cookie, and `auth()` in server components and middleware.
+
+This layer is **IdP-independent**: Auth.js talks plain OIDC to Zitadel via its generic
+OIDC provider, and would talk the same plain OIDC to Keycloak, Authentik, or a managed
+vendor. That is what keeps §2 a reversible decision rather than a one-way door — swapping
+the IdP is an issuer URL, a client ID, and a re-seed, not a re-platform.
 
 - Session cookie: encrypted JWT (Auth.js default), `httpOnly`, `Secure`, `SameSite=Lax`.
 - No session data is trusted from the client. Roles are **not** stored in the session
@@ -174,7 +284,7 @@ Alongside `X-API-Key`, the BFF mints a short-lived assertion and sends it as
   ```json
   {
     "iss": "bff:platform-control-admin",
-    "sub": "workos|user_01J...",
+    "sub": "zitadel|298734569872345",
     "aud": "platform-control",
     "email": "operator@evidara.example",
     "name": "A. Operator",
@@ -285,6 +395,19 @@ The property this protects is specific: a demo account must not be able to dispa
 or flip the ADR-0030/ADR-0035 two-key lock. Those are the two actions that turn a demo
 into a real, unreviewed write against the corpus.
 
+**Self-hosting makes this cheap, which is a genuine point in its favour (§2).** Demo
+accounts cost nothing per seat and nothing per MAU, so there is no commercial pressure to
+share one demo login among many prospects — which is precisely the shared-credential
+anti-pattern this ADR exists to end, and which a per-seat price list would quietly
+reintroduce. Each demo gets its own identity, in its own Zitadel organization, disposable
+on a schedule.
+
+**Seeding.** Demo accounts are created in a dedicated `demo` organization via Zitadel's
+management API from a script, with `is_demo = true` set on the corresponding
+platform-control operator row at JIT-provision time (§6.4) based on that organization.
+The org boundary is what makes "delete every demo account" a one-liner rather than an
+audit.
+
 ### 6. Migration from the three key-shaped `Operator` rows
 
 The three seeded rows (`20260426_0016_operators.py:52-79`) are referenced by existing
@@ -294,14 +417,17 @@ audit data — `blueprint_template_overrides.updated_by` and corrections'
 1. **Keep all three rows. Do not delete, do not renumber.** Foreign audit references keep
    resolving.
 2. **Add `kind` (`service_key` | `person`)** and mark the three existing rows
-   `service_key`. Add `subject`, `email`, `role`, `is_demo`.
+   `service_key`. Add `subject`, `email`, `role`, `is_demo`, and `idp_org_id` — the
+   Zitadel organization the person belongs to, recorded but **not yet enforced**, so that
+   the eventual tenancy work has the mapping it needs without a backfill (see Context).
    `auth_principal` remains the unique key; for people it becomes `oidc:<iss>:<sub>`.
 3. **Relabel, don't rewrite.** `op_scoped_operator_key`'s `display_name` becomes
    *"Shared operator key (pre-identity)"* so the admin UI stops rendering a key as if it
    were a person. The identifier is untouched.
 4. **Per-person rows are created just-in-time on first successful login**, with
-   `role = viewer` always — never `operator`, never inherited from the key. An existing
-   `admin` promotes. The first `admin` is seeded out-of-band by whoever runs the
+   `role = viewer` always — never `operator`, never inherited from the key. `is_demo` is
+   set from the IdP organization (the `demo` org, §5); `idp_org_id` is recorded. An
+   existing `admin` promotes. The first `admin` is seeded out-of-band by whoever runs the
    deployment, exactly once.
 5. **Once at least one person holds `admin`, set `disabled_at` on the three
    `service_key` rows** so they cannot back new writes. `get_current_principal` already
@@ -330,17 +456,22 @@ Ordered by what M13 actually needs, not by what is most visible:
 
 1. **Fail-closed auth + real `reviewed_by` derivation.** Independent of this design; can
    and should land immediately. *(Separate change; see the companion PR.)*
-2. **Operator table extension + per-person schema** (§6 steps 1-3).
-3. **The assertion seam** (§4) — mint in both BFFs, verify in both backends, strip at
+2. **Stand up Zitadel** on the k3s node: a `zitadel` database in the existing CNPG
+   cluster (the Nessie precedent in `postgres-cluster.yaml`), an Ingress under the
+   existing cert-manager issuer, backups joined to the platform-control database's
+   path and *restore-tested once* before anything depends on it (§2b), and a documented
+   break-glass procedure. Nothing else in this list can start until this is boring.
+3. **Operator table extension + per-person schema** (§6 steps 1-3).
+4. **The assertion seam** (§4) — mint in both BFFs, verify in both backends, strip at
    ingress. Roles read from the DB.
-4. **Auth.js login on `platform-control/admin`** (§3) — this is where attribution starts
+5. **Auth.js login on `platform-control/admin`** (§3) — this is where attribution starts
    producing real values.
-5. **Role enforcement + demo hard-scoping** (§5).
-6. **Auth.js login on `legal-search/frontend`**, retire the shared BasicAuth front door.
-7. **ID-token pass-through** (§4.5) when sessions are proven.
+6. **Role enforcement + demo hard-scoping** (§5).
+7. **Auth.js login on `legal-search/frontend`**, retire the shared BasicAuth front door.
+8. **ID-token pass-through** (§4.5) when sessions are proven.
 
-Steps 2-4 are what makes an ADR-0035 approval attributable. That is the M13-relevant
-subset.
+Steps 2-5 are what makes an ADR-0035 approval attributable. That is the M13-relevant
+subset. Step 1 is independent of all of it and should not wait.
 
 ## Consequences
 
@@ -351,11 +482,19 @@ subset.
   control plane that can dispatch runs.
 - Demo accounts become safe to hand out.
 - ADR-0020's Future Work items (RBAC, OIDC) are closed rather than perpetually deferred.
+- The runtime stays entirely self-hosted OSS (ADR-0029, ADR-0036). No vendor sits on the
+  path between a user and a legal corpus, and no per-seat price list shapes how we hand
+  out demo accounts.
+- Zitadel organizations give the currently-unenforced `tenant_id` / `scope_type` labels
+  (`models/corpus.py:33-39`) an identity-side counterpart to be mapped onto when tenancy
+  becomes enforced, rather than requiring a bespoke user↔tenant model invented first.
 
 ### Negative / accepted
 
-- A third-party dependency on the login path. If WorkOS is down, nobody logs in. Mitigated
-  only by the fact that sessions outlive brief outages.
+- **We now operate an IdP.** Its uptime, patching, and backups are ours, and a login
+  outage takes down both apps. §2b is the full bill; it is accepted deliberately, not
+  overlooked. Mitigated only by the fact that Auth.js sessions outlive brief outages —
+  an existing session survives a Zitadel restart; a new login does not.
 - The BFF becomes a signing authority (§4.4). Its compromise is a user-impersonation
   compromise — bounded, but real, and worse than today only in that it is now *possible to
   impersonate a specific named person* rather than merely act as the key.

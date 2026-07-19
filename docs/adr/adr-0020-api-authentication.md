@@ -116,8 +116,9 @@ still deferred.
 - ~~**RBAC**: Finer roles (viewer vs editor) beyond operator vs service.~~ — decided by
   ADR-0038 (`viewer` / `operator` / `admin`).
 - ~~**OAuth2 / OIDC**: Integrate Google Identity Platform if frontend users need
-  per-identity authentication.~~ — decided by ADR-0038, which recommends **WorkOS
-  AuthKit** rather than Google Identity Platform, because ADR-0029 retires the GCP
-  runtime this suggestion assumed.
+  per-identity authentication.~~ — decided by ADR-0038, which recommends **self-hosted
+  Zitadel** rather than Google Identity Platform. ADR-0029 retires the GCP runtime this
+  suggestion assumed, and the argument against re-opening a cloud account generalises to
+  managed identity as a category: every other component in this runtime is self-hosted OSS.
 - **Mutual TLS**: Consider mTLS for service-to-service communication if
   the mesh grows beyond 3 services.
