@@ -1,6 +1,6 @@
 # ADR-0038: User identity, roles, and genuine operator attribution
 
-Status: Proposed
+Status: Accepted
 Date: 2026-07-19
 Deciders: Platform / Security
 Supersedes: ADR-0020 (API authentication — extended, not replaced; its service-to-service
