@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 from sqlalchemy import select
 
 from platform_control.domain import ProcessingStatus, ProviderJobStatus, RunMode, RunStatus
-from platform_control.errors import InvalidStateTransitionError
+from platform_control.errors import DispatchPublishError, InvalidStateTransitionError
 from platform_control.events.publisher import LocalOutboxRawArtifactPublisher
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.captured_resource import CapturedResource
@@ -1289,3 +1289,133 @@ async def test_dispatch_pending_runs_does_not_publish_before_commit(session) -> 
 
     assert publisher.raw_artifact_ids == []
     assert publisher.bundle_events == []
+
+
+# ── #707: acquisition succeeded, the downstream handoff did not ───────────────
+#
+# The defect these cover is not "oversize payloads break". It is that a run whose
+# events never published was committed `status: completed, failure_reason: null`
+# over a pipeline that delivered zero documents, while the API answered a bare 500.
+# The evidence gate (#628) would have certified that as a successful acceptance run.
+# So the tests below fail the publish for an *arbitrary* reason — a broker that is
+# simply unavailable — because any failure between acquisition and DI must be
+# recorded the same honest way, not only the `MaxPayloadError` that exposed it.
+
+
+@dataclass
+class UnavailableBrokerPublisher:
+    """Every publish fails, the way a broker that is down fails."""
+
+    published: list[str] = field(default_factory=list)
+
+    async def publish_raw_artifact_available(self, artifact: RawArtifact) -> None:
+        del artifact
+        raise RuntimeError("broker unavailable")
+
+    async def publish_artifact_bundle_available(self, event: dict) -> None:
+        del event
+        raise RuntimeError("broker unavailable")
+
+
+@dataclass
+class OneBadArtifactPublisher:
+    """Fails a single named artifact and accepts everything else."""
+
+    reject_index: int = 0
+    seen: int = 0
+    published_artifact_ids: list[str] = field(default_factory=list)
+    published_bundles: list[dict] = field(default_factory=list)
+
+    async def publish_raw_artifact_available(self, artifact: RawArtifact) -> None:
+        index = self.seen
+        self.seen += 1
+        if index == self.reject_index:
+            raise RuntimeError("nats: maximum payload exceeded")
+        self.published_artifact_ids.append(artifact.artifact_id)
+
+    async def publish_artifact_bundle_available(self, event: dict) -> None:
+        self.published_bundles.append(event)
+
+
+async def _seed_inline_run_fixtures(session):
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "deterministic_http",
+        "seed_url": "https://registry.npmjs.org/left-pad/latest",
+        "mode": "crawl",
+    }
+    await session.commit()
+    registry = ProviderRegistry()
+    registry.register(StubProvider())
+    registry.register(InlineJsonDeterministicProvider())
+    return source, version, registry
+
+
+@pytest.mark.asyncio
+async def test_a_run_whose_events_never_published_is_not_recorded_as_completed(session) -> None:
+    source, version, registry = await _seed_inline_run_fixtures(session)
+    run_service = RunService(
+        session,
+        provider_registry=registry,
+        artifact_store=InMemoryArtifactStore(),
+        publisher=UnavailableBrokerPublisher(),
+    )
+
+    with pytest.raises(DispatchPublishError) as excinfo:
+        await run_service.create_run(
+            CreateRunRequest(
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                mode=RunMode.PRODUCTION,
+            )
+        )
+
+    # The caller learns the cause instead of reading a bare 500.
+    assert "broker unavailable" in str(excinfo.value)
+
+    run = await session.scalar(select(Run).where(Run.source_id == source.source_id))
+    assert run is not None
+    # The lie, gone: nothing reached document-intelligence, so the run must not
+    # claim otherwise. `completed` here is what would have been captured as
+    # acceptance evidence for a template that indexed nothing.
+    assert run.status is RunStatus.FAILED
+    assert run.failure_reason is not None
+    assert "broker unavailable" in run.failure_reason
+    assert run.completed_at is not None
+    # Machine-readable alongside the `refused` marker (#634/#681), so "which runs
+    # acquired but never handed off?" is answerable without parsing prose.
+    assert (run.run_metadata or {}).get("dispatch_publish_failed") is True
+    # The counts stay honest in the other direction too: acquisition really did
+    # capture the resource, and that is not retracted.
+    assert run.artifacts_count == 1
+
+
+@pytest.mark.asyncio
+async def test_one_unpublishable_artifact_does_not_strand_the_rest_of_its_batch(session) -> None:
+    source, version, registry = await _seed_inline_run_fixtures(session)
+    publisher = OneBadArtifactPublisher(reject_index=0)
+    run_service = RunService(
+        session,
+        provider_registry=registry,
+        artifact_store=InMemoryArtifactStore(),
+        publisher=publisher,
+    )
+
+    with pytest.raises(DispatchPublishError):
+        await run_service.create_run(
+            CreateRunRequest(
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                mode=RunMode.PRODUCTION,
+            )
+        )
+
+    # The bundle event still went out: under the old loop the first exception
+    # aborted the whole batch, so TSchG — well under the limit — was lost as
+    # collateral to TSchV. Partial delivery is still not success, so the run fails.
+    assert len(publisher.published_bundles) == 1
+    run = await session.scalar(select(Run).where(Run.source_id == source.source_id))
+    assert run is not None
+    assert run.status is RunStatus.FAILED
+    assert "maximum payload exceeded" in (run.failure_reason or "")

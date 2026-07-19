@@ -18,6 +18,7 @@ from platform_control.auth import (
 from platform_control.config import get_settings
 from platform_control.errors import (
     ConflictError,
+    DispatchPublishError,
     InvalidStateTransitionError,
     NotFoundError,
     PlatformControlError,
@@ -170,6 +171,15 @@ def create_app() -> FastAPI:
         # BlueprintTemplateNotEnabledError (config-side key) is a
         # PlatformControlError and lands on the domain handler below, also 400.
         return JSONResponse(status_code=400, content=_error_payload(request, str(exc)))
+
+    @app.exception_handler(DispatchPublishError)
+    async def dispatch_publish_handler(request: Request, exc: DispatchPublishError) -> JSONResponse:
+        # 502, not 500: the request was valid and acquisition succeeded — the
+        # downstream broker refused the handoff. A bare 500 is what #707 returned,
+        # and it told the caller nothing while the run read `completed`. The run has
+        # already been rewritten to FAILED with this same reason, so the API answer
+        # and the persisted record now agree.
+        return JSONResponse(status_code=502, content=_error_payload(request, str(exc)))
 
     @app.exception_handler(SignatureVerificationError)
     async def signature_handler(request: Request, exc: SignatureVerificationError) -> JSONResponse:
