@@ -66,6 +66,23 @@ class Settings(BaseSettings):
     nats_servers: str = "nats://localhost:4222"
     nats_raw_artifact_subject: str = "evidara.raw-artifact-available"
     nats_artifact_bundle_subject: str = "evidara.artifact-bundle-available"
+    nats_connect_timeout_seconds: float = Field(
+        default=5.0,
+        gt=0,
+        description=(
+            "Hard ceiling on opening a NATS connection from the publish path (#722). "
+            "nats-py's own budget is max_reconnect_attempts x reconnect_time_wait, and "
+            "unresolvable DNS is retried *outside* connect_timeout, so an unreachable "
+            "broker took ~2-7 minutes to return. Dispatch answers an operator over HTTP: "
+            "the correct answer is a fast 502 with the run recorded `failed` (#707), not "
+            "a correct answer minutes later."
+        ),
+    )
+    nats_publish_timeout_seconds: float = Field(
+        default=5.0,
+        gt=0,
+        description="Per-message ceiling on a JetStream publish ack from the publish path.",
+    )
     run_dispatch_backend: Literal["inline", "worker"] = "inline"
     wizard_orchestrator_backend: Literal["in_memory", "temporal"] = "in_memory"
     temporal_namespace: str = "default"

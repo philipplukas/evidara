@@ -136,18 +136,35 @@ pre-commit and CI.
 - **Repository interface pattern** — OpenSearch logic only in adapters, never in controllers or services.
 - **Spec-first** — `contracts/api/legal-search.openapi.yaml` is canonical. Swagger decorators are additive for dev UI only.
 - **Global pipes/filters** — ValidationPipe (whitelist, transform), AllExceptionsFilter, CorrelationIdMiddleware.
-- Test layers: unit (fast, mocked), integration (Testcontainers OpenSearch), smoke (HTTP-level).
-  The integration layer (`src/**/*.integration.spec.ts`, run by `npm run test:integration`, which
-  `npm run check` invokes) needs a running **Docker daemon**. It is the only layer that meets a real
-  index mapping — see [docs/testing/testing-levels.md](docs/testing/testing-levels.md) Level 4 and
-  #672/#673/#675 for why mocking it away is not an option.
+- Test layers: unit (fast, mocked), integration (Testcontainers OpenSearch), smoke (HTTP-level),
+  compiled-artifact. The integration layer (`src/**/*.integration.spec.ts`, run by
+  `npm run test:integration`, which `npm run check` invokes) needs a running **Docker daemon**. It is
+  the only layer that meets a real index mapping — see
+  [docs/testing/testing-levels.md](docs/testing/testing-levels.md) Level 4 and #672/#673/#675 for why
+  mocking it away is not an option.
+- **Controllers must import their DTOs as VALUES, never with `import type`.** `import type` erases
+  the class, so `emitDecoratorMetadata` writes `Function` into `design:paramtypes`, `ValidationPipe`
+  has nothing to instantiate, and — with `whitelist: true` — it hands the handler an **empty
+  object**. Every query parameter is silently dropped in the built app, with no error. That is #728:
+  `/v1/norm-hierarchy` shipped to production with ADR-0033's `in_force_at` completely inert.
+  **No Vitest layer can see this** — Vitest emits no decorator metadata at all, so the DTO works
+  fine in tests and only the compiled app drops it. Two things hold the line, and neither asks
+  anyone to remember: `style/useImportType` is **off for `src/**/*.controller.ts`** in `biome.json`
+  (its autofix rewrote the fix back in on every `npm run format`), and `npm run test:compiled`
+  builds and asserts against `dist/` that every `@Query()`/`@Body()`/`@Param()` DTO binding resolves
+  to a real class. See [docs/testing/testing-levels.md](docs/testing/testing-levels.md) Level 5.
 - **The documents-index mapping has one source of truth**:
   `legal-search/api/src/core/opensearch/documents-index.mapping.ts`. Every producer derives from it —
   `documents-bootstrap.ts` (runtime + seed + cutover) directly, and non-TypeScript producers via the
   generated `scripts/opensearch/documents-index.mapping.json` (`npm run mapping:generate`, drift-gated
   by `documents-index.mapping-json.spec.ts`). Never hand-maintain a parallel copy: a drifted copy in
-  `scripts/validate-tar89-metadata-local.sh` is what caused #675, and because OpenSearch returns empty
-  buckets rather than an error for a missing field, it presented as a query bug for months.
+  `scripts/validate-tar89-metadata-local.sh` is what caused #675, and a mapping-less `PUT` in the GCP
+  runtime tfvars was the same defect again (#713). Because OpenSearch returns empty
+  buckets rather than an error for a missing field, both presented as query bugs for months.
+  Index creation is first-writer-wins, so a second creation path does not merely disagree with the
+  canonical one — it silently *wins* over it. Producers go through `createDocumentsIndex()` in
+  `documents-bootstrap.ts` and are enumerated in `PRODUCERS` in `mapping-drift.integration.spec.ts`;
+  a producer that cannot be added to that registry is by definition drifting.
   When a live index disagrees with the canonical mapping, **fix the index** (reindex/cutover) — never
   weaken the query to match the drift. `npm run mapping:check-drift` reports the difference against a
   live cluster; `mapping-drift.integration.spec.ts` guards the creation path in CI.

@@ -30,3 +30,31 @@ export const SEARCH_FACET_AGG_FIELDS = {
 } as const;
 
 export type SearchFacetKey = keyof typeof SEARCH_FACET_AGG_FIELDS;
+
+/**
+ * The same convention, for the corpus-coverage dimensions (`/v1/coverage`,
+ * ADR-0042).
+ *
+ * A sibling constant rather than entries in `SEARCH_FACET_AGG_FIELDS`, because
+ * that map's contract is `key === field base name` (asserted in its spec) and
+ * coverage groups by dimensions whose names differ from their fields:
+ * `jurisdiction` there is the single-valued display field, while coverage must
+ * group by the multi-valued `jurisdiction_ids` that actually carries scope.
+ * Both maps are held to the same `.keyword` rule by `facet-fields.spec.ts`.
+ */
+export const COVERAGE_DIMENSION_AGG_FIELDS = {
+  jurisdiction: 'jurisdiction_ids.keyword',
+  authority: 'authority_ids.keyword',
+  document_type: 'document_type.keyword',
+  level: 'level.keyword',
+} as const;
+
+export type CoverageDimension = keyof typeof COVERAGE_DIMENSION_AGG_FIELDS;
+
+export const COVERAGE_DIMENSIONS = Object.keys(
+  COVERAGE_DIMENSION_AGG_FIELDS,
+) as CoverageDimension[];
+
+export function isCoverageDimension(value: unknown): value is CoverageDimension {
+  return typeof value === 'string' && value in COVERAGE_DIMENSION_AGG_FIELDS;
+}

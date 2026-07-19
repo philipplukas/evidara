@@ -8,6 +8,7 @@ import { AllExceptionsFilter } from './core/filters/all-exceptions.filter';
 import { MetricsModule } from './core/metrics/metrics.module';
 import { OpenSearchModule } from './core/opensearch/client';
 import { CitationsModule } from './modules/citations/citations.module';
+import { CoverageModule } from './modules/coverage/coverage.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { NormHierarchyModule } from './modules/norm-hierarchy/norm-hierarchy.module';
@@ -28,6 +29,7 @@ import { SearchModule } from './modules/search/search.module';
     NormHierarchyModule,
     ProjectionsModule,
     CitationsModule,
+    CoverageModule,
   ],
   providers: [
     {

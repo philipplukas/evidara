@@ -2,4 +2,8 @@ node_modules
 dist
 dist-test
 coverage
+# Report output only — never the `src/modules/coverage` module (see the root
+# .dockerignore for the full story).
+!src/**/coverage
+!src/**/coverage/**
 *.tsbuildinfo
