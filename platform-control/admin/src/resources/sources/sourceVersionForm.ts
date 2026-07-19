@@ -233,6 +233,67 @@ export const textToList = (value: string): string[] =>
 export const describeSourceVersionStatus = (status: SourceVersionRecord["status"]) =>
   VERSION_STATUS_META[status];
 
+export type SourceVersionAction = "edit" | "preview" | "production" | "approve" | "reject";
+
+const ACTION_LABEL: Record<SourceVersionAction, string> = {
+  edit: "Edit",
+  preview: "Preview run",
+  production: "Production run",
+  approve: "Approve",
+  reject: "Reject",
+};
+
+/**
+ * Why is this action unavailable on a version in this status?
+ *
+ * The row rendered `Edit` / `Approve` / `Reject` as three greyed buttons on an
+ * approved version with no `title`, no accessible description, and no adjacent
+ * copy (#674). "Approval is terminal" is a rule of the lifecycle, not something
+ * an operator can infer from a dimmed button — and to a screen-reader user a
+ * disabled button with no stated reason carries no information at all.
+ *
+ * Returns `null` when the action is available, so the caller can use the same
+ * value for both the `disabled` decision and the explanation.
+ */
+export const explainUnavailableVersionAction = (
+  action: SourceVersionAction,
+  status: SourceVersionRecord["status"],
+): string | null => {
+  const label = ACTION_LABEL[action];
+
+  if (action === "edit") {
+    if (status === "draft" || status === "rejected") return null;
+    if (status === "approved") {
+      return "Approved versions are immutable — create a new version to change the spec.";
+    }
+    if (status === "superseded") {
+      return "Superseded versions are read-only history.";
+    }
+    return `${label} is unavailable while the version is waiting on operator review.`;
+  }
+
+  if (action === "approve" || action === "reject") {
+    if (status === "draft" || status === "pending_approval") return null;
+    if (status === "approved") {
+      return "This version is already approved — approval is terminal.";
+    }
+    if (status === "rejected") {
+      return "This version is already rejected — rejection is terminal.";
+    }
+    return "Superseded versions are read-only history.";
+  }
+
+  if (action === "preview") {
+    if (status !== "rejected" && status !== "superseded") return null;
+    return status === "rejected"
+      ? "Rejected versions are permanently blocked from runs."
+      : "Superseded versions are read-only history.";
+  }
+
+  if (status === "approved") return null;
+  return "Production runs require an approved version.";
+};
+
 export type SourceVersionLifecycleSummary = {
   total: number;
   counts: Record<SourceVersionRecord["status"], number>;
@@ -525,7 +586,7 @@ export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<Acquis
   }
 
   // Same provider -> every field without a widget survives, base or otherwise
-  // (fedlex's `scope_kind`/`canton`/`max_works`, say). Provider switched -> only
+  // (ris_ogd's `applikation`/`page_size`, say). Provider switched -> only
   // the base fields carry over: they are provider-independent, whereas the old
   // provider's own fields are not valid on the new one and the server's spec
   // models are `extra="forbid"`.
@@ -535,12 +596,31 @@ export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<Acquis
   return { ...preserved, ...edited };
 };
 
+/**
+ * How many entries of a list the summary names before counting the rest.
+ *
+ * The summary is a table *cell*. The Fedlex 50-act version printed all 50 work
+ * URIs into it, producing one row several screens tall that pushed the row's
+ * other columns out of view, next to a four-line ZH row (#674). Three entries
+ * is enough to recognise the shape of the list; the full value stays available
+ * in the edit dialog, which renders the spec verbatim.
+ */
+const SUMMARY_LIST_LIMIT = 3;
+
+export const summarizeList = (values: string[]): string => {
+  if (values.length === 0) return "none";
+  if (values.length <= SUMMARY_LIST_LIMIT) return values.join(", ");
+  return `${values.slice(0, SUMMARY_LIST_LIMIT).join(", ")} … and ${
+    values.length - SUMMARY_LIST_LIMIT
+  } more`;
+};
+
 const formatSpecValue = (value: unknown): string => {
   if (value === null || value === undefined) {
     return "not set";
   }
   if (Array.isArray(value)) {
-    return value.length > 0 ? value.join(", ") : "none";
+    return summarizeList(value.map(String));
   }
   return String(value);
 };
@@ -578,10 +658,7 @@ export const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
     const seeds = deterministic.seed_url
       ? [deterministic.seed_url, ...(deterministic.seed_urls ?? [])]
       : (deterministic.seed_urls ?? []);
-    return [
-      `provider: ${provider}`,
-      seeds.length > 0 ? `seeds: ${seeds.join(", ")}` : "seeds: none",
-    ];
+    return [`provider: ${provider}`, `seeds: ${summarizeList(seeds)}`];
   }
 
   if (provider === "fedlex_sparql") {
@@ -591,7 +668,7 @@ export const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
       : (fedlex.seed_urls ?? []);
     return [
       `provider: ${provider}`,
-      `work URIs: ${seeds.join(", ") || "none"}`,
+      `work URIs: ${summarizeList(seeds)}`,
       `SPARQL endpoint: ${fedlex.sparql_endpoint ?? "n/a"}`,
       `preferred languages: ${(fedlex.preferred_languages ?? []).join(", ") || "n/a"}`,
       `query mode / max expressions: ${fedlex.query_mode ?? "n/a"} / ${fedlex.max_expressions ?? "n/a"}`,
@@ -605,7 +682,7 @@ export const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
   return [
     `provider: ${provider}`,
     `mode: ${firecrawl.mode}`,
-    seeds.length > 0 ? `seeds: ${seeds.join(", ")}` : "seeds: none",
+    `seeds: ${summarizeList(seeds)}`,
     `limit: ${firecrawl.limit}`,
     `depth: ${firecrawl.max_discovery_depth}`,
     (firecrawl.include_paths ?? []).length > 0

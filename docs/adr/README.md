@@ -33,6 +33,13 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0030 | [Acquisition provider enablement lifecycle](0030-acquisition-provider-enablement-lifecycle.md) |
 | ADR-0032 | [Pipeline observability — Prometheus, Grafana, and a funnel that cannot lie](0032-pipeline-observability.md) |
 | ADR-0034 | [Generate the platform-control contract from the app](0034-generated-platform-control-contract.md) |
+| ADR-0035 | [Operator-reachable blueprint enablement](0035-operator-reachable-blueprint-enablement.md) |
+| ADR-0038 | [User identity, roles, and genuine operator attribution](0038-user-identity-and-operator-attribution.md) (Accepted) |
+| ADR-0039 | [A third frontend surface — the public marketing page](0039-public-marketing-surface.md) |
+| ADR-0040 | [What makes a test result trustworthy](0040-test-result-trust.md) |
+| ADR-0041 | [Separate the Randtitel band geometrically, and do not adopt Docling for PDFs](0041-geometric-pdf-marginalia.md) |
+| ADR-0042 | [Corpus coverage is an API, and it is a claim about the corpus — never about the law](0042-corpus-coverage-as-an-api.md) |
+| ADR-0043 | [A source's scope is a measurement, not an assumption](0043-source-scope-must-be-measured.md) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.

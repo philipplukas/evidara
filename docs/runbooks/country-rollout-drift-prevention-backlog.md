@@ -268,37 +268,53 @@ and can run in parallel.
 - Enable `regione_http_lombardia` template
 - Runbook: create `docs/runbooks/it-lombardia-regione-fast-loop.md`
 
-### 4.4 Fedlex cantonal SPARQL filter — wired, awaiting acceptance run
+### 4.4 Fedlex cantonal SPARQL filter — ❌ CLOSED, REMOVED (#716)
 
-**Landed (scaffolding):**
+**Do not re-open this item. The premise was false.**
 
-- `_canton_filter(acquisition_spec)` normalizes ISO 3166-2:CH codes.
-- `_canton_iri(code)` maps to the Fedlex canton vocabulary IRI
-  (`https://fedlex.data.admin.ch/vocabulary/canton/ZH`).
-- `_build_canton_discovery_query(code, limit)` renders the
-  `jolux:CantonOfOrigin` discovery SPARQL.
-- `_discover_works_by_canton(...)` async method executes the query and
-  returns work URIs.
-- 5 unit tests cover the mapping, query shape, default limit, and
-  rejection of garbage codes.
+The whole of 4.4 assumed Fedlex exposes a `jolux:CantonOfOrigin` predicate.
+It does not, and never did. Measured against the live endpoint on 2026-07-19:
+56,238,852 triples and 426 distinct predicates, of which **zero** contain
+`anton` (case-insensitive, covering both `Canton` and `Kanton`); six spelling
+variants all `ASK -> false`; `/vocabulary/canton/ZH` returns 404 while the
+control `/vocabulary/legal-institution/3525` returns 200; 133 classes, none
+cantonal; and only the federal collections `fga` / `oc` / `cc` exist.
 
-**Landed (wiring, #531):**
+Nor could the mode have been repaired by fixing the predicate name. Fedlex
+does carry inter-cantonal concordats, but every predicate on one is
+AS-collection metadata with no cantonal attribution — there is nothing to
+filter on. The "run a live acceptance test against a Valais concordat" step
+this section listed as *Still needed* is the step that would have caught it,
+and it is why the item stayed open for months while the code read as done.
 
-- `_discover_works_by_canton` is wired into `start_run()` via
-  `acquisition_spec.scope_kind = "canton"` (federal seed path unchanged);
-  discovery routes through `limited_get` for per-host politeness.
-- `FedlexSparqlAcquisitionSpec` gained `scope_kind` / `canton` / `max_works`
-  with a validator; cantonal blueprint templates
-  (`fedlex_sparql_canton_zh` / `_be` / `_bs`) land `enabled: false`.
-- Unit tests cover canton-mode discovery+processing, the missing-canton
-  failure path, and the canton `plan()` output.
+**Why this survived so long** — worth internalising, because it is a
+repeatable failure mode: the canton path was fully tested *against itself*.
+`test_build_canton_discovery_query_shape` asserted `"jolux:CantonOfOrigin" in
+query` — a tautology over a string we generate — and the test double
+intercepted on a substring of our own query text, returning a hand-written
+binding whose work URI was `eli/cc/1999/404`, the **federal** Bundesverfassung.
+Every artifact that could have falsified the predicate restated it instead.
+Two smells were available for free without any network call: `CantonOfOrigin`
+is PascalCase (RDF reserves that for classes; every other predicate in the file
+is lowerCamelCase), and this very section already recorded the live run as
+*Still needed*. Contrast the verified predicates in the same file
+(`jolux:dateApplicability`, `jolux:inForceStatus`), which carry explicit
+"VERIFIED against the live endpoint" comments.
 
-**Still needed:**
+**Removed in #716:** the `canton_discovery` mode and its query builder,
+`_canton_filter` / `_canton_iri` / `_build_canton_discovery_query` /
+`_discover_works_by_canton`, the `scope_kind` / `canton` / `max_works` fields
+on `FedlexSparqlAcquisitionSpec`, the `fedlex_sparql_canton_zh` / `_be` / `_bs`
+blueprint templates, the `fedlex_sparql_canton` provider token in
+`contracts/vocabularies/subdivisions.json`, and the 8 self-referential tests.
+`fedlex_sparql`'s federal seed mode is untouched and remains the live CH
+legislation path (`scripts/ch-fedlex-fast-loop.sh`).
 
-- Run a live acceptance test against a known cantonal concordat
-  (proposal: a Valais inter-cantonal concordat as first target).
-- Flip the cantonal templates to `enabled: true` + land evidence under
-  `docs/runbooks/evidence/<date>-ch-fedlex-cantonal-*.md`.
+**Where cantonal coverage actually goes:** a per-canton provider against the
+canton's own systematic collection — the `canton_http` line of work. The ZH
+Hundegesetz (ADR-0033's acceptance target) lives at ZH-Lex LS 554.5 on `zh.ch`,
+not in Fedlex; the only "Hundegesetz" Fedlex holds is the federal 2009 *draft*
+that was never enacted.
 
 ## Tier 5 — Feature additions
 
@@ -444,7 +460,7 @@ T3.1-3.3 DE/FR/IT evidence ──── operator work, unblocks GA sign-off
 T4.1 EurLex live ──── independent; ship once ready
 T4.2 Bayern live ──── needs T2.1
 T4.3 Lombardia live ──── needs T2.1
-T4.4 Cantonal filter ──── independent
+T4.4 Cantonal filter ──── REMOVED (#716): false premise, no such predicate
 
 T5.1 ELI URI ──── needs T4.1 for end-to-end value
 T5.2 sub-federal UI ──── needs T1.5 + T2.3

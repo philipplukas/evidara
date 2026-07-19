@@ -60,7 +60,7 @@ describe('SearchOpenSearchAdapter', () => {
     );
 
     await adapter.search('verantwortlichkeit', {
-      jurisdictions: ['ch', 'at'],
+      jurisdictions: ['CH', 'AT'],
       documentTypes: ['law', 'decision'],
       languages: ['de'],
       officialOnly: true,
@@ -79,7 +79,7 @@ describe('SearchOpenSearchAdapter', () => {
       };
     };
     expect(firstCall.body.query.bool.filter).toEqual([
-      { terms: { jurisdiction: ['ch', 'at'] } },
+      { terms: { jurisdiction: ['CH', 'AT'] } },
       { terms: { document_type: ['law', 'decision'] } },
       { terms: { language: ['de'] } },
       { term: { is_official: true } },
@@ -181,7 +181,7 @@ describe('SearchOpenSearchAdapter', () => {
     );
 
     await adapter.search('arbeitsrecht', {
-      jurisdictions: ['ch'],
+      jurisdictions: ['CH'],
       jurisdictionIds: ['jur_ch_federal', 'jur_ch_gemeinde_4001'],
       authorityIds: ['auth_fedlex'],
     });
@@ -190,7 +190,7 @@ describe('SearchOpenSearchAdapter', () => {
       body: { query: { bool: { filter: unknown[] } } };
     };
     expect(firstCall.body.query.bool.filter).toEqual([
-      { terms: { jurisdiction: ['ch'] } },
+      { terms: { jurisdiction: ['CH'] } },
       {
         terms: {
           'jurisdiction_ids.keyword': ['jur_ch_federal', 'jur_ch_gemeinde_4001'],

@@ -412,3 +412,113 @@ test.describe("SourceCreate wizard", () => {
     await expect(preview.locator("pre")).toBeHidden();
   });
 });
+
+/**
+ * #666 — the milestone-blocking one.
+ *
+ * The picker fetched 250 of 2,169 jurisdictions into a native `<select>`, cut
+ * alphabetically at "Bovernier". `jur_ch_zh` (ADR-0033's dog jurisdiction) and
+ * `jur_ch_federal` (the canary in `scripts/ch-fedlex-fast-loop.sh`) were both
+ * past the cut, so an operator could not create a source for either — none of
+ * the four sources that already existed could have been made in this wizard.
+ *
+ * The fixture reproduces the real registry's shape: enough alphabetically-early
+ * entries to push the interesting ids well outside any fixed window.
+ */
+test.describe("SourceCreate jurisdiction reachability (#666)", () => {
+  const BIG_REGISTRY = {
+    data: [
+      ...Array.from({ length: 2167 }, (_, index) => ({
+        jurisdiction_id: `jur_gem_${index}`,
+        // "Aa…"/"Bo…" names sort ahead of Zürich and Swiss Confederation.
+        name: `Aargau Gemeinde ${String(index).padStart(4, "0")}`,
+        slug: `ch-gemeinde-${index}`,
+        parent_id: null,
+        compliance_policy_id: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      })),
+      {
+        jurisdiction_id: "jur_ch_zh",
+        name: "Kanton Zürich",
+        slug: "ch-zh",
+        parent_id: null,
+        compliance_policy_id: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      {
+        jurisdiction_id: "jur_ch_federal",
+        name: "Swiss Confederation",
+        slug: "ch-federal",
+        parent_id: null,
+        compliance_policy_id: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+    ],
+  };
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("evidara_user_role", "admin");
+    });
+  });
+
+  test("Zürich and the federal jurisdiction are reachable in a 2169-entry registry", async ({
+    page,
+  }) => {
+    await mockPlatformControlApi(page);
+    // Override the small fixture with a realistically-sized registry.
+    await page.route("**/api/platform-control/v1/reference-data/jurisdictions*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(BIG_REGISTRY),
+      }),
+    );
+
+    await page.goto("/#/sources/create");
+    await expect(page.locator("h1")).toContainText("Create source");
+
+    const picker = page.getByTestId("source-jurisdiction-combobox");
+    const input = picker.getByRole("combobox");
+    await input.click();
+
+    // The option list is windowed — but it says so, rather than looking complete.
+    await expect(picker.locator("p[aria-live]")).toContainText("of 2169 matches");
+
+    // The dog jurisdiction, found by typing its ASCII spelling.
+    await input.fill("zurich");
+    const zurich = page.getByRole("option", { name: "Kanton Zürich (ch-zh)" });
+    await expect(zurich).toBeVisible();
+    await zurich.click();
+    await expect(input).toHaveValue("Kanton Zürich (ch-zh)");
+
+    // The canary jurisdiction, found by pasting its id.
+    await input.click();
+    await input.fill("jur_ch_federal");
+    const federal = page.getByRole("option", { name: "Swiss Confederation (ch-federal)" });
+    await expect(federal).toBeVisible();
+    await federal.click();
+    await expect(input).toHaveValue("Swiss Confederation (ch-federal)");
+  });
+
+  test("the same picker on authority setup is equally reachable", async ({ page }) => {
+    await mockPlatformControlApi(page);
+    await page.route("**/api/platform-control/v1/reference-data/jurisdictions*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(BIG_REGISTRY),
+      }),
+    );
+
+    await page.goto("/#/authorities/create");
+    const picker = page.getByTestId("authority-jurisdiction-combobox");
+    const input = picker.getByRole("combobox");
+    await input.click();
+    await input.fill("zurich");
+    await expect(page.getByRole("option", { name: "Kanton Zürich (ch-zh)" })).toBeVisible();
+  });
+});

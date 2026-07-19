@@ -48,7 +48,11 @@ API_TITLE = "Platform Control API"
 # `live_ready`/`launchable`/`notes` on blueprint responses (#632, #634).
 # 0.10.0: additive — routes now declare the 4xx/5xx their exception handlers
 # really return, with the shared `ErrorResponse` body (#627).
-API_VERSION = "0.10.0"
+# 0.11.0: additive — `refused` on run responses + `?refused=` filter on the run
+# collection, and `plan_notes` on blueprint-preview (#634).
+# 0.13.0: additive — blueprint coverage inventory fields on source responses,
+# so the admin can show which blueprints are enabled and which are not (#668).
+API_VERSION = "0.14.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

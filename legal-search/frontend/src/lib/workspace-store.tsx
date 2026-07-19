@@ -57,6 +57,18 @@ interface WorkspaceState {
   pinned: PinnedItem[];
 }
 
+/**
+ * Search scopes carry no stored label.
+ *
+ * The reducer is pure and has no access to `next-intl`, so anything it
+ * fabricates here is necessarily untranslated — which is how `Results for "…"`
+ * ended up rendered verbatim in the German UI (#648). The label for a search
+ * scope is derived at render time by `describeResultSetScope`; only pivots,
+ * whose label is supplied by a component that *does* have a translator, store
+ * one.
+ */
+const DERIVED_AT_RENDER = "";
+
 function createInitialState(
   results: SearchResultViewModel[],
   query: string,
@@ -66,7 +78,7 @@ function createInitialState(
     resultSet: {
       source: { type: "search", query },
       items: results,
-      scopeLabel: `Results for "${query}"`,
+      scopeLabel: DERIVED_AT_RENDER,
       totalResults,
     },
     resultSetStack: [],
@@ -86,7 +98,7 @@ function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): Works
         resultSet: {
           source: { type: "search", query: action.query },
           items: action.results,
-          scopeLabel: `Results for "${action.query}"`,
+          scopeLabel: DERIVED_AT_RENDER,
           totalResults: action.totalResults,
         },
         resultSetStack: [],

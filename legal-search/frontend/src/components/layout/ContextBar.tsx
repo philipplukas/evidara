@@ -6,7 +6,11 @@ import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
-import { hasActiveSearchConstraints, useSearchConstraints } from "@/lib/search-constraints-store";
+import {
+  countActiveSearchConstraints,
+  hasActiveSearchConstraints,
+  useSearchConstraints,
+} from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
 
 interface ContextBarProps {
@@ -14,18 +18,6 @@ interface ContextBarProps {
 }
 
 const SOURCE_TYPE_I18N_KEYS = new Set(["all", "law", "decision", "rechtssatz", "commentary"]);
-
-function useActiveFilterCount(constraints: {
-  jurisdictions: string[];
-  languages: string[];
-  sourceType: string | null;
-  officialOnly: boolean;
-}) {
-  let count = constraints.jurisdictions.length + constraints.languages.length;
-  if (constraints.sourceType) count += 1;
-  if (constraints.officialOnly) count += 1;
-  return count;
-}
 
 /**
  * Top-level, high-signal search constraints.
@@ -37,7 +29,9 @@ export function ContextBar({ context }: ContextBarProps) {
   const t = useTranslations();
   const tSourceTypes = useTranslations("results.sourceTypes");
   const [mobileExpanded, setMobileExpanded] = useState(false);
-  const activeCount = useActiveFilterCount(constraints.context);
+  // Counts only what the user set away from the seeded `CH` / `de` defaults, so
+  // the badge is absent — not "2" — on a cold load (#674).
+  const activeCount = countActiveSearchConstraints(constraints);
 
   const translatedSourceTypes = context.sourceTypes.map((item) => ({
     ...item,
@@ -147,23 +141,10 @@ export function ContextBar({ context }: ContextBarProps) {
             // otherwise the toast would be misleading ("resetting the default
             // state to itself").
             const hadActive = hasActiveSearchConstraints(constraints);
-            // Count dimensions that RESET_ALL will actually clear: anything
-            // away from the "CH" / "de" defaults plus any refinement.
-            // Intentionally stricter than the badge counter (which counts
-            // defaults too) so the telemetry number reflects real damage.
-            const activeFilterCount = hadActive
-              ? (constraints.context.jurisdictions.length !== 1 ||
-                constraints.context.jurisdictions[0] !== "ch"
-                  ? 1
-                  : 0) +
-                (constraints.context.languages.length !== 1 ||
-                constraints.context.languages[0] !== "de"
-                  ? 1
-                  : 0) +
-                (constraints.context.sourceType !== null ? 1 : 0) +
-                (constraints.context.officialOnly ? 1 : 0) +
-                constraints.refinements.length
-              : 0;
+            // Dimensions RESET_ALL will actually clear. The badge now uses this
+            // same count — it used to count the defaults too, so the two
+            // disagreed about what "active" meant on the same screen (#674).
+            const activeFilterCount = activeCount;
             dispatch({ type: "RESET_ALL" });
             // Emit unconditionally so no-op clicks still surface in analytics —
             // they're a signal the user expected something to reset, which is

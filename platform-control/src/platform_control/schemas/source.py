@@ -99,19 +99,14 @@ class FedlexSparqlAcquisitionSpec(BaseAcquisitionSpec):
     preferred_languages: list[LanguageCode] = Field(default_factory=list)
     query_mode: Literal["work_to_expression"] = "work_to_expression"
     max_expressions: int = Field(default=1, ge=1, le=10)
-    # Cantonal-discovery mode (#531): scope_kind="canton" discovers works via
-    # jolux:CantonOfOrigin instead of seed URIs. See the FedlexSparqlProvider
-    # start_run wiring and country-rollout-drift-prevention §4.4.
-    scope_kind: Literal["seed", "canton"] = "seed"
-    canton: str | None = Field(default=None, pattern=r"^(?:CH-)?[A-Za-z]{2}$")
-    max_works: int = Field(default=50, ge=1, le=500)
+    # Federal seed mode only. A `scope_kind: canton` discovery mode existed here
+    # until #716; it was removed because `jolux:CantonOfOrigin` does not exist
+    # and Fedlex publishes no cantonal law at all (measured — see the SCOPE note
+    # in services/fedlex_sparql_provider.py). Cantonal coverage needs a
+    # per-canton provider, not a field on this spec.
 
     @model_validator(mode="after")
     def validate_fedlex_sparql_config(self) -> FedlexSparqlAcquisitionSpec:
-        if self.scope_kind == "canton":
-            if not self.canton:
-                raise ValueError("fedlex_sparql scope_kind=canton requires canton (ISO 3166-2:CH)")
-            return self
         if self.seed_url is None and not self.seed_urls:
             raise ValueError("fedlex_sparql provider requires seed_url or seed_urls")
         return self
@@ -412,6 +407,15 @@ class SourceBlueprintPreviewResponse(BaseModel):
         default_factory=list,
         description="Human-readable explanation of any closed key (why the template is inert).",
     )
+    plan_notes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The provider's own `plan()` notes for this spec (#634) — seed URLs it would "
+            "hit, config errors, and provider-specific caveats. Distinct from `notes`, "
+            "which explains the two-key lock; these describe the acquisition itself. "
+            "Empty when the provider exposes no plan or plan computation failed."
+        ),
+    )
 
 
 class SourceBlueprintTemplateResponse(BaseModel):
@@ -431,6 +435,25 @@ class SourceBlueprintTemplateResponse(BaseModel):
     notes: list[str] = Field(
         default_factory=list,
         description="Human-readable explanation of any closed key (why the template is inert).",
+    )
+    default_enabled: bool = Field(
+        description="The shipped source_blueprints.yaml default for the config key.",
+    )
+    source: str = Field(
+        description="Provenance of the effective config key: 'override' (an operator flipped "
+        "it) or 'default' (running on the shipped value, never touched).",
+    )
+    note: str | None = Field(
+        default=None,
+        description="Evidence note the operator recorded with the override, if any.",
+    )
+    updated_by: str | None = Field(
+        default=None,
+        description="Operator identity that last flipped the override. Key-shaped, not "
+        "person-shaped: every human sharing an operator API key resolves to the same row.",
+    )
+    updated_at: datetime | None = Field(
+        default=None, description="When the override was last written."
     )
 
 

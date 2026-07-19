@@ -14,8 +14,10 @@ See ADR-0013 for internationalization strategy.
 Document body reads fall back to the Document Service
 (`contracts/api/document-intelligence.openapi.yaml`) when the projection carries no body.
 See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
+See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
+particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 import {
   useQuery
@@ -35,9 +37,11 @@ import type {
 import type {
   CitationGraphStats,
   CitedByResponse,
+  CorpusCoverageView,
   DetailView,
   FindCitingDocumentsParams,
   FindCitingResponse,
+  GetCorpusCoverageParams,
   GetDocumentSections200,
   GetNormHierarchyParams,
   IndexedProjectionDocumentPage,
@@ -959,6 +963,147 @@ export function useGetCitationGraphStats<TData = Awaited<ReturnType<typeof getCi
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCitationGraphStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+/**
+ * ADR-0033 §2 makes explicit coverage "the only real cure for confident
+fabrication": an agent that can check whether the governing norm is in the
+corpus can refuse instead of reaching for the nearest plausible text. This
+endpoint is that check. See ADR-0042.
+
+Before this path existed, the only signal about absence was
+`totalResults: 0`, which conflates at least four different situations —
+we do not hold the norm, we hold it but the query missed it, a filter bug
+dropped it (#672 did exactly this), or the norm does not exist. An agent
+cannot refuse safely on evidence that ambiguous.
+
+## What a `not_held` answer means
+
+**`not_held` means: the search index contains no document matching this
+scope.** That is a statement about our holdings, in the first person.
+
+It does **NOT** mean the norm does not exist, that no such law was enacted,
+or that the platform has determined the law to be absent. The corpus is a
+subset of the law by construction, and no endpoint over it can ever be
+evidence of what the law does not contain.
+
+The `holding` enum is therefore exactly `held | not_held`. There is no
+value meaning "confirmed absent in law", and none will be added — a
+requirement for one is a requirement to revisit ADR-0042.
+
+The strongest claim this endpoint supports is a refusal: *"I do not hold
+the governing norm for this question, so I will not answer it."* Per
+ADR-0033 §2 that is a **correct** answer.
+
+## What it also cannot tell you
+
+- **Whether the corpus is current.** `last_processed_at` is when the newest
+  document in the group entered the corpus — NOT evidence that the source
+  was re-checked then. A jurisdiction whose law changed last week and whose
+  last acquisition ran a year ago reports a year-old timestamp and no
+  indication of staleness. "When did we last check?" is run history, which
+  lives in platform-control (ADR-0042 §4/§5).
+- **Completeness within a scope.** "We hold 41 federal acts" is not "we hold
+  all federal acts". Nothing in the platform knows the denominator, so no
+  percentage or completeness score is reported — inventing one is the single
+  most dangerous field this endpoint could carry.
+- **Anything at instrument granularity.** A group reporting `held` may still
+  be missing the one act that governs the caller's question — this is the
+  measured #709 failure, where the federal level was covered by the
+  Bundesverfassung while TSchG/TSchV were absent. Use
+  `/v1/citations/resolve` to ask about a specific norm.
+
+ * @summary What the corpus holds for a named scope — and, explicitly, what that does not mean
+ */
+export const getCorpusCoverage = (
+    params?: GetCorpusCoverageParams,
+ options?: SecondParameter<typeof customFetch>,signal?: AbortSignal
+) => {
+      
+      
+      return customFetch<CorpusCoverageView>(
+      {url: `/v1/coverage`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetCorpusCoverageQueryKey = (params?: GetCorpusCoverageParams,) => {
+    return [
+    `/v1/coverage`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetCorpusCoverageQueryOptions = <TData = Awaited<ReturnType<typeof getCorpusCoverage>>, TError = void>(params?: GetCorpusCoverageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCorpusCoverage>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCorpusCoverageQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCorpusCoverage>>> = ({ signal }) => getCorpusCoverage(params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCorpusCoverage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCorpusCoverageQueryResult = NonNullable<Awaited<ReturnType<typeof getCorpusCoverage>>>
+export type GetCorpusCoverageQueryError = void
+
+
+export function useGetCorpusCoverage<TData = Awaited<ReturnType<typeof getCorpusCoverage>>, TError = void>(
+ params: undefined |  GetCorpusCoverageParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCorpusCoverage>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCorpusCoverage>>,
+          TError,
+          Awaited<ReturnType<typeof getCorpusCoverage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCorpusCoverage<TData = Awaited<ReturnType<typeof getCorpusCoverage>>, TError = void>(
+ params?: GetCorpusCoverageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCorpusCoverage>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCorpusCoverage>>,
+          TError,
+          Awaited<ReturnType<typeof getCorpusCoverage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCorpusCoverage<TData = Awaited<ReturnType<typeof getCorpusCoverage>>, TError = void>(
+ params?: GetCorpusCoverageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCorpusCoverage>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary What the corpus holds for a named scope — and, explicitly, what that does not mean
+ */
+
+export function useGetCorpusCoverage<TData = Awaited<ReturnType<typeof getCorpusCoverage>>, TError = void>(
+ params?: GetCorpusCoverageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCorpusCoverage>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCorpusCoverageQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

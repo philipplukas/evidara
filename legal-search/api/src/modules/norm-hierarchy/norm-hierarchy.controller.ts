@@ -1,6 +1,10 @@
 import { Controller, Get, Headers, Inject, Param, Query } from '@nestjs/common';
 import { resolveLocale } from '../../core/i18n';
-import type { NormHierarchyQueryDto } from './dto/norm-hierarchy-query.dto';
+// Value import, deliberately: `import type` erases the class, and ValidationPipe
+// then has no metatype to instantiate — it hands the handler an empty object and
+// `in_force_at` silently stops applying (#728). Guarded by
+// `scripts/check-validation-metadata.mjs` against the compiled output.
+import { NormHierarchyQueryDto } from './dto/norm-hierarchy-query.dto';
 import { NormHierarchyService } from './norm-hierarchy.service';
 
 @Controller('v1/norm-hierarchy')

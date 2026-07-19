@@ -53,6 +53,7 @@
     },
     "loadFailed": "Impossible de charger les filtres",
     "loadFailedDescription": "Les options de filtre n'ont pas pu \u00eatre r\u00e9cup\u00e9r\u00e9es.",
+    "expandPanel": "Afficher le panneau de filtres",
     "tooltip": {
       "checkbox": "S\u00e9lectionnez une ou plusieurs options dans la liste.",
       "chip": "Cliquez sur les chips pour affiner les r\u00e9sultats.",
@@ -135,6 +136,8 @@
       "back": "Retour au p\u00e9rim\u00e8tre pr\u00e9c\u00e9dent",
       "searchFor": "Recherche de \u00ab\u00a0{query}\u00a0\u00bb",
       "reopen": "Rouvrir {scope}",
+      "resultsFor": "R\u00e9sultats pour \u00ab\u00a0{query}\u00a0\u00bb",
+      "pivotFor": "{label} pour {title}",
       "pivotDescription": "Le p\u00e9rim\u00e8tre a \u00e9t\u00e9 resserr\u00e9 par rapport au jeu de r\u00e9sultats pr\u00e9c\u00e9dent pour garder les \u00e9l\u00e9ments actuels plus cibl\u00e9s."
     },
     "sourceTypes": {

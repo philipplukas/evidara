@@ -64,3 +64,15 @@ class Run(TimestampMixin, Base):
     def replay_checkpoint(self) -> dict[str, Any] | None:
         checkpoint = (self.run_metadata or {}).get("replay_checkpoint")
         return dict(checkpoint) if isinstance(checkpoint, dict) else None
+
+    @property
+    def refused(self) -> bool:
+        """True when this run is a refusal record, not an attempted acquisition.
+
+        `RunService._record_refused_run` writes a terminal FAILED run when the
+        ADR-0030 two-key lock blocks a dispatch, so the attempt leaves evidence
+        rather than silence (#634). Reading the marker back is what makes that
+        evidence auditable: without it a refusal is indistinguishable from a run
+        that actually fired and failed.
+        """
+        return (self.run_metadata or {}).get("refused") is True

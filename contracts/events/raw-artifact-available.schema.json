@@ -49,7 +49,7 @@
             },
             "storage_path": {
               "type": "string",
-              "description": "URI or path to the stored raw artifact."
+              "description": "URI or path to the stored raw artifact. This is the artifact's transport: the event notifies that the artifact exists, consumers read the bytes from here. The acquisition envelope at this URI carries the document body (#707)."
             },
             "content_type": {
               "type": "string",
@@ -63,7 +63,14 @@
             "metadata": {
               "type": "object",
               "additionalProperties": true,
-              "description": "Optional provider-specific metadata captured with the artifact."
+              "description": "Optional provider-specific metadata captured with the artifact - what describes the artifact, never the artifact itself. The inline document body (`inline_body` / `inline_body_base64`) is deliberately omitted here and replaced by `inline_body_omitted: true`, so event size stays bounded by the metadata rather than scaling with the document. Inlining it made a 1.44 MB federal act exceed the NATS `max_payload` and drop out of the corpus (#707); read the body from `storage_path` instead.",
+              "properties": {
+                "inline_body_omitted": {
+                  "type": "boolean",
+                  "const": true,
+                  "description": "Present and true when the captured resource had an inline body that was stripped from this event. Its absence is stated rather than implied, so a consumer never has to guess whether the provider captured nothing."
+                }
+              }
             }
           },
           "additionalProperties": false

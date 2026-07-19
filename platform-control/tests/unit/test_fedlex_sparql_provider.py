@@ -534,139 +534,50 @@ def test_eli_uri_for_work_returns_none_without_fedlex_eli():
     assert provider._eli_uri_for_work("https://other.example/foo", "https://other/bar") is None
 
 
-# ─── Cantonal discovery helpers (T4.4) ─────────────────────────────────────
-# These helpers are not yet wired into start_run(); exercised here so the
-# query shape and IRI mapping are tested ahead of the live acceptance run.
+# ─── Cantonal discovery is removed, not dormant (#716) ─────────────────────
+# `jolux:CantonOfOrigin` never existed and Fedlex publishes no cantonal law
+# (measured — see the SCOPE note in the provider module). These tests pin the
+# removal so a canton spec fails loudly instead of silently running a query
+# that can only ever return zero bindings.
 
 
-def test_canton_iri_from_iso_3166_2_code():
+def test_canton_scope_spec_is_rejected() -> None:
+    """`scope_kind`/`canton` are gone from the spec, and `extra="forbid"` refuses them."""
+    from pydantic import ValidationError
+
+    from platform_control.schemas.source import AcquisitionSpecAdapter
+
+    with pytest.raises(ValidationError):
+        AcquisitionSpecAdapter.validate_python(
+            {
+                "provider": "fedlex_sparql",
+                "scope_kind": "canton",
+                "canton": "CH-ZH",
+            }
+        )
+
+
+def test_provider_exposes_no_canton_discovery_surface() -> None:
     provider = FedlexSparqlProvider()
-    assert provider._canton_iri("CH-ZH") == "https://fedlex.data.admin.ch/vocabulary/canton/ZH"
+    for removed in (
+        "_is_canton_scope",
+        "_canton_filter",
+        "_canton_iri",
+        "_build_canton_discovery_query",
+        "_discover_works_by_canton",
+        "_CANTON_WORK_DISCOVERY_QUERY",
+        "_CANTON_IRI_BASE",
+    ):
+        assert not hasattr(provider, removed)
 
 
-def test_canton_iri_accepts_bare_two_letter_code():
-    provider = FedlexSparqlProvider()
-    assert provider._canton_iri("VS") == "https://fedlex.data.admin.ch/vocabulary/canton/VS"
-
-
-def test_canton_iri_rejects_garbage():
-    provider = FedlexSparqlProvider()
-    import pytest
-
-    with pytest.raises(ValueError, match="Invalid ISO 3166-2:CH"):
-        provider._canton_iri("CH-XYZ")
-    with pytest.raises(ValueError, match="Invalid ISO 3166-2:CH"):
-        provider._canton_iri("")
-
-
-def test_build_canton_discovery_query_shape():
-    provider = FedlexSparqlProvider()
-    query = provider._build_canton_discovery_query("CH-ZH", limit=25)
-    assert "jolux:CantonOfOrigin" in query
-    assert "<https://fedlex.data.admin.ch/vocabulary/canton/ZH>" in query
-    assert "LIMIT 25" in query
-    assert "SELECT ?work" in query
-
-
-def test_build_canton_discovery_query_default_limit():
-    provider = FedlexSparqlProvider()
-    query = provider._build_canton_discovery_query("CH-VS")
-    assert "LIMIT 50" in query
-
-
-class CantonDiscoveryAsyncClient(FakeAsyncClient):
-    """Extends the federal fake with a cantonal-discovery response.
-
-    The `jolux:CantonOfOrigin` query resolves to the BV work URI so the
-    discovered work flows through the same member→expression→manifestation
-    pipeline the base fake already serves.
-    """
-
-    async def get(self, url: str, *, params=None, headers=None):
-        query = (params or {}).get("query", "")
-        if "SELECT ?work" in query and "jolux:CantonOfOrigin" in query:
-            request = httpx.Request("GET", url, params=params)
-            return httpx.Response(
-                200,
-                json={
-                    "results": {
-                        "bindings": [
-                            {
-                                "work": {
-                                    "type": "uri",
-                                    "value": "https://fedlex.data.admin.ch/eli/cc/1999/404",
-                                }
-                            }
-                        ]
-                    }
-                },
-                request=request,
-            )
-        return await super().get(url, params=params, headers=headers)
-
-
-@pytest.mark.asyncio
-async def test_canton_scope_discovers_and_processes_works(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(httpx, "AsyncClient", CantonDiscoveryAsyncClient)
-    provider = FedlexSparqlProvider()
-    source_version = SimpleNamespace(
-        acquisition_spec={
-            "scope_kind": "canton",
-            "canton": "CH-ZH",
-            "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
-            "preferred_languages": ["de"],
-            "max_expressions": 1,
-            "max_works": 10,
-        }
-    )
-
-    result = await provider.start_run(
-        SimpleNamespace(),
-        source_version,
-        SimpleNamespace(run_id="run_canton_zh"),
-    )
-
-    assert result.response_payload["scope_kind"] == "canton"
-    assert result.response_payload["canton"] == "CH-ZH"
-    assert result.response_payload["captured"] == 1
-    assert result.request_payload["work_uris"] == ["https://fedlex.data.admin.ch/eli/cc/1999/404"]
-    assert result.inline_resources[0].content_type == "text/html"
-    assert result.inline_failure_reason is None
-
-
-@pytest.mark.asyncio
-async def test_canton_scope_without_canton_code_fails_cleanly(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(httpx, "AsyncClient", CantonDiscoveryAsyncClient)
-    provider = FedlexSparqlProvider()
-    source_version = SimpleNamespace(
-        acquisition_spec={
-            "scope_kind": "canton",
-            "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
-        }
-    )
-
-    result = await provider.start_run(
-        SimpleNamespace(),
-        source_version,
-        SimpleNamespace(run_id="run_canton_missing"),
-    )
-
-    assert result.response_payload["captured"] == 0
-    assert result.response_payload["failed"] == 1
-    assert "requires acquisition_spec.canton" in result.response_payload["failures"][0]["error"]
-    assert "did not capture any resources" in (result.inline_failure_reason or "")
-
-
-def test_plan_canton_mode_needs_no_seed_urls() -> None:
+def test_plan_only_offers_the_federal_seed_mode() -> None:
     provider = FedlexSparqlProvider()
     plan = provider.plan(
         SimpleNamespace(),
-        SimpleNamespace(acquisition_spec={"scope_kind": "canton", "canton": "CH-BE"}),
+        SimpleNamespace(
+            acquisition_spec={"seed_urls": ["https://fedlex.data.admin.ch/eli/cc/1999/404"]}
+        ),
     )
-    assert plan.mode == "canton_discovery"
-    assert plan.seed_urls == []
-    assert any("canton=CH-BE" in note for note in plan.notes)
+    assert plan.mode == "work_to_expression"
+    assert plan.seed_urls == ["https://fedlex.data.admin.ch/eli/cc/1999/404"]

@@ -1,6 +1,18 @@
 # ADR-0037: Binary artifacts end-to-end and a layout-aware PDF normaliser
 
-Status: Proposed
+> **Amended by [ADR-0041](0041-geometric-pdf-marginalia.md) (2026-07-19).**
+> §1 (binary `ProviderResource`), §2 (PDF as a pipeline modality) and the choice of
+> **pdfplumber** all stand.
+> **The x-projection column detection in §3 is superseded**: measured on the real
+> AS 554.510 PDF, the body/Randtitel gutter is 5.6pt against a p90 intra-sentence word gap
+> of 6.5pt, so projecting words onto the x-axis cannot separate them and splices the
+> marginal heading into the sentence. It also only looked *left* of the body, while the
+> booklet layout puts recto Randtitel on the right. ADR-0041 replaces the signal with
+> line-start clustering and subtracts the band from the word stream.
+> **§4's synthetic fixture is the reason that defect shipped green** — the regression
+> fixture is now the real PDF.
+
+Status: Proposed (§3 signal and §4 gate superseded by ADR-0041)
 Date: 2026-07-15
 Deciders: Contracts / Platform / Document-intelligence
 Related: ADR-0033 (agentic legal reasoning — the corpus must be trustworthy),

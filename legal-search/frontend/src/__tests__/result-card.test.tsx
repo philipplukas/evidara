@@ -76,6 +76,30 @@ describe("ResultCard", () => {
     expect(onFocus).toHaveBeenCalledWith("law-1");
   });
 
+  /**
+   * #648 — the title was a `<button>` with no `href`, so a result could not be
+   * opened in a new tab, middle-clicked, or copied as a link. For a legal
+   * research tool a shareable, citable document link is a core affordance.
+   */
+  it("renders the title as a real link to the result's deep link", () => {
+    renderWithProviders(
+      <ResultCard result={mockResult} isSelected={false} onFocus={vi.fn()} isPinned={false} />,
+    );
+
+    const link = screen.getByRole("link", { name: "Art. 754 OR" });
+    expect(link).toHaveAttribute("href", expect.stringContaining("item=law-1"));
+  });
+
+  it("leaves modified clicks to the browser so new-tab still works", () => {
+    const onFocus = vi.fn();
+    renderWithProviders(
+      <ResultCard result={mockResult} isSelected={false} onFocus={onFocus} isPinned={false} />,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Art. 754 OR" }), { metaKey: true });
+    expect(onFocus).not.toHaveBeenCalled();
+  });
+
   it("fires onPivot on related count click", () => {
     const onPivot = vi.fn();
     renderWithProviders(

@@ -21,6 +21,7 @@ coordinates) and the `evidara-app-secrets` Secret created by
 
 | Setting | Value | Source |
 |---|---|---|
+| `PLATFORM_CONTROL_ENVIRONMENT` | `production` | configmap — **required**, no default (#683) |
 | `PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND` | `nats` | configmap |
 | `PLATFORM_CONTROL_NATS_SERVERS` | `nats://nats.evidara.svc:4222` | configmap |
 | `PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND` | `s3` | configmap |

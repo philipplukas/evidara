@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.10.0
+  version: 0.14.0
 paths:
   /health:
     get:
@@ -783,6 +783,20 @@ paths:
           - type: string
           - type: 'null'
           title: Source Id
+      - name: refused
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Filter on ADR-0030 two-key-lock refusals (#634). `true` returns only refused dispatches
+            — what an operator tried to onboard and why it was blocked; `false` excludes them so they
+            do not pollute failure triage.
+          title: Refused
+        description: Filter on ADR-0030 two-key-lock refusals (#634). `true` returns only refused dispatches
+          — what an operator tried to onboard and why it was blocked; `false` excludes them so they do
+          not pollute failure triage.
       - name: limit
         in: query
         required: false
@@ -2842,14 +2856,6 @@ paths:
           - type: string
           - type: 'null'
           title: X-Firecrawl-Signature
-      requestBody:
-        content:
-          application/json:
-            schema:
-              anyOf:
-              - $ref: '#/components/schemas/Settings'
-              - type: 'null'
-              title: Settings
       responses:
         '200':
           description: Successful Response
@@ -4938,25 +4944,6 @@ components:
           minimum: 1.0
           title: Max Expressions
           default: 1
-        scope_kind:
-          type: string
-          enum:
-          - seed
-          - canton
-          title: Scope Kind
-          default: seed
-        canton:
-          anyOf:
-          - type: string
-            pattern: ^(?:CH-)?[A-Za-z]{2}$
-          - type: 'null'
-          title: Canton
-        max_works:
-          type: integer
-          maximum: 500.0
-          minimum: 1.0
-          title: Max Works
-          default: 50
       additionalProperties: false
       type: object
       title: FedlexSparqlAcquisitionSpec
@@ -6157,6 +6144,12 @@ components:
           - type: string
           - type: 'null'
           title: Failure Reason
+        refused:
+          type: boolean
+          title: Refused
+          description: True when the ADR-0030 two-key lock blocked this dispatch (#634). Filter the collection
+            with `?refused=true` to audit refusals.
+          default: false
         created_at:
           type: string
           format: date-time
@@ -6539,6 +6532,13 @@ components:
           - type: string
           - type: 'null'
           title: Failure Reason
+        refused:
+          type: boolean
+          title: Refused
+          description: True when the ADR-0030 two-key lock blocked this dispatch. The run is a refusal
+            record — terminal FAILED, never dispatched — kept so an operator can ask what was attempted
+            and why it was refused (#634).
+          default: false
         created_at:
           type: string
           format: date-time
@@ -6699,222 +6699,6 @@ components:
       - created_at
       - updated_at
       title: ScheduleResponse
-    Settings:
-      properties:
-        app_name:
-          type: string
-          title: App Name
-          default: platform-control
-        environment:
-          type: string
-          title: Environment
-          default: development
-        database_url:
-          type: string
-          title: Database Url
-          default: sqlite+aiosqlite:///./platform_control.db
-        sql_echo:
-          type: boolean
-          title: Sql Echo
-          default: false
-        firecrawl_api_key:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Firecrawl Api Key
-        firecrawl_base_url:
-          type: string
-          title: Firecrawl Base Url
-          default: https://api.firecrawl.dev/v2
-        firecrawl_webhook_secret:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Firecrawl Webhook Secret
-        firecrawl_webhook_url:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Firecrawl Webhook Url
-        firecrawl_webhook_record_dir:
-          anyOf:
-          - type: string
-            format: path
-          - type: 'null'
-          title: Firecrawl Webhook Record Dir
-          description: Optional directory where each processed Firecrawl webhook payload is mirrored to
-            disk (one JSON file per payload). When set, enables offline replay of a real crawl via 'pc
-            ingest --from-fixture'.
-        gcp_project_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Gcp Project Id
-        artifact_store_backend:
-          type: string
-          enum:
-          - local
-          - gcs
-          - s3
-          title: Artifact Store Backend
-          default: local
-        raw_artifact_bucket:
-          type: string
-          title: Raw Artifact Bucket
-          default: evidara-raw-artifacts-dev
-        raw_artifact_prefix:
-          type: string
-          title: Raw Artifact Prefix
-          default: runs
-        s3_endpoint_url:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: S3 Endpoint Url
-        s3_region:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: S3 Region
-        s3_access_key_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: S3 Access Key Id
-        s3_secret_access_key:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: S3 Secret Access Key
-        raw_artifact_local_dir:
-          type: string
-          format: path
-          title: Raw Artifact Local Dir
-          default: .data/raw-artifacts
-        cassette_dir:
-          type: string
-          format: path
-          title: Cassette Dir
-          description: Directory holding cassettes used by CassetteProvider (shadow-mode + fixture-driven
-            runs).
-          default: .data/cassettes
-        event_publisher_backend:
-          type: string
-          enum:
-          - noop
-          - pubsub
-          - local_outbox
-          - nats
-          title: Event Publisher Backend
-          default: noop
-        raw_artifact_pubsub_topic:
-          type: string
-          title: Raw Artifact Pubsub Topic
-          default: raw-artifact-available
-        artifact_bundle_pubsub_topic:
-          type: string
-          title: Artifact Bundle Pubsub Topic
-          default: artifact-bundle-available
-        nats_servers:
-          type: string
-          title: Nats Servers
-          default: nats://localhost:4222
-        nats_raw_artifact_subject:
-          type: string
-          title: Nats Raw Artifact Subject
-          default: evidara.raw-artifact-available
-        nats_artifact_bundle_subject:
-          type: string
-          title: Nats Artifact Bundle Subject
-          default: evidara.artifact-bundle-available
-        run_dispatch_backend:
-          type: string
-          enum:
-          - inline
-          - worker
-          title: Run Dispatch Backend
-          default: inline
-        wizard_orchestrator_backend:
-          type: string
-          enum:
-          - in_memory
-          - temporal
-          title: Wizard Orchestrator Backend
-          default: in_memory
-        temporal_namespace:
-          type: string
-          title: Temporal Namespace
-          default: default
-        temporal_task_queue:
-          type: string
-          title: Temporal Task Queue
-          default: platform-control-wizard
-        temporal_target:
-          type: string
-          title: Temporal Target
-          default: localhost:7233
-        temporal_tls_ca_path:
-          anyOf:
-          - type: string
-            format: path
-          - type: 'null'
-          title: Temporal Tls Ca Path
-        temporal_tls_cert_path:
-          anyOf:
-          - type: string
-            format: path
-          - type: 'null'
-          title: Temporal Tls Cert Path
-        temporal_tls_key_path:
-          anyOf:
-          - type: string
-            format: path
-          - type: 'null'
-          title: Temporal Tls Key Path
-        temporal_tls_server_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Temporal Tls Server Name
-        rescore_runner_backend:
-          type: string
-          enum:
-          - document_intelligence
-          - in_memory
-          title: Rescore Runner Backend
-          description: Targeted-rescore runner used by the Temporal worker. Use 'in_memory' only for explicit
-            local/test fallback; production uses document_intelligence.
-          default: document_intelligence
-        legifrance_client_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Legifrance Client Id
-        legifrance_client_secret:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Legifrance Client Secret
-        api_key:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Api Key
-          description: Legacy full-access key for all protected routes when scoped keys are unset.
-        operator_api_key:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Operator Api Key
-          description: Admin / control-plane routes (sources, runs, reference data, schedules).
-        service_api_key:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Service Api Key
-          description: Pipeline ingest (DI events, Firecrawl webhook path).
-      type: object
-      title: Settings
     SourceBlueprintPreviewRequest:
       properties:
         overlay_id:
@@ -6984,6 +6768,15 @@ components:
           type: array
           title: Notes
           description: Human-readable explanation of any closed key (why the template is inert).
+        plan_notes:
+          items:
+            type: string
+          type: array
+          title: Plan Notes
+          description: The provider's own `plan()` notes for this spec (#634) — seed URLs it would hit,
+            config errors, and provider-specific caveats. Distinct from `notes`, which explains the two-key
+            lock; these describe the acquisition itself. Empty when the provider exposes no plan or plan
+            computation failed.
       type: object
       required:
       - overlay_id
@@ -7034,6 +6827,35 @@ components:
           type: array
           title: Notes
           description: Human-readable explanation of any closed key (why the template is inert).
+        default_enabled:
+          type: boolean
+          title: Default Enabled
+          description: The shipped source_blueprints.yaml default for the config key.
+        source:
+          type: string
+          title: Source
+          description: 'Provenance of the effective config key: ''override'' (an operator flipped it)
+            or ''default'' (running on the shipped value, never touched).'
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+          description: Evidence note the operator recorded with the override, if any.
+        updated_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated By
+          description: 'Operator identity that last flipped the override. Key-shaped, not person-shaped:
+            every human sharing an operator API key resolves to the same row.'
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+          description: When the override was last written.
       type: object
       required:
       - overlay_id
@@ -7042,6 +6864,8 @@ components:
       - enabled
       - live_ready
       - launchable
+      - default_enabled
+      - source
       title: SourceBlueprintTemplateResponse
     SourceListResponse:
       properties:

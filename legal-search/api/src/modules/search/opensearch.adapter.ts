@@ -14,6 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Client } from '@opensearch-project/opensearch';
 import { MetricsService } from '../../core/metrics/metrics.service';
 import { OPENSEARCH_CLIENT } from '../../core/opensearch/client';
+import { SEARCH_FACET_AGG_FIELDS } from '../../core/opensearch/facet-fields';
 import type {
   AggregationBucket,
   ContextAggregations,
@@ -89,6 +90,11 @@ export class SearchOpenSearchAdapter implements SearchRepository {
     if (options?.jurisdictions && options.jurisdictions.length > 0) {
       filters.push({ terms: { jurisdiction: options.jurisdictions } });
     }
+    // `jurisdiction_ids` and `authority_ids` are declared `facetKeyword` in
+    // the canonical mapping — `keyword` WITH a `.keyword` sub-field — so the
+    // sub-field is the correct, exact-match target. It also happens to be the
+    // form that resolves on the drifted live index, where these two were
+    // dynamic-mapped as `text` + `.keyword`.
     if (options?.jurisdictionIds && options.jurisdictionIds.length > 0) {
       filters.push({ terms: { 'jurisdiction_ids.keyword': options.jurisdictionIds } });
     }
@@ -155,10 +161,12 @@ export class SearchOpenSearchAdapter implements SearchRepository {
           },
         },
       },
+      // Aggregation targets come from `SEARCH_FACET_AGG_FIELDS`, which is
+      // pinned to the canonical mapping (#675). Do not inline field names here.
       aggs: {
-        jurisdiction: { terms: { field: 'jurisdiction.keyword', size: 20 } },
-        document_type: { terms: { field: 'document_type.keyword', size: 20 } },
-        language: { terms: { field: 'language.keyword', size: 10 } },
+        jurisdiction: { terms: { field: SEARCH_FACET_AGG_FIELDS.jurisdiction, size: 20 } },
+        document_type: { terms: { field: SEARCH_FACET_AGG_FIELDS.document_type, size: 20 } },
+        language: { terms: { field: SEARCH_FACET_AGG_FIELDS.language, size: 10 } },
       },
     };
 
@@ -236,9 +244,10 @@ export class SearchOpenSearchAdapter implements SearchRepository {
         body: {
           size: 0,
           aggs: {
-            jurisdictions: { terms: { field: 'jurisdiction.keyword', size: 20 } },
-            languages: { terms: { field: 'language.keyword', size: 10 } },
-            source_types: { terms: { field: 'document_type.keyword', size: 20 } },
+            // Same pinned targets as the search aggs (#675).
+            jurisdictions: { terms: { field: SEARCH_FACET_AGG_FIELDS.jurisdiction, size: 20 } },
+            languages: { terms: { field: SEARCH_FACET_AGG_FIELDS.language, size: 10 } },
+            source_types: { terms: { field: SEARCH_FACET_AGG_FIELDS.document_type, size: 20 } },
           },
         },
       });

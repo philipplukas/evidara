@@ -11,12 +11,16 @@ uses testcontainers.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import httpx
 import pytest
 
 from platform_control.database import get_session
 from platform_control.main import create_app
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.models.run import Run
+from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.routers.runs import get_firecrawl_provider
 from platform_control.services.firecrawl_provider import ProviderStartResult
@@ -107,6 +111,65 @@ async def test_health_returns_200(client) -> None:
 async def test_ready_returns_200(client) -> None:
     response = await client.get("/ready")
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_stats_recent_runs_carry_started_at(client, session_maker) -> None:
+    """`/stats` must expose `started_at`, or the dashboard cannot state a duration.
+
+    Without it the only elapsed time the dashboard could compute is
+    `created_at -> completed_at` — queue wait plus execution — which it labelled
+    "Duration". Three Fedlex runs read "2m 20s" against a real execution of
+    ~0.3s, and the run detail page (which uses `started_at`) read "273ms" for
+    the same run under the same column name (#674).
+    """
+    created = datetime(2026, 7, 18, 17, 43, 4, tzinfo=UTC)
+    started = datetime(2026, 7, 18, 17, 45, 24, 412000, tzinfo=UTC)
+    completed = datetime(2026, 7, 18, 17, 45, 24, 685000, tzinfo=UTC)
+
+    async with session_maker() as session:
+        session.add(Jurisdiction(jurisdiction_id="jur_stats", name="Switzerland", slug="ch-stats"))
+        session.add(
+            Authority(
+                authority_id="auth_stats",
+                jurisdiction_id="jur_stats",
+                name="Fedlex",
+                slug="fedlex-stats",
+            )
+        )
+        session.add_all(
+            [
+                Source(
+                    source_id="src_stats",
+                    name="Stats source",
+                    jurisdiction_id="jur_stats",
+                    authority_id="auth_stats",
+                ),
+                SourceVersion(
+                    source_version_id="sv_stats",
+                    source_id="src_stats",
+                    version_label="v1",
+                    acquisition_spec={"provider": "firecrawl", "mode": "crawl"},
+                ),
+                Run(
+                    run_id="run_stats",
+                    source_id="src_stats",
+                    source_version_id="sv_stats",
+                    created_at=created,
+                    started_at=started,
+                    completed_at=completed,
+                ),
+            ]
+        )
+        await session.commit()
+
+    response = await client.get("/stats")
+    assert response.status_code == 200
+
+    recent = next(r for r in response.json()["recent_runs"] if r["run_id"] == "run_stats")
+    assert recent["started_at"] is not None
+    # The queue wait is real, and still available — it is just not the duration.
+    assert recent["created_at"] != recent["started_at"]
 
 
 # ── Sources CRUD ─────────────────────────────────
@@ -314,6 +377,44 @@ async def test_list_source_blueprint_templates_returns_data(client) -> None:
     assert any(
         row["provider_template_id"] == "deterministic_http_bundesrecht" for row in body["data"]
     )
+
+
+@pytest.mark.asyncio
+async def test_blueprint_template_inventory_reports_config_key_provenance(client) -> None:
+    """The inventory must distinguish "never touched" from "an operator flipped it" (#668).
+
+    Without `source`, the admin inventory cannot tell a template running on the
+    shipped default from one an operator deliberately turned on (or off) — which
+    is the whole point of an evidence-gated coverage surface.
+    """
+    before = await client.get("/v1/sources/blueprint-templates")
+    assert before.status_code == 200
+    row = next(
+        r
+        for r in before.json()["data"]
+        if (r["overlay_id"], r["provider_template_id"]) == ("de", "bundesland_http_bayern")
+    )
+    assert row["source"] == "default"
+    assert row["note"] is None
+    assert row["updated_by"] is None
+
+    flip = await client.put(
+        "/v1/sources/blueprint-templates/de/bundesland_http_bayern/enablement",
+        json={"enabled": True, "note": "acceptance run 2026-07-19"},
+    )
+    assert flip.status_code == 200
+
+    after = await client.get("/v1/sources/blueprint-templates")
+    flipped = next(
+        r
+        for r in after.json()["data"]
+        if (r["overlay_id"], r["provider_template_id"]) == ("de", "bundesland_http_bayern")
+    )
+    assert flipped["source"] == "override"
+    assert flipped["enabled"] is True
+    assert flipped["default_enabled"] is False
+    assert flipped["note"] == "acceptance run 2026-07-19"
+    assert flipped["updated_at"] is not None
 
 
 @pytest.mark.asyncio

@@ -32,8 +32,13 @@ test.describe("Visual regressions", () => {
     // Anti-duplicate assertion: one scope-bar and one result title.
     // Pixel-diff tolerance (maxDiffPixelRatio) can hide structural regressions
     // like double-mounted components; this DOM-level check can't.
+    //
+    // The scope label is asserted in GERMAN on purpose. It used to read
+    // `Results for "…"` — an untranslated English string in an otherwise fully
+    // German UI (#648) — and this assertion pinned that bug as correct. It is
+    // now derived through `next-intl` like its siblings.
     await expect(page.getByText("Ausgangssuche", { exact: true })).toHaveCount(1);
-    await expect(page.getByText(/Results for "Art\. 754/)).toHaveCount(1);
+    await expect(page.getByText(/Ergebnisse für „Art\. 754/)).toHaveCount(1);
 
     await expect(page).toHaveScreenshot("workspace-desktop.png", {
       fullPage: true,
@@ -48,7 +53,7 @@ test.describe("Visual regressions", () => {
     await expect(page.locator("article").first()).toBeVisible();
 
     await expect(page.getByText("Ausgangssuche", { exact: true })).toHaveCount(1);
-    await expect(page.getByText(/Results for "Art\. 754/)).toHaveCount(1);
+    await expect(page.getByText(/Ergebnisse für „Art\. 754/)).toHaveCount(1);
 
     await expect(page).toHaveScreenshot("workspace-mobile.png", {
       fullPage: true,

@@ -98,6 +98,14 @@ class RunResponse(BaseModel):
     artifacts_count: int
     captured_resources_count: int
     failure_reason: str | None
+    refused: bool = Field(
+        default=False,
+        description=(
+            "True when the ADR-0030 two-key lock blocked this dispatch. The run is a "
+            "refusal record — terminal FAILED, never dispatched — kept so an operator can "
+            "ask what was attempted and why it was refused (#634)."
+        ),
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -115,6 +123,13 @@ class RunListItemResponse(BaseModel):
     artifacts_count: int
     captured_resources_count: int
     failure_reason: str | None
+    refused: bool = Field(
+        default=False,
+        description=(
+            "True when the ADR-0030 two-key lock blocked this dispatch (#634). "
+            "Filter the collection with `?refused=true` to audit refusals."
+        ),
+    )
     created_at: datetime
     updated_at: datetime
     source_name: str

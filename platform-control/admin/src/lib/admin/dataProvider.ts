@@ -16,6 +16,7 @@ import {
   type UpdateManyResult,
   type UpdateResult,
 } from "react-admin";
+import { classifyTemplate } from "../../domain/blueprintLock";
 import { ResourceName } from "../../domain/resourceNames";
 
 type ListResponse<T> = {
@@ -238,10 +239,30 @@ export type SourceBlueprintPreview = SourceBlueprintPreviewInput & {
   acquisition_spec: AcquisitionSpec;
 } & BlueprintTwoKeyLock;
 
+/**
+ * One row of the operator's coverage inventory (#668).
+ *
+ * `provider` is a plain `string`, not a union: eleven providers exist and a
+ * four-member union was how the contract drifted in the first place (#618).
+ * Narrowing it here would make `gemeinde_http` — the municipal path the whole
+ * ADR-0033 dog axis runs on — a type error in the panel that lists it.
+ *
+ * The provenance fields say where the config key's current value came from:
+ * `source: "default"` means nobody has ever touched it (the shipped
+ * `source_blueprints.yaml` value is in force), `"override"` means an operator
+ * deliberately flipped it and `note`/`updated_by`/`updated_at` carry the audit
+ * trail. `updated_by` is **key-shaped, not person-shaped** — every human
+ * sharing an operator API key resolves to the same identity.
+ */
 export type SourceBlueprintTemplate = {
   overlay_id: string;
   provider_template_id: string;
-  provider: "firecrawl" | "deterministic_http" | "ris_ogd" | "fedlex_sparql";
+  provider: string;
+  default_enabled: boolean;
+  source: "override" | "default";
+  note: string | null;
+  updated_by: string | null;
+  updated_at: string | null;
 } & BlueprintTwoKeyLock;
 
 type CapturedResource = {
@@ -633,13 +654,26 @@ const applyClientSort = <T extends Record<string, unknown>>(
  * come through here: windowing a page re-derives `total` from the page length
  * and silently caps the list at the server default (#616).
  */
+/**
+ * Window an in-memory array the way `getList` promises to.
+ *
+ * This deliberately does **not** reuse `toLimitOffset`. That helper clamps to
+ * `MAX_SERVER_PAGE_SIZE` because the API clamps `limit` the same way — a
+ * server-request concern that has no business capping a slice of an array the
+ * browser already holds in full. Applying it here meant a caller asking for
+ * "all 2,169 jurisdictions" got 500 and no way to tell (#666): the picker fix is
+ * not just "raise `perPage`", because any `perPage` above 500 was silently
+ * ignored. `total` stays the true array length either way.
+ */
 const applyClientListWindow = <T extends Record<string, unknown>>(
   records: T[],
   params: GetListParams,
 ): { data: T[]; total: number } => {
   const sorted = applyClientSort(records, params);
-  const { limit, offset } = toLimitOffset(params);
-  return { data: sorted.slice(offset, offset + limit), total: sorted.length };
+  const perPage = Math.max(params.pagination?.perPage ?? 25, 1);
+  const page = Math.max(params.pagination?.page ?? 1, 1);
+  const offset = (page - 1) * perPage;
+  return { data: sorted.slice(offset, offset + perPage), total: sorted.length };
 };
 
 /**
@@ -1129,6 +1163,33 @@ export const controlPlaneDataProvider: DataProvider = {
       );
       const records = response.data.map((item) => toRecord(item, "source_id"));
       return toServerPagedResult(records, response.total, params);
+    }
+
+    if (resource === ResourceName.BlueprintTemplates) {
+      // `/v1/sources/blueprint-templates` returns the whole collection (31 rows
+      // today) in one unbounded array and takes no query parameters, so filter
+      // and page client-side. `applyClientListWindow` is the sanctioned helper
+      // for genuinely-unbounded endpoints; it derives `total` from the full
+      // list, not from a server page, which is exactly right here.
+      const templates = await controlPlaneActions.listSourceBlueprintTemplates();
+      const overlay = params.filter?.overlay_id;
+      const lockClass = params.filter?.lock_class;
+      const filtered = templates.filter((template) => {
+        if (typeof overlay === "string" && !isMissingFilterValue(overlay)) {
+          if (template.overlay_id !== overlay) return false;
+        }
+        if (typeof lockClass === "string" && !isMissingFilterValue(lockClass)) {
+          if (classifyTemplate(template).id !== lockClass) return false;
+        }
+        return true;
+      });
+      // Composite id: the API keys a template on (overlay, template), and
+      // react-admin needs a single scalar identifier per row.
+      const records = filtered.map((template) => ({
+        ...template,
+        id: `${template.overlay_id}/${template.provider_template_id}`,
+      }));
+      return applyClientListWindow(records, params);
     }
 
     if (resource === "source-versions") {

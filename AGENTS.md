@@ -5,6 +5,7 @@
 This is the Evidara monorepo — a document intelligence platform for legal research. It contains:
 
 - **legal-search** — Next.js frontend + NestJS BFF for search and document detail
+- **marketing** — public waitlist / positioning page (Next.js static export; the only public surface — see ADR-0039)
 - **platform-control** — Source lifecycle, runs, approvals, reference data (Cloud Run)
 - **document-intelligence** — Raw-to-canonical processing pipelines (containerized NATS JetStream consumer; Spark/Databricks is opt-in only — see ADR-0029)
 - **contracts** — OpenAPI specs, JSON Schemas, event schemas (build-time only)
@@ -102,8 +103,8 @@ run gates inside each package:
 ### JavaScript dependency resolution (read before touching node_modules)
 
 The repo is **not** an npm workspace. Each JS surface (`legal-search/frontend`,
-`legal-search/api`, `platform-control/admin`) owns its `node_modules`, and CI
-installs them per-surface with `npm ci`.
+`legal-search/api`, `platform-control/admin`, `marketing`) owns its
+`node_modules`, and CI installs them per-surface with `npm ci`.
 
 - **Node is pinned in `.nvmrc` (22)** and enforced via `engines`. Node >= 24 ships an
   experimental built-in `localStorage` that shadows jsdom's under Vitest, silently
@@ -135,7 +136,38 @@ pre-commit and CI.
 - **Repository interface pattern** — OpenSearch logic only in adapters, never in controllers or services.
 - **Spec-first** — `contracts/api/legal-search.openapi.yaml` is canonical. Swagger decorators are additive for dev UI only.
 - **Global pipes/filters** — ValidationPipe (whitelist, transform), AllExceptionsFilter, CorrelationIdMiddleware.
-- Test layers: unit (fast, mocked), integration (Testcontainers OpenSearch), smoke (HTTP-level).
+- Test layers: unit (fast, mocked), integration (Testcontainers OpenSearch), smoke (HTTP-level),
+  compiled-artifact. The integration layer (`src/**/*.integration.spec.ts`, run by
+  `npm run test:integration`, which `npm run check` invokes) needs a running **Docker daemon**. It is
+  the only layer that meets a real index mapping — see
+  [docs/testing/testing-levels.md](docs/testing/testing-levels.md) Level 4 and #672/#673/#675 for why
+  mocking it away is not an option.
+- **Controllers must import their DTOs as VALUES, never with `import type`.** `import type` erases
+  the class, so `emitDecoratorMetadata` writes `Function` into `design:paramtypes`, `ValidationPipe`
+  has nothing to instantiate, and — with `whitelist: true` — it hands the handler an **empty
+  object**. Every query parameter is silently dropped in the built app, with no error. That is #728:
+  `/v1/norm-hierarchy` shipped to production with ADR-0033's `in_force_at` completely inert.
+  **No Vitest layer can see this** — Vitest emits no decorator metadata at all, so the DTO works
+  fine in tests and only the compiled app drops it. Two things hold the line, and neither asks
+  anyone to remember: `style/useImportType` is **off for `src/**/*.controller.ts`** in `biome.json`
+  (its autofix rewrote the fix back in on every `npm run format`), and `npm run test:compiled`
+  builds and asserts against `dist/` that every `@Query()`/`@Body()`/`@Param()` DTO binding resolves
+  to a real class. See [docs/testing/testing-levels.md](docs/testing/testing-levels.md) Level 5.
+- **The documents-index mapping has one source of truth**:
+  `legal-search/api/src/core/opensearch/documents-index.mapping.ts`. Every producer derives from it —
+  `documents-bootstrap.ts` (runtime + seed + cutover) directly, and non-TypeScript producers via the
+  generated `scripts/opensearch/documents-index.mapping.json` (`npm run mapping:generate`, drift-gated
+  by `documents-index.mapping-json.spec.ts`). Never hand-maintain a parallel copy: a drifted copy in
+  `scripts/validate-tar89-metadata-local.sh` is what caused #675, and a mapping-less `PUT` in the GCP
+  runtime tfvars was the same defect again (#713). Because OpenSearch returns empty
+  buckets rather than an error for a missing field, both presented as query bugs for months.
+  Index creation is first-writer-wins, so a second creation path does not merely disagree with the
+  canonical one — it silently *wins* over it. Producers go through `createDocumentsIndex()` in
+  `documents-bootstrap.ts` and are enumerated in `PRODUCERS` in `mapping-drift.integration.spec.ts`;
+  a producer that cannot be added to that registry is by definition drifting.
+  When a live index disagrees with the canonical mapping, **fix the index** (reindex/cutover) — never
+  weaken the query to match the drift. `npm run mapping:check-drift` reports the difference against a
+  live cluster; `mapping-drift.integration.spec.ts` guards the creation path in CI.
 
 ### platform-control stack
 
@@ -171,7 +203,8 @@ The pre-commit hooks and CI workflows must run the same checks. If you add a che
 | Entity shapes | `contracts/schemas/*.json` |
 | Event payloads | `contracts/events/*.json` |
 | Infra resources | `infra/terraform/` |
-| Design tokens | `styles/tokens/tokens.css` (shared; see ADR-0027 — "two products, shared brand"). Workspace-local extensions: `legal-search/frontend/src/app/globals.css`; admin-local: `platform-control/admin/src/app/globals.css`. |
+| Design tokens | `styles/tokens/tokens.css` (shared; see ADR-0027 — "two products, shared brand"). Workspace-local extensions: `legal-search/frontend/src/app/globals.css`; admin-local: `platform-control/admin/src/app/globals.css`; marketing-local: `marketing/src/app/globals.css`. |
+| Public marketing copy | `marketing/src/lib/content.ts` — every claim carries an `evidence` code path; `content.test.ts` fails the build on a claim without one (ADR-0039) |
 | Tests | Test files adjacent to code |
 | Narrative docs | `docs/` |
 
@@ -209,6 +242,35 @@ Before finalizing, verify:
 - [ ] Contracts are updated if needed
 - [ ] Docs are updated if needed
 - [ ] Architecture is updated if needed
+
+## Working guidance for AI
+
+### Verify against code, not against issue text
+
+**Establish the baseline from the repository before you change anything.** Issue bodies, ADRs,
+PR descriptions and code comments record what was true when written. This repo moves fast enough
+that they are routinely stale — and stale in both directions.
+
+Before acting on a stated problem:
+
+- Read the code on current `origin/main` and cite `file:line` for what you find.
+- Check whether a merged PR already resolved it (`git log --grep`, the issue's cross-references).
+- Treat an **open** PR as resolving nothing — a fix in flight means the issue is still live.
+- Check in-flight PRs for anything you are about to claim exclusively (an ADR number, a
+  `contracts/manifest.yaml` version, a new file path). Reading `main` alone will not show them.
+- If the stated diagnosis is wrong, say so and fix the real defect. Do not implement a fix aimed
+  at a cause that does not exist.
+
+If the issue turns out to be resolved, or wrong, **that is a valid and useful outcome** — report it
+with evidence instead of manufacturing work to match the ticket.
+
+The same applies to a green test suite: see the testing-trust rules on when a passing run is and
+is not evidence.
+
+### Report what you found, not what was expected
+
+State honestly when a result contradicts the brief you were given, including a brief from another
+agent or from the repo owner. A correction backed by `file:line` is worth more than agreement.
 
 ## Review guidance for AI
 

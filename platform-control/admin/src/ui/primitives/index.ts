@@ -13,7 +13,13 @@ export {
 } from "./Accordion";
 export { Button } from "./Button";
 export { Checkbox } from "./Checkbox";
+export { Combobox, type ComboboxChoice } from "./Combobox";
 export { cn } from "./cn";
+export {
+  describeComboboxStatus,
+  filterComboboxChoices,
+  normalizeSearchText,
+} from "./comboboxFilter";
 export {
   DataTable,
   type DataTableColumn,

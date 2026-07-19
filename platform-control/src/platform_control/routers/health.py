@@ -83,6 +83,7 @@ async def get_stats() -> dict:
                 Run.status,
                 Run.artifacts_count,
                 Run.created_at,
+                Run.started_at,
                 Run.completed_at,
             )
             .order_by(Run.created_at.desc())
@@ -94,6 +95,11 @@ async def get_stats() -> dict:
                 "status": r.status,
                 "artifacts_count": r.artifacts_count,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
+                # `started_at` is what makes a *duration* statable. Without it the
+                # dashboard could only subtract `created_at` from `completed_at`,
+                # which is queue wait + execution — and it labelled that "Duration",
+                # disagreeing with the run detail page about the same field (#674).
+                "started_at": r.started_at.isoformat() if r.started_at else None,
                 "completed_at": r.completed_at.isoformat() if r.completed_at else None,
             }
             for r in recent_rows

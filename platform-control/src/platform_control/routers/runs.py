@@ -66,6 +66,16 @@ async def list_runs(
     mode: RunMode | None = None,
     status: RunStatus | None = None,
     source_id: str | None = None,
+    refused: Annotated[
+        bool | None,
+        Query(
+            description=(
+                "Filter on ADR-0030 two-key-lock refusals (#634). `true` returns only "
+                "refused dispatches — what an operator tried to onboard and why it was "
+                "blocked; `false` excludes them so they do not pollute failure triage."
+            )
+        ),
+    ] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> RunListResponse:
@@ -76,6 +86,7 @@ async def list_runs(
         mode=mode,
         status=status,
         source_id=source_id,
+        refused=refused,
         limit=clamped_limit,
         offset=clamped_offset,
     )

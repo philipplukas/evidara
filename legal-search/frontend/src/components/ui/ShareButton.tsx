@@ -16,6 +16,12 @@ interface ShareButtonProps {
   label?: string;
 }
 
+/** Resolves `url` (which may be relative, e.g. a result deep link) to an absolute URL. */
+function resolveShareTarget(url?: string): string {
+  if (!url) return window.location.href;
+  return new URL(url, window.location.href).toString();
+}
+
 /**
  * Copies the current page URL (or a custom URL) to the clipboard.
  * Shows a Link icon that transitions to a Check icon for 2 seconds
@@ -35,7 +41,7 @@ export function ShareButton({
   const handleCopy = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      const target = url ?? window.location.href;
+      const target = resolveShareTarget(url);
       void navigator.clipboard.writeText(target);
       track(AnalyticsEvent.SHARE_LINK_COPIED, { url: target, context: "share_button" });
 

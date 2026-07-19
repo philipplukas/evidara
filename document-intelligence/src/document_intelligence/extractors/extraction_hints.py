@@ -28,12 +28,15 @@ All values are optional. Unknown keys are ignored (forward-compatible).
 
 ``in_force_from_hint`` (string, ISO 8601 date)
     First day the norm is in force, as established at acquisition time (e.g.
-    the ``jolux:dateApplicability`` of the Fedlex consolidation actually
-    selected). Applied to ``document.metadata["in_force_from"]``.
+    RIS ``Inkrafttretensdatum``, or the ``jolux:dateApplicability`` of the
+    Fedlex consolidation actually selected). Applied to
+    ``document.metadata["in_force_from"]``.
 
 ``in_force_until_hint`` (string, ISO 8601 date)
-    Last day the norm is in force; absent for an open-ended (current)
-    consolidation. Applied to ``document.metadata["in_force_until"]``.
+    Last day the norm is in force; absent while the norm is still in force
+    (RIS omits ``Ausserkrafttretensdatum``; Fedlex leaves the current
+    consolidation open-ended). Applied to
+    ``document.metadata["in_force_until"]``.
 
     Both in-force hints are *omitted*, never defaulted, when acquisition could
     not establish the window — downstream in-force logic is four-valued and

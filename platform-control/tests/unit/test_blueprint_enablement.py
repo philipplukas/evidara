@@ -14,7 +14,11 @@ import pytest
 from platform_control.domain import RunMode
 from platform_control.errors import NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
-from platform_control.schemas.source import CreateSourceRequest, CreateSourceVersionRequest
+from platform_control.schemas.source import (
+    CreateSourceRequest,
+    CreateSourceVersionRequest,
+    SourceBlueprintPreviewRequest,
+)
 from platform_control.services.blueprint_enablement import BlueprintEnablementService
 from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.run_service import RunService
@@ -166,3 +170,44 @@ def _settings():
     from platform_control.config import get_settings
 
     return get_settings()
+
+
+@pytest.mark.asyncio
+async def test_blueprint_preview_surfaces_the_providers_own_plan_notes(session) -> None:
+    """The system knew the answer and did not say it (#634, item 3).
+
+    Every provider's `plan()` already computes the caveats an operator needs
+    before investing in a source, but the only caller in the repo was the `plan`
+    CLI — so `blueprint-preview` returned a spec that looked correct while the
+    provider had already written down why it was not. These notes are distinct
+    from the lock `notes`: the lock explains which key is shut, `plan_notes`
+    describe the acquisition itself.
+    """
+    service = SourceService(session)
+    spec = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="ch", provider_template_id="gemeinde_http_zh_stadt_hundevorschriften"
+        )
+    )
+
+    plan_notes = service.describe_blueprint_plan_notes(spec)
+
+    # The gemeinde provider resolves the commune and names the open defect that
+    # keeps its code key shut — the exact warning #634 found stranded.
+    assert any("bfs_number=261" in note for note in plan_notes)
+    assert any("live_ready=false" in note for note in plan_notes)
+
+
+@pytest.mark.asyncio
+async def test_plan_notes_degrade_to_empty_rather_than_failing_the_preview(session) -> None:
+    # A preview is a read-only pre-flight. If a provider's plan() raises, the
+    # operator must still get the lock verdict, not a 500.
+    service = SourceService(session)
+    spec = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id=LIVE_TEMPLATE[0], provider_template_id=LIVE_TEMPLATE[1]
+        )
+    )
+    spec.provider = "no_such_provider"
+
+    assert service.describe_blueprint_plan_notes(spec) == []

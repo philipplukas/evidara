@@ -28,7 +28,11 @@ import { act, renderHook } from "@testing-library/react";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
 // Import the actual provider to test through React hooks
-import { SearchConstraintsProvider, useSearchConstraints } from "@/lib/search-constraints-store";
+import {
+  countActiveSearchConstraints,
+  SearchConstraintsProvider,
+  useSearchConstraints,
+} from "@/lib/search-constraints-store";
 import type { SearchRefinement } from "@/lib/types";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -250,5 +254,53 @@ describe("SearchConstraintsProvider", () => {
     expect(result.current.state.context.sourceType).toBeNull();
     expect(result.current.state.context.officialOnly).toBe(false);
     expect(result.current.state.refinements).toEqual([]);
+  });
+});
+
+/**
+ * WHY: the mobile filter badge renders this count. Counting the seeded
+ * `CH` / `de` defaults made it read "2" on a cold load — beside a desktop
+ * panel that said "Keine Filter verfügbar" for the same state (#674). The
+ * badge must count user choices, not the scope the app arrived with.
+ */
+describe("countActiveSearchConstraints", () => {
+  it("counts nothing in the default state", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    expect(countActiveSearchConstraints(result.current.state)).toBe(0);
+  });
+
+  it("counts each dimension the user moves away from the default", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({ type: "SET_OFFICIAL_ONLY", value: true });
+    });
+    expect(countActiveSearchConstraints(result.current.state)).toBe(1);
+
+    act(() => {
+      result.current.dispatch({ type: "TOGGLE_JURISDICTION", jurisdiction: "AT" });
+    });
+    expect(countActiveSearchConstraints(result.current.state)).toBe(2);
+
+    act(() => {
+      result.current.dispatch({
+        type: "SET_REFINEMENT",
+        field: "legal_area",
+        refinement: { field: "legal_area", type: "terms", values: ["civil"] },
+      });
+    });
+    expect(countActiveSearchConstraints(result.current.state)).toBe(3);
+  });
+
+  it("returns to zero after RESET_ALL", () => {
+    const { result } = renderHook(() => useSearchConstraints(), { wrapper });
+
+    act(() => {
+      result.current.dispatch({ type: "SET_OFFICIAL_ONLY", value: true });
+      result.current.dispatch({ type: "RESET_ALL" });
+    });
+
+    expect(countActiveSearchConstraints(result.current.state)).toBe(0);
   });
 });

@@ -1,0 +1,28 @@
+# Mirrors legal-search/frontend/.gitignore — this surface owns its own
+# node_modules and build output (the repo is not an npm workspace, #588).
+
+# dependencies
+/node_modules
+
+# next.js — `/out` is the static export, i.e. the deploy artifact (ADR-0039).
+# It is a build product and must never be committed.
+/.next/
+/out/
+
+# testing
+/coverage
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+
+# env files. `NEXT_PUBLIC_WAITLIST_ENDPOINT` is read at BUILD time and is not
+# a secret, but keep local env files out of git regardless.
+.env*
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

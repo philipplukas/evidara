@@ -17,9 +17,14 @@
 
 import { ChevronDown } from "lucide-react";
 import { useDataProvider, useGetList, useNotify, useRedirect, useRefresh } from "ra-core";
-import { Fragment, type ReactNode, useId, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { ResourceName } from "../../domain/resourceNames";
-import type { RunRecord, SourceRecord, SourceVersionRecord } from "../../lib/admin/dataProvider";
+import type {
+  RunReadiness,
+  RunRecord,
+  SourceRecord,
+  SourceVersionRecord,
+} from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
 import {
@@ -37,17 +42,25 @@ import { SourceVersionDiffPanel } from "./SourceVersionDiffPanel";
 import {
   describeSourceVersionStatus,
   emptyFormState,
+  explainUnavailableVersionAction,
   OVERLAY_CHOICES,
   PROVIDER_CHOICES,
   PROVIDER_TEMPLATE_CHOICES,
   type ProviderType,
   SOURCE_VERSION_LIST_PARAMS,
+  type SourceVersionAction,
   type SourceVersionFormState,
   summarizeAcquisitionSpec,
   summarizeSourceVersionLifecycle,
   toAcquisitionSpec,
   toFormState,
 } from "./sourceVersionForm";
+import {
+  deriveVersionLaunchGuards,
+  describeLaunchBlockRollup,
+  type LaunchGuard,
+  type VersionLaunchGuards,
+} from "./sourceVersionLaunch";
 
 const INPUT_CLASS =
   "w-full rounded-lg border border-[var(--border)] bg-[var(--surface-input)] px-3 py-2.5 text-sm text-[var(--foreground)] " +
@@ -435,6 +448,135 @@ const CONFIRM_COPY: Record<
   },
 };
 
+/**
+ * A lifecycle action on one version, which states *why* it is unavailable.
+ *
+ * A greyed button is not an explanation (#674). When the action is blocked by
+ * the version's status, the reason becomes both a native tooltip (`title`) and
+ * an accessible description, so the rule — "approval is terminal", "production
+ * runs require an approved version" — is readable rather than inferred.
+ *
+ * `busy` (an in-flight request on this row) also disables the button, but is
+ * transient and self-evident, so it carries no explanation.
+ *
+ * For the two launch actions a `guard` from `/v1/runs/readiness` supersedes the
+ * status-only rule (#667): status alone cannot see an inert blueprint template,
+ * and `deriveVersionLaunchGuards` already folds the status reason in, so the
+ * guard is strictly the better-informed answer. It also carries the two
+ * "I don't know" states — `checking` (disabled) and `unknown` (enabled, but the
+ * reason says the check did not complete) — which a status rule cannot express.
+ */
+function VersionActionButton({
+  action,
+  status,
+  busy,
+  versionId,
+  variant = "secondary",
+  className,
+  onClick,
+  children,
+  guard = null,
+}: {
+  action: SourceVersionAction;
+  status: SourceVersionRecord["status"];
+  busy: boolean;
+  versionId: string;
+  variant?: "primary" | "secondary" | "ghost";
+  className?: string;
+  onClick: () => void;
+  children: ReactNode;
+  guard?: LaunchGuard | null;
+}) {
+  const reason = guard ? guard.reason : explainUnavailableVersionAction(action, status);
+  const blocked = guard ? !guard.allowed : reason !== null;
+  const describedById = reason ? `version-action-${versionId}-${action}` : undefined;
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant={variant}
+        className={className}
+        onClick={onClick}
+        disabled={blocked || busy}
+        title={reason ?? undefined}
+        aria-describedby={describedById}
+      >
+        {children}
+      </Button>
+      {reason ? (
+        <span id={describedById} className="sr-only">
+          {reason}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+type ReadinessEntry = { readiness: RunReadiness | null; error: string | null };
+
+/**
+ * Probe `/v1/runs/readiness` once per version so the launch buttons on this page
+ * are gated by the same pre-flight `POST /v1/runs` enforces (#667).
+ *
+ * `mode: "production"` is the strictest probe and its non-mode checks — the
+ * ADR-0030 two-key lock in particular — apply to preview runs identically;
+ * `deriveVersionLaunchGuards` separates the one mode-dependent check back out.
+ * A version list is per-source and small, so one request each is cheaper than
+ * adding a bulk endpoint and keeps the authoritative answer authoritative.
+ */
+function useVersionLaunchReadiness(
+  sourceId: string,
+  versions: SourceVersionRecord[],
+): Record<string, ReadinessEntry> {
+  const [entries, setEntries] = useState<Record<string, ReadinessEntry>>({});
+  // Re-probe only when the actual set of version ids changes, not on every
+  // re-render of the (new-identity-each-time) array from `useGetList`.
+  const versionKey = versions.map((version) => version.source_version_id).join(",");
+
+  useEffect(() => {
+    if (!sourceId || versionKey.length === 0) {
+      setEntries({});
+      return;
+    }
+    let active = true;
+    // Clear first so rows report "checking" rather than reusing a stale verdict
+    // from the previously selected source.
+    setEntries({});
+
+    const ids = versionKey.split(",");
+    void Promise.all(
+      ids.map(async (sourceVersionId): Promise<[string, ReadinessEntry]> => {
+        try {
+          const readiness = await controlPlaneActions.getRunReadiness({
+            source_id: sourceId,
+            source_version_id: sourceVersionId,
+            mode: "production",
+          });
+          return [sourceVersionId, { readiness, error: null }];
+        } catch (error) {
+          return [
+            sourceVersionId,
+            {
+              readiness: null,
+              error: error instanceof Error ? error.message : "readiness check failed",
+            },
+          ];
+        }
+      }),
+    ).then((results) => {
+      if (!active) return;
+      setEntries(Object.fromEntries(results));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [sourceId, versionKey]);
+
+  return entries;
+}
+
 export function SourceVersionsSection({ source }: { source: SourceRecord }) {
   const dataProvider = useDataProvider();
   const notify = useNotify();
@@ -456,14 +598,42 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
   });
 
   const lifecycle = summarizeSourceVersionLifecycle(versions.data ?? []);
+
+  const readinessEntries = useVersionLaunchReadiness(source.source_id, versions.data ?? []);
+
+  const guardsByVersion = useMemo(() => {
+    const map: Record<string, VersionLaunchGuards> = {};
+    for (const version of versions.data ?? []) {
+      const entry = readinessEntries[version.source_version_id];
+      map[version.source_version_id] = deriveVersionLaunchGuards({
+        status: version.status,
+        readiness: entry?.readiness ?? null,
+        readinessError: entry?.error ?? null,
+      });
+    }
+    return map;
+  }, [versions.data, readinessEntries]);
+
+  // The rollup that replaces "Approved versions are ready for operator use and
+  // run creation." whenever readiness disagrees with that claim (#667).
+  const launchRollup = describeLaunchBlockRollup(Object.values(guardsByVersion));
+
   const attentionTone =
-    lifecycle.total === 0 ? "info" : lifecycle.attentionCount > 0 ? "warning" : "success";
+    lifecycle.total === 0
+      ? "info"
+      : launchRollup
+        ? launchRollup.tone
+        : lifecycle.attentionCount > 0
+          ? "warning"
+          : "success";
   const attentionLabel =
     lifecycle.total === 0
       ? "Awaiting first version"
-      : lifecycle.attentionCount > 0
-        ? `${lifecycle.attentionCount} need attention`
-        : "No attention needed";
+      : launchRollup
+        ? "Launch blocked"
+        : lifecycle.attentionCount > 0
+          ? `${lifecycle.attentionCount} need attention`
+          : "No attention needed";
 
   const openCreateDialog = () => {
     setEditingVersion(null);
@@ -621,10 +791,14 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                 {attentionLabel}
               </Pill>
             </div>
-            <InlineAlert tone={attentionTone}>
+            <InlineAlert tone={attentionTone} testId="source-versions-attention">
               <div className="space-y-1">
-                <p className="font-semibold text-[var(--foreground)]">{lifecycle.nextAction}</p>
-                <p className="text-[var(--foreground-muted)]">{lifecycle.nextActionDetail}</p>
+                <p className="font-semibold text-[var(--foreground)]">
+                  {launchRollup ? launchRollup.headline : lifecycle.nextAction}
+                </p>
+                <p className="text-[var(--foreground-muted)]">
+                  {launchRollup ? launchRollup.detail : lifecycle.nextActionDetail}
+                </p>
                 {lifecycle.latestVersion ? (
                   <p className="text-[12px] text-[var(--foreground-subtle)]">
                     Latest version: {lifecycle.latestVersion.version_label} (
@@ -675,12 +849,23 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
               </thead>
               <tbody>
                 {rows.map((version, index) => {
-                  const canEdit = version.status === "draft" || version.status === "rejected";
-                  const canReview =
-                    version.status === "draft" || version.status === "pending_approval";
-                  const canPreview =
-                    version.status !== "rejected" && version.status !== "superseded";
-                  const canProduction = version.status === "approved";
+                  // Edit / approve / reject are decided by version status alone,
+                  // via `explainUnavailableVersionAction` inside
+                  // `VersionActionButton` — one source of truth for both the
+                  // `disabled` flag and the explanation the operator reads.
+                  //
+                  // The two *launch* actions need more than status (#667): a
+                  // status-only rule cannot see an inert blueprint template, so
+                  // launchability comes from the platform's own pre-flight.
+                  // While the probe is in flight the buttons stay disabled and
+                  // say "Checking…" — briefly refusing is honest; briefly
+                  // promising is not.
+                  const guards = guardsByVersion[version.source_version_id] ?? {
+                    state: "checking" as const,
+                    preview: { allowed: false, reason: "Checking run readiness…" },
+                    production: { allowed: false, reason: "Checking run readiness…" },
+                    summary: "Checking run readiness…",
+                  };
                   const isActing = actionVersionId === version.source_version_id;
                   const statusMeta = describeSourceVersionStatus(version.status);
                   const previousVersion = index < rows.length - 1 ? rows[index + 1] : null;
@@ -700,9 +885,26 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                             <Pill level={sourceVersionStatusToLevel(version.status)}>
                               {statusMeta.label}
                             </Pill>
-                            <span className="text-[11px] text-[var(--foreground-subtle)]">
-                              {statusMeta.detail}
-                            </span>
+                            {/*
+                              `statusMeta.detail` for an approved version reads
+                              "Ready for preview or production runs." — a claim
+                              about launchability made from status alone. When
+                              readiness disagrees, the readiness answer wins and
+                              is shown in the row, not only in a tooltip that
+                              keyboard and touch users never see (#667).
+                            */}
+                            {guards.summary ? (
+                              <span
+                                data-testid="version-launch-block"
+                                className="text-[11px] font-medium text-[var(--status-degraded)]"
+                              >
+                                {guards.summary}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-[var(--foreground-subtle)]">
+                                {statusMeta.detail}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3.5">{version.extractor_profile_id ?? "—"}</td>
@@ -716,14 +918,15 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            <VersionActionButton
+                              action="edit"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               onClick={() => openEditDialog(version)}
-                              disabled={!canEdit || isActing}
                             >
                               Edit
-                            </Button>
+                            </VersionActionButton>
                             {previousVersion ? (
                               <Button
                                 size="sm"
@@ -735,43 +938,50 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                                 {isDiffOpen ? "Hide diff" : "Compare"}
                               </Button>
                             ) : null}
-                            <Button
-                              size="sm"
+                            <VersionActionButton
+                              action="preview"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               variant="primary"
                               onClick={() => createRun("preview", version)}
-                              disabled={!canPreview || isActing}
+                              guard={guards.preview}
                             >
-                              Preview run
-                            </Button>
+                              {guards.state === "checking" ? "Checking…" : "Preview run"}
+                            </VersionActionButton>
                             <span
                               aria-hidden
                               className="mx-0.5 hidden h-6 w-px self-center bg-[var(--border)] sm:inline-block"
                             />
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            <VersionActionButton
+                              action="production"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               onClick={() => setConfirm({ kind: "production", version })}
-                              disabled={!canProduction || isActing}
+                              guard={guards.production}
                             >
-                              Production run
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                              {guards.state === "checking" ? "Checking…" : "Production run"}
+                            </VersionActionButton>
+                            <VersionActionButton
+                              action="approve"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               onClick={() => setConfirm({ kind: "approve", version })}
-                              disabled={!canReview || isActing}
                             >
                               Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            </VersionActionButton>
+                            <VersionActionButton
+                              action="reject"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               className="border-[var(--status-critical)]/40 text-[var(--status-critical)] hover:border-[var(--status-critical)]"
                               onClick={() => setConfirm({ kind: "reject", version })}
-                              disabled={!canReview || isActing}
                             >
                               Reject
-                            </Button>
+                            </VersionActionButton>
                           </div>
                         </td>
                       </tr>

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import Annotated
+
+from fastapi import Depends
+
 from platform_control.config import Settings, get_settings
 from platform_control.events.publisher import (
     LocalOutboxRawArtifactPublisher,
@@ -15,8 +19,16 @@ from platform_control.services.artifact_store import (
     S3ArtifactStore,
 )
 
+# Both factories below are used two ways: called directly (CLI, services, tests) with an
+# explicit `Settings`, and as FastAPI dependencies via `Depends(...)`. A bare
+# `settings: Settings | None = None` makes FastAPI classify the parameter as a *request
+# body* — it hoisted the whole `Settings` model, secret field names included, into the
+# published schema for POST /v1/firecrawl/webhooks (#682). Annotating it as a dependency
+# keeps the direct-call seam while telling FastAPI this is injected, not read from the body.
+SettingsSeam = Annotated[Settings | None, Depends(get_settings)]
 
-def get_artifact_store(settings: Settings | None = None) -> ArtifactStore:
+
+def get_artifact_store(settings: SettingsSeam = None) -> ArtifactStore:
     active_settings = settings or get_settings()
     if active_settings.artifact_store_backend == "gcs":
         return GcsArtifactStore(
@@ -36,7 +48,7 @@ def get_artifact_store(settings: Settings | None = None) -> ArtifactStore:
     return LocalArtifactStore(base_dir=active_settings.raw_artifact_local_dir)
 
 
-def get_raw_artifact_publisher(settings: Settings | None = None) -> RawArtifactPublisher:
+def get_raw_artifact_publisher(settings: SettingsSeam = None) -> RawArtifactPublisher:
     active_settings = settings or get_settings()
     if active_settings.event_publisher_backend == "pubsub":
         return PubSubRawArtifactPublisher(
@@ -49,6 +61,8 @@ def get_raw_artifact_publisher(settings: Settings | None = None) -> RawArtifactP
             servers=active_settings.nats_servers,
             raw_artifact_subject=active_settings.nats_raw_artifact_subject,
             artifact_bundle_subject=active_settings.nats_artifact_bundle_subject,
+            connect_timeout_seconds=active_settings.nats_connect_timeout_seconds,
+            publish_timeout_seconds=active_settings.nats_publish_timeout_seconds,
         )
     if active_settings.event_publisher_backend == "local_outbox":
         return LocalOutboxRawArtifactPublisher(base_dir=active_settings.raw_artifact_local_dir)

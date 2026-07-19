@@ -51,17 +51,13 @@ jobs:
           echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
           echo "head_ref=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
 
-      - name: Run contract guard unit tests
-        run: |
-          python -m unittest discover -s scripts/tests -p "test_check_contract_version_bump.py"
-          python -m unittest discover -s scripts/tests -p "test_check_contract_manifest.py"
-          python -m unittest discover -s scripts/tests -p "test_check_platform_contract_vendor.py"
-          python -m unittest discover -s scripts/tests -p "test_check_country_overlay.py"
-          python -m unittest discover -s scripts/tests -p "test_check_country_overlay_at.py"
-          python -m unittest discover -s scripts/tests -p "test_check_country_overlay_files.py"
-          python -m unittest discover -s scripts/tests -p "test_analyze_github_actions_queue.py"
-          python -m unittest discover -s scripts/tests -p "test_generate_brand_assets.py"
-          python -m unittest discover -s scripts/tests -p "test_check_compose_profiles.py"
+      - name: Run guard unit tests
+        # Discover the WHOLE directory rather than enumerating one -p pattern per
+        # file. The enumerated form silently orphaned test_check_connector_worker_runtime.py
+        # and test_lawyer_journey_kpis.py: committed, linted, maintained, executed
+        # nowhere. Prefer running the directory and arguing for exclusions over
+        # enumerating inclusions (#688, #686).
+        run: python -m unittest discover -s scripts/tests -p "test_*.py"
 
       - name: Check Docker Compose profiles resolve
         run: python scripts/check_compose_profiles.py
@@ -124,6 +120,18 @@ jobs:
       - name: Check workflow vars.* references are terraform-managed
         run: |
           python3 scripts/check_workflow_vars.py
+
+      # Every committed test file must be collectable by some CI job. See
+      # ADR-0040 (coverage honesty) and #686.
+      - name: Check every test file is reachable from some CI job
+        run: |
+          python3 scripts/check_test_reachability.py
+
+      # Two branches adding `0038-a.md` and `0038-b.md` merge without a git
+      # conflict. This is the first point both are observable in one tree.
+      - name: Check no two ADRs claim the same number
+        run: |
+          python3 scripts/check_adr_numbers.py
 
       - name: Check Austria overlay consistency
         run: |

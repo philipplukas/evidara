@@ -103,3 +103,38 @@ class TestRisSourceFamily:
         xml_text = _read_fixture_xml("ris_xml")
         ir = normalize_xml_document(xml_text, "test_artifact")
         assert ir.metadata.get("source_family") == "law"
+
+
+class TestRisTemporalValidity:
+    """#663: the RIS validity window was mapped to a dead key in a dead format.
+
+    Two faults compounded: the key was `in_force_to` (the contract vocabulary is
+    `in_force_until`), and the value was left in RIS's DD.MM.YYYY form, which
+    the whole ISO-8601 downstream chain cannot read.
+    """
+
+    def test_akra_maps_to_the_contract_key_in_iso_form(self):
+        xml_text = _read_fixture_xml("ris_xml_law_consolidated")
+        ir = normalize_xml_document(xml_text, "test_artifact")
+        em = ir.metadata.get("extracted_metadata", {})
+
+        # RIS publishes 24.04.1998 / 31.12.2018 in the document XML.
+        assert em.get("in_force_from") == "1998-04-24"
+        assert em.get("in_force_until") == "2018-12-31"
+        # `in_force_to` is not the contract vocabulary and must be gone.
+        assert "in_force_to" not in em
+
+    def test_unparseable_ris_date_is_dropped_not_stored_raw(self):
+        xml_text = (
+            '<risdok xmlns="http://www.bka.gv.at"><nutzdaten><abschnitt>'
+            '<absatz ct="ikra">irgendwann</absatz>'
+            '<absatz ct="akra">31.12.2018</absatz>'
+            "</abschnitt></nutzdaten></risdok>"
+        )
+        ir = normalize_xml_document(xml_text, "test_artifact")
+        em = ir.metadata.get("extracted_metadata", {})
+
+        # A date we cannot read must stay absent so in-force reasoning answers
+        # `unknown`, rather than being handed something it will misparse.
+        assert "in_force_from" not in em
+        assert em.get("in_force_until") == "2018-12-31"
