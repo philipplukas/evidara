@@ -25,6 +25,21 @@ def build_bundle_extraction_hints(
     if title_hint is not None:
         hints["title_hint"] = title_hint
 
+    # Temporal validity (#628/#633). Providers that can establish a norm's
+    # in-force window (fedlex_sparql from jolux applicability dates,
+    # gemeinde_http from `inkrafttretendatum`) put it on the resource
+    # metadata. Without these two hints the window dies here: DI's artifact
+    # loader keeps only the body bytes, so every federal norm answered
+    # `in_force_state: unknown` even though acquisition knew the answer.
+    # Absent keys stay absent — an unknown window must never be guessed.
+    for hint_key, metadata_key in (
+        ("in_force_from_hint", "in_force_from"),
+        ("in_force_until_hint", "in_force_until"),
+    ):
+        value = _extract_metadata_string(artifact_metadata, metadata_key)
+        if value is not None:
+            hints[hint_key] = value
+
     if document_type_hint is not None:
         stripped = document_type_hint.strip()
         if stripped:
@@ -164,6 +179,33 @@ def _extract_title_hint(artifact_metadata: dict[str, Any] | None) -> str | None:
         nested_title = _extract_title_hint(nested_metadata)
         if nested_title is not None:
             return nested_title
+    return None
+
+
+def _extract_metadata_string(
+    artifact_metadata: dict[str, Any] | None,
+    key: str,
+) -> str | None:
+    """Read a non-empty string ``key`` from artifact or provider metadata.
+
+    Mirrors ``_extract_title_hint``'s nesting: ``run_service`` attaches the
+    provider's own payload under ``provider_metadata``, so a value set by the
+    provider is one level down from the artifact metadata the manifest sees.
+    """
+    if not isinstance(artifact_metadata, dict):
+        return None
+
+    candidate = artifact_metadata.get(key)
+    if isinstance(candidate, str) and candidate.strip():
+        return candidate.strip()
+
+    for nested_key in ("metadata", "provider_metadata"):
+        nested_metadata = artifact_metadata.get(nested_key)
+        if not isinstance(nested_metadata, dict):
+            continue
+        nested_value = _extract_metadata_string(nested_metadata, key)
+        if nested_value is not None:
+            return nested_value
     return None
 
 

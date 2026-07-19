@@ -516,6 +516,27 @@ def _compute_llm_invoked(
     return True
 
 
+def _in_force_window_from_hints(hints: Any) -> dict[str, str]:
+    """Extract `{in_force_from, in_force_until}` from v1 extraction hints.
+
+    Returns only the keys acquisition actually established. Values are passed
+    through as-is (already sanitized to non-empty strings by
+    ``coerce_extraction_hints``); no parsing or defaulting happens here,
+    because a wrong date is worse than a missing one for in-force reasoning.
+    """
+    if not isinstance(hints, dict):
+        return {}
+    window: dict[str, str] = {}
+    for field_name, hint_key in (
+        ("in_force_from", "in_force_from_hint"),
+        ("in_force_until", "in_force_until_hint"),
+    ):
+        value = hints.get(hint_key)
+        if isinstance(value, str) and value.strip():
+            window[field_name] = value.strip()
+    return window
+
+
 def _build_document(
     *,
     normalized_document: NormalizedDocumentIR,
@@ -543,6 +564,14 @@ def _build_document(
     eh = normalized_document.metadata.get("extraction_hints")
     if isinstance(eh, dict) and eh:
         metadata["extraction_hints"] = dict(eh)
+    # Temporal validity (#628/#633): promote the acquisition-established
+    # in-force window onto the document's own metadata. The search projection
+    # already reads `metadata.in_force_from` / `metadata.in_force_until`, so
+    # this is the hop that lets four-valued in-force logic answer instead of
+    # reporting `unknown`. Only set when acquisition actually knew — an absent
+    # window stays absent rather than being inferred from a nearby date.
+    in_force_window = _in_force_window_from_hints(eh)
+    metadata.update(in_force_window)
     official_citation = _resolve_official_citation(normalized_document.metadata, extracted_metadata)
     if official_citation:
         metadata["official_citation"] = official_citation
@@ -626,6 +655,9 @@ def _build_document(
         val = extracted_metadata.get(field_name)
         if val:
             provenance_audit.set(field_name, val, "structured")
+
+    for field_name, value in in_force_window.items():
+        provenance_audit.set(field_name, value, "manifest")
 
     metadata["field_provenance"] = provenance_audit.to_dict()
 

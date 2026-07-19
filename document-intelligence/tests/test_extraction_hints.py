@@ -160,3 +160,61 @@ class TestExtractionHintsInPipeline(unittest.TestCase):
         coerced = coerce_extraction_hints(hints)
         self.assertIn("title_hint", coerced)
         self.assertIn("docket_numbers", coerced)
+
+
+class TestInForceWindowFromHints(unittest.TestCase):
+    """#628: the acquisition-established in-force window must reach the document.
+
+    The provider knew the window and the projection could read it, but the two
+    hops in between dropped it, so federal law answered `in_force_state:
+    unknown`. These tests pin the connected chain.
+    """
+
+    def test_coerce_keeps_in_force_window_keys(self):
+        out = coerce_extraction_hints({"in_force_from_hint": " 2024-03-03 ", "in_force_until_hint": "2028-12-31"})
+        assert out["in_force_from_hint"] == "2024-03-03"
+        assert out["in_force_until_hint"] == "2028-12-31"
+
+    def _process_with_hints(self, hints):
+        html = """<html><head><title>Bundesverfassung</title></head><body>
+        <h1>Bundesverfassung</h1><p>Art. 1 ...</p></body></html>"""
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
+            f.write(html)
+            artifact_path = f.name
+
+        payload = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        payload["bundle_metadata"] = {"extraction_hints": hints}
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as mf:
+            json.dump(payload, mf)
+            manifest_path = mf.name
+
+        try:
+            return ProcessingPipeline(processing_version="di_hints_test").process_event(
+                build_bundle_event(manifest_path)
+            )
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def test_window_lands_on_document_metadata_with_manifest_provenance(self):
+        result = self._process_with_hints({"in_force_from_hint": "2024-03-03", "in_force_until_hint": "2028-12-31"})
+        metadata = result.document.metadata
+        # The search projection reads exactly these two paths.
+        assert metadata["in_force_from"] == "2024-03-03"
+        assert metadata["in_force_until"] == "2028-12-31"
+        fp = metadata.get("field_provenance", {})
+        assert fp.get("in_force_from", {}).get("source") == "manifest"
+
+    def test_open_ended_consolidation_sets_only_the_start(self):
+        result = self._process_with_hints({"in_force_from_hint": "2024-03-03"})
+        metadata = result.document.metadata
+        assert metadata["in_force_from"] == "2024-03-03"
+        assert "in_force_until" not in metadata
+
+    def test_absent_window_is_not_invented(self):
+        result = self._process_with_hints({"title_hint": "Bundesverfassung"})
+        metadata = result.document.metadata
+        # Unknown must stay unknown — the four-valued in-force logic depends on
+        # being able to answer `unknown` rather than being handed a guess.
+        assert "in_force_from" not in metadata
+        assert "in_force_until" not in metadata

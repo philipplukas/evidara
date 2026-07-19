@@ -143,6 +143,50 @@ instead of reporting `unknown`. The CH Fedlex fast loop (`ch-fedlex-fast-loop.sh
 gates on this: a future-dated or not-in-force selection fails with verdict
 `acquired_law_not_in_force`.
 
+### Act-level enforcement status (#628)
+
+Consolidation dates describe a *version*; they do not reliably say whether the
+**act** is still law. Verified against the live endpoint (2026-07-19), the
+abstract work additionally carries:
+
+- `jolux:inForceStatus` — a
+  `https://fedlex.data.admin.ch/vocabulary/enforcement-status/{code}` IRI. Only
+  three codes are in use: `0` = *In force*, `1` = *No longer published in the
+  SR*, `3` = *No longer in force*.
+- `jolux:dateEntryInForce` — the act's **original** entry into force, which is
+  not the selected consolidation's start date (BV: act `2000-01-01`, current
+  consolidation `2024-03-03`).
+
+This matters because a repealed act's newest consolidation does **not** always
+carry `dateEndApplicability` — measured live, 3 works with status *No longer in
+force* have an open-ended newest consolidation. Consolidation dates alone would
+report repealed law as currently in force, which is the confident fabrication
+ADR-0033 exists to prevent. The act-level status is therefore authoritative over
+an absent end date: status `3` forces `in_force_at_selection: false`, so the
+canary fails closed. An unrecognised vocabulary code is reported as `null`
+rather than mapped onto a plausible value.
+
+### The population chain (#628)
+
+Asking Fedlex for the dates is necessary but not sufficient — the window has to
+survive to the document. Before this change it was dropped at two hops between
+acquisition and the search projection, so federal law answered
+`in_force_state: unknown` even though acquisition knew the answer:
+
+```text
+provider metadata (in_force_from/in_force_until)
+  → RawArtifact.artifact_metadata.provider_metadata          [always worked]
+  → bundle manifest extraction_hints                          [was dropped]
+       in_force_from_hint / in_force_until_hint
+  → DI document.metadata.in_force_from / .in_force_until      [was dropped]
+  → search projection in_force_from (coalesces effective_date)
+  → resolveInForceState() answers instead of `unknown`
+```
+
+The hints are omitted, never defaulted, when acquisition could not establish the
+window: the in-force model is four-valued precisely so it can say `unknown`, and
+handing it a guessed date would defeat that.
+
 ### Acquisition spec shape
 
 The current union contains:

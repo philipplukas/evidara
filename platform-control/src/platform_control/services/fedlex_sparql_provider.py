@@ -33,6 +33,30 @@ _FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
 _JOLUX_IN_FORCE_FROM_PREDICATE = "jolux:dateApplicability"
 _JOLUX_IN_FORCE_UNTIL_PREDICATE = "jolux:dateEndApplicability"
 
+# Act-level (abstract work) temporal predicates. VERIFIED against the live endpoint
+# (2026-07-19, issue #628): the abstract work carries `jolux:inForceStatus` (a
+# fedlex `enforcement-status` vocabulary IRI) and `jolux:dateEntryInForce` (the
+# act's original entry into force, distinct from the selected consolidation's
+# applicability date).
+#
+# Why this matters beyond the consolidation window: a repealed act's newest
+# consolidation does NOT always carry `dateEndApplicability`. Measured live, 3
+# works with status "no longer in force" have an open-ended newest consolidation
+# — so consolidation dates alone would report repealed law as currently in force.
+# That is exactly the confident fabrication ADR-0033 exists to prevent, so the
+# act-level status is authoritative over an absent end date.
+_JOLUX_IN_FORCE_STATUS_PREDICATE = "jolux:inForceStatus"
+_JOLUX_ENTRY_IN_FORCE_PREDICATE = "jolux:dateEntryInForce"
+
+# https://fedlex.data.admin.ch/vocabulary/enforcement-status/{code} → our value.
+# Confirmed live: only 0, 1 and 3 are in use, with skos:prefLabel@en as noted.
+_ENFORCEMENT_STATUS_BY_CODE = {
+    "0": "in_force",  # "In force"
+    "1": "no_longer_published",  # "No longer published in the SR"
+    "3": "no_longer_in_force",  # "No longer in force"
+}
+_ENFORCEMENT_STATUS_VOCABULARY = "https://fedlex.data.admin.ch/vocabulary/enforcement-status/"
+
 
 class _ConsolidationMember(NamedTuple):
     """A single dated consolidation of a Fedlex work.
@@ -100,6 +124,20 @@ WHERE {{
   OPTIONAL {{ ?member {in_force_until_predicate} ?inForceUntil . }}
 }}
 ORDER BY ?member
+""".strip()
+
+    # Act-level enforcement status + original entry into force, read from the
+    # abstract work (not the consolidation). Both are OPTIONAL: cantonal and
+    # older works may publish neither, in which case the temporal answer stays
+    # whatever the consolidation window said.
+    _WORK_STATUS_QUERY = """
+PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
+SELECT ?status ?entryIntoForce
+WHERE {{
+  OPTIONAL {{ <{work_uri}> {status_predicate} ?status . }}
+  OPTIONAL {{ <{work_uri}> {entry_in_force_predicate} ?entryIntoForce . }}
+}}
+LIMIT 1
 """.strip()
 
     _TITLE_QUERY = """
@@ -200,6 +238,17 @@ LIMIT {limit}
                         as_of=as_of,
                     )
                     concrete_work_uri = selected_member.uri
+                    # Act-level status is authoritative over an absent
+                    # consolidation end date: a repealed act whose newest
+                    # consolidation is open-ended would otherwise be reported as
+                    # currently in force (measured live: 3 such works).
+                    in_force_status, entry_into_force = await self._query_work_status(
+                        client=client,
+                        sparql_endpoint=sparql_endpoint,
+                        work_uri=work_uri,
+                    )
+                    if in_force_status == "no_longer_in_force":
+                        member_in_force = False
                     expression_uris = await self._query_expression_uris(
                         client=client,
                         sparql_endpoint=sparql_endpoint,
@@ -288,6 +337,14 @@ LIMIT {limit}
                                 # `selected_as_of` — the canary gates on this.
                                 "selected_as_of": as_of.isoformat(),
                                 "in_force_at_selection": member_in_force,
+                                # Act-level signals (#628). `in_force_status` is
+                                # the fedlex enforcement-status vocabulary term
+                                # for the whole act; `entry_into_force` is the
+                                # act's original entry into force, which differs
+                                # from the selected consolidation's start date.
+                                # Both None when Fedlex publishes neither.
+                                "in_force_status": in_force_status,
+                                "entry_into_force": _iso_date_or_none(entry_into_force),
                             },
                         )
                     )
@@ -580,6 +637,50 @@ LIMIT {limit}
         # not-in-force so the acceptance gate can refuse it.
         earliest = min(dated, key=lambda member: member.in_force_from)
         return earliest, False
+
+    async def _query_work_status(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        sparql_endpoint: str,
+        work_uri: str,
+    ) -> tuple[str | None, date | None]:
+        """Read the act-level enforcement status and original entry into force.
+
+        Returns `(status, entry_into_force)` where `status` is one of
+        `in_force` / `no_longer_in_force` / `no_longer_published`, or None when
+        Fedlex publishes no status for this work (or publishes a vocabulary code
+        we do not recognise — an unknown code is reported as None rather than
+        being mapped onto a guess).
+        """
+        response = await limited_get(
+            client,
+            sparql_endpoint,
+            params={
+                "query": self._WORK_STATUS_QUERY.format(
+                    work_uri=work_uri,
+                    status_predicate=_JOLUX_IN_FORCE_STATUS_PREDICATE,
+                    entry_in_force_predicate=_JOLUX_ENTRY_IN_FORCE_PREDICATE,
+                ),
+                "format": "application/sparql-results+json",
+            },
+            headers={"Accept": "application/sparql-results+json"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        bindings = payload.get("results", {}).get("bindings", [])
+        if not bindings:
+            return None, None
+        binding = bindings[0]
+        entry_into_force = _parse_sparql_date(binding.get("entryIntoForce"))
+        status_value = binding.get("status", {})
+        status_iri = status_value.get("value") if isinstance(status_value, dict) else None
+        if not isinstance(status_iri, str) or not status_iri.startswith(
+            _ENFORCEMENT_STATUS_VOCABULARY
+        ):
+            return None, entry_into_force
+        code = status_iri[len(_ENFORCEMENT_STATUS_VOCABULARY) :].strip("/")
+        return _ENFORCEMENT_STATUS_BY_CODE.get(code), entry_into_force
 
     async def _query_consolidation_members(
         self,
