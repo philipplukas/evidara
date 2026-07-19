@@ -51,7 +51,7 @@ regression fixture is now the real PDF.
 
 ### The first attempt — routing PDFs through docling — was tried and rejected
 
-#650 proposed docling, and a first implementation of this ADR did exactly that: docling
+Issue #650 proposed docling, and a first implementation of this ADR did exactly that: docling
 extracted the text, and a post-pass string-matched each geometrically-detected Randtitel out
 of the paragraph docling had merged it into.
 
@@ -123,7 +123,7 @@ Everything docling was wanted for is available from pdfplumber's own font metada
 - **Headings** — bold face at or above the modal body size. Size above modal ⇒ level 1
   (the title), at modal ⇒ level 2 (`A. Allgemeine Bestimmung`). A heading that wraps
   across two lines is emitted as one block.
-- **List items** — Swiss literas (`a. `, `b. `, `c. `), with wrapped continuation lines
+- **List items** — Swiss literas (`a.`, `b.`, `c.`), with wrapped continuation lines
   kept inside the item they continue.
 - **Paragraphs** — split on baseline steps exceeding 1.4× the page's own modal line pitch
   (measured: pitch 14.0pt, within-paragraph steps 14.0–14.7, between-paragraph 20.7–25.6).
