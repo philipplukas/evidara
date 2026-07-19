@@ -128,7 +128,7 @@ repos:
         entry: bash scripts/check-js-workspace-hygiene.sh
         language: system
         pass_filenames: false
-        files: ^(package\.json|\.nvmrc|scripts/check-js-workspace-hygiene\.sh|\.github/workflows/.*\.yml|(legal-search|platform-control/admin)/.*/?(package\.json|package-lock\.json|tsconfig\.json|vitest\.config\.ts|next\.config\.ts))$
+        files: ^(package\.json|\.nvmrc|scripts/check-js-workspace-hygiene\.sh|\.github/workflows/.*\.yml|(legal-search|platform-control/admin|marketing)/.*/?(package\.json|package-lock\.json|tsconfig\.json|vitest\.config\.ts|next\.config\.ts))$
 
       # `legal-search/` is NOT an npm workspace root — the real packages are
       # `legal-search/frontend` and `legal-search/api`. This hook used to run
