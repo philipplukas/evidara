@@ -23,7 +23,7 @@
 "use client";
 
 import { Check, ChevronDown } from "lucide-react";
-import { useInput, type Validator } from "ra-core";
+import { useInput, useTranslate, type Validator } from "ra-core";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cn } from "./cn";
 import {
@@ -32,6 +32,7 @@ import {
   filterComboboxChoices,
 } from "./comboboxFilter";
 import { FormField } from "./FormField";
+import { translateValidationError } from "./validationError";
 
 export type { ComboboxChoice } from "./comboboxFilter";
 
@@ -107,9 +108,12 @@ export function Combobox({
   const listboxId = `${id}-listbox`;
   const statusId = `${id}-status`;
 
+  const translate = useTranslate();
   const { field, fieldState, isRequired } = useInput({ source, validate });
   const errorMessage =
-    typeof fieldState.error?.message === "string" ? fieldState.error.message : null;
+    // Unwrap ra-core's "@@react-admin@@" validator envelope and translate it,
+    // instead of showing the operator a raw i18n key (#671).
+    translateValidationError(translate, fieldState.error?.message);
   const effectivelyRequired = required ?? isRequired;
 
   const [open, setOpen] = useState(false);
