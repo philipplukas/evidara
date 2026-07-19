@@ -221,7 +221,10 @@ test.describe("Canonical screenshot evidence pack", () => {
 
     await gotoWithRetry(page, `${ADMIN_BASE_URL}/#/`);
     await expect(page.getByText("Control Plane Overview")).toBeVisible();
-    await expect(page.getByText("Recent Runs")).toBeVisible();
+    // Scoped to the heading: #670 added a "…only the N most recent runs" scope
+    // label to the health snapshot, which the loose substring locator also
+    // matched (case-insensitively), tripping strict mode on two elements.
+    await expect(page.getByRole("heading", { name: "Recent runs" })).toBeVisible();
     await saveScreenshot(page, "admin-dashboard.png");
   });
 

@@ -231,6 +231,35 @@ Before finalizing, verify:
 - [ ] Docs are updated if needed
 - [ ] Architecture is updated if needed
 
+## Working guidance for AI
+
+### Verify against code, not against issue text
+
+**Establish the baseline from the repository before you change anything.** Issue bodies, ADRs,
+PR descriptions and code comments record what was true when written. This repo moves fast enough
+that they are routinely stale — and stale in both directions.
+
+Before acting on a stated problem:
+
+- Read the code on current `origin/main` and cite `file:line` for what you find.
+- Check whether a merged PR already resolved it (`git log --grep`, the issue's cross-references).
+- Treat an **open** PR as resolving nothing — a fix in flight means the issue is still live.
+- Check in-flight PRs for anything you are about to claim exclusively (an ADR number, a
+  `contracts/manifest.yaml` version, a new file path). Reading `main` alone will not show them.
+- If the stated diagnosis is wrong, say so and fix the real defect. Do not implement a fix aimed
+  at a cause that does not exist.
+
+If the issue turns out to be resolved, or wrong, **that is a valid and useful outcome** — report it
+with evidence instead of manufacturing work to match the ticket.
+
+The same applies to a green test suite: see the testing-trust rules on when a passing run is and
+is not evidence.
+
+### Report what you found, not what was expected
+
+State honestly when a result contradicts the brief you were given, including a brief from another
+agent or from the repo owner. A correction backed by `file:line` is worth more than agreement.
+
 ## Review guidance for AI
 
 Flag or warn if:

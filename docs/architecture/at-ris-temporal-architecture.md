@@ -61,7 +61,7 @@ fabrication ADR-0033 exists to prevent.
 
 ## Act-level status: RIS does NOT reproduce the Fedlex trap
 
-#661 found that 3 Fedlex works whose `jolux:inForceStatus` says *No longer in
+PR #661 found that 3 Fedlex works whose `jolux:inForceStatus` says *No longer in
 force* have an **open-ended newest consolidation** — so consolidation dates
 alone report repealed law as currently in force. The obvious question for #663
 was whether RIS has the same shape. Measured live rather than assumed:
