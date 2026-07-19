@@ -18,10 +18,11 @@
 
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
-import { useInput, type Validator } from "ra-core";
+import { useInput, useTranslate, type Validator } from "ra-core";
 import { useId } from "react";
 import { cn } from "./cn";
 import { FormField } from "./FormField";
+import { translateValidationError } from "./validationError";
 
 export interface SelectChoice {
   id: string;
@@ -91,12 +92,15 @@ export function Select({
   triggerClassName,
 }: SelectProps) {
   const id = useId();
+  const translate = useTranslate();
   const { field, fieldState, isRequired } = useInput({
     source,
     validate,
   });
   const errorMessage =
-    typeof fieldState.error?.message === "string" ? fieldState.error.message : null;
+    // Unwrap ra-core's "@@react-admin@@" validator envelope and translate it,
+    // instead of showing the operator a raw i18n key (#671).
+    translateValidationError(translate, fieldState.error?.message);
   const effectivelyRequired = required ?? isRequired;
 
   // Convert radix's string-only value domain into the ra-core field value:

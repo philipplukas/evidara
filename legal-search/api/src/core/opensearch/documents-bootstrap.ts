@@ -104,12 +104,45 @@ async function indexExists(node: string, index: string, authHeader?: string): Pr
   return response.ok;
 }
 
-async function createIndex(
+/**
+ * Replica count a versioned production cutover creates its index with
+ * (`scripts/opensearch-alias-cutover.ts`). Lives here rather than in that
+ * script because the script executes `main()` on import, so nothing else —
+ * including the drift guard — can import from it.
+ */
+export const CUTOVER_REPLICAS = 1;
+
+/** Replica count the startup bootstrap uses (single-node default). */
+export const BOOTSTRAP_REPLICAS = 0;
+
+export interface CreateDocumentsIndexOptions {
+  /** Replica count for the new index (bootstrap uses 0, a versioned cutover 1). */
+  numberOfReplicas?: number;
+  authHeader?: string;
+  /**
+   * Swallow `resource_already_exists_exception` instead of throwing. True for
+   * the startup bootstrap (multiple API replicas race); false for a versioned
+   * cutover, where a colliding index name is a real error.
+   */
+  tolerateExisting?: boolean;
+}
+
+/**
+ * THE single way to create a documents index. Every producer must call this
+ * rather than PUT a mapping of its own — a hand-maintained copy in
+ * `scripts/validate-tar89-metadata-local.sh` caused #675, and a mapping-less
+ * `PUT` in the GCP runtime tfvars caused #713. Both presented as query bugs,
+ * because OpenSearch answers a missing field with empty buckets, not an error.
+ *
+ * Guarded by the producer registry in `mapping-drift.integration.spec.ts`,
+ * which asserts every caller's arguments yield zero drift from canonical.
+ */
+export async function createDocumentsIndex(
   node: string,
   index: string,
-  numberOfReplicas: number,
-  authHeader?: string,
+  options: CreateDocumentsIndexOptions = {},
 ): Promise<void> {
+  const { numberOfReplicas = 0, authHeader, tolerateExisting = false } = options;
   const response = await fetch(`${node}/${index}`, {
     method: 'PUT',
     headers: headers(authHeader),
@@ -117,8 +150,7 @@ async function createIndex(
   });
   if (response.ok) return;
   const text = await response.text();
-  // Concurrent bootstrap (multiple API replicas) — index already there.
-  if (text.includes('resource_already_exists_exception')) return;
+  if (tolerateExisting && text.includes('resource_already_exists_exception')) return;
   throw new Error(`failed creating index ${index}: ${response.status} ${text}`);
 }
 
@@ -165,7 +197,11 @@ export async function bootstrapDocumentsIndex(options: BootstrapOptions): Promis
 
   const physicalIndex = deriveDocumentsPhysicalIndex(readAlias);
   if (!(await indexExists(node, physicalIndex, authHeader))) {
-    await createIndex(node, physicalIndex, numberOfReplicas, authHeader);
+    await createDocumentsIndex(node, physicalIndex, {
+      numberOfReplicas,
+      authHeader,
+      tolerateExisting: true,
+    });
     logger.info(`created documents index ${physicalIndex} with canonical mapping`);
   }
 

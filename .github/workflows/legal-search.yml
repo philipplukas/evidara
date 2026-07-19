@@ -1,9 +1,20 @@
 # CI for legal-search (frontend + API).
 #
-# KEY DESIGN DECISION: CI runs `npm run check` — the SAME script
-# that pre-commit runs locally. This ensures CI and pre-commit
-# never drift apart. If you add a new quality gate, add it to
-# the `check` script in package.json and both environments get it.
+# KEY DESIGN DECISION: CI runs `npm run check` — the same npm script that
+# pre-commit runs locally, via scripts/check-legal-search.sh. If you add a new
+# quality gate, add it to the `check` script in package.json and both
+# environments get it.
+#
+# CI does NOT shell out to scripts/check-legal-search.sh, unlike every other
+# surface: the api and frontend run as parallel jobs with per-surface npm
+# caches, which one serial script would give up. That means nothing *structural*
+# keeps this file and the script in step, and they had already drifted (#688).
+# Parity is therefore asserted by a test:
+#
+#   scripts/tests/test_check_legal_search_parity.py
+#
+# Add a `npm run` gate to one of the two and that test fails until you add it to
+# the other. Do not add a gate here alone.
 
 name: Legal Search
 
@@ -20,6 +31,7 @@ on:
       - 'package.json'
       - 'scripts/check-js-workspace-hygiene.sh'
       - 'scripts/check-legal-search.sh'
+      - 'scripts/check-e2e-spec-coverage.sh'
       - 'scripts/check_visual_baseline_provenance.py'
       - 'docs/runbooks/interaction-flow-validation.md'
       - 'scripts/run-interaction-flow-local.sh'
@@ -34,6 +46,7 @@ on:
       - 'package.json'
       - 'scripts/check-js-workspace-hygiene.sh'
       - 'scripts/check-legal-search.sh'
+      - 'scripts/check-e2e-spec-coverage.sh'
       - 'scripts/check_visual_baseline_provenance.py'
       - 'docs/runbooks/interaction-flow-validation.md'
       - 'scripts/run-interaction-flow-local.sh'
@@ -126,6 +139,13 @@ jobs:
       # Build separately — catches SSR issues tsc misses.
       - name: Build
         run: npm run build
+
+      # Asserts every e2e spec is selected by some CI command. Runs here because
+      # this job already has the frontend node_modules and the check needs no
+      # browser (`playwright test --list` does not start the webServer). See #686.
+      - name: Check e2e spec coverage
+        working-directory: .
+        run: bash scripts/check-e2e-spec-coverage.sh
 
   # ─── Interaction-flow evidence (Playwright smoke + contract) ───
   interaction-flow-evidence:
@@ -390,6 +410,18 @@ jobs:
 
       - name: Visual pixel regression
         run: npm run e2e:visual
+
+      # The specs that carry no tag CI greps for. Selection in this suite is
+      # entirely `-g <tag>` or by path (playwright.config.ts sets no testMatch),
+      # so before #686 these were selected by nothing: committed, linted,
+      # typechecked, executed nowhere. That is how workspace-panels.spec.ts sat
+      # 4/4 red on main unnoticed, and why the geometry guard added in #605 has
+      # been inert since it landed.
+      # `!cancelled()` so this reports independently of the pixel baselines
+      # above rather than being masked by an unrelated baseline drift.
+      - name: Workspace panel + mobile layout suites
+        if: ${{ !cancelled() }}
+        run: npm run e2e:workspace
 
       # On failure, upload the Playwright test-results (actual render, diff,
       # trace) so a baseline drift can be inspected — and, when the drift is

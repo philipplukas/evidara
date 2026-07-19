@@ -1,0 +1,207 @@
+{
+  "$comment": "GENERATED FILE — do not edit. Source of truth: legal-search/api/src/core/opensearch/documents-index.mapping.ts. Regenerate with `cd legal-search/api && npm run mapping:generate`.",
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "analyzer": {
+        "legal_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "german_normalization"
+          ]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "document_id": {
+        "type": "keyword"
+      },
+      "record_kind": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "legal_text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "authority_name": {
+        "type": "text",
+        "analyzer": "legal_text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "official_citation": {
+        "type": "text",
+        "analyzer": "legal_text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "regeste": {
+        "type": "text",
+        "analyzer": "legal_text"
+      },
+      "content": {
+        "type": "text",
+        "analyzer": "legal_text"
+      },
+      "content_preview": {
+        "type": "text"
+      },
+      "structural_path": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "jurisdiction": {
+        "type": "keyword",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "document_type": {
+        "type": "keyword",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "language": {
+        "type": "keyword",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "jurisdiction_ids": {
+        "type": "keyword",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "authority_ids": {
+        "type": "keyword",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "level": {
+        "type": "keyword",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "subordinate_to": {
+        "type": "keyword"
+      },
+      "delegates_to": {
+        "type": "nested",
+        "properties": {
+          "target_level": {
+            "type": "keyword"
+          },
+          "target_jurisdiction_id": {
+            "type": "keyword"
+          },
+          "section_id": {
+            "type": "keyword"
+          },
+          "scope": {
+            "type": "text",
+            "analyzer": "legal_text"
+          }
+        }
+      },
+      "original_language": {
+        "type": "keyword"
+      },
+      "translation_status": {
+        "type": "keyword"
+      },
+      "source_id": {
+        "type": "keyword"
+      },
+      "source_version_id": {
+        "type": "keyword"
+      },
+      "source_document_ids": {
+        "type": "keyword"
+      },
+      "run_id": {
+        "type": "keyword"
+      },
+      "processing_manifest_id": {
+        "type": "keyword"
+      },
+      "lifecycle_status": {
+        "type": "keyword"
+      },
+      "court": {
+        "type": "keyword"
+      },
+      "docket_number": {
+        "type": "keyword"
+      },
+      "is_official": {
+        "type": "boolean"
+      },
+      "sections_count": {
+        "type": "integer"
+      },
+      "citations_count": {
+        "type": "integer"
+      },
+      "related_decisions_count": {
+        "type": "integer"
+      },
+      "related_commentary_count": {
+        "type": "integer"
+      },
+      "document_revision": {
+        "type": "long"
+      },
+      "processed_at": {
+        "type": "date"
+      },
+      "effective_date": {
+        "type": "date",
+        "format": "strict_date_optional_time||yyyy-MM-dd"
+      },
+      "in_force_from": {
+        "type": "date",
+        "format": "strict_date_optional_time||yyyy-MM-dd"
+      },
+      "in_force_until": {
+        "type": "date",
+        "format": "strict_date_optional_time||yyyy-MM-dd"
+      }
+    }
+  }
+}

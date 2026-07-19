@@ -54,6 +54,16 @@
   },
   "overrides": [
     {
+      "includes": ["src/**/*.controller.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useImportType": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/core/config/**"],
       "linter": {
         "rules": {

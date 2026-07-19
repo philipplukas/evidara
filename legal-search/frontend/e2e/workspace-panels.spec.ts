@@ -1,3 +1,28 @@
+/**
+ * Desktop three-panel workspace: geometry, collapse, and detail selection.
+ *
+ * ## Before you believe a red result here, check which server you hit
+ *
+ * `playwright.config.ts` sets `reuseExistingServer: true` on port 3101. If
+ * *anything* already holds 3101 — most often a `evidara-legal-search-frontend`
+ * Docker container from `docker compose up` — Playwright attaches to it and
+ * reports that build's behaviour under your branch's name. The container is not
+ * rebuilt when you check out a branch, so it can be arbitrarily old.
+ *
+ * That is not hypothetical: it is exactly how #711 was filed. The two guards
+ * below (`:69` handle geometry, `:85` filter-rail collapse) were reported as
+ * failing on main, with `Expected: >= 16 / Received: 1`. Re-run against a
+ * server whose identity was verified, both pass — the `Received: 1` came from a
+ * container image built ~25h *before* #700 (the commit that fixes both) merged.
+ * The guards are correct and the behaviour is fixed; only the server was wrong.
+ *
+ * So: a failure here that reports a 1px separator, or a filter rail that never
+ * shows "Filterbereich einblenden", is a **stale-server symptom until proven
+ * otherwise**. Confirm identity before opening an issue or marking anything
+ * `test.fixme()` — a suppressed passing test is the dishonest signal ADR-0040
+ * exists to prevent. `ss -ltnp | grep 3101` and `docker ps` are the fast check;
+ * #719 makes the run assert this for you.
+ */
 import { expect, test } from "@playwright/test";
 import { mockSearchApi } from "./helpers/mock-api";
 

@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/*
+ * The canonical shared design tokens (ADR-0027, "two products, shared brand").
+ * This is the ONLY colour source for this surface — every rule below reads
+ * `var(--token)`. Do not introduce a literal hex/rgb/oklch value in this file
+ * or in any component; `marketing-token-parity.test.ts` fails the build if you
+ * do.
+ *
+ * Marketing is a THIRD surface (ADR-0039). Per ADR-0027 it inherits the shared
+ * layer — palette, spacing scale, focus ring, status colours, accessibility
+ * contracts — and layers its own typography and density on top, exactly as
+ * workspace and admin do. Marketing-only concerns stay in this file and must
+ * never leak back into styles/tokens/tokens.css.
+ */
+@import "../../../styles/tokens/tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* ─── Marketing-local: reading measure and section rhythm ─── */
+  --marketing-measure: 68ch;
+  --marketing-section-gap: 6rem;
+  --marketing-radius-panel: 1.1rem;
+
+  /* Page wash. Derived from shared tokens via color-mix so a palette change
+     in tokens.css propagates here instead of drifting. */
+  --marketing-page-top: var(--surface-panel);
+  --marketing-page-bottom: color-mix(in oklab, var(--surface-page) 92%, var(--brand) 8%);
+  --marketing-hero-glow: color-mix(in oklab, var(--accent-core) 9%, transparent);
+  --marketing-rule: var(--border-faint);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-serif: var(--font-serif-display), Georgia, serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Respect users who ask the OS for reduced motion — WCAG 2.3.3 / AGENTS.md
+   accessibility contract carried over from ADR-0027. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Page wash.
+ *
+ * `html` carries a flat base colour so no region of the page can ever go
+ * unpainted; `body` layers the gradient on top. This is deliberate: an earlier
+ * version used `background-attachment: fixed` on body, which paints relative
+ * to the viewport and left everything below the first screen unpainted —
+ * white — so in dark mode the light body text became near-invisible on scroll.
+ * `fixed` is also unreliable on mobile Safari. Don't reintroduce it.
+ *
+ * The radial glow is sized in absolute units rather than percentages because
+ * percentage sizing resolves against the FULL document height, which would
+ * scale the glow with page length instead of keeping it behind the hero.
+ */
+html {
+  background-color: var(--marketing-page-bottom);
+}
+
+body {
+  background:
+    radial-gradient(ellipse 1100px 520px at 50% 0%, var(--marketing-hero-glow), transparent),
+    linear-gradient(to bottom, var(--marketing-page-top), var(--marketing-page-bottom) 900px);
+  background-repeat: no-repeat;
+  color: var(--foreground);
+}
+
+/*
+ * Focus affordance. ADR-0027 lists the focus ring as a NON-NEGOTIABLE shared
+ * contract: identical width, offset, colour token and keyboard-visible
+ * behaviour across every surface. Marketing therefore uses the same
+ * `--focus-ring` token and the same 2px/2px geometry as workspace and admin.
+ */
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-core);
+  outline-offset: 2px;
+  border-radius: calc(var(--radius) * 0.5);
+}

@@ -1,0 +1,67 @@
+# Public ingress for the Evidara marketing page (ADR-0039).
+#
+# ############################################################################
+# #  NOT APPLIED. REQUIRES HUMAN REVIEW BEFORE `kubectl apply`.              #
+# ############################################################################
+#
+# This is the FIRST Ingress in this cluster that deliberately OMITS the
+# BasicAuth middleware:
+#
+#     traefik.ingress.kubernetes.io/router.middlewares: evidara-evidara-basicauth@kubernetescrd
+#
+# Every other Evidara Ingress (infra/hetzner/auth/ingress-tls.yaml) carries it.
+# The omission here is intentional — a marketing page behind a password is not
+# a marketing page — but it is exactly the kind of line that looks like an
+# oversight in a later diff, so it is called out here and in ADR-0039.
+#
+# Note the hazard it exposes: BasicAuth in this cluster is opt-in PER INGRESS,
+# not a cluster-wide default. The default posture is therefore *public*, and
+# protection is something an author must remember to add. A reviewer applying
+# this file should confirm that this is the only Ingress currently missing the
+# annotation.
+#
+# ── What must be true before applying ──
+#
+#   1. DNS A record exists AND RESOLVES:
+#        evidara.veyo.dev   A   88.99.26.120
+#      (AAAA -> 2a01:4f8:10a:284::2 optional.)
+#      Applying before the record resolves fails the cert-manager HTTP-01
+#      challenge and burns Let's Encrypt production rate limit.
+#
+#   2. A `marketing` Deployment + Service exists serving the static export on
+#      port 8080. This file references it; it does not create it.
+#
+#   3. Consider issuing first with `letsencrypt-staging` (as the original
+#      bring-up did) to dodge rate limits, then switching to
+#      `letsencrypt-prod` once a cert is seen to issue.
+#
+#   4. Decide whether a Traefik rate-limit middleware belongs here now. It is
+#      not required while the page is static with no form backend (ADR-0039
+#      D3 defers storage), but it IS required before any submission endpoint
+#      goes live — at which point add the middleware annotation rather than
+#      relying on application-level limiting.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: marketing-tls
+  namespace: evidara
+  annotations:
+    # NO basicauth middleware — see the header comment. This is deliberate.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - evidara.veyo.dev
+      secretName: marketing-evidara-tls
+  rules:
+    - host: evidara.veyo.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: marketing
+                port:
+                  number: 8080

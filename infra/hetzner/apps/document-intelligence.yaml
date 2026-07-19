@@ -92,9 +92,23 @@ spec:
                 name: evidara-config
             - secretRef:
                 name: evidara-app-secrets
-          readinessProbe:
+          # Liveness and readiness answer different questions, and #722 is what happens
+          # when only one of them is asked. /health is "the process is alive" — it stays
+          # green through a broker outage on purpose, because the consumer now retries
+          # forever and restarting it would only add CrashLoopBackOff delay to an outage
+          # it cannot fix. /ready is "this consumer can reach the broker" and goes 503
+          # the moment NATS is gone, so a consumer that is waiting rather than working
+          # is visibly not working.
+          livenessProbe:
             httpGet:
               path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
@@ -156,9 +170,17 @@ spec:
                 name: evidara-config
             - secretRef:
                 name: evidara-app-secrets
-          readinessProbe:
+          # See di-consumer above: liveness = process alive, readiness = broker reachable (#722).
+          livenessProbe:
             httpGet:
               path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10

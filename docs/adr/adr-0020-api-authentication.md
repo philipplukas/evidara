@@ -1,6 +1,11 @@
-# Security Architecture — Trust Boundaries & Access Control
+# ADR-0020: API Authentication & Authorization Policy
 
-> ADR-0020: API Authentication & Authorization Policy
+Status: Accepted — service-to-service scope only. Extended by
+[ADR-0038](0038-user-identity-and-operator-attribution.md) (Proposed), which decides the
+"RBAC" and "OAuth2 / OIDC" items in this ADR's Future Work and adds per-person operator
+identity. The API-key model below is retained unchanged by ADR-0038.
+
+> Security Architecture — Trust Boundaries & Access Control
 
 ## Overview
 
@@ -108,8 +113,12 @@ still deferred.
 
 ## Future Work
 
-- **RBAC**: Finer roles (viewer vs editor) beyond operator vs service.
-- **OAuth2 / OIDC**: Integrate Google Identity Platform if frontend users need
-  per-identity authentication.
+- ~~**RBAC**: Finer roles (viewer vs editor) beyond operator vs service.~~ — decided by
+  ADR-0038 (`viewer` / `operator` / `admin`).
+- ~~**OAuth2 / OIDC**: Integrate Google Identity Platform if frontend users need
+  per-identity authentication.~~ — decided by ADR-0038, which recommends **self-hosted
+  Zitadel** rather than Google Identity Platform. ADR-0029 retires the GCP runtime this
+  suggestion assumed, and the argument against re-opening a cloud account generalises to
+  managed identity as a category: every other component in this runtime is self-hosted OSS.
 - **Mutual TLS**: Consider mTLS for service-to-service communication if
   the mesh grows beyond 3 services.

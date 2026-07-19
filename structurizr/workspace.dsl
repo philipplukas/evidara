@@ -16,6 +16,7 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         # --- People ---
         legalResearcher = person "Legal Researcher" "Searches and explores legal documents"
         operator = person "Operator" "Manages sources, approvals, runs, and monitors system health"
+        prospect = person "Prospective User" "Evaluating Evidara; has no account and no access to the product"
 
         # --- Evidara platform ---
         evidara = softwareSystem "Evidara" "Document intelligence platform" {
@@ -47,6 +48,16 @@ workspace "Evidara" "Document intelligence platform for legal research" {
                 searchProjection = component "Search Projection" "Builds search-ready projections from canonical"
             }
 
+            # --- marketing (ADR-0039) ---
+            # Statically exported; NO server runtime and NO dependency on any
+            # other container. The absence of an arrow from `marketing` to
+            # anything else in this model is the architectural point: the only
+            # publicly reachable surface cannot reach the control plane, the
+            # search API, or any data store.
+            marketing = container "marketing" "Public waitlist and positioning page" "Kubernetes (k3s) / Next.js static export behind Traefik" {
+                tags "Public"
+            }
+
             # --- Data stores (all self-hosted in-cluster; see ADR-0029) ---
             postgres = container "PostgreSQL" "Source registry, runs, approvals, reference data" "CloudNativePG" "Database"
             deltaLake = container "Delta Lake" "Canonical document truth and published downstream surfaces" "Delta on MinIO (pure-Python deltalake); queried via Nessie + Trino" "Database"
@@ -61,6 +72,11 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         # --- Relationships: People ---
         legalResearcher -> legalSearch "Searches and explores documents" "HTTPS"
         operator -> platformControlAdmin "Manages sources and monitors runs" "HTTPS"
+        # The prospect reaches ONLY the marketing page. There is deliberately
+        # no `prospect -> legalSearch` edge: until user identity exists
+        # (ADR-0038), there is no way to let a stranger into the product
+        # without handing them the shared operator password. See ADR-0039.
+        prospect -> marketing "Reads positioning, joins the waitlist" "HTTPS"
 
         # --- Relationships: Platform flow ---
         legalSources -> platformControl "Provides raw legal artifacts"

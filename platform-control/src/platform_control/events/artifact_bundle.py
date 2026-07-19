@@ -25,11 +25,12 @@ def build_bundle_extraction_hints(
     if title_hint is not None:
         hints["title_hint"] = title_hint
 
-    # Temporal validity (#628/#633). Providers that can establish a norm's
-    # in-force window (fedlex_sparql from jolux applicability dates,
-    # gemeinde_http from `inkrafttretendatum`) put it on the resource
+    # Temporal validity (#628/#633, extended to AT RIS by #663). Providers that
+    # can establish a norm's in-force window (fedlex_sparql from jolux
+    # applicability dates, gemeinde_http from `inkrafttretendatum`, ris_ogd from
+    # RIS `Inkrafttretensdatum`/`Ausserkrafttretensdatum`) put it on the resource
     # metadata. Without these two hints the window dies here: DI's artifact
-    # loader keeps only the body bytes, so every federal norm answered
+    # loader keeps only the body bytes, so every such norm answered
     # `in_force_state: unknown` even though acquisition knew the answer.
     # Absent keys stay absent — an unknown window must never be guessed.
     for hint_key, metadata_key in (

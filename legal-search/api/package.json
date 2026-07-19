@@ -13,12 +13,16 @@
     "lint": "biome check src/",
     "format": "biome check --write src/",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run openapi:check",
+    "test:compiled": "npm run build && node scripts/check-validation-metadata.mjs",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run test:integration && npm run test:compiled && npm run openapi:check",
     "openapi:generate": "orval --config orval.config.ts",
     "openapi:check": "npm run openapi:generate && git diff --exit-code src/lib/document-intelligence/generated/",
     "seed": "npx -y tsx scripts/seed-from-opencaselaw.ts",
-    "seed:index": "npx -y tsx scripts/seed-from-opencaselaw.ts --index"
+    "seed:index": "npx -y tsx scripts/seed-from-opencaselaw.ts --index",
+    "mapping:generate": "npx -y tsx scripts/generate-documents-index-mapping-json.ts",
+    "mapping:check-drift": "npx -y tsx scripts/check-opensearch-mapping-drift.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.3",
@@ -45,6 +49,7 @@
     "@types/supertest": "^7.2.0",
     "orval": "^7.3.0",
     "supertest": "^7.2.2",
+    "testcontainers": "^12.0.4",
     "typescript": "^5.8.3",
     "unplugin-swc": "^1.5.9",
     "vitest": "^4.1.2"

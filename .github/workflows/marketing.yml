@@ -1,0 +1,95 @@
+# CI for the public marketing surface (ADR-0039).
+#
+# KEY DESIGN DECISION (inherited from legal-search.yml): CI runs
+# `npm run check` — the SAME script pre-commit runs locally. If you add a
+# quality gate, add it to the `check` script in marketing/package.json and both
+# environments get it.
+#
+# The build step is not redundant with `check`. `output: "export"` is the whole
+# deployment model for this surface (no server runtime), and static export can
+# fail on things typecheck cannot see — a server-only API used in a client
+# component, or a Turbopack alias that resolves under Vitest but not under the
+# widened monorepo root (#588). If the export breaks, there is nothing to
+# deploy, so CI proves it every time.
+
+name: Marketing
+
+on:
+  pull_request:
+    paths:
+      - 'marketing/**'
+      # `styles/` holds the shared @evidara/* modules and the canonical design
+      # tokens — both are compiled into this bundle, so a change there must run
+      # this CI (ADR-0027).
+      - 'styles/**'
+      - '.nvmrc'
+      - 'scripts/check-js-workspace-hygiene.sh'
+      - '.github/workflows/marketing.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'marketing/**'
+      - 'styles/**'
+      - '.nvmrc'
+      - 'scripts/check-js-workspace-hygiene.sh'
+      - '.github/workflows/marketing.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  marketing:
+    name: Marketing quality gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketing
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          # Read the pin from `.nvmrc` so CI and local cannot drift (#588).
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: marketing/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # typecheck → lint → test (includes the token-parity guard and the
+      # copy-integrity gate that fails on a claim without evidence)
+      - name: Check (typecheck + lint + test)
+        run: npm run check
+
+      - name: Build static export
+        run: npm run build
+
+      - name: Assert the export is genuinely static and prerendered
+        # A regression to a server runtime would silently change both the
+        # deployment model and the threat model (ADR-0039 D2), so prove it
+        # rather than trusting the config.
+        #
+        # `out/` is produced ONLY under `output: "export"` — dropping that
+        # option makes this step fail. The content grep additionally proves
+        # the HTML is prerendered rather than an empty client-rendered shell,
+        # which matters because the page must be readable without JS.
+        run: |
+          test -f out/index.html || {
+            echo "::error::out/index.html missing — 'output: export' was removed or the export failed."
+            exit 1
+          }
+          grep -q "Law is a graph" out/index.html || {
+            echo "::error::out/index.html has no prerendered hero copy — the page is not server-rendered at build time."
+            exit 1
+          }
+          grep -q "What it does not do yet" out/index.html || {
+            echo "::error::the limitations section is missing from the built page (ADR-0039)."
+            exit 1
+          }

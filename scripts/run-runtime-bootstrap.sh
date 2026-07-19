@@ -20,7 +20,10 @@ run_job() {
 }
 
 run_job "platform-control-db-migrate"
-run_job "os-alias-bootstrap"
+
+# The documents index + aliases are created by the legal-search-api startup
+# bootstrap from the canonical mapping (#713) — there is no os-alias-bootstrap
+# job to run. `os-alias-check` is the read-only preflight over its result.
 run_job "os-alias-check"
 
 echo "✅ Runtime bootstrap complete for ${ENVIRONMENT}."

@@ -7,10 +7,11 @@
  */
 "use client";
 
-import { useInput, type Validator } from "ra-core";
+import { useInput, useTranslate, type Validator } from "ra-core";
 import { useId } from "react";
 import { cn } from "./cn";
 import { FormField } from "./FormField";
+import { translateValidationError } from "./validationError";
 
 interface TextInputProps {
   source: string;
@@ -51,12 +52,15 @@ export function TextInput({
   inputClassName,
 }: TextInputProps) {
   const id = useId();
+  const translate = useTranslate();
   const { field, fieldState, isRequired } = useInput({
     source,
     validate,
   });
   const errorMessage =
-    typeof fieldState.error?.message === "string" ? fieldState.error.message : null;
+    // Unwrap ra-core's "@@react-admin@@" validator envelope and translate it,
+    // instead of showing the operator a raw i18n key (#671).
+    translateValidationError(translate, fieldState.error?.message);
   const effectivelyRequired = required ?? isRequired;
   const commonClassName = cn(BASE_INPUT, errorMessage ? BORDER_ERROR : BORDER_OK, inputClassName);
 

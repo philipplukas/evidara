@@ -19,13 +19,23 @@ import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { RunListRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
-import { DataTable, type DataTableColumn, Pill, type PillLevel } from "../../ui/primitives";
+import {
+  Button,
+  DataTable,
+  type DataTableColumn,
+  InlineAlert,
+  Pill,
+  type PillLevel,
+} from "../../ui/primitives";
 import { runModeToLevel, runRecordStatusToLevel } from "../shared/statusLevels";
 import { CancelRunButton } from "./RunActions";
 import { RunLaunchButton } from "./RunLaunchDialog";
 import {
+  describeQueueScope,
   describeRunState,
+  formatQueueCount,
   getRunQueueKeyboardShortcutAction,
+  resolveQueueCountScope,
   summarizeRunFilters,
 } from "./RunList";
 
@@ -104,6 +114,15 @@ export default function RunListV2() {
   }, [runs]);
   const filterSummary = useMemo(() => summarizeRunFilters(filterValues), [filterValues]);
   const hasActiveFilters = filterSummary.length > 0;
+
+  // Whether the numbers on the preset chips mean anything, and if so what.
+  // Everything below reads this instead of assuming `runs` is the whole queue.
+  const countScope = resolveQueueCountScope({
+    hasError: Boolean(controller.error),
+    isPending: controller.isPending,
+    loadedCount: runs.length,
+    total: controller.total,
+  });
 
   const statusCounts = useMemo(() => {
     const seed: Record<RunStatus, number> = {
@@ -280,7 +299,7 @@ export default function RunListV2() {
                   onClick={() => setStatus(preset.key)}
                   tone={preset.key === "failed" ? "warning" : "accent"}
                 >
-                  {preset.label} {statusCounts[preset.key]}
+                  {preset.label} {formatQueueCount(statusCounts[preset.key], countScope)}
                 </PresetButton>
               ))}
               {MODE_PRESETS.map((preset) => (
@@ -304,12 +323,43 @@ export default function RunListV2() {
               </button>
             ) : null}
           </div>
-          <p className="text-[12px] text-[var(--foreground-subtle)]">
-            {hasActiveFilters
-              ? `Filtering ${filterSummary} · ${runs.length} of ${controller.total ?? runs.length}`
-              : `${runs.length} run${runs.length === 1 ? "" : "s"} in view`}
+          <p
+            className={
+              countScope === "unknown"
+                ? "text-[12px] font-semibold text-[var(--status-critical)]"
+                : "text-[12px] text-[var(--foreground-subtle)]"
+            }
+          >
+            {describeQueueScope({
+              scope: countScope,
+              loadedCount: runs.length,
+              total: controller.total,
+              filterSummary,
+            })}
           </p>
         </section>
+
+        {/*
+         * #669: the outage used to be a footnote inside the table body while
+         * five confident zeros sat above it. The failure is the primary state of
+         * this panel now, and it offers the operator a way out.
+         */}
+        {controller.error ? (
+          <InlineAlert tone="error" testId="run-queue-load-error">
+            <div className="space-y-2">
+              <p className="font-semibold text-[var(--foreground)]">
+                Cannot reach platform-control
+              </p>
+              <p>
+                The run queue could not be loaded, so no run counts are known — the presets above
+                show “—”, not zero. Existing runs are unaffected.
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => controller.refetch()}>
+                Retry
+              </Button>
+            </div>
+          </InlineAlert>
+        ) : null}
 
         <DataTable<RunListRecord>
           records={records}

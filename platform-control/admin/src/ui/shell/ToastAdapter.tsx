@@ -15,11 +15,39 @@
 "use client";
 
 import * as ToastPrimitive from "@radix-ui/react-toast";
-import { useNotificationContext } from "ra-core";
-import { useEffect, useState } from "react";
+import { useNotificationContext, useTranslate } from "ra-core";
+import { useCallback, useEffect, useState } from "react";
 import { Toast } from "./Toast";
 
 export type NotificationType = "success" | "info" | "warning" | "error";
+
+/**
+ * `ra-core` publishes the **i18n key** as `notification.message` and expects the
+ * renderer to translate it — the MUI `<Notification>` this adapter replaced did
+ * that internally (ADR-0026 P4a). Rendering `message` raw is why operators saw
+ * `ra.notification.item_doesnt_exist` and `ra.message.invalid_form` as toast
+ * titles (#671).
+ *
+ * Exported for unit testing: takes a `translate` fn plus the raw message and
+ * returns what should be displayed. App-authored literals ("Could not create
+ * source: …") are passed through untouched, because `translate` is called with
+ * a `_` default equal to the input — the catalogue only wins when it has an
+ * entry.
+ */
+export function translateNotificationMessage(
+  translate: (key: string, options: { _: string }) => string,
+  message: React.ReactNode,
+): React.ReactNode {
+  if (typeof message !== "string") {
+    return message;
+  }
+  try {
+    return translate(message, { _: message });
+  } catch {
+    // A missing catalogue must never cost the operator the message itself.
+    return message;
+  }
+}
 
 interface ActiveNotification {
   id: string;
@@ -38,7 +66,13 @@ function toNotificationType(raw: unknown): NotificationType {
 
 export function ToastAdapter() {
   const { notifications, takeNotification } = useNotificationContext();
+  const rawTranslate = useTranslate();
   const [active, setActive] = useState<ActiveNotification[]>([]);
+
+  const translate = useCallback(
+    (key: string, options: { _: string }) => rawTranslate(key, options),
+    [rawTranslate],
+  );
 
   useEffect(() => {
     if (notifications.length === 0) return;
@@ -49,12 +83,12 @@ export function ToastAdapter() {
       {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         type: toNotificationType(next.type),
-        message: next.message,
+        message: translateNotificationMessage(translate, next.message),
         duration: next.notificationOptions?.autoHideDuration ?? 5000,
         open: true,
       },
     ]);
-  }, [notifications, takeNotification]);
+  }, [notifications, takeNotification, translate]);
 
   // Drop closed toasts after their exit animation completes. Radix owns the
   // open→closed transition; we wait a frame past `open=false` before GCing

@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 // (run by the workspace surface's vitest), so coverage is preserved.
 const primitiveFiles = [
   "src/ui/primitives/Button.tsx",
+  "src/ui/primitives/Combobox.tsx",
   "src/ui/primitives/DataTable.tsx",
   "src/ui/primitives/FormField.tsx",
   "src/ui/primitives/DetailGrid.tsx",

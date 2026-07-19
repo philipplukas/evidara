@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from platform_control.services.ris_ogd_provider import RisOgdProvider
+from platform_control.services.ris_ogd_provider import RisOgdProvider, _extract_metadata
 
 
 class TimeoutingRisAsyncClient:
@@ -104,3 +104,117 @@ async def test_ris_ogd_provider_returns_failed_result_when_document_fetch_times_
     assert result.inline_resources == []
     assert "did not capture any resources" in (result.inline_failure_reason or "")
     assert "timed out after 7.0s" in result.response_payload["failures"][0]["error"]
+
+
+# ---------------------------------------------------------------------------
+# Temporal validity (#663)
+#
+# The RIS path acquired the validity window and then dropped it: it was written
+# to `metadata.extracted_metadata.in_force_from` / `in_force_to` — a path the
+# search projection never reads, under a key (`in_force_to`) that is not the
+# contract vocabulary (`in_force_until`). Austrian law therefore answered
+# `unknown` for a reason that had nothing to do with RIS.
+#
+# Shapes below are copied from live OGD responses (2026-07-19), norm
+# NOR11013238 — a real repealed Verordnung.
+# ---------------------------------------------------------------------------
+
+
+def _brkons_ref(brkons: dict) -> dict:
+    return {
+        "Data": {
+            "Metadaten": {
+                "Technisch": {"ID": "NOR11013238", "Applikation": "BrKons"},
+                "Allgemein": {"DokumentUrl": "https://www.ris.bka.gv.at/eli/test"},
+                "Bundesrecht": {
+                    "Titel": "Verordnung des Bundesministers",
+                    "Kurztitel": "Test-Verordnung",
+                    "Eli": "eli/bgbl/test",
+                    "BrKons": brkons,
+                },
+            }
+        }
+    }
+
+
+def test_extract_metadata_reads_the_ris_validity_window() -> None:
+    """The window RIS publishes must survive acquisition in ISO form."""
+    meta = _extract_metadata(
+        _brkons_ref(
+            {
+                "Inkrafttretensdatum": "1998-04-24",
+                "Ausserkrafttretensdatum": "2018-12-31",
+                "NovellenBeziehung": "aufgehoben durch",
+                "Gesetzesnummer": "10012838",
+            }
+        )
+    )
+
+    assert meta["in_force_from"] == "1998-04-24"
+    assert meta["in_force_until"] == "2018-12-31"
+    assert meta["amendment_relation"] == "repealed_by"
+    assert meta["gesetzesnummer"] == "10012838"
+
+
+def test_extract_metadata_leaves_an_in_force_norm_open_ended() -> None:
+    """RIS omits `Ausserkrafttretensdatum` while a norm is still in force.
+
+    That absence is meaningful and must not be filled in — an open-ended window
+    is what lets downstream logic say "in force", and a fabricated end date
+    would silently expire live law.
+    """
+    meta = _extract_metadata(
+        _brkons_ref(
+            {
+                "Inkrafttretensdatum": "2020-01-01",
+                "NovellenBeziehung": "zuletzt geändert durch",
+            }
+        )
+    )
+
+    assert meta["in_force_from"] == "2020-01-01"
+    assert meta["in_force_until"] is None
+    assert meta["amendment_relation"] == "last_amended_by"
+
+
+def test_extract_metadata_reports_unknown_dates_as_none_rather_than_guessing() -> None:
+    """An unparseable date is dropped, never coerced onto a plausible value."""
+    meta = _extract_metadata(
+        _brkons_ref({"Inkrafttretensdatum": "irgendwann", "Ausserkrafttretensdatum": ""})
+    )
+
+    assert meta["in_force_from"] is None
+    assert meta["in_force_until"] is None
+
+
+def test_unrecognised_amendment_relation_is_none_not_a_plausible_guess() -> None:
+    """Mirrors #661's rule for unknown Fedlex enforcement-status codes.
+
+    A relation we have not seen must not be bent into `repealed_by`; reporting
+    None keeps the temporal answer honestly `unknown`.
+    """
+    meta = _extract_metadata(
+        _brkons_ref(
+            {"Inkrafttretensdatum": "2020-01-01", "NovellenBeziehung": "wiederverlautbart durch"}
+        )
+    )
+
+    assert meta["amendment_relation"] is None
+
+
+def test_extract_metadata_survives_a_missing_application_block() -> None:
+    """Judikatur refs carry no BrKons block; that must not raise."""
+    meta = _extract_metadata(
+        {
+            "Data": {
+                "Metadaten": {
+                    "Technisch": {"ID": "JJT_123", "Applikation": "Vfgh"},
+                    "Judikatur": {"Titel": "Erkenntnis"},
+                }
+            }
+        }
+    )
+
+    assert meta["in_force_from"] is None
+    assert meta["in_force_until"] is None
+    assert meta["amendment_relation"] is None
