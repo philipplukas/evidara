@@ -36,6 +36,7 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0035 | [Operator-reachable blueprint enablement](0035-operator-reachable-blueprint-enablement.md) |
 | ADR-0038 | [User identity, roles, and genuine operator attribution](0038-user-identity-and-operator-attribution.md) (Accepted) |
 | ADR-0039 | [A third frontend surface — the public marketing page](0039-public-marketing-surface.md) |
+| ADR-0040 | [What makes a test result trustworthy](0040-test-result-trust.md) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.
