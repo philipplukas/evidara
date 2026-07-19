@@ -276,24 +276,23 @@ services:
   # the S3 path:
   #   PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 \
   #     docker compose -f docker-compose.local.yml --profile apps --profile minio up
+  # The raw-artifacts bucket is created in-process, just before `minio server` execs,
+  # rather than by a companion one-shot container. A one-shot `minio-init` used to do
+  # this, but nothing in the `minio` profile could depend on it with
+  # `service_completed_successfully`: the profile holds no long-running consumer, and a
+  # cross-profile depends_on hard-errors the apps-only stack ("depends on undefined
+  # service"). Without such a dependent, `docker compose up --wait` keeps the one-shot in
+  # its wait set and fails the entire bring-up with `container evidara-minio-init-1
+  # exited (0)` whenever the container finishes before the wait set is evaluated. That
+  # race is what made the E2E CH Fedlex Loop canary red on every scheduled main run.
+  #
+  # On the filesystem backend a bucket is just a directory under /data, so `mkdir -p` is
+  # sufficient and idempotent. The healthcheck asserts the bucket is actually listable,
+  # so `--wait` now gates on bucket readiness — a stronger guarantee than the one-shot
+  # ever gave, since nothing previously waited on it at all.
   minio:
     image: minio/minio:latest
     profiles: ["minio"]
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    mem_limit: 512m
-
-  # One-shot: create the raw-artifacts bucket once MinIO is reachable.
-  minio-init:
-    image: minio/mc:latest
-    profiles: ["minio"]
-    depends_on:
-      - minio
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -301,14 +300,22 @@ services:
     entrypoint: ["sh", "-c"]
     command:
       - >
-        for i in $$(seq 1 30); do
-          if mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; then
-            mc mb --ignore-existing "local/$$BUCKET" && echo "bucket $$BUCKET ready" && exit 0;
-          fi;
-          echo "waiting for minio ($$i/30)"; sleep 2;
-        done;
-        echo 'failed to reach minio'; exit 1
-    restart: "no"
+        mkdir -p "/data/$$BUCKET" &&
+        exec minio server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          mc alias set hc http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1 &&
+          mc ls "hc/$$BUCKET" >/dev/null 2>&1
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 3s
+    mem_limit: 512m
 
 volumes:
   # Canonical surface shared by di-consumer (writer) and document-service (reader),
