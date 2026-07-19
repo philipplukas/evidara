@@ -41,6 +41,9 @@ services:
       PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: ${PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND:-noop}
       PLATFORM_CONTROL_NATS_SERVERS: ${PLATFORM_CONTROL_NATS_SERVERS:-nats://nats:4222}
       PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: inline
+      # Local stack runs keyless. Auth fails closed by default, so the open path
+      # must be opted into by name. LOCAL ONLY — never set in a deployment.
+      PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED: "1"
     command:
       - uvicorn
       - platform_control.main:app
@@ -106,6 +109,9 @@ services:
       OPENSEARCH_NODE: http://opensearch:9200
       PORT: "3102"
       NODE_ENV: production
+      # Local stack runs keyless. ApiKeyGuard fails closed by default, so the open
+      # path must be opted into by name. LOCAL ONLY — never set in a deployment.
+      AUTH_DEV_ALLOW_UNAUTHENTICATED: "1"
       # Where the BFF fetches a document's canonical body (`fetchLeanDocument`).
       # `document.processed` carries only refs, so without this legal-search falls
       # back to the "Document <id>" stub and body-text search finds nothing.

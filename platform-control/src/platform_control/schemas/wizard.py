@@ -103,6 +103,10 @@ class ReviewDecisionRequest(BaseModel):
     """
 
     decision: str
+    # Inert. The persisted reviewer is derived from the authenticated principal in
+    # `routers/reviews.record_review_decision`; whatever a client sends here is
+    # overwritten. Kept only because removing it is a contract change (ADR-0034
+    # regenerates platform-control.openapi.yaml). Drop it in the ADR-0038 work.
     reviewed_by: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
 

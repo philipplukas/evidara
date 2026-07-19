@@ -244,14 +244,17 @@ async def test_record_review_decision_completes_the_task(session) -> None:
 
     decided = await service.record_review_decision(
         task.review_task_id,
-        ReviewDecisionRequest(decision="accept", reviewed_by="reviewer_a"),
+        # The body's `reviewed_by` is inert — the route passes the authenticated
+        # principal, and that is what gets persisted.
+        ReviewDecisionRequest(decision="accept", reviewed_by="a-name-the-client-made-up"),
+        reviewed_by="op_reviewer_a",
     )
 
     assert decided.status is ReviewTaskStatus.COMPLETED
     assert decided.processed_at is not None
     assert decided.decision_payload is not None
     assert decided.decision_payload["decision"] == "accept"
-    assert decided.decision_payload["reviewed_by"] == "reviewer_a"
+    assert decided.decision_payload["reviewed_by"] == "op_reviewer_a"
 
 
 @pytest.mark.asyncio
@@ -271,10 +274,10 @@ async def test_record_review_decision_conflicts_on_an_already_decided_task(sessi
     await session.commit()
 
     request = ReviewDecisionRequest(decision="accept")
-    await service.record_review_decision(task.review_task_id, request)
+    await service.record_review_decision(task.review_task_id, request, reviewed_by="op_a")
 
     with pytest.raises(ConflictError):
-        await service.record_review_decision(task.review_task_id, request)
+        await service.record_review_decision(task.review_task_id, request, reviewed_by="op_b")
 
 
 # ---------------------------------------------------------------------------

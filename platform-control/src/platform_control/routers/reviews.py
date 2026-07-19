@@ -13,6 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from platform_control.auth import Principal, get_current_principal
 from platform_control.database import get_session
 from platform_control.schemas.errors import error_responses
 from platform_control.schemas.wizard import (
@@ -25,6 +26,7 @@ from platform_control.services.wizard_service import WizardService
 
 router = APIRouter(prefix="/v1/reviews", tags=["reviews"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+PrincipalDep = Annotated[Principal, Depends(get_current_principal)]
 
 
 def get_reviews_wizard_service(session: SessionDep) -> WizardService:
@@ -72,10 +74,21 @@ async def record_review_decision(
     task_id: str,
     request: ReviewDecisionRequest,
     service: ServiceDep,
+    principal: PrincipalDep,
 ) -> ReviewTaskResponse:
     """Close a review task with an operator's verdict.
 
     Replaces ``POST /v1/reviews/sync-from-argilla``: the decision is pushed by the
     reviewer instead of polled out of an annotation tool.
     """
-    return await service.record_review_decision(task_id, request)
+    # The reviewer is taken from the authenticated principal, never from the request
+    # body. A client-supplied `reviewed_by` used to be persisted verbatim into the
+    # decision payload, which is worse than recording nothing: it looks like attribution
+    # while being an unverified free-text field any caller could set to any name. The
+    # principal is only key-shaped today (ADR-0020) — ADR-0038 makes it a person — but a
+    # coarse true value beats a precise false one.
+    #
+    # This note is a comment, not docstring prose, on purpose: the docstring is
+    # published as the operation `description` in the generated contract (ADR-0034),
+    # and contracts/api/platform-control.openapi.yaml is owned by another change.
+    return await service.record_review_decision(task_id, request, reviewed_by=principal.operator_id)

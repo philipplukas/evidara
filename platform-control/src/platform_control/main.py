@@ -10,7 +10,11 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from acquisition_core.providers import ProviderNotLiveReadyError
-from platform_control.auth import require_control_plane_operator, require_control_plane_service
+from platform_control.auth import (
+    check_auth_configuration,
+    require_control_plane_operator,
+    require_control_plane_service,
+)
 from platform_control.config import get_settings
 from platform_control.errors import (
     ConflictError,
@@ -109,6 +113,14 @@ def create_app() -> FastAPI:
             )
         )
         return response
+
+    # Fail-closed auth: surface a missing key at boot, not only as a 503 on the first
+    # request. `create_app` deliberately does not raise — the ADR-0034 contract
+    # generator imports it at build time with no environment — but a deployment that
+    # reaches this log line and ignores it is serving nothing but 503s.
+    _auth_problem = check_auth_configuration(settings)
+    if _auth_problem is not None:
+        logging.getLogger(__name__).critical(_auth_problem)
 
     # Health endpoints — unauthenticated
     app.include_router(health.router)

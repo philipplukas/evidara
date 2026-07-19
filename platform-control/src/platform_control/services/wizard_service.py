@@ -184,7 +184,11 @@ class WizardService:
         return wizard_run
 
     async def record_review_decision(
-        self, review_task_id: str, request: ReviewDecisionRequest
+        self,
+        review_task_id: str,
+        request: ReviewDecisionRequest,
+        *,
+        reviewed_by: str,
     ) -> ReviewTaskResponse:
         """Record an operator's verdict, moving the task to a terminal state.
 
@@ -193,6 +197,10 @@ class WizardService:
         annotation store to reconcile with and no last-writer-wins timestamp to
         compare: a task that already carries a decision conflicts rather than being
         silently overwritten.
+
+        ``reviewed_by`` is supplied by the caller *route* from the authenticated
+        principal and always overwrites whatever the request body carried. The schema
+        field is retained (removing it is a contract change) but is now inert.
         """
         task = await self.get_review_task(review_task_id)
         if task.status is not ReviewTaskStatus.PENDING:
@@ -202,6 +210,8 @@ class WizardService:
         task.processed_at = datetime.now(UTC)
         task.decision_payload = {
             **request.model_dump(mode="json"),
+            # Authenticated principal wins over anything the client sent.
+            "reviewed_by": reviewed_by,
             "recorded_at": task.processed_at.isoformat(),
         }
 
