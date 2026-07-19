@@ -731,9 +731,43 @@ class RunService:
                 f"Cannot create runs from source versions in status {source_version.status}."
             )
 
-    @classmethod
+    def _describe_seed_discovery(self, source_version: SourceVersion) -> str | None:
+        """Ask the spec's provider whether it discovers its own acquisition targets.
+
+        Some providers do not take a seed list at all: `fedlex_sparql` in
+        cantonal-discovery mode enumerates works from `jolux:CantonOfOrigin`,
+        so the blueprint the platform itself emits for `fedlex_sparql_canton_*`
+        carries `seed_urls: []` **by design**. Demanding seeds from such a spec
+        is not a safety gate, it is a dead end — the operator turns both
+        ADR-0030 keys and still cannot launch (#706).
+
+        The provider is the only component that knows which of the two it is, and
+        it already computes the answer in `plan()`. This asks it, and returns a
+        human-readable detail when the provider declares seed discovery, else
+        None so the caller's refusal stands. `plan()` is pure and network-free
+        (same contract `describe_blueprint_plan_notes` relies on), and a provider
+        whose `plan()` raises gets no exemption — a spec too broken to plan is
+        not a spec that discovers its own seeds.
+        """
+        acquisition_spec = source_version.acquisition_spec or {}
+        try:
+            registry = self.provider_registry or build_provider_registry(get_settings())
+            provider = registry.resolve_for_spec(acquisition_spec)
+            plan = provider.plan(None, source_version)
+        except Exception:
+            return None
+        if not getattr(plan, "discovers_seeds", False):
+            return None
+        provider_name = getattr(plan, "provider", None) or "provider"
+        mode = getattr(plan, "mode", None)
+        in_mode = f" in {mode} mode" if mode else ""
+        return (
+            f"Provider '{provider_name}' discovers its own acquisition targets{in_mode}; "
+            "this spec carries no seed list by design."
+        )
+
     def assess_run_readiness(
-        cls,
+        self,
         *,
         source: Source | None,
         source_version: SourceVersion | None,
@@ -785,7 +819,7 @@ class RunService:
         mode_detail = "Cannot determine mode compatibility before source/version checks pass."
         if belongs_to_source and source_version is not None:
             try:
-                cls._validate_version_for_run_mode(source_version, mode)
+                self._validate_version_for_run_mode(source_version, mode)
                 mode_compatible = True
                 mode_detail = "Version status is compatible with requested run mode."
             except InvalidStateTransitionError as exc:
@@ -837,6 +871,15 @@ class RunService:
                     else "Acquisition spec must define seed_url, seed_urls, or base_url."
                 )
             )
+            # No seed *fields* is not the same as no seeds. Before refusing, ask
+            # the provider whether it discovers its own targets (#706). Only a
+            # provider that says so is exempt; one that needs seeds and has none
+            # keeps the refusal above, so the gate is narrowed, not removed.
+            if not has_seed:
+                discovery_detail = self._describe_seed_discovery(source_version)
+                if discovery_detail is not None:
+                    has_seed = True
+                    seed_detail = discovery_detail
         checks.append(
             RunReadinessCheck(
                 code="acquisition_seed_present",

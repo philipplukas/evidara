@@ -670,3 +670,30 @@ def test_plan_canton_mode_needs_no_seed_urls() -> None:
     assert plan.mode == "canton_discovery"
     assert plan.seed_urls == []
     assert any("canton=CH-BE" in note for note in plan.notes)
+
+
+def test_plan_declares_seed_discovery_for_canton_scope() -> None:
+    """Canton mode has no seed list and must say so, not just look empty (#706)."""
+    provider = FedlexSparqlProvider()
+    plan = provider.plan(
+        SimpleNamespace(),
+        SimpleNamespace(acquisition_spec={"scope_kind": "canton", "canton": "CH-ZH"}),
+    )
+
+    assert plan.mode == "canton_discovery"
+    assert plan.seed_urls == []
+    assert plan.discovers_seeds is True
+
+
+def test_plan_does_not_declare_seed_discovery_for_seed_scope() -> None:
+    provider = FedlexSparqlProvider()
+    plan = provider.plan(
+        SimpleNamespace(),
+        SimpleNamespace(
+            acquisition_spec={
+                "seed_urls": ["https://fedlex.data.admin.ch/eli/cc/1999/404"],
+            }
+        ),
+    )
+
+    assert plan.discovers_seeds is False

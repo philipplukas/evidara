@@ -341,6 +341,94 @@ async def test_get_run_readiness_rejects_empty_legifrance_code_ids(session) -> N
     assert seed_check.detail == "Legifrance acquisition spec must define code_ids."
 
 
+async def _seed_fedlex_canton_version(session):
+    """A fedlex_sparql version in cantonal-discovery mode — no seeds, by design (#706)."""
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "fedlex_sparql",
+        "scope_kind": "canton",
+        "canton": "CH-ZH",
+        "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+        "preferred_languages": ["de"],
+        "max_works": 50,
+    }
+    await session.commit()
+    return source, version
+
+
+@pytest.mark.asyncio
+async def test_get_run_readiness_accepts_canton_discovery_without_seed_urls(session) -> None:
+    """Canton mode discovers works via jolux:CantonOfOrigin, so it has no seed list.
+
+    Readiness used to demand one, which made all three `fedlex_sparql_canton_*`
+    templates un-runnable the moment an operator turned both ADR-0030 keys (#706).
+    """
+    source, version = await _seed_fedlex_canton_version(session)
+    run_service = RunService(session, StubProvider(provider_name="fedlex_sparql"))
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    seed_check = next(
+        check for check in readiness.checks if check.code == "acquisition_seed_present"
+    )
+    assert seed_check.ok is True
+    assert "discovers its own acquisition targets" in seed_check.detail
+    assert readiness.ready is True
+
+
+@pytest.mark.asyncio
+async def test_create_run_launches_canton_discovery_version(session) -> None:
+    """Pre-flight and dispatch must agree: readiness passing has to mean it launches."""
+    source, version = await _seed_fedlex_canton_version(session)
+    run_service = RunService(
+        session,
+        StubProvider(provider_name="fedlex_sparql"),
+        run_dispatch_backend="worker",
+    )
+
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.PRODUCTION,
+        )
+    )
+
+    assert run.status is RunStatus.PENDING
+
+
+@pytest.mark.asyncio
+async def test_get_run_readiness_still_rejects_fedlex_seed_mode_without_seeds(session) -> None:
+    """The narrowing must not become a hole: seed mode still needs seeds."""
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "fedlex_sparql",
+        "scope_kind": "seed",
+        "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+    }
+    await session.commit()
+    run_service = RunService(session, StubProvider(provider_name="fedlex_sparql"))
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    seed_check = next(
+        check for check in readiness.checks if check.code == "acquisition_seed_present"
+    )
+    assert seed_check.ok is False
+    assert seed_check.detail == "Acquisition spec must define seed_url, seed_urls, or base_url."
+    assert readiness.ready is False
+
+
 @pytest.mark.asyncio
 async def test_overlay_template_source_version_passes_readiness_checks(session) -> None:
     session.add(Jurisdiction(jurisdiction_id="jur_at", name="Austria", slug="at"))

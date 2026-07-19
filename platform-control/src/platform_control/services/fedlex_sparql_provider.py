@@ -406,6 +406,11 @@ LIMIT {limit}
                 provider=self.provider_name,
                 mode="canton_discovery",
                 seed_urls=[],
+                # Cantonal discovery has no seed list by design: works are
+                # enumerated from `jolux:CantonOfOrigin` at run time. Declaring
+                # it here is what keeps run readiness from demanding a field
+                # this mode is built not to have (#706).
+                discovers_seeds=True,
                 estimated_request_count=canton_discovery_limit * max_expressions,
                 user_agent=acquisition_spec.get("user_agent"),
                 request_timeout_seconds=float(

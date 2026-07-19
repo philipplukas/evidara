@@ -206,7 +206,15 @@ before launch to diagnose blocked runs from control panel preflight checks.
 | `source_version_exists` | Source version ID not found | Re-select an existing source version; if recently removed/superseded, create a new version from the source. |
 | `source_version_belongs_to_source` | Version does not belong to selected source | Pick the matching source/version pair from the same source record; do not mix IDs across sources. |
 | `mode_compatible_with_version_status` | Mode invalid for current version status (e.g. production on non-approved) | For production runs, approve the version first; for preview, avoid rejected/superseded versions. |
-| `acquisition_seed_present` | Acquisition spec has no `seed_url` or `seed_urls` | Edit the source version acquisition spec and add at least one deterministic seed URL, then retry launch. |
+| `acquisition_seed_present` | Acquisition spec has no `seed_url` or `seed_urls`, **and** the spec's provider does not discover its own targets | Edit the source version acquisition spec and add at least one deterministic seed URL, then retry launch. |
+
+Note on discovery-mode providers (#706): a provider that finds its own targets has no
+seed list *by design* — `fedlex_sparql` with `scope_kind: canton` enumerates works from
+`jolux:CantonOfOrigin`, so the blueprint the platform emits for `fedlex_sparql_canton_*`
+carries `seed_urls: []`. Readiness asks the provider (via its `plan()`) before refusing,
+and passes such a spec with the detail *"Provider '…' discovers its own acquisition
+targets in … mode"*. Providers that genuinely need seeds — including `fedlex_sparql` in
+its default `scope_kind: seed` mode — are still refused.
 
 ## Latest Execution and Triage (2026-04-06)
 

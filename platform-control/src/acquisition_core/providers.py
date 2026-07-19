@@ -86,6 +86,19 @@ class ProviderPlan:
     request_timeout_seconds: float | None = None
     notes: list[str] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict)
+    # discovers_seeds distinguishes "this plan has no targets yet because the
+    # provider will find them itself" from "this spec is missing its seeds".
+    # Both look like `seed_urls == []`, and conflating them turns run readiness
+    # into a dead end: `fedlex_sparql` in cantonal-discovery mode enumerates
+    # works via `jolux:CantonOfOrigin`, so the blueprint the platform itself
+    # emits has no seed list *by design*, and demanding one refuses a precondition
+    # that can never be satisfied (#706).
+    #
+    # Set True ONLY when `start_run` derives its own targets from the spec (a
+    # query, a code, a canton) rather than from a caller-supplied URL list. A
+    # provider that genuinely needs seeds and has none must leave this False so
+    # readiness still refuses it.
+    discovers_seeds: bool = False
 
 
 class AcquisitionProvider(Protocol):
