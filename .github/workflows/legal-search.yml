@@ -31,6 +31,7 @@ on:
       - 'package.json'
       - 'scripts/check-js-workspace-hygiene.sh'
       - 'scripts/check-legal-search.sh'
+      - 'scripts/check-e2e-spec-coverage.sh'
       - 'docs/runbooks/interaction-flow-validation.md'
       - 'scripts/run-interaction-flow-local.sh'
   push:
@@ -44,6 +45,7 @@ on:
       - 'package.json'
       - 'scripts/check-js-workspace-hygiene.sh'
       - 'scripts/check-legal-search.sh'
+      - 'scripts/check-e2e-spec-coverage.sh'
       - 'docs/runbooks/interaction-flow-validation.md'
       - 'scripts/run-interaction-flow-local.sh'
 
