@@ -46,7 +46,9 @@ test.describe("Mobile workspace interactions", () => {
   });
 
   test("opens and closes detail sheet from result tap", async ({ page }) => {
-    await page.getByRole("button", { name: RESULT_TITLE }).click();
+    // A real anchor, not a button — #700 made it one so middle-click and
+    // cmd/ctrl-click open a new tab (see ResultCard.tsx).
+    await page.getByRole("link", { name: RESULT_TITLE }).click();
     await expect(page).toHaveURL(/item=decision-1/);
 
     await expect(page.getByRole("heading", { name: DETAIL_TITLE }).last()).toBeVisible();
