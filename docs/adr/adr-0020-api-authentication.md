@@ -41,11 +41,20 @@ without credentials.
 |---------|-----------|-------|
 | platform-control | `PLATFORM_CONTROL_API_KEY` (optional legacy full-access), `PLATFORM_CONTROL_OPERATOR_API_KEY`, `PLATFORM_CONTROL_SERVICE_API_KEY` | `auth.require_control_plane_operator` / `auth.require_control_plane_service` (FastAPI `Depends`) |
 | legal-search API | `API_KEY` | `ApiKeyGuard` (NestJS global APP_GUARD) |
+| both (dev only) | `PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED` / `AUTH_DEV_ALLOW_UNAUTHENTICATED` | Explicit opt-in to the keyless local path; without it a keyless process serves 503s |
 
 **Behavior (platform-control):**
 
-- When **no** platform-control API key env vars are **set**: authentication is
-  disabled (local development default).
+- When **no** platform-control API key env vars are **set**: every protected route
+  **fails closed with 503** and the app logs a `CRITICAL` line at startup. This was
+  previously "authentication is disabled (local development default)" — a fail-**open**
+  default, which meant a deployment whose key Secret failed to mount served the entire
+  control plane unauthenticated and looked exactly like a working one.
+  The keyless local-development path is preserved but must be opted into by name:
+  `PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1`. The flag is ignored once any key
+  is configured, so it cannot be used as a backdoor. `legal-search` behaves the same way
+  via `AUTH_DEV_ALLOW_UNAUTHENTICATED`. Health endpoints stay unauthenticated either way,
+  so an unconfigured pod remains diagnosable.
 - **Legacy:** only `PLATFORM_CONTROL_API_KEY` is set — same as before: every
   protected route requires that key (401 if missing/invalid).
 - **Scoped:** `PLATFORM_CONTROL_OPERATOR_API_KEY` and/or
@@ -90,8 +99,11 @@ still deferred.
    protect against compromised internal callers.
 2. **Key rotation**: Set new `PLATFORM_CONTROL_*` / `API_KEY` values and
    redeploy. No session invalidation needed (stateless).
-3. **Secrets storage**: API keys stored in Google Secret Manager, mounted as
-   Cloud Run env vars. Never committed to source control.
+3. **Secrets storage**: on the live Hetzner runtime (ADR-0029) the keys live in the
+   `evidara-auth` Kubernetes Secret, created by `infra/hetzner/deploy-stage5.sh` and
+   consumed as a **required** secret ref — a pod without it refuses to start. The GCP
+   Secret Manager / Cloud Run path described here belongs to the retired stack. Never
+   committed to source control.
 4. **Logging**: Auth failures are logged at WARN level. API keys are NOT logged.
 
 ## Future Work

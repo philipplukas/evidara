@@ -1,3 +1,21 @@
+# ============================================================================
+# DEPRECATED — GCP prod runtime. ADR-0029 replaced this with self-hosted Hetzner
+# k3s; the live prod runtime is `infra/hetzner/` + `k8s/gitops/`, and this stack's
+# `terraform destroy` is the last open item of ADR-0029 Slice 6.
+#
+# Do not add new services or secrets here. If you are provisioning something for
+# the runtime that actually serves traffic, it belongs in `infra/hetzner/apps/`.
+#
+# Known gap, left deliberately unfixed: this file declares no
+# PLATFORM_CONTROL_OPERATOR_API_KEY / API_KEY for `platform-control-api` or
+# `legal-search-api`. On the live Hetzner runtime those keys ARE provisioned —
+# `infra/hetzner/deploy-stage5.sh` creates the `evidara-auth` Secret and the
+# Deployments consume it — so the gap is confined to this dead stack. Plumbing
+# secrets into a stack that is being destroyed would be the wrong fix. What was
+# fixed instead is the app-side fail-open the gap depended on: both APIs now
+# refuse traffic (503) when no key is configured rather than serving everything.
+# ============================================================================
+
 environment = "prod"
 
 project_id      = "evidara-prod"
@@ -87,9 +105,20 @@ cloud_run_services = {
   }
 
   "document-intelligence-document-service" = {
-    image                 = "europe-west6-docker.pkg.dev/evidara-prod/runtime/document-intelligence-document-service:latest"
-    service_account_key   = "document_intelligence"
-    allow_unauthenticated = true
+    image               = "europe-west6-docker.pkg.dev/evidara-prod/runtime/document-intelligence-document-service:latest"
+    service_account_key = "document_intelligence"
+    # Was `true` — i.e. the `allUsers` IAM binding, an anonymous public endpoint on a
+    # service that reads published Delta rows. Its only other credential is
+    # DOCUMENT_SERVICE_BEARER_TOKEN, and nothing external needs to call it: the sole
+    # caller is legal-search-api, in-cluster, via DOCUMENT_INTELLIGENCE_BASE_URL.
+    #
+    # This stack is dead (see the banner at the top of this file), so the practical
+    # exposure today is nil — but it is flipped rather than left, because "dead" is a
+    # claim about the world, not about the file, and a `terraform apply` from anyone
+    # who believes otherwise would open it. The equivalent on the live runtime is
+    # `infra/hetzner/apps/document-intelligence.yaml`, whose document-service is a
+    # ClusterIP Service with no Ingress — not internet-reachable.
+    allow_unauthenticated = false
     startup_probe_path    = "/health"
     liveness_probe_path   = "/health"
     env_vars = {

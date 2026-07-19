@@ -1,3 +1,10 @@
+# NOTE: the `evidara-auth` Secret is REQUIRED, not `optional: true`. It used to be
+# optional, which meant a cluster where `deploy-stage5.sh` had never run (or where the
+# Secret was deleted) started every pod with no API key — and both APIs then failed
+# OPEN, serving the control plane and the search API to anyone who reached them. The
+# apps now fail closed (503) instead, and making the Secret required moves the failure
+# earlier still: the pod refuses to start rather than starting up unauthenticated.
+# Run `infra/hetzner/deploy-stage5.sh` before `kubectl apply -k apps/`.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,7 +36,6 @@ spec:
                 secretKeyRef:
                   name: evidara-auth
                   key: LEGAL_SEARCH_API_KEY
-                  optional: true
           envFrom:
             - configMapRef:
                 name: evidara-config
@@ -104,7 +110,6 @@ spec:
                 secretKeyRef:
                   name: evidara-auth
                   key: LEGAL_SEARCH_API_KEY
-                  optional: true
           readinessProbe:
             httpGet:
               path: /

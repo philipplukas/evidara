@@ -15,6 +15,13 @@ from platform_control.config import get_settings
 from platform_control.database import reset_database_caches
 from platform_control.models.base import Base
 
+# Auth fails closed when no API key is configured (see `platform_control.auth`).
+# The suite runs keyless by design, so it opts into the local-development open path
+# by name — the same way `docker-compose.local.yml` does. `setdefault` so a test that
+# wants to exercise the fail-closed branch can override it via monkeypatch/env.
+# This must run before any `Settings()` is constructed, hence module import time.
+os.environ.setdefault("PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED", "1")
+
 # Where the temporalio SDK caches the `temporal-test-server` binary it drives
 # `WorkflowEnvironment.start_time_skipping()` with. The binary is fetched once
 # per SDK version and reused forever after; the server itself is local (it binds

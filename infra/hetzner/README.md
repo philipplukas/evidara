@@ -111,8 +111,20 @@ BASIC_AUTH_USER=admin BASIC_AUTH_PASS='choose-a-strong-pass' bash infra/hetzner/
 - **API keys** — the `evidara-auth` Secret holds a `PLATFORM_CONTROL_OPERATOR_API_KEY` and a
   `LEGAL_SEARCH_API_KEY` (generated once, reused after). Each API enforces `X-API-Key`; the
   matching Next.js middleware (`platform-control/admin`, `legal-search/frontend`) injects the
-  key server-side when proxying, so the browser never sees it. Both keys are wired as
-  `optional` secret refs — absent key ⇒ API stays open (backward compatible).
+  key server-side when proxying, so the browser never sees it.
+  **The Secret is required, and both APIs fail closed.** This used to read "absent key ⇒ API
+  stays open (backward compatible)" — an unmounted Secret silently served the whole control
+  plane and search API to anyone who could reach them, and looked identical to a working
+  deployment. Now:
+  - The secret refs are **not** `optional`, so a pod without `evidara-auth` refuses to start.
+  - If a keyless process does start anyway, every protected route returns **503**
+    (`Authentication is not configured`), and platform-control logs a `CRITICAL` line at boot.
+  - Health/readiness endpoints stay reachable either way, so an unconfigured pod is still
+    diagnosable.
+  - The keyless path still exists for local development, but must be requested by name:
+    `PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1` / `AUTH_DEV_ALLOW_UNAUTHENTICATED=1`.
+    Never set either in this cluster.
+  Run `deploy-stage5.sh` before `kubectl apply -k apps/`.
 - **Front door** — Traefik BasicAuth Middleware + Ingress on the real hostnames
   `admin.evidara.veyo.dev` / `search.evidara.veyo.dev` (admin + search; the old
   `*.88-99-26-120.nip.io` ingress has been retired). Rotate the BasicAuth password

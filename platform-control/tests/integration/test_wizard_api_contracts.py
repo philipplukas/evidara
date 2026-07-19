@@ -89,15 +89,19 @@ async def test_wizard_api_happy_path(client, session_maker) -> None:
 
     decision = await client.post(
         f"/v1/reviews/tasks/{task_id}/decision",
-        json={"decision": "accept", "reviewed_by": "reviewer_api"},
+        # The client sends a `reviewed_by` it invented. It must not be believed.
+        json={"decision": "accept", "reviewed_by": "definitely-not-me"},
     )
     assert decision.status_code == 200
     assert decision.json()["status"] == "completed"
+    # Attribution comes from the authenticated principal, not the request body.
+    # Only key-shaped today (ADR-0020); ADR-0038 makes it a person.
+    assert decision.json()["decision_payload"]["reviewed_by"] == "op_00000000000000000000000001"
 
     # A second verdict conflicts rather than silently overwriting the first.
     replay = await client.post(
         f"/v1/reviews/tasks/{task_id}/decision",
-        json={"decision": "reject", "reviewed_by": "reviewer_api"},
+        json={"decision": "reject"},
     )
     assert replay.status_code == 409
 
@@ -106,3 +110,4 @@ async def test_wizard_api_happy_path(client, session_maker) -> None:
     assert fetched.json()["status"] == "completed"
     assert fetched.json()["external_id"] == "api_review_1"
     assert fetched.json()["decision_payload"]["decision"] == "accept"
+    assert fetched.json()["decision_payload"]["reviewed_by"] != "definitely-not-me"

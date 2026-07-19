@@ -1,6 +1,10 @@
 """API-key authentication and coarse authorization for platform-control.
 
-When no API keys are configured, dependencies are a no-op (local development).
+**Fail-closed default.** When no API keys are configured the dependencies reject
+with 503 unless ``PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED`` is explicitly
+set. The keyless path is a local-development convenience that must be asked for by
+name — it used to be what you got by accident from a deployment with an unmounted
+secret. See :func:`_dev_open_mode`.
 
 **Legacy single key** — only ``PLATFORM_CONTROL_API_KEY`` is set: any protected
 route accepts that key (same behavior as before scoped keys existed).
@@ -28,6 +32,7 @@ that needs the operator's identity should depend on
 from __future__ import annotations
 
 import hmac
+import os
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -50,6 +55,69 @@ def _timing_safe_equal(expected: str, provided: str | None) -> bool:
 
 def _auth_configured(settings: Settings) -> bool:
     return bool(settings.api_key or settings.operator_api_key or settings.service_api_key)
+
+
+_DEV_OPEN_ENV = "PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED"
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def _dev_open_requested() -> bool:
+    """Read the keyless-development opt-in straight from the environment.
+
+    Deliberately *not* a field on :class:`Settings`. The Firecrawl webhook route
+    resolves ``Depends(get_settings)`` in a way that publishes the entire ``Settings``
+    model as a request-body schema in the generated contract (see
+    ``contracts/api/platform-control.openapi.yaml`` under ``/v1/firecrawl/webhooks``),
+    so adding a field there is a contract change. A dev-only escape hatch is not worth
+    a contract revision, and this keeps the flag out of the published document.
+    """
+    return os.environ.get(_DEV_OPEN_ENV, "").strip().lower() in _TRUTHY
+
+
+def _dev_open_mode(settings: Settings) -> bool:
+    """True when the keyless local-development path is *explicitly* opted into.
+
+    Fail-closed default. Historically ``_auth_configured`` returning False meant
+    "authentication disabled", so a deployment that forgot to mount
+    ``PLATFORM_CONTROL_OPERATOR_API_KEY`` served the entire control plane — sources,
+    runs, approvals, reference data — unauthenticated to anyone who could reach it.
+    That is a fail-open default on the most privileged surface we have.
+
+    Now the open path must be asked for by name via
+    ``PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1``. Local compose and the test
+    suite set it deliberately; nothing deployed does, so a missing key produces 503 on
+    every protected route instead of silence.
+    """
+    return not _auth_configured(settings) and _dev_open_requested()
+
+
+def _auth_misconfigured() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            "Authentication is not configured. Set PLATFORM_CONTROL_OPERATOR_API_KEY "
+            "(and/or PLATFORM_CONTROL_SERVICE_API_KEY), or opt into the keyless "
+            "local-development path with PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED=1."
+        ),
+    )
+
+
+def check_auth_configuration(settings: Settings) -> str | None:
+    """Return a fatal-misconfiguration message, or ``None`` when the config is sound.
+
+    Called at app startup so the failure is visible in logs at boot rather than only
+    as a 503 on the first request. Kept separate from ``create_app`` raising so that
+    build-time importers (the contract generator, ADR-0034) can still construct the app.
+    """
+    if _auth_configured(settings):
+        return None
+    if _dev_open_requested():
+        return None
+    return (
+        "platform-control has NO API key configured and "
+        "PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED is not set: every protected "
+        "route will reject with 503. Mount PLATFORM_CONTROL_OPERATOR_API_KEY."
+    )
 
 
 def _scoped_keys_configured(settings: Settings) -> bool:
@@ -103,7 +171,9 @@ async def require_control_plane_operator(
     """Operator/admin routes: full-access or operator key; reject service-only with 403."""
     settings = get_settings()
     if not _auth_configured(settings):
-        return
+        if _dev_open_mode(settings):
+            return
+        raise _auth_misconfigured()
 
     if not _scoped_keys_configured(settings):
         if api_key is None or not _matches_full_access(settings, api_key):
@@ -128,7 +198,9 @@ async def require_control_plane_service(
     """Pipeline / webhook / DI ingest routes: service, operator, or full-access key."""
     settings = get_settings()
     if not _auth_configured(settings):
-        return
+        if _dev_open_mode(settings):
+            return
+        raise _auth_misconfigured()
 
     if not _scoped_keys_configured(settings):
         if api_key is None or not _matches_full_access(settings, api_key):
@@ -195,14 +267,17 @@ async def get_current_principal(
 ) -> Principal:
     """Resolve the authenticated caller to an :class:`Operator` row.
 
-    Local-dev mode (no API keys configured) returns the static
-    ``op_local_dev`` principal without a DB lookup. Configured mode
+    Local-dev mode (no API keys configured *and* the dev opt-in flag set)
+    returns the static ``op_local_dev`` principal without a DB lookup;
+    unconfigured-and-not-opted-in fails closed with 503. Configured mode
     requires the presented key to map to an enabled operator row;
     unmapped principals raise 403 (fail-closed).
     """
     settings = get_settings()
     if not _auth_configured(settings):
-        return _LOCAL_DEV_PRINCIPAL
+        if _dev_open_mode(settings):
+            return _LOCAL_DEV_PRINCIPAL
+        raise _auth_misconfigured()
 
     if api_key is None:
         raise _unauthorized()

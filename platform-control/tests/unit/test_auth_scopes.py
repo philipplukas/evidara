@@ -203,3 +203,89 @@ async def test_full_access_key_works_when_scoped_keys_exist(
             assert r2.status_code == 422
     finally:
         app.dependency_overrides.clear()
+
+
+_DEV_OPEN = "PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED"
+
+
+@pytest.mark.asyncio
+async def test_no_keys_and_no_dev_optin_fails_closed(
+    session_maker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The regression that matters: an unconfigured deployment must serve nothing.
+
+    Before this, `_auth_configured()` returning False meant "auth disabled", so a
+    deployment whose API-key Secret failed to mount served the entire control plane
+    to anyone who could reach it — with no signal that it was doing so.
+    """
+    monkeypatch.delenv(_DEV_OPEN, raising=False)
+    get_settings.cache_clear()
+
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            # Operator route: closed.
+            assert (await client.get("/v1/sources")).status_code == 503
+            # Service route: closed too.
+            assert (await client.post("/v1/firecrawl/webhooks", json={})).status_code == 503
+            # Health stays open so probes still work — an unconfigured pod must be
+            # diagnosable, and readiness is not a control-plane capability.
+            assert (await client.get("/health")).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_no_keys_with_dev_optin_stays_open(
+    session_maker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The local-development path is preserved — but only when asked for by name."""
+    monkeypatch.setenv(_DEV_OPEN, "1")
+    get_settings.cache_clear()
+
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            assert (await client.get("/v1/sources")).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_dev_optin_is_ignored_once_a_key_is_configured(
+    session_maker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The flag must not be a backdoor: with a key set, the key is still required."""
+    monkeypatch.setenv(_OP, "operator-secret")
+    monkeypatch.setenv(_DEV_OPEN, "1")
+    get_settings.cache_clear()
+
+    app = create_app()
+
+    async def override_get_session():
+        async with session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            assert (await client.get("/v1/sources")).status_code == 401
+            authed = await client.get("/v1/sources", headers={"X-API-Key": "operator-secret"})
+            assert authed.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
