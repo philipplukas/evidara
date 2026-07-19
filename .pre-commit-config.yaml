@@ -138,7 +138,10 @@ repos:
         entry: python3 scripts/check_test_reachability.py
         language: system
         pass_filenames: false
-        files: ^(scripts/check_test_reachability\.py|\.github/workflows/.*\.yml|scripts/check-.*\.sh|.*/(package\.json|vitest\.config\.ts|playwright\.config\.ts)|.*(\.spec\.tsx?|\.test\.tsx?)|.*/tests?/.*\.py|.*/test_[^/]*\.py)$
+        # `vitest[^/]*\.config\.ts` — not just `vitest.config.ts`. A surface may
+        # run several vitest projects off several configs (legal-search/api has
+        # three), and each one decides what it collects.
+        files: ^(scripts/check_test_reachability\.py|\.github/workflows/.*\.yml|scripts/check-.*\.sh|.*/(package\.json|vitest[^/]*\.config\.ts|playwright[^/]*\.config\.ts)|.*(\.spec\.tsx?|\.test\.tsx?)|.*/tests?/.*\.py|.*/test_[^/]*\.py)$
 
       # Two ADRs may not share a number. Git merges `0038-a.md` and `0038-b.md`
       # cleanly, so nothing else catches this. See ADR-0040.

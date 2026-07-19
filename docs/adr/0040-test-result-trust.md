@@ -197,7 +197,7 @@ building a machine to refuse to guess, using tooling that guesses.
 
 ## Consequences
 
-**Positive**
+### Positive
 
 - A green run means something specific, and the meaning is checkable.
 - The three causes give review a vocabulary. "This is an A problem" is more
@@ -207,7 +207,7 @@ building a machine to refuse to guess, using tooling that guesses.
 - Debt registers make the size of the problem a number on every CI run rather
   than a thing people rediscover.
 
-**Negative**
+### Negative
 
 - More gates that can block a PR, including on days when the underlying test
   change is trivial. This is the intended trade.
@@ -219,7 +219,7 @@ building a machine to refuse to guess, using tooling that guesses.
   sufficiently dynamic invocation. It fails loudly if it parses zero
   invocations, but a partially-broken parser would under-report.
 
-**Neutral**
+### Neutral
 
 - `docs/testing/testing-principles.md` and `docs/testing/ci-testing-strategy.md`
   gain a "trust" section pointing here. Those documents describe what to test
