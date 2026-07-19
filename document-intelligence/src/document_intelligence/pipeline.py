@@ -169,7 +169,17 @@ class ProcessingPipeline:
             selected_bundle.manifest.provenance.source_id,
             _document_identity_key(selected_bundle),
         )
-        document_revision = 1
+        # Re-acquiring a law publishes the *next* revision of it, not another copy pinned at
+        # 1 (#652). Keying `document_id` on the upstream locator made re-acquisitions land on
+        # the same document; this is what makes them ordered once they do. Without it,
+        # `_pick_latest_row` falls back to comparing `processed_at` strings and legal-search's
+        # stale-event guard (`document_revision < latest`) can never fire, so a redelivered or
+        # replayed older event silently overwrites newer content.
+        #
+        # `None` means the sink has no history for this document — new document, or a sink that
+        # cannot read back — and publication starts at 1, exactly as before.
+        previous_revision = self._sink.latest_document_revision(document_id)
+        document_revision = (previous_revision or 0) + 1
         processing_manifest_id = random_prefixed_id("pm")
         provenance = _build_canonical_provenance(
             selected_bundle.manifest.provenance,

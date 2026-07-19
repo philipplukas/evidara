@@ -27,10 +27,23 @@ flowchart LR
 | Serving — search | legal-search | OpenSearch | Projections derived from published refs; aliases for cutover. |
 | Serving — detail | legal-search BFF + Document Service | OpenSearch (metadata) + Delta (body via API) | Body reads go through `contracts/api/document-intelligence.openapi.yaml` per ADR-0010. |
 
-## Withdrawal & supersession
+## Document identity & supersession
 
-- **Supersession** — New `document_revision` via `document.processed`.
+- **Identity** — `document_id` is derived from the source plus the document's `upstream_locator`
+  (its permalink at the authority: an ELI for Fedlex, the AS landing page for a communal
+  ordinance). It is therefore stable across acquisition runs, so re-fetching a law resolves to
+  the *same* document. Sources publishing no stable locator fall back to the artifact id, which
+  keeps genuinely distinct documents apart at the cost of not collapsing their re-acquisitions.
+- **Supersession** — New `document_revision` via `document.processed`. The pipeline reads the
+  highest revision already published for that `document_id` and publishes `N+1`, so successive
+  acquisitions are ordered rather than all pinned at 1. `_pick_latest_row` orders on
+  `(document_revision, processed_at)`, and legal-search drops events whose revision is below the
+  latest already projected — a redelivered or replayed older event cannot overwrite newer content.
 - **Withdrawal from search** — `document.withdrawn` drives deindexing and UI hiding.
+
+Both halves are load-bearing together: stable identity without moving revisions leaves ordering to
+a `processed_at` string comparison, and moving revisions without stable identity just numbers
+duplicates (#652).
 
 ## Retention
 
