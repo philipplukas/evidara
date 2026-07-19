@@ -3,6 +3,8 @@ import type { AcquisitionSpec, SourceVersionRecord } from "../../lib/admin/dataP
 import {
   describeSourceVersionStatus,
   emptyFormState,
+  explainUnavailableVersionAction,
+  type SourceVersionAction,
   summarizeAcquisitionSpec,
   summarizeSourceVersionLifecycle,
   toAcquisitionSpec,
@@ -97,6 +99,75 @@ describe("SourceVersionsSection helpers", () => {
       label: "Rejected",
       attention: true,
     });
+  });
+});
+
+describe("explainUnavailableVersionAction", () => {
+  it("states why every action is blocked on an approved version", () => {
+    // The live repro (#674): an approved version rendered Edit / Approve /
+    // Reject as three greyed buttons with no stated reason.
+    expect(explainUnavailableVersionAction("edit", "approved")).toContain("immutable");
+    expect(explainUnavailableVersionAction("approve", "approved")).toContain("terminal");
+    expect(explainUnavailableVersionAction("reject", "approved")).toContain("terminal");
+  });
+
+  it("returns null for the actions an approved version can still take", () => {
+    expect(explainUnavailableVersionAction("preview", "approved")).toBeNull();
+    expect(explainUnavailableVersionAction("production", "approved")).toBeNull();
+  });
+
+  it("leaves a draft's review actions available and explains the production block", () => {
+    expect(explainUnavailableVersionAction("edit", "draft")).toBeNull();
+    expect(explainUnavailableVersionAction("approve", "draft")).toBeNull();
+    expect(explainUnavailableVersionAction("reject", "draft")).toBeNull();
+    expect(explainUnavailableVersionAction("preview", "draft")).toBeNull();
+    expect(explainUnavailableVersionAction("production", "draft")).toContain("approved version");
+  });
+
+  it("explains the rejected and superseded dead ends", () => {
+    expect(explainUnavailableVersionAction("edit", "rejected")).toBeNull();
+    expect(explainUnavailableVersionAction("preview", "rejected")).toContain("blocked");
+    expect(explainUnavailableVersionAction("approve", "rejected")).toContain("already rejected");
+    expect(explainUnavailableVersionAction("edit", "superseded")).toContain("read-only");
+    expect(explainUnavailableVersionAction("preview", "superseded")).toContain("read-only");
+  });
+
+  it("preserves the availability matrix the row's ad-hoc booleans encoded", () => {
+    // This helper replaced four inline booleans in `SourceVersionsSection`
+    // (`canEdit` / `canReview` / `canPreview` / `canProduction`). Adding the
+    // explanation must not change *which* buttons are disabled, so the whole
+    // 5x5 matrix is pinned against the behaviour those booleans produced.
+    const available: Record<SourceVersionRecord["status"], SourceVersionAction[]> = {
+      draft: ["edit", "preview", "approve", "reject"],
+      pending_approval: ["preview", "approve", "reject"],
+      approved: ["preview", "production"],
+      rejected: ["edit"],
+      superseded: [],
+    };
+    const allActions: SourceVersionAction[] = [
+      "edit",
+      "preview",
+      "production",
+      "approve",
+      "reject",
+    ];
+
+    for (const [status, expected] of Object.entries(available)) {
+      const actual = allActions.filter(
+        (action) =>
+          explainUnavailableVersionAction(action, status as SourceVersionRecord["status"]) === null,
+      );
+      expect({ status, actual }).toEqual({
+        status,
+        actual: allActions.filter((a) => expected.includes(a)),
+      });
+    }
+  });
+
+  it("keeps a pending-approval version reviewable but not editable", () => {
+    expect(explainUnavailableVersionAction("approve", "pending_approval")).toBeNull();
+    expect(explainUnavailableVersionAction("reject", "pending_approval")).toBeNull();
+    expect(explainUnavailableVersionAction("edit", "pending_approval")).toContain("review");
   });
 });
 
@@ -198,6 +269,38 @@ describe("acquisition-spec form helpers", () => {
     // of them (`admin-04-canton-http-show.png` in #614).
     expect(lines).not.toContain("mode: undefined");
     expect(lines).not.toContain("limit: undefined");
+  });
+
+  it("counts the tail of a long list instead of printing every entry", () => {
+    // The Fedlex 50-act version printed all 50 work URIs into one table cell,
+    // making a row several screens tall and pushing the row's other columns out
+    // of view (#674).
+    const lines = summarizeAcquisitionSpec({
+      provider: "fedlex_sparql",
+      seed_url: "https://fedlex.data.admin.ch/eli/cc/0",
+      seed_urls: Array.from(
+        { length: 49 },
+        (_, index) => `https://fedlex.data.admin.ch/eli/cc/${index + 1}`,
+      ),
+      sparql_endpoint: "https://fedlex.data.admin.ch/sparqlendpoint",
+      preferred_languages: ["de"],
+      query_mode: "work_to_expression",
+      max_expressions: 1,
+    });
+
+    const workUris = lines.find((line) => line.startsWith("work URIs:")) ?? "";
+    expect(workUris).toContain("… and 47 more");
+    expect(workUris).not.toContain("/eli/cc/40");
+  });
+
+  it("leaves a short list intact", () => {
+    const lines = summarizeAcquisitionSpec({
+      provider: "deterministic_http",
+      seed_url: "https://example.test/a",
+      seed_urls: ["https://example.test/b"],
+    });
+
+    expect(lines).toContain("seeds: https://example.test/a, https://example.test/b");
   });
 });
 

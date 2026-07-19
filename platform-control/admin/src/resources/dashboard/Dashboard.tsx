@@ -31,6 +31,7 @@ type DashboardStats = {
     status: string;
     artifacts_count: number;
     created_at: string | null;
+    started_at: string | null;
     completed_at: string | null;
   }>;
 };
@@ -340,7 +341,12 @@ export function Dashboard() {
     {
       key: "duration",
       header: "Duration",
-      render: (run) => formatDuration(run.created_at, run.completed_at),
+      // `created_at -> completed_at` is queue wait + execution, not a duration.
+      // Three Fedlex runs read "2m 20s" here while the run detail page read
+      // "273ms" for the same run under the same column name (#674). Measure what
+      // the detail page measures: `started_at -> completed_at`. A run that never
+      // started has no duration to state, and formatDuration renders "-".
+      render: (run) => formatDuration(run.started_at, run.completed_at),
     },
     {
       key: "inspect",
