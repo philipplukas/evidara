@@ -50,6 +50,55 @@ _FORMAT_CONTENT_TYPE: dict[str, str] = {
 _DEFAULT_PAGE_SIZE = 20
 _MAX_PAGES = 50
 
+# Temporal validity (#663). VERIFIED against the live OGD API (2026-07-19): every
+# `BrKons` document reference carries `Bundesrecht.BrKons.Inkrafttretensdatum`
+# (540/540 sampled) and, when the norm has ceased to apply,
+# `Ausserkrafttretensdatum`. Both are already ISO-8601 in the JSON listing — the
+# per-document RIS XML publishes the same two values as `ct="ikra"` / `ct="akra"`
+# in DD.MM.YYYY, which is why acquisition is the better place to read them.
+_RIS_IN_FORCE_FROM_FIELD = "Inkrafttretensdatum"
+_RIS_IN_FORCE_UNTIL_FIELD = "Ausserkrafttretensdatum"
+
+# Act-level relation signal, the closest RIS analogue to Fedlex `jolux:inForceStatus`
+# (#661). `NovellenBeziehung` states how this norm relates to the amending act
+# (Novelle). Observed live across 540 sampled norms, only these two values occur,
+# plus absence:
+#   "aufgehoben durch"       → repealed by
+#   "zuletzt geändert durch" → last amended by
+#
+# Unlike Fedlex, this signal does NOT need to override the window. Measured live
+# (#663): of 27 acts sampled, 11 carry a repeal signal, and **0** of them have an
+# open-ended newest version — RIS closes `Ausserkrafttretensdatum` on every
+# version of a repealed act (checked per act: 4, 8, 32, 22, 16, 22, 4 and 22
+# versions, all closed). The Fedlex trap — a repealed work whose newest
+# consolidation is open-ended, so version dates alone report repealed law as
+# current — therefore does not reproduce in RIS. We record the signal as
+# corroboration rather than as an override; see the module docs for why.
+_RIS_AMENDMENT_RELATION_FIELD = "NovellenBeziehung"
+_AMENDMENT_RELATION_BY_RIS_VALUE = {
+    "aufgehoben durch": "repealed_by",
+    "zuletzt geändert durch": "last_amended_by",
+}
+
+
+def _iso_date_or_none(value: Any) -> str | None:
+    """Return `value` as an ISO-8601 date string, or None if it is not one.
+
+    RIS publishes these fields as ISO in the OGD JSON, but a value we cannot
+    parse is reported as None rather than guessed at: the downstream in-force
+    model is four-valued precisely so it can answer `unknown`, and a wrong date
+    is worse than a missing one.
+    """
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        return datetime.strptime(candidate, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        return None
+
 
 def _format_date(value: Any) -> str:
     """Convert ISO date/datetime string to DD.MM.YYYY for the OGD API."""
@@ -298,6 +347,12 @@ def _extract_metadata(ref: dict[str, Any]) -> dict[str, Any]:
     applikation = tech.get("Applikation", "")
     document_type = _APPLIKATION_TO_DOCTYPE.get(applikation, "")
 
+    # Temporal validity (#663) lives one level further down, in the
+    # application-specific block (`BrKons` for consolidated federal law).
+    domain_detail = domain_meta.get(applikation) if isinstance(domain_meta, dict) else None
+    if not isinstance(domain_detail, dict):
+        domain_detail = {}
+
     return {
         "ris_id": tech.get("ID", ""),
         "applikation": applikation,
@@ -307,7 +362,28 @@ def _extract_metadata(ref: dict[str, Any]) -> dict[str, Any]:
         "title": domain_meta.get("Titel", ""),
         "short_title": domain_meta.get("Kurztitel", ""),
         "eli": domain_meta.get("Eli", ""),
+        # Omitted (None), never defaulted, when RIS does not publish them: an
+        # absent `Ausserkrafttretensdatum` means the norm is still in force, and
+        # an unparseable value must stay `unknown` rather than become a guess.
+        "in_force_from": _iso_date_or_none(domain_detail.get(_RIS_IN_FORCE_FROM_FIELD)),
+        "in_force_until": _iso_date_or_none(domain_detail.get(_RIS_IN_FORCE_UNTIL_FIELD)),
+        "amendment_relation": _amendment_relation(domain_detail),
+        "gesetzesnummer": domain_detail.get("Gesetzesnummer") or "",
     }
+
+
+def _amendment_relation(domain_detail: dict[str, Any]) -> str | None:
+    """Map RIS `NovellenBeziehung` onto our controlled vocabulary.
+
+    Returns `repealed_by` / `last_amended_by`, or None when RIS publishes no
+    relation *or* publishes a value we do not recognise. An unrecognised value is
+    reported as None rather than mapped onto a plausible guess — the same rule
+    #661 applies to unknown Fedlex enforcement-status codes.
+    """
+    raw = domain_detail.get(_RIS_AMENDMENT_RELATION_FIELD)
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    return _AMENDMENT_RELATION_BY_RIS_VALUE.get(raw.strip().lower())
 
 
 async def _fetch_single_document(
@@ -347,6 +423,32 @@ async def _fetch_single_document(
     actual_ct = response.headers.get("content-type", content_type)
     normalized_ct = actual_ct.split(";")[0].strip().lower()
 
+    resource_metadata: dict[str, Any] = {
+        "provider": "ris_ogd",
+        "ris_id": ris_id,
+        "applikation": meta.get("applikation"),
+        "document_type": meta.get("document_type"),
+        "eli": meta.get("eli"),
+        "short_title": meta.get("short_title"),
+        "organ": meta.get("organ"),
+        "data_type": data_type,
+        "fetched_at": datetime.now(UTC).isoformat(),
+        "run_id": run.run_id,
+    }
+
+    # Temporal validity (#663). These land on the resource metadata under the
+    # exact keys `build_bundle_extraction_hints` looks for, so the window reaches
+    # `document.metadata.in_force_from` / `.in_force_until` — the paths the search
+    # projection already coalesces. Keys stay ABSENT when RIS did not publish
+    # them; the in-force model is four-valued so it can answer `unknown`, and
+    # handing it a fabricated date is what ADR-0033 exists to prevent.
+    for key in ("in_force_from", "in_force_until", "amendment_relation"):
+        value = meta.get(key)
+        if value:
+            resource_metadata[key] = value
+    if meta.get("gesetzesnummer"):
+        resource_metadata["gesetzesnummer"] = meta["gesetzesnummer"]
+
     return ProviderResource(
         source_url=meta.get("document_url") or url,
         final_url=url,
@@ -355,16 +457,5 @@ async def _fetch_single_document(
         title=meta.get("title") or meta.get("short_title"),
         http_status=response.status_code,
         discovery_depth=0,
-        metadata={
-            "provider": "ris_ogd",
-            "ris_id": ris_id,
-            "applikation": meta.get("applikation"),
-            "document_type": meta.get("document_type"),
-            "eli": meta.get("eli"),
-            "short_title": meta.get("short_title"),
-            "organ": meta.get("organ"),
-            "data_type": data_type,
-            "fetched_at": datetime.now(UTC).isoformat(),
-            "run_id": run.run_id,
-        },
+        metadata=resource_metadata,
     )

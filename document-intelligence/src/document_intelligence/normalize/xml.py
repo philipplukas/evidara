@@ -1,5 +1,6 @@
 """XML normalization into the shared intermediate representation."""
 
+from datetime import datetime
 from xml.etree import ElementTree
 
 from document_intelligence.errors import ProcessingError
@@ -70,8 +71,13 @@ _RIS_CT_MAP = {
     "strs": "headnote",
     "hinweisstrs": "headnote_reference",
     "kundmachungsorgan": "publication_organ",
+    # Temporal validity (#663). The key MUST be `in_force_until`, not
+    # `in_force_to`: `in_force_until` is the contract vocabulary the search
+    # projection and `resolveInForceState()` read. RIS publishes both as
+    # DD.MM.YYYY in the document XML, so `_extract_ris_ct_metadata` reformats
+    # them to ISO — see `_ris_iso_date`.
     "ikra": "in_force_from",
-    "akra": "in_force_to",
+    "akra": "in_force_until",
     "schlagworte": "keywords",
     "gesnr": "gesetzesnummer",
     "doknr": "dokumentnummer",
@@ -352,9 +358,40 @@ def _extract_ris_ct_metadata(root) -> dict[str, str]:
         if key is None or key in output:
             continue
         text = _normalize_whitespace(" ".join(element.itertext()))
-        if text:
-            output[key] = text
+        if not text:
+            continue
+        if key in _RIS_DATE_FIELDS:
+            iso = _ris_iso_date(text)
+            # A date we cannot parse is dropped, not stored raw: these two feed
+            # in-force reasoning, which must answer `unknown` rather than be
+            # handed a value it will misread.
+            if iso is None:
+                continue
+            text = iso
+        output[key] = text
     return output
+
+
+# RIS `ct` fields carrying dates, published as DD.MM.YYYY in the document XML.
+_RIS_DATE_FIELDS = frozenset({"in_force_from", "in_force_until"})
+
+
+def _ris_iso_date(value: str) -> str | None:
+    """Convert a RIS DD.MM.YYYY date to ISO 8601, or None if it is not one.
+
+    The RIS document XML publishes `ct="ikra"` / `ct="akra"` as `24.04.1998`,
+    while the whole downstream chain — the search projection and
+    `resolveInForceState()` — requires ISO 8601. Storing the raw RIS form would
+    leave temporal validity just as dead as the wrong key did (#663). Values
+    already in ISO form are passed through unchanged.
+    """
+    candidate = value.strip()
+    for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(candidate, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
 
 
 def _looks_like_ris(root, extracted_metadata: dict[str, str]) -> bool:

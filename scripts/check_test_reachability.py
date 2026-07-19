@@ -73,15 +73,6 @@ WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 # on every run. Removing a file or making it reachable requires deleting its
 # entry (a stale entry fails the check, so this cannot silently rot).
 KNOWN_UNREACHABLE: dict[str, str] = {
-    "legal-search/frontend/e2e/workspace-panels.spec.ts": (
-        "No tag, and not the one path `e2e:visual` names. The #605 panel-geometry "
-        "guard has never run. Tagging it green requires first fixing the failures "
-        "it finds — tracked separately."
-    ),
-    "legal-search/frontend/e2e/mobile-workspace.spec.ts": (
-        "No tag. Mobile sheet interactions are covered visually by `@screenshots`, "
-        "but these behavioural assertions run nowhere."
-    ),
     "legal-search/frontend/e2e/demo-queries.spec.ts": (
         "Tagged `@demo`; no CI command filters on `@demo`. Written for manual demo "
         "rehearsal, never wired to a job."
@@ -95,6 +86,10 @@ KNOWN_UNREACHABLE: dict[str, str] = {
     "platform-control/admin/e2e/preview-review-v2.spec.ts": (
         "`platform-control/admin` has an `e2e` script but no workflow invokes it. "
         "`npm run lint` covers `e2e/`, so these specs are linted and never run."
+    ),
+    "platform-control/admin/e2e/blueprint-inventory.spec.ts": (
+        "Same as preview-review-v2.spec.ts — admin Playwright has no CI job. "
+        "(#668 added it; it needs a running backend, so it needs a job that starts one.)"
     ),
     "platform-control/admin/e2e/reference-data.spec.ts": (
         "Same as preview-review-v2.spec.ts — admin Playwright has no CI job."

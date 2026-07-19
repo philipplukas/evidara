@@ -152,13 +152,28 @@ repos:
         pass_filenames: false
         files: ^docs/adr/.*\.md$
 
+      # Every Playwright spec must be selected by some CI command. Selection in
+      # that suite is entirely `-g <tag>` or by path, so an untagged spec runs
+      # nowhere while still looking maintained. Skips cleanly when the frontend
+      # node_modules is absent. See #686.
+      - id: e2e-spec-coverage
+        name: e2e spec coverage (every spec is reachable from CI)
+        entry: bash scripts/check-e2e-spec-coverage.sh
+        language: system
+        pass_filenames: false
+        files: ^(legal-search/frontend/(e2e/.*|package\.json)|\.github/workflows/legal-search\.yml|scripts/check-e2e-spec-coverage\.sh)$
+
       # `legal-search/` is NOT an npm workspace root — the real packages are
       # `legal-search/frontend` and `legal-search/api`. This hook used to run
       # `cd legal-search && npm run check` against a vestigial package.json,
       # gated on `^legal-search/src/` — a path that does not exist, so it
-      # never fired. It now runs the same script CI does. See #588.
+      # never fired. It now runs the same gates CI does. See #588.
+      # CI runs these same `npm run` gates, but inlined per job rather than
+      # through this script (parallel jobs + per-surface npm caches). The two are
+      # kept in step by scripts/tests/test_check_legal_search_parity.py, not by
+      # shared invocation — the old "same script as CI" claim was false (#688).
       - id: legal-search-check
-        name: Legal Search checks (api + frontend, same script as CI)
+        name: Legal Search checks (api + frontend, same gates as CI)
         entry: bash scripts/check-legal-search.sh
         language: system
         pass_filenames: false

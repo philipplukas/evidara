@@ -441,6 +441,25 @@ class SourceBlueprintTemplateResponse(BaseModel):
         default_factory=list,
         description="Human-readable explanation of any closed key (why the template is inert).",
     )
+    default_enabled: bool = Field(
+        description="The shipped source_blueprints.yaml default for the config key.",
+    )
+    source: str = Field(
+        description="Provenance of the effective config key: 'override' (an operator flipped "
+        "it) or 'default' (running on the shipped value, never touched).",
+    )
+    note: str | None = Field(
+        default=None,
+        description="Evidence note the operator recorded with the override, if any.",
+    )
+    updated_by: str | None = Field(
+        default=None,
+        description="Operator identity that last flipped the override. Key-shaped, not "
+        "person-shaped: every human sharing an operator API key resolves to the same row.",
+    )
+    updated_at: datetime | None = Field(
+        default=None, description="When the override was last written."
+    )
 
 
 class SourceBlueprintTemplateListResponse(BaseModel):

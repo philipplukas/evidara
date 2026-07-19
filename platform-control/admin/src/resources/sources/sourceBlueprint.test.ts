@@ -39,6 +39,13 @@ const mkTemplate = (
   live_ready: true,
   launchable: true,
   notes: [],
+  // Config-key provenance (#668): the API always emits these, so a fixture
+  // without them is a shape the server never returns.
+  default_enabled: true,
+  source: "default",
+  note: null,
+  updated_by: null,
+  updated_at: null,
   ...overrides,
 });
 

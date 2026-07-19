@@ -109,8 +109,8 @@ class BlueprintEnablementService:
         if not enabled:
             raise BlueprintTemplateNotEnabledError(
                 f"Blueprint template '{overlay_id}/{provider_template_id}' is not enabled for "
-                "live acquisition. Capture acceptance-run evidence, then enable it via the "
-                "blueprint-template enablement endpoint (PUT .../enablement) (ADR-0030, #632)."
+                "live acquisition. Capture acceptance-run evidence, then turn the config key on "
+                "from the admin panel's Blueprints inventory (ADR-0030, #632, #668)."
             )
 
     async def set_enabled(
