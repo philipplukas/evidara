@@ -66,3 +66,44 @@ def test_build_bundle_extraction_hints_prefers_short_title_and_skips_placeholder
     assert hints == {
         "title_hint": "Bundesverfassung der Schweizerischen Eidgenossenschaft vom 18. April 1999",
     }
+
+
+def test_build_bundle_extraction_hints_carries_provider_in_force_window() -> None:
+    """The in-force window must survive into the manifest DI actually receives.
+
+    Before #628 the provider established the window and the manifest dropped it,
+    so every federal norm answered `in_force_state: unknown` downstream even
+    though acquisition knew the answer.
+    """
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "provider_metadata": {
+                "provider": "fedlex_sparql",
+                "short_title": "Bundesverfassung",
+                "in_force_from": "2024-03-03",
+                "in_force_until": "2028-12-31",
+            }
+        }
+    )
+
+    assert hints["in_force_from_hint"] == "2024-03-03"
+    assert hints["in_force_until_hint"] == "2028-12-31"
+
+
+def test_build_bundle_extraction_hints_omits_unknown_in_force_window() -> None:
+    """An unknown window is omitted, never defaulted — in-force logic must be
+    free to answer `unknown` rather than be handed a guess."""
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "provider_metadata": {
+                "provider": "fedlex_sparql",
+                "short_title": "Bundesverfassung",
+                # Current consolidation: open-ended, so no end date published.
+                "in_force_from": "2024-03-03",
+                "in_force_until": None,
+            }
+        }
+    )
+
+    assert hints["in_force_from_hint"] == "2024-03-03"
+    assert "in_force_until_hint" not in hints

@@ -26,6 +26,19 @@ All values are optional. Unknown keys are ignored (forward-compatible).
 ``effective_date_hint`` (string, ISO 8601 date recommended)
     Optional temporal anchor for downstream use.
 
+``in_force_from_hint`` (string, ISO 8601 date)
+    First day the norm is in force, as established at acquisition time (e.g.
+    the ``jolux:dateApplicability`` of the Fedlex consolidation actually
+    selected). Applied to ``document.metadata["in_force_from"]``.
+
+``in_force_until_hint`` (string, ISO 8601 date)
+    Last day the norm is in force; absent for an open-ended (current)
+    consolidation. Applied to ``document.metadata["in_force_until"]``.
+
+    Both in-force hints are *omitted*, never defaulted, when acquisition could
+    not establish the window — downstream in-force logic is four-valued and
+    must be free to answer ``unknown`` rather than be handed a guess.
+
 ``docket_numbers`` (list of strings)
     Case numbers / Geschäftszahlen hints for LLM context or future IR.
 
@@ -51,6 +64,8 @@ _EXTRACTION_HINTS_V1_KEYS = frozenset(
         "document_type_hint",
         "authority_display_hint",
         "effective_date_hint",
+        "in_force_from_hint",
+        "in_force_until_hint",
         "docket_numbers",
         "jurisdiction_hint",
     }

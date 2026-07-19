@@ -101,6 +101,28 @@ class FakeAsyncClient:
                 },
                 request=request,
             )
+        if "SELECT ?status ?entryIntoForce" in query:
+            # The BV is in force (enforcement-status/0) since 2000-01-01.
+            return httpx.Response(
+                200,
+                json={
+                    "results": {
+                        "bindings": [
+                            {
+                                "status": {
+                                    "type": "uri",
+                                    "value": (
+                                        "https://fedlex.data.admin.ch/vocabulary/"
+                                        "enforcement-status/0"
+                                    ),
+                                },
+                                "entryIntoForce": {"type": "literal", "value": "2000-01-01"},
+                            }
+                        ]
+                    }
+                },
+                request=request,
+            )
         if "DESCRIBE" in query:
             return httpx.Response(
                 200,
@@ -362,6 +384,131 @@ async def test_start_run_selects_in_force_and_emits_validity_dates(
     assert metadata["in_force_at_selection"] is True
     assert metadata["selected_as_of"] == date.today().isoformat()
     assert result.request_payload["as_of_date"] == date.today().isoformat()
+    # Act-level signals (#628): status from the enforcement-status vocabulary,
+    # and the act's ORIGINAL entry into force — which is not the selected
+    # consolidation's start date.
+    assert metadata["in_force_status"] == "in_force"
+    assert metadata["entry_into_force"] == "2000-01-01"
+
+
+class RepealedWorkAsyncClient(DatedMemberAsyncClient):
+    """A repealed act whose newest consolidation is open-ended.
+
+    Measured live (2026-07-19): 3 works with `enforcement-status/3` have a
+    newest consolidation carrying no `dateEndApplicability`. Consolidation
+    dates alone therefore say "still in force" for repealed law — the act-level
+    status is the only signal that catches it.
+    """
+
+    async def get(self, url: str, *, params=None, headers=None):
+        query = (params or {}).get("query", "")
+        if "SELECT ?status ?entryIntoForce" in query:
+            request = httpx.Request("GET", url, params=params)
+            return httpx.Response(
+                200,
+                json={
+                    "results": {
+                        "bindings": [
+                            {
+                                "status": {
+                                    "type": "uri",
+                                    "value": (
+                                        "https://fedlex.data.admin.ch/vocabulary/"
+                                        "enforcement-status/3"
+                                    ),
+                                }
+                            }
+                        ]
+                    }
+                },
+                request=request,
+            )
+        return await super().get(url, params=params, headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_repealed_act_is_not_reported_in_force_despite_open_ended_consolidation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", RepealedWorkAsyncClient)
+    provider = FedlexSparqlProvider()
+    source_version = SimpleNamespace(
+        acquisition_spec={
+            "seed_url": "https://fedlex.data.admin.ch/eli/cc/1999/404",
+            "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+            "preferred_languages": ["de"],
+            "max_expressions": 1,
+        }
+    )
+
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_repealed"),
+    )
+
+    metadata = result.inline_resources[0].metadata
+    assert metadata["in_force_status"] == "no_longer_in_force"
+    # The consolidation window still reports its own end date, but the act-level
+    # repeal overrides the in-force verdict so the canary fails closed.
+    assert metadata["in_force_at_selection"] is False
+
+
+class UnknownStatusAsyncClient(DatedMemberAsyncClient):
+    """Fedlex publishes an enforcement-status code we do not recognise."""
+
+    async def get(self, url: str, *, params=None, headers=None):
+        query = (params or {}).get("query", "")
+        if "SELECT ?status ?entryIntoForce" in query:
+            request = httpx.Request("GET", url, params=params)
+            return httpx.Response(
+                200,
+                json={
+                    "results": {
+                        "bindings": [
+                            {
+                                "status": {
+                                    "type": "uri",
+                                    "value": (
+                                        "https://fedlex.data.admin.ch/vocabulary/"
+                                        "enforcement-status/99"
+                                    ),
+                                }
+                            }
+                        ]
+                    }
+                },
+                request=request,
+            )
+        return await super().get(url, params=params, headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_unrecognised_enforcement_status_is_reported_as_none_not_guessed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "AsyncClient", UnknownStatusAsyncClient)
+    provider = FedlexSparqlProvider()
+    source_version = SimpleNamespace(
+        acquisition_spec={
+            "seed_url": "https://fedlex.data.admin.ch/eli/cc/1999/404",
+            "sparql_endpoint": "https://fedlex.data.admin.ch/sparqlendpoint",
+            "preferred_languages": ["de"],
+            "max_expressions": 1,
+        }
+    )
+
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_unknown_status"),
+    )
+
+    metadata = result.inline_resources[0].metadata
+    # An unknown vocabulary code must not be mapped onto a plausible value, and
+    # must not silently flip the consolidation's in-force verdict.
+    assert metadata["in_force_status"] is None
+    assert metadata["in_force_at_selection"] is True
 
 
 def test_eli_uri_for_work_prefers_abstract_seed():
