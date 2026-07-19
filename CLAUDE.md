@@ -27,7 +27,7 @@ Run the narrowest gate for the surface you touched before pushing:
 
 | Surface | Gate |
 |---|---|
-| `platform-control/` | `cd platform-control && uv run pytest` |
+| `platform-control/` | `cd platform-control && uv run ruff check . && uv run ruff format --check . && uv run pytest` |
 | `platform-control/admin/` | `cd platform-control/admin && npm run check` |
 | `document-intelligence/` | `cd document-intelligence && uv run --extra dev --extra service --extra test pytest && uv run ruff check . && uv run ruff format --check .` |
 | `legal-search/api/` | `cd legal-search/api && npm run check` |

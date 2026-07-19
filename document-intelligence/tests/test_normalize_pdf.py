@@ -17,13 +17,18 @@ from __future__ import annotations
 
 import io
 
-import pytest
+# reportlab is a declared dependency of the `test` extra, which every path that runs this
+# suite installs (CI job, scripts/check-document-intelligence.sh, the documented local
+# gate in CLAUDE.md). It is imported hard, not via `pytest.importorskip`, on purpose:
+# these are the anti-corruption regression tests for #590/#650, and a module-level
+# importorskip would silently delete the whole file from the run if the extra were ever
+# dropped — reporting green over the exact tests that exist to catch text corruption.
+# If this import fails, the environment is wrong and the suite should say so loudly.
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas as reportlab_canvas
 
 from document_intelligence.normalize.ir import NormalizedDocumentIR
 from document_intelligence.normalize.pdf import normalize_pdf_document
-
-reportlab_canvas = pytest.importorskip("reportlab.pdfgen.canvas")
-from reportlab.lib.pagesizes import A4  # noqa: E402
 
 _PAGE_WIDTH, _PAGE_HEIGHT = A4
 _BODY_X = 200.0
