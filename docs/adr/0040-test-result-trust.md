@@ -170,8 +170,8 @@ building a machine to refuse to guess, using tooling that guesses.
 | Inverted `grep -qv` guard rewritten, with a fixture-tree self-test asserting both directions | #702 (`scripts/check-js-workspace-hygiene.sh`, `scripts/tests/test_check_js_workspace_hygiene.py`) |
 | "CI may not skip" generalised from the #564 Temporal site to the whole platform-control suite | #704 (`platform-control/tests/ci_skip_guard.py`) |
 | Visual baselines re-blessed outside the bug window | #700 |
-| Reachability check — enumerates specs, enumerates what CI invokes, fails on any spec no job can reach | #706 (`scripts/check_test_reachability.py`) |
-| ADR number-collision guard — two files may not claim one number | #706 (`scripts/check_adr_numbers.py`) |
+| Reachability check — enumerates specs, enumerates what CI invokes, fails on any spec no job can reach | #686 (`scripts/check_test_reachability.py`) |
+| ADR number-collision guard — two files may not claim one number | #686 (`scripts/check_adr_numbers.py`) |
 
 **In flight:**
 
@@ -187,6 +187,12 @@ building a machine to refuse to guess, using tooling that guesses.
   `KNOWN_UNREACHABLE` with reasons and are visible on every run, but registering
   debt is not paying it. The largest single item is the five
   `platform-control/admin` Playwright specs, which need a job, not a tag.
+- **No JS equivalent of `ci_skip_guard.py`.** The reachability check is
+  file-level, so a collected file may still contain a test that never runs:
+  `e2e/smoke.spec.ts` guards its only real-backend test with
+  `test.skip(!USE_REAL_BACKEND, ...)` and no job sets that variable (#686
+  case 3). Python fails the run on an unargued skip; vitest and Playwright do
+  not. This is the largest open B-class gap.
 - No guard exists for section C in general. Assertion strength is currently
   enforced by review alone, and review is exactly what missed
   `toBeGreaterThanOrEqual(1)`. A mutation-testing spike on the narrowest
@@ -250,4 +256,4 @@ A suite bound to a stale container reports high coverage of the wrong binary.
 - `platform-control/tests/ci_skip_guard.py` — outcome-over-syntax guard, prior art
 - `scripts/check-js-workspace-hygiene.sh` — both-directions self-test, prior art
 - `scripts/check_test_reachability.py` — the coverage-honesty check this ADR ships with
-- Issues: #564, #588, #605, #611, #646, #664, #690, #698, #700, #702, #704, #706
+- Issues: #564, #588, #605, #611, #646, #664, #686, #688, #690, #698, #700, #702, #704

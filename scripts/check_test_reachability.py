@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail the build when a test file exists that no CI job can reach.
 
-Background (#706): a green suite is only evidence about the tests CI actually
+Background (#686, #688): a green suite is only evidence about the tests CI actually
 runs. This repo accumulated specs that are written, linted, typechecked, and
 committed — and never executed by anything. They look like coverage in the
 file tree and provide none.
@@ -26,6 +26,15 @@ Design (deliberately mirrors `platform-control/tests/ci_skip_guard.py`):
   every entry in it must carry a reason.
 - **Check the outcome, not the syntax.** Reachability is "would some CI
   command collect this file", not "does this file look tagged".
+
+**What this does NOT check.** Reachability is decided per *file*. A file that
+CI collects can still contain a test that never executes — `e2e/smoke.spec.ts`
+guards its only real-backend test with
+`test.skip(!USE_REAL_BACKEND, ...)`, and no CI job sets that variable (#686
+case 3). That is a skip, not a reachability gap, and it is the JS analogue of
+what `platform-control/tests/ci_skip_guard.py` catches on the Python side.
+There is no equivalent for vitest/Playwright yet. Do not read a passing run of
+this check as "everything in these files executed".
 
 Known-unreachable files are recorded in `KNOWN_UNREACHABLE` with a reason, so
 the check is green on a repo that still has debt while **new** unreachable

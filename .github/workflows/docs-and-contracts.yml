@@ -122,7 +122,7 @@ jobs:
           python3 scripts/check_workflow_vars.py
 
       # Every committed test file must be collectable by some CI job. See
-      # ADR-0040 (coverage honesty) and #706.
+      # ADR-0040 (coverage honesty) and #686.
       - name: Check every test file is reachable from some CI job
         run: |
           python3 scripts/check_test_reachability.py
