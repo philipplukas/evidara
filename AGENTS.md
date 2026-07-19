@@ -146,8 +146,13 @@ pre-commit and CI.
   `documents-bootstrap.ts` (runtime + seed + cutover) directly, and non-TypeScript producers via the
   generated `scripts/opensearch/documents-index.mapping.json` (`npm run mapping:generate`, drift-gated
   by `documents-index.mapping-json.spec.ts`). Never hand-maintain a parallel copy: a drifted copy in
-  `scripts/validate-tar89-metadata-local.sh` is what caused #675, and because OpenSearch returns empty
-  buckets rather than an error for a missing field, it presented as a query bug for months.
+  `scripts/validate-tar89-metadata-local.sh` is what caused #675, and a mapping-less `PUT` in the GCP
+  runtime tfvars was the same defect again (#713). Because OpenSearch returns empty
+  buckets rather than an error for a missing field, both presented as query bugs for months.
+  Index creation is first-writer-wins, so a second creation path does not merely disagree with the
+  canonical one — it silently *wins* over it. Producers go through `createDocumentsIndex()` in
+  `documents-bootstrap.ts` and are enumerated in `PRODUCERS` in `mapping-drift.integration.spec.ts`;
+  a producer that cannot be added to that registry is by definition drifting.
   When a live index disagrees with the canonical mapping, **fix the index** (reindex/cutover) — never
   weaken the query to match the drift. `npm run mapping:check-drift` reports the difference against a
   live cluster; `mapping-drift.integration.spec.ts` guards the creation path in CI.
