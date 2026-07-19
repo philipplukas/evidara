@@ -21,6 +21,8 @@ DOC_ID="doc_01jq7bhgy7g0pkj4f1d03f8f8c"
 CONTENT_DIR="$ROOT/scripts/fixtures/tar89-demo-content"
 TEMPLATE="$ROOT/scripts/fixtures/tar89-document-processed.template.json"
 REPLAY="$ROOT/scripts/replay-document-projection.sh"
+# Generated from legal-search/api/src/core/opensearch/documents-index.mapping.ts.
+MAPPING_JSON="$ROOT/scripts/opensearch/documents-index.mapping.json"
 
 usage() {
   cat <<EOF
@@ -101,45 +103,26 @@ ensure_documents_index() {
   if [[ "$code" == "200" ]]; then
     return 0
   fi
-  curl -fsS -m 30 -X PUT "$OS/$WRITE_INDEX" -H 'Content-Type: application/json' -d '{
-    "settings": {
-      "number_of_shards": 1,
-      "number_of_replicas": 0,
-      "analysis": {
-        "analyzer": {
-          "legal_text": {
-            "type": "custom",
-            "tokenizer": "standard",
-            "filter": ["lowercase", "german_normalization"]
-          }
-        }
-      }
-    },
-    "mappings": {
-      "properties": {
-        "document_id": {"type": "keyword"},
-        "title": {"type": "text", "analyzer": "legal_text", "fields": {"keyword": {"type": "keyword"}}},
-        "jurisdiction": {"type": "keyword"},
-        "document_type": {"type": "keyword"},
-        "language": {"type": "keyword"},
-        "effective_date": {"type": "date", "format": "yyyy-MM-dd"},
-        "structural_path": {"type": "text"},
-        "content": {"type": "text", "analyzer": "legal_text"},
-        "content_preview": {"type": "text"},
-        "sections_count": {"type": "integer"},
-        "citations_count": {"type": "integer"},
-        "related_decisions_count": {"type": "integer"},
-        "related_commentary_count": {"type": "integer"},
-        "source_id": {"type": "keyword"},
-        "processed_at": {"type": "date"},
-        "authority_name": {"type": "keyword"},
-        "official_citation": {"type": "keyword"},
-        "is_official": {"type": "boolean"},
-        "lifecycle_status": {"type": "keyword"}
-      }
-    }
-  }' >/dev/null
-  echo "  created index $WRITE_INDEX"
+  # Apply the CANONICAL mapping, never a copy of it (#675). This function used
+  # to inline a hand-maintained mapping that had drifted from
+  # `legal-search/api/src/core/opensearch/documents-index.mapping.ts`: bare
+  # `keyword` facet fields with no `.keyword` sub-field, and no
+  # `jurisdiction_ids` / `authority_ids` at all. Aggregating a field that does
+  # not exist is not an error in OpenSearch — it silently returns empty buckets
+  # — so the index this created served a permanently dead facet rail and
+  # `authority_id` filters that matched nothing, while every test stayed green.
+  #
+  # MAPPING_JSON is generated from that TypeScript source of truth and
+  # drift-gated by `documents-index.mapping-json.spec.ts`. Regenerate with
+  # `cd legal-search/api && npm run mapping:generate`. The `$comment` banner is
+  # stripped because OpenSearch rejects unknown top-level keys on create-index.
+  if [[ ! -f "$MAPPING_JSON" ]]; then
+    echo "error: missing $MAPPING_JSON — run 'cd legal-search/api && npm run mapping:generate'" >&2
+    exit 1
+  fi
+  jq 'del(."$comment")' "$MAPPING_JSON" \
+    | curl -fsS -m 30 -X PUT "$OS/$WRITE_INDEX" -H 'Content-Type: application/json' -d @- >/dev/null
+  echo "  created index $WRITE_INDEX from canonical mapping"
 }
 
 ensure_read_alias() {

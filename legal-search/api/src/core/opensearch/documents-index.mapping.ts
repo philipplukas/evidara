@@ -24,6 +24,17 @@
  * Fields used both ways are declared as `keyword` WITH a `keyword`
  * sub-field so both resolve; relying on dynamic mapping instead gave the
  * projection-only fields no analyzer/type parity guarantee.
+ *
+ * THIS FILE IS THE CONTRACT, NOT A DESCRIPTION OF WHAT IS DEPLOYED (#675).
+ * The live index drifted from it — it was created by a hand-maintained
+ * mapping in a shell script rather than from this definition, so it lacks
+ * the `.keyword` sub-fields and dynamic-mapped `jurisdiction_ids` /
+ * `authority_ids` as `text`. Aggregating a field that does not exist is
+ * not an error in OpenSearch; it silently returns empty buckets, which is
+ * why the facet rail was dead. The fix is to make index creation apply
+ * THIS mapping and to reindex — never to weaken the query to match the
+ * drift. `scripts/check-opensearch-mapping-drift.ts` compares a live index
+ * against this definition so the drift cannot recur unnoticed.
  */
 
 /**

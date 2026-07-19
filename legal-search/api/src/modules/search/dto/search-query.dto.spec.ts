@@ -9,7 +9,9 @@ describe('SearchQueryDto', () => {
     dto.languages = 'de, FR';
     dto.document_types = 'law,all,decision';
 
-    expect(dto.getNormalizedJurisdictions()).toEqual(['ch', 'at']);
+    // ISO codes are UPPERCASED to match the case-sensitive `jurisdiction`
+    // keyword field in the index (#672); languages/document types stay lower.
+    expect(dto.getNormalizedJurisdictions()).toEqual(['CH', 'AT']);
     expect(dto.getNormalizedLanguages()).toEqual(['de', 'fr']);
     expect(dto.getNormalizedDocumentTypes()).toEqual(['law', 'decision']);
   });
@@ -88,7 +90,7 @@ describe('SearchQueryDto', () => {
       dto.jurisdiction = 'CH';
       dto.jurisdiction_id = 'jur_ch_federal';
 
-      expect(dto.getNormalizedJurisdictions()).toEqual(['ch']);
+      expect(dto.getNormalizedJurisdictions()).toEqual(['CH']);
       expect(dto.getCanonicalJurisdictionIds()).toEqual(['jur_ch_federal']);
     });
   });

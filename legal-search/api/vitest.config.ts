@@ -5,6 +5,10 @@ export default defineConfig({
     root: './',
     globals: true,
     include: ['src/**/*.spec.ts'],
-    exclude: ['src/modules/health/health.smoke.spec.ts'],
+    // Integration specs need Docker (Testcontainers OpenSearch) and run in
+    // their own project via `npm run test:integration`, which `npm run check`
+    // invokes right after this one. Excluded here only so the unit layer stays
+    // fast — NOT so it can be skipped.
+    exclude: ['src/modules/health/health.smoke.spec.ts', 'src/**/*.integration.spec.ts'],
   },
 });
