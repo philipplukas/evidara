@@ -22,6 +22,25 @@ from platform_control.services.politeness import limited_get
 _FEDLEX_HOST = "fedlex.data.admin.ch"
 _FEDLEX_FILESTORE_HOST = "www.fedlex.admin.ch"
 
+# SCOPE: this provider acquires FEDERAL Swiss law only, from seed work URIs.
+#
+# It once carried a `canton_discovery` mode that enumerated works via a
+# `jolux:CantonOfOrigin` predicate. That predicate never existed. Measured
+# against the live endpoint on 2026-07-19 (#716): 56,238,852 triples, 426
+# distinct predicates, ZERO containing "anton" (case-insensitive, so both
+# `Canton` and `Kanton`); six spelling variants all `ASK -> false`; the
+# vocabulary the IRIs were built against (`/vocabulary/canton/ZH`) 404s while
+# the control `/vocabulary/legal-institution/3525` returns 200; 133 classes,
+# none cantonal; only the federal collections `fga` (BBl), `oc` (AS) and `cc`
+# (SR) are present.
+#
+# Fedlex is the Federal Chancellery platform for Bundesrecht. Cantonal law is
+# out of scope by design — each canton runs its own systematic collection. The
+# inter-cantonal concordats Fedlex *does* carry are modelled as AS-collection
+# publications with no cantonal attribution of any kind, so they cannot be
+# filtered by canton either. Do not re-add a cantonal mode here: cantonal
+# coverage needs a per-canton provider against the canton's own portal.
+
 # jolux predicates that carry a consolidation's entry-into-force window.
 # VERIFIED against the live endpoint (https://fedlex.data.admin.ch/sparqlendpoint,
 # 2026-07-17, issue #633): each `jolux:isMemberOf` consolidation of a work exposes
@@ -127,9 +146,9 @@ ORDER BY ?member
 """.strip()
 
     # Act-level enforcement status + original entry into force, read from the
-    # abstract work (not the consolidation). Both are OPTIONAL: cantonal and
-    # older works may publish neither, in which case the temporal answer stays
-    # whatever the consolidation window said.
+    # abstract work (not the consolidation). Both are OPTIONAL: older works may
+    # publish neither, in which case the temporal answer stays whatever the
+    # consolidation window said.
     _WORK_STATUS_QUERY = """
 PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
 SELECT ?status ?entryIntoForce
@@ -150,23 +169,6 @@ WHERE {{
 LIMIT 1
 """.strip()
 
-    # Discover cantonal-concordat works filtered by canton of origin. Wired
-    # into start_run() via scope_kind="canton" (#531); the cantonal blueprint
-    # templates stay `enabled: false` until the live acceptance run per
-    # docs/runbooks/country-rollout-drift-prevention-backlog.md §4.4.
-    # `canton_iri` is a full IRI (e.g. https://fedlex.data.admin.ch/vocabulary/canton/ZH).
-    _CANTON_WORK_DISCOVERY_QUERY = """
-PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
-SELECT ?work
-WHERE {{
-  ?work jolux:CantonOfOrigin <{canton_iri}> .
-}}
-ORDER BY ?work
-LIMIT {limit}
-""".strip()
-
-    _CANTON_IRI_BASE = "https://fedlex.data.admin.ch/vocabulary/canton/"
-
     async def start_run(
         self,
         source: Source,
@@ -182,9 +184,6 @@ LIMIT {limit}
         max_expressions = int(acquisition_spec.get("max_expressions") or 1)
         timeout_seconds = float(acquisition_spec.get("request_timeout_seconds") or 30.0)
         max_content_bytes = int(acquisition_spec.get("max_content_bytes") or 2_000_000)
-        canton_scope = self._is_canton_scope(acquisition_spec)
-        canton = self._canton_filter(acquisition_spec) if canton_scope else None
-        canton_discovery_limit = int(acquisition_spec.get("max_works") or 50)
         # The consolidation in force at this date is selected — default today, so a
         # future consolidation is never acquired unless an operator opts in with an
         # explicit `as_of_date` (#633).
@@ -194,40 +193,7 @@ LIMIT {limit}
         failures: list[dict[str, str]] = []
 
         async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
-            # Cantonal-discovery mode (scope_kind="canton") replaces seed URIs
-            # with works discovered via `jolux:CantonOfOrigin`; the federal path
-            # (seed URIs) is unchanged. See country-rollout-drift-prevention
-            # backlog §4.4.
-            if canton_scope:
-                if canton is None:
-                    failures.append(
-                        {
-                            "url": "canton:?",
-                            "error": (
-                                "scope_kind=canton requires acquisition_spec.canton "
-                                "(ISO 3166-2:CH code, e.g. CH-ZH)"
-                            ),
-                        }
-                    )
-                    work_uris = []
-                else:
-                    try:
-                        work_uris = await self._discover_works_by_canton(
-                            client=client,
-                            sparql_endpoint=sparql_endpoint,
-                            iso_3166_2_code=canton,
-                            limit=canton_discovery_limit,
-                        )
-                    except Exception as exc:  # pragma: no cover - defensive capture path
-                        failures.append(
-                            {
-                                "url": f"canton:{canton}",
-                                "error": f"cantonal discovery failed: {exc}",
-                            }
-                        )
-                        work_uris = []
-            else:
-                work_uris = self._seed_work_uris(acquisition_spec)
+            work_uris = self._seed_work_uris(acquisition_spec)
 
             for work_uri in work_uris:
                 try:
@@ -353,8 +319,6 @@ LIMIT {limit}
 
         response_payload = {
             "provider": self.provider_name,
-            "scope_kind": "canton" if canton_scope else "seed",
-            "canton": canton,
             "requested": len(work_uris),
             "captured": len(resources),
             "failed": len(failures),
@@ -362,20 +326,12 @@ LIMIT {limit}
         }
         inline_failure_reason = None
         if not resources:
-            if canton_scope:
-                inline_failure_reason = (
-                    f"Fedlex SPARQL provider did not capture any resources for "
-                    f"canton={canton} (discovered_works={len(work_uris)})."
-                )
-            else:
-                inline_failure_reason = "Fedlex SPARQL provider did not capture any resources."
+            inline_failure_reason = "Fedlex SPARQL provider did not capture any resources."
 
         return ProviderStartResult(
             provider=self.provider_name,
             external_job_id=f"fedlexsparql_{run.run_id}",
             request_payload={
-                "scope_kind": "canton" if canton_scope else "seed",
-                "canton": canton,
                 "work_uris": work_uris,
                 "sparql_endpoint": sparql_endpoint,
                 "preferred_languages": preferred_languages,
@@ -399,21 +355,6 @@ LIMIT {limit}
         sparql_endpoint = str(
             acquisition_spec.get("sparql_endpoint") or f"https://{_FEDLEX_HOST}/sparqlendpoint"
         )
-        if self._is_canton_scope(acquisition_spec):
-            canton = self._canton_filter(acquisition_spec)
-            canton_discovery_limit = int(acquisition_spec.get("max_works") or 50)
-            return ProviderPlan(
-                provider=self.provider_name,
-                mode="canton_discovery",
-                seed_urls=[],
-                estimated_request_count=canton_discovery_limit * max_expressions,
-                user_agent=acquisition_spec.get("user_agent"),
-                request_timeout_seconds=float(
-                    acquisition_spec.get("request_timeout_seconds") or 30.0
-                ),
-                notes=[f"sparql_endpoint={sparql_endpoint}", f"canton={canton}"],
-                raw=dict(acquisition_spec),
-            )
         work_uris = self._seed_work_uris(acquisition_spec)
         return ProviderPlan(
             provider=self.provider_name,
@@ -425,15 +366,6 @@ LIMIT {limit}
             notes=[f"sparql_endpoint={sparql_endpoint}"],
             raw=dict(acquisition_spec),
         )
-
-    @staticmethod
-    def _is_canton_scope(acquisition_spec: dict[str, object]) -> bool:
-        """True when the version requests cantonal-discovery mode.
-
-        Triggered by `acquisition_spec.scope_kind == "canton"` per the
-        country-rollout-drift-prevention backlog §4.4 contract.
-        """
-        return str(acquisition_spec.get("scope_kind") or "").strip().lower() == "canton"
 
     def _seed_work_uris(self, acquisition_spec: dict[str, object]) -> list[str]:
         seed_urls = [
@@ -470,26 +402,6 @@ LIMIT {limit}
             ]
         return [language for language in languages if language]
 
-    def _canton_filter(self, acquisition_spec: dict[str, object]) -> str | None:
-        """Return the ISO 3166-2:CH code when the spec asks for a cantonal slice.
-
-        Reads `acquisition_spec.canton` (e.g. "CH-ZH" or "ZH") and normalizes to
-        the ISO form. Not yet wired into start_run(); discovery mode lands
-        alongside the first cantonal acceptance run — see
-        docs/runbooks/country-rollout-drift-prevention-backlog.md §4.4.
-        """
-        raw = acquisition_spec.get("canton")
-        if not isinstance(raw, str):
-            return None
-        code = raw.strip().upper()
-        if not code:
-            return None
-        if code.startswith("CH-"):
-            return code
-        if len(code) == 2:
-            return f"CH-{code}"
-        return code
-
     def _eli_uri_for_work(self, seed_work_uri: str, concrete_work_uri: str) -> str | None:
         """Return the ELI URI for a Fedlex work, preferring the abstract form.
 
@@ -504,65 +416,6 @@ LIMIT {limit}
             if isinstance(candidate, str) and f"{_FEDLEX_HOST}/eli/" in candidate:
                 return candidate
         return None
-
-    def _canton_iri(self, iso_3166_2_code: str) -> str:
-        """Return the Fedlex vocabulary IRI for an ISO 3166-2:CH code.
-
-        E.g. `CH-ZH` -> `https://fedlex.data.admin.ch/vocabulary/canton/ZH`.
-        The Fedlex canton vocabulary uses the trailing two-letter cantonal
-        code (uppercase) as the fragment.
-        """
-        code = iso_3166_2_code.strip().upper()
-        if code.startswith("CH-"):
-            code = code[3:]
-        if len(code) != 2 or not code.isalpha():
-            raise ValueError(f"Invalid ISO 3166-2:CH subdivision code: {iso_3166_2_code!r}")
-        return f"{self._CANTON_IRI_BASE}{code}"
-
-    def _build_canton_discovery_query(self, iso_3166_2_code: str, limit: int = 50) -> str:
-        """Render the cantonal work-discovery SPARQL query.
-
-        Isolated so it can be unit-tested without a live endpoint. The
-        runtime discovery path will call this and issue the query via
-        the same httpx client used by start_run().
-        """
-        canton_iri = self._canton_iri(iso_3166_2_code)
-        return self._CANTON_WORK_DISCOVERY_QUERY.format(
-            canton_iri=canton_iri,
-            limit=int(limit),
-        )
-
-    async def _discover_works_by_canton(
-        self,
-        *,
-        client: httpx.AsyncClient,
-        sparql_endpoint: str,
-        iso_3166_2_code: str,
-        limit: int = 50,
-    ) -> list[str]:
-        """Execute the cantonal work-discovery query and return work URIs.
-
-        Invoked by start_run() when the version runs in cantonal-discovery
-        mode (`acquisition_spec.scope_kind == "canton"`); the discovered work
-        URIs feed the same work→expression→manifestation flow as seed URIs.
-        Kept isolated so unit tests can exercise it without a live endpoint.
-        """
-        query = self._build_canton_discovery_query(iso_3166_2_code, limit=limit)
-        response = await limited_get(
-            client,
-            sparql_endpoint,
-            params={"query": query, "format": "application/sparql-results+json"},
-            headers={"Accept": "application/sparql-results+json"},
-        )
-        response.raise_for_status()
-        payload = response.json()
-        bindings = payload.get("results", {}).get("bindings", [])
-        work_uris: list[str] = []
-        for binding in bindings:
-            work = binding.get("work", {}).get("value")
-            if isinstance(work, str) and work.startswith(f"https://{_FEDLEX_HOST}/"):
-                work_uris.append(work)
-        return work_uris
 
     def _as_of_date(self, acquisition_spec: dict[str, object]) -> date:
         """Return the date at which "in force" is evaluated for this run.
