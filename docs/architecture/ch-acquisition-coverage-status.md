@@ -59,10 +59,10 @@ lands alongside the provider) before both keys flip.
 `fedlex_sparql` once carried a `canton_discovery` mode, with templates
 `fedlex_sparql_canton_zh` / `_be` / `_bs`, which discovered works via a
 `jolux:CantonOfOrigin` predicate. **That predicate never existed, and Fedlex
-publishes no cantonal law.** The mode and the three templates were removed in
-#716 rather than left dormant: `fedlex_sparql` is `live_ready: true`, so the
-`enabled: false` default was the only thing between an operator and a run that
-could only ever capture zero documents.
+publishes no cantonal law.** The mode and the three templates were removed
+in #716 rather than left dormant: `fedlex_sparql` is `live_ready: true`, so
+the `enabled: false` default was the only thing between an operator and a run
+that could only ever capture zero documents.
 
 Measured against `https://fedlex.data.admin.ch/sparqlendpoint` on 2026-07-19:
 
