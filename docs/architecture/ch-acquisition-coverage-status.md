@@ -54,20 +54,42 @@ requires implementing the provider, setting real discovery URLs, and a
 `pass` verdict from the `scripts/ch-bger-fast-loop.sh` court harness (which
 lands alongside the provider) before both keys flip.
 
-### Cantonal legislation via Fedlex (#531)
+### Cantonal legislation via Fedlex — REMOVED, the premise was false (#716)
 
-Templates `fedlex_sparql_canton_zh`, `fedlex_sparql_canton_be`, and
-`fedlex_sparql_canton_bs` reuse the live federal `fedlex_sparql` provider
-in cantonal-discovery mode (`scope_kind: canton` + `canton`), discovering
-works via `jolux:CantonOfOrigin` rather than seed URIs. The provider key
-is already turned (`live_ready: true`); the templates hold `enabled: false`
-pending a cantonal acceptance run.
+`fedlex_sparql` once carried a `canton_discovery` mode, with templates
+`fedlex_sparql_canton_zh` / `_be` / `_bs`, which discovered works via a
+`jolux:CantonOfOrigin` predicate. **That predicate never existed, and Fedlex
+publishes no cantonal law.** The mode and the three templates were removed in
+#716 rather than left dormant: `fedlex_sparql` is `live_ready: true`, so the
+`enabled: false` default was the only thing between an operator and a run that
+could only ever capture zero documents.
 
-**Scope caveat — do not overstate:** cantonal Fedlex covers only what
-Fedlex itself publishes per canton, which is essentially concordats and
-inter-cantonal agreements of origin ZH/BE/BS. It is **not** the bulk of
-cantonal law. The main body of each canton's statutes lives on cantonal
-portals (systematische Rechtssammlungen), which Fedlex does not republish.
+Measured against `https://fedlex.data.admin.ch/sparqlendpoint` on 2026-07-19:
+
+| Probe | Result |
+|---|---|
+| `SELECT (COUNT(*)) WHERE { ?s ?p ?o }` | 56,238,852 triples — the endpoint is live, so the negatives below are real |
+| `SELECT DISTINCT ?p` | 426 predicates, **zero** containing `anton` (covers `Canton` and `Kanton`) |
+| `ASK` on 6 spellings (`CantonOfOrigin`, `cantonOfOrigin`, `canton`, `Canton`, `applicableCanton`, `cantonalAuthority`) | all `false` |
+| `GET /vocabulary/canton/ZH` | **404** (control: `/vocabulary/legal-institution/3525` → 200) |
+| `SELECT DISTINCT ?t WHERE { ?s a ?t }` | 133 classes, none cantonal; `jolux:Country` exists — Fedlex models *country*, not canton |
+| ELI collection segments | only `fga` (BBl), `oc` (AS), `cc` (SR) — all federal |
+
+**Correcting the previous claim in this section.** It said cantonal Fedlex
+covered "concordats and inter-cantonal agreements **of origin ZH/BE/BS**". The
+concordats are real — e.g. `eli/oc/1980/1631_1631_1631`, "Konkordat über die
+Vollstreckung von Zivilurteilen" — but the "of origin ZH/BE/BS" part is not
+expressible. Every predicate on such a work is pure AS-collection metadata
+(`memorialName`, `memorialYear`, `identifier`, `memorialPage`, `title`,
+`language`, …) with **no cantonal attribution of any kind**. Fedlex models a
+concordat as a federal-gazette publication. So canton discovery could not have
+worked even with a corrected predicate name — there is nothing to filter on.
+
+Fedlex is the Federal Chancellery platform for Bundesrecht (BBl / AS / SR);
+cantonal law is out of scope by design, and each canton runs its own
+systematic collection. Cantonal coverage therefore requires a **per-canton
+provider against the canton's own portal**, not a mode on `fedlex_sparql`.
+See the `canton_http` section below.
 
 ### Cantonal portal legislation — `canton_http` provider
 

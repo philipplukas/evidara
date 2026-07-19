@@ -72,7 +72,7 @@ which we do not adopt, and which Evidara file owns each concept.
 
 Every concept above has exactly one Evidara file that owns it.
 Downstream consumers (legal-search frontend icons, admin UI filters,
-Fedlex cantonal SPARQL filter, RIS per-state applikation selector,
+RIS per-state applikation selector,
 projection mappers) MUST read from that file. They MUST NOT re-encode
 the mapping locally.
 
@@ -80,8 +80,11 @@ Concretely, for sub-federal identity:
 
 - ISO 3166-2 code `CH-ZH` is the canonical identifier.
 - `subdivisions.json` maps it to `slug=zh`, `iconKey=ch-zh`,
-  `hierarchyTier=canton`, `hierarchyPath=ch/canton/zh`, and the provider
-  tokens `fedlex_sparql_canton=ZH`.
+  `hierarchyTier=canton`, and `hierarchyPath=ch/canton/zh`. CH entries carry
+  no `providerTokens`: the `fedlex_sparql_canton` token was removed with the
+  Fedlex `canton_discovery` mode in #716 (Fedlex publishes no cantonal law —
+  see docs/architecture/ch-acquisition-coverage-status.md). A future
+  per-canton provider adds its own token here.
 - `legal-search/frontend/src/lib/icons.ts`, provider adapters, and any
   future admin filter MUST derive their value from this registry.
 

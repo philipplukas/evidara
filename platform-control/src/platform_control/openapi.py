@@ -52,7 +52,7 @@ API_TITLE = "Platform Control API"
 # collection, and `plan_notes` on blueprint-preview (#634).
 # 0.13.0: additive — blueprint coverage inventory fields on source responses,
 # so the admin can show which blueprints are enabled and which are not (#668).
-API_VERSION = "0.13.0"
+API_VERSION = "0.14.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

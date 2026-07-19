@@ -105,16 +105,6 @@ def _validate_template(
             ]
         return []
 
-    # Cantonal-discovery Fedlex templates (#531) discover works via
-    # scope_kind=canton and carry a canton instead of seed URIs.
-    if provider == "fedlex_sparql" and str(payload.get("scope_kind") or "").lower() == "canton":
-        if not _has_nonempty_str(payload.get("canton")):
-            return [
-                f"Overlay '{overlay_id}' template '{template_id}' fedlex_sparql "
-                "scope_kind=canton requires canton (ISO 3166-2:CH)."
-            ]
-        return []
-
     if provider in {"deterministic_http", "fedlex_sparql", "eur_lex_sparql"}:
         if not (
             _has_nonempty_str(payload.get("seed_url"))

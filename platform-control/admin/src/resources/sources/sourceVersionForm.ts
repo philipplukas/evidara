@@ -586,7 +586,7 @@ export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<Acquis
   }
 
   // Same provider -> every field without a widget survives, base or otherwise
-  // (fedlex's `scope_kind`/`canton`/`max_works`, say). Provider switched -> only
+  // (ris_ogd's `applikation`/`page_size`, say). Provider switched -> only
   // the base fields carry over: they are provider-independent, whereas the old
   // provider's own fields are not valid on the new one and the server's spec
   // models are `extra="forbid"`.

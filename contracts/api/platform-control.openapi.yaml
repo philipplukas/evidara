@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.13.0
+  version: 0.14.0
 paths:
   /health:
     get:
@@ -4944,25 +4944,6 @@ components:
           minimum: 1.0
           title: Max Expressions
           default: 1
-        scope_kind:
-          type: string
-          enum:
-          - seed
-          - canton
-          title: Scope Kind
-          default: seed
-        canton:
-          anyOf:
-          - type: string
-            pattern: ^(?:CH-)?[A-Za-z]{2}$
-          - type: 'null'
-          title: Canton
-        max_works:
-          type: integer
-          maximum: 500.0
-          minimum: 1.0
-          title: Max Works
-          default: 50
       additionalProperties: false
       type: object
       title: FedlexSparqlAcquisitionSpec
