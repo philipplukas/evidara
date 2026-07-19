@@ -9,6 +9,7 @@ from platform_control.config import get_settings
 from platform_control.database import get_session
 from platform_control.events.publisher import RawArtifactPublisher
 from platform_control.integrations import get_artifact_store, get_raw_artifact_publisher
+from platform_control.schemas.errors import ERROR_DESCRIPTIONS, ErrorResponse
 from platform_control.schemas.run import WebhookAcceptedResponse
 from platform_control.services.artifact_store import ArtifactStore
 from platform_control.services.firecrawl_webhook_service import FirecrawlWebhookService
@@ -19,7 +20,26 @@ ArtifactStoreDep = Annotated[ArtifactStore, Depends(get_artifact_store)]
 PublisherDep = Annotated[RawArtifactPublisher, Depends(get_raw_artifact_publisher)]
 
 
-@router.post("/webhooks", response_model=WebhookAcceptedResponse)
+@router.post(
+    "/webhooks",
+    response_model=WebhookAcceptedResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": ERROR_DESCRIPTIONS[401]},
+        503: {
+            "model": ErrorResponse,
+            "description": (
+                "The delivery was stored unprocessed and must be redelivered — never a "
+                "2xx, or the identical retry would be deduped away (#558)."
+            ),
+            "headers": {
+                "Retry-After": {
+                    "description": "Seconds to wait before redelivering.",
+                    "schema": {"type": "string"},
+                }
+            },
+        },
+    },
+)
 async def receive_firecrawl_webhook(
     request: Request,
     session: SessionDep,

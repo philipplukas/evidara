@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session, get_session_maker
+from platform_control.schemas.errors import error_responses
 from platform_control.schemas.reference_data import (
     AuthorityListResponse,
     AuthorityResponse,
@@ -42,7 +43,11 @@ async def create_jurisdiction(
     return await service.create_jurisdiction(request)
 
 
-@router.patch("/jurisdictions/{jurisdiction_id}", response_model=JurisdictionResponse)
+@router.patch(
+    "/jurisdictions/{jurisdiction_id}",
+    response_model=JurisdictionResponse,
+    responses=error_responses(404),
+)
 async def update_jurisdiction(
     jurisdiction_id: str,
     request: UpdateJurisdictionRequest,
@@ -62,6 +67,7 @@ async def list_authorities(session: SessionDep) -> AuthorityListResponse:
     "/authorities",
     response_model=AuthorityResponse,
     status_code=status.HTTP_201_CREATED,
+    responses=error_responses(404),
 )
 async def create_authority(
     request: CreateAuthorityRequest,
@@ -71,7 +77,11 @@ async def create_authority(
     return await service.create_authority(request)
 
 
-@router.patch("/authorities/{authority_id}", response_model=AuthorityResponse)
+@router.patch(
+    "/authorities/{authority_id}",
+    response_model=AuthorityResponse,
+    responses=error_responses(404),
+)
 async def update_authority(
     authority_id: str,
     request: UpdateAuthorityRequest,

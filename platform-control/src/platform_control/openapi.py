@@ -46,7 +46,9 @@ API_TITLE = "Platform Control API"
 # (additive -> minor, breaking -> major).
 # 0.9.0: additive — new blueprint-template enablement endpoint + `enabled`/
 # `live_ready`/`launchable`/`notes` on blueprint responses (#632, #634).
-API_VERSION = "0.9.0"
+# 0.10.0: additive — routes now declare the 4xx/5xx their exception handlers
+# really return, with the shared `ErrorResponse` body (#627).
+API_VERSION = "0.10.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

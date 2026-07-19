@@ -8,6 +8,7 @@ from platform_control.database import get_session
 from platform_control.domain import RunMode, RunStatus
 from platform_control.openapi import AGENT_DISCOVERY_TAG
 from platform_control.schemas.document_events import DocumentLifecycleEventListResponse
+from platform_control.schemas.errors import error_responses
 from platform_control.schemas.lifecycle import RunLifecycleResponse
 from platform_control.schemas.processing_status import ProcessingStatusUpdateListResponse
 from platform_control.schemas.run import (
@@ -81,7 +82,12 @@ async def list_runs(
     return RunListResponse(data=data, total=total, limit=clamped_limit, offset=clamped_offset)
 
 
-@router.post("", response_model=RunResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=RunResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(400, 404, 409),
+)
 async def create_run(
     request: CreateRunRequest,
     session: SessionDep,
@@ -111,7 +117,12 @@ async def get_run_readiness(
     )
 
 
-@router.get("/{run_id}", response_model=RunResponse, tags=[AGENT_DISCOVERY_TAG])
+@router.get(
+    "/{run_id}",
+    response_model=RunResponse,
+    tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
+)
 async def get_run(
     run_id: str,
     session: SessionDep,
@@ -124,6 +135,7 @@ async def get_run(
     "/{run_id}/captured-resources",
     response_model=CapturedResourceListResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def list_run_captured_resources(
     run_id: str,
@@ -139,6 +151,7 @@ async def list_run_captured_resources(
     "/{run_id}/raw-artifacts",
     response_model=RawArtifactListResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def list_run_raw_artifacts(
     run_id: str,
@@ -154,6 +167,7 @@ async def list_run_raw_artifacts(
     "/{run_id}/provider-jobs",
     response_model=ProviderJobListResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def list_run_provider_jobs(
     run_id: str,
@@ -165,7 +179,7 @@ async def list_run_provider_jobs(
     return await service.list_provider_jobs(run_id, limit=limit, offset=offset)
 
 
-@router.post("/{run_id}/cancel", response_model=RunResponse)
+@router.post("/{run_id}/cancel", response_model=RunResponse, responses=error_responses(404, 409))
 async def cancel_run(
     run_id: str,
     session: SessionDep,
@@ -174,7 +188,11 @@ async def cancel_run(
     return await service.cancel_run(run_id)
 
 
-@router.post("/{run_id}/retry", response_model=RunResponse)
+@router.post(
+    "/{run_id}/retry",
+    response_model=RunResponse,
+    responses=error_responses(400, 404, 409),
+)
 async def retry_run(
     run_id: str,
     session: SessionDep,
@@ -188,6 +206,7 @@ async def retry_run(
     "/{run_id}/preview-summary",
     response_model=RunPreviewSummaryResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def get_run_preview_summary(
     run_id: str,
@@ -197,7 +216,11 @@ async def get_run_preview_summary(
     return await service.get_preview_summary(run_id)
 
 
-@router.get("/{run_id}/pipeline-health", response_model=RunPipelineHealthResponse)
+@router.get(
+    "/{run_id}/pipeline-health",
+    response_model=RunPipelineHealthResponse,
+    responses=error_responses(404),
+)
 async def get_run_pipeline_health(
     run_id: str,
     session: SessionDep,
@@ -210,6 +233,7 @@ async def get_run_pipeline_health(
     "/{run_id}/processing-status",
     response_model=ProcessingStatusUpdateListResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def list_run_processing_status(
     run_id: str,
@@ -224,6 +248,7 @@ async def list_run_processing_status(
     "/{run_id}/document-lifecycle",
     response_model=DocumentLifecycleEventListResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def list_run_document_lifecycle(
     run_id: str,
@@ -234,7 +259,11 @@ async def list_run_document_lifecycle(
     return DocumentLifecycleEventListResponse(data=events)
 
 
-@router.get("/{run_id}/lifecycle", response_model=RunLifecycleResponse)
+@router.get(
+    "/{run_id}/lifecycle",
+    response_model=RunLifecycleResponse,
+    responses=error_responses(404),
+)
 async def get_run_lifecycle(
     run_id: str,
     session: SessionDep,

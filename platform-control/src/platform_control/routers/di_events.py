@@ -14,6 +14,7 @@ from platform_control.schemas.document_events import (
     DocumentProcessedEvent,
     DocumentWithdrawnEvent,
 )
+from platform_control.schemas.errors import VALIDATION_ERROR_RESPONSE, ErrorResponse
 from platform_control.schemas.processing_status import (
     DocumentProcessingStatusUpdatedEvent,
     EventAcceptedResponse,
@@ -31,6 +32,15 @@ LOGGER = logging.getLogger("platform_control.di_events")
     "/document-processing-status-updated",
     response_model=EventAcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": (
+                "The body could not be decoded as a bare event or a Pub/Sub push envelope."
+            ),
+        },
+        **VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def receive_document_processing_status_updated(
     request: Request,
@@ -83,6 +93,15 @@ async def receive_document_processing_status_updated(
     "/document-processed",
     response_model=EventAcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": (
+                "The body could not be decoded as a bare event or a Pub/Sub push envelope."
+            ),
+        },
+        **VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def receive_document_processed(
     request: Request,
@@ -143,6 +162,15 @@ async def receive_document_processed(
     "/document-withdrawn",
     response_model=EventAcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": (
+                "The body could not be decoded as a bare event or a Pub/Sub push envelope."
+            ),
+        },
+        **VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def receive_document_withdrawn(
     request: Request,

@@ -32,6 +32,7 @@ from platform_control.schemas.correction import (
     TargetEntityType,
     UpdateCorrectionStatusRequest,
 )
+from platform_control.schemas.errors import error_responses
 from platform_control.services.correction_service import CorrectionService
 from platform_control.services.rescore_scheduler import (
     RescoreScheduler,
@@ -51,6 +52,7 @@ _OPERATOR_ID_PATTERN = r"^op_[a-z0-9]+$"
     "/corrections",
     response_model=CorrectionResponse,
     status_code=status.HTTP_201_CREATED,
+    responses=error_responses(404),
 )
 async def create_correction(
     request: CreateCorrectionRequest,
@@ -126,6 +128,7 @@ async def get_correction_metrics(
     "/corrections/{correction_id}",
     response_model=CorrectionResponse,
     tags=[AGENT_DISCOVERY_TAG],
+    responses=error_responses(404),
 )
 async def get_correction(
     correction_id: str,
@@ -169,6 +172,7 @@ RescoreSchedulerDep = Annotated[RescoreScheduler, Depends(_default_rescore_sched
 @router.patch(
     "/corrections/{correction_id}",
     response_model=CorrectionResponse,
+    responses=error_responses(404, 409),
 )
 async def update_correction_status(
     correction_id: str,
@@ -208,6 +212,7 @@ async def update_correction_status(
     "/corrections/{correction_id}/rescore",
     response_model=RescoreTriggerResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    responses=error_responses(404, 409),
 )
 async def trigger_rescore_from_correction(
     correction_id: str,

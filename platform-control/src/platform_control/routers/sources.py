@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from platform_control.auth import Principal, get_current_principal
 from platform_control.database import get_session
 from platform_control.openapi import AGENT_DISCOVERY_TAG
+from platform_control.schemas.errors import error_responses
 from platform_control.schemas.source import (
     BlueprintTemplateEnablementRequest,
     BlueprintTemplateEnablementResponse,
@@ -43,7 +44,12 @@ async def list_sources(
     return SourceListResponse(data=data, total=total, limit=clamped_limit, offset=clamped_offset)
 
 
-@router.post("", response_model=SourceResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=SourceResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(404, 409),
+)
 async def create_source(
     request: CreateSourceRequest,
     session: SessionDep,
@@ -56,6 +62,7 @@ async def create_source(
     "/with-version",
     response_model=CreateSourceWithVersionResponse,
     status_code=status.HTTP_201_CREATED,
+    responses=error_responses(404, 409),
 )
 async def create_source_with_initial_version(
     request: CreateSourceWithVersionRequest,
@@ -66,7 +73,11 @@ async def create_source_with_initial_version(
     return CreateSourceWithVersionResponse(source=source, source_version=source_version)
 
 
-@router.post("/blueprint-preview", response_model=SourceBlueprintPreviewResponse)
+@router.post(
+    "/blueprint-preview",
+    response_model=SourceBlueprintPreviewResponse,
+    responses=error_responses(404, 409),
+)
 async def preview_source_blueprint(
     request: SourceBlueprintPreviewRequest,
     session: SessionDep,
@@ -100,6 +111,7 @@ async def list_source_blueprint_templates(
 @router.put(
     "/blueprint-templates/{overlay_id}/{provider_template_id}/enablement",
     response_model=BlueprintTemplateEnablementResponse,
+    responses=error_responses(404),
 )
 async def set_blueprint_template_enablement(
     overlay_id: str,
@@ -136,7 +148,7 @@ async def set_blueprint_template_enablement(
     )
 
 
-@router.get("/{source_id}", response_model=SourceResponse)
+@router.get("/{source_id}", response_model=SourceResponse, responses=error_responses(404))
 async def get_source(
     source_id: str,
     session: SessionDep,
@@ -145,7 +157,11 @@ async def get_source(
     return await service.get_source(source_id)
 
 
-@router.get("/{source_id}/versions", response_model=SourceVersionListResponse)
+@router.get(
+    "/{source_id}/versions",
+    response_model=SourceVersionListResponse,
+    responses=error_responses(404),
+)
 async def list_source_versions(
     source_id: str,
     session: SessionDep,
@@ -158,6 +174,7 @@ async def list_source_versions(
     "/{source_id}/versions",
     response_model=SourceVersionResponse,
     status_code=status.HTTP_201_CREATED,
+    responses=error_responses(404, 409),
 )
 async def create_source_version(
     source_id: str,

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.database import get_session
+from platform_control.schemas.errors import error_responses
 from platform_control.schemas.wizard import (
     CreateReviewTaskRequest,
     ReviewDecisionRequest,
@@ -37,6 +38,7 @@ ServiceDep = Annotated[WizardService, Depends(get_reviews_wizard_service)]
     "/tasks",
     response_model=ReviewTaskResponse,
     status_code=status.HTTP_201_CREATED,
+    responses=error_responses(404, 409),
 )
 async def create_review_task(
     request: CreateReviewTaskRequest,
@@ -51,13 +53,21 @@ async def create_review_task(
     return await service.create_review_task(request)
 
 
-@router.get("/tasks/{task_id}", response_model=ReviewTaskResponse)
+@router.get(
+    "/tasks/{task_id}",
+    response_model=ReviewTaskResponse,
+    responses=error_responses(404),
+)
 async def get_review_task(task_id: str, service: ServiceDep) -> ReviewTaskResponse:
     task = await service.get_review_task(task_id)
     return ReviewTaskResponse.model_validate(task)
 
 
-@router.post("/tasks/{task_id}/decision", response_model=ReviewTaskResponse)
+@router.post(
+    "/tasks/{task_id}/decision",
+    response_model=ReviewTaskResponse,
+    responses=error_responses(404, 409),
+)
 async def record_review_decision(
     task_id: str,
     request: ReviewDecisionRequest,
