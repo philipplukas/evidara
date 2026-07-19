@@ -31,8 +31,12 @@ from document_intelligence.events.publisher import (
 )
 from document_intelligence.ingest.loaders import DispatchingBundleLoader
 from document_intelligence.jobs._consumer_common import (
+    BROKER_HEALTH,
     PERMANENT_ERRORS,
+    BrokerConnectionLost,
+    connect_nats,
     extract_event_context,
+    fetch_messages,
     start_health_server,
 )
 from document_intelligence.observability.event_logging import log_event
@@ -210,12 +214,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 async def run(args: argparse.Namespace, environment: Mapping[str, str]) -> int:
-    import nats
     from nats.js.api import AckPolicy, ConsumerConfig
 
     pipeline = _build_pipeline(environment)
 
-    connection = await nats.connect(args.servers)
+    connection = await connect_nats(args.servers, service=CONSUMER_SERVICE)
     jetstream = connection.jetstream()
 
     publisher: AsyncEventPublisher | None = (
@@ -257,17 +260,19 @@ async def run(args: argparse.Namespace, environment: Mapping[str, str]) -> int:
     LOGGER.info("starting NATS consumer on %s (subject=%s)", args.stream, args.bundle_subject)
     while not should_stop.is_set():
         try:
-            messages = await subscription.fetch(args.max_messages, timeout=args.fetch_timeout_seconds)
-        except TimeoutError:
-            # An idle fetch (no pending bundles within the timeout) is the normal
-            # steady state, not an error — keep polling. nats-py 2.15's
-            # PullSubscription.fetch raises the *builtin* TimeoutError; the earlier
-            # `except nats.errors.TimeoutError` could not catch it (that class is a
-            # *subclass* of builtin TimeoutError, and a subclass except never
-            # catches a parent instance), so the bare timeout escaped and
-            # crash-looped the consumer whenever the queue was empty. Catching the
-            # builtin covers both the bare timeout and the nats subclass.
-            continue
+            messages = await fetch_messages(
+                subscription,
+                args.max_messages,
+                timeout=args.fetch_timeout_seconds,
+                connection=connection,
+                service=CONSUMER_SERVICE,
+            )
+        except BrokerConnectionLost as exc:
+            # Exit non-zero so the k8s restart policy takes over. Returning 0 here — or
+            # letting the old bare traceback stand — is what made #722 present as a
+            # pipeline regression instead of a dead consumer.
+            LOGGER.error("%s — exiting for restart", exc)
+            return 1
         for msg in messages:
             outcome = await dispatch_message(
                 _NatsMessage(msg),
@@ -290,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    start_health_server(CONSUMER_SERVICE)
+    start_health_server(CONSUMER_SERVICE, broker_health=BROKER_HEALTH)
     return asyncio.run(run(args, os.environ))
 
 

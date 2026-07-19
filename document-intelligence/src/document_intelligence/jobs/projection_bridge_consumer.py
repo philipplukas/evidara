@@ -57,7 +57,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from document_intelligence.jobs._consumer_common import (
+    BROKER_HEALTH,
+    BrokerConnectionLost,
+    connect_nats,
     extract_event_context,
+    fetch_messages,
     start_health_server,
 )
 from document_intelligence.jobs.nats_consumer import IncomingMessage, _NatsMessage
@@ -65,6 +69,7 @@ from document_intelligence.observability.event_logging import log_event
 from document_intelligence.observability.metrics import record_projection_outcome
 
 LOGGER = logging.getLogger("document_intelligence.projection_bridge")
+BRIDGE_SERVICE = "document-intelligence-projection-bridge"
 
 # HTTP 4xx that are the message's fault -> permanent (drop). 408/425/429 are
 # retry-worthy despite being 4xx, so they fall through to the transient path.
@@ -277,7 +282,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 async def run(args: argparse.Namespace) -> int:
-    import nats
     from nats.js.api import AckPolicy, ConsumerConfig
 
     if not args.legal_search_api_url:
@@ -307,7 +311,7 @@ async def run(args: argparse.Namespace) -> int:
     def platform_control(path: str) -> ForwardTarget:
         return ForwardTarget(f"{platform_control_base}{path}", args.platform_control_api_key)
 
-    connection = await nats.connect(args.servers)
+    connection = await connect_nats(args.servers, service=BRIDGE_SERVICE)
     jetstream = connection.jetstream()
 
     def make_forward(*targets: ForwardTarget) -> Callable[[bytes], Awaitable[None]]:
@@ -398,11 +402,18 @@ async def run(args: argparse.Namespace) -> int:
     while not should_stop.is_set():
         for subscription, subject, forward, dlq_publish in routes:
             try:
-                messages = await subscription.fetch(args.max_messages, timeout=args.fetch_timeout_seconds)
-            except TimeoutError:
-                # Idle fetch is the normal steady state, not an error (see nats_consumer
-                # for the builtin-vs-nats TimeoutError subtlety that crash-looped #513).
-                continue
+                messages = await fetch_messages(
+                    subscription,
+                    args.max_messages,
+                    timeout=args.fetch_timeout_seconds,
+                    connection=connection,
+                    service=BRIDGE_SERVICE,
+                )
+            except BrokerConnectionLost as exc:
+                # Exit non-zero so the restart policy takes over rather than leaving a
+                # dead bridge inside a running pod (#722).
+                LOGGER.error("%s — exiting for restart", exc)
+                return 1
             for msg in messages:
                 outcome = await forward_message(
                     _NatsMessage(msg),
@@ -422,7 +433,7 @@ async def run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    start_health_server("document-intelligence-projection-bridge")
+    start_health_server(BRIDGE_SERVICE, broker_health=BROKER_HEALTH)
     return asyncio.run(run(args))
 
 

@@ -14,8 +14,10 @@ See ADR-0013 for internationalization strategy.
 Document body reads fall back to the Document Service
 (`contracts/api/document-intelligence.openapi.yaml`) when the projection carries no body.
 See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
+See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
+particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.8.0
+ * OpenAPI spec version: 0.9.0
  */
 
 export * from './acceptLanguageParameter';
@@ -31,7 +33,13 @@ export * from './citationTarget';
 export * from './citedByResponse';
 export * from './contentLanguage';
 export * from './contextChip';
+export * from './corpusCoverageView';
+export * from './corpusCoverageViewBasis';
 export * from './correlationIdParameter';
+export * from './coverageDimension';
+export * from './coverageGroup';
+export * from './coverageHolding';
+export * from './coverageScope';
 export * from './detailView';
 export * from './detailViewLocalStructure';
 export * from './filterFacetView';
@@ -39,6 +47,7 @@ export * from './filterFacetViewType';
 export * from './filterOption';
 export * from './findCitingDocumentsParams';
 export * from './findCitingResponse';
+export * from './getCorpusCoverageParams';
 export * from './getDocumentSections200';
 export * from './getNormHierarchyParams';
 export * from './inForceState';
