@@ -211,7 +211,10 @@ def _sections_for_page(*, body_words: list[Word], page_height: float) -> list[_S
             # "Gebühren") is one heading, so an adjacent heading line of the same rank
             # continues it. Any other type change across a heading boundary breaks.
             starts_new = not (kind == "heading" and previous.type == "heading" and previous.level == level and adjacent)
-        elif kind == "list_item" and _LIST_MARKER_RE.match(line.text):
+        elif kind == "list_item":
+            # `_classify` only returns list_item for a line carrying a litera marker, so
+            # this is always the start of a new item — its continuations classify as
+            # paragraphs and fall through to the adjacency rule below.
             starts_new = True
         else:
             starts_new = not adjacent
