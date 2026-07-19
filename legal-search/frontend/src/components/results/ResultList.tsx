@@ -139,12 +139,16 @@ export function ResultList({
   const hasMore = visibleCount < results.length;
   const currentSource = state.resultSet.source;
   const scopeTrail = describeScopeTrail(currentSource, (q) => tList("scopeSearch", { query: q }));
+  // The total is the hit count the API reported, not the length of the page it
+  // returned. Counting `results` told the user a 25-hit search found 20 (#615).
+  // Falls back to the array only when the result set carries no total.
+  const totalResults = state.resultSet.totalResults ?? results.length;
   const resultsSummary =
-    visibleResults.length === results.length
-      ? tList("resultCount", { count: results.length })
+    visibleResults.length === totalResults
+      ? tList("resultCount", { count: totalResults })
       : tList("resultCountPartial", {
           visible: visibleResults.length,
-          total: results.length,
+          total: totalResults,
         });
 
   if (isLoading) {
