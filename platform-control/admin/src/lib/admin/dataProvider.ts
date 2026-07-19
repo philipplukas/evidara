@@ -633,13 +633,26 @@ const applyClientSort = <T extends Record<string, unknown>>(
  * come through here: windowing a page re-derives `total` from the page length
  * and silently caps the list at the server default (#616).
  */
+/**
+ * Window an in-memory array the way `getList` promises to.
+ *
+ * This deliberately does **not** reuse `toLimitOffset`. That helper clamps to
+ * `MAX_SERVER_PAGE_SIZE` because the API clamps `limit` the same way — a
+ * server-request concern that has no business capping a slice of an array the
+ * browser already holds in full. Applying it here meant a caller asking for
+ * "all 2,169 jurisdictions" got 500 and no way to tell (#666): the picker fix is
+ * not just "raise `perPage`", because any `perPage` above 500 was silently
+ * ignored. `total` stays the true array length either way.
+ */
 const applyClientListWindow = <T extends Record<string, unknown>>(
   records: T[],
   params: GetListParams,
 ): { data: T[]; total: number } => {
   const sorted = applyClientSort(records, params);
-  const { limit, offset } = toLimitOffset(params);
-  return { data: sorted.slice(offset, offset + limit), total: sorted.length };
+  const perPage = Math.max(params.pagination?.perPage ?? 25, 1);
+  const page = Math.max(params.pagination?.page ?? 1, 1);
+  const offset = (page - 1) * perPage;
+  return { data: sorted.slice(offset, offset + perPage), total: sorted.length };
 };
 
 /**

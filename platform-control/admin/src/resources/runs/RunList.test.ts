@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import {
+  describeQueueScope,
   describeRunState,
+  formatQueueCount,
   getRunQueueKeyboardShortcutAction,
   isKeyboardShortcutInputTarget,
+  resolveQueueCountScope,
   selectAttentionRun,
   summarizeRunFilters,
 } from "./RunList";
@@ -137,5 +140,65 @@ describe("RunList helpers", () => {
         failedRun,
       ),
     ).toBeNull();
+  });
+});
+
+/**
+ * #669: with platform-control down the queue rendered
+ * "Pending 0 · Running 0 · Completed 0 · Failed 0 · Cancelled 0 · 0 runs in view"
+ * over a real 10-completed / 1-failed queue. Zero and unknown must not render
+ * identically.
+ */
+describe("queue count honesty during an outage", () => {
+  it("reports counts as unknown — not zero — when the list query failed", () => {
+    const scope = resolveQueueCountScope({
+      hasError: true,
+      isPending: false,
+      loadedCount: 0,
+      total: undefined,
+    });
+
+    expect(scope).toBe("unknown");
+    expect(formatQueueCount(0, scope)).toBe("—");
+    expect(
+      describeQueueScope({ scope, loadedCount: 0, total: undefined, filterSummary: "" }),
+    ).toContain("not zeros");
+  });
+
+  it("reports a genuinely empty queue as zero", () => {
+    const scope = resolveQueueCountScope({
+      hasError: false,
+      isPending: false,
+      loadedCount: 0,
+      total: 0,
+    });
+
+    expect(scope).toBe("complete");
+    expect(formatQueueCount(0, scope)).toBe("0");
+  });
+
+  it("flags counts that only describe the loaded page", () => {
+    const scope = resolveQueueCountScope({
+      hasError: false,
+      isPending: false,
+      loadedCount: 25,
+      total: 120,
+    });
+
+    expect(scope).toBe("partial");
+    expect(describeQueueScope({ scope, loadedCount: 25, total: 120, filterSummary: "" })).toBe(
+      "Showing 25 of 120 runs · counts describe this page only",
+    );
+  });
+
+  it("does not claim counts while the first page is still loading", () => {
+    expect(
+      resolveQueueCountScope({
+        hasError: false,
+        isPending: true,
+        loadedCount: 0,
+        total: undefined,
+      }),
+    ).toBe("unknown");
   });
 });

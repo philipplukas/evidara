@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  describeAttentionTarget,
   formatDuration,
   loadDashboardStats,
   selectDashboardAttentionRun,
@@ -104,6 +105,7 @@ describe("Dashboard helpers", () => {
         ] as never,
       ),
     ).toEqual({
+      kind: "run",
       run_id: "run-1",
       reason: "blocked pipeline health",
     });
@@ -113,6 +115,7 @@ describe("Dashboard helpers", () => {
     expect(
       selectDashboardAttentionRun([], [{ run_id: "run-3", status: "pending" }] as never),
     ).toEqual({
+      kind: "run",
       run_id: "run-3",
       reason: "pending run status",
     });
@@ -139,5 +142,53 @@ describe("formatDuration", () => {
 
   it("refuses to render a duration from an unparseable timestamp", () => {
     expect(formatDuration("not-a-date", "2026-07-18T17:45:24.685Z")).toBe("-");
+  });
+});
+
+/**
+ * #670: the ATTENTION card said "No blocked or stalled run is visible yet" on a
+ * screen that simultaneously rendered `failed: 1`, because the selector only
+ * ever saw the 5-item `recent_runs` window and the failed run was 11th.
+ */
+describe("dashboard attention beyond the recent-runs window", () => {
+  it("points at the failed queue when the counters disagree with the recent window", () => {
+    const target = selectDashboardAttentionRun(
+      [],
+      // Five healthy runs — exactly what `/stats` returned in the bug report.
+      [
+        { run_id: "r1", status: "completed" },
+        { run_id: "r2", status: "completed" },
+        { run_id: "r3", status: "completed" },
+        { run_id: "r4", status: "completed" },
+        { run_id: "r5", status: "completed" },
+      ] as never,
+      { completed: 10, failed: 1 },
+    );
+
+    expect(target).toEqual({ kind: "queue", status: "failed", count: 1, reason: "failed" });
+    // And it must not render as the disabled dead end it used to.
+    expect(describeAttentionTarget(target).buttonLabel).toBe("Open failed queue");
+  });
+
+  it("still reports nothing to do only when the counters themselves are zero", () => {
+    const target = selectDashboardAttentionRun([], [] as never, {
+      completed: 10,
+      failed: 0,
+      pending: 0,
+      running: 0,
+    });
+
+    expect(target).toBeNull();
+    expect(describeAttentionTarget(target).description).toContain("not just the recent five");
+  });
+
+  it("prefers a concrete run id over the queue fallback when one is in the window", () => {
+    const target = selectDashboardAttentionRun(
+      [],
+      [{ run_id: "run-9", status: "failed" }] as never,
+      { failed: 3 },
+    );
+
+    expect(target).toEqual({ kind: "run", run_id: "run-9", reason: "failed run status" });
   });
 });

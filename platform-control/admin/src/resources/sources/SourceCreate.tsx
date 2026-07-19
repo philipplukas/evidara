@@ -29,22 +29,26 @@ import type {
   SourceBlueprintTemplate,
 } from "../../lib/admin/dataProvider";
 import { controlPlaneActions } from "../../lib/admin/dataProvider";
-import { Button, InlineAlert, Select, type SelectChoice, TextInput } from "../../ui/primitives";
+import {
+  Button,
+  Combobox,
+  type ComboboxChoice,
+  InlineAlert,
+  Select,
+  type SelectChoice,
+  TextInput,
+} from "../../ui/primitives";
 import {
   filterAuthoritiesByJurisdiction,
   formatReferenceLabel,
   isAuthorityValidForJurisdiction,
+  REFERENCE_PICKER_LIST_PARAMS,
 } from "../shared/referenceUtils";
 import {
   buildOverlayChoices,
   buildTemplateChoicesByOverlay,
   summarizePreview,
 } from "./sourceBlueprint";
-
-const REFERENCE_LIST_PARAMS = {
-  pagination: { page: 1, perPage: 250 },
-  sort: { field: "name", order: "ASC" as const },
-};
 
 const SOURCE_TYPE_CHOICES: SelectChoice[] = [
   { id: "website", name: "Website (crawl)" },
@@ -80,10 +84,16 @@ type SourceWizardFormData = {
 // `<Select>` re-renders with a filtered choice list whenever the operator
 // changes jurisdiction. Splitting it out keeps the `useWatch` call inside the
 // `<Form>`-provided react-hook-form context.
-function AuthoritySelectField({ authorities }: { authorities: AuthorityRecord[] }) {
+function AuthoritySelectField({
+  authorities,
+  isLoading,
+}: {
+  authorities: AuthorityRecord[];
+  isLoading: boolean;
+}) {
   const currentJurisdictionId = useWatch({ name: "jurisdiction_id" }) as string | null | undefined;
 
-  const choices: SelectChoice[] = filterAuthoritiesByJurisdiction(
+  const choices: ComboboxChoice[] = filterAuthoritiesByJurisdiction(
     authorities,
     currentJurisdictionId,
   ).map((authority) => ({
@@ -107,22 +117,24 @@ function AuthoritySelectField({ authorities }: { authorities: AuthorityRecord[] 
   };
 
   return (
-    <Select
-      // Force remount on jurisdiction change so the trigger re-reads its
+    <Combobox
+      // Force remount on jurisdiction change so the input re-reads its
       // value against the new choice set — same trick the v1 page uses with
       // `key={formData.jurisdiction_id}` on `AuthoritySelectInput`.
       key={currentJurisdictionId ?? "no-jurisdiction"}
       source="authority_id"
       label="Authority"
       choices={choices}
+      loading={isLoading && choices.length === 0}
       required
       validate={[required(), validateAuthority]}
       helperText={
         currentJurisdictionId
-          ? "Only authorities in the selected jurisdiction are shown."
+          ? "Type to search. Only authorities in the selected jurisdiction (plus global authorities) are shown."
           : "Select a jurisdiction first to load the matching authorities."
       }
-      placeholder={currentJurisdictionId ? "Select an authority…" : "Select a jurisdiction first"}
+      placeholder={currentJurisdictionId ? "Search authorities…" : "Select a jurisdiction first"}
+      testId="source-authority-combobox"
     />
   );
 }
@@ -308,8 +320,11 @@ export default function SourceCreate() {
   const [templates, setTemplates] = useState<SourceBlueprintTemplate[]>([]);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
 
-  const jurisdictions = useGetList<JurisdictionRecord>("jurisdictions", REFERENCE_LIST_PARAMS);
-  const authorities = useGetList<AuthorityRecord>("authorities", REFERENCE_LIST_PARAMS);
+  const jurisdictions = useGetList<JurisdictionRecord>(
+    "jurisdictions",
+    REFERENCE_PICKER_LIST_PARAMS,
+  );
+  const authorities = useGetList<AuthorityRecord>("authorities", REFERENCE_PICKER_LIST_PARAMS);
 
   useEffect(() => {
     let active = true;
@@ -330,7 +345,7 @@ export default function SourceCreate() {
     };
   }, []);
 
-  const jurisdictionChoices: SelectChoice[] = (jurisdictions.data ?? []).map((jurisdiction) => ({
+  const jurisdictionChoices: ComboboxChoice[] = (jurisdictions.data ?? []).map((jurisdiction) => ({
     id: jurisdiction.jurisdiction_id,
     name: formatReferenceLabel(jurisdiction),
   }));
@@ -403,16 +418,22 @@ export default function SourceCreate() {
             multiline
             helperText="Optional internal notes for operators reviewing this source."
           />
-          <Select
+          <Combobox
             source="jurisdiction_id"
             label="Jurisdiction"
             choices={jurisdictionChoices}
+            totalCount={jurisdictions.total}
+            loading={jurisdictions.isPending && jurisdictionChoices.length === 0}
             required
             validate={required()}
-            helperText="Choose the legal boundary this source belongs to."
-            placeholder="Select a jurisdiction…"
+            helperText="Type to search the full jurisdiction registry by name or id (e.g. “zurich”, “jur_ch_federal”)."
+            placeholder="Search jurisdictions…"
+            testId="source-jurisdiction-combobox"
           />
-          <AuthoritySelectField authorities={authorities.data ?? []} />
+          <AuthoritySelectField
+            authorities={authorities.data ?? []}
+            isLoading={authorities.isPending}
+          />
           <TextInput
             source="document_family"
             label="Document family"

@@ -93,10 +93,17 @@ type RecentHealthSummary = {
   unavailable: number;
 };
 
-type AttentionRun = {
-  run_id: string;
-  reason: string;
-};
+/**
+ * What the ATTENTION card should point the operator at.
+ *
+ * `run`   — we have an actual run id worth opening.
+ * `queue` — the counters say work needs attention but the recent window does
+ *           not contain it, so the honest answer is "go look at the filtered
+ *           queue", not "nothing needs attention".
+ */
+export type AttentionTarget =
+  | { kind: "run"; run_id: string; reason: string }
+  | { kind: "queue"; status: "failed" | "pending" | "running"; count: number; reason: string };
 
 const MAX_HEALTH_PROBES = 5;
 
@@ -134,13 +141,30 @@ export const summarizeRecentHealth = (recentHealth: RecentRunHealth[]): RecentHe
     { ok: 0, blocked: 0, failed: 0, in_progress: 0, unavailable: 0 },
   );
 
+/**
+ * Pick what the ATTENTION card should point at.
+ *
+ * The bug this fixes (#670): the selector scanned only `stats.recent_runs`,
+ * which `/stats` caps at 5. The failed ADR-0033 dog-axis run was 11th by
+ * recency, so the card rendered "No blocked or stalled run is visible yet" on
+ * the same screen that showed `failed: 1` — a conclusion drawn from a truncated
+ * list, presented as an answer about the whole system.
+ *
+ * `runByStatus` is the counter over *all* runs and comes from the same `/stats`
+ * payload, so consulting it costs nothing and is the only way this function can
+ * distinguish "nothing needs attention" from "the thing that needs attention is
+ * outside my window". The disabled/empty state is now reachable only when the
+ * counters actually say zero.
+ */
 export const selectDashboardAttentionRun = (
   recentHealth: RecentRunHealth[],
   recentRuns: DashboardStats["recent_runs"],
-): AttentionRun | null => {
+  runByStatus: Record<string, number> = {},
+): AttentionTarget | null => {
   const blockedRun = recentHealth.find((entry) => entry.health?.overall_status === "blocked");
   if (blockedRun) {
     return {
+      kind: "run",
       run_id: blockedRun.run_id,
       reason: "blocked pipeline health",
     };
@@ -149,6 +173,7 @@ export const selectDashboardAttentionRun = (
   const failedRun = recentHealth.find((entry) => entry.health?.overall_status === "failed");
   if (failedRun) {
     return {
+      kind: "run",
       run_id: failedRun.run_id,
       reason: "failed pipeline health",
     };
@@ -159,6 +184,7 @@ export const selectDashboardAttentionRun = (
   );
   if (blockedStatusRun) {
     return {
+      kind: "run",
       run_id: blockedStatusRun.run_id,
       reason:
         blockedStatusRun.status === "failed"
@@ -169,7 +195,52 @@ export const selectDashboardAttentionRun = (
     };
   }
 
+  // Nothing actionable in the recent window — but the counters may still know
+  // better. Failed first: it is the only one that is unambiguously wrong.
+  const outsideWindow: Array<{ status: "failed" | "pending" | "running"; reason: string }> = [
+    { status: "failed", reason: "failed" },
+    { status: "pending", reason: "pending" },
+    { status: "running", reason: "running" },
+  ];
+  for (const candidate of outsideWindow) {
+    const count = runByStatus[candidate.status] ?? 0;
+    if (count > 0) {
+      return {
+        kind: "queue",
+        status: candidate.status,
+        count,
+        reason: candidate.reason,
+      };
+    }
+  }
+
   return null;
+};
+
+/** Card copy for whatever `selectDashboardAttentionRun` returned. */
+export const describeAttentionTarget = (
+  target: AttentionTarget | null,
+): { description: string; buttonLabel: string } => {
+  if (!target) {
+    return {
+      description:
+        "No run is failing, pending, or running. The run counters — not just the recent five — report nothing needing attention.",
+      buttonLabel: "No blocked run",
+    };
+  }
+
+  if (target.kind === "run") {
+    return {
+      description: `Open ${target.run_id} first. It is the newest run with ${target.reason}.`,
+      buttonLabel: "Inspect blocked run",
+    };
+  }
+
+  const plural = target.count === 1 ? "run" : "runs";
+  return {
+    description: `${target.count} ${target.reason} ${plural} exist but fall outside the five most recent, so no id is shown here. Open the filtered queue to triage them.`,
+    buttonLabel: `Open ${target.reason} queue`,
+  };
 };
 
 function ActionCard({
@@ -294,7 +365,12 @@ export function Dashboard() {
   const successRate =
     completed + failed > 0 ? `${Math.round((completed / (completed + failed)) * 100)}%` : "-";
   const recentHealthSummary = summarizeRecentHealth(recentHealth);
-  const attentionRun = selectDashboardAttentionRun(recentHealth, stats.recent_runs);
+  const attentionRun = selectDashboardAttentionRun(
+    recentHealth,
+    stats.recent_runs,
+    stats.run_by_status,
+  );
+  const attentionCopy = describeAttentionTarget(attentionRun);
   const recentRunColumns: DataTableColumn<DashboardStats["recent_runs"][number]>[] = [
     {
       key: "run",
@@ -403,23 +479,28 @@ export function Dashboard() {
               <ActionCard
                 eyebrow="Attention"
                 title="Inspect blocked run"
-                description={
-                  attentionRun
-                    ? `Open ${attentionRun.run_id} first. It is the newest run with ${attentionRun.reason}.`
-                    : "No blocked or stalled run is visible yet. Recent runs are all complete or unavailable."
-                }
+                description={attentionCopy.description}
                 tone={attentionRun ? "warning" : "default"}
                 action={
                   <Button
                     variant="secondary"
                     disabled={!attentionRun}
                     onClick={() => {
-                      if (attentionRun) {
+                      if (!attentionRun) return;
+                      if (attentionRun.kind === "run") {
                         redirect("show", ResourceName.Runs, attentionRun.run_id);
+                        return;
                       }
+                      // No id to open — hand the operator the filtered queue
+                      // instead of a dead disabled button (#670).
+                      redirect(
+                        `/${ResourceName.Runs}?filter=${encodeURIComponent(
+                          JSON.stringify({ status: attentionRun.status }),
+                        )}`,
+                      );
                     }}
                   >
-                    {attentionRun ? "Inspect blocked run" : "No blocked run"}
+                    {attentionCopy.buttonLabel}
                   </Button>
                 }
               />
@@ -457,7 +538,8 @@ export function Dashboard() {
                   Runs by status
                 </h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Quick filter cues for the operational queue.
+                  Run lifecycle across <strong>all {stats.total_runs} runs</strong>. These are queue
+                  states (pending / running / completed), not pipeline health.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -480,7 +562,10 @@ export function Dashboard() {
                   Recent health snapshot
                 </h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Pipeline health probes from the newest runs.
+                  Pipeline health (acquisition → DI → projection) for{" "}
+                  <strong>only the {recentHealth.length} most recent runs</strong> — a different
+                  vocabulary and a different scope from the run lifecycle beside it. It says nothing
+                  about older runs.
                 </p>
               </div>
               {healthLoading ? (

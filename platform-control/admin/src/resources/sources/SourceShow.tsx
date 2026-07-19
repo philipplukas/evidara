@@ -35,7 +35,12 @@ import { buildSourceHandoffGuidance } from "./sourceHandoff";
 const SOURCE_STATUS_META: Record<SourceRecord["status"], { label: string; detail: string }> = {
   active: {
     label: "Active",
-    detail: "This source can receive new versions and launch new runs.",
+    detail:
+      // Deliberately scoped to the source record. Whether a run can actually
+      // launch is a per-version question answered by `/v1/runs/readiness` in the
+      // versions panel below; this card cannot know it and must not imply it
+      // (#667).
+      "This source is not paused. Per-version launch readiness is shown in Source versions below.",
   },
   inactive: {
     label: "Inactive",

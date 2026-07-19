@@ -1421,3 +1421,58 @@ describe("controlPlaneDataProvider", () => {
     });
   });
 });
+
+/**
+ * #666, the half the issue did not name: raising the picker's `perPage` alone
+ * would NOT have fixed the truncation. `/v1/reference-data/jurisdictions` returns
+ * the whole table and the provider windows it client-side — but that windowing
+ * reused `toLimitOffset`, which clamps to the *server's* `MAX_SERVER_PAGE_SIZE`
+ * of 500. Any `perPage` above 500 was silently ignored, so a naive
+ * "bump 250 → 5000" fix would still have shipped a picker showing 500 of 2,169.
+ */
+describe("client-side windowing of unbounded reference lists", () => {
+  const jurisdictions = Array.from({ length: 2169 }, (_, index) => ({
+    jurisdiction_id: `jur_${String(index).padStart(4, "0")}`,
+    name: `Jurisdiction ${String(index).padStart(4, "0")}`,
+    slug: `jur-${index}`,
+  }));
+
+  it("does not apply the server page-size ceiling to an in-memory array", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: jurisdictions }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("jurisdictions", {
+      pagination: { page: 1, perPage: 25_000 },
+      sort: { field: "name", order: "ASC" },
+      filter: {},
+    });
+
+    expect(result.total).toBe(2169);
+    // The bug: this used to be 500.
+    expect(result.data).toHaveLength(2169);
+    expect(result.data.map((record) => record.jurisdiction_id)).toContain("jur_2168");
+  });
+
+  it("still paginates normally for ordinary page sizes", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: jurisdictions }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("jurisdictions", {
+      pagination: { page: 2, perPage: 50 },
+      sort: { field: "name", order: "ASC" },
+      filter: {},
+    });
+
+    expect(result.data).toHaveLength(50);
+    expect(result.total).toBe(2169);
+    expect(result.data[0].jurisdiction_id).toBe("jur_0050");
+  });
+});
