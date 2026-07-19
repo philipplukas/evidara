@@ -6,6 +6,11 @@ metadata:
   namespace: evidara
 data:
   # platform-control
+  # Required — `Settings.environment` has no default (#683). Every platform-control pod
+  # (api, connector worker, migrate job, retention sweep) reads it via envFrom on this
+  # ConfigMap; a missing value now fails at startup rather than silently meaning
+  # "development", which is what any environment-based safety gate would have branched on.
+  PLATFORM_CONTROL_ENVIRONMENT: "production"
   PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: "s3"
   PLATFORM_CONTROL_S3_ENDPOINT_URL: "http://minio.evidara.svc:9000"
   PLATFORM_CONTROL_S3_REGION: "us-east-1"

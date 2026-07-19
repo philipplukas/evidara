@@ -55,6 +55,7 @@ cp platform-control/.env.example platform-control/.env
 The checked-in `.env.example` now targets the Compose-backed local Postgres instance:
 
 ```text
+PLATFORM_CONTROL_ENVIRONMENT=development
 PLATFORM_CONTROL_DATABASE_URL=postgresql+asyncpg://platform_control:platform_control@127.0.0.1:5432/platform_control
 PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=local
 PLATFORM_CONTROL_RAW_ARTIFACT_LOCAL_DIR=.data/raw-artifacts

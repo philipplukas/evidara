@@ -7,6 +7,10 @@ PLATFORM_CONTROL_ADMIN_DIR="${PLATFORM_CONTROL_DIR}/admin"
 DEFAULT_DATABASE_URL="postgresql+asyncpg://platform_control:platform_control@127.0.0.1:5432/platform_control"
 
 export PLATFORM_CONTROL_DATABASE_URL="${PLATFORM_CONTROL_DATABASE_URL:-$DEFAULT_DATABASE_URL}"
+# Settings.environment is required and has no default (#683). This script is the local
+# demo, so it declares "development" explicitly rather than relying on a default that
+# would also have been what production silently reported.
+export PLATFORM_CONTROL_ENVIRONMENT="${PLATFORM_CONTROL_ENVIRONMENT:-development}"
 
 usage() {
   cat <<'EOF'
@@ -31,6 +35,9 @@ Environment:
   PLATFORM_CONTROL_DATABASE_URL
       Defaults to:
       postgresql+asyncpg://platform_control:platform_control@127.0.0.1:5432/platform_control
+  PLATFORM_CONTROL_ENVIRONMENT
+      development | staging | production. Required by the app (no default); this
+      script exports "development" unless you set it.
 EOF
 }
 

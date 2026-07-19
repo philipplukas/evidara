@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import os
 from pathlib import Path
 import sys
 from typing import Any
@@ -90,6 +91,11 @@ _Dumper.add_representer(str, _str_representer)
 
 def render() -> str:
     """Return the contract YAML text for the current app."""
+    # `Settings.environment` is required and has no default (#683). This is a build-time
+    # export, not a deployment, so it declares "development" rather than inheriting one —
+    # the value does not appear in the generated document.
+    os.environ.setdefault("PLATFORM_CONTROL_ENVIRONMENT", "development")
+
     # Imported lazily: this module is importable from the repo root for `--help`,
     # but `platform_control` only resolves inside the platform-control venv.
     from platform_control.main import create_app

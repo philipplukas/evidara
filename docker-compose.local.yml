@@ -5,6 +5,8 @@ services:
       dockerfile: platform-control/Dockerfile
     profiles: ["apps"]
     environment:
+      # Required — Settings.environment has no default (#683).
+      PLATFORM_CONTROL_ENVIRONMENT: development
       PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
       PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: local
       PLATFORM_CONTROL_RAW_ARTIFACT_LOCAL_DIR: .data/raw-artifacts
@@ -30,6 +32,8 @@ services:
       dockerfile: platform-control/Dockerfile
     profiles: ["apps"]
     environment:
+      # Required — Settings.environment has no default (#683).
+      PLATFORM_CONTROL_ENVIRONMENT: ${PLATFORM_CONTROL_ENVIRONMENT:-development}
       PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
       PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: ${PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND:-local}
       PLATFORM_CONTROL_RAW_ARTIFACT_LOCAL_DIR: .data/raw-artifacts

@@ -17,7 +17,13 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "platform-control"
-    environment: str = "development"
+    # Deliberately has NO default. It used to default to "development", and
+    # PLATFORM_CONTROL_ENVIRONMENT was set nowhere in the repo — so every deployment
+    # reported itself as development (#683). Any safety gate written as
+    # `if settings.environment == "development"` would therefore have failed *open* in
+    # production, silently. A default that is also the least-safe value is the defect;
+    # requiring the value makes a missing one a startup error instead of a wrong answer.
+    environment: Literal["development", "staging", "production"]
     database_url: str = "sqlite+aiosqlite:///./platform_control.db"
     sql_echo: bool = False
 

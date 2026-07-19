@@ -285,3 +285,40 @@ def test_di_event_validation_errors_reference_an_existing_component(schema: dict
         response = schema["paths"][path]["post"]["responses"]["422"]
         ref = response["content"]["application/json"]["schema"]["$ref"]
         assert ref == "#/components/schemas/HTTPValidationError"
+
+
+def test_settings_is_not_published_as_a_schema(schema: dict) -> None:
+    """The service's own configuration model must never reach the contract (#682).
+
+    `Settings` enumerates every credential the service holds by name
+    (`firecrawl_webhook_secret`, `operator_api_key`, `s3_secret_access_key`, …). It
+    leaked because `get_artifact_store`/`get_raw_artifact_publisher` took a bare
+    `settings: Settings | None = None` parameter, which FastAPI classifies as a
+    *request body* when the callable is used via `Depends`. Any dependency that grows
+    the same signature shape re-opens this, so assert on the published document rather
+    than on those two functions.
+    """
+    assert "Settings" not in schema["components"]["schemas"]
+
+    published = yaml.dump(schema)
+    for secret_field in (
+        "firecrawl_webhook_secret",
+        "operator_api_key",
+        "service_api_key",
+        "s3_secret_access_key",
+        "legifrance_client_secret",
+    ):
+        assert secret_field not in published, (
+            f"Settings field {secret_field!r} appears in the published schema — a "
+            "Pydantic-typed parameter on a Depends()-injected callable was hoisted "
+            "into a request body again (#682)."
+        )
+
+
+def test_firecrawl_webhook_declares_no_request_body(schema: dict) -> None:
+    """It reads raw bytes to verify the HMAC, so it has no typed body to declare.
+
+    Its docstring says exactly that; before #682 the contract contradicted it with
+    `anyOf: [$ref Settings, null]`.
+    """
+    assert "requestBody" not in schema["paths"]["/v1/firecrawl/webhooks"]["post"]
