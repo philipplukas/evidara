@@ -12,7 +12,7 @@ from document_intelligence.extractors.metadata import (
 )
 from document_intelligence.ingest.docling_adapter import _is_placeholder_title as is_docling_placeholder_title
 from document_intelligence.persist.sinks import InMemoryCanonicalSink
-from document_intelligence.pipeline import ProcessingPipeline, _resolve_official_citation
+from document_intelligence.pipeline import ProcessingPipeline, ProcessingResult, _resolve_official_citation
 from document_intelligence.validate.schema_validation import (
     validate_instance_against_contract,
 )
@@ -265,6 +265,135 @@ class ProcessingPipelineTests(unittest.TestCase):
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)
+
+    # ─── Document identity across acquisition runs (#652) ────────────────
+
+    def _process_with(
+        self,
+        *,
+        upstream_locator: str | None,
+        artifact_id: str | None = None,
+        sink: InMemoryCanonicalSink | None = None,
+    ) -> ProcessingResult:
+        """Process one bundle and return its result.
+
+        Each call writes a *fresh* artifact file, mimicking a new acquisition run of
+        the same law: the artifact id differs every time, exactly as it does in
+        production where artifact ids are per-run ULIDs.
+
+        Passing a shared ``sink`` across calls models successive runs publishing into the
+        same canonical surface, which is what makes revisions observable.
+        """
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as handle:
+            handle.write(SAMPLE_HTML)
+            artifact_path = handle.name
+
+        payload = build_manifest_payload(artifact_path, artifact_role="primary_document")
+        payload["upstream_locator"] = upstream_locator
+        if artifact_id is not None:
+            payload["artifacts"][0]["artifact_id"] = artifact_id
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump(payload, handle)
+            manifest_path = handle.name
+
+        try:
+            pipeline = ProcessingPipeline(sink=sink if sink is not None else InMemoryCanonicalSink())
+            return pipeline.process_event(build_bundle_event(manifest_path))
+        finally:
+            os.unlink(artifact_path)
+            os.unlink(manifest_path)
+
+    def _document_id_for(self, **kwargs: object) -> str:
+        return self._process_with(**kwargs).document.document_id  # type: ignore[arg-type]
+
+    def test_reacquiring_the_same_law_keeps_one_document_identity(self) -> None:
+        # The #652 regression: two runs of the same source fetch the same ELI, so they
+        # must be two revisions of ONE document — not two documents. Keying on the
+        # per-run artifact id cloned the constitution on every run.
+        eli = "https://fedlex.data.admin.ch/eli/cc/1999/404"
+        first = self._document_id_for(upstream_locator=eli, artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fk")
+        second = self._document_id_for(upstream_locator=eli, artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fm")
+
+        self.assertEqual(first, second)
+
+    def test_distinct_laws_keep_distinct_identities(self) -> None:
+        # The failure mode the fix must not introduce: collapsing different documents.
+        first = self._document_id_for(upstream_locator="https://fedlex.data.admin.ch/eli/cc/1999/404")
+        second = self._document_id_for(upstream_locator="https://fedlex.data.admin.ch/eli/cc/2002/123")
+
+        self.assertNotEqual(first, second)
+
+    def test_without_a_locator_identity_falls_back_to_the_artifact(self) -> None:
+        # Sources publishing no stable permalink keep the old behaviour rather than
+        # collapsing onto a shared id.
+        first = self._document_id_for(upstream_locator=None, artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fn")
+        second = self._document_id_for(upstream_locator=None, artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fp")
+
+        self.assertNotEqual(first, second)
+
+    def test_blank_locator_is_treated_as_absent(self) -> None:
+        first = self._document_id_for(upstream_locator="   ", artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fn")
+        second = self._document_id_for(upstream_locator="   ", artifact_id="art_01jq7ab8x4nm7m3qz3b8e9q2fp")
+
+        self.assertNotEqual(first, second)
+
+    # ─── Document revision across acquisition runs (#652) ────────────────
+
+    def test_reacquiring_the_same_law_publishes_the_next_revision(self) -> None:
+        # Stable identity alone still left every publication pinned at revision 1, so
+        # `_pick_latest_row` had only `processed_at` to order by and legal-search's
+        # stale-event guard (`document_revision < latest`) could never fire.
+        eli = "https://fedlex.data.admin.ch/eli/cc/1999/404"
+        sink = InMemoryCanonicalSink()
+
+        first = self._process_with(upstream_locator=eli, sink=sink)
+        second = self._process_with(upstream_locator=eli, sink=sink)
+        third = self._process_with(upstream_locator=eli, sink=sink)
+
+        self.assertEqual(
+            [first.document.document_revision, second.document.document_revision, third.document.document_revision],
+            [1, 2, 3],
+        )
+        # One document, three revisions — not three documents.
+        self.assertEqual(len({row.document_id for row in sink.published_documents}), 1)
+
+    def test_revision_is_tracked_per_document(self) -> None:
+        # A second law re-acquired into the same surface starts at 1; revisions must not
+        # be a global counter.
+        sink = InMemoryCanonicalSink()
+        self._process_with(upstream_locator="https://fedlex.data.admin.ch/eli/cc/1999/404", sink=sink)
+        self._process_with(upstream_locator="https://fedlex.data.admin.ch/eli/cc/1999/404", sink=sink)
+        other = self._process_with(upstream_locator="https://fedlex.data.admin.ch/eli/cc/2002/123", sink=sink)
+
+        self.assertEqual(other.document.document_revision, 1)
+
+    def test_revision_propagates_to_the_processed_event_and_sections(self) -> None:
+        # The revision only does its job downstream if the emitted event carries it —
+        # that payload field is what legal-search's stale guard compares.
+        eli = "https://fedlex.data.admin.ch/eli/cc/1999/404"
+        sink = InMemoryCanonicalSink()
+        self._process_with(upstream_locator=eli, sink=sink)
+        second = self._process_with(upstream_locator=eli, sink=sink)
+
+        self.assertEqual(second.document_processed_event["payload"]["document_revision"], 2)
+        for section in second.sections:
+            self.assertEqual(section.document_revision, 2)
+
+    def test_unreadable_sink_history_starts_at_revision_one(self) -> None:
+        # A sink that cannot read back history (Iceberg, Spark) must keep publishing
+        # rather than fail the write path over a missing read capability.
+        class NoHistorySink(InMemoryCanonicalSink):
+            def latest_document_revision(self, document_id: str) -> int | None:
+                return None
+
+        sink = NoHistorySink()
+        eli = "https://fedlex.data.admin.ch/eli/cc/1999/404"
+        first = self._process_with(upstream_locator=eli, sink=sink)
+        second = self._process_with(upstream_locator=eli, sink=sink)
+
+        self.assertEqual(first.document.document_revision, 1)
+        self.assertEqual(second.document.document_revision, 1)
 
     def test_processes_ris_style_xml_bundle(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as xml_handle:

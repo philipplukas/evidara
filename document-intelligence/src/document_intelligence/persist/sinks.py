@@ -2,14 +2,18 @@
 
 import importlib
 import json
+import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 import pyarrow as pa
+import pyarrow.compute as pc
 
 from document_intelligence.canonical.models import CommentaryInsight, Document, ProcessingManifest, Section
 from document_intelligence.errors import ProcessingError
+
+logger = logging.getLogger(__name__)
 
 # Delta append requires an Arrow schema compatible with the existing table. `_delta_ready_rows`
 # normally drops keys that are null in every row; that narrows the schema and breaks append
@@ -258,6 +262,18 @@ class CanonicalSink:
     def persist_commentary_insights(self, commentary_insights: list[CommentaryInsight]) -> None:
         raise NotImplementedError
 
+    def latest_document_revision(self, document_id: str) -> int | None:
+        """Highest ``document_revision`` already published for ``document_id``, if known (#652).
+
+        The pipeline uses this to publish a re-acquisition as revision *N+1* rather than
+        pinning every publication at 1. ``None`` means "no history available" — either the
+        document is new or this sink cannot read back — and the caller starts at 1.
+
+        Defaulting to ``None`` keeps sinks that cannot read (Iceberg, Spark) behaving exactly
+        as they do today instead of failing the write path over a missing read capability.
+        """
+        return None
+
 
 @dataclass(frozen=True)
 class DeltaSinkConfig:
@@ -294,6 +310,14 @@ class InMemoryCanonicalSink(CanonicalSink):
 
     def persist_commentary_insights(self, commentary_insights: list[CommentaryInsight]) -> None:
         self.published_commentary_insights.extend(commentary_insights)
+
+    def latest_document_revision(self, document_id: str) -> int | None:
+        revisions = [
+            document.document_revision
+            for document in self.published_documents
+            if document.document_id == document_id and document.document_revision is not None
+        ]
+        return max(revisions) if revisions else None
 
 
 class DeltaCanonicalSink(CanonicalSink):
@@ -362,6 +386,42 @@ class DeltaCanonicalSink(CanonicalSink):
             schema_override=_COMMENTARY_INSIGHTS_ARROW_SCHEMA,
         )
 
+    def latest_document_revision(self, document_id: str) -> int | None:
+        """Read back the highest revision already published for ``document_id`` (#652).
+
+        Pushes the ``document_id`` predicate and the single column down into the scan, so
+        this stays a metadata-pruned read of one column rather than a corpus-wide load.
+
+        Never raises: a missing table (first publication of anything), an absent
+        ``deltalake``, or an unreadable surface all mean "no history", and the caller then
+        starts at revision 1. Failing the write path because history could not be read
+        would turn a degraded read into a dropped document, which is the worse outcome.
+        """
+        try:
+            deltalake_mod = importlib.import_module("deltalake")
+            table_kwargs = {"storage_options": self._storage_options} if self._storage_options else {}
+            dataset = deltalake_mod.DeltaTable(
+                self._config.published_documents_uri, **table_kwargs
+            ).to_pyarrow_dataset()
+            if "document_revision" not in dataset.schema.names:
+                return None
+            table = dataset.to_table(
+                columns=["document_revision"],
+                filter=pc.field("document_id") == document_id,
+            )
+        except Exception as error:
+            # The surface not existing yet is the ordinary first-publication case, not a
+            # fault; only genuinely unexpected read failures are worth a warning.
+            if not _is_missing_delta_table(error):
+                logger.warning(
+                    "latest_document_revision_unavailable",
+                    extra={"document_id": document_id},
+                    exc_info=True,
+                )
+            return None
+        revisions = [value for value in table.column("document_revision").to_pylist() if value is not None]
+        return max(revisions) if revisions else None
+
     def _write_rows(
         self,
         uri: str,
@@ -405,6 +465,16 @@ class DeltaCanonicalSink(CanonicalSink):
                 "delta_write_failed",
                 f"failed to write canonical rows to Delta surface {uri}",
             ) from error
+
+
+def _is_missing_delta_table(error: BaseException) -> bool:
+    """Whether ``error`` means "this Delta surface does not exist yet" (#652).
+
+    Matched on the exception *name* rather than the type: ``TableNotFoundError`` lives in
+    ``deltalake._internal``, a native module, so importing it here to catch it would couple
+    canonical persistence to a private path that has moved between deltalake releases.
+    """
+    return type(error).__name__ == "TableNotFoundError"
 
 
 def _default_delta_writer() -> Callable[..., object]:

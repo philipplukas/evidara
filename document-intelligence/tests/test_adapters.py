@@ -1,3 +1,4 @@
+import dataclasses
 import hashlib
 import importlib.util
 import json
@@ -164,6 +165,49 @@ class DeltaCanonicalSinkTests(unittest.TestCase):
             )
             self.assertEqual(len(sink.status_events), 3)
             self.assertEqual(len(sink.document_processed_events), 1)
+
+    def test_latest_document_revision_reads_back_published_history(self) -> None:
+        # The read side of #652: the pipeline asks the sink what it already published so a
+        # re-acquisition can be revision N+1 instead of another row pinned at 1.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            sink = DeltaCanonicalSink(
+                DeltaSinkConfig(
+                    published_documents_uri=os.path.join(temp_dir, "published_documents"),
+                    published_sections_uri=os.path.join(temp_dir, "published_sections"),
+                    processing_manifests_uri=os.path.join(temp_dir, "processing_manifests"),
+                )
+            )
+
+            # No table yet: nothing published anywhere, so the first publication starts at 1.
+            self.assertIsNone(sink.latest_document_revision("doc_does_not_exist"))
+
+            first = build_processing_result()
+            sink.persist(first.document, first.sections, first.manifest)
+            self.assertEqual(sink.latest_document_revision(first.document.document_id), 1)
+
+            second = build_processing_result()
+            sink.persist(
+                dataclasses.replace(second.document, document_revision=2),
+                second.sections,
+                second.manifest,
+            )
+            self.assertEqual(sink.latest_document_revision(first.document.document_id), 2)
+
+            # Scoped per document, not a global high-water mark.
+            self.assertIsNone(sink.latest_document_revision("doc_other"))
+
+    def test_latest_document_revision_degrades_to_none_when_surface_unreadable(self) -> None:
+        # An unreadable surface must not fail the write path — a degraded read becoming a
+        # dropped document is the worse outcome.
+        sink = DeltaCanonicalSink(
+            DeltaSinkConfig(
+                published_documents_uri="/nonexistent/published_documents",
+                published_sections_uri="/nonexistent/published_sections",
+                processing_manifests_uri="/nonexistent/processing_manifests",
+            )
+        )
+
+        self.assertIsNone(sink.latest_document_revision("doc_anything"))
 
     def test_replay_appends_new_manifest_rows_while_document_identity_stays_stable(
         self,
