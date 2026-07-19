@@ -50,7 +50,7 @@ API_TITLE = "Platform Control API"
 # really return, with the shared `ErrorResponse` body (#627).
 # 0.11.0: additive — `refused` on run responses + `?refused=` filter on the run
 # collection, and `plan_notes` on blueprint-preview (#634).
-API_VERSION = "0.11.0"
+API_VERSION = "0.12.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

@@ -22,6 +22,10 @@ from platform_control.models.base import Base
 # This must run before any `Settings()` is constructed, hence module import time.
 os.environ.setdefault("PLATFORM_CONTROL_AUTH_DEV_ALLOW_UNAUTHENTICATED", "1")
 
+# `Settings.environment` is required and has no default (#683) — the suite must declare
+# which environment it is, the same as any deployment. `setdefault` so a test can override.
+os.environ.setdefault("PLATFORM_CONTROL_ENVIRONMENT", "development")
+
 # Where the temporalio SDK caches the `temporal-test-server` binary it drives
 # `WorkflowEnvironment.start_time_skipping()` with. The binary is fetched once
 # per SDK version and reused forever after; the server itself is local (it binds
