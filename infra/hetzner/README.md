@@ -249,3 +249,35 @@ Full deploy/verify/receiver-wiring guide:
 > **First-rollout check.** Confirm `nats_consumer_num_pending` actually resolves in
 > Prometheus. The `prometheus-nats-exporter` metric names have moved between versions,
 > and an alert on a metric that does not exist is worse than no alert — it looks like one.
+
+### Bouncing NATS (what the consumers do) — #722
+
+`di-consumer` and `projection-bridge` retry the broker **forever**
+(`max_reconnect_attempts=-1`). Bouncing NATS — a helm upgrade, a node drain, a transient
+network fault — no longer kills them; they reconnect and resume consuming on their own.
+
+They used to die. Neither ever configured a reconnect policy, so both inherited nats-py's
+default of 60 attempts at 2s. Any outage past ~2 minutes expired it, the client closed the
+connection, and `fetch()` raised `ConnectionClosedError` straight out of the run loop. The
+pods restarted (restartPolicy defaults to `Always`) but the local docker-compose stack did
+not, and either way the *symptom* was a pipeline stalled at `canonical_ready=0` — which
+reads as a document-processing regression, not a dead consumer. That misdiagnosis is the
+reason this is written down.
+
+The two probes now answer different questions, and you need both to read the situation:
+
+| Probe | Question | During a broker outage |
+|---|---|---|
+| `/health` (liveness) | Is the process alive? | **200** — it is healthy and correctly retrying |
+| `/ready` (readiness) | Can it reach the broker? | **503**, with `broker_connected: false` and a reason |
+
+So `kubectl get pods -n evidara` showing `di-consumer 0/1 Running` with no restarts means
+*the broker is unreachable*, not that the consumer is broken. Check NATS first. If the pod
+is also restarting, the connection closed unrecoverably — the consumer exits non-zero on
+purpose so the restart policy takes over.
+
+Publishing is the mirror image: platform-control's dispatch path answers an operator over
+HTTP, so it does **not** retry. It bounds the connect at
+`PLATFORM_CONTROL_NATS_CONNECT_TIMEOUT_SECONDS` (default 5s) and fails the rest of the
+batch immediately for a 30s cooldown, so a run against a down broker returns a 502 naming
+the cause in seconds and records the run `failed` (#707) rather than hanging for minutes.
