@@ -596,12 +596,31 @@ export const toAcquisitionSpec = (state: SourceVersionFormState): Partial<Acquis
   return { ...preserved, ...edited };
 };
 
+/**
+ * How many entries of a list the summary names before counting the rest.
+ *
+ * The summary is a table *cell*. The Fedlex 50-act version printed all 50 work
+ * URIs into it, producing one row several screens tall that pushed the row's
+ * other columns out of view, next to a four-line ZH row (#674). Three entries
+ * is enough to recognise the shape of the list; the full value stays available
+ * in the edit dialog, which renders the spec verbatim.
+ */
+const SUMMARY_LIST_LIMIT = 3;
+
+export const summarizeList = (values: string[]): string => {
+  if (values.length === 0) return "none";
+  if (values.length <= SUMMARY_LIST_LIMIT) return values.join(", ");
+  return `${values.slice(0, SUMMARY_LIST_LIMIT).join(", ")} … and ${
+    values.length - SUMMARY_LIST_LIMIT
+  } more`;
+};
+
 const formatSpecValue = (value: unknown): string => {
   if (value === null || value === undefined) {
     return "not set";
   }
   if (Array.isArray(value)) {
-    return value.length > 0 ? value.join(", ") : "none";
+    return summarizeList(value.map(String));
   }
   return String(value);
 };
@@ -639,10 +658,7 @@ export const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
     const seeds = deterministic.seed_url
       ? [deterministic.seed_url, ...(deterministic.seed_urls ?? [])]
       : (deterministic.seed_urls ?? []);
-    return [
-      `provider: ${provider}`,
-      seeds.length > 0 ? `seeds: ${seeds.join(", ")}` : "seeds: none",
-    ];
+    return [`provider: ${provider}`, `seeds: ${summarizeList(seeds)}`];
   }
 
   if (provider === "fedlex_sparql") {
@@ -652,7 +668,7 @@ export const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
       : (fedlex.seed_urls ?? []);
     return [
       `provider: ${provider}`,
-      `work URIs: ${seeds.join(", ") || "none"}`,
+      `work URIs: ${summarizeList(seeds)}`,
       `SPARQL endpoint: ${fedlex.sparql_endpoint ?? "n/a"}`,
       `preferred languages: ${(fedlex.preferred_languages ?? []).join(", ") || "n/a"}`,
       `query mode / max expressions: ${fedlex.query_mode ?? "n/a"} / ${fedlex.max_expressions ?? "n/a"}`,
@@ -666,7 +682,7 @@ export const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
   return [
     `provider: ${provider}`,
     `mode: ${firecrawl.mode}`,
-    seeds.length > 0 ? `seeds: ${seeds.join(", ")}` : "seeds: none",
+    `seeds: ${summarizeList(seeds)}`,
     `limit: ${firecrawl.limit}`,
     `depth: ${firecrawl.max_discovery_depth}`,
     (firecrawl.include_paths ?? []).length > 0

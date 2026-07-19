@@ -270,6 +270,38 @@ describe("acquisition-spec form helpers", () => {
     expect(lines).not.toContain("mode: undefined");
     expect(lines).not.toContain("limit: undefined");
   });
+
+  it("counts the tail of a long list instead of printing every entry", () => {
+    // The Fedlex 50-act version printed all 50 work URIs into one table cell,
+    // making a row several screens tall and pushing the row's other columns out
+    // of view (#674).
+    const lines = summarizeAcquisitionSpec({
+      provider: "fedlex_sparql",
+      seed_url: "https://fedlex.data.admin.ch/eli/cc/0",
+      seed_urls: Array.from(
+        { length: 49 },
+        (_, index) => `https://fedlex.data.admin.ch/eli/cc/${index + 1}`,
+      ),
+      sparql_endpoint: "https://fedlex.data.admin.ch/sparqlendpoint",
+      preferred_languages: ["de"],
+      query_mode: "work_to_expression",
+      max_expressions: 1,
+    });
+
+    const workUris = lines.find((line) => line.startsWith("work URIs:")) ?? "";
+    expect(workUris).toContain("… and 47 more");
+    expect(workUris).not.toContain("/eli/cc/40");
+  });
+
+  it("leaves a short list intact", () => {
+    const lines = summarizeAcquisitionSpec({
+      provider: "deterministic_http",
+      seed_url: "https://example.test/a",
+      seed_urls: ["https://example.test/b"],
+    });
+
+    expect(lines).toContain("seeds: https://example.test/a, https://example.test/b");
+  });
 });
 
 /**
