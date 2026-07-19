@@ -471,8 +471,15 @@ jobs:
         if: runner.environment == 'github-hosted'
         run: npx playwright install-deps chromium
 
-      - name: Regenerate baselines
-        run: npm run e2e:visual:update
+      # `=changed`, NOT the bare `--update-snapshots` (which means `=all`).
+      # `=all` rewrites every snapshot even when it already matches, so a
+      # refresh that should touch 6 images touches all 14 — and a reviewer can
+      # no longer tell which baseline actually moved. An unreadable diff is how
+      # bad baselines get waved through, which is the failure this whole change
+      # is about. Keep the diff minimal so the ledger entry can be checked
+      # against it.
+      - name: Regenerate baselines (only those that actually differ)
+        run: npx playwright test e2e/visual.spec.ts --update-snapshots=changed
 
       - name: Record provenance and commit
         working-directory: .
