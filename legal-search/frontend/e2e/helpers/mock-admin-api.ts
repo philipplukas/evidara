@@ -13,6 +13,10 @@ async function fulfillJson(route: Route, body: JsonBody, status = 200) {
 }
 
 export async function mockAdminRunFlowApi(page: Page) {
+  // One warning per distinct unmocked path per page — react-admin retries and
+  // refetches, so warning per request would bury the signal it exists to give.
+  const warnedPaths = new Set<string>();
+
   await page.route("**/api/platform-control/**", async (route) => {
     const requestUrl = new URL(route.request().url());
     const apiPath = requestUrl.pathname.replace(API_PREFIX, "");
@@ -289,6 +293,71 @@ export async function mockAdminRunFlowApi(page: Page) {
       return;
     }
 
+    // #693 gave the admin a Blueprints resource, and `SourceCreate` calls
+    // `listSourceBlueprintTemplates()` on mount. Without a branch here the
+    // request fell through to `route.fallback()` below, was proxied to a
+    // platform-control the screenshot harness never starts, and surfaced as
+    // `ECONNREFUSED 127.0.0.1:8000` in the shared WebServer log — where it sat
+    // next to an unrelated failure and got read as its cause (#732).
+    //
+    // The three rows cover the states ADR-0030's two-key lock can be in, so a
+    // screenshot of this surface shows the lock rather than one happy row:
+    // shipped-default enabled, shipped-default disabled (fail-closed), and an
+    // operator override. `launchable` is always `enabled && live_ready`.
+    if (apiPath === "/v1/sources/blueprint-templates") {
+      await fulfillJson(route, {
+        data: [
+          {
+            overlay_id: "at",
+            provider_template_id: "ris_ogd_bundesrecht",
+            provider: "ris_ogd",
+            enabled: true,
+            live_ready: true,
+            launchable: true,
+            default_enabled: true,
+            source: "default",
+            notes: [],
+            note: null,
+            updated_by: null,
+            updated_at: null,
+          },
+          {
+            overlay_id: "ch",
+            provider_template_id: "fedlex_sparql_federal",
+            provider: "fedlex_sparql",
+            // Config key off while the code key is on: the fail-closed default
+            // is the only thing standing between an operator and this run.
+            enabled: false,
+            live_ready: true,
+            launchable: false,
+            default_enabled: false,
+            source: "default",
+            notes: [],
+            note: null,
+            updated_by: null,
+            updated_at: null,
+          },
+          {
+            overlay_id: "de",
+            provider_template_id: "gesetze_im_internet",
+            provider: "gemeinde_http",
+            enabled: true,
+            live_ready: false,
+            launchable: false,
+            default_enabled: false,
+            source: "override",
+            notes: [],
+            note: "Enabled after acceptance-run evidence.",
+            // Key-shaped, never person-shaped — see describeProvenance in
+            // platform-control/admin/src/domain/blueprintLock.ts.
+            updated_by: "op_scoped_operator_key",
+            updated_at: "2026-04-06T09:30:00Z",
+          },
+        ],
+      });
+      return;
+    }
+
     if (apiPath === "/stats") {
       await fulfillJson(route, {
         source_count: 4,
@@ -327,6 +396,21 @@ export async function mockAdminRunFlowApi(page: Page) {
       return;
     }
 
+    // Falling back proxies to a platform-control the harness does not start, so
+    // an unmocked admin endpoint becomes `ECONNREFUSED` in the WebServer log
+    // rather than anything that names itself. That is how #693's new endpoint
+    // stayed invisible and then got blamed for an unrelated test failure
+    // (#732). The fallback is kept — some paths legitimately pass through —
+    // but it no longer does so silently.
+    const signature = `${route.request().method()} ${apiPath}`;
+    if (!warnedPaths.has(signature)) {
+      warnedPaths.add(signature);
+      console.warn(
+        `[mock-admin-api] no branch for ${signature} — falling through to the real ` +
+          "backend, which the screenshot harness does not run. Add a branch in " +
+          "legal-search/frontend/e2e/helpers/mock-admin-api.ts.",
+      );
+    }
     await route.fallback();
   });
 }
