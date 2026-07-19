@@ -37,11 +37,13 @@ import { SourceVersionDiffPanel } from "./SourceVersionDiffPanel";
 import {
   describeSourceVersionStatus,
   emptyFormState,
+  explainUnavailableVersionAction,
   OVERLAY_CHOICES,
   PROVIDER_CHOICES,
   PROVIDER_TEMPLATE_CHOICES,
   type ProviderType,
   SOURCE_VERSION_LIST_PARAMS,
+  type SourceVersionAction,
   type SourceVersionFormState,
   summarizeAcquisitionSpec,
   summarizeSourceVersionLifecycle,
@@ -435,6 +437,61 @@ const CONFIRM_COPY: Record<
   },
 };
 
+/**
+ * A lifecycle action on one version, which states *why* it is unavailable.
+ *
+ * A greyed button is not an explanation (#674). When the action is blocked by
+ * the version's status, the reason becomes both a native tooltip (`title`) and
+ * an accessible description, so the rule — "approval is terminal", "production
+ * runs require an approved version" — is readable rather than inferred.
+ *
+ * `busy` (an in-flight request on this row) also disables the button, but is
+ * transient and self-evident, so it carries no explanation.
+ */
+function VersionActionButton({
+  action,
+  status,
+  busy,
+  versionId,
+  variant = "secondary",
+  className,
+  onClick,
+  children,
+}: {
+  action: SourceVersionAction;
+  status: SourceVersionRecord["status"];
+  busy: boolean;
+  versionId: string;
+  variant?: "primary" | "secondary" | "ghost";
+  className?: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const reason = explainUnavailableVersionAction(action, status);
+  const describedById = reason ? `version-action-${versionId}-${action}` : undefined;
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant={variant}
+        className={className}
+        onClick={onClick}
+        disabled={reason !== null || busy}
+        title={reason ?? undefined}
+        aria-describedby={describedById}
+      >
+        {children}
+      </Button>
+      {reason ? (
+        <span id={describedById} className="sr-only">
+          {reason}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 export function SourceVersionsSection({ source }: { source: SourceRecord }) {
   const dataProvider = useDataProvider();
   const notify = useNotify();
@@ -675,12 +732,11 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
               </thead>
               <tbody>
                 {rows.map((version, index) => {
-                  const canEdit = version.status === "draft" || version.status === "rejected";
-                  const canReview =
-                    version.status === "draft" || version.status === "pending_approval";
-                  const canPreview =
-                    version.status !== "rejected" && version.status !== "superseded";
-                  const canProduction = version.status === "approved";
+                  // The per-action availability rules moved into
+                  // `explainUnavailableVersionAction`, which returns the reason
+                  // an action is blocked (or `null` when it is available) —
+                  // one source of truth for both the `disabled` flag and the
+                  // explanation the operator reads.
                   const isActing = actionVersionId === version.source_version_id;
                   const statusMeta = describeSourceVersionStatus(version.status);
                   const previousVersion = index < rows.length - 1 ? rows[index + 1] : null;
@@ -716,14 +772,15 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            <VersionActionButton
+                              action="edit"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               onClick={() => openEditDialog(version)}
-                              disabled={!canEdit || isActing}
                             >
                               Edit
-                            </Button>
+                            </VersionActionButton>
                             {previousVersion ? (
                               <Button
                                 size="sm"
@@ -735,43 +792,48 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
                                 {isDiffOpen ? "Hide diff" : "Compare"}
                               </Button>
                             ) : null}
-                            <Button
-                              size="sm"
+                            <VersionActionButton
+                              action="preview"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               variant="primary"
                               onClick={() => createRun("preview", version)}
-                              disabled={!canPreview || isActing}
                             >
                               Preview run
-                            </Button>
+                            </VersionActionButton>
                             <span
                               aria-hidden
                               className="mx-0.5 hidden h-6 w-px self-center bg-[var(--border)] sm:inline-block"
                             />
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            <VersionActionButton
+                              action="production"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               onClick={() => setConfirm({ kind: "production", version })}
-                              disabled={!canProduction || isActing}
                             >
                               Production run
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            </VersionActionButton>
+                            <VersionActionButton
+                              action="approve"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               onClick={() => setConfirm({ kind: "approve", version })}
-                              disabled={!canReview || isActing}
                             >
                               Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            </VersionActionButton>
+                            <VersionActionButton
+                              action="reject"
+                              status={version.status}
+                              busy={isActing}
+                              versionId={version.source_version_id}
                               className="border-[var(--status-critical)]/40 text-[var(--status-critical)] hover:border-[var(--status-critical)]"
                               onClick={() => setConfirm({ kind: "reject", version })}
-                              disabled={!canReview || isActing}
                             >
                               Reject
-                            </Button>
+                            </VersionActionButton>
                           </div>
                         </td>
                       </tr>

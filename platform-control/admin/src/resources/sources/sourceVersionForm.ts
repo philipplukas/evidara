@@ -233,6 +233,67 @@ export const textToList = (value: string): string[] =>
 export const describeSourceVersionStatus = (status: SourceVersionRecord["status"]) =>
   VERSION_STATUS_META[status];
 
+export type SourceVersionAction = "edit" | "preview" | "production" | "approve" | "reject";
+
+const ACTION_LABEL: Record<SourceVersionAction, string> = {
+  edit: "Edit",
+  preview: "Preview run",
+  production: "Production run",
+  approve: "Approve",
+  reject: "Reject",
+};
+
+/**
+ * Why is this action unavailable on a version in this status?
+ *
+ * The row rendered `Edit` / `Approve` / `Reject` as three greyed buttons on an
+ * approved version with no `title`, no accessible description, and no adjacent
+ * copy (#674). "Approval is terminal" is a rule of the lifecycle, not something
+ * an operator can infer from a dimmed button — and to a screen-reader user a
+ * disabled button with no stated reason carries no information at all.
+ *
+ * Returns `null` when the action is available, so the caller can use the same
+ * value for both the `disabled` decision and the explanation.
+ */
+export const explainUnavailableVersionAction = (
+  action: SourceVersionAction,
+  status: SourceVersionRecord["status"],
+): string | null => {
+  const label = ACTION_LABEL[action];
+
+  if (action === "edit") {
+    if (status === "draft" || status === "rejected") return null;
+    if (status === "approved") {
+      return "Approved versions are immutable — create a new version to change the spec.";
+    }
+    if (status === "superseded") {
+      return "Superseded versions are read-only history.";
+    }
+    return `${label} is unavailable while the version is waiting on operator review.`;
+  }
+
+  if (action === "approve" || action === "reject") {
+    if (status === "draft" || status === "pending_approval") return null;
+    if (status === "approved") {
+      return "This version is already approved — approval is terminal.";
+    }
+    if (status === "rejected") {
+      return "This version is already rejected — rejection is terminal.";
+    }
+    return "Superseded versions are read-only history.";
+  }
+
+  if (action === "preview") {
+    if (status !== "rejected" && status !== "superseded") return null;
+    return status === "rejected"
+      ? "Rejected versions are permanently blocked from runs."
+      : "Superseded versions are read-only history.";
+  }
+
+  if (status === "approved") return null;
+  return "Production runs require an approved version.";
+};
+
 export type SourceVersionLifecycleSummary = {
   total: number;
   counts: Record<SourceVersionRecord["status"], number>;

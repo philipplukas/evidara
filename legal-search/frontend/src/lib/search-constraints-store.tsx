@@ -152,18 +152,36 @@ export function useSearchConstraints(): SearchConstraintsContextValue {
  * the `RESET_ALL` reducer so the two can't drift.
  */
 export function hasActiveSearchConstraints(state: SearchConstraintsState): boolean {
+  return countActiveSearchConstraints(state) > 0;
+}
+
+/**
+ * How many constraints the user actually set — the count `RESET_ALL` would
+ * clear.
+ *
+ * The seeded `CH` / `de` defaults are not user choices, so they are not
+ * counted. The mobile filter badge used to count them, and so read "2" on a
+ * cold load where the user had chosen nothing and the desktop panel said
+ * "Keine Filter verfügbar" (#674). Same arithmetic as
+ * `hasActiveSearchConstraints`, deliberately colocated so the badge, the reset
+ * affordance, and the reset telemetry cannot disagree about what "active"
+ * means.
+ */
+export function countActiveSearchConstraints(state: SearchConstraintsState): number {
   // `normalizeJurisdictions` / `normalizeLanguages` lowercase incoming values,
   // so compare against the normalized defaults (`"ch"` / `"de"`), not the
   // `RESET_ALL` payload (`"CH"` / `"de"`).
   const { context, refinements } = state;
+  const jurisdictionsChanged =
+    context.jurisdictions.length !== 1 || context.jurisdictions[0] !== "ch";
+  const languagesChanged = context.languages.length !== 1 || context.languages[0] !== "de";
+
   return (
-    context.jurisdictions.length !== 1 ||
-    context.jurisdictions[0] !== "ch" ||
-    context.languages.length !== 1 ||
-    context.languages[0] !== "de" ||
-    context.sourceType !== null ||
-    context.officialOnly ||
-    refinements.length > 0
+    (jurisdictionsChanged ? 1 : 0) +
+    (languagesChanged ? 1 : 0) +
+    (context.sourceType !== null ? 1 : 0) +
+    (context.officialOnly ? 1 : 0) +
+    refinements.length
   );
 }
 
