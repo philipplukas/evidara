@@ -6,10 +6,10 @@
  * verify, and it is the specific test that would have prevented the wrong
  * diagnosis of #675:
  *
- *   1. The real production creation path (`bootstrapDocumentsIndex`, what
- *      `main.ts` runs on startup) must produce an index with ZERO drift from
- *      the canonical mapping. If someone changes the mapping and forgets a
- *      producer, this goes red.
+ *   1. EVERY production creation path — enumerated in `PRODUCERS` below — must
+ *      produce an index with ZERO drift from the canonical mapping, and with
+ *      the `legal_text` analyzer present. If someone changes the mapping and
+ *      forgets a producer, this goes red.
  *   2. The drift detector must actually FLAG the shape the live index had.
  *      A detector that reports "no drift" on a drifted index is worse than
  *      none, because it launders the drift as canonical.
@@ -22,7 +22,11 @@
  */
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { bootstrapDocumentsIndex } from './documents-bootstrap';
+import {
+  bootstrapDocumentsIndex,
+  CUTOVER_REPLICAS,
+  createDocumentsIndex,
+} from './documents-bootstrap';
 import { DOCUMENTS_INDEX_PROPERTIES } from './documents-index.mapping';
 import { findMappingDrift } from './mapping-drift';
 
@@ -101,17 +105,68 @@ async function liveProperties(index: string): Promise<Record<string, unknown>> {
 
 const canonical = DOCUMENTS_INDEX_PROPERTIES as unknown as Record<string, unknown>;
 
-describe('documents index mapping drift', () => {
-  it('the real bootstrap path creates an index with zero drift from canonical', async () => {
-    const result = await bootstrapDocumentsIndex({
-      node,
-      readAlias: 'drift-check-read',
-      writeAlias: 'drift-check-write',
-    });
-    expect(result.status).toBe('created');
+/**
+ * Every code path that may CREATE a documents index, enumerated (#713).
+ *
+ * This registry is the guard's whole point. It previously tested only
+ * `bootstrapDocumentsIndex`, which left `opensearch-alias-cutover.ts` creating
+ * indices with no integration coverage at all, and said nothing about the GCP
+ * runtime tfvars job that created one with no mapping whatsoever — the #713
+ * defect. That job is gone and its creation duty now belongs to the startup
+ * bootstrap, so the two entries below are the complete set.
+ *
+ * If you add a producer, add it here. If you cannot add it here — because it
+ * PUTs a mapping of its own instead of calling `createDocumentsIndex` — that
+ * is the defect, not the test.
+ */
+const PRODUCERS: Array<{ name: string; index: string; create: (index: string) => Promise<void> }> =
+  [
+    {
+      name: 'startup bootstrap (main.ts → bootstrapDocumentsIndex)',
+      index: 'drift-check-read',
+      create: async () => {
+        const result = await bootstrapDocumentsIndex({
+          node,
+          readAlias: 'drift-check-read',
+          writeAlias: 'drift-check-write',
+        });
+        expect(result.status).toBe('created');
+      },
+    },
+    {
+      name: 'versioned cutover (scripts/opensearch-alias-cutover.ts → ensureIndex)',
+      index: 'drift-check-cutover',
+      // Mirrors that script's `ensureIndex` exactly: the shared creator, cutover
+      // replica count, no tolerance for a colliding name.
+      create: (index) => createDocumentsIndex(node, index, { numberOfReplicas: CUTOVER_REPLICAS }),
+    },
+  ];
 
-    const drift = findMappingDrift(await liveProperties('drift-check-read'), canonical);
+describe('documents index mapping drift', () => {
+  it.each(PRODUCERS)('producer "$name" creates an index with zero drift from canonical', async ({
+    index,
+    create,
+  }) => {
+    await create(index);
+    const drift = findMappingDrift(await liveProperties(index), canonical);
     expect(drift).toEqual([]);
+  }, 120_000);
+
+  it('every producer creates the legal_text analyzer', async () => {
+    // #713: the removed GCP job PUT settings with no `analysis` block, so
+    // `legal_text` did not exist and German normalization silently never
+    // applied — Straße/Strasse stopped matching. A missing analyzer is a
+    // recall loss the property-level drift check above cannot see.
+    for (const { index } of PRODUCERS) {
+      const response = await fetch(`${node}/${index}/_settings`);
+      const body = (await response.json()) as Record<
+        string,
+        { settings?: { index?: { analysis?: { analyzer?: Record<string, unknown> } } } }
+      >;
+      const physical = Object.keys(body)[0];
+      const analyzers = body[physical]?.settings?.index?.analysis?.analyzer ?? {};
+      expect(Object.keys(analyzers), `${index} is missing legal_text`).toContain('legal_text');
+    }
   }, 120_000);
 
   it('flags the drifted mapping the live index actually had', async () => {

@@ -36,7 +36,7 @@ import {
   cutoverAliasActions,
   moveAliasActions,
 } from '../src/core/opensearch/alias-actions';
-import { documentsIndexDefinition } from '../src/core/opensearch/documents-index.mapping';
+import { CUTOVER_REPLICAS, createDocumentsIndex } from '../src/core/opensearch/documents-bootstrap';
 
 const args = process.argv.slice(2);
 const shouldReindex = args.includes('--reindex');
@@ -87,16 +87,14 @@ async function osFetch(path: string, init?: RequestInit): Promise<Response> {
 }
 
 async function ensureIndex(indexName: string): Promise<void> {
-  // Canonical mapping (single source of truth). A versioned production
-  // cutover keeps 1 replica for resilience.
-  const response = await osFetch(`/${indexName}`, {
-    method: 'PUT',
-    body: JSON.stringify(documentsIndexDefinition(1)),
+  // Canonical mapping via the shared creator — see the producer registry in
+  // `mapping-drift.integration.spec.ts`, which guards this exact call shape.
+  // A colliding index name during a cutover is a real error, so we do not
+  // tolerate `resource_already_exists_exception` here.
+  await createDocumentsIndex(node, indexName, {
+    numberOfReplicas: CUTOVER_REPLICAS,
+    authHeader,
   });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`failed creating index ${indexName}: ${response.status} ${body}`);
-  }
 }
 
 async function getAliasIndices(aliasName: string): Promise<string[]> {

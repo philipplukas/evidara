@@ -19,6 +19,18 @@ const baseURL = `http://localhost:${port}`;
 
 declareIdentityTargets([{ url: baseURL, surface: "platform-control-admin" }]);
 
+/**
+ * Port is overridable via `ADMIN_E2E_PORT` (default 3000, which is what CI uses).
+ *
+ * `reuseExistingServer` adopts a dev server already listening on the port rather
+ * than replacing it — convenient locally, and a silent trap when two git
+ * worktrees of this repo are worked on at once: the second run adopts the *first
+ * worktree's build* and reports results against code that is not the code under
+ * test. It is therefore **opt-in** (`reuseExistingServer()`), not defaulted on,
+ * and the identity nonce above is what actually proves the server is ours — a
+ * per-worktree port is only a courtesy.
+ */
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,

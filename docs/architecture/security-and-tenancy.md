@@ -27,9 +27,17 @@ The Document Service (`contracts/api/document-intelligence.openapi.yaml`) must e
 ## Secrets & credentials
 
 - Runtime secrets live in the secret manager / deployment layer described in [Infrastructure Overview](../setup/infrastructure-overview.md), not in git.
-- JWT verification keys for the BFF are configured per environment (`legal-search/api`).
+- **Aspirational, not built:** JWT verification in `legal-search/api` does not exist today —
+  the only guard is `ApiKeyGuard` (`src/core/auth/api-key.guard.ts`), and the browser is
+  never authenticated (the BFF injects a server-held `X-API-Key`). User identity, the
+  signed-assertion seam that would carry it to the backends, and the verification keys
+  this line describes are designed in
+  [ADR-0038: User identity, roles, and genuine operator attribution](../adr/0038-user-identity-and-operator-attribution.md)
+  (Proposed). Today's enforced model is [ADR-0020](../adr/adr-0020-api-authentication.md).
 
 ## Related decisions
 
+- [ADR-0020: API Authentication](../adr/adr-0020-api-authentication.md) (what is enforced today)
+- [ADR-0038: User Identity & Operator Attribution](../adr/0038-user-identity-and-operator-attribution.md) (Proposed)
 - [ADR-0004: Contract Strategy](../adr/0004-contract-strategy.md)
 - [ADR-0010: Document Content Format](../adr/0010-document-content-format.md) (Docling and read boundaries)

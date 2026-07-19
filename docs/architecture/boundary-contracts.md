@@ -39,6 +39,19 @@ When `platform-control` has durably stored one upstream snapshot and its sibling
 
 `raw_artifact.available` may still be emitted inside `platform-control` for preview, observability, or capture workflows, but it is not the primary `document-intelligence` handoff contract.
 
+**Events reference artifacts; they do not carry them.** Both events name the artifact's
+`storage_path` / `storage_ref` and consumers read the bytes from object storage. The document body
+is deliberately absent from `raw_artifact.available` — the payload records
+`inline_body_omitted: true` in its place. Inlining it made event size a function of *document* size,
+so a 1.44 MB Swiss federal act exceeded the NATS `max_payload` and could not enter the corpus at all
+(#707). Every broker has some limit and consolidated codes run to tens of megabytes, so the limit is
+removed rather than raised. Keep it that way: a body added back to any boundary event reintroduces a
+ceiling on how large a law we can ingest.
+
+A run whose events fail to publish is recorded **FAILED** with a `failure_reason` and a
+`dispatch_publish_failed` marker, never `completed`. Acquisition succeeding is not the same as the
+handoff succeeding, and #628's evidence gate depends on that distinction being visible on the run.
+
 The boundary contract is intentionally split:
 
 - the event is the progression signal

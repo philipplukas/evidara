@@ -26,6 +26,7 @@ import { Navigate, Route, useParams } from "react-router-dom";
 import { ResourceName } from "../domain/resourceNames";
 import { controlPlaneDataProvider } from "../lib/admin/dataProvider";
 import { adminMuiTheme } from "../lib/admin/muiTheme";
+import BlueprintTemplateList from "../resources/blueprints/BlueprintTemplateList";
 import { CommentaryInsightList } from "../resources/corrections/CommentaryInsightList";
 import { CommentaryInsightShow } from "../resources/corrections/CommentaryInsightShow";
 import { CorrectionShow } from "../resources/corrections/CorrectionShow";
@@ -119,6 +120,18 @@ export default function AdminApp() {
         show={SourceShow}
         recordRepresentation="name"
         options={{ label: "Sources" }}
+      />
+      {/*
+       * The coverage inventory (#668). Sits next to Sources because it is the
+       * screen an operator reads *before* creating one: it says which templates
+       * are live, which are inert, and which key is shut. It is also the only
+       * place the ADR-0030 config key can be flipped from the panel.
+       */}
+      <Resource
+        name={ResourceName.BlueprintTemplates}
+        list={BlueprintTemplateList}
+        recordRepresentation="provider_template_id"
+        options={{ label: "Blueprints" }}
       />
       <Resource
         name={ResourceName.PreviewReview}

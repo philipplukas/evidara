@@ -550,14 +550,27 @@ class ProcessingPipelineTests(unittest.TestCase):
                 parser_backend="docling",
                 enable_spacy=True,
             ).process_event(build_bundle_event(manifest_path))
+            # This test used to assert "docling_fallback_v1" / backend "fallback"
+            # unconditionally — it was pinning a bug. `doc.iterate_items()` yields
+            # (item, level) pairs and the adapter unpacked it as a bare item, so every
+            # block came out empty and the docling backend *always* fell back to the
+            # legacy normaliser. Fixed in ADR-0041; with docling installed the real
+            # backend now runs, and the fallback is only taken when it is absent.
+            try:
+                import docling  # noqa: F401
+
+                expected_profile, expected_backend = "docling_v1", "docling"
+            except ImportError:
+                expected_profile, expected_backend = "docling_fallback_v1", "fallback"
+
             self.assertEqual(
                 result.manifest.selected_profiles["normalization_profile_ref"],
-                "docling_fallback_v1",
+                expected_profile,
             )
             self.assertIn("docling", result.document.metadata)
             self.assertIn("nlp", result.document.metadata)
             self.assertTrue(result.document.metadata["nlp"]["enabled"])
-            self.assertEqual(result.document.metadata["docling"]["backend"], "fallback")
+            self.assertEqual(result.document.metadata["docling"]["backend"], expected_backend)
             self.assertEqual(result.document.metadata["nlp"]["model_name"], "xx_sent_ud_sm")
             self.assertEqual(result.document.metadata["nlp"]["max_chars_per_section"], 100000)
             self.assertEqual(result.document.metadata["nlp"]["batch_size"], 32)

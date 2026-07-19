@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -22,6 +23,7 @@ from platform_control.domain import (
 )
 from platform_control.errors import (
     BlueprintTemplateNotEnabledError,
+    DispatchPublishError,
     InvalidStateTransitionError,
     NotFoundError,
     ProviderConfigurationError,
@@ -81,6 +83,10 @@ from platform_control.services.robots import RobotsChecker, current_robots_conte
 class PendingDispatchPublications:
     raw_artifact_ids: list[str] = field(default_factory=list)
     bundle_events: list[dict[str, Any]] = field(default_factory=list)
+    # Which run these events hand off. Publication happens *after* the run row is
+    # committed, so without this the publisher cannot attribute a failure back to
+    # the run it silently broke — which is how #707 left `status: completed`.
+    run_id: str | None = None
 
 
 class RunService:
@@ -319,7 +325,13 @@ class RunService:
         pending_publications = await self._dispatch_run(source, source_version, run)
         await self.session.commit()
         await self.session.refresh(run)
-        await self._publish_pending_dispatch_events([pending_publications])
+        publish_failures = await self._publish_pending_dispatch_events([pending_publications])
+        if publish_failures:
+            # The run has already been rewritten to FAILED with a reason. Raising
+            # turns the bare 500 of #707 into a 502 that names the cause, so the
+            # caller learns the handoff died instead of reading `completed` back.
+            await self.session.refresh(run)
+            raise DispatchPublishError(run.failure_reason or "; ".join(publish_failures))
         return run
 
     async def get_run_readiness(
@@ -574,7 +586,12 @@ class RunService:
                 pending_publications = await self._dispatch_run(source, source_version, run)
                 await self.session.commit()
                 await self.session.refresh(run)
-                await self._publish_pending_dispatch_events([pending_publications])
+                publish_failures = await self._publish_pending_dispatch_events(
+                    [pending_publications]
+                )
+                if publish_failures:
+                    await self.session.refresh(run)
+                    raise DispatchPublishError(run.failure_reason or "; ".join(publish_failures))
                 return run
 
         await self.session.commit()
@@ -1070,7 +1087,7 @@ class RunService:
         # Funnel stage 1. Every launch path (API, connector worker, Temporal activity)
         # converges on _dispatch_run, so one counter here covers all three.
         metrics.record_run_launched(provider_job.provider)
-        pending_publications = PendingDispatchPublications()
+        pending_publications = PendingDispatchPublications(run_id=run.run_id)
 
         if provider_result.inline_resources:
             pending_publications.raw_artifact_ids.extend(
@@ -1433,16 +1450,83 @@ class RunService:
 
     async def _publish_pending_dispatch_events(
         self, pending_publications: list[PendingDispatchPublications]
-    ) -> None:
+    ) -> list[str]:
+        """Hand the dispatched run's events to the broker, honestly (#707).
+
+        Publication happens after the run row is already committed, so a failure
+        here used to be invisible: the exception escaped to FastAPI as a bare 500
+        while the run kept `status: completed, failure_reason: null` over a pipeline
+        that delivered nothing downstream. Acquisition really had succeeded — the
+        artifact counts were never fabricated — but no field said the handoff died.
+
+        Two properties this restores, and both are general: they hold for *any*
+        publish failure (broker down, subject not bound, oversize payload), not just
+        the `MaxPayloadError` that exposed them.
+
+        1. **A run whose events did not publish is not `completed`.** It is rewritten
+           to terminal FAILED with a `failure_reason` naming the cause, and a
+           `dispatch_publish_failed` marker in `run_metadata` alongside the existing
+           `refused` marker (#634/#681) so the trace is machine-readable, not just prose.
+        2. **One bad event does not take out its batch.** Each publish is isolated, so
+           an artifact that cannot be published no longer strands its siblings — under
+           the old loop TSchG, well under the limit, was lost as collateral to TSchV.
+           Every event that *can* be delivered still is, and the run is failed anyway,
+           because partial delivery is not success either.
+
+        Returns the failure reasons. Callers that answer an operator over HTTP raise
+        `DispatchPublishError`; the worker loop keeps going, since each affected run
+        already carries its own honest record.
+        """
+        failures: list[str] = []
         for pending in pending_publications:
+            run_failures: list[str] = []
             for artifact_id in pending.raw_artifact_ids:
                 artifact = await self.session.get(RawArtifact, artifact_id)
                 if artifact is None:  # pragma: no cover - defensive guard
                     continue
-                await self.publisher.publish_raw_artifact_available(artifact)
+                try:
+                    await self.publisher.publish_raw_artifact_available(artifact)
+                except Exception as exc:
+                    run_failures.append(f"raw_artifact.available for {artifact_id}: {exc}")
             for event in pending.bundle_events:
-                await self.publisher.publish_artifact_bundle_available(event)
+                try:
+                    await self.publisher.publish_artifact_bundle_available(event)
+                except Exception as exc:
+                    run_failures.append(
+                        f"artifact_bundle.available for {event.get('event_id')}: {exc}"
+                    )
+                    continue
                 metrics.record_bundle_event_published()
+            if run_failures:
+                await self._record_dispatch_publish_failure(pending.run_id, run_failures)
+                failures.extend(run_failures)
+        return failures
+
+    async def _record_dispatch_publish_failure(
+        self, run_id: str | None, run_failures: list[str]
+    ) -> None:
+        """Rewrite a run that acquired successfully but could not hand off (#707)."""
+        reason = (
+            "Acquisition succeeded but the downstream handoff failed, so"
+            " document-intelligence received nothing from this run."
+            f" {len(run_failures)} event(s) could not be published: "
+            + "; ".join(run_failures)
+            + ". The captured artifacts are stored and the run can be retried"
+            " once the cause is resolved."
+        )
+        logging.getLogger(__name__).error(
+            "dispatch publish failed for run %s: %s", run_id, "; ".join(run_failures)
+        )
+        if run_id is None:  # pragma: no cover - defensive guard
+            return
+        run = await self.session.get(Run, run_id)
+        if run is None:  # pragma: no cover - defensive guard
+            return
+        run.status = RunStatus.FAILED
+        run.failure_reason = reason
+        run.completed_at = datetime.now(UTC)
+        run.run_metadata = {**(run.run_metadata or {}), "dispatch_publish_failed": True}
+        await self.session.commit()
 
     @staticmethod
     def _upstream_locator(artifact_metadata: dict[str, Any]) -> str:

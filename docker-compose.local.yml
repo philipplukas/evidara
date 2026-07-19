@@ -228,6 +228,12 @@ services:
     depends_on:
       nats-init:
         condition: service_completed_successfully
+    # The consumer now retries the broker forever, so a `docker compose stop nats`
+    # no longer kills it. This is the belt-and-braces half: if it ever *does* exit
+    # non-zero, come back rather than sitting dead. Compose's default (`no`) is what
+    # made #722 present as a pipeline regression locally — in k8s the pods were
+    # restarted by the default `Always` policy, so only the local loop stayed dead.
+    restart: unless-stopped
     mem_limit: 1024m
 
   # Serves GET /v1/documents/{id}/lean from the canonical surface the consumer
@@ -279,6 +285,8 @@ services:
         condition: service_healthy
       platform-control-api:
         condition: service_healthy
+    # Same reasoning as di-consumer above (#722).
+    restart: unless-stopped
     mem_limit: 512m
 
   # MinIO — self-hosted S3-compatible object storage (ADR-0029 Slice 4). Opt-in via the

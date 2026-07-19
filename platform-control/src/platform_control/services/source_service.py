@@ -28,6 +28,33 @@ from platform_control.services.source_blueprints import (
 )
 
 
+def _describe_lock(provider: str, *, enabled: bool, live_ready: bool) -> dict[str, object]:
+    """Render the ADR-0030 two-key lock, with a note per closed key.
+
+    Shared by the single-template preview and the inventory listing so the two
+    can never disagree about *why* a template is inert. The notes name which key
+    is shut on purpose: the config key is the one an operator owns and can flip
+    themselves, the code key needs a provider change.
+    """
+    notes: list[str] = []
+    if not live_ready:
+        notes.append(
+            f"Code key closed: provider '{provider}' is not live-ready — it cannot yet "
+            "acquire this format, so runs stay locked (ADR-0030)."
+        )
+    if not enabled:
+        notes.append(
+            "Config key closed: not enabled. Capture acceptance-run evidence, then enable "
+            "this template to launch live runs (ADR-0030)."
+        )
+    return {
+        "enabled": enabled,
+        "live_ready": live_ready,
+        "launchable": enabled and live_ready,
+        "notes": notes,
+    }
+
+
 class SourceService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -145,23 +172,7 @@ class SourceService:
         enablement = BlueprintEnablementService(self.session)
         enabled = await enablement.is_enabled(overlay_id, provider_template_id)
         live_ready = self._provider_live_ready(provider)
-        notes: list[str] = []
-        if not live_ready:
-            notes.append(
-                f"Code key closed: provider '{provider}' is not live-ready — it cannot yet "
-                "acquire this format, so runs stay locked (ADR-0030)."
-            )
-        if not enabled:
-            notes.append(
-                "Config key closed: not enabled. Capture acceptance-run evidence, then enable "
-                "this template to launch live runs (ADR-0030)."
-            )
-        return {
-            "enabled": enabled,
-            "live_ready": live_ready,
-            "launchable": enabled and live_ready,
-            "notes": notes,
-        }
+        return _describe_lock(provider, enabled=enabled, live_ready=live_ready)
 
     def describe_blueprint_plan_notes(self, acquisition_spec: AcquisitionSpec) -> list[str]:
         """Return the provider's own `plan()` notes for a previewed spec (#634).
@@ -206,15 +217,38 @@ class SourceService:
         return bool(getattr(resolved, "live_ready", False))
 
     async def list_source_blueprint_templates(self) -> list[dict[str, object]]:
-        templates = list_source_blueprint_templates()
+        """The operator's coverage inventory: every template, with lock + provenance.
+
+        Each row carries the two-key lock *and* where the config key's current
+        value came from (`source`: an operator override, or the shipped
+        `source_blueprints.yaml` default) plus that override's audit trail. The
+        admin blueprint inventory (#668) needs the provenance to distinguish
+        "nobody has ever touched this" from "an operator deliberately turned it
+        off", which the lock booleans alone cannot express.
+        """
+        enablement = BlueprintEnablementService(self.session)
         enriched: list[dict[str, object]] = []
-        for template in templates:
-            lock = await self.describe_blueprint_lock(
-                template["overlay_id"],
-                template["provider_template_id"],
-                template["provider"],
+        for template in list_source_blueprint_templates():
+            provider = template["provider"]
+            state = await enablement.get_state(
+                template["overlay_id"], template["provider_template_id"]
             )
-            enriched.append({**template, **lock})
+            lock = _describe_lock(
+                provider,
+                enabled=state.enabled,
+                live_ready=self._provider_live_ready(provider),
+            )
+            enriched.append(
+                {
+                    **template,
+                    **lock,
+                    "default_enabled": state.default_enabled,
+                    "source": state.source,
+                    "note": state.note,
+                    "updated_by": state.updated_by,
+                    "updated_at": state.updated_at,
+                }
+            )
         return enriched
 
     async def list_source_versions(self, source_id: str) -> list[SourceVersion]:

@@ -296,6 +296,7 @@ class _FakeConnection:
     def __init__(self, jetstream: _FakeJetStream) -> None:
         self._jetstream = jetstream
         self.drained = False
+        self.is_connected = True
 
     def jetstream(self) -> _FakeJetStream:
         return self._jetstream
@@ -318,7 +319,7 @@ class ConsumerRunLoopTests(unittest.TestCase):
         connection = _FakeConnection(_FakeJetStream(subscription))
         pipeline = FakePipeline()
 
-        async def _fake_connect(servers):  # noqa: ANN001, ANN202
+        async def _fake_connect(servers, **kwargs):  # noqa: ANN001, ANN003, ANN202
             return connection
 
         args = nats_consumer._parse_args(["--dry-run-publish"])

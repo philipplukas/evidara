@@ -11,6 +11,7 @@ This directory contains Evidara's testing strategy, principles, and guides. Test
 
 | Document | Purpose |
 |----------|---------|
+| [ADR-0040: What makes a test result trustworthy](../adr/0040-test-result-trust.md) | Isolation → coverage honesty → assertion strength; when to believe a green run |
 | [Testing Principles](testing-principles.md) | Core philosophy and test type definitions |
 | [Testing Levels](testing-levels.md) | What each testing level catches and when to use it |
 | [Drift Detection](drift-detection.md) | Detecting and recovering from drift |
@@ -34,6 +35,7 @@ This directory contains Evidara's testing strategy, principles, and guides. Test
 
 ## How to Use These Docs
 
+0. **Read [ADR-0040](../adr/0040-test-result-trust.md)** to understand when a green run is evidence.
 1. **Start with [Testing Principles](testing-principles.md)** to understand the philosophy.
 2. **Read [Testing Levels](testing-levels.md)** to understand what types of tests exist and when they matter.
 3. **Check the [Minimal Test Matrix](minimal-test-matrix.md)** to see what the MVP requires.
