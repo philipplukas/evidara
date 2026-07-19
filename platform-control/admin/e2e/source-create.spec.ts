@@ -57,10 +57,34 @@ const AUTHORITIES = {
 };
 
 // Flat blueprint-template list — one template per overlay.
+//
+// Every template and preview carries the ADR-0030 two-key lock
+// (`enabled` / `live_ready` / `launchable` / `notes`); the API always emits all
+// four (see `SourceBlueprintTemplateResponse` / `SourceBlueprintPreviewResponse`
+// in `platform-control/src/platform_control/schemas/source.py`). Omitting them
+// here is not a "smaller" fixture — it is a shape the server never returns, and
+// it crashes the preview panel. CH is launchable, AT is inert (config key off)
+// so the "· inert (locked)" choice marker is covered too.
 const BLUEPRINT_TEMPLATES = {
   data: [
-    { overlay_id: "ch", provider_template_id: "fedlex-default", provider: "fedlex_sparql" },
-    { overlay_id: "at", provider_template_id: "ris-default", provider: "ris_ogd" },
+    {
+      overlay_id: "ch",
+      provider_template_id: "fedlex-default",
+      provider: "fedlex_sparql",
+      enabled: true,
+      live_ready: true,
+      launchable: true,
+      notes: [],
+    },
+    {
+      overlay_id: "at",
+      provider_template_id: "ris-default",
+      provider: "ris_ogd",
+      enabled: false,
+      live_ready: true,
+      launchable: false,
+      notes: ["Config key is off — an operator has not enabled this template yet."],
+    },
   ],
 };
 
@@ -77,6 +101,29 @@ const BLUEPRINT_PREVIEW = {
     query_mode: "work_to_expression",
     max_expressions: 25,
   },
+  enabled: true,
+  live_ready: true,
+  launchable: true,
+  notes: [],
+};
+
+// Same shape for the AT / RIS template, but with the config key still closed —
+// the two-key lock must warn instead of promising a live run (#634).
+const INERT_BLUEPRINT_PREVIEW = {
+  overlay_id: "at",
+  provider_template_id: "ris-default",
+  acquisition_spec: {
+    provider: "ris_ogd",
+    base_url: "https://ris.example/api",
+    applikation: "Bundesnormen",
+    preferred_formats: ["html"],
+    page_size: 100,
+    max_pages: 5,
+  },
+  enabled: false,
+  live_ready: true,
+  launchable: false,
+  notes: ["Config key is off — an operator has not enabled this template yet."],
 };
 
 const CREATED_SOURCE = {
@@ -160,14 +207,16 @@ async function mockPlatformControlApi(page: Page) {
     }),
   );
 
-  // Server-side blueprint preview.
-  await page.route("**/api/platform-control/v1/sources/blueprint-preview*", (route) =>
-    route.fulfill({
+  // Server-side blueprint preview. Answers per requested overlay so the inert
+  // (locked) AT template can be asserted alongside the launchable CH one.
+  await page.route("**/api/platform-control/v1/sources/blueprint-preview*", (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}") as { overlay_id?: string };
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(BLUEPRINT_PREVIEW),
-    }),
-  );
+      body: JSON.stringify(body.overlay_id === "at" ? INERT_BLUEPRINT_PREVIEW : BLUEPRINT_PREVIEW),
+    });
+  });
 
   // Combined source + initial-version create.
   await page.route("**/api/platform-control/v1/sources/with-version*", async (route) => {
@@ -234,6 +283,12 @@ test.describe("SourceCreate wizard", () => {
     const preview = page.getByTestId("blueprint-preview");
     await expect(preview).toContainText("Provider: fedlex_sparql");
     await expect(preview).toContainText("SPARQL endpoint: https://fedlex.example/sparql");
+
+    // ── Both ADR-0030 keys are open, so the lock panel clears the run ──
+    const lock = page.getByTestId("blueprint-lock");
+    await expect(lock).toContainText("this template can launch live runs");
+    await expect(lock).toContainText("Config key (enabled): on");
+    await expect(lock).toContainText("Code key (live_ready): on");
 
     // ── Submit ──
     await page.getByRole("button", { name: "Create source" }).click();
@@ -306,6 +361,31 @@ test.describe("SourceCreate wizard", () => {
     await templateTrigger2.click();
     await expect(page.getByRole("option", { name: "ris-default (ris_ogd)" })).toBeVisible();
     await expect(page.getByRole("option", { name: "fedlex-default (fedlex_sparql)" })).toBeHidden();
+  });
+
+  test("an inert template is flagged at selection time, before the operator invests", async ({
+    page,
+  }) => {
+    await mockPlatformControlApi(page);
+    await page.goto("/#/sources/create");
+    await expect(page.locator("h1")).toContainText("Create source");
+
+    // The closed config key is visible in the choice label itself (#634) — the
+    // operator sees the lock while picking, not four green steps later.
+    await pickRadixSelect(page, "Country overlay", "Austria (AT)");
+    const templateTrigger = page.getByRole("combobox", { name: "Provider template" }).first();
+    await templateTrigger.click();
+    await expect(
+      page.getByRole("option", { name: "ris-default (ris_ogd) · inert (locked)" }),
+    ).toBeVisible();
+    await page.getByRole("option", { name: "ris-default (ris_ogd) · inert (locked)" }).click();
+
+    // …and the preview panel warns rather than promising a live run.
+    const lock = page.getByTestId("blueprint-lock");
+    await expect(lock).toContainText("Inert template — the two-key lock will block live runs");
+    await expect(lock).toContainText("Config key (enabled): off");
+    await expect(lock).toContainText("Code key (live_ready): on");
+    await expect(lock).toContainText("an operator has not enabled this template yet");
   });
 
   test("blueprint preview raw-JSON toggle reveals the expanded acquisition_spec", async ({
