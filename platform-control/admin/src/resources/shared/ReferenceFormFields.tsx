@@ -15,13 +15,8 @@
 import { useGetList, type Validator } from "ra-core";
 import { useWatch } from "react-hook-form";
 import type { JurisdictionRecord } from "../../lib/admin/dataProvider";
-import { InlineAlert, Select, type SelectChoice } from "../../ui/primitives";
-import { formatReferenceLabel } from "./referenceUtils";
-
-const LIST_PARAMS = {
-  pagination: { page: 1, perPage: 250 },
-  sort: { field: "name", order: "ASC" as const },
-};
+import { Combobox, type ComboboxChoice, InlineAlert } from "../../ui/primitives";
+import { formatReferenceLabel, REFERENCE_PICKER_LIST_PARAMS } from "./referenceUtils";
 
 export type ReferenceSelectState = {
   severity: "info" | "warning" | "error";
@@ -137,8 +132,11 @@ function ReferenceStateAlert({ state }: { state: ReferenceSelectState }) {
  * back to `null` so an authority can stay global.
  */
 export function JurisdictionSelectField() {
-  const jurisdictions = useGetList<JurisdictionRecord>("jurisdictions", LIST_PARAMS);
-  const choices: SelectChoice[] = (jurisdictions.data ?? []).map((jurisdiction) => ({
+  const jurisdictions = useGetList<JurisdictionRecord>(
+    "jurisdictions",
+    REFERENCE_PICKER_LIST_PARAMS,
+  );
+  const choices: ComboboxChoice[] = (jurisdictions.data ?? []).map((jurisdiction) => ({
     id: jurisdiction.jurisdiction_id,
     name: formatReferenceLabel(jurisdiction),
   }));
@@ -164,15 +162,17 @@ export function JurisdictionSelectField() {
   return (
     <div className="space-y-2">
       {state ? <ReferenceStateAlert state={state} /> : null}
-      <Select
+      <Combobox
         source="jurisdiction_id"
         label="Jurisdiction"
         choices={choices}
+        totalCount={jurisdictions.total}
         allowEmpty
         emptyLabel="No jurisdiction (global)"
-        disabled={jurisdictions.isPending && choices.length === 0}
-        helperText="Global authorities are shared everywhere. Scoped authorities only appear within the selected jurisdiction."
-        placeholder="Select a jurisdiction…"
+        loading={jurisdictions.isPending && choices.length === 0}
+        helperText="Type to search the jurisdiction registry by name or id. Global authorities are shared everywhere; scoped authorities only appear within the selected jurisdiction."
+        placeholder="Search jurisdictions…"
+        testId="authority-jurisdiction-combobox"
       />
     </div>
   );

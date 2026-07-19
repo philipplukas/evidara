@@ -52,6 +52,18 @@ function AdminLayout({ children }: { children: ReactNode }) {
 }
 
 /**
+ * `<Admin>` mounts MUI's `<Notification>` by default. `<AppShell>` already
+ * mounts `<ToastAdapter>`, so the two rendered the *same* failure twice in two
+ * different styles — a dark bottom-centre snackbar with no dismiss alongside the
+ * bottom-right toast (#671). Worse, both drain the same `takeNotification()`
+ * queue, so which surface a given notification landed on was a race. Rendering
+ * nothing here leaves `ToastAdapter` as the single notification surface.
+ */
+function NoNotification() {
+  return null;
+}
+
+/**
  * Redirects the retired `/runs-v2/:id` preview detail route to the canonical
  * `runs` resource show route, preserving the record id (#520 consolidation).
  */
@@ -81,6 +93,7 @@ export default function AdminApp() {
       dashboard={Dashboard}
       disableTelemetry
       layout={AdminLayout}
+      notification={NoNotification}
       theme={adminMuiTheme}
     >
       <Resource
