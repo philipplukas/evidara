@@ -73,15 +73,6 @@ WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 # on every run. Removing a file or making it reachable requires deleting its
 # entry (a stale entry fails the check, so this cannot silently rot).
 KNOWN_UNREACHABLE: dict[str, str] = {
-    "legal-search/frontend/e2e/workspace-panels.spec.ts": (
-        "No tag, and not the one path `e2e:visual` names. The #605 panel-geometry "
-        "guard has never run. Tagging it green requires first fixing the failures "
-        "it finds — tracked separately."
-    ),
-    "legal-search/frontend/e2e/mobile-workspace.spec.ts": (
-        "No tag. Mobile sheet interactions are covered visually by `@screenshots`, "
-        "but these behavioural assertions run nowhere."
-    ),
     "legal-search/frontend/e2e/demo-queries.spec.ts": (
         "Tagged `@demo`; no CI command filters on `@demo`. Written for manual demo "
         "rehearsal, never wired to a job."
