@@ -19,10 +19,16 @@ function mapFacetsToFilters(facets: FilterFacetView[]): FilterViewModel[] {
 export function mapSearchResponse(response: SearchResponseView): {
   results: SearchResponseView["results"];
   filters: FilterViewModel[];
+  totalResults: number;
 } {
   return {
     results: response.results,
     filters: mapFacetsToFilters(response.facets),
+    // The hit count, not the page. `results` is one page of `totalResults`, so
+    // counting the array reports "20 Ergebnisse" for a 25-hit search. Telling a
+    // legal researcher a search found fewer documents than it did is a
+    // correctness problem, not a cosmetic one (#615).
+    totalResults: response.totalResults,
   };
 }
 

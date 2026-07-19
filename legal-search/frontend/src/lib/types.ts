@@ -191,6 +191,13 @@ export interface ResultSet {
   source: ResultSetSource;
   items: SearchResultViewModel[];
   scopeLabel: string;
+  /**
+   * Total hits the search matched, which `items` is one page of. Optional
+   * because pivots and boot paths may not carry it; consumers fall back to
+   * `items.length`. Never derive the count from `items` when this is present —
+   * that is #615.
+   */
+  totalResults?: number;
 }
 
 // ─── Search Constraints (ES-ready shapes) ───

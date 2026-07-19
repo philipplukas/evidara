@@ -26,6 +26,22 @@ function indexNotFoundError(): Error {
 }
 
 describe('SearchOpenSearchAdapter', () => {
+  it('asks OpenSearch for an exact hit count rather than the default 10 000 cap', async () => {
+    const search = vi.fn().mockResolvedValue({
+      body: { hits: { total: { value: 0 }, hits: [] }, aggregations: {} },
+    });
+
+    const adapter = new SearchOpenSearchAdapter({ search } as never, CONFIG, new MetricsService());
+
+    await adapter.search('verantwortlichkeit');
+
+    // `total` becomes `SearchResponseView.totalResults`. Without
+    // `track_total_hits`, OpenSearch caps the count at 10 000 and the UI
+    // under-reports how many documents matched (#615).
+    const body = (search.mock.calls[0][0] as { body: { track_total_hits?: boolean } }).body;
+    expect(body.track_total_hits).toBe(true);
+  });
+
   it('translates multi-filter options into OpenSearch bool filters', async () => {
     const search = vi.fn().mockResolvedValue({
       body: {

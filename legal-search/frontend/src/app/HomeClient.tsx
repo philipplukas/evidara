@@ -22,6 +22,7 @@ export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: H
     searchContext: SearchContextViewModel;
     filters: FilterViewModel[];
     results: SearchResultViewModel[];
+    totalResults?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: H
         searchContext: mappedContext,
         filters: mappedSearch.filters,
         results: mappedSearch.results,
+        totalResults: mappedSearch.totalResults,
       });
     };
 
@@ -93,7 +95,11 @@ export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: H
   return (
     <Suspense>
       <SearchConstraintsProvider>
-        <WorkspaceProvider initialResults={bootState.results} initialQuery={urlQuery}>
+        <WorkspaceProvider
+          initialResults={bootState.results}
+          initialQuery={urlQuery}
+          initialTotalResults={bootState.totalResults}
+        >
           <WorkspaceClient
             searchContext={bootState.searchContext}
             filters={bootState.filters}

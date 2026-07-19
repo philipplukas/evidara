@@ -270,6 +270,29 @@ describe("DetailPanel", () => {
     ).toBeInTheDocument();
   });
 
+  // The API emits `citations` for the reference groups (see `composeTabs` in
+  // document-detail.mapper.ts); the mock's vocabulary is `references`. The
+  // panel handled only the mock's key, so the tab the API actually advertises
+  // rendered "nothing here" over real citation data (#622).
+  it.each([
+    "references",
+    "citations",
+  ])("renders the reference groups for the %s tab key", (tabKey) => {
+    renderWithProviders(
+      <DetailPanel
+        detail={articleDetail}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        isPinned={false}
+      />,
+      { searchParams: { tab: tabKey } },
+    );
+
+    expect(screen.getByText("Art. 756 OR")).toBeInTheDocument();
+    expect(screen.queryByText("Kein Inhalt verfügbar")).not.toBeInTheDocument();
+  });
+
   it("has no accessibility violations (empty state)", async () => {
     const { container } = renderWithProviders(<DetailPanel detail={null} />);
     const results = await axe(container);

@@ -17,18 +17,27 @@ import { StructureTab } from "./tabs/StructureTab";
 // never used and this panel did not handle, so selecting it rendered a blank
 // void. Any key not listed here now falls through to a graceful empty state.
 //
-// `sections` is the key the API uses for a document's local structure, where
-// the mock uses `structure`; both render the outline. They are listed
-// separately rather than reconciled because the mock's vocabulary is the one
-// that drifted, and the API's is the contract.
-const DETAIL_TAB_KEYS = [
+// The API and the mock use different vocabularies for two tabs that render the
+// same panel, so each is an alias group rather than a single key:
+//
+//   - `sections` (API) / `structure` (mock) — the local outline.
+//   - `citations` (API) / `references` (mock) — the reference groups. The API
+//     only ever emits `citations` (`document-detail.mapper.ts` `composeTabs`),
+//     so the panel previously handled a key the API never sends while missing
+//     the one it always does: the tab appeared, was clickable, and confidently
+//     rendered "nothing here" over real citation data (#622).
+//
+// Each group is declared once and used by both the guard below and the render
+// branch it drives — the two drifting apart is what produced #609 and #622.
+const REFERENCE_TAB_KEYS: string[] = ["references", "citations"];
+const STRUCTURE_TAB_KEYS: string[] = ["structure", "sections"];
+const DETAIL_TAB_KEYS: string[] = [
   "details",
   "related",
-  "references",
   "annotation",
-  "structure",
-  "sections",
   "content",
+  ...REFERENCE_TAB_KEYS,
+  ...STRUCTURE_TAB_KEYS,
 ];
 
 interface DetailPanelProps {
@@ -73,7 +82,7 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
             sourceId={detail.id}
           />
         )}
-        {activeTab === "references" && (
+        {REFERENCE_TAB_KEYS.includes(activeTab) && (
           <ReferencesTab
             references={detail.references}
             onFocus={onFocus}
@@ -97,7 +106,7 @@ export function DetailPanel({ detail, onFocus, onPivot, onPin, isPinned }: Detai
               description={t("empty.noContentDescription")}
             />
           ))}
-        {(activeTab === "structure" || activeTab === "sections") &&
+        {STRUCTURE_TAB_KEYS.includes(activeTab) &&
           (detail.localStructure?.items?.length ? (
             <StructureTab items={detail.localStructure.items} onFocus={onFocus} />
           ) : (

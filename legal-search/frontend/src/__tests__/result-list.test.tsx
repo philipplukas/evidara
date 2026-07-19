@@ -124,6 +124,26 @@ describe("ResultList", () => {
     expect(screen.getByText("Result 3")).toBeInTheDocument();
   });
 
+  it("reports the hit count the search matched, not the size of the page", () => {
+    // The real API case from #615: 25 documents matched, one page of 20 came
+    // back. Counting the array renders "20 Ergebnisse" — telling a legal
+    // researcher the corpus holds less than it does.
+    renderWithProviders(
+      <ResultList
+        results={makeResults(20)}
+        selectedId={null}
+        onFocus={vi.fn()}
+        onPivot={vi.fn()}
+        onPin={vi.fn()}
+        pinnedIds={new Set()}
+      />,
+      { initialResults: makeResults(20), initialTotalResults: 25 },
+    );
+
+    expect(screen.getAllByText("20 von 25 Ergebnissen angezeigt").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("20 Ergebnisse")).not.toBeInTheDocument();
+  });
+
   it("shows Load more button when results exceed page size", () => {
     // Default resultsPerPage preference is 25
     renderWithProviders(

@@ -12,6 +12,8 @@ import { WorkspaceProvider } from "@/lib/workspace-store";
 interface ProviderOptions {
   initialQuery?: string;
   initialResults?: SearchResultViewModel[];
+  /** Total hits the search matched, which `initialResults` is one page of. */
+  initialTotalResults?: number;
   /** URL search params to initialize nuqs with, e.g. { item: "law-1", tab: "related" } */
   searchParams?: Record<string, string>;
 }
@@ -30,6 +32,7 @@ export function renderWithProviders(
   const {
     initialQuery = "Art 754 OR",
     initialResults = searchResults,
+    initialTotalResults,
     searchParams = {},
     ...renderOptions
   } = options ?? {};
@@ -44,7 +47,11 @@ export function renderWithProviders(
         <QueryClientProvider client={queryClient}>
           <NextIntlClientProvider locale="de" messages={MESSAGES.de}>
             <SearchConstraintsProvider>
-              <WorkspaceProvider initialResults={initialResults} initialQuery={initialQuery}>
+              <WorkspaceProvider
+                initialResults={initialResults}
+                initialQuery={initialQuery}
+                initialTotalResults={initialTotalResults}
+              >
                 {children}
               </WorkspaceProvider>
             </SearchConstraintsProvider>

@@ -208,7 +208,11 @@ export default function WorkspaceClient({
       // telemetry undercounts them.
       lastSearchSignatureRef.current = signature;
       try {
-        const { results, filters: nextFilters } = await runSearch(query, constraints, {
+        const {
+          results,
+          filters: nextFilters,
+          totalResults,
+        } = await runSearch(query, constraints, {
           pageSize: preferences.resultsPerPage,
         });
         if (requestId !== searchRequestIdRef.current) {
@@ -216,7 +220,7 @@ export default function WorkspaceClient({
           return;
         }
         setActiveFilters(nextFilters);
-        dispatch({ type: "SEARCH", query, results });
+        dispatch({ type: "SEARCH", query, results, totalResults });
         setSearchError(false);
         if (isRefinement) {
           track(AnalyticsEvent.SEARCH_REFINED, {
@@ -244,7 +248,11 @@ export default function WorkspaceClient({
       track(AnalyticsEvent.RESULT_PIVOTED, { sourceId, label });
       const sourceResult = state.resultSet.items.find((r) => r.id === sourceId);
       const pivotQuery = sourceResult?.title ?? label;
-      const { results, filters: nextFilters } = await runSearch(pivotQuery, constraints, {
+      const {
+        results,
+        filters: nextFilters,
+        totalResults,
+      } = await runSearch(pivotQuery, constraints, {
         pageSize: preferences.resultsPerPage,
       });
       setActiveFilters(nextFilters);
@@ -257,6 +265,7 @@ export default function WorkspaceClient({
         },
         results,
         scopeLabel: `${label} for ${state.resultSet.items.find((r) => r.id === sourceId)?.title ?? sourceId}`,
+        totalResults,
       });
     },
     [dispatch, state.resultSet, constraints, preferences.resultsPerPage],

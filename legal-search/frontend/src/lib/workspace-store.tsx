@@ -19,13 +19,24 @@ import type {
 // ─── Actions ───
 
 export type WorkspaceAction =
-  | { type: "SEARCH"; query: string; results: SearchResultViewModel[] }
-  | { type: "RESET_FROM_BOOT"; query: string; results: SearchResultViewModel[] }
+  | {
+      type: "SEARCH";
+      query: string;
+      results: SearchResultViewModel[];
+      totalResults?: number;
+    }
+  | {
+      type: "RESET_FROM_BOOT";
+      query: string;
+      results: SearchResultViewModel[];
+      totalResults?: number;
+    }
   | {
       type: "PIVOT";
       source: ResultSetSource;
       results: SearchResultViewModel[];
       scopeLabel: string;
+      totalResults?: number;
     }
   | { type: "BACK" }
   | { type: "PUSH_TRAIL"; entry: TrailEntry }
@@ -46,12 +57,17 @@ interface WorkspaceState {
   pinned: PinnedItem[];
 }
 
-function createInitialState(results: SearchResultViewModel[], query: string): WorkspaceState {
+function createInitialState(
+  results: SearchResultViewModel[],
+  query: string,
+  totalResults?: number,
+): WorkspaceState {
   return {
     resultSet: {
       source: { type: "search", query },
       items: results,
       scopeLabel: `Results for "${query}"`,
+      totalResults,
     },
     resultSetStack: [],
     trail: [],
@@ -71,6 +87,7 @@ function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): Works
           source: { type: "search", query: action.query },
           items: action.results,
           scopeLabel: `Results for "${action.query}"`,
+          totalResults: action.totalResults,
         },
         resultSetStack: [],
         trail: [],
@@ -84,6 +101,7 @@ function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): Works
           source: action.source,
           items: action.results,
           scopeLabel: action.scopeLabel,
+          totalResults: action.totalResults,
         },
       };
 
@@ -147,16 +165,18 @@ interface WorkspaceProviderProps {
   children: ReactNode;
   initialResults: SearchResultViewModel[];
   initialQuery: string;
+  initialTotalResults?: number;
 }
 
 export function WorkspaceProvider({
   children,
   initialResults,
   initialQuery,
+  initialTotalResults,
 }: WorkspaceProviderProps) {
   const [state, dispatch] = useReducer(
     workspaceReducer,
-    createInitialState(initialResults, initialQuery),
+    createInitialState(initialResults, initialQuery, initialTotalResults),
   );
 
   useEffect(() => {
@@ -164,8 +184,9 @@ export function WorkspaceProvider({
       type: "RESET_FROM_BOOT",
       query: initialQuery,
       results: initialResults,
+      totalResults: initialTotalResults,
     });
-  }, [initialQuery, initialResults]);
+  }, [initialQuery, initialResults, initialTotalResults]);
 
   return (
     <WorkspaceContext.Provider value={{ state, dispatch }}>{children}</WorkspaceContext.Provider>
