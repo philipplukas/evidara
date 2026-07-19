@@ -213,7 +213,7 @@ class ProcessingPipeline:
         ]
 
         if primary_content_type == "application/pdf":
-            # PDFs always normalise geometrically (ADR-0038); ``parser_backend`` selects
+            # PDFs always normalise geometrically (ADR-0041); ``parser_backend`` selects
             # between legacy and docling for *text* modalities only. Deliberately not
             # configurable: a text-order extractor splices marginal headings into body
             # sentences, and no environment variable should be able to silently select

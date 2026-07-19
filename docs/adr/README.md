@@ -37,6 +37,7 @@ Human-readable decisions for Evidara. The [MkDocs navigation](../index.md) lists
 | ADR-0038 | [User identity, roles, and genuine operator attribution](0038-user-identity-and-operator-attribution.md) (Accepted) |
 | ADR-0039 | [A third frontend surface — the public marketing page](0039-public-marketing-surface.md) |
 | ADR-0040 | [What makes a test result trustworthy](0040-test-result-trust.md) |
+| ADR-0041 | [Separate the Randtitel band geometrically, and do not adopt Docling for PDFs](0041-geometric-pdf-marginalia.md) |
 | SLI/SLO | [Definitions](sli-slo-definitions.md) |
 
 Some filenames reuse numeric prefixes where historical numbering overlapped; treat the **title inside each file** as authoritative when in doubt.

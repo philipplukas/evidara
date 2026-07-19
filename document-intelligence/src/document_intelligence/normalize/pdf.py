@@ -11,7 +11,7 @@ and a top-to-bottom reading order splices them into the body sentence —
 That is silently corrupted legal text: it indexes, it searches, it looks fine, and it is
 wrong.
 
-**The fix is geometric, not a better extractor** (ADR-0038, amending ADR-0037 §3).
+**The fix is geometric, not a better extractor** (ADR-0041, amending ADR-0037 §3).
 ``normalize/marginalia.py`` decides which words on a page are marginal; this module
 subtracts them from the word stream and lays out what remains. Subtracting the band leaves
 an ordinary single column behind, so reading order becomes trivial and the splice is

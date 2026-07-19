@@ -18,7 +18,7 @@ on whitespace gutters. Measured on the real Zurich ordinance AS 554.510 that sig
 not exist: the body column ends at x1 = 492.6 and the Randtitel band starts at x0 = 498.2,
 a **5.6pt gutter** — narrower than ordinary inter-word spacing inside a body sentence
 (p50 3.9pt, **p90 6.5pt**). No join tolerance separates them, because at p90 the gutter is
-*smaller* than the gaps it would have to survive. See ADR-0038.
+*smaller* than the gaps it would have to survive. See ADR-0041.
 
 ### The signal that does work: shared left edges
 

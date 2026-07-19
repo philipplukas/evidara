@@ -1,4 +1,4 @@
-# ADR-0038: Separate the Randtitel band geometrically, and do not adopt Docling for PDFs
+# ADR-0041: Separate the Randtitel band geometrically, and do not adopt Docling for PDFs
 
 Status: Proposed
 Date: 2026-07-19

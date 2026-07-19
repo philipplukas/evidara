@@ -554,7 +554,7 @@ class ProcessingPipelineTests(unittest.TestCase):
             # unconditionally — it was pinning a bug. `doc.iterate_items()` yields
             # (item, level) pairs and the adapter unpacked it as a bare item, so every
             # block came out empty and the docling backend *always* fell back to the
-            # legacy normaliser. Fixed in ADR-0038; with docling installed the real
+            # legacy normaliser. Fixed in ADR-0041; with docling installed the real
             # backend now runs, and the fallback is only taken when it is absent.
             try:
                 import docling  # noqa: F401
