@@ -159,8 +159,10 @@ Named here so they are visible as gaps rather than discovered as surprises:
 - **Acquisition-scope coverage on platform-control** — *"is any source even configured for this
   jurisdiction, is it enabled, when did it last succeed?"* This is the strictly stronger
   refusal: *"we have never attempted to acquire this"* is a much better thing to tell an agent
-  than *"we hold nothing."* It is a separate PR on a separate service, and PR #693's blueprint
-  inventory is the natural place for it.
+  than *"we hold nothing."* It is a separate PR on a separate service. #693's blueprint
+  inventory — merged as of 2026-07-19 — is the natural place to hang it: it already
+  surfaces per-template lock state (`enabled` / `live_ready` / `launchable`), which is
+  exactly the "were we even asked to acquire this?" half that legal-search cannot see.
 - **Coverage annotation on search responses.** The `q=Tierschutz` failure happened on
   `/v1/search`, and a caller that only searches never sees `/v1/coverage`. Attaching a coverage
   block to `SearchResponse` is the fix that most directly addresses the measured incident. It is
