@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 import pytest_asyncio
+from ci_skip_guard import CiSkipGuard
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from temporalio.testing import WorkflowEnvironment
 
@@ -38,6 +39,16 @@ TEMPORAL_TEST_SERVER_DIR = Path(
         Path(__file__).resolve().parent.parent / ".temporal-test-server",
     )
 )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Register the "CI may not skip" guard (#690).
+
+    Generalises the per-site rule below to every skip in the suite: in CI, a
+    skipped test fails the run unless its reason is allowlisted. See
+    tests/ci_skip_guard.py for the rationale and the allowlist.
+    """
+    config.pluginmanager.register(CiSkipGuard(), "ci-skip-guard")
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
