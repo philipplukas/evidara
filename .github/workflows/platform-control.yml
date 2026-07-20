@@ -1,12 +1,13 @@
 name: Platform Control
 
 on:
+  # Deliberately NOT path-filtered for pull_request: `Platform Control gate` is a
+  # required status check, and a workflow that never starts never reports one, so
+  # the PR would stay pending forever. The `changes` job below reproduces the old
+  # filter at job level, so an unrelated PR still skips `check` and pays only the
+  # ~10s filter job. `push` keeps its filter — required checks apply to PRs only.
+  # See #719.
   pull_request:
-    paths:
-      - "platform-control/**"
-      - "contracts/api/platform-control.openapi.yaml"
-      - "scripts/check-platform-control.sh"
-      - "scripts/generate_platform_control_contract.py"
   push:
     branches: [main]
     paths:
@@ -20,9 +21,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Reproduces the `on.pull_request.paths` filter that used to gate this
+  # workflow, at job level, so `gate` can always report. See #719.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paths filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'platform-control/**'
+              - 'contracts/api/platform-control.openapi.yaml'
+              - 'scripts/check-platform-control.sh'
+              - 'scripts/generate_platform_control_contract.py'
+              - '.github/workflows/platform-control.yml'
+
   check:
     # GitHub-hosted keeps setup-node/setup-python stable until Hetzner K8s
     # runners provide an Ubuntu-compatible bootstrap path for both toolchains.
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -67,3 +96,30 @@ jobs:
 
       - name: Check (backend + admin)
         run: bash scripts/check-platform-control.sh
+
+  # The single required status check for this workflow. Individual jobs are
+  # path-filtered and GitHub reports no conclusion for a job skipped by `if:`,
+  # so requiring one directly would leave unrelated PRs pending forever.
+  # This job always reports; `skipped` is accepted, `failure`/`cancelled` are not.
+  gate:
+    name: Platform Control gate
+    needs:
+      - changes
+      - check
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assert every job succeeded or was skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.value.result)\t\(.key)"' | sort
+          failed=$(echo "$NEEDS" \
+            | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key')
+          if [ -n "$failed" ]; then
+            echo "::error::Job(s) did not pass: $(echo "$failed" | tr '\n' ' ')"
+            exit 1
+          fi
+          echo "All jobs passed or were skipped."

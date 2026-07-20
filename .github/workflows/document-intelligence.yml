@@ -1,17 +1,13 @@
 name: Document Intelligence
 
 on:
+  # Deliberately NOT path-filtered for pull_request: `Document Intelligence gate`
+  # is a required status check, and a workflow that never starts never reports
+  # one, so the PR would stay pending forever. The `changes` job below reproduces
+  # the old filter at job level, so an unrelated PR still skips the check job and
+  # pays only the ~10s filter job. `push` keeps its filter — required checks apply
+  # to PRs only. See #719.
   pull_request:
-    paths:
-      - "document-intelligence/**"
-      - "contracts/api/document-intelligence.openapi.yaml"
-      - "contracts/api/document-intelligence-runtime.openapi.yaml"
-      - "contracts/common/**"
-      - "contracts/events/**"
-      - "contracts/examples/**"
-      - "contracts/schemas/**"
-      - "contracts/vocabularies/document-type.json"
-      - "scripts/check-document-intelligence.sh"
   push:
     branches: [main]
     paths:
@@ -30,7 +26,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Reproduces the `on.pull_request.paths` filter that used to gate this
+  # workflow, at job level, so `gate` can always report. See #719.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paths filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'document-intelligence/**'
+              - 'contracts/api/document-intelligence.openapi.yaml'
+              - 'contracts/api/document-intelligence-runtime.openapi.yaml'
+              - 'contracts/common/**'
+              - 'contracts/events/**'
+              - 'contracts/examples/**'
+              - 'contracts/schemas/**'
+              - 'contracts/vocabularies/document-type.json'
+              - 'scripts/check-document-intelligence.sh'
+              - '.github/workflows/document-intelligence.yml'
+
   document-intelligence-check:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
     runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
 
     steps:
@@ -54,3 +83,30 @@ jobs:
 
       - name: Check (ruff + pytest + contracts + dbt)
         run: bash scripts/check-document-intelligence.sh
+
+  # The single required status check for this workflow. Individual jobs are
+  # path-filtered and GitHub reports no conclusion for a job skipped by `if:`,
+  # so requiring one directly would leave unrelated PRs pending forever.
+  # This job always reports; `skipped` is accepted, `failure`/`cancelled` are not.
+  gate:
+    name: Document Intelligence gate
+    needs:
+      - changes
+      - document-intelligence-check
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assert every job succeeded or was skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.value.result)\t\(.key)"' | sort
+          failed=$(echo "$NEEDS" \
+            | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key')
+          if [ -n "$failed" ]; then
+            echo "::error::Job(s) did not pass: $(echo "$failed" | tr '\n' ' ')"
+            exit 1
+          fi
+          echo "All jobs passed or were skipped."

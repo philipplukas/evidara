@@ -19,22 +19,13 @@
 name: Legal Search
 
 on:
+  # Deliberately NOT path-filtered for pull_request: `Legal Search gate` is a
+  # required status check, and a workflow that never starts never reports one, so
+  # the PR would stay pending forever. The `changes` job below reproduces the old
+  # filter at job level, so an unrelated PR still skips every job here and pays
+  # only the ~10s filter job. `push` keeps its filter — required checks apply to
+  # PRs only. See #719.
   pull_request:
-    paths:
-      - 'legal-search/**'
-      - 'contracts/api/legal-search.openapi.yaml'
-      - 'platform-control/admin/**'
-      # `styles/` holds the shared @evidara/* modules — they are compiled
-      # into the frontend bundle, so a change there must run this CI.
-      - 'styles/**'
-      - '.nvmrc'
-      - 'package.json'
-      - 'scripts/check-js-workspace-hygiene.sh'
-      - 'scripts/check-legal-search.sh'
-      - 'scripts/check-e2e-spec-coverage.sh'
-      - 'scripts/check_visual_baseline_provenance.py'
-      - 'docs/runbooks/interaction-flow-validation.md'
-      - 'scripts/run-interaction-flow-local.sh'
   push:
     branches: [main]
     paths:
@@ -56,6 +47,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─── Changed-path detection ───
+  #
+  # Reproduces the `on.pull_request.paths` filter that used to gate this whole
+  # workflow, at job level, so `gate` below can always report. See #719.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paths filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'legal-search/**'
+              - 'contracts/api/legal-search.openapi.yaml'
+              - 'platform-control/admin/**'
+              # `styles/` holds the shared @evidara/* modules — they are compiled
+              # into the frontend bundle, so a change there must run this CI.
+              - 'styles/**'
+              - '.nvmrc'
+              - 'package.json'
+              - 'scripts/check-js-workspace-hygiene.sh'
+              - 'scripts/check-legal-search.sh'
+              - 'scripts/check-e2e-spec-coverage.sh'
+              - 'scripts/check_visual_baseline_provenance.py'
+              - 'docs/runbooks/interaction-flow-validation.md'
+              - 'scripts/run-interaction-flow-local.sh'
+              - '.github/workflows/legal-search.yml'
+
   # ─── JS dependency-resolution hygiene ───
   #
   # Cheap, repo-wide invariants that keep local runs honest: no root
@@ -64,6 +93,8 @@ jobs:
   # `.nvmrc`. Runs the SAME script as the pre-commit hook. See #588.
   js-workspace-hygiene:
     name: JS workspace hygiene
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -84,6 +115,8 @@ jobs:
   api:
     # GitHub-hosted: keeps the Node tool bootstrap (actions/setup-node) stable.
     # The self-hosted ARC pools serve the required checks and heavy e2e jobs instead.
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -111,6 +144,8 @@ jobs:
 
   # ─── Frontend quality gate ───
   frontend:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -149,6 +184,8 @@ jobs:
 
   # ─── Interaction-flow evidence (Playwright smoke + contract) ───
   interaction-flow-evidence:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     env:
       E2E_SMOKE_STATUS: not_run
@@ -339,7 +376,8 @@ jobs:
   # Mirrors the pre-commit hook of the same name (AGENTS.md: pre-commit and CI
   # run the same checks). Needs full history for the merge-base diff.
   visual-baseline-provenance:
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -367,7 +405,8 @@ jobs:
   # carries that workstation's font rasterisation, which no other machine
   # reproduces exactly.
   frontend-visual-regression:
-    if: true
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -453,9 +492,11 @@ jobs:
   #
   # It deliberately does not run on `main`.
   visual-baseline-refresh:
+    needs: changes
     if: >-
       github.event_name == 'pull_request' &&
-      contains(github.event.pull_request.labels.*.name, 'visual-baseline-refresh')
+      contains(github.event.pull_request.labels.*.name, 'visual-baseline-refresh') &&
+      needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -571,3 +612,40 @@ jobs:
           git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
 
           echo "::notice::Baselines refreshed. Fill in the Reason: line in PROVENANCE.md before merging."
+
+  # ─── Required-check aggregator ───
+  #
+  # The single required status check for this workflow. The jobs above are
+  # path-filtered via `changes`, and GitHub reports no conclusion for a job
+  # skipped by `if:`, so requiring one directly would leave every unrelated PR
+  # pending forever. This job always reports; `skipped` is an accepted result
+  # (a docs-only PR skips everything here), `failure` and `cancelled` are not.
+  # See #719.
+  gate:
+    name: Legal Search gate
+    needs:
+      - changes
+      - js-workspace-hygiene
+      - api
+      - frontend
+      - interaction-flow-evidence
+      - visual-baseline-provenance
+      - frontend-visual-regression
+      - visual-baseline-refresh
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assert every job succeeded or was skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.value.result)\t\(.key)"' | sort
+          failed=$(echo "$NEEDS" \
+            | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key')
+          if [ -n "$failed" ]; then
+            echo "::error::Job(s) did not pass: $(echo "$failed" | tr '\n' ' ')"
+            exit 1
+          fi
+          echo "All jobs passed or were skipped."
