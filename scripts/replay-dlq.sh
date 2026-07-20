@@ -34,6 +34,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Deliberately unquoted at the call sites below: PROJECT_FLAG is either empty (no
+# flag at all) or a single `--project=x` argument, and quoting an empty string
+# would pass gcloud a stray empty argument. See check-e2e-spec-coverage.sh:86 for
+# the same pattern.
 PROJECT_FLAG=""
 if [[ -n "$PROJECT" ]]; then
   PROJECT_FLAG="--project=$PROJECT"
@@ -47,6 +51,7 @@ echo "Dry run:             $DRY_RUN"
 echo ""
 
 # Pull messages without ack
+# shellcheck disable=SC2086 # intentional: PROJECT_FLAG is empty-or-one-flag
 MESSAGES=$(gcloud pubsub subscriptions pull "$SUBSCRIPTION" \
   $PROJECT_FLAG \
   --limit="$LIMIT" \
@@ -93,6 +98,7 @@ print(base64.b64decode(data).decode('utf-8'))
   fi
 
   # Republish to original topic
+  # shellcheck disable=SC2086 # intentional: PROJECT_FLAG is empty-or-one-flag
   if gcloud pubsub topics publish "$TOPIC" \
     $PROJECT_FLAG \
     --message="$DATA" >/dev/null 2>&1; then

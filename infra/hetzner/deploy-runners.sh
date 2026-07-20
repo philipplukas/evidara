@@ -38,7 +38,11 @@ HEAVY_NAME=evidara-heavy-v2
 # ~/.docker/config.json makes helm shell out to a docker-credential-desktop helper
 # that isn't installed. Point helm at a throwaway empty docker config so it pulls
 # the public OCI charts anonymously.
-export DOCKER_CONFIG="$(mktemp -d)"
+# Declared and assigned separately (SC2155): `export X="$(cmd)"` always returns
+# export's own status, so a failing mktemp would leave DOCKER_CONFIG empty and
+# helm would fall back to the broken credsStore this line exists to avoid.
+DOCKER_CONFIG="$(mktemp -d)"
+export DOCKER_CONFIG
 
 echo "==> 1/4 ARC controller (namespace ${CONTROLLER_NS})"
 helm upgrade --install arc "${CONTROLLER_CHART}" \

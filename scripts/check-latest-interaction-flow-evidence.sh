@@ -98,7 +98,10 @@ else
     --output-dir "${OUTPUT_DIR}"
 fi
 
-latest_dir="$(ls -1d "${OUTPUT_DIR}"/* 2>/dev/null | sort -n | tail -n 1 || true)"
+# find, not ls: a directory name with a newline would otherwise split into two
+# candidates and the "latest" pick would be wrong rather than merely ugly.
+latest_dir="$(find "${OUTPUT_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort -n | tail -n 1 || true)"
+[[ -n "${latest_dir}" ]] && latest_dir="${OUTPUT_DIR}/${latest_dir}"
 if [[ -z "${latest_dir}" ]]; then
   echo "No downloaded run directory found under ${OUTPUT_DIR}" >&2
   exit 2
@@ -116,8 +119,8 @@ video_mode="$(awk -F': ' '/video_mode:/{print $2; exit}' "${manifest_path}" 2>/d
 video_mode="${video_mode//$'\r'/}"
 video_mode="${video_mode//\`/}"
 video_mode="${video_mode//\"/}"
-video_mode="${video_mode#${video_mode%%[![:space:]]*}}"
-video_mode="${video_mode%${video_mode##*[![:space:]]}}"
+video_mode="${video_mode#"${video_mode%%[![:space:]]*}"}"
+video_mode="${video_mode%"${video_mode##*[![:space:]]}"}"
 
 if [[ ! -f "${manifest_path}" ]]; then
   echo "Missing manifest: ${manifest_path}" >&2

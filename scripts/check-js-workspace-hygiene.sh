@@ -134,6 +134,7 @@ fi
 #    (Ignores expression-valued pins like `${{ env.NODE_VERSION }}`.)
 while read -r line; do
   ci_major="${line##*: }"
+  # shellcheck disable=SC2016 # matching the literal GitHub Actions '${{' token
   case "$ci_major" in
   *'${{'* | '') continue ;;
   esac

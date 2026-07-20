@@ -303,7 +303,7 @@ MAX_DI_POLLS="${E2E_DI_MAX_POLLS:-24}"
 DI_INTERVAL="${E2E_DI_POLL_INTERVAL:-5}"
 E2E_DI_ZERO_HINT_AFTER="${E2E_DI_ZERO_HINT_AFTER:-3}"
 di_zero_hint_shown=0
-for i in $(seq 1 ${MAX_DI_POLLS}); do
+for i in $(seq 1 "${MAX_DI_POLLS}"); do
   status_response=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}/processing-status")
   lifecycle_response=$(curl_json "${PC_URL}/v1/runs/${RUN_ID}/document-lifecycle")
 
@@ -333,7 +333,7 @@ for i in $(seq 1 ${MAX_DI_POLLS}); do
     exit 1
   fi
 
-  sleep ${DI_INTERVAL}
+  sleep "${DI_INTERVAL}"
 done
 echo ""
 
