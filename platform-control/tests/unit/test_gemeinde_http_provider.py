@@ -6,11 +6,12 @@ WHY THESE TESTS EXIST:
   so it proves we can actually locate a communal ordinance and read its
   lifecycle metadata — including `in_force_until`, the repeal date ADR-0033
   records as missing from the corpus.
-- The REFUSAL is the load-bearing behaviour. Zurich's ordinance is PDF-only,
-  and `ProviderResource.body` is `str`-typed, so the provider must NOT fall
-  back to emitting the metadata landing page in place of the ordinance.
-  Indexing a metadata stub as if it were the law is the "demo that lies
-  convincingly" failure ADR-0033 exists to prevent — so it is asserted here.
+- The REFUSAL is the load-bearing behaviour. Zurich's ordinance is PDF-only, and
+  the provider must NOT fall back to emitting the metadata landing page in place
+  of the ordinance. Indexing a metadata stub as if it were the law is the "demo
+  that lies convincingly" failure ADR-0033 exists to prevent — so it is asserted
+  here. (The PDF itself is carried as `body_bytes` since #590; the refusal guards
+  the landing-page substitution, not a missing binary capability.)
 - Host allow-list + BFS validation: prevents an operator from pointing a
   commune template at an arbitrary host.
 - Scaffold guard: `live_ready is False` keeps the ADR-0030 two-key lock shut.
