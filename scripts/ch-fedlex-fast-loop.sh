@@ -27,6 +27,13 @@ AUTHORITY_ID="auth_fedlex"
 SOURCE_NAME="CH Fedlex SPARQL fast-loop source"
 CORPUS_SLUG="ch-fedlex"
 CORPUS_LABEL="CH Fedlex"
+# Which ADR-0030 keys the run needs. `preview` is the default so the Fedlex
+# nightly asserts exactly what it always did. `acceptance` is the mode an
+# operator uses for a provider whose readiness is `awaiting_evidence`: it reaches
+# the live portal to PRODUCE the evidence, so it cannot require the keys that
+# evidence justifies. The lock refuses `preview` for such a provider, which is
+# why a municipal run needs this flag (#743).
+RUN_MODE="preview"
 SOURCE_ID=""
 SOURCE_VERSION_ID=""
 RUN_ID=""
@@ -71,6 +78,10 @@ Options:
                                  (default: "CH Fedlex SPARQL fast-loop source")
   --corpus-slug <slug>           Slug used in the --copy-evidence filename (default: ch-fedlex)
   --corpus-label <label>         Human corpus name in the evidence markdown (default: CH Fedlex)
+  --mode <preview|acceptance|production>
+                                 Run mode (default: preview). Use `acceptance` for a
+                                 provider whose readiness is `awaiting_evidence` —
+                                 `preview` is refused by the two-key lock there (#743).
   --max-resources <n>            Preview scope max_resources (default: 25)
   --max-polls <n>                Maximum run polls (default: 60)
   --poll-interval <seconds>      Run poll interval (default: 5)
@@ -120,6 +131,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --corpus-label)
       CORPUS_LABEL="${2:?missing value for --corpus-label}"
+      shift 2
+      ;;
+    --mode)
+      RUN_MODE="${2:?missing value for --mode}"
       shift 2
       ;;
     --project)
@@ -354,6 +369,7 @@ log "    jurisdiction_id=${JURISDICTION_ID}"
 log "    authority_id=${AUTHORITY_ID}"
 log "    source_name=${SOURCE_NAME}"
 log "    corpus_slug=${CORPUS_SLUG}"
+log "    run_mode=${RUN_MODE}"
 log "    max_resources=${MAX_RESOURCES}"
 log "    max_polls=${MAX_POLLS}"
 log "    poll_interval=${POLL_INTERVAL}"
@@ -403,7 +419,7 @@ if [[ -z "${SOURCE_ID}" || -z "${SOURCE_VERSION_ID}" ]]; then
 fi
 
 log "==> Checking readiness"
-curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=preview" | tee "${RUN_DIR}/readiness.json" >/dev/null
+curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=${RUN_MODE}" | tee "${RUN_DIR}/readiness.json" >/dev/null
 READY="$(jq -r '.ready' < "${RUN_DIR}/readiness.json")"
 if [[ "${READY}" != "true" ]]; then
   echo "error: readiness returned ready=${READY}" >&2
@@ -415,17 +431,17 @@ log "==> Approving source version"
 curl -fsS -X POST "${PC_URL}/v1/versions/${SOURCE_VERSION_ID}/approve" \
   "${PC_AUTH_HEADER[@]}" | tee "${RUN_DIR}/approve.json" >/dev/null
 
-RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --argjson max_resources "${MAX_RESOURCES}" '{
+RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --arg run_mode "${RUN_MODE}" --argjson max_resources "${MAX_RESOURCES}" '{
   source_id: $source_id,
   source_version_id: $source_version_id,
-  mode: "preview",
+  mode: $run_mode,
   scope: {
     kind: "discovered_subset",
     max_resources: $max_resources
   }
 }')"
 
-log "==> Launching preview run"
+log "==> Launching ${RUN_MODE} run"
 curl -fsS -X POST "${PC_URL}/v1/runs" \
   "${PC_AUTH_HEADER[@]}" \
   -H "Content-Type: application/json" \
@@ -653,6 +669,7 @@ SUMMARY_JSON="$(jq -n \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" \
   --arg corpus_slug "${CORPUS_SLUG}" \
+  --arg run_mode "${RUN_MODE}" \
   --arg source_id "${SOURCE_ID}" \
   --arg source_version_id "${SOURCE_VERSION_ID}" \
   --arg run_id "${RUN_ID}" \
@@ -697,6 +714,7 @@ SUMMARY_JSON="$(jq -n \
     jurisdiction_id: $jurisdiction_id,
     authority_id: $authority_id,
     corpus_slug: $corpus_slug,
+    run_mode: $run_mode,
     source_id: $source_id,
     source_version_id: $source_version_id,
     run_id: $run_id,

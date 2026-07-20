@@ -111,3 +111,33 @@ class ContentTypeLabelTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RunModeTests(unittest.TestCase):
+    """An acceptance run's evidence must not read like a production run's (#743).
+
+    A `pass` from an acceptance run proves the pipeline works; it does NOT mean
+    either ADR-0030 key is turned. Evidence that omits the mode can be read as
+    proof of something it never showed.
+    """
+
+    def test_acceptance_mode_is_named_and_qualified(self) -> None:
+        markdown = render({**summary(), "run_mode": "acceptance"})
+
+        self.assertIn("- Run mode: `acceptance`", markdown)
+        self.assertIn("> Run mode: `acceptance` — an acceptance rehearsal", markdown)
+        self.assertIn("does not imply either ADR-0030 key is turned", markdown)
+
+    def test_preview_mode_carries_no_acceptance_caveat(self) -> None:
+        markdown = render({**summary(), "run_mode": "preview"})
+
+        self.assertIn("> Run mode: `preview`.", markdown)
+        self.assertNotIn("acceptance rehearsal", markdown)
+
+    def test_a_run_that_reported_no_mode_says_so(self) -> None:
+        # The sibling harnesses do not emit run_mode yet. Unspecified must not be
+        # silently rendered as the safe-looking default.
+        markdown = render(summary())
+
+        self.assertIn("- Run mode: `unspecified`", markdown)
+        self.assertIn("> Run mode: `unspecified`.", markdown)

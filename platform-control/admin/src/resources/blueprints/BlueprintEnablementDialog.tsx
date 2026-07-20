@@ -120,8 +120,9 @@ export function BlueprintEnablementDialog({ template, onClose }: BlueprintEnable
           <InlineAlert tone="warning" testId="blueprint-enablement-acceptance-warning">
             <strong>Capture an acceptance run first.</strong> Provider{" "}
             <code>{template.provider}</code> is built and verified, but no acceptance evidence has
-            been captured for this template. Dispatch a run with <code>mode=acceptance</code>{" "}
-            against the live source, then enable it here. You do not need an engineer for this.
+            been captured for this template. Run the acceptance harness against the live source (a
+            run with <code>mode=acceptance</code>), then enable it here and paste the verdict as
+            your evidence note. You do not need an engineer for this.
           </InlineAlert>
         ) : null}
 

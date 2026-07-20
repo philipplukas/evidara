@@ -1,3 +1,5 @@
+import { runModeLabel } from "../../domain/runMode";
+
 /**
  * `PreviewReviewShowV2` — the canonical `preview-review` detail (the MUI v1
  * `PreviewReviewShow` it replaced is deleted; `/preview-review-v2/:id`
@@ -7,7 +9,7 @@
  * dataProvider guards the `PreviewReview` getOne to preview-mode runs, so a
  * production run id resolves to a 404 here.
  */
-"use client";
+("use client");
 
 import { RecordContextProvider, useShowController } from "ra-core";
 import { useParams } from "react-router-dom";
@@ -64,9 +66,7 @@ export default function PreviewReviewShowV2() {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill level={runRecordStatusToLevel(run.status)}>{STATUS_LABEL[run.status]}</Pill>
-          <Pill level={runModeToLevel(run.mode)}>
-            {run.mode === "production" ? "Production" : "Preview"}
-          </Pill>
+          <Pill level={runModeToLevel(run.mode)}>{runModeLabel(run.mode)}</Pill>
           <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
         </div>
         <RecordContextProvider value={run}>

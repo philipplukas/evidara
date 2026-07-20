@@ -58,6 +58,7 @@ render_fast_loop_evidence_markdown() {
   local started_at_utc
   local completed_at_utc
   local max_resources
+  local run_mode
   local next_action
   local checks_markdown
   local skipped_gates_markdown
@@ -76,6 +77,11 @@ render_fast_loop_evidence_markdown() {
   started_at_utc="$(jq -r '.started_at_utc // empty' "${summary_path}")"
   completed_at_utc="$(jq -r '.completed_at_utc // empty' "${summary_path}")"
   max_resources="$(jq -r '.max_resources // empty' "${summary_path}")"
+  # An acceptance run reaches the live portal to PRODUCE evidence; it does not
+  # imply either ADR-0030 key is turned. Evidence that does not say which mode
+  # produced it can be read as proof of something it never showed, so the mode is
+  # stated rather than left to the reader (#743).
+  run_mode="$(jq -r '.run_mode // empty' "${summary_path}")"
   next_action="$(fast_loop_next_action "${verdict}")"
 
   checks_markdown="$(
@@ -109,6 +115,7 @@ render_fast_loop_evidence_markdown() {
       | [
         "> " + $corpus_label + " fast loop `" + (.template_id // "unknown") + "` on `" + (.environment // "unknown") + "` returned `" + (.verdict // "unknown") + "` (`" + (.run_id // "unknown") + "`).",
         "> Checks: captured=`" + ((.checks.captured_count // 0) | tostring) + "`, raw_artifacts=`" + ((.checks.raw_artifact_count // 0) | tostring) + "`, " + $ct_label + "=`" + ($ct_count | tostring) + "`, DI accepted/processing/canonical_ready=`" + ((.checks.accepted_count // 0) | tostring) + "/" + ((.checks.processing_count // 0) | tostring) + "/" + ((.checks.canonical_ready_count // 0) | tostring) + "`, lifecycle processed=`" + ((.checks.processed_count // 0) | tostring) + "`.",
+        "> Run mode: `" + (.run_mode // "unspecified") + "`" + (if (.run_mode // "") == "acceptance" then " — an acceptance rehearsal, not production ingest; it does not imply either ADR-0030 key is turned." else "." end),
         "> Skipped gates (not verified): " + (if ($skipped | length) > 0 then ($skipped | map("`" + . + "`") | join(", ")) else "none" end) + ".",
         "> Source/version: `" + (.source_id // "unknown") + "` / `" + (.source_version_id // "unknown") + "`.",
         "> Next action: " + $next_action
@@ -126,6 +133,7 @@ render_fast_loop_evidence_markdown() {
 - Run: \`${run_id}\`
 - Verdict: \`${verdict}\`
 - Max resources: \`${max_resources}\`
+- Run mode: \`${run_mode:-unspecified}\`
 - Started at (UTC): \`${started_at_utc}\`
 - Completed at (UTC): \`${completed_at_utc}\`
 - Run dir: \`${run_dir}\`

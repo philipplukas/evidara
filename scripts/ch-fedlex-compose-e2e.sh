@@ -48,6 +48,9 @@ EXPECT_CONTENT_TYPE="${EXPECT_CONTENT_TYPE:-text/html}"
 JURISDICTION_ID="${JURISDICTION_ID:-jur_ch_federal}"
 AUTHORITY_ID="${AUTHORITY_ID:-auth_fedlex}"
 SOURCE_NAME="${SOURCE_NAME:-CH Fedlex compose e2e source}"
+# See ch-fedlex-fast-loop.sh: `acceptance` is required for a provider whose
+# readiness is `awaiting_evidence`, since the lock refuses `preview` there (#743).
+RUN_MODE="${RUN_MODE:-preview}"
 WORKDIR_ROOT="${WORKDIR_ROOT:-${TMPDIR:-/tmp}/ch-fedlex-compose-e2e}"
 RUN_DIR="${RUN_DIR:-}"
 STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -73,6 +76,9 @@ Options:
   --authority-id <id>       authority_id for the created source (default: auth_fedlex)
   --source-name <name>      name for the created source
                             (default: "CH Fedlex compose e2e source")
+  --mode <preview|acceptance|production>
+                            Run mode (default: preview). Use `acceptance` for a
+                            provider whose readiness is `awaiting_evidence` (#743).
   --max-resources <n>       Preview scope max_resources (default: 25)
   --query <text>            legal-search query used for the searchable assertion
                             (default: Bundesverfassung)
@@ -80,7 +86,7 @@ Options:
   -h, --help                Show this help
 
 Env overrides: EVIDARA_PLATFORM_CONTROL_URL, EVIDARA_LEGAL_SEARCH_URL, TEMPLATE_ID,
-EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME,
+EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME, RUN_MODE,
 MAX_RESOURCES, MAX_POLLS, POLL_INTERVAL, DI_MAX_POLLS, DI_POLL_INTERVAL,
 SEARCH_MAX_POLLS, SEARCH_POLL_INTERVAL, SEARCH_QUERY, WORKDIR_ROOT, RUN_DIR.
 EOF
@@ -95,6 +101,7 @@ while [[ $# -gt 0 ]]; do
     --jurisdiction-id) JURISDICTION_ID="${2:?missing value for --jurisdiction-id}"; shift 2 ;;
     --authority-id) AUTHORITY_ID="${2:?missing value for --authority-id}"; shift 2 ;;
     --source-name) SOURCE_NAME="${2:?missing value for --source-name}"; shift 2 ;;
+    --mode) RUN_MODE="${2:?missing value for --mode}"; shift 2 ;;
     --max-resources) MAX_RESOURCES="${2:?missing value for --max-resources}"; shift 2 ;;
     --query) SEARCH_QUERY="${2:?missing value for --query}"; shift 2 ;;
     --out-dir) RUN_DIR="${2:?missing value for --out-dir}"; shift 2 ;;
@@ -181,6 +188,7 @@ log "    expect_content_type=${EXPECT_CONTENT_TYPE}"
 log "    jurisdiction_id=${JURISDICTION_ID}"
 log "    authority_id=${AUTHORITY_ID}"
 log "    source_name=${SOURCE_NAME}"
+log "    run_mode=${RUN_MODE}"
 log "    max_resources=${MAX_RESOURCES}"
 log "    search_query=${SEARCH_QUERY}"
 log "    run_dir=${RUN_DIR}"
@@ -195,6 +203,7 @@ VERSION_LABEL="ch-fedlex-compose-e2e-$(date -u +%Y%m%dT%H%M%SZ)"
 CREATE_PAYLOAD="$(jq -n \
   --arg version_label "${VERSION_LABEL}" \
   --arg template_id "${TEMPLATE_ID}" \
+  --arg run_mode "${RUN_MODE}" \
   --arg source_name "${SOURCE_NAME}" \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" '{
@@ -228,7 +237,7 @@ log "    source_id=${SOURCE_ID} source_version_id=${SOURCE_VERSION_ID}"
 
 # ── 3. Readiness ───────────────────────────────────────────────────────────
 log "==> Checking readiness"
-curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=preview" \
+curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=${RUN_MODE}" \
   | tee "${RUN_DIR}/readiness.json" >/dev/null
 READY="$(jq -r '.ready' < "${RUN_DIR}/readiness.json")"
 if [[ "${READY}" != "true" ]]; then
@@ -242,14 +251,14 @@ log "==> Approving source version"
 curl_json -X POST "${PC_URL}/v1/versions/${SOURCE_VERSION_ID}/approve" | tee "${RUN_DIR}/approve.json" >/dev/null
 
 # ── 5. Launch preview run ──────────────────────────────────────────────────
-RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --argjson max_resources "${MAX_RESOURCES}" '{
+RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --arg run_mode "${RUN_MODE}" --argjson max_resources "${MAX_RESOURCES}" '{
   source_id: $source_id,
   source_version_id: $source_version_id,
-  mode: "preview",
+  mode: $run_mode,
   scope: { kind: "discovered_subset", max_resources: $max_resources }
 }')"
 
-log "==> Launching preview run"
+log "==> Launching ${RUN_MODE} run"
 curl_json -X POST "${PC_URL}/v1/runs" \
   -H "Content-Type: application/json" \
   -d "${RUN_PAYLOAD}" | tee "${RUN_DIR}/run-create.json" >/dev/null
@@ -424,6 +433,7 @@ SUMMARY_JSON="$(jq -n \
   '{
     environment: "compose-local",
     template_id: $template_id,
+    run_mode: $run_mode,
     jurisdiction_id: $jurisdiction_id,
     authority_id: $authority_id,
     source_id: $source_id,

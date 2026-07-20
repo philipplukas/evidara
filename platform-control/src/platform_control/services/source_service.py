@@ -61,9 +61,9 @@ def _describe_lock(
     elif readiness is AcquisitionReadiness.AWAITING_EVIDENCE:
         notes.append(
             f"Code key closed: provider '{provider}' is implemented and verified, but no "
-            "acceptance run has been captured for it yet. Dispatch a run with "
-            "mode=acceptance against the live source — you do not need an engineer "
-            "(ADR-0030)."
+            "acceptance run has been captured for it yet. Run the acceptance harness "
+            "against the live source (a run with mode=acceptance) and attach the evidence "
+            "— you do not need an engineer (ADR-0030)."
         )
     if not enabled:
         notes.append(

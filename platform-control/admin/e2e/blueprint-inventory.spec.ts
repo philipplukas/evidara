@@ -77,7 +77,7 @@ const BLUEPRINT_TEMPLATES = {
       acquisition_readiness: "awaiting_evidence",
       launchable: false,
       notes: [
-        "Code key closed: provider 'gemeinde_http' is implemented and verified, but no acceptance run has been captured for it yet. Dispatch a run with mode=acceptance against the live source — you do not need an engineer (ADR-0030).",
+        "Code key closed: provider 'gemeinde_http' is implemented and verified, but no acceptance run has been captured for it yet. Run the acceptance harness against the live source (a run with mode=acceptance) and attach the evidence — you do not need an engineer (ADR-0030).",
         "Config key closed: not enabled. Capture acceptance-run evidence, then enable this template to launch live runs (ADR-0030).",
       ],
       default_enabled: false,

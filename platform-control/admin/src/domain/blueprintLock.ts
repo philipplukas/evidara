@@ -209,3 +209,31 @@ export function describeProvenance(
     ? `Overridden by operator key ${template.updated_by}.`
     : "Overridden by an operator.";
 }
+
+/**
+ * Describe the code key for the source-create preview panel.
+ *
+ * `SourceCreate` rendered `Code key (live_ready): off` for every shut code key,
+ * which is the undifferentiated verdict #743 exists to remove — it reads the
+ * same for a scaffold and for a provider that only needs an acceptance run.
+ */
+export function describeBlueprintCodeKey(lock: LockLike): { label: string; detail: string } {
+  switch (readinessOf(lock)) {
+    case "live":
+      return { label: "on", detail: "The provider is live-ready." };
+    case "awaiting_evidence":
+      return {
+        label: "awaiting acceptance run",
+        detail:
+          "The provider is built and verified. Capture evidence with the acceptance harness " +
+          "(a run with mode=acceptance against the live source), then enable the template — " +
+          "no engineer, no deploy.",
+      };
+    default:
+      return {
+        label: "off (scaffold)",
+        detail:
+          "The provider is a scaffold — start_run is not implemented. This needs engineering.",
+      };
+  }
+}
