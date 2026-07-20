@@ -65,11 +65,18 @@ jobs:
             shellcheck --version
             exit 0
           fi
+          # Extract with Python rather than `tar -xJ`: the runner has no `xz`, and
+          # `setup-python` has already run, so stdlib `tarfile`/`lzma` is the one
+          # decompressor we can count on being present. `python -c`, not a heredoc:
+          # a heredoc body inside this indented YAML block keeps its leading spaces
+          # and Python rejects them.
           tmp="$(mktemp -d)"
-          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-            | tar -xJ -C "${tmp}" --strip-components=1
+          curl -fsSL -o "${tmp}/shellcheck.tar.xz" \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          python -c "import sys,tarfile,pathlib; d=pathlib.Path(sys.argv[1]); t=tarfile.open(d/'shellcheck.tar.xz'); m=next(x for x in t.getmembers() if x.name.endswith('/shellcheck')); m.name='shellcheck'; t.extract(m, d)" "${tmp}"
           install -Dm755 "${tmp}/shellcheck" "${HOME}/.local/bin/shellcheck"
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+          "${HOME}/.local/bin/shellcheck" --version
 
       - name: Lint shell scripts
         # The repo carried `# shellcheck disable=` directives for a long time with
