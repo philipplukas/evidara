@@ -264,13 +264,46 @@ CREATE_PAYLOAD="$(jq -n \
   }
 }')"
 
-log "==> Creating source + version"
-curl_json -X POST "${PC_URL}/v1/sources/with-version" \
-  -H "Content-Type: application/json" \
-  -d "${CREATE_PAYLOAD}" | tee "${RUN_DIR}/create.json" >/dev/null
+# Reuse the acceptance source for this template if one already exists (#766).
+#
+# `document_id` is derived from (tenant_id, corpus_id, source_id, upstream_locator)
+# — `pipeline.py:166`. Minting a fresh source per run therefore minted a fresh
+# DOCUMENT per run: the same ordinance indexed again, `document_revision: 1` on
+# both, indistinguishable in search. The pipeline is right — re-acquiring under a
+# *stable* source publishes the next revision, which is what `_document_identity_key`
+# was built for (#652) — the harness was simply never stable.
+#
+# It also corrupted the harness's own evidence: `search_hits` is a gate, and a
+# second run turned `1` into `2`, reading like broader coverage when it was one
+# law counted twice. That is what made the first #751 evidence bundle wrong.
+log "==> Resolving acceptance source"
+curl_json "${PC_URL}/v1/sources?q=$(printf '%s' "${SOURCE_NAME}" | jq -sRr @uri)&limit=100" \
+  | tee "${RUN_DIR}/source-lookup.json" >/dev/null
+SOURCE_ID="$(jq -r --arg name "${SOURCE_NAME}" \
+  'first(.data[]? | select(.name == $name) | .source_id // .id) // empty' \
+  < "${RUN_DIR}/source-lookup.json")"
 
-SOURCE_ID="$(jq -r '.source.source_id // .source.id // .source_id // empty' < "${RUN_DIR}/create.json")"
-SOURCE_VERSION_ID="$(jq -r '.source_version.source_version_id // .source_version.id // .source_version_id // empty' < "${RUN_DIR}/create.json")"
+if [[ -n "${SOURCE_ID}" ]]; then
+  log "    reusing source ${SOURCE_ID} — re-acquisition publishes the next revision"
+  VERSION_PAYLOAD="$(jq -n \
+    --arg version_label "${VERSION_LABEL}" \
+    --arg template_id "${TEMPLATE_ID}" '{
+    version_label: $version_label,
+    overlay_id: "ch",
+    provider_template_id: $template_id
+  }')"
+  curl_json -X POST "${PC_URL}/v1/sources/${SOURCE_ID}/versions" \
+    -H "Content-Type: application/json" \
+    -d "${VERSION_PAYLOAD}" | tee "${RUN_DIR}/create.json" >/dev/null
+  SOURCE_VERSION_ID="$(jq -r '.source_version_id // .id // empty' < "${RUN_DIR}/create.json")"
+else
+  log "    no existing acceptance source — creating one"
+  curl_json -X POST "${PC_URL}/v1/sources/with-version" \
+    -H "Content-Type: application/json" \
+    -d "${CREATE_PAYLOAD}" | tee "${RUN_DIR}/create.json" >/dev/null
+  SOURCE_ID="$(jq -r '.source.source_id // .source.id // .source_id // empty' < "${RUN_DIR}/create.json")"
+  SOURCE_VERSION_ID="$(jq -r '.source_version.source_version_id // .source_version.id // .source_version_id // empty' < "${RUN_DIR}/create.json")"
+fi
 if [[ -z "${SOURCE_ID}" || -z "${SOURCE_VERSION_ID}" ]]; then
   echo "error: source creation did not return source/source_version ids" >&2
   cat "${RUN_DIR}/create.json" >&2
