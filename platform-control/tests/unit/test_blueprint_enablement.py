@@ -26,12 +26,19 @@ from platform_control.services.provider_registry_factory import build_provider_r
 from platform_control.services.run_service import RunService
 from platform_control.services.source_service import SourceService
 
-# See source_blueprints.yaml: canton_http_zh is a real scaffold (start_run is not
-# implemented) shipped disabled; fedlex_sparql_constitution_de is live + enabled;
-# the gemeinde template's provider is implemented but has no acceptance evidence.
+# See source_blueprints.yaml: canton_http_zh's provider needs engineering
+# (readiness=scaffold); fedlex_sparql_constitution_de is live + enabled;
+# ch_court_decisions_bger's provider is implemented but has no acceptance
+# evidence yet.
+#
+# This last one was `gemeinde_http_zh_stadt_hundevorschriften` until its
+# acceptance run passed (#735, evidence committed 2026-07-20) and moved that
+# provider to `live`. The exemplar has to be a provider that is *actually* in the
+# state under test — pinning these to a provider whose readiness has moved on
+# would leave the awaiting-evidence branch untested while still looking covered.
 SCAFFOLD_TEMPLATE = ("ch", "canton_http_zh")
 LIVE_TEMPLATE = ("ch", "fedlex_sparql_constitution_de")
-AWAITING_EVIDENCE_TEMPLATE = ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
+AWAITING_EVIDENCE_TEMPLATE = ("ch", "ch_court_decisions_bger")
 
 
 async def _seed_reference(session) -> None:
@@ -131,7 +138,7 @@ async def test_the_listing_gives_each_code_key_state_its_own_remedy(session) -> 
     # A scaffold must never be described as ready to gather evidence.
     assert "acceptance harness" not in scaffold_notes
 
-    awaiting = by_id["gemeinde_http_zh_stadt_hundevorschriften"]
+    awaiting = by_id["ch_court_decisions_bger"]
     awaiting_notes = " ".join(awaiting["notes"]).lower()
     assert awaiting["acquisition_readiness"] == "awaiting_evidence"
     assert "implemented and verified" in awaiting_notes
@@ -350,10 +357,12 @@ async def test_blueprint_preview_surfaces_the_providers_own_plan_notes(session) 
 
     plan_notes = service.describe_blueprint_plan_notes(spec)
 
-    # The gemeinde provider resolves the commune and names the open defect that
-    # keeps its code key shut — the exact warning #634 found stranded.
+    # The gemeinde provider resolves the commune and states its own readiness —
+    # the class of warning #634 found stranded. Since #735 that readiness is
+    # `live`, and the note now points at the remaining config key rather than at
+    # missing evidence.
     assert any("bfs_number=261" in note for note in plan_notes)
-    assert any("readiness=awaiting_evidence" in note for note in plan_notes)
+    assert any("readiness=live" in note for note in plan_notes)
 
 
 @pytest.mark.asyncio
@@ -483,9 +492,7 @@ async def test_a_failing_acceptance_run_is_not_retried_forever(session) -> None:
             type(self).calls += 1
             raise RuntimeError("portal timed out")
 
-    source, version = await _approved_version_from_template(
-        session, ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
-    )
+    source, version = await _approved_version_from_template(session, AWAITING_EVIDENCE_TEMPLATE)
     version.status = SourceVersionStatus.APPROVED
     await session.commit()
 

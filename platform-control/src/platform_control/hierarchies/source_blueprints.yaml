@@ -424,9 +424,10 @@ overlays:
       # in force 01.09.2017, not repealed). That page carries the metadata; the
       # operative text is a PDF.
       #
-      # STAYS `enabled: false`, and the provider's readiness is
-      # `awaiting_evidence` — NOT `scaffold`, and not for the engineering reasons
-      # this comment used to give. Both of those blockers have since landed:
+      # STAYS `enabled: false`, but the provider's readiness is now `live`: the
+      # ADR-0030 acceptance run was captured against live Zürich AS 554.510 on
+      # 2026-07-20 (#735). The engineering blockers this comment used to give had
+      # already landed before that:
       #
       #   - Binary manifestations are carried: `ProviderResource` has `body_bytes`
       #     alongside `body`, with `raw_bytes`/`is_binary` accessors (#590/ADR-0037).
@@ -435,12 +436,11 @@ overlays:
       #     verified against the real AS 554.510 PDF, not a synthetic fixture —
       #     document-intelligence/tests/test_marginalia.py.
       #
-      # What remains is the ADR-0030 **evidence** step: an operator has not yet
-      # captured an acceptance run for this template. That is a loop to run, not
-      # code to write — dispatch a run with `mode=acceptance`, which the lock
-      # admits for an `awaiting_evidence` provider precisely so it can produce
-      # its own evidence (#743). See #735 and #628. Do not flip either key
-      # without it.
+      # What remains is the **config** key, which is the operator's: flip it from
+      # the admin panel with the evidence attached
+      # (docs/runbooks/evidence/2026-07-20-ch-gemeinde-zuerich-acceptance.md).
+      # The code key says the provider works; it does not say this corpus was
+      # accepted. See #735 and #628.
       # ───────────────────────────────────────────────────────────────
       gemeinde_http_zh_stadt_hundevorschriften:
         provider: gemeinde_http

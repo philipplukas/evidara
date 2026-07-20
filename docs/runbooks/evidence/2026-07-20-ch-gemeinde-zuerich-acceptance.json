@@ -1,0 +1,37 @@
+{
+  "environment": "compose-local",
+  "template_id": "gemeinde_http_zh_stadt_hundevorschriften",
+  "run_mode": "acceptance",
+  "jurisdiction_id": "jur_ch_gemeinde_261",
+  "authority_id": "auth_stadt_zuerich_sk",
+  "source_id": "src_01ky04f3svshqmfgrwv9hgxgjg",
+  "source_version_id": "sv_01ky04f3sv92f6q2j2bq5wsjqk",
+  "run_id": "run_01ky04f3tmfrvxtcx69x8mmx40",
+  "max_resources": 5,
+  "verdict": "pass",
+  "run_dir": "/tmp/claude-1000/-home-philipp-Projects-evidara/63ea2b42-4620-4fea-84e1-60768c8f524e/scratchpad/zh-final",
+  "search_query": "Hundegesetz",
+  "started_at_utc": "2026-07-20T16:06:41Z",
+  "completed_at_utc": "2026-07-20T16:06:51Z",
+  "checks": {
+    "captured_count": 1,
+    "raw_artifact_count": 1,
+    "expect_content_type": "application/pdf",
+    "content_type_match_count": 1,
+    "accepted_count": 1,
+    "processing_count": 1,
+    "canonical_ready_count": 1,
+    "processed_count": 1,
+    "title_ok": 1,
+    "title_checked": 0,
+    "skipped_gates": [
+      "title_ok",
+      "indexed_language_ok"
+    ],
+    "search_hits": 2,
+    "indexed_language_expected": "",
+    "indexed_language_observed": "",
+    "indexed_language_checked": 0,
+    "indexed_language_ok": 1
+  }
+}
