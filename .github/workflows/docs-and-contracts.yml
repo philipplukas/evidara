@@ -51,11 +51,30 @@ jobs:
           echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
           echo "head_ref=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
 
+      - name: Install shellcheck
+        # This job runs on the self-hosted ARC scale set, which is a plain k8s pod
+        # with no shellcheck and no guarantee of a package manager. Fetching the
+        # upstream static binary is deterministic and needs no root — and pinning
+        # the version keeps a new shellcheck release from turning this gate red on
+        # an unrelated PR.
+        env:
+          SHELLCHECK_VERSION: v0.11.0
+        run: |
+          set -euo pipefail
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck --version
+            exit 0
+          fi
+          tmp="$(mktemp -d)"
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJ -C "${tmp}" --strip-components=1
+          install -Dm755 "${tmp}/shellcheck" "${HOME}/.local/bin/shellcheck"
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
       - name: Lint shell scripts
-        # shellcheck is preinstalled on ubuntu-latest runners. The repo carried
-        # `# shellcheck disable=` directives for a long time with nothing enforcing
-        # them, which is how a deploy script kept an `export X="$(cmd)"` that hid a
-        # failing command from `set -e` (#747).
+        # The repo carried `# shellcheck disable=` directives for a long time with
+        # nothing enforcing them, which is how a deploy script kept an
+        # `export X="$(cmd)"` that hid a failing command from `set -e` (#747).
         run: bash scripts/check-shellcheck.sh
 
       - name: Run guard unit tests
