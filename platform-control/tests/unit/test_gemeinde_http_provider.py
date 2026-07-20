@@ -37,6 +37,13 @@ from platform_control.services.gemeinde_http_provider import (
     load_communal_portals,
     parse_amtliche_sammlung_page,
 )
+from platform_control.services.politeness import current_rate_limiter
+from platform_control.services.robots import (
+    RobotsChecker,
+    RobotsContext,
+    RobotsMode,
+    current_robots_context,
+)
 
 FIXTURE = (
     Path(__file__).resolve().parents[1]
@@ -361,3 +368,116 @@ def test_gemeinde_http_admits_an_acceptance_run_but_not_a_production_one() -> No
     # The refusal must point at the loop, not at engineering.
     assert "acceptance run" in str(excinfo.value)
     assert "does not need an engineer" in str(excinfo.value)
+
+
+# ─── Politeness (#735 review) ───────────────────────────────────
+#
+# `cp_ch_municipal` is the most conservative compliance tier in the repo and was
+# written for this provider specifically: robots_mode=strict, a FLAT 10 rpm
+# ceiling (deliberately equal to the start rate so the adaptive controller
+# cannot probe upward against a municipal server), max_concurrent=1.
+#
+# None of that is self-enforcing. `run_service` binds the limiter and robots
+# context around `start_run`, but they are only read inside `limited_get` — so a
+# provider calling `client.get` directly silently bypasses the entire policy.
+# Every other implemented provider routes through `limited_get`; this one did
+# not, which meant the policy was declared and inert. Going LIVE is what would
+# have made that reachable behind a single admin toggle.
+
+
+class _DenyAllRobots(RobotsChecker):
+    async def is_allowed(self, url: str, user_agent: str) -> bool:  # noqa: ARG002
+        return False
+
+
+@pytest.mark.asyncio
+async def test_provider_honours_a_strict_robots_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A strict robots deny must stop the fetch, not merely be recorded.
+
+    Asserted at the provider boundary rather than on `limited_get` itself: the
+    defect this guards is a provider that never calls it.
+    """
+    captured = _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                _fixture_html(),
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    source_version = SimpleNamespace(
+        acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL},
+    )
+
+    token = current_robots_context.set(
+        RobotsContext(checker=_DenyAllRobots(), mode=RobotsMode.STRICT, user_agent="evidara-bot")
+    )
+    try:
+        result = await provider.start_run(
+            SimpleNamespace(),
+            source_version,
+            SimpleNamespace(run_id="run_robots_denied"),
+        )
+    finally:
+        current_robots_context.reset(token)
+
+    # The request must not have been made at all.
+    assert captured.calls == []
+    assert result.response_payload["captured"] == 0
+
+
+@pytest.mark.asyncio
+async def test_provider_consumes_the_run_rate_limiter(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The flat 10 rpm ceiling only binds if the provider actually acquires tokens.
+    acquired: list[str] = []
+
+    class _Permit:
+        async def __aenter__(self) -> _Permit:
+            return self
+
+        async def __aexit__(self, *exc: object) -> None:
+            del exc
+
+    class _SpyLimiter:
+        # `acquire` takes a host and returns an async context-manager permit;
+        # returning None here would blow up inside the provider's own try/except
+        # and be swallowed as an acquisition failure.
+        async def acquire(self, host: str) -> _Permit:
+            acquired.append(host)
+            return _Permit()
+
+        def observe(self, *args: object, **kwargs: object) -> None:
+            del args, kwargs
+
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                _fixture_html(),
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+            "https://www.stadt-zuerich.ch/dam/": (
+                200,
+                _PDF_BYTES,
+                {"content-type": "application/pdf"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    token = current_rate_limiter.set(_SpyLimiter())
+    try:
+        await provider.start_run(
+            SimpleNamespace(),
+            SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL}),
+            SimpleNamespace(run_id="run_rate_limited"),
+        )
+    finally:
+        current_rate_limiter.reset(token)
+
+    # Landing page + the linked PDF: both go through the limiter, both on the
+    # commune's host — which is what the flat per-host ceiling binds.
+    assert acquired == ["www.stadt-zuerich.ch", "www.stadt-zuerich.ch"]

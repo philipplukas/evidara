@@ -101,6 +101,7 @@ from platform_control.services.acquisition_provider import (
     ProviderResource,
     ProviderStartResult,
 )
+from platform_control.services.politeness import limited_get
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 # The AS landing page renders its metadata into a web component whose
@@ -315,7 +316,7 @@ class GemeindeHttpProvider:
         ) as client:
             for url in seed_urls:
                 try:
-                    response = await client.get(url)
+                    response = await limited_get(client, url)
                     response.raise_for_status()
                     body = response.content or b""
                     if len(body) > max_content_bytes:
@@ -356,7 +357,7 @@ class GemeindeHttpProvider:
                         )
                         continue
 
-                    text_response = await client.get(document_url)
+                    text_response = await limited_get(client, document_url)
                     text_response.raise_for_status()
                     manifestation = (text_response.content or b"")[:max_content_bytes]
                     is_binary = content_type in _BINARY_CONTENT_TYPES
