@@ -18,6 +18,10 @@ Commands:
   env       Print local env variables used by runtime services
   help      Show this message
 
+For the full acquisition -> search loop (NATS + MinIO + the event path), use
+scripts/dev-loop-stack.sh instead — this script predates ADR-0029 and does not
+configure the publisher or artifact store.
+
 Modes:
   lite      postgres only (lowest RAM)
   search    postgres + opensearch (default; recommended for search API work)

@@ -24,6 +24,23 @@ For vertical-slice local development, use the repo compose stack plus helper scr
 - `bash scripts/local-vertical-slice.sh env` to print local env wiring
 - guide: [Local Vertical Slice Setup](./local-vertical-slice.md)
 
+For the **full acquisition → search loop** (NATS + MinIO + document-intelligence
++ the projection bridge), use `bash scripts/dev-loop-stack.sh up` instead. It
+exists because two settings are inert by default and silent when wrong:
+
+- `PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND` defaults to `noop`, so
+  platform-control acquires documents and never publishes the artifact event.
+  document-intelligence idles, the run appears to hang at `canonical_ready=0`,
+  and **no component logs an error** — every health check stays green.
+- `platform-control-init` (which runs `alembic upgrade head`) is a **separate
+  image** from `platform-control-api`. Rebuilding the API alone leaves
+  migrations running from a stale image, and alembic reports success while
+  applying nothing.
+
+`bash scripts/dev-loop-stack.sh verify` checks a running stack for both against
+the repo and fails with the remedy. Run it before trusting a local loop result —
+`up` runs it automatically.
+
 ## GCP Services
 
 | Service | Purpose | Used by |
