@@ -60,6 +60,8 @@ render_fast_loop_evidence_markdown() {
   local max_resources
   local next_action
   local checks_markdown
+  local skipped_gates_markdown
+  local skipped_gate_count
   local paste_block
 
   environment="$(jq -r '.environment // "unknown"' "${summary_path}")"
@@ -80,11 +82,34 @@ render_fast_loop_evidence_markdown() {
     jq -r '.checks | to_entries[] | "- `\(.key)=\(.value)`"' "${summary_path}"
   )"
 
+  # A gate that self-skipped must read as skipped here, not as a pass (#744). The
+  # `checks` list above renders `<gate>_ok=1` for a gate that never ran, which is the
+  # green-because-it-never-ran failure this repo keeps paying for (#605, #675, #713) —
+  # and this markdown is the artifact an operator reads before flipping `enabled: true`
+  # under ADR-0030. Scripts that do not emit `skipped_gates` yet get the empty list,
+  # so the section stays truthful rather than claiming a coverage they never reported.
+  skipped_gate_count="$(jq -r '(.checks.skipped_gates // []) | length' "${summary_path}")"
+  if [[ "${skipped_gate_count}" -gt 0 ]]; then
+    skipped_gates_markdown="$(
+      jq -r '(.checks.skipped_gates // [])[] | "- `\(.)` — **skipped (not applicable to this template)**, not verified"' "${summary_path}"
+    )"
+  elif jq -e 'has("checks") and (.checks | has("skipped_gates"))' "${summary_path}" >/dev/null; then
+    skipped_gates_markdown="- None — every gate below was evaluated."
+  else
+    skipped_gates_markdown="- Unknown — this run did not report gate coverage."
+  fi
+
   paste_block="$(
     jq -r --arg corpus_label "${corpus_label}" --arg next_action "${next_action}" '
-      [
+      # `content_type_html_count` predates --expect-content-type and is still emitted by
+      # the sibling fast-loop scripts; prefer the corpus-agnostic key when present.
+      (.checks.content_type_match_count // .checks.content_type_html_count // 0) as $ct_count
+      | (.checks.expect_content_type // "text/html") as $ct_label
+      | (.checks.skipped_gates // []) as $skipped
+      | [
         "> " + $corpus_label + " fast loop `" + (.template_id // "unknown") + "` on `" + (.environment // "unknown") + "` returned `" + (.verdict // "unknown") + "` (`" + (.run_id // "unknown") + "`).",
-        "> Checks: captured=`" + ((.checks.captured_count // 0) | tostring) + "`, raw_artifacts=`" + ((.checks.raw_artifact_count // 0) | tostring) + "`, html=`" + ((.checks.content_type_html_count // 0) | tostring) + "`, DI accepted/processing/canonical_ready=`" + ((.checks.accepted_count // 0) | tostring) + "/" + ((.checks.processing_count // 0) | tostring) + "/" + ((.checks.canonical_ready_count // 0) | tostring) + "`, lifecycle processed=`" + ((.checks.processed_count // 0) | tostring) + "`.",
+        "> Checks: captured=`" + ((.checks.captured_count // 0) | tostring) + "`, raw_artifacts=`" + ((.checks.raw_artifact_count // 0) | tostring) + "`, " + $ct_label + "=`" + ($ct_count | tostring) + "`, DI accepted/processing/canonical_ready=`" + ((.checks.accepted_count // 0) | tostring) + "/" + ((.checks.processing_count // 0) | tostring) + "/" + ((.checks.canonical_ready_count // 0) | tostring) + "`, lifecycle processed=`" + ((.checks.processed_count // 0) | tostring) + "`.",
+        "> Skipped gates (not verified): " + (if ($skipped | length) > 0 then ($skipped | map("`" + . + "`") | join(", ")) else "none" end) + ".",
         "> Source/version: `" + (.source_id // "unknown") + "` / `" + (.source_version_id // "unknown") + "`.",
         "> Next action: " + $next_action
       ] | join("\n")
@@ -119,6 +144,10 @@ EOF
   fi
 
   cat >>"${output_path}" <<EOF
+
+## Gate coverage
+
+${skipped_gates_markdown}
 
 ## Checks
 

@@ -39,6 +39,15 @@ DI_POLL_INTERVAL="${DI_POLL_INTERVAL:-5}"
 SEARCH_MAX_POLLS="${SEARCH_MAX_POLLS:-24}"
 SEARCH_POLL_INTERVAL="${SEARCH_POLL_INTERVAL:-5}"
 SEARCH_QUERY="${SEARCH_QUERY:-Bundesverfassung}"
+# Corpus-shaped expectations (#744). Defaults reproduce the Fedlex behaviour this
+# script has always had; they are parameters so a non-HTML / non-federal corpus is
+# measured against its own shape instead of being reported as `provider_failed`.
+# (There is no --url-pattern or --corpus-slug here: this script has no final_url
+# gate and no --copy-evidence path.)
+EXPECT_CONTENT_TYPE="${EXPECT_CONTENT_TYPE:-text/html}"
+JURISDICTION_ID="${JURISDICTION_ID:-jur_ch_federal}"
+AUTHORITY_ID="${AUTHORITY_ID:-auth_fedlex}"
+SOURCE_NAME="${SOURCE_NAME:-CH Fedlex compose e2e source}"
 WORKDIR_ROOT="${WORKDIR_ROOT:-${TMPDIR:-/tmp}/ch-fedlex-compose-e2e}"
 RUN_DIR="${RUN_DIR:-}"
 STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -56,6 +65,14 @@ Options:
   --pc-url <url>            platform-control base URL (default: http://localhost:8000)
   --ls-url <url>            legal-search base URL (default: http://localhost:3102)
   --template <template-id>  Source blueprint template (default: fedlex_sparql_constitution_de)
+  --expect-content-type <mime>
+                            Content type the capture gate counts (default: text/html).
+                            A PDF corpus needs application/pdf, or the run reports
+                            provider_failed while working correctly (#744).
+  --jurisdiction-id <id>    jurisdiction_id for the created source (default: jur_ch_federal)
+  --authority-id <id>       authority_id for the created source (default: auth_fedlex)
+  --source-name <name>      name for the created source
+                            (default: "CH Fedlex compose e2e source")
   --max-resources <n>       Preview scope max_resources (default: 25)
   --query <text>            legal-search query used for the searchable assertion
                             (default: Bundesverfassung)
@@ -63,6 +80,7 @@ Options:
   -h, --help                Show this help
 
 Env overrides: EVIDARA_PLATFORM_CONTROL_URL, EVIDARA_LEGAL_SEARCH_URL, TEMPLATE_ID,
+EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME,
 MAX_RESOURCES, MAX_POLLS, POLL_INTERVAL, DI_MAX_POLLS, DI_POLL_INTERVAL,
 SEARCH_MAX_POLLS, SEARCH_POLL_INTERVAL, SEARCH_QUERY, WORKDIR_ROOT, RUN_DIR.
 EOF
@@ -73,6 +91,10 @@ while [[ $# -gt 0 ]]; do
     --pc-url) PC_URL="${2:?missing value for --pc-url}"; shift 2 ;;
     --ls-url) LS_URL="${2:?missing value for --ls-url}"; shift 2 ;;
     --template) TEMPLATE_ID="${2:?missing value for --template}"; shift 2 ;;
+    --expect-content-type) EXPECT_CONTENT_TYPE="${2:?missing value for --expect-content-type}"; shift 2 ;;
+    --jurisdiction-id) JURISDICTION_ID="${2:?missing value for --jurisdiction-id}"; shift 2 ;;
+    --authority-id) AUTHORITY_ID="${2:?missing value for --authority-id}"; shift 2 ;;
+    --source-name) SOURCE_NAME="${2:?missing value for --source-name}"; shift 2 ;;
     --max-resources) MAX_RESOURCES="${2:?missing value for --max-resources}"; shift 2 ;;
     --query) SEARCH_QUERY="${2:?missing value for --query}"; shift 2 ;;
     --out-dir) RUN_DIR="${2:?missing value for --out-dir}"; shift 2 ;;
@@ -110,6 +132,19 @@ expected_title_regex() {
   esac
 }
 
+# `.+` above is the catch-all: it matches any non-empty title, so for an unknown
+# template the title gate asserts nothing and still reports `title_ok=1`. A check
+# that reports green because it never ran is the failure mode this repo keeps paying
+# for (#605, #675, #713), so per #744 every self-skipping gate carries a companion
+# `<gate>_checked`. Visibility only — the skip does not change what blocks the verdict.
+title_gate_checked() {
+  case "${TEMPLATE_ID}" in
+    fedlex_sparql_constitution_de|fedlex_sparql_vwvg_de|fedlex_sparql_federal_law_batch_de)
+      printf '%s' '1' ;;
+    *) printf '%s' '0' ;;
+  esac
+}
+
 # Fedlex publishes every act as DE/FR/IT expressions and the templates are
 # per-language, so the template suffix IS the language the indexed document must
 # carry on its `language` facet (#572).
@@ -142,6 +177,10 @@ log "==> CH Fedlex compose e2e"
 log "    platform-control=${PC_URL}"
 log "    legal-search=${LS_URL}"
 log "    template=${TEMPLATE_ID}"
+log "    expect_content_type=${EXPECT_CONTENT_TYPE}"
+log "    jurisdiction_id=${JURISDICTION_ID}"
+log "    authority_id=${AUTHORITY_ID}"
+log "    source_name=${SOURCE_NAME}"
 log "    max_resources=${MAX_RESOURCES}"
 log "    search_query=${SEARCH_QUERY}"
 log "    run_dir=${RUN_DIR}"
@@ -153,11 +192,16 @@ curl_json "${LS_URL}/health" >/dev/null || { echo "error: legal-search health fa
 
 # ── 2. Create source + version ─────────────────────────────────────────────
 VERSION_LABEL="ch-fedlex-compose-e2e-$(date -u +%Y%m%dT%H%M%SZ)"
-CREATE_PAYLOAD="$(jq -n --arg version_label "${VERSION_LABEL}" --arg template_id "${TEMPLATE_ID}" '{
+CREATE_PAYLOAD="$(jq -n \
+  --arg version_label "${VERSION_LABEL}" \
+  --arg template_id "${TEMPLATE_ID}" \
+  --arg source_name "${SOURCE_NAME}" \
+  --arg jurisdiction_id "${JURISDICTION_ID}" \
+  --arg authority_id "${AUTHORITY_ID}" '{
   source: {
-    name: "CH Fedlex compose e2e source",
-    jurisdiction_id: "jur_ch_federal",
-    authority_id: "auth_fedlex",
+    name: $source_name,
+    jurisdiction_id: $jurisdiction_id,
+    authority_id: $authority_id,
     source_type: "api",
     document_family: "law"
   },
@@ -266,14 +310,23 @@ done
 # ── 8b. Assert the indexed language matches the acquired expression (#572) ──
 # The search-facing `language` field is a facet and a filter: a wrong value is a
 # wrong answer, not a missing one. Assert it on the documents THIS run produced.
+#
+# `expected_language()` returns "" for any template without a `_de`/`_fr`/`_it`
+# suffix, and this gate then defaults to `indexed_language_ok=1` — a pass it never
+# earned. `indexed_language_checked` records whether the facet was actually read
+# (#744); the verdict logic is unchanged.
 EXPECTED_LANG="$(expected_language)"
 indexed_language_ok=1
+indexed_language_checked=0
 indexed_language_observed=""
-if [[ -n "${EXPECTED_LANG}" ]]; then
+if [[ -z "${EXPECTED_LANG}" ]]; then
+  log "==> Indexed-language gate: SKIPPED (not applicable) — template ${TEMPLATE_ID} has no language suffix"
+else
   processed_document_ids="$(jq -r '[.data[]? | select(.event_type=="document.processed") | .document_id] | unique | join(" ")' < "${RUN_DIR}/document-lifecycle.json")"
   if [[ -z "${processed_document_ids}" ]]; then
     indexed_language_ok=0
   else
+    indexed_language_checked=1
     log "==> Asserting indexed language=${EXPECTED_LANG} for: ${processed_document_ids}"
     read -ra doc_ids <<< "${processed_document_ids}"
     for doc_id in "${doc_ids[@]}"; do
@@ -297,12 +350,33 @@ fi
 
 # ── 9. Content gates (reused from ch-fedlex-fast-loop.sh) ───────────────────
 TITLE_REGEX="$(expected_title_regex)"
-content_type_count="$(jq -r '[.content_type_breakdown[]? | select(.content_type=="text/html") | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
+title_checked="$(title_gate_checked)"
+content_type_count="$(jq -r --arg expect_content_type "${EXPECT_CONTENT_TYPE}" '[.content_type_breakdown[]? | select(.content_type==$expect_content_type) | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
 captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
 title_ok="$(jq -r --arg title_regex "${TITLE_REGEX}" '[.data[]? | select((.title // "") | test($title_regex))] | length' < "${RUN_DIR}/captured-resources.json")"
 accepted_count="$(jq -r '[.data[]? | select(.status=="accepted")] | length' < "${RUN_DIR}/processing-status.json")"
 processing_count="$(jq -r '[.data[]? | select(.status=="processing")] | length' < "${RUN_DIR}/processing-status.json")"
+
+# ── 9b. Skipped-gate ledger (#744) ─────────────────────────────────────────
+# A gate that self-skipped is reported as skipped, never folded into the pass count.
+# `skipped_gates` being empty is what an operator needs before flipping
+# `enabled: true` under ADR-0030: proof every gate actually ran.
+skipped_gates=()
+[[ "${title_checked}" -eq 1 ]] || skipped_gates+=("title_ok")
+# checked=0 with ok=1 is a genuine skip; checked=0 with ok=0 is a real failure the
+# verdict already catches.
+if [[ "${indexed_language_checked}" -eq 0 && "${indexed_language_ok}" -eq 1 ]]; then
+  skipped_gates+=("indexed_language_ok")
+fi
+skipped_gates_json="$(jq -nc '$ARGS.positional' --args "${skipped_gates[@]+"${skipped_gates[@]}"}")"
+
+if [[ "${#skipped_gates[@]}" -gt 0 ]]; then
+  log "==> Gates NOT evaluated for template ${TEMPLATE_ID} — reported as skipped, not as passes (#744):"
+  for skipped_gate in "${skipped_gates[@]}"; do
+    log "    - ${skipped_gate}: skipped (not applicable)"
+  done
+fi
 
 # ── 10. Verdict ────────────────────────────────────────────────────────────
 verdict="pass"
@@ -320,8 +394,8 @@ fi
 
 SUMMARY_JSON="$(jq -n \
   --arg template_id "${TEMPLATE_ID}" \
-  --arg jurisdiction_id "jur_ch_federal" \
-  --arg authority_id "auth_fedlex" \
+  --arg jurisdiction_id "${JURISDICTION_ID}" \
+  --arg authority_id "${AUTHORITY_ID}" \
   --arg source_id "${SOURCE_ID}" \
   --arg source_version_id "${SOURCE_VERSION_ID}" \
   --arg run_id "${RUN_ID}" \
@@ -333,14 +407,18 @@ SUMMARY_JSON="$(jq -n \
   --argjson max_resources "${MAX_RESOURCES}" \
   --argjson captured_count "${captured_count}" \
   --argjson raw_artifact_count "${raw_artifact_count}" \
-  --argjson content_type_html_count "${content_type_count}" \
+  --arg expect_content_type "${EXPECT_CONTENT_TYPE}" \
+  --argjson content_type_match_count "${content_type_count}" \
   --argjson accepted_count "${accepted_count}" \
   --argjson processing_count "${processing_count}" \
   --argjson canonical_ready_count "${canonical_ready_count}" \
   --argjson processed_count "${processed_count}" \
   --argjson title_ok "${title_ok}" \
+  --argjson title_checked "${title_checked}" \
+  --argjson skipped_gates "${skipped_gates_json}" \
   --argjson search_hits "${search_hits}" \
   --argjson indexed_language_ok "${indexed_language_ok}" \
+  --argjson indexed_language_checked "${indexed_language_checked}" \
   --arg indexed_language_expected "${EXPECTED_LANG}" \
   --arg indexed_language_observed "${indexed_language_observed}" \
   '{
@@ -360,15 +438,19 @@ SUMMARY_JSON="$(jq -n \
     checks: {
       captured_count: $captured_count,
       raw_artifact_count: $raw_artifact_count,
-      content_type_html_count: $content_type_html_count,
+      expect_content_type: $expect_content_type,
+      content_type_match_count: $content_type_match_count,
       accepted_count: $accepted_count,
       processing_count: $processing_count,
       canonical_ready_count: $canonical_ready_count,
       processed_count: $processed_count,
       title_ok: $title_ok,
+      title_checked: $title_checked,
+      skipped_gates: $skipped_gates,
       search_hits: $search_hits,
       indexed_language_expected: $indexed_language_expected,
       indexed_language_observed: $indexed_language_observed,
+      indexed_language_checked: $indexed_language_checked,
       indexed_language_ok: $indexed_language_ok
     }
   }')"

@@ -153,8 +153,21 @@ workflow, not a code change:
    `provider.live_ready` (if still a scaffold) and `template.enabled: true`
    — turning both keys of the lock.
 
-The two fast-loop scripts hardcode `auth_fedlex` / `jur_ch_federal` /
-`auth_bger`; renames of those IDs must keep the harnesses functional
+A `pass` verdict is only justification for the gates that actually ran. Several
+gates self-skip when they do not apply to a template (the title regex, the body
+language hint, the indexed-language facet), and a skipped gate used to render as
+an unqualified pass. The evidence markdown now carries a **Gate coverage**
+section listing every skipped gate by name (`checks.skipped_gates` in
+`summary.json`); read it before step 3 and treat a skipped gate as unverified,
+not as verified-and-green (#744).
+
+`scripts/ch-fedlex-fast-loop.sh` and `scripts/ch-fedlex-compose-e2e.sh` take the
+corpus shape as flags — `--expect-content-type`, `--url-pattern`,
+`--jurisdiction-id`, `--authority-id`, `--corpus-slug` — so a non-HTML or
+non-federal corpus is measured against its own shape instead of being reported
+as `provider_failed` for not being Fedlex. Their *defaults* are still
+`auth_fedlex` / `jur_ch_federal`, and `scripts/ch-bger-fast-loop.sh` still
+hardcodes `auth_bger`; renames of those IDs must keep the harnesses functional
 (see ADR-0026).
 
 ## Alternatives considered
