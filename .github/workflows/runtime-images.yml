@@ -2,14 +2,14 @@ name: Runtime Images
 
 on:
   workflow_dispatch:
+  # Deliberately NOT path-filtered for pull_request. `Runtime Images gate` is a
+  # required status check, and a required check that never reports leaves the PR
+  # pending forever — so this workflow must start on every PR. Nothing is wasted:
+  # the `changes` job below does the same filtering at job level, so on a PR that
+  # touches no image input every build still skips and only `changes` (~10s on the
+  # light pool) actually runs. The `push` trigger keeps its path filter, because
+  # required checks apply to PRs only. See #719.
   pull_request:
-    paths:
-      - ".github/workflows/runtime-images.yml"
-      - "platform-control/**"
-      - "legal-search/api/**"
-      - "legal-search/frontend/**"
-      - "document-intelligence/**"
-      - "contracts/**"
   push:
     branches: [main]
     paths:
@@ -540,3 +540,43 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The single required status check for this workflow.
+  #
+  # Individual build jobs cannot be required directly: they are path-filtered via
+  # `changes`, and GitHub never reports a conclusion for a job skipped by `if:`,
+  # so requiring one would block every PR that does not touch its paths. Two of
+  # them also collide by name with `platform-control-image.yml`, which publishes
+  # a check run called "Build platform-control image" as well — an ambiguous
+  # context to gate on.
+  #
+  # This job always reports, and fails only when a needed job genuinely failed.
+  # `skipped` is an accepted result; `failure` and `cancelled` are not.
+  gate:
+    name: Runtime Images gate
+    needs:
+      - changes
+      - platform-control
+      - legal-search-api
+      - legal-search-frontend
+      - platform-control-admin
+      - platform-control-worker
+      - document-intelligence-consumer
+      - document-intelligence-document-service
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assert every image build succeeded or was skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.value.result)\t\(.key)"' | sort
+          failed=$(echo "$NEEDS" \
+            | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key')
+          if [ -n "$failed" ]; then
+            echo "::error::Image build(s) did not pass: $(echo "$failed" | tr '\n' ' ')"
+            exit 1
+          fi
+          echo "All image builds passed or were skipped."
