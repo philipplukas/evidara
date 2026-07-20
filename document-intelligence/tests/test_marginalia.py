@@ -23,6 +23,7 @@ from document_intelligence.normalize.marginalia import (
     join_wrapped_lines,
     split_page_words,
 )
+from document_intelligence.normalize.pdf import normalize_pdf_document
 
 pytest.importorskip("pdfplumber")
 
@@ -157,3 +158,51 @@ def test_hyphen_healing_keeps_an_elided_compound() -> None:
     # word "Halterund". The conjunction is the signal that distinguishes the two.
     assert join_wrapped_lines(["Halter-", "und Hundedaten"]) == "Halter- und Hundedaten"
     assert join_wrapped_lines(["Hundehaltungsvoraus-", "setzungen sind"]) == "Hundehaltungsvoraussetzungen sind"
+
+
+# ─── Footnote apparatus (#754) ──────────────────────────────────
+
+
+def test_footnotes_are_typed_apparatus_not_body_paragraphs() -> None:
+    """Page 1's footnote block must not read as operative text.
+
+    The apparatus WAS already lifted out of the sentence flow — the #650 splice does
+    not happen here. But it was re-emitted as `type="paragraph"`, so in document
+    reading order page 1's footnotes sat between Art. 4 and Art. 5, indistinguishable
+    from the ordinance's own text.
+
+    That matters because the markers survive as bare digits:
+    `"§ 20 Hundeverordnung 4"` (footnote 4) is shaped exactly like `"§ 20 Abs. 4"`.
+    An agentic layer reading this as body text cites a provision that does not exist,
+    which is the demo-that-lies-convincingly failure ADR-0033 exists to prevent.
+    """
+    ir = normalize_pdf_document(_pdf_bytes(), "art_footnotes")
+
+    footnotes = [b for b in ir.blocks if b.type == "footnote"]
+    assert [b.text for b in footnotes] == [
+        "1 LS 554.5",
+        "2 LS 554.51",
+        "3 Begründung siehe STRB Nr. 418 vom 31. Mai 2017.",
+        "4 Der Kantonsbeitrag beträgt zurzeit Fr. 30.–.",
+    ]
+
+    # Retained as blocks — these are legal citations, not noise, and a renderer
+    # should be able to show them.
+    assert all(b.text for b in footnotes)
+
+    # …but absent from the operative text that reaches search and the agentic layer.
+    body = ir.body_text
+    for citation in ("LS 554.5", "STRB Nr. 418", "Kantonsbeitrag beträgt zurzeit"):
+        assert citation not in body, f"apparatus leaked into body_text: {citation!r}"
+
+
+def test_article_four_runs_straight_into_article_five() -> None:
+    # The page boundary is where the apparatus used to land. Art. 4 ends page 1;
+    # Art. 5 opens page 2 under its own Randtitel.
+    body = normalize_pdf_document(_pdf_bytes(), "art_seam").body_text
+    end_of_art_4 = body.index("Haushalt zu erlassen")
+    seam = body[end_of_art_4 : end_of_art_4 + 160]
+
+    assert "Gebühren" in seam
+    assert "Art. 5" in seam
+    assert "LS 554" not in seam

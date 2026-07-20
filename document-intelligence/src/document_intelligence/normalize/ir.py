@@ -3,6 +3,13 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+# Block types that are apparatus rather than operative text. They are retained as
+# blocks — the citations they carry are legally meaningful and a renderer should be
+# able to show them — but they are excluded from `body_text`, which is what reaches
+# search and the agentic layer. A footnote read as body text is a provision that does
+# not exist (#754).
+APPARATUS_BLOCK_TYPES = frozenset({"footnote"})
+
 
 @dataclass(frozen=True)
 class Block:
@@ -30,7 +37,10 @@ class NormalizedDocumentIR:
 
     @property
     def body_text(self) -> str:
-        return "\n\n".join(block.text for block in self.blocks if block.text).strip()
+        """Operative text only — apparatus (footnotes) is excluded, see APPARATUS_BLOCK_TYPES."""
+        return "\n\n".join(
+            block.text for block in self.blocks if block.text and block.type not in APPARATUS_BLOCK_TYPES
+        ).strip()
 
     @property
     def full_text(self) -> str:

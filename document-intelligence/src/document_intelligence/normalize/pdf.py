@@ -190,7 +190,15 @@ def _sections_for_page(*, body_words: list[Word], page_height: float) -> list[_S
     pitch = _modal_pitch(lines)
 
     # Footnote apparatus is the trailing run of small type at the foot of the page. It is
-    # kept (it carries the legal citations) but never merged into a body paragraph.
+    # kept (it carries the legal citations) but never merged into a body paragraph, and
+    # it is typed `footnote` rather than `paragraph` so downstream can tell it apart.
+    #
+    # Typing it matters more than it looks (#754). These lines are correctly lifted out of
+    # the sentence flow — the #650 splice does not happen here — but emitting them as
+    # ordinary paragraphs put page 1's apparatus between Art. 4 and Art. 5 in reading
+    # order, indistinguishable from operative text. Footnote markers survive as bare
+    # digits, so `"§ 20 Hundeverordnung 4"` (footnote 4) reads exactly like `§ 20 Abs. 4`
+    # to the agentic layer ADR-0033 is built for: a provision that does not exist.
     body_lines = list(lines)
     footnotes: list[_Line] = []
     while body_lines and body_lines[-1].size < body_size * _FOOTNOTE_SIZE_RATIO:
@@ -224,7 +232,7 @@ def _sections_for_page(*, body_words: list[Word], page_height: float) -> list[_S
             previous.lines.append(line)
 
     for line in footnotes:
-        sections.append(_Section(type="paragraph", lines=[line]))
+        sections.append(_Section(type="footnote", lines=[line]))
     return sections
 
 
