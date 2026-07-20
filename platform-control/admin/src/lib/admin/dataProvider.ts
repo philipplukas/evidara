@@ -18,7 +18,6 @@ import {
 } from "react-admin";
 import { classifyTemplate } from "../../domain/blueprintLock";
 import { ResourceName } from "../../domain/resourceNames";
-import type { RunMode } from "../../domain/runMode";
 
 type ListResponse<T> = {
   data: T[];
@@ -146,7 +145,7 @@ type RunBase = {
   run_id: string;
   source_id: string;
   source_version_id: string;
-  mode: RunMode;
+  mode: "preview" | "production";
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
   started_at: string | null;
   completed_at: string | null;
@@ -167,7 +166,7 @@ type RunResponse = RunBase;
 export type RunCreateInput = {
   source_id: string;
   source_version_id: string;
-  mode: RunMode;
+  mode: "preview" | "production";
 };
 
 export type RunReadinessCheck = {
@@ -179,7 +178,7 @@ export type RunReadinessCheck = {
 export type RunReadiness = {
   source_id: string;
   source_version_id: string;
-  mode: RunMode;
+  mode: "preview" | "production";
   ready: boolean;
   checks: RunReadinessCheck[];
 };
@@ -195,7 +194,7 @@ export type RunPipelineHealth = {
   run_id: string;
   source_id: string;
   source_version_id: string;
-  mode: RunMode;
+  mode: "preview" | "production";
   run_status: "pending" | "running" | "completed" | "failed" | "cancelled";
   overall_status: "in_progress" | "blocked" | "failed" | "ok";
   stages: RunPipelineHealthStage[];
@@ -217,17 +216,9 @@ export type SourceBlueprintPreviewInput = {
  * is the code-owner key; `launchable` is both turned; `notes` explains any
  * closed key.
  */
-export type AcquisitionReadiness = "scaffold" | "awaiting_evidence" | "live";
-
 export type BlueprintTwoKeyLock = {
   enabled: boolean;
-  /**
-   * Boolean projection of `acquisition_readiness`, true only for `"live"`.
-   * Retained for compatibility; branch on `acquisition_readiness` instead, or a
-   * built-but-unproven provider reads as a scaffold (#743).
-   */
   live_ready: boolean;
-  acquisition_readiness?: AcquisitionReadiness;
   launchable: boolean;
   notes: string[];
 };

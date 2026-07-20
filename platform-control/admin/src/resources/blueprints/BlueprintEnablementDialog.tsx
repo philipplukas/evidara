@@ -55,10 +55,6 @@ export function BlueprintEnablementDialog({ template, onClose }: BlueprintEnable
   }
 
   const turningOn = !template.enabled;
-  // Fall back to the legacy boolean for payloads that predate #743. Never infer
-  // `awaiting_evidence` from it — only the server can assert that state.
-  const codeKeyState =
-    template.acquisition_readiness ?? (template.live_ready ? "live" : "scaffold");
   const noteRequired = turningOn;
   const noteMissing = noteRequired && note.trim().length === 0;
 
@@ -107,22 +103,12 @@ export function BlueprintEnablementDialog({ template, onClose }: BlueprintEnable
       description={`${template.overlay_id} · ${template.provider_template_id} · provider ${template.provider}`}
     >
       <div className="space-y-4">
-        {turningOn && codeKeyState === "scaffold" ? (
+        {turningOn && !template.live_ready ? (
           <InlineAlert tone="error" testId="blueprint-enablement-code-key-warning">
             <strong>This will not make the template launchable.</strong> The code key is shut —
-            provider <code>{template.provider}</code> is a scaffold and cannot acquire anything yet.
-            Turning the config key on records your intent, but live runs stay blocked until the
-            provider ships. That half needs an engineer.
-          </InlineAlert>
-        ) : null}
-
-        {turningOn && codeKeyState === "awaiting_evidence" ? (
-          <InlineAlert tone="warning" testId="blueprint-enablement-acceptance-warning">
-            <strong>Capture an acceptance run first.</strong> Provider{" "}
-            <code>{template.provider}</code> is built and verified, but no acceptance evidence has
-            been captured for this template. Run the acceptance harness against the live source (a
-            run with <code>mode=acceptance</code>), then enable it here and paste the verdict as
-            your evidence note. You do not need an engineer for this.
+            provider <code>{template.provider}</code> cannot yet acquire this format. Turning the
+            config key on records your intent, but live runs stay blocked until the provider ships.
+            That half needs an engineer.
           </InlineAlert>
         ) : null}
 

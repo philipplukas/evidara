@@ -1,5 +1,3 @@
-import type { RunMode } from "../../domain/runMode";
-
 export type OperatorJourneyEventName =
   | "preflight_blocked"
   | "preflight_ready"
@@ -14,7 +12,7 @@ export type OperatorJourneyEvent = {
   run_id?: string;
   source_id?: string;
   source_version_id?: string;
-  mode?: RunMode;
+  mode?: "preview" | "production";
   readiness_codes?: string[];
   duration_ms?: number;
   stage?: "acquisition" | "document_intelligence" | "projection" | "search";

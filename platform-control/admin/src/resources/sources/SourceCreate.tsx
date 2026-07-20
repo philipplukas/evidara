@@ -22,7 +22,6 @@ import { Form, required, useDataProvider, useGetList, useNotify } from "ra-core"
 import { useEffect, useRef, useState } from "react";
 import { useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { describeBlueprintCodeKey } from "../../domain/blueprintLock";
 import type {
   AuthorityRecord,
   JurisdictionRecord,
@@ -244,10 +243,6 @@ function SourceBlueprintPreviewPanel() {
     return null;
   }
 
-  // The bare boolean cannot distinguish "needs an engineer" from "needs an
-  // acceptance run you can dispatch yourself" (#743).
-  const codeKey = describeBlueprintCodeKey(preview);
-
   return (
     <div className="space-y-2">
       <InlineAlert tone={preview.launchable ? "success" : "warning"} testId="blueprint-lock">
@@ -259,9 +254,8 @@ function SourceBlueprintPreviewPanel() {
           </p>
           <p className="text-[12px]">
             Config key (enabled): <strong>{preview.enabled ? "on" : "off"}</strong> · Code key
-            (readiness): <strong>{codeKey.label}</strong>
+            (live_ready): <strong>{preview.live_ready ? "on" : "off"}</strong>
           </p>
-          <p className="text-[12px]">{codeKey.detail}</p>
           {preview.notes.length > 0 ? (
             <ul className="m-0 list-disc space-y-0.5 pl-4 text-[12px]">
               {preview.notes.map((note) => (

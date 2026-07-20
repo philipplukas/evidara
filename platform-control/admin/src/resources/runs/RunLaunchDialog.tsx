@@ -13,7 +13,6 @@ import {
 } from "react";
 import { useDataProvider, useGetList, useNotify, useRedirect } from "react-admin";
 import { ResourceName } from "../../domain/resourceNames";
-import { type RunMode, runModeLabel } from "../../domain/runMode";
 import type {
   RunCreateInput,
   RunReadiness,
@@ -80,36 +79,40 @@ type RunLaunchButtonProps = {
   label: string;
   buttonVariant?: "contained" | "outlined" | "text";
   buttonColor?: "primary" | "secondary";
-  defaultMode?: RunMode;
-  allowedModes?: RunMode[];
+  defaultMode?: "preview" | "production";
+  allowedModes?: Array<"preview" | "production">;
   redirectResource?: RunLaunchRedirectResource;
 };
 
 type RunLaunchFormState = {
   source_id: string;
   source_version_id: string;
-  mode: RunMode;
+  mode: "preview" | "production";
 };
 
-const resolveInitialMode = (defaultMode: RunMode, allowedModes: RunMode[]): RunMode => {
+const resolveInitialMode = (
+  defaultMode: "preview" | "production",
+  allowedModes: Array<"preview" | "production">,
+): "preview" | "production" => {
   if (allowedModes.includes(defaultMode)) {
     return defaultMode;
   }
   return allowedModes[0] ?? "preview";
 };
 
-const createInitialState = (defaultMode: RunMode): RunLaunchFormState => ({
+const createInitialState = (defaultMode: "preview" | "production"): RunLaunchFormState => ({
   source_id: "",
   source_version_id: "",
   mode: defaultMode,
 });
 
-const versionAllowedForMode = (status: SourceVersionRecord["status"], mode: RunMode): boolean => {
+const versionAllowedForMode = (
+  status: SourceVersionRecord["status"],
+  mode: "preview" | "production",
+): boolean => {
   if (mode === "production") {
     return status === "approved";
   }
-  // Acceptance follows preview here: it is a rehearsal, and requiring approval
-  // first would recreate a smaller version of the deadlock it exists to break.
   return status !== "rejected" && status !== "superseded";
 };
 
@@ -119,19 +122,18 @@ const RUN_READINESS_BLOCKED_CODES_KEY_PREFIX = "evidara_run_readiness_blocked_co
 const normalizeReadinessCodes = (checks: RunReadiness["checks"]): string[] =>
   Array.from(new Set(checks.filter((check) => !check.ok).map((check) => check.code))).sort();
 
-// Delegates to the shared descriptor so a new mode cannot be silently rendered
-// under an existing mode's name (#743).
-const formatModeLabel = (mode: RunMode): string => runModeLabel(mode);
+const formatModeLabel = (mode: "preview" | "production"): string =>
+  mode === "production" ? "Production" : "Preview";
 
 export type PreflightRetryPayload = {
   source_id: string;
   source_version_id: string;
-  mode: RunMode;
+  mode: "preview" | "production";
   previous_error_message: string | null;
 };
 
 export function buildPreflightRetryPayload(
-  formState: { source_id: string; source_version_id: string; mode: RunMode },
+  formState: { source_id: string; source_version_id: string; mode: "preview" | "production" },
   readinessError: string | null,
 ): PreflightRetryPayload {
   return {
