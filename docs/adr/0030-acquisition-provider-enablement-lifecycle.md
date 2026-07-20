@@ -61,12 +61,14 @@ unrecognised.
 
 `ProviderRegistry.live_ready_names()` enumerates only `LIVE` providers — an
 *enabled* template must never reference one whose evidence nobody captured.
-`readiness_names()` returns the full three-state map for operator read models.
+Operator read models resolve readiness per template through
+`SourceService._provider_readiness()`.
 
 ### 2. Two-key lock for launching a run
 
 Production-readiness lives on the blueprint template, not the provider. A
-run may launch only when **both** keys are turned:
+run may launch only when **both** keys are turned (with one narrow exception —
+`RunMode.ACCEPTANCE`, see §6):
 
 - the provider's readiness is `LIVE` (see §1; amended from
   `provider.live_ready is True` by #743), **and**
@@ -103,8 +105,9 @@ than retried forever.
 
 `ExecutionMode.SHADOW` versions are exempt: they are routed to the cassette
 provider and replay fixtures, so no request reaches the portal the lock
-protects — that is the rehearsal mode an operator uses *before* capturing
-acceptance-run evidence.
+protects. That also means a SHADOW run proves nothing about the live portal and
+**cannot serve as acceptance evidence** — capturing evidence is what
+`RunMode.ACCEPTANCE` is for (§6).
 
 Both keys default to the safe value (readiness `SCAFFOLD` — including for any
 provider that declares nothing, or declares something unrecognised — and
@@ -280,12 +283,18 @@ the Nth source never falls.
 
 - Scaffolds are safe to commit and reference; the two-key lock makes an
   accidental live run structurally impossible.
-- The scaffold-vs-live boundary is explicit in code (`live_ready`) and the
-  live decision is explicit in config (`enabled`), with separate owners.
+- The code-readiness boundary is explicit in code (`AcquisitionReadiness`) and
+  the live decision is explicit in config (`enabled`), with separate owners.
+  The three-state code key also distinguishes "needs an engineer" from "needs an
+  acceptance run", so the panel stops sending operators to build what exists.
 - Template misconfiguration fails in CI, not against a live third party.
 - One jurisdiction can carry mixed compliance tiers per authority.
 - Live-enablement is an auditable operator workflow with evidence under
   version control.
+
+- A provider can earn its own first key: `RunMode.ACCEPTANCE` lets an operator
+  produce the evidence the lock asks for, so onboarding the Nth source does not
+  require an engineer (§6).
 
 **Negative:**
 
@@ -295,6 +304,18 @@ the Nth source never falls.
   a footgun without the runbook.
 - `extra="forbid"` makes spec evolution slightly stricter: adding a field
   to a template requires adding it to the spec model first.
+- **`RunMode.ACCEPTANCE` reaches a live portal with the config key waived.**
+  That is a deliberate hole in an otherwise fail-closed lock, and it is the
+  riskiest thing in this ADR. It is bounded three ways: the code key still
+  applies (a `SCAFFOLD` provider is refused in every mode), the waiver is
+  limited to `AWAITING_EVIDENCE` — so an operator's explicit `enabled: false`
+  kill switch still stops a `LIVE` provider — and the mode cannot be attached to
+  a schedule, so a rehearsal cannot become an unattended crawl. Those bounds are
+  what the mode's safety rests on; weakening any of them re-opens the hole.
+- A three-state code key is more to hold in mind than a boolean, and the boolean
+  survives as a derived projection, so two spellings of the same fact now exist.
+  `provider_readiness()` is the only correct reader; setting `live_ready`
+  directly on a provider that declares `readiness` is a silent no-op.
 
 ## References
 

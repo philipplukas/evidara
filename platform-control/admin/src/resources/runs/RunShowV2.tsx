@@ -1,5 +1,3 @@
-import { runModeLabel } from "../../domain/runMode";
-
 /**
  * `RunShowV2` — v2 preview of the run detail page. Largest single admin
  * page (v1's `RunShow.tsx` is 433 LoC before `RunDetailSections`). This
@@ -16,11 +14,12 @@ import { runModeLabel } from "../../domain/runMode";
  * `buildRunHandoffGuidance`) are imported from v1's `./RunShow.tsx` rather
  * than forked.
  */
-("use client");
+"use client";
 
 import { RecordContextProvider, useShowController } from "ra-core";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { runModeLabel } from "../../domain/runMode";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { type LegalSearchHandoff, readLegalSearchHandoff } from "../../lib/admin/navigationContext";
 import { formatSwissDateTime } from "../../lib/format/date";

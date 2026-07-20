@@ -54,8 +54,8 @@ def _describe_lock(
     notes: list[str] = []
     if readiness is AcquisitionReadiness.SCAFFOLD:
         notes.append(
-            f"Code key closed: provider '{provider}' is a scaffold — start_run is not "
-            "implemented, so it cannot acquire anything yet. This needs engineering "
+            f"Code key closed: provider '{provider}' cannot acquire this format yet — it "
+            "is a scaffold or faces sources it cannot fetch. This needs engineering "
             "(ADR-0030)."
         )
     elif readiness is AcquisitionReadiness.AWAITING_EVIDENCE:

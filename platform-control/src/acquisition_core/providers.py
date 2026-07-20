@@ -242,10 +242,6 @@ class ProviderRegistry:
             if provider_readiness(provider) is AcquisitionReadiness.LIVE
         }
 
-    def readiness_names(self) -> dict[str, AcquisitionReadiness]:
-        """Return every registered provider's readiness, for operator read models."""
-        return {name: provider_readiness(provider) for name, provider in self._providers.items()}
-
     def resolve_for_spec(self, acquisition_spec: dict[str, Any] | None) -> AcquisitionProvider:
         provider_name = str((acquisition_spec or {}).get("provider") or "firecrawl")
         return self.get(provider_name)

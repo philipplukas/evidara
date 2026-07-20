@@ -203,7 +203,6 @@ VERSION_LABEL="ch-fedlex-compose-e2e-$(date -u +%Y%m%dT%H%M%SZ)"
 CREATE_PAYLOAD="$(jq -n \
   --arg version_label "${VERSION_LABEL}" \
   --arg template_id "${TEMPLATE_ID}" \
-  --arg run_mode "${RUN_MODE}" \
   --arg source_name "${SOURCE_NAME}" \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" '{
@@ -403,6 +402,7 @@ fi
 
 SUMMARY_JSON="$(jq -n \
   --arg template_id "${TEMPLATE_ID}" \
+  --arg run_mode "${RUN_MODE}" \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" \
   --arg source_id "${SOURCE_ID}" \

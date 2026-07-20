@@ -6801,10 +6801,11 @@ components:
             a scaffold from a provider that is merely awaiting acceptance evidence (#743).'
         acquisition_readiness:
           $ref: '#/components/schemas/AcquisitionReadiness'
-          description: ADR-0030 code key, three-state. 'scaffold' = start_run is not implemented (needs
-            engineering); 'awaiting_evidence' = implemented and verified, but no acceptance run captured
-            yet (the operator can dispatch mode=acceptance themselves); 'live' = evidence accepted. `live_ready`
-            is the legacy boolean projection of this field and is true only for 'live'.
+          description: ADR-0030 code key, three-state. 'scaffold' = the provider cannot acquire its targets
+            and needs engineering (usually a stub start_run, sometimes a real one facing sources it cannot
+            fetch); 'awaiting_evidence' = implemented and verified, but no acceptance run captured yet
+            (the operator can run one themselves); 'live' = evidence accepted. `live_ready` is the legacy
+            boolean projection of this field and is true only for 'live'.
           default: scaffold
         launchable:
           type: boolean
@@ -6868,10 +6869,11 @@ components:
             Retained so existing clients keep working; prefer acquisition_readiness (#743).'
         acquisition_readiness:
           $ref: '#/components/schemas/AcquisitionReadiness'
-          description: ADR-0030 code key, three-state. 'scaffold' = start_run is not implemented (needs
-            engineering); 'awaiting_evidence' = implemented and verified, but no acceptance run captured
-            yet (the operator can dispatch mode=acceptance themselves); 'live' = evidence accepted. `live_ready`
-            is the legacy boolean projection of this field and is true only for 'live'.
+          description: ADR-0030 code key, three-state. 'scaffold' = the provider cannot acquire its targets
+            and needs engineering (usually a stub start_run, sometimes a real one facing sources it cannot
+            fetch); 'awaiting_evidence' = implemented and verified, but no acceptance run captured yet
+            (the operator can run one themselves); 'live' = evidence accepted. `live_ready` is the legacy
+            boolean projection of this field and is true only for 'live'.
           default: scaffold
         launchable:
           type: boolean

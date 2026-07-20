@@ -39,9 +39,10 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     # until an operator captures acceptance-run evidence (#530). Not a scaffold —
     # a mode=acceptance run may dispatch to produce that evidence (#743).
     registry.register(ChCourtDecisionsProvider())
-    # Swiss cantonal legislation portals. A genuine scaffold
-    # (readiness=scaffold): start_run is not implemented, so no run of any mode
-    # dispatches. Registered only so blueprint templates referencing it parse.
+    # Swiss cantonal legislation portals. readiness=scaffold — though start_run
+    # is inherited and real, the ZH-Lex-style SPA portals never serve the statute
+    # to a deterministic fetch (#631), so the remedy is engineering and no run of
+    # any mode dispatches.
     registry.register(CantonHttpProvider())
     # Swiss communal (Gemeinde) legal collections — where the ADR-0033 acceptance
     # test lives. readiness=awaiting_evidence: the PDF blockers this comment used

@@ -361,9 +361,14 @@ overlays:
       # Distinct from the Fedlex cantonal-concordat discovery path: this
       # provider scrapes the cantonal systematic collections directly, which
       # surface the bulk of cantonal/"state" legislation. Provider
-      # `canton_http` is a genuine scaffold (readiness=scaffold): start_run is
-      # not implemented, so no run of any mode dispatches — not even
-      # mode=acceptance, since there is nothing to gather evidence about (#743). The seed_urls below are placeholder
+      # `canton_http` is readiness=scaffold — but note its start_run IS
+      # implemented (inherited from PortalHttpProviderBase). It cannot acquire
+      # because several cantonal collections are JavaScript SPA portals whose
+      # statute text deterministic HTTP never sees (#631); the shared density
+      # gate refuses the nav shell rather than reporting success on chrome.
+      # The remedy is engineering (SPA rendering or a data endpoint), which is
+      # what `scaffold` encodes — so no run of any mode dispatches, not even
+      # mode=acceptance (#743). The seed_urls below are placeholder
       # portal URLs and the portal hosts/paths need verification at
       # live-enablement. Kept as a trailing block to minimise merge conflict.
       # ───────────────────────────────────────────────────────────────

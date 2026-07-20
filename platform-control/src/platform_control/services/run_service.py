@@ -431,9 +431,23 @@ class RunService:
         # be waived depends on the provider's readiness, so the order here has to
         # match `_require_launchable`.
         for_acceptance = run_mode is RunMode.ACCEPTANCE
-        provider = self._resolve_provider_for_source_version(source_version)
-        if provider is None and self.provider_registry is None:
-            provider = build_provider_registry(get_settings()).resolve_for_version(source_version)
+        # An unregistered provider name raises: `ProviderRegistry.get` adapts the
+        # core registry's KeyError into ProviderConfigurationError, and the bare
+        # core registry still raises KeyError — catch both, since either reaches
+        # here depending on which registry was injected. Readiness is a read-only
+        # pre-flight and must report this as a closed key rather than 500.
+        # Moving resolution ahead of the config-key check made it reachable for a
+        # version whose spec names an unknown provider, where the config-key
+        # branch used to answer first.
+        provider = None
+        try:
+            provider = self._resolve_provider_for_source_version(source_version)
+            if provider is None and self.provider_registry is None:
+                provider = build_provider_registry(get_settings()).resolve_for_version(
+                    source_version
+                )
+        except (ProviderConfigurationError, KeyError):
+            provider = None
 
         # A provider we cannot resolve is not one we can vouch for. `ensure_launchable`
         # treats it as SCAFFOLD, so pre-flight must refuse rather than report an
@@ -443,8 +457,8 @@ class RunService:
                 code="acquisition_lock_open",
                 ok=False,
                 detail=(
-                    "Code key closed: no acquisition provider could be resolved "
-                    "for this source version."
+                    "Code key closed: no acquisition provider could be resolved for this "
+                    "source version (unknown provider name in the acquisition spec)."
                 ),
             )
 

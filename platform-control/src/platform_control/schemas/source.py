@@ -406,9 +406,10 @@ class SourceBlueprintPreviewResponse(BaseModel):
     acquisition_readiness: AcquisitionReadiness = Field(
         default=AcquisitionReadiness.SCAFFOLD,
         description=(
-            "ADR-0030 code key, three-state. 'scaffold' = start_run is not implemented "
-            "(needs engineering); 'awaiting_evidence' = implemented and verified, but no "
-            "acceptance run captured yet (the operator can dispatch mode=acceptance "
+            "ADR-0030 code key, three-state. 'scaffold' = the provider cannot acquire its "
+            "targets and needs engineering (usually a stub start_run, sometimes a real one "
+            "facing sources it cannot fetch); 'awaiting_evidence' = implemented and "
+            "verified, but no acceptance run captured yet (the operator can run one "
             "themselves); 'live' = evidence accepted. `live_ready` is the legacy boolean "
             "projection of this field and is true only for 'live'."
         ),
@@ -447,9 +448,10 @@ class SourceBlueprintTemplateResponse(BaseModel):
     acquisition_readiness: AcquisitionReadiness = Field(
         default=AcquisitionReadiness.SCAFFOLD,
         description=(
-            "ADR-0030 code key, three-state. 'scaffold' = start_run is not implemented "
-            "(needs engineering); 'awaiting_evidence' = implemented and verified, but no "
-            "acceptance run captured yet (the operator can dispatch mode=acceptance "
+            "ADR-0030 code key, three-state. 'scaffold' = the provider cannot acquire its "
+            "targets and needs engineering (usually a stub start_run, sometimes a real one "
+            "facing sources it cannot fetch); 'awaiting_evidence' = implemented and "
+            "verified, but no acceptance run captured yet (the operator can run one "
             "themselves); 'live' = evidence accepted. `live_ready` is the legacy boolean "
             "projection of this field and is true only for 'live'."
         ),

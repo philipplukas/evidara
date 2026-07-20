@@ -274,9 +274,12 @@ async def test_canton_provider_refuses_javascript_navigation_shell(
 
 
 def test_canton_http_provider_is_a_scaffold() -> None:
-    # A genuine scaffold, unlike gemeinde_http/ch_court_decisions: start_run is
-    # not implemented, so there is nothing for an acceptance run to gather
-    # evidence about. Even mode=acceptance must refuse (#743).
+    # `scaffold` is remedy-shaped, not stub-shaped: start_run here is inherited
+    # from PortalHttpProviderBase and real, but the cantonal SPA portals never
+    # serve the statute to a deterministic fetch (#631), so it still needs
+    # engineering. Unlike gemeinde_http/ch_court_decisions there is nothing for
+    # an acceptance run to gather evidence about, so even mode=acceptance must
+    # refuse (#743).
     assert provider_readiness(CantonHttpProvider) is AcquisitionReadiness.SCAFFOLD
     with pytest.raises(ProviderNotLiveReadyError) as excinfo:
         ensure_launchable(CantonHttpProvider, for_acceptance=True)

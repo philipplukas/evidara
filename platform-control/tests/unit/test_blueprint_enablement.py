@@ -112,6 +112,38 @@ async def test_templates_listing_surfaces_the_lock(session) -> None:
     assert live["notes"] == []
 
 
+@pytest.mark.asyncio
+async def test_the_listing_gives_each_code_key_state_its_own_remedy(session) -> None:
+    """The note bodies are the #743 fix; assert they cannot be swapped.
+
+    A mutation pass swapped the SCAFFOLD and AWAITING_EVIDENCE note strings — so
+    a scaffold told the operator "implemented and verified, dispatch an
+    acceptance run" and a finished provider was sent to an engineer — and
+    nothing failed. That is the original defect reintroduced on the server side,
+    which is the half the admin cannot compensate for.
+    """
+    rows = await SourceService(session).list_source_blueprint_templates()
+    by_id = {r["provider_template_id"]: r for r in rows}
+
+    scaffold_notes = " ".join(by_id["canton_http_zh"]["notes"]).lower()
+    assert by_id["canton_http_zh"]["acquisition_readiness"] == "scaffold"
+    assert "needs engineering" in scaffold_notes
+    # A scaffold must never be described as ready to gather evidence.
+    assert "acceptance harness" not in scaffold_notes
+
+    awaiting = by_id["gemeinde_http_zh_stadt_hundevorschriften"]
+    awaiting_notes = " ".join(awaiting["notes"]).lower()
+    assert awaiting["acquisition_readiness"] == "awaiting_evidence"
+    assert "implemented and verified" in awaiting_notes
+    assert "acceptance harness" in awaiting_notes
+    # …and must never be sent to an engineer, which is the whole point.
+    assert "needs engineering" not in awaiting_notes
+
+    # The boolean projection stays consistent with the enum on every row.
+    for row in rows:
+        assert row["live_ready"] is (row["acquisition_readiness"] == "live")
+
+
 async def _approved_version_from_template(session, template):
     await _seed_reference(session)
     source_service = SourceService(session)
@@ -403,3 +435,25 @@ async def test_create_run_refuses_acceptance_for_a_scaffold(session) -> None:
                 mode=RunMode.ACCEPTANCE,
             )
         )
+
+
+@pytest.mark.asyncio
+async def test_readiness_reports_an_unknown_provider_instead_of_500ing(session) -> None:
+    # Regression guard (#743 review round 2). Moving provider resolution ahead of
+    # the config-key check made `ProviderRegistry.get`'s KeyError reachable from
+    # the readiness endpoint, where the config-key branch used to answer first.
+    # Readiness is a read-only pre-flight; an unknown provider is a closed key,
+    # not a 500.
+    source, version = await _approved_version_from_template(session, LIVE_TEMPLATE)
+    version.acquisition_spec = {**(version.acquisition_spec or {}), "provider": "no_such_provider"}
+    await session.commit()
+
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+    lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
+    assert lock.ok is False
+    assert "unknown provider" in lock.detail.lower()
