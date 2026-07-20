@@ -1,4 +1,7 @@
-"""CH communal (Gemeinde) HTTP acquisition provider — SCAFFOLD (#584).
+"""CH communal (Gemeinde) HTTP acquisition provider — AWAITING ACCEPTANCE EVIDENCE (#584).
+
+Not a scaffold: `start_run` is implemented and verified against the live source.
+The ADR-0030 code key is shut only on the evidence step (see below, and #743).
 
 Swiss communal law is the layer the ADR-0033 acceptance test lives in
 ("Can the city ban a certain thing for dogs, year-round?"): the act being
@@ -45,8 +48,8 @@ Verified against live Zürich AS 554.510 ("Vollzugsvorschriften zum
 Hundegesetz", in force 2017-09-01): the landing page parses and the linked
 217 KB PDF is fetched intact.
 
-WHY THE PROVIDER STILL SHIPS DISABLED (`live_ready = False`)
-------------------------------------------------------------
+WHY THE PROVIDER STILL SHIPS DISABLED (`readiness = AWAITING_EVIDENCE`)
+-----------------------------------------------------------------------
 Not for an engineering reason any more. Both halves are built:
 
 - **Acquisition** (#584): the operative PDF is fetched and emitted as a binary

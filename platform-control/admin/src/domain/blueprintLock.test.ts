@@ -9,6 +9,13 @@ import {
 
 const lock = (enabled: boolean, liveReady: boolean) => ({ enabled, live_ready: liveReady });
 
+/** A template whose provider is built but has no acceptance evidence yet (#743). */
+const awaitingEvidence = (enabled: boolean) => ({
+  enabled,
+  live_ready: false,
+  acquisition_readiness: "awaiting_evidence" as const,
+});
+
 describe("classifyTemplate", () => {
   it("calls both keys open 'live'", () => {
     expect(classifyTemplate(lock(true, true)).id).toBe("live");
@@ -20,11 +27,25 @@ describe("classifyTemplate", () => {
     expect(classifyTemplate(lock(false, true)).id).toBe("operator-actionable");
   });
 
-  it("lets the code key dominate — a shut provider is never operator-actionable", () => {
+  it("lets a scaffold code key dominate — it is never operator-actionable", () => {
     // Both keys shut looks like "config key off" if you only read `enabled`,
     // and an operator who flips it would meet a refusal at run time anyway.
     expect(classifyTemplate(lock(false, false)).id).toBe("engineer-blocked");
     expect(classifyTemplate(lock(true, false)).id).toBe("engineer-blocked");
+  });
+
+  it("does not send an operator to an engineer for a provider that is merely unproven", () => {
+    // The #743 defect: `live_ready: false` used to mean "scaffold" unconditionally,
+    // so a built-and-verified provider was reported as needing engineering. It needs
+    // an acceptance run, which the operator dispatches themselves.
+    expect(classifyTemplate(awaitingEvidence(false)).id).toBe("awaiting-acceptance");
+    expect(classifyTemplate(awaitingEvidence(true)).id).toBe("awaiting-acceptance");
+  });
+
+  it("never infers awaiting_evidence from the legacy boolean alone", () => {
+    // Only the server can assert that state; guessing it client-side would invent
+    // an operator action for a provider that genuinely has no implementation.
+    expect(classifyTemplate(lock(false, false)).id).toBe("engineer-blocked");
   });
 });
 
@@ -36,12 +57,14 @@ describe("summarizeInventory", () => {
       lock(false, true),
       lock(false, false),
       lock(true, false),
+      awaitingEvidence(false),
     ]);
     expect(summary).toEqual({
       live: 1,
       "operator-actionable": 2,
+      "awaiting-acceptance": 1,
       "engineer-blocked": 2,
-      total: 5,
+      total: 6,
     });
   });
 });

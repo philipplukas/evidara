@@ -22,6 +22,7 @@ const BLUEPRINT_TEMPLATES = {
       provider: "fedlex_sparql",
       enabled: true,
       live_ready: true,
+      acquisition_readiness: "live",
       launchable: true,
       notes: [],
       default_enabled: true,
@@ -36,6 +37,7 @@ const BLUEPRINT_TEMPLATES = {
       provider: "deterministic_http",
       enabled: false,
       live_ready: true,
+      acquisition_readiness: "live",
       launchable: false,
       notes: [
         "Config key closed: not enabled. Capture acceptance-run evidence, then enable this template to launch live runs (ADR-0030).",
@@ -49,12 +51,33 @@ const BLUEPRINT_TEMPLATES = {
     {
       overlay_id: "de",
       provider_template_id: "bundesland_http_bayern",
+      provider: "canton_http",
+      enabled: false,
+      live_ready: false,
+      acquisition_readiness: "scaffold",
+      launchable: false,
+      notes: [
+        "Code key closed: provider 'canton_http' is a scaffold — start_run is not implemented, so it cannot acquire anything yet. This needs engineering (ADR-0030).",
+        "Config key closed: not enabled. Capture acceptance-run evidence, then enable this template to launch live runs (ADR-0030).",
+      ],
+      default_enabled: false,
+      source: "default",
+      note: null,
+      updated_by: null,
+      updated_at: null,
+    },
+    {
+      // Built and verified, but unproven — the state that used to be reported as a
+      // scaffold, sending operators to an engineer for work already done (#743).
+      overlay_id: "ch",
+      provider_template_id: "gemeinde_http_zh_stadt_hundevorschriften",
       provider: "gemeinde_http",
       enabled: false,
       live_ready: false,
+      acquisition_readiness: "awaiting_evidence",
       launchable: false,
       notes: [
-        "Code key closed: provider 'gemeinde_http' is not live-ready — it cannot yet acquire this format, so runs stay locked (ADR-0030).",
+        "Code key closed: provider 'gemeinde_http' is implemented and verified, but no acceptance run has been captured for it yet. Dispatch a run with mode=acceptance against the live source — you do not need an engineer (ADR-0030).",
         "Config key closed: not enabled. Capture acceptance-run evidence, then enable this template to launch live runs (ADR-0030).",
       ],
       default_enabled: false,
@@ -134,7 +157,7 @@ test.describe("Blueprint coverage inventory", () => {
 
     // The operator-actionable template says the shut key is theirs to turn…
     const actionableRow = page.getByRole("row", { name: /canton_http_zh/ });
-    await expect(actionableRow).toContainText("Awaiting evidence");
+    await expect(actionableRow).toContainText("Ready to enable");
     await expect(actionableRow).toContainText("yours to turn");
 
     // …while the engineer-blocked one names the provider as the blocker and
@@ -144,13 +167,28 @@ test.describe("Blueprint coverage inventory", () => {
     await expect(blockedRow).toContainText("needs an engineer");
   });
 
+  test("a built-but-unproven provider is not reported as needing an engineer", async ({ page }) => {
+    // #743: `live_ready: false` used to mean "scaffold" unconditionally, so this
+    // row read "Needs provider work" for a provider that acquires and normalises
+    // its format today. The operator was sent to build something that existed.
+    await mockBlueprintApi(page);
+    await page.goto("/#/blueprint-templates");
+
+    const row = page.getByRole("row", { name: /gemeinde_http_zh_stadt_hundevorschriften/ });
+    await expect(row).toContainText("Awaiting acceptance run");
+    await expect(row).not.toContainText("Needs provider work");
+    await expect(row).not.toContainText("needs an engineer");
+    // The remedy, and that it is the operator's to take.
+    await expect(row).toContainText("acceptance run you can dispatch");
+  });
+
   test("the 'awaiting evidence' preset filters to the operator's own worklist", async ({
     page,
   }) => {
     await mockBlueprintApi(page);
     await page.goto("/#/blueprint-templates");
 
-    await page.getByRole("button", { name: /Awaiting evidence/ }).click();
+    await page.getByRole("button", { name: /Ready to enable/ }).click();
 
     await expect(page.getByText("canton_http_zh")).toBeVisible();
     await expect(page.getByText("bundesland_http_bayern")).toHaveCount(0);

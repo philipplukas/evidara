@@ -216,9 +216,17 @@ export type SourceBlueprintPreviewInput = {
  * is the code-owner key; `launchable` is both turned; `notes` explains any
  * closed key.
  */
+export type AcquisitionReadiness = "scaffold" | "awaiting_evidence" | "live";
+
 export type BlueprintTwoKeyLock = {
   enabled: boolean;
+  /**
+   * Boolean projection of `acquisition_readiness`, true only for `"live"`.
+   * Retained for compatibility; branch on `acquisition_readiness` instead, or a
+   * built-but-unproven provider reads as a scaffold (#743).
+   */
   live_ready: boolean;
+  acquisition_readiness?: AcquisitionReadiness;
   launchable: boolean;
   notes: string[];
 };

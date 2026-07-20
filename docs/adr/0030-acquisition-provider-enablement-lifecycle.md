@@ -33,21 +33,35 @@ template crosses from disabled to live.
 
 Adopt a single enablement lifecycle with four load-bearing mechanisms.
 
-### 1. Provider protocol with an explicit `live_ready` flag
+### 1. Provider protocol with an explicit readiness state
+
+> **Amended 2026-07-20 (#743/#735).** This section originally specified a
+> `live_ready: bool`. That binary is superseded by a three-state
+> `AcquisitionReadiness`; the reasoning is recorded in §6 below, and the
+> boolean survives only as a derived projection.
 
 The `AcquisitionProvider` protocol
 ([`platform-control/src/acquisition_core/providers.py`](../../platform-control/src/acquisition_core/providers.py))
-carries a `live_ready: bool` class attribute that encodes the
-scaffold-vs-implementation distinction:
+carries an `AcquisitionReadiness` class attribute — the **code-owner key**:
 
-- `live_ready = False` — `start_run` is a stub (typically raises
-  `NotImplementedError`). The provider is registered only so templates
-  referencing it parse.
-- `live_ready = True` — `start_run` performs real work and is covered by
-  mocked tests against its target API contract.
+- `SCAFFOLD` — `start_run` is a stub (typically raises `NotImplementedError`).
+  The provider is registered only so templates referencing it parse. **Remedy:
+  engineering.** No run of any mode may dispatch.
+- `AWAITING_EVIDENCE` — `start_run` performs real work, is covered by tests
+  against its target contract, and the provider can physically acquire its
+  format — but no operator has captured an acceptance run yet. **Remedy: run the
+  loop.** Only a `RunMode.ACCEPTANCE` run may dispatch.
+- `LIVE` — acceptance evidence exists and was accepted. Runs dispatch once the
+  config key is also open.
 
-`ProviderRegistry.live_ready_names()` enumerates the implemented
-providers for operator read models and readiness checks.
+`live_ready` remains as a derived boolean (true only for `LIVE`) so existing
+clients and the OpenAPI contract keep working; `provider_readiness()` also
+accepts the legacy bool from third-party doubles and fails closed on anything
+unrecognised.
+
+`ProviderRegistry.live_ready_names()` enumerates only `LIVE` providers — an
+*enabled* template must never reference one whose evidence nobody captured.
+`readiness_names()` returns the full three-state map for operator read models.
 
 ### 2. Two-key lock for launching a run
 
@@ -170,6 +184,47 @@ as `provider_failed` for not being Fedlex. Their *defaults* are still
 hardcodes `auth_bger`; renames of those IDs must keep the harnesses functional
 (see ADR-0026).
 
+### 6. `RunMode.ACCEPTANCE` — how a provider earns its first key
+
+> **Added 2026-07-20 (#743/#735).**
+
+The workflow in §5 assumed an acceptance run was possible on a locked template.
+It was not. Traced on `main`:
+
+- Acceptance evidence requires a run against the **live** portal. `SHADOW` is
+  exempt from the lock (`run_service.py`) but routes to the cassette provider and
+  replays fixtures, so it proves nothing about the live portal and cannot serve
+  as evidence.
+- Every non-SHADOW run — **including `mode=preview`** — passes
+  `_require_launchable`, at creation and again at dispatch.
+- That requires both keys. The code key was a class constant with no env or DB
+  override.
+
+So the evidence required the run, the run required the code key, and the code key
+required the evidence. A provider could never earn its own first key without an
+engineer shipping a code change. Fedlex never hit this because its templates were
+already enabled — the workflow had never been exercised on a genuinely locked
+template, which is why the deadlock survived unnoticed.
+
+That is not merely inconvenient. #628 measures the cost of the **Nth** source,
+and a lifecycle in which every new source needs an engineer before it can even be
+*tested* is the "if every new source is an engineering project, the platform has
+failed" condition, expressed as a lock.
+
+`RunMode.ACCEPTANCE` breaks it, narrowly:
+
+- It admits `AWAITING_EVIDENCE` and **never** `SCAFFOLD` — there is no
+  implementation for an acceptance run to gather evidence about.
+- It skips the **config** key, because turning that key is the *outcome* of the
+  acceptance run, not its precondition.
+- It does **not** skip the code key; it widens what the code key accepts.
+- It is recorded on the run, so evidence is self-labelling and an acceptance run
+  can never be mistaken for production ingest after the fact.
+
+The readiness check reports it explicitly ("this is not a production run and does
+not imply either ADR-0030 key is turned") so a green pre-flight on an acceptance
+run is not misread as an open lock.
+
 ## Alternatives considered
 
 ### A. Single boolean (template `enabled` only)
@@ -194,6 +249,23 @@ authority/jurisdiction. Rejected: duplicates politeness config per
 template and loses the single-source-of-truth tiers; the
 authority-over-jurisdiction resolution already expresses mixed tiers
 within one jurisdiction without per-template duplication.
+
+### D. Break the acceptance deadlock with an environment-gated bypass
+
+*(Considered 2026-07-20, #743.)* Let `AWAITING_EVIDENCE` satisfy the code key
+whenever the environment is non-production. Rejected: it keys a safety property
+on deploy config rather than declared intent, nothing marks the resulting run as
+a rehearsal, and #712 is open precisely because `ENVIRONMENT` is unset in places
+— so the guard could be silently wrong in the direction that opens the lock.
+`RunMode.ACCEPTANCE` puts the intent in the request and on the run record.
+
+### E. Flip the code key first and treat the acceptance run as ratification
+
+Ship `live_ready = True` for a built provider, then run the acceptance loop.
+Rejected as the general answer: it is indistinguishable, at the moment of the
+flip, from flipping on confidence — the thing the whole lock exists to stop —
+and it leaves the deadlock in place for the next locked provider, so the cost of
+the Nth source never falls.
 
 ## Consequences
 
