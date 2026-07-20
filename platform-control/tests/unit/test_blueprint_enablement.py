@@ -31,7 +31,12 @@ from platform_control.services.source_service import SourceService
 # the gemeinde template's provider is implemented but has no acceptance evidence.
 SCAFFOLD_TEMPLATE = ("ch", "canton_http_zh")
 LIVE_TEMPLATE = ("ch", "fedlex_sparql_constitution_de")
-AWAITING_EVIDENCE_TEMPLATE = ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
+# Was `gemeinde_http_zh_stadt_hundevorschriften` until its acceptance run passed
+# (#735, evidence committed 2026-07-20) and moved that provider to `live`. The
+# exemplar has to be a provider that is *actually* in the state under test —
+# pinning these to one whose readiness has moved on would leave the
+# awaiting-evidence branch untested while still appearing covered.
+AWAITING_EVIDENCE_TEMPLATE = ("ch", "ch_court_decisions_bger")
 
 
 async def _seed_reference(session) -> None:
@@ -131,7 +136,7 @@ async def test_the_listing_gives_each_code_key_state_its_own_remedy(session) -> 
     # A scaffold must never be described as ready to gather evidence.
     assert "acceptance harness" not in scaffold_notes
 
-    awaiting = by_id["gemeinde_http_zh_stadt_hundevorschriften"]
+    awaiting = by_id["ch_court_decisions_bger"]
     awaiting_notes = " ".join(awaiting["notes"]).lower()
     assert awaiting["acquisition_readiness"] == "awaiting_evidence"
     assert "implemented and verified" in awaiting_notes
@@ -353,7 +358,9 @@ async def test_blueprint_preview_surfaces_the_providers_own_plan_notes(session) 
     # The gemeinde provider resolves the commune and names the open defect that
     # keeps its code key shut — the exact warning #634 found stranded.
     assert any("bfs_number=261" in note for note in plan_notes)
-    assert any("readiness=awaiting_evidence" in note for note in plan_notes)
+    # Since #735 this provider's readiness is `live`; the note now points at the
+    # remaining config key rather than at missing evidence.
+    assert any("readiness=live" in note for note in plan_notes)
 
 
 @pytest.mark.asyncio
@@ -483,9 +490,7 @@ async def test_a_failing_acceptance_run_is_not_retried_forever(session) -> None:
             type(self).calls += 1
             raise RuntimeError("portal timed out")
 
-    source, version = await _approved_version_from_template(
-        session, ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
-    )
+    source, version = await _approved_version_from_template(session, AWAITING_EVIDENCE_TEMPLATE)
     version.status = SourceVersionStatus.APPROVED
     await session.commit()
 
