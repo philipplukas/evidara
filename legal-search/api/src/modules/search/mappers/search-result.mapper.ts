@@ -16,6 +16,7 @@
 import type { SupportedLocale } from '../../../core/i18n';
 import {
   DEFAULT_LOCALE,
+  formatIsoDateDisplay,
   formatLanguageDisplay,
   formatLifecycleStatus,
   formatMessage,
@@ -229,7 +230,7 @@ export function composeMetadata(
       hit.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({
       label,
-      value: hit.effective_date,
+      value: formatIsoDateDisplay(hit.effective_date),
       iconKey: METADATA_ROW_ICONS.calendar,
     });
   }

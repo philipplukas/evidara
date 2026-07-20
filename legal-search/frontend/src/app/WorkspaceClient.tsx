@@ -26,6 +26,7 @@ import { usePreferences } from "@/hooks/use-preferences";
 import { runSearch } from "@/hooks/use-search";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
+import { DEFAULT_SEARCH_QUERY } from "@/lib/search-params";
 import type { FilterViewModel, SearchContextViewModel } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace-store";
 
@@ -96,7 +97,7 @@ export default function WorkspaceClient({
 
   // URL state via nuqs — replaces manual useSearchParams + router.replace
   const [selectedId, setSelectedId] = useQueryState("item", parseAsString);
-  const [urlQuery] = useQueryState("q", parseAsString.withDefault(""));
+  const [urlQuery] = useQueryState("q", parseAsString.withDefault(DEFAULT_SEARCH_QUERY));
 
   const leftRef = useRef<PanelImperativeHandle>(null);
   const rightRef = useRef<PanelImperativeHandle>(null);

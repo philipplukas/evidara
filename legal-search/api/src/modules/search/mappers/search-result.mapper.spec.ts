@@ -141,7 +141,8 @@ describe('composeMetadata', () => {
     });
     expect(rows).toContainEqual({
       label: 'In Kraft',
-      value: '2024-01-01',
+      // Swiss display form, not the raw ISO the index stores (#761).
+      value: '01.01.2024',
       iconKey: 'meta-calendar',
     });
     expect(rows).toContainEqual({
@@ -170,7 +171,7 @@ describe('composeMetadata', () => {
     });
     expect(rows).toContainEqual({
       label: 'Datum',
-      value: '2018-06-15',
+      value: '15.06.2018',
       iconKey: 'meta-calendar',
     });
   });

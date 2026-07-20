@@ -5,11 +5,10 @@ import { Suspense, useEffect, useState } from "react";
 import { getSearchContext, searchDocuments } from "@/lib/api/generated/client";
 import { mapSearchContext, mapSearchResponse } from "@/lib/api-adapters";
 import { SearchConstraintsProvider } from "@/lib/search-constraints-store";
+import { DEFAULT_SEARCH_QUERY } from "@/lib/search-params";
 import type { FilterViewModel, SearchContextViewModel, SearchResultViewModel } from "@/lib/types";
 import { WorkspaceProvider } from "@/lib/workspace-store";
 import WorkspaceClient from "./WorkspaceClient";
-
-const DEFAULT_QUERY = "Art. 754 OR Verantwortlichkeit";
 
 interface HomeClientProps {
   showControlPlaneEntry: boolean;
@@ -17,7 +16,7 @@ interface HomeClientProps {
 }
 
 export default function HomeClient({ showControlPlaneEntry, controlPanelUrl }: HomeClientProps) {
-  const [urlQuery] = useQueryState("q", parseAsString.withDefault(DEFAULT_QUERY));
+  const [urlQuery] = useQueryState("q", parseAsString.withDefault(DEFAULT_SEARCH_QUERY));
   const [bootState, setBootState] = useState<{
     searchContext: SearchContextViewModel;
     filters: FilterViewModel[];

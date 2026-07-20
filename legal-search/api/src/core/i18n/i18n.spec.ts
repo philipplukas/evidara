@@ -5,7 +5,7 @@
  * translation key lookup via t().
  */
 import { describe, expect, it } from 'vitest';
-import { resolveLocale, t } from '../../core/i18n';
+import { formatIsoDateDisplay, resolveLocale, t } from '../../core/i18n';
 
 // ─── resolveLocale ───
 
@@ -75,5 +75,22 @@ describe('translation key parity', () => {
       .filter((k) => k !== 'default')
       .sort();
     expect(frKeys).toEqual(deKeys);
+  });
+});
+
+describe('formatIsoDateDisplay', () => {
+  it('renders an ISO date in Swiss form', () => {
+    expect(formatIsoDateDisplay('2015-12-22')).toBe('22.12.2015');
+  });
+
+  it('accepts a full ISO timestamp and keeps only the date', () => {
+    expect(formatIsoDateDisplay('2024-01-01T09:30:00Z')).toBe('01.01.2024');
+  });
+
+  it('returns an uninterpretable value unchanged rather than blanking it', () => {
+    // A malformed date should be visible, not invisible: silently rendering ""
+    // would hide a data defect behind a tidy-looking gap.
+    expect(formatIsoDateDisplay('not-a-date')).toBe('not-a-date');
+    expect(formatIsoDateDisplay('  ')).toBe('');
   });
 });
