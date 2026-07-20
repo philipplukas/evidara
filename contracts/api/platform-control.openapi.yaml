@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.14.0
+  version: 0.15.0
 paths:
   /health:
     get:
@@ -3018,6 +3018,35 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    AcquisitionReadiness:
+      type: string
+      enum:
+      - scaffold
+      - awaiting_evidence
+      - live
+      title: AcquisitionReadiness
+      description: |-
+        Code-owner key of the ADR-0030 two-key lock.
+
+        Replaces the original ``live_ready: bool``, which could not distinguish two
+        states with opposite operator remedies — and so told operators "escalate to
+        engineering" about providers that were finished (#743):
+
+        - ``SCAFFOLD``: ``start_run`` is a stub (typically ``NotImplementedError``).
+          Registered only so blueprint templates referencing it parse. **Remedy:
+          engineering.** No run of any mode may dispatch.
+        - ``AWAITING_EVIDENCE``: ``start_run`` is implemented and tested, and the
+          provider can physically acquire its format — but no operator has captured
+          an ADR-0030 acceptance run yet. **Remedy: run the loop.** An
+          ``ACCEPTANCE`` run may dispatch against the live portal; nothing else may.
+        - ``LIVE``: acceptance evidence exists and was accepted. Runs of any mode
+          dispatch once the config key is also open.
+
+        ``AWAITING_EVIDENCE`` exists because the binary deadlocked: acceptance
+        evidence requires a live run, a live run required the code key, and the code
+        key was supposed to require the evidence. A provider could never earn its own
+        first key without a code change, which made every new source an engineering
+        project — the exact failure ADR-0033/#628 measure against.
     AttachCompliancePolicyRequest:
       properties:
         compliance_policy_id:
@@ -6212,7 +6241,18 @@ components:
       enum:
       - preview
       - production
+      - acceptance
       title: RunMode
+      description: |-
+        What a run is *for*, which decides which ADR-0030 keys it needs.
+
+        ``ACCEPTANCE`` is the operator's rehearsal against the live portal — the run
+        that produces the evidence for turning the keys, so it cannot require them to
+        be turned already. It admits a provider in ``AWAITING_EVIDENCE`` (never a
+        scaffold) and does not require the config key, because flipping that key is
+        the *outcome* of the acceptance, not its precondition. It is recorded on the
+        run so evidence is self-labelling and can never be mistaken for production
+        ingest afterwards.
     RunPipelineHealthResponse:
       properties:
         run_id:
@@ -6756,8 +6796,16 @@ components:
         live_ready:
           type: boolean
           title: Live Ready
-          description: 'ADR-0030 code key: the resolved provider can physically acquire this format. Stays
-            in code — it is an engineering assertion, not operator state.'
+          description: 'ADR-0030 code key, as a boolean: true only when acquisition_readiness is ''live''.
+            Retained so existing clients keep working; prefer acquisition_readiness, which distinguishes
+            a scaffold from a provider that is merely awaiting acceptance evidence (#743).'
+        acquisition_readiness:
+          $ref: '#/components/schemas/AcquisitionReadiness'
+          description: ADR-0030 code key, three-state. 'scaffold' = start_run is not implemented (needs
+            engineering); 'awaiting_evidence' = implemented and verified, but no acceptance run captured
+            yet (the operator can dispatch mode=acceptance themselves); 'live' = evidence accepted. `live_ready`
+            is the legacy boolean projection of this field and is true only for 'live'.
+          default: scaffold
         launchable:
           type: boolean
           title: Launchable
@@ -6816,7 +6864,15 @@ components:
         live_ready:
           type: boolean
           title: Live Ready
-          description: 'ADR-0030 code key: the resolved provider can physically acquire this format.'
+          description: 'ADR-0030 code key, as a boolean: true only when acquisition_readiness is ''live''.
+            Retained so existing clients keep working; prefer acquisition_readiness (#743).'
+        acquisition_readiness:
+          $ref: '#/components/schemas/AcquisitionReadiness'
+          description: ADR-0030 code key, three-state. 'scaffold' = start_run is not implemented (needs
+            engineering); 'awaiting_evidence' = implemented and verified, but no acceptance run captured
+            yet (the operator can dispatch mode=acceptance themselves); 'live' = evidence accepted. `live_ready`
+            is the legacy boolean projection of this field and is true only for 'live'.
+          default: scaffold
         launchable:
           type: boolean
           title: Launchable

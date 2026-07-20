@@ -25,6 +25,12 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
+from acquisition_core.providers import (
+    AcquisitionReadiness,
+    ProviderNotLiveReadyError,
+    ensure_launchable,
+    provider_readiness,
+)
 from platform_control.errors import ProviderConfigurationError
 from platform_control.services.gemeinde_http_provider import (
     GemeindeHttpProvider,
@@ -332,12 +338,26 @@ def test_plan_reports_scaffold_status_without_network_io() -> None:
     assert plan.provider == "gemeinde_http"
     assert plan.seed_urls == [LANDING_URL]
     assert any("jur_ch_gemeinde_261" in note for note in plan.notes)
-    assert any("live_ready=false" in note for note in plan.notes)
+    assert any("readiness=awaiting_evidence" in note for note in plan.notes)
 
 
-def test_gemeinde_http_provider_is_not_live_ready() -> None:
-    # Scaffold guard (ADR-0030): communal ordinances are PDFs, and neither
-    # ProviderResource.body (str) nor document-intelligence can carry them.
-    # Flipping this key without a PDF pipeline would fire at a live municipal
-    # portal and acquire nothing usable.
-    assert GemeindeHttpProvider.live_ready is False
+def test_gemeinde_http_provider_awaits_evidence_rather_than_being_a_scaffold() -> None:
+    # NOT a scaffold, and the distinction is the point (#743). Acquisition (#590)
+    # and PDF normalisation (#650, ADR-0041) both landed and are verified against
+    # the real AS 554.510 PDF. The code key is shut on the one remaining ADR-0030
+    # requirement — acceptance-run evidence — which an operator can capture
+    # themselves. Reporting this as a scaffold sent operators to an engineer to
+    # build something that already existed.
+    assert provider_readiness(GemeindeHttpProvider) is AcquisitionReadiness.AWAITING_EVIDENCE
+
+
+def test_gemeinde_http_admits_an_acceptance_run_but_not_a_production_one() -> None:
+    # The deadlock this state exists to break: evidence needs a live run, the
+    # live run needed the code key, and the code key needed the evidence.
+    ensure_launchable(GemeindeHttpProvider, for_acceptance=True)
+
+    with pytest.raises(ProviderNotLiveReadyError) as excinfo:
+        ensure_launchable(GemeindeHttpProvider)
+    # The refusal must point at the loop, not at engineering.
+    assert "acceptance run" in str(excinfo.value)
+    assert "does not need an engineer" in str(excinfo.value)

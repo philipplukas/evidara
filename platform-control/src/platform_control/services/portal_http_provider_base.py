@@ -52,6 +52,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -67,7 +68,7 @@ class PortalHttpProviderBase:
     subdivision_spec_key: ClassVar[str]
     subdivision_country: ClassVar[str]
     supported_portals: ClassVar[dict[str, str]]
-    live_ready: ClassVar[bool] = False
+    readiness: ClassVar[AcquisitionReadiness] = AcquisitionReadiness.SCAFFOLD
 
     async def start_run(
         self,

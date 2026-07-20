@@ -23,6 +23,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -60,7 +61,7 @@ class LegifranceProvider:
     """
 
     provider_name = "legifrance"
-    live_ready = False
+    readiness = AcquisitionReadiness.SCAFFOLD
 
     def __init__(
         self,

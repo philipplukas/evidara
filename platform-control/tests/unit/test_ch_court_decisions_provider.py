@@ -7,6 +7,12 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
+from acquisition_core.providers import (
+    AcquisitionReadiness,
+    ProviderNotLiveReadyError,
+    ensure_launchable,
+    provider_readiness,
+)
 from platform_control.services.ch_court_decisions_provider import (
     _DEFAULT_ALLOWED_HOSTS,
     _DEFAULT_LINK_PATTERN,
@@ -221,8 +227,14 @@ def test_plan_reports_targets_without_network() -> None:
     assert any("court=bger" in note for note in plan.notes)
 
 
-def test_provider_is_scaffold_until_live_enablement() -> None:
-    assert ChCourtDecisionsProvider.live_ready is False
+def test_provider_awaits_evidence_rather_than_being_a_scaffold() -> None:
+    # Fetch/parse is implemented and unit-tested; what is missing is acceptance
+    # evidence against a live court environment. That is an operator's run to
+    # dispatch, not an engineer's ticket (#743).
+    assert provider_readiness(ChCourtDecisionsProvider) is AcquisitionReadiness.AWAITING_EVIDENCE
+    ensure_launchable(ChCourtDecisionsProvider, for_acceptance=True)
+    with pytest.raises(ProviderNotLiveReadyError):
+        ensure_launchable(ChCourtDecisionsProvider)
 
 
 @pytest.mark.parametrize("court", ["bger", "bvger", "bstger", "bpger", "zh", "be", "bs"])

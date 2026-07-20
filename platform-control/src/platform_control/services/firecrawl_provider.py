@@ -10,12 +10,16 @@ from platform_control.errors import ProviderConfigurationError
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
-from platform_control.services.acquisition_provider import ProviderPlan, ProviderStartResult
+from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
+    ProviderPlan,
+    ProviderStartResult,
+)
 
 
 class FirecrawlProvider:
     provider_name = "firecrawl"
-    live_ready = True
+    readiness = AcquisitionReadiness.LIVE
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings

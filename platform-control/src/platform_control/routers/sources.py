@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from acquisition_core.providers import AcquisitionReadiness
 from platform_control.auth import Principal, get_current_principal
 from platform_control.database import get_session
 from platform_control.openapi import AGENT_DISCOVERY_TAG
@@ -95,6 +96,7 @@ async def preview_source_blueprint(
         acquisition_spec=acquisition_spec,
         enabled=bool(lock["enabled"]),
         live_ready=bool(lock["live_ready"]),
+        acquisition_readiness=AcquisitionReadiness(lock["acquisition_readiness"]),
         launchable=bool(lock["launchable"]),
         notes=list(lock["notes"]),
         plan_notes=service.describe_blueprint_plan_notes(acquisition_spec),

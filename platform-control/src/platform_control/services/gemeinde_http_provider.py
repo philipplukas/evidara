@@ -93,6 +93,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -269,7 +270,7 @@ class GemeindeHttpProvider:
     # The code-owner key stays shut on the remaining ADR-0030 requirement alone:
     # no operator has captured acceptance-run evidence for this template yet.
     # That is a loop to run (#628/#735), not code to write. ADR-0030 two-key lock.
-    live_ready: ClassVar[bool] = False
+    readiness: ClassVar[AcquisitionReadiness] = AcquisitionReadiness.AWAITING_EVIDENCE
 
     @property
     def supported_portals(self) -> dict[int, CommunalPortal]:
@@ -436,9 +437,9 @@ class GemeindeHttpProvider:
         except ProviderConfigurationError as exc:
             notes.append(f"config_error={exc}")
         notes.append(
-            "live_ready=false: acquisition (#584) and PDF normalisation (#650) are both "
-            "done; the remaining ADR-0030 requirement is operator acceptance-run "
-            "evidence for this template — see #735"
+            "readiness=awaiting_evidence: acquisition (#584) and PDF normalisation (#650) "
+            "are both done; the remaining ADR-0030 requirement is operator acceptance-run "
+            "evidence for this template — dispatch mode=acceptance, see #735"
         )
         return ProviderPlan(
             provider=self.provider_name,

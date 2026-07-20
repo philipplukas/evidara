@@ -12,7 +12,12 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from acquisition_core.normalization import ArtifactPipeline
-from acquisition_core.providers import ProviderNotLiveReadyError, ensure_live_ready
+from acquisition_core.providers import (
+    AcquisitionReadiness,
+    ProviderNotLiveReadyError,
+    ensure_launchable,
+    provider_readiness,
+)
 from platform_control.config import get_settings
 from platform_control.domain import (
     ExecutionMode,
@@ -133,6 +138,7 @@ class RunService:
         self,
         source_version: SourceVersion,
         provider: AcquisitionProvider,
+        run_mode: RunMode | None = None,
     ) -> None:
         """Two-key lock for the run-launch path (ADR-0030).
 
@@ -142,22 +148,35 @@ class RunService:
           the effective key resolved by `BlueprintEnablementService` (DB override
           an operator flipped, else the shipped `source_blueprints.yaml` default),
           and
-        - code owner: the provider that will actually be called declares
-          `live_ready = True` (i.e. `start_run` is not a stub).
+        - code owner: the provider that will actually be called is
+          ``AcquisitionReadiness.LIVE`` (i.e. `start_run` is not a stub, and
+          acceptance evidence has been accepted).
 
         SHADOW versions are exempt: they are routed to the cassette provider
         and replay fixtures, so no request ever reaches the portal the lock
-        protects — that is precisely the rehearsal mode an operator uses
-        *before* capturing acceptance-run evidence.
+        protects — a rehearsal that proves nothing about the live portal, which
+        is why it cannot serve as acceptance evidence.
+
+        ``RunMode.ACCEPTANCE`` is the other exemption, and the narrow one. It
+        reaches the real portal, so it is *not* exempt from the code key — it
+        merely admits ``AWAITING_EVIDENCE`` alongside ``LIVE``. It does skip the
+        config key, because an acceptance run is what an operator does in order
+        to justify turning that key; requiring it first is the deadlock this
+        mode exists to break.
         """
         if source_version.execution_mode is ExecutionMode.SHADOW:
             return
-        if source_version.overlay_id and source_version.provider_template_id:
+        for_acceptance = run_mode is RunMode.ACCEPTANCE
+        if not for_acceptance and source_version.overlay_id and source_version.provider_template_id:
             await BlueprintEnablementService(self.session).require_enabled(
                 source_version.overlay_id,
                 source_version.provider_template_id,
             )
-        ensure_live_ready(provider, template_id=source_version.provider_template_id)
+        ensure_launchable(
+            provider,
+            template_id=source_version.provider_template_id,
+            for_acceptance=for_acceptance,
+        )
 
     async def _record_refused_run(
         self,
@@ -292,7 +311,7 @@ class RunService:
         provider = self._resolve_provider_for_source_version(source_version)
         if provider is not None:
             try:
-                await self._require_launchable(source_version, provider)
+                await self._require_launchable(source_version, provider, request.mode)
             except (BlueprintTemplateNotEnabledError, ProviderNotLiveReadyError) as exc:
                 await self._record_refused_run(source, source_version, request, str(exc))
                 raise
@@ -349,7 +368,7 @@ class RunService:
         # Readiness is the operator's pre-flight ("can I run this?"). It must
         # evaluate the two-key lock too, or it reports `ready: true` for a run
         # that create_run then 400s on the ADR-0030 lock (#634).
-        lock_check = await self._assess_launch_lock(source_version)
+        lock_check = await self._assess_launch_lock(source_version, mode)
         if lock_check is None:
             return readiness
         checks = [*readiness.checks, lock_check]
@@ -362,15 +381,17 @@ class RunService:
         )
 
     async def _assess_launch_lock(
-        self, source_version: SourceVersion | None
+        self, source_version: SourceVersion | None, run_mode: RunMode | None = None
     ) -> RunReadinessCheck | None:
         """Evaluate the ADR-0030 two-key lock as a readiness check.
 
         Returns None when there is no version to assess (earlier checks already
         fail). Mirrors `_require_launchable` exactly so pre-flight and dispatch
-        never disagree: SHADOW is exempt, the config key is the effective
-        enablement (DB override ?? shipped default), the code key is the
-        resolved provider's `live_ready`.
+        never disagree: SHADOW is exempt, ACCEPTANCE skips the config key and
+        admits AWAITING_EVIDENCE, the config key is the effective enablement (DB
+        override ?? shipped default), and the code key is the resolved provider's
+        readiness. Any divergence between the two here is a `ready: true` that
+        create_run then 400s on (#634) — keep them edited together.
         """
         if source_version is None:
             return None
@@ -381,7 +402,8 @@ class RunService:
                 detail="Shadow mode replays fixtures; the live-portal lock does not apply.",
             )
 
-        if source_version.overlay_id and source_version.provider_template_id:
+        for_acceptance = run_mode is RunMode.ACCEPTANCE
+        if not for_acceptance and source_version.overlay_id and source_version.provider_template_id:
             try:
                 config_enabled = await BlueprintEnablementService(self.session).is_enabled(
                     source_version.overlay_id, source_version.provider_template_id
@@ -409,13 +431,41 @@ class RunService:
         provider = self._resolve_provider_for_source_version(source_version)
         if provider is None and self.provider_registry is None:
             provider = build_provider_registry(get_settings()).resolve_for_version(source_version)
-        if provider is not None and not getattr(provider, "live_ready", False):
+        if provider is not None:
+            readiness = provider_readiness(provider)
+            provider_name = getattr(provider, "provider_name", "unknown")
+            # The remedy differs per state, so the detail must too: telling an
+            # operator "escalate to engineering" about a finished provider is the
+            # misdirection #743 exists to remove.
+            if readiness is AcquisitionReadiness.SCAFFOLD:
+                return RunReadinessCheck(
+                    code="acquisition_lock_open",
+                    ok=False,
+                    detail=(
+                        f"Code key closed: provider '{provider_name}' is a scaffold "
+                        "(start_run is not implemented). This needs engineering."
+                    ),
+                )
+            if readiness is AcquisitionReadiness.AWAITING_EVIDENCE and not for_acceptance:
+                return RunReadinessCheck(
+                    code="acquisition_lock_open",
+                    ok=False,
+                    detail=(
+                        f"Code key closed: provider '{provider_name}' is implemented but "
+                        "has no acceptance-run evidence yet. Dispatch a run with "
+                        "mode=acceptance to capture it — this does not need an engineer "
+                        "(ADR-0030)."
+                    ),
+                )
+
+        if for_acceptance:
             return RunReadinessCheck(
                 code="acquisition_lock_open",
-                ok=False,
+                ok=True,
                 detail=(
-                    f"Code key closed: provider '{getattr(provider, 'provider_name', 'unknown')}' "
-                    "is not live-ready (start_run is still a scaffold)."
+                    "Acceptance run: the provider is implemented, so it may reach the live "
+                    "portal to produce evidence. This is not a production run and does not "
+                    "imply either ADR-0030 key is turned."
                 ),
             )
         return RunReadinessCheck(
@@ -1054,8 +1104,10 @@ class RunService:
             )
 
         # Last gate before any outbound request: no scaffold provider and no
-        # disabled blueprint template may reach a live portal (ADR-0030).
-        await self._require_launchable(source_version, provider)
+        # disabled blueprint template may reach a live portal (ADR-0030). The run
+        # carries its own mode, so an acceptance run re-checks as an acceptance run
+        # here — otherwise dispatch would refuse what creation admitted.
+        await self._require_launchable(source_version, provider, run.mode)
 
         # Bind the jurisdiction's rate limiter + robots context into the async
         # context so every outbound GET performed by the provider honours them.

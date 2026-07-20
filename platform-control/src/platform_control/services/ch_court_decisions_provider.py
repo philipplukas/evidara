@@ -61,6 +61,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -229,7 +230,7 @@ class ChCourtDecisionsProvider:
     """Acquisition provider for Swiss federal court decisions (HTML)."""
 
     provider_name = "ch_court_decisions"
-    live_ready = False
+    readiness = AcquisitionReadiness.AWAITING_EVIDENCE
 
     async def start_run(
         self,

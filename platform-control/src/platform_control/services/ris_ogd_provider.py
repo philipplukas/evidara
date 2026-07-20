@@ -17,6 +17,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -115,7 +116,7 @@ class RisOgdProvider:
     """Acquisition provider that pages through the OGD-RIS REST API."""
 
     provider_name = "ris_ogd"
-    live_ready = True
+    readiness = AcquisitionReadiness.LIVE
 
     async def start_run(
         self,

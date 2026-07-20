@@ -24,10 +24,12 @@ from platform_control.services.provider_registry_factory import build_provider_r
 from platform_control.services.run_service import RunService
 from platform_control.services.source_service import SourceService
 
-# See source_blueprints.yaml: canton_http_zh is a scaffold provider (live_ready
-# False) shipped disabled; fedlex_sparql_constitution_de is live + enabled.
+# See source_blueprints.yaml: canton_http_zh is a real scaffold (start_run is not
+# implemented) shipped disabled; fedlex_sparql_constitution_de is live + enabled;
+# the gemeinde template's provider is implemented but has no acceptance evidence.
 SCAFFOLD_TEMPLATE = ("ch", "canton_http_zh")
 LIVE_TEMPLATE = ("ch", "fedlex_sparql_constitution_de")
+AWAITING_EVIDENCE_TEMPLATE = ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
 
 
 async def _seed_reference(session) -> None:
@@ -163,7 +165,73 @@ async def test_readiness_code_key_still_holds_after_config_key_flipped(session) 
     )
     lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
     assert lock.ok is False
-    assert "live-ready" in lock.detail.lower()
+    # The detail must name the remedy, not just the refusal: canton_http is a real
+    # scaffold, so this one genuinely does need engineering (#743).
+    assert "scaffold" in lock.detail.lower()
+    assert "needs engineering" in lock.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_acceptance_run_is_admitted_for_a_provider_awaiting_evidence(session) -> None:
+    """The deadlock break (#743/#735).
+
+    Both ADR-0030 keys are shut for this template, and under the old binary lock
+    that was terminal: acceptance evidence required a live run, the live run
+    required the code key, and the code key required the evidence. A provider
+    could never earn its own first key without an engineer shipping a code change
+    — which made every new source an engineering project, the exact failure #628
+    measures against.
+    """
+    source, version = await _approved_version_from_template(session, AWAITING_EVIDENCE_TEMPLATE)
+    # Open the config key so the code key is what the production run refuses on.
+    # The lock reports the config key first and returns early, so leaving it shut
+    # would hide the message under test.
+    await BlueprintEnablementService(session).set_enabled(
+        *AWAITING_EVIDENCE_TEMPLATE, enabled=True, note="flip", actor="op_local_dev"
+    )
+    await session.commit()
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+
+    production = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+    production_lock = next(c for c in production.checks if c.code == "acquisition_lock_open")
+    assert production_lock.ok is False
+    # Crucially NOT "this needs engineering" — the remedy is a run the operator
+    # can dispatch themselves.
+    assert "acceptance" in production_lock.detail.lower()
+    assert "does not need an engineer" in production_lock.detail.lower()
+
+    acceptance = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.ACCEPTANCE,
+    )
+    acceptance_lock = next(c for c in acceptance.checks if c.code == "acquisition_lock_open")
+    assert acceptance_lock.ok is True
+    # A pass here must not read as "the keys are turned" — it is a rehearsal that
+    # produces the evidence for turning them.
+    assert "not a production run" in acceptance_lock.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_acceptance_run_is_still_refused_for_a_real_scaffold(session) -> None:
+    # The narrow exemption stays narrow: there is no implementation for an
+    # acceptance run to gather evidence about, so ACCEPTANCE must not become a
+    # general way past the code key.
+    source, version = await _approved_version_from_template(session, SCAFFOLD_TEMPLATE)
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.ACCEPTANCE,
+    )
+    lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
+    assert lock.ok is False
+    assert "scaffold" in lock.detail.lower()
 
 
 def _settings():
@@ -195,7 +263,7 @@ async def test_blueprint_preview_surfaces_the_providers_own_plan_notes(session) 
     # The gemeinde provider resolves the commune and names the open defect that
     # keeps its code key shut — the exact warning #634 found stranded.
     assert any("bfs_number=261" in note for note in plan_notes)
-    assert any("live_ready=false" in note for note in plan_notes)
+    assert any("readiness=awaiting_evidence" in note for note in plan_notes)
 
 
 @pytest.mark.asyncio

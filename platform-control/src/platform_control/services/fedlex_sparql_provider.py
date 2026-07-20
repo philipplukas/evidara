@@ -13,6 +13,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -119,7 +120,7 @@ def _iso_date_or_none(value: date | None) -> str | None:
 
 class FedlexSparqlProvider:
     provider_name = AcquisitionProvider.FEDLEX_SPARQL.value
-    live_ready = True
+    readiness = AcquisitionReadiness.LIVE
     _EXPRESSION_QUERY = """
 PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#>
 SELECT ?expr

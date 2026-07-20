@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Protocol
 
 
@@ -88,22 +89,45 @@ class ProviderPlan:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
+class AcquisitionReadiness(StrEnum):
+    """Code-owner key of the ADR-0030 two-key lock.
+
+    Replaces the original ``live_ready: bool``, which could not distinguish two
+    states with opposite operator remedies — and so told operators "escalate to
+    engineering" about providers that were finished (#743):
+
+    - ``SCAFFOLD``: ``start_run`` is a stub (typically ``NotImplementedError``).
+      Registered only so blueprint templates referencing it parse. **Remedy:
+      engineering.** No run of any mode may dispatch.
+    - ``AWAITING_EVIDENCE``: ``start_run`` is implemented and tested, and the
+      provider can physically acquire its format — but no operator has captured
+      an ADR-0030 acceptance run yet. **Remedy: run the loop.** An
+      ``ACCEPTANCE`` run may dispatch against the live portal; nothing else may.
+    - ``LIVE``: acceptance evidence exists and was accepted. Runs of any mode
+      dispatch once the config key is also open.
+
+    ``AWAITING_EVIDENCE`` exists because the binary deadlocked: acceptance
+    evidence requires a live run, a live run required the code key, and the code
+    key was supposed to require the evidence. A provider could never earn its own
+    first key without a code change, which made every new source an engineering
+    project — the exact failure ADR-0033/#628 measure against.
+    """
+
+    SCAFFOLD = "scaffold"
+    AWAITING_EVIDENCE = "awaiting_evidence"
+    LIVE = "live"
+
+
 class AcquisitionProvider(Protocol):
     provider_name: str
-    # live_ready distinguishes scaffolds from implementations:
-    # - True: the provider's `start_run` is internally consistent and
-    #   mocked tests cover the logic against its target API contract.
-    #   Blueprint templates MAY reference it and, once the operator
-    #   enables a template, runs go live.
-    # - False: `start_run` is a stub (typically raises NotImplementedError).
-    #   The provider is registered only so blueprint templates referencing
-    #   it parse, but the loader's two-key lock rejects any run attempt.
+    # The code-owner key. See AcquisitionReadiness for the three states.
     #
-    # Production-readiness (whether a template is safe to enable for live
-    # acquisition) lives separately on each blueprint template via
-    # `enabled: true` in source_blueprints.yaml. An operator flips that
-    # after capturing acceptance-run evidence.
-    live_ready: bool
+    # Whether a template is safe to enable for live acquisition is the *config*
+    # key, held separately per blueprint template via `enabled: true` in
+    # source_blueprints.yaml (DB override wins). An operator flips that after
+    # capturing acceptance-run evidence; this field is engineering's assertion
+    # about the code, not the operator's about the corpus.
+    readiness: AcquisitionReadiness
 
     async def start_run(
         self,
@@ -122,37 +146,73 @@ class AcquisitionProvider(Protocol):
 
 
 class ProviderNotLiveReadyError(RuntimeError):
-    """Raised when a blueprint template references a provider that is a scaffold.
+    """Raised when the code-owner key refuses a dispatch.
 
-    The two-key lock requires `template.enabled: true` AND
-    `provider.live_ready: true`; this exception fires when the second key
-    fails. Message points at the relevant scaffold runbook so an operator
-    knows which follow-up ticket owns live-enablement.
+    The two-key lock requires `template.enabled: true` AND a provider whose
+    readiness admits the run. This exception fires when the second key fails.
+    The message names *which* state blocked, because the remedy differs: a
+    SCAFFOLD needs engineering, an AWAITING_EVIDENCE provider needs an
+    acceptance run the operator can drive themselves (#743).
     """
 
 
-def ensure_live_ready(
+def provider_readiness(provider: AcquisitionProvider) -> AcquisitionReadiness:
+    """Resolve a provider's readiness, failing closed.
+
+    Accepts the legacy ``live_ready: bool`` as an input so third-party and test
+    doubles that predate the enum keep working: ``True`` maps to ``LIVE`` and
+    ``False`` to ``SCAFFOLD``, which is the binary's original meaning. A provider
+    declaring neither resolves to ``SCAFFOLD`` — unknown must never mean
+    launchable, the same fail-closed default the bool had.
+    """
+    declared = getattr(provider, "readiness", None)
+    if declared is not None:
+        try:
+            return AcquisitionReadiness(declared)
+        except ValueError:
+            # An unrecognised state is not a reason to open the lock.
+            return AcquisitionReadiness.SCAFFOLD
+    if getattr(provider, "live_ready", False):
+        return AcquisitionReadiness.LIVE
+    return AcquisitionReadiness.SCAFFOLD
+
+
+def ensure_launchable(
     provider: AcquisitionProvider,
     *,
     template_id: str | None = None,
+    for_acceptance: bool = False,
 ) -> AcquisitionProvider:
     """Provider-side key of the two-key lock (ADR-0030).
 
-    Raises ProviderNotLiveReadyError when ``provider`` is a scaffold
-    (``live_ready`` falsy or absent). Shared by ``ProviderRegistry`` and by
-    the run-launch path, which holds an already-resolved provider (the
-    SHADOW execution mode swaps in the cassette provider, so the run-launch
-    path must gate the provider it will actually call, not the one the
-    acquisition spec names).
+    Shared by ``ProviderRegistry`` and by the run-launch path, which holds an
+    already-resolved provider (the SHADOW execution mode swaps in the cassette
+    provider, so the run-launch path must gate the provider it will actually
+    call, not the one the acquisition spec names).
+
+    ``for_acceptance`` marks an ADR-0030 acceptance run — the operator's
+    rehearsal against the live portal that *produces* the evidence for flipping
+    the keys. It admits ``AWAITING_EVIDENCE`` and nothing more: a SCAFFOLD still
+    cannot dispatch, because there is no implementation to gather evidence about.
     """
-    if not getattr(provider, "live_ready", False):
-        provider_name = getattr(provider, "provider_name", type(provider).__name__)
+    readiness = provider_readiness(provider)
+    if readiness is AcquisitionReadiness.LIVE:
+        return provider
+    if readiness is AcquisitionReadiness.AWAITING_EVIDENCE and for_acceptance:
+        return provider
+
+    provider_name = getattr(provider, "provider_name", type(provider).__name__)
+    if readiness is AcquisitionReadiness.AWAITING_EVIDENCE:
         raise ProviderNotLiveReadyError(
-            f"Provider {provider_name!r} is a scaffold and cannot run "
-            f"(template_id={template_id!r}). See the provider's runbook for "
-            "live-enablement criteria."
+            f"Provider {provider_name!r} is implemented but has no acceptance-run "
+            f"evidence yet (template_id={template_id!r}). Dispatch an acceptance run "
+            "to capture it — this does not need an engineer (ADR-0030)."
         )
-    return provider
+    raise ProviderNotLiveReadyError(
+        f"Provider {provider_name!r} is a scaffold and cannot run "
+        f"(template_id={template_id!r}). See the provider's runbook for "
+        "live-enablement criteria."
+    )
 
 
 class ProviderRegistry:
@@ -169,12 +229,22 @@ class ProviderRegistry:
         return provider
 
     def live_ready_names(self) -> set[str]:
-        """Return provider names whose start_run() performs real work."""
+        """Return provider names an *enabled* blueprint template may reference.
+
+        Only LIVE qualifies. An AWAITING_EVIDENCE provider performs real work, but
+        a template enabled against it would dispatch production runs on evidence
+        nobody captured — which is the invariant
+        `test_enabled_templates_only_reference_live_ready_providers` guards.
+        """
         return {
             name
             for name, provider in self._providers.items()
-            if getattr(provider, "live_ready", False)
+            if provider_readiness(provider) is AcquisitionReadiness.LIVE
         }
+
+    def readiness_names(self) -> dict[str, AcquisitionReadiness]:
+        """Return every registered provider's readiness, for operator read models."""
+        return {name: provider_readiness(provider) for name, provider in self._providers.items()}
 
     def resolve_for_spec(self, acquisition_spec: dict[str, Any] | None) -> AcquisitionProvider:
         provider_name = str((acquisition_spec or {}).get("provider") or "firecrawl")
@@ -185,15 +255,17 @@ class ProviderRegistry:
         acquisition_spec: dict[str, Any] | None,
         *,
         template_id: str | None = None,
+        for_acceptance: bool = False,
     ) -> AcquisitionProvider:
         """Two-key lock for blueprint resolution.
 
-        Raises ProviderNotLiveReadyError when the requested provider is a
-        scaffold. Callers that merely want to resolve-and-introspect can
-        keep using resolve_for_spec(); the loader path for launching a run
+        Raises ProviderNotLiveReadyError when the requested provider's readiness
+        does not admit the run. Callers that merely want to resolve-and-introspect
+        can keep using resolve_for_spec(); the loader path for launching a run
         should use this method so scaffolds cannot fire at runtime.
         """
-        return ensure_live_ready(
+        return ensure_launchable(
             self.resolve_for_spec(acquisition_spec),
             template_id=template_id,
+            for_acceptance=for_acceptance,
         )
