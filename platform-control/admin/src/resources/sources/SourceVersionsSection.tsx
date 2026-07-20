@@ -19,6 +19,7 @@ import { ChevronDown } from "lucide-react";
 import { useDataProvider, useGetList, useNotify, useRedirect, useRefresh } from "ra-core";
 import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { ResourceName } from "../../domain/resourceNames";
+import { type RunMode, runModeLabel } from "../../domain/runMode";
 import type {
   RunReadiness,
   RunRecord,
@@ -721,7 +722,7 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
     }
   };
 
-  const createRun = async (mode: "preview" | "production", version: SourceVersionRecord) => {
+  const createRun = async (mode: RunMode, version: SourceVersionRecord) => {
     try {
       setActionVersionId(version.source_version_id);
       const result = await dataProvider.create<RunRecord>(ResourceName.Runs, {
@@ -731,7 +732,7 @@ export function SourceVersionsSection({ source }: { source: SourceRecord }) {
           mode,
         },
       });
-      notify(`${mode === "preview" ? "Preview" : "Production"} run created.`, { type: "success" });
+      notify(`${runModeLabel(mode)} run created.`, { type: "success" });
       redirect("show", ResourceName.Runs, result.data.id, result.data);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Unable to create run.", { type: "error" });

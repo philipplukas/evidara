@@ -31,7 +31,16 @@ export function runRecordStatusToLevel(status: string): AdminStatusLevel {
 }
 
 export function runModeToLevel(mode: string): AdminStatusLevel {
-  return mode === "production" ? "healthy" : "info";
+  if (mode === "production") {
+    return "healthy";
+  }
+  // An acceptance run reaches a live portal on a provider with no accepted
+  // evidence. Rendering it with the same calm tone as a preview understates what
+  // it touches (#743).
+  if (mode === "acceptance") {
+    return "degraded";
+  }
+  return "info";
 }
 
 export function pipelineHealthToLevel(status: string): AdminStatusLevel {

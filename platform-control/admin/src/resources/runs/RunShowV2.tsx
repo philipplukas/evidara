@@ -19,6 +19,7 @@
 import { RecordContextProvider, useShowController } from "ra-core";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { runModeLabel } from "../../domain/runMode";
 import type { RunRecord } from "../../lib/admin/dataProvider";
 import { type LegalSearchHandoff, readLegalSearchHandoff } from "../../lib/admin/navigationContext";
 import { formatSwissDateTime } from "../../lib/format/date";
@@ -106,9 +107,7 @@ export default function RunShowV2() {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill level={runRecordStatusToLevel(run.status)}>{STATUS_LABEL[run.status]}</Pill>
-          <Pill level={runModeToLevel(run.mode)}>
-            {run.mode === "production" ? "Production" : "Preview"}
-          </Pill>
+          <Pill level={runModeToLevel(run.mode)}>{runModeLabel(run.mode)}</Pill>
           <Pill variant="meta">{`Version ${run.source_version_id}`}</Pill>
         </div>
         <RecordContextProvider value={run}>

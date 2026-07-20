@@ -288,7 +288,7 @@ test.describe("SourceCreate wizard", () => {
     const lock = page.getByTestId("blueprint-lock");
     await expect(lock).toContainText("this template can launch live runs");
     await expect(lock).toContainText("Config key (enabled): on");
-    await expect(lock).toContainText("Code key (live_ready): on");
+    await expect(lock).toContainText("Code key (readiness): on");
 
     // ── Submit ──
     await page.getByRole("button", { name: "Create source" }).click();
@@ -384,7 +384,7 @@ test.describe("SourceCreate wizard", () => {
     const lock = page.getByTestId("blueprint-lock");
     await expect(lock).toContainText("Inert template — the two-key lock will block live runs");
     await expect(lock).toContainText("Config key (enabled): off");
-    await expect(lock).toContainText("Code key (live_ready): on");
+    await expect(lock).toContainText("Code key (readiness): on");
     await expect(lock).toContainText("an operator has not enabled this template yet");
   });
 
