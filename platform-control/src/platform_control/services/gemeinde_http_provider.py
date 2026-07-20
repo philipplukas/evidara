@@ -1,7 +1,8 @@
-"""CH communal (Gemeinde) HTTP acquisition provider — AWAITING ACCEPTANCE EVIDENCE (#584).
+"""CH communal (Gemeinde) HTTP acquisition provider — LIVE (#584).
 
-Not a scaffold: `start_run` is implemented and verified against the live source.
-The ADR-0030 code key is shut only on the evidence step (see below, and #743).
+The ADR-0030 code key is open: acceptance evidence was captured against live
+Zürich AS 554.510 on 2026-07-20 and is committed under
+docs/runbooks/evidence/2026-07-20-ch-gemeinde-zuerich-acceptance.md (#735).
 
 Swiss communal law is the layer the ADR-0033 acceptance test lives in
 ("Can the city ban a certain thing for dogs, year-round?"): the act being
@@ -48,9 +49,9 @@ Verified against live Zürich AS 554.510 ("Vollzugsvorschriften zum
 Hundegesetz", in force 2017-09-01): the landing page parses and the linked
 217 KB PDF is fetched intact.
 
-WHY THE PROVIDER STILL SHIPS DISABLED (`readiness = AWAITING_EVIDENCE`)
------------------------------------------------------------------------
-Not for an engineering reason any more. Both halves are built:
+WHY THE CODE KEY IS OPEN (`readiness = LIVE`)
+---------------------------------------------
+Both halves are built, and both are now evidenced against the live source:
 
 - **Acquisition** (#584): the operative PDF is fetched and emitted as a binary
   `ProviderResource`, verified against live Zürich AS 554.510.
@@ -62,12 +63,15 @@ Not for an engineering reason any more. Both halves are built:
   It is asserted against the **real** AS 554.510 PDF, not a synthetic one:
   document-intelligence/tests/test_marginalia.py.
 
-What is left is the ADR-0030 **evidence** step, and only that: no operator has
-captured an acceptance run for this template yet. The code key asserts both
-that the provider can physically acquire *and* that the result is trustworthy,
-and the second half of that claim is exactly what an acceptance run is for —
-#650's splice was found in this very document. So it stays shut until the loop
-is run, which is #628's subject rather than a coding task. See #735.
+The code key asserts both that the provider can physically acquire *and* that
+the result is trustworthy. The second half was the real question — #650's splice
+was found in this very document — so the acceptance run checked it: the ordinance
+normalised into 9 sections with "die Führung des Hundeverzeichnisses" intact and
+`Organisation` correctly separated as its Randtitel.
+
+Templates still ship `enabled: false`. The config key is the operator's, flipped
+from the admin panel with the evidence attached; this key only says the code
+works. See #735.
 
 The design generalises past Zürich: the BFS → host allow-list lives in
 `communal_portals.yaml`, so adding a commune is a config edit to that data
@@ -269,12 +273,18 @@ class GemeindeHttpProvider:
     """Config-driven HTTP provider for Swiss communal legal collections."""
 
     provider_name = AcquisitionProvider.GEMEINDE_HTTP.value
-    # Acquisition (#584) and normalisation (#650, ADR-0041) are both done — the
-    # Randtitel splice is fixed and asserted against the real AS 554.510 PDF.
-    # The code-owner key stays shut on the remaining ADR-0030 requirement alone:
-    # no operator has captured acceptance-run evidence for this template yet.
-    # That is a loop to run (#628/#735), not code to write. ADR-0030 two-key lock.
-    readiness: ClassVar[AcquisitionReadiness] = AcquisitionReadiness.AWAITING_EVIDENCE
+    # Acquisition (#584) and normalisation (#650, ADR-0041) are done, and an
+    # ADR-0030 acceptance run against live Zürich AS 554.510 on 2026-07-20
+    # captured the evidence with every gate armed and none skipped (#735):
+    # docs/runbooks/evidence/2026-07-20-ch-gemeinde-zuerich-acceptance.md
+    #
+    # This key says the code works. The config key — whether this corpus is
+    # accepted — is the operator's, and the templates still ship `enabled: false`.
+    #
+    # If this is ever rolled back, roll back to SCAFFOLD, not AWAITING_EVIDENCE:
+    # the latter is the one state whose acceptance runs waive the operator's
+    # config key, so it would re-open the route a rollback is trying to close.
+    readiness: ClassVar[AcquisitionReadiness] = AcquisitionReadiness.LIVE
 
     @property
     def supported_portals(self) -> dict[int, CommunalPortal]:
@@ -441,9 +451,9 @@ class GemeindeHttpProvider:
         except ProviderConfigurationError as exc:
             notes.append(f"config_error={exc}")
         notes.append(
-            "readiness=awaiting_evidence: acquisition (#584) and PDF normalisation (#650) "
-            "are both done; the remaining ADR-0030 requirement is operator acceptance-run "
-            "evidence for this template — dispatch mode=acceptance, see #735"
+            "readiness=live: acquisition (#584) and PDF normalisation (#650) are done and "
+            "evidenced against live Zürich AS 554.510 (2026-07-20, #735). The template "
+            "still needs its config key enabled by an operator."
         )
         return ProviderPlan(
             provider=self.provider_name,
