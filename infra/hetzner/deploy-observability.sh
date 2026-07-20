@@ -64,6 +64,7 @@ export EVIDARA_TELEGRAM_CHAT_ID
 
 VALUES_RENDERED="$(mktemp)"
 trap 'rm -f "$VALUES_RENDERED"' EXIT
+# shellcheck disable=SC2016 # envsubst needs the literal name, not its value
 envsubst '${EVIDARA_TELEGRAM_CHAT_ID}' \
   < "${SCRIPT_DIR}/values/kube-prometheus-stack.yaml" > "$VALUES_RENDERED"
 

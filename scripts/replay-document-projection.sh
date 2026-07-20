@@ -14,7 +14,6 @@
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE_URL="${LEGAL_SEARCH_API_URL:-http://127.0.0.1:3102}"
 BASE_URL="${BASE_URL%/}"
 

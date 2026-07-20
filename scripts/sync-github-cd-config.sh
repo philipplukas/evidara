@@ -142,7 +142,12 @@ detect_artifact_repo() {
   repos="$(gcloud artifacts repositories list --project "$project_id" --location "$region" --format='value(name.basename())' 2>/dev/null || true)"
   [[ -n "$repos" ]] || die "Unable to detect artifact repo. Provide --artifact-repo."
   preferred="$(printf '%s\n' "$repos" | awk '/evidara|image/ {print; exit}')"
-  [[ -n "$preferred" ]] && echo "$preferred" || printf '%s\n' "$repos" | awk 'NR==1 {print}'
+  # if/else, not `A && B || C`: the latter also runs the fallback when echo fails.
+  if [[ -n "$preferred" ]]; then
+    echo "$preferred"
+  else
+    printf '%s\n' "$repos" | awk 'NR==1 {print}'
+  fi
 }
 
 detect_platform_control_service() {
@@ -211,7 +216,12 @@ detect_wif_provider() {
     providers="$(gcloud iam workload-identity-pools providers list --project "$project_id" --location global --workload-identity-pool "$pool_hint" --format='value(name)' 2>/dev/null || true)"
     if [[ -n "$providers" ]]; then
       match="$(printf '%s\n' "$providers" | awk '/providers\/(evidara|github)/ {print; exit}')"
-      [[ -n "$match" ]] && echo "$match" || printf '%s\n' "$providers" | awk 'NR==1 {print}'
+      # if/else, not `A && B || C` — see the note on the artifact-repo branch above.
+      if [[ -n "$match" ]]; then
+        echo "$match"
+      else
+        printf '%s\n' "$providers" | awk 'NR==1 {print}'
+      fi
       return
     fi
   fi

@@ -81,6 +81,13 @@ repos:
         pass_filenames: false
         files: ^(structurizr/|scripts/check-architecture\.sh$)
 
+      - id: shellcheck
+        name: Lint shell scripts with shellcheck
+        entry: bash scripts/check-shellcheck.sh
+        language: system
+        pass_filenames: false
+        files: ^.*\.sh$
+
       - id: check-compose-profiles
         name: Check Docker Compose profiles resolve
         entry: python scripts/check_compose_profiles.py

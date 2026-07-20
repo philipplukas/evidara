@@ -31,6 +31,7 @@ trap 'rm -f "$tmp"' EXIT
   echo ""
   echo "**Note:** Re-run after corpus or ranking changes. List API does not expose per-hit scores — marked \`n/a\`."
   echo ""
+  # shellcheck disable=SC2016 # markdown table with literal backticks, not expansions
   echo '| # | Query text | Top 1 `document_id` | Top 1 score | Top 2 `document_id` | Top 2 score | Top 3 `document_id` | Top 3 score | Expected doc in top 5? | Notes |'
   echo "|---|------------|------------------------|-------------|------------------------|-------------|------------------------|-------------|------------------------|-------|"
 } >"$tmp"

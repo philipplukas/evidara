@@ -55,6 +55,10 @@ RUN_MODE="${RUN_MODE:-preview}"
 # any corpus that does not follow that naming, or the indexed-language facet goes
 # unverified while the run still reports `pass` (#735).
 EXPECT_LANGUAGE="${EXPECT_LANGUAGE:-}"
+# Regex the captured title must match. Without it the gate falls back to a
+# per-template lookup that ends in a `.+` catch-all — which matches any non-empty
+# title, so the gate reports `title_ok=1` having asserted nothing (#744).
+EXPECT_TITLE="${EXPECT_TITLE:-}"
 WORKDIR_ROOT="${WORKDIR_ROOT:-${TMPDIR:-/tmp}/ch-fedlex-compose-e2e}"
 RUN_DIR="${RUN_DIR:-}"
 STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -86,6 +90,9 @@ Options:
   --expect-language <code>  Language the indexed document must carry (e.g. de).
                             Without it the gate derives from the Fedlex template
                             suffix and SELF-SKIPS for other corpora (#735).
+  --expect-title <regex>    Regex the captured title must match. Without it the
+                            gate falls back to a `.+` catch-all that asserts
+                            nothing while reporting title_ok=1 (#744).
   --max-resources <n>       Preview scope max_resources (default: 25)
   --query <text>            legal-search query used for the searchable assertion
                             (default: Bundesverfassung)
@@ -93,7 +100,7 @@ Options:
   -h, --help                Show this help
 
 Env overrides: EVIDARA_PLATFORM_CONTROL_URL, EVIDARA_LEGAL_SEARCH_URL, TEMPLATE_ID,
-EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME, RUN_MODE, EXPECT_LANGUAGE,
+EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME, RUN_MODE, EXPECT_LANGUAGE, EXPECT_TITLE,
 MAX_RESOURCES, MAX_POLLS, POLL_INTERVAL, DI_MAX_POLLS, DI_POLL_INTERVAL,
 SEARCH_MAX_POLLS, SEARCH_POLL_INTERVAL, SEARCH_QUERY, WORKDIR_ROOT, RUN_DIR.
 EOF
@@ -110,6 +117,7 @@ while [[ $# -gt 0 ]]; do
     --source-name) SOURCE_NAME="${2:?missing value for --source-name}"; shift 2 ;;
     --mode) RUN_MODE="${2:?missing value for --mode}"; shift 2 ;;
     --expect-language) EXPECT_LANGUAGE="${2:?missing value for --expect-language}"; shift 2 ;;
+    --expect-title) EXPECT_TITLE="${2:?missing value for --expect-title}"; shift 2 ;;
     --max-resources) MAX_RESOURCES="${2:?missing value for --max-resources}"; shift 2 ;;
     --query) SEARCH_QUERY="${2:?missing value for --query}"; shift 2 ;;
     --out-dir) RUN_DIR="${2:?missing value for --out-dir}"; shift 2 ;;
@@ -147,6 +155,10 @@ log() { printf '%s\n' "$*" >&2; }
 curl_json() { curl -fsS --connect-timeout 5 --max-time 60 "$@"; }
 
 expected_title_regex() {
+  if [[ -n "${EXPECT_TITLE}" ]]; then
+    printf '%s' "${EXPECT_TITLE}"
+    return
+  fi
   case "${TEMPLATE_ID}" in
     fedlex_sparql_constitution_de) printf '%s' 'Bundesverfassung' ;;
     fedlex_sparql_vwvg_de) printf '%s' 'Verwaltungsverfahren' ;;
@@ -161,6 +173,10 @@ expected_title_regex() {
 # for (#605, #675, #713), so per #744 every self-skipping gate carries a companion
 # `<gate>_checked`. Visibility only — the skip does not change what blocks the verdict.
 title_gate_checked() {
+  if [[ -n "${EXPECT_TITLE}" ]]; then
+    printf '%s' '1'
+    return
+  fi
   case "${TEMPLATE_ID}" in
     fedlex_sparql_constitution_de|fedlex_sparql_vwvg_de|fedlex_sparql_federal_law_batch_de)
       printf '%s' '1' ;;
@@ -216,6 +232,7 @@ log "    authority_id=${AUTHORITY_ID}"
 log "    source_name=${SOURCE_NAME}"
 log "    run_mode=${RUN_MODE}"
 log "    expect_language=${EXPECT_LANGUAGE:-<from template suffix>}"
+log "    expect_title=${EXPECT_TITLE:-<from template lookup>}"
 log "    max_resources=${MAX_RESOURCES}"
 log "    search_query=${SEARCH_QUERY}"
 log "    run_dir=${RUN_DIR}"

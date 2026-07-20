@@ -51,6 +51,13 @@ jobs:
           echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
           echo "head_ref=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
 
+      - name: Lint shell scripts
+        # shellcheck is preinstalled on ubuntu-latest runners. The repo carried
+        # `# shellcheck disable=` directives for a long time with nothing enforcing
+        # them, which is how a deploy script kept an `export X="$(cmd)"` that hid a
+        # failing command from `set -e` (#747).
+        run: bash scripts/check-shellcheck.sh
+
       - name: Run guard unit tests
         # Discover the WHOLE directory rather than enumerating one -p pattern per
         # file. The enumerated form silently orphaned test_check_connector_worker_runtime.py
