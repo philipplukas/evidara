@@ -423,6 +423,7 @@ fi
 
 SUMMARY_JSON="$(jq -n \
   --arg environment "${ENVIRONMENT}" \
+  --arg run_mode "preview" \
   --arg template_id "${TEMPLATE_ID}" \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" \
@@ -445,6 +446,7 @@ SUMMARY_JSON="$(jq -n \
   --argjson ris_html_ok "${ris_html_ok}" \
   --argjson section_gate_ok "${section_gate_ok}" \
   '{
+    run_mode: $run_mode,
     environment: $environment,
     template_id: $template_id,
     jurisdiction_id: $jurisdiction_id,

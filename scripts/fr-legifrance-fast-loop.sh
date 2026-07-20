@@ -342,6 +342,7 @@ fi
 
 SUMMARY_JSON="$(jq -n \
   --arg environment "${ENVIRONMENT}" \
+  --arg run_mode "preview" \
   --arg template_id "${TEMPLATE_ID}" \
   --arg source_id "${SOURCE_ID}" \
   --arg source_version_id "${SOURCE_VERSION_ID}" \
@@ -361,6 +362,7 @@ SUMMARY_JSON="$(jq -n \
   --argjson title_ok "${title_ok}" \
   --argjson source_url_ok "${source_url_ok}" \
   '{
+    run_mode: $run_mode,
     environment: $environment,
     template_id: $template_id,
     source_id: $source_id,

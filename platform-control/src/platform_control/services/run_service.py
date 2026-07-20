@@ -499,8 +499,8 @@ class RunService:
                 code="acquisition_lock_open",
                 ok=False,
                 detail=(
-                    f"Code key closed: provider '{provider_name}' is a scaffold "
-                    "(start_run is not implemented). This needs engineering."
+                    f"Code key closed: provider '{provider_name}' cannot acquire its "
+                    "targets yet. This needs engineering."
                 ),
             )
         if readiness is AcquisitionReadiness.AWAITING_EVIDENCE and not for_acceptance:
@@ -560,6 +560,21 @@ class RunService:
                 # of leaving it PENDING, or the worker retries it every poll cycle.
                 run.status = RunStatus.FAILED
                 run.failure_reason = str(exc)
+                run.completed_at = datetime.now(UTC)
+                locked += 1
+                continue
+            except Exception as exc:
+                # An acceptance run is a ONE-SHOT rehearsal by construction, and it
+                # is the one mode whose config key may be waived — so a PENDING
+                # acceptance run that keeps throwing is re-dispatched every poll
+                # cycle and the operator's `enabled: false` cannot stop it. That is
+                # a second route to unattended repetition, alongside the schedule
+                # ban ADR-0030 §6 relies on. Terminate it here; the operator can
+                # inspect the failure and dispatch a fresh one deliberately.
+                if run.mode is not RunMode.ACCEPTANCE:
+                    raise
+                run.status = RunStatus.FAILED
+                run.failure_reason = f"Acceptance run failed and is not retried: {exc}"
                 run.completed_at = datetime.now(UTC)
                 locked += 1
                 continue

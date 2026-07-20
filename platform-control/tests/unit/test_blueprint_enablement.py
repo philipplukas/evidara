@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from acquisition_core.providers import ProviderNotLiveReadyError
-from platform_control.domain import RunMode, SourceVersionStatus
+from acquisition_core.providers import AcquisitionReadiness, ProviderNotLiveReadyError
+from platform_control.domain import RunMode, RunStatus, SourceVersionStatus
 from platform_control.errors import BlueprintTemplateNotEnabledError, NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.schemas.run import CreateRunRequest
@@ -199,9 +199,11 @@ async def test_readiness_code_key_still_holds_after_config_key_flipped(session) 
     )
     lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
     assert lock.ok is False
-    # The detail must name the remedy, not just the refusal: canton_http is a real
-    # scaffold, so this one genuinely does need engineering (#743).
-    assert "scaffold" in lock.detail.lower()
+    # The detail must name the remedy, not just the refusal. canton_http genuinely
+    # needs engineering — though note its start_run IS implemented and inherited;
+    # `scaffold` is remedy-shaped, so the message says "cannot acquire its targets"
+    # rather than asserting a stub the code contradicts (#743).
+    assert "cannot acquire its targets" in lock.detail.lower()
     assert "needs engineering" in lock.detail.lower()
 
 
@@ -271,7 +273,8 @@ async def test_acceptance_run_is_still_refused_for_a_real_scaffold(session) -> N
     )
     lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
     assert lock.ok is False
-    assert "scaffold" in lock.detail.lower()
+    assert "cannot acquire its targets" in lock.detail.lower()
+    assert "needs engineering" in lock.detail.lower()
 
 
 @pytest.mark.asyncio
@@ -457,3 +460,52 @@ async def test_readiness_reports_an_unknown_provider_instead_of_500ing(session) 
     lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
     assert lock.ok is False
     assert "unknown provider" in lock.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_a_failing_acceptance_run_is_not_retried_forever(session) -> None:
+    """A rehearsal must be one-shot even when dispatch throws (#743 review round 3).
+
+    A fresh reviewer demonstrated this against running code: an acceptance run
+    whose `start_run` raises (portal timeout, 5xx) stays PENDING, is re-dispatched
+    every poll cycle, and — because the acceptance waiver skips the config key —
+    the operator's `enabled: false` kill switch does not stop it. Three portal
+    hits landed after the switch was thrown. That is a second route to unattended
+    repetition beside the schedule ban ADR-0030 §6 relies on.
+    """
+
+    class _ExplodingProvider:
+        provider_name = "gemeinde_http"
+        readiness = AcquisitionReadiness.AWAITING_EVIDENCE
+        calls = 0
+
+        async def start_run(self, source, source_version, run):
+            type(self).calls += 1
+            raise RuntimeError("portal timed out")
+
+    source, version = await _approved_version_from_template(
+        session, ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
+    )
+    version.status = SourceVersionStatus.APPROVED
+    await session.commit()
+
+    provider = _ExplodingProvider()
+    service = RunService(session, provider=provider, run_dispatch_backend="worker")
+    run = await service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.ACCEPTANCE,
+        )
+    )
+    assert run.status is RunStatus.PENDING
+
+    await service.dispatch_pending_runs()
+    await session.refresh(run)
+    # Terminal, so no later poll cycle can pick it up again.
+    assert run.status is RunStatus.FAILED
+    assert "not retried" in (run.failure_reason or "")
+
+    calls_after_first = _ExplodingProvider.calls
+    await service.dispatch_pending_runs()
+    assert _ExplodingProvider.calls == calls_after_first

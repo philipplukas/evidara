@@ -110,6 +110,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "${RUN_MODE}" in
+  preview|acceptance|production) ;;
+  *)
+    echo "error: --mode must be preview, acceptance or production (got '${RUN_MODE}')" >&2
+    exit 1
+    ;;
+esac
+
 PC_URL="${PC_URL%/}"
 LS_URL="${LS_URL%/}"
 

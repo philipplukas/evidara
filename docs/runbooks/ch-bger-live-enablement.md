@@ -109,9 +109,16 @@ first). Sequence:
      --pc-url "$EVIDARA_PLATFORM_CONTROL_URL" \
      --ls-url "$EVIDARA_LEGAL_SEARCH_URL" \
      --template ch_court_decisions_bger \
+     --mode acceptance \
      --max-resources 25 \
      --copy-evidence
    ```
+
+   `--mode acceptance` is required, not optional. `ch_court_decisions` is
+   `readiness = AWAITING_EVIDENCE`, and the two-key lock refuses `preview` for a
+   provider awaiting evidence — an acceptance run is precisely what produces the
+   evidence this step exists to capture (#743). Without the flag the script exits
+   1 at the readiness check.
 
    For BVGer, rerun with `--template ch_court_decisions_bvger` (the script maps
    this to `auth_bvger` automatically).
@@ -240,11 +247,20 @@ If a live court run misbehaves after enablement:
 1. Hit **Disable** on the affected template in the admin **Blueprints** screen
    (fastest, per-court, no deploy) — this re-arms the two-key lock without
    touching the provider, and records the reason alongside the flip.
-2. If the provider itself regresses, set
-   `readiness = AcquisitionReadiness.AWAITING_EVIDENCE` (or `SCAFFOLD` if it is
-   genuinely broken) to disable all court templates at once. **Setting
-   `live_ready = False` does nothing** — the enum wins, so that edit would look
-   like a rollback while runs kept dispatching.
+
+   Note what this does **not** stop: an `AWAITING_EVIDENCE` provider waives the
+   config key for `mode=acceptance` runs, so Disable alone will not block those.
+   If acceptance runs are the problem, go to step 2.
+2. If the provider itself regresses, set `readiness = AcquisitionReadiness.SCAFFOLD`
+   to disable all court templates at once, in every mode.
+
+   **Do not roll back to `AWAITING_EVIDENCE`** to stop traffic: that is the one
+   state whose acceptance runs bypass the config key, so it would re-open the
+   route you just closed in step 1. `SCAFFOLD` is the only readiness that refuses
+   every mode.
+
+   **Setting `live_ready = False` does nothing** — the enum wins, so that edit
+   would look like a rollback while runs kept dispatching.
 3. Re-run the canary to confirm runs are blocked again, and capture a short
    incident note under `docs/runbooks/evidence/`.
 

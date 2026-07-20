@@ -218,6 +218,14 @@ require_cmd() {
 
 require_cmd curl
 require_cmd jq
+case "${RUN_MODE}" in
+  preview|acceptance|production) ;;
+  *)
+    echo "error: --mode must be preview, acceptance or production (got '${RUN_MODE}')" >&2
+    exit 1
+    ;;
+esac
+
 
 mkdir -p "${WORKDIR_ROOT}"
 if [[ -z "${RUN_DIR}" ]]; then
