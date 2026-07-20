@@ -417,12 +417,20 @@ overlays:
       # in force 01.09.2017, not repealed). That page carries the metadata; the
       # operative text is a PDF.
       #
-      # STAYS `enabled: false` — and the provider is `live_ready = False` — for a
-      # reason that code in this PR cannot fix: the ordinance has no HTML
-      # manifestation, `ProviderResource.body` is `str`-typed so binary artifacts
-      # cannot be carried, and document-intelligence has no PDF normaliser. Both
-      # keys of the ADR-0030 lock stay shut until a layout-aware PDF pipeline
-      # lands. See the module docstring in gemeinde_http_provider.py.
+      # STAYS `enabled: false`, and the provider is still `live_ready = False` —
+      # but NOT for the engineering reasons this comment used to give. Both of
+      # those blockers have since landed:
+      #
+      #   - Binary manifestations are carried: `ProviderResource` has `body_bytes`
+      #     alongside `body`, with `raw_bytes`/`is_binary` accessors (#590/ADR-0037).
+      #   - The layout-aware PDF normaliser exists, and the right-margin Randtitel
+      #     splice that made it untrustworthy is fixed (#650, ADR-0041). It is
+      #     verified against the real AS 554.510 PDF, not a synthetic fixture —
+      #     document-intelligence/tests/test_marginalia.py.
+      #
+      # What remains is the ADR-0030 **evidence** step: an operator has not yet
+      # captured an acceptance run for this template. That is a loop to run, not
+      # code to write — see #735 and #628. Do not flip either key without it.
       # ───────────────────────────────────────────────────────────────
       gemeinde_http_zh_stadt_hundevorschriften:
         provider: gemeinde_http

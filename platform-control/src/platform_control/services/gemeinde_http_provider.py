@@ -47,16 +47,24 @@ Hundegesetz", in force 2017-09-01): the landing page parses and the linked
 
 WHY THE PROVIDER STILL SHIPS DISABLED (`live_ready = False`)
 ------------------------------------------------------------
-Acquisition is done; **normalisation is not**. `normalize/pdf.py` separates
-marginal headings ("Randtitel") from the body by x-position, which assumes
-the Randtitel band sits to the *left* of the body column. Zürich puts it on
-the **right**, in a 5.6pt gutter — narrower than the p90 space between two
-words of the same sentence (6.5pt). No join tolerance separates them, so the
-heading splices mid-sentence: "die Führung des **Organisation**
-Hundeverzeichnisses". See #650.
+Not for an engineering reason any more. Both halves are built:
 
-Until that lands, flipping the code-owner key would mean indexing spliced
-legal text — the same class of failure the refusal above guards against.
+- **Acquisition** (#584): the operative PDF is fetched and emitted as a binary
+  `ProviderResource`, verified against live Zürich AS 554.510.
+- **Normalisation** (#650, ADR-0041): the right-margin Randtitel splice that
+  made the PDF path untrustworthy — "die Führung des **Organisation**
+  Hundeverzeichnisses" — is fixed. `normalize/marginalia.py` partitions by
+  shared line-start edges instead of x-projection gutters, and handles the
+  recto-right / verso-left booklet layout the old left-only search could not.
+  It is asserted against the **real** AS 554.510 PDF, not a synthetic one:
+  document-intelligence/tests/test_marginalia.py.
+
+What is left is the ADR-0030 **evidence** step, and only that: no operator has
+captured an acceptance run for this template yet. The code key asserts both
+that the provider can physically acquire *and* that the result is trustworthy,
+and the second half of that claim is exactly what an acceptance run is for —
+#650's splice was found in this very document. So it stays shut until the loop
+is run, which is #628's subject rather than a coding task. See #735.
 
 The design generalises past Zürich: the BFS → host allow-list lives in
 `communal_portals.yaml`, so adding a commune is a config edit to that data
@@ -256,13 +264,11 @@ class GemeindeHttpProvider:
     """Config-driven HTTP provider for Swiss communal legal collections."""
 
     provider_name = AcquisitionProvider.GEMEINDE_HTTP.value
-    # The acquisition half is done (#584): PDF manifestations are fetched and
-    # emitted as binary resources, verified against live Zürich AS 554.510.
-    # The code-owner key stays shut on the *normalisation* half — the layout-aware
-    # PDF path splices right-margin Randtitel into the body on the real Zürich
-    # PDFs (#650). Indexing spliced legal text is the failure ADR-0033 exists to
-    # prevent, so this stays false until that lands and an operator captures
-    # acceptance-run evidence. ADR-0030 two-key lock.
+    # Acquisition (#584) and normalisation (#650, ADR-0041) are both done — the
+    # Randtitel splice is fixed and asserted against the real AS 554.510 PDF.
+    # The code-owner key stays shut on the remaining ADR-0030 requirement alone:
+    # no operator has captured acceptance-run evidence for this template yet.
+    # That is a loop to run (#628/#735), not code to write. ADR-0030 two-key lock.
     live_ready: ClassVar[bool] = False
 
     @property
@@ -390,9 +396,10 @@ class GemeindeHttpProvider:
             if skipped:
                 inline_failure_reason = (
                     f"{self.provider_name} found {len(skipped)} manifestation(s) for BFS "
-                    f"{bfs_number} but all are binary (PDF). The binary body and the "
-                    "layout-aware PDF normaliser exist as of #590, but this provider does "
-                    "not yet emit PDFs — the municipal acquisition slice is #584."
+                    f"{bfs_number}, none of which it can carry: the operative text was "
+                    "neither HTML (-> body) nor a supported binary type (-> body_bytes). "
+                    "PDF and HTML are both emitted as of #584/#590; this reports an "
+                    "unrecognised content type rather than a missing capability."
                 )
             else:
                 inline_failure_reason = (
@@ -429,9 +436,9 @@ class GemeindeHttpProvider:
         except ProviderConfigurationError as exc:
             notes.append(f"config_error={exc}")
         notes.append(
-            "live_ready=false: PDF manifestations are emitted as of #584, but the "
-            "layout-aware normaliser still splices right-margin Randtitel on the real "
-            "Zürich PDFs — see #650"
+            "live_ready=false: acquisition (#584) and PDF normalisation (#650) are both "
+            "done; the remaining ADR-0030 requirement is operator acceptance-run "
+            "evidence for this template — see #735"
         )
         return ProviderPlan(
             provider=self.provider_name,
