@@ -51,6 +51,10 @@ SOURCE_NAME="${SOURCE_NAME:-CH Fedlex compose e2e source}"
 # See ch-fedlex-fast-loop.sh: `acceptance` is required for a provider whose
 # readiness is `awaiting_evidence`, since the lock refuses `preview` there (#743).
 RUN_MODE="${RUN_MODE:-preview}"
+# Overrides the Fedlex `_de`/`_fr`/`_it` template-suffix convention. Set it for
+# any corpus that does not follow that naming, or the indexed-language facet goes
+# unverified while the run still reports `pass` (#735).
+EXPECT_LANGUAGE="${EXPECT_LANGUAGE:-}"
 WORKDIR_ROOT="${WORKDIR_ROOT:-${TMPDIR:-/tmp}/ch-fedlex-compose-e2e}"
 RUN_DIR="${RUN_DIR:-}"
 STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -79,6 +83,9 @@ Options:
   --mode <preview|acceptance|production>
                             Run mode (default: preview). Use `acceptance` for a
                             provider whose readiness is `awaiting_evidence` (#743).
+  --expect-language <code>  Language the indexed document must carry (e.g. de).
+                            Without it the gate derives from the Fedlex template
+                            suffix and SELF-SKIPS for other corpora (#735).
   --max-resources <n>       Preview scope max_resources (default: 25)
   --query <text>            legal-search query used for the searchable assertion
                             (default: Bundesverfassung)
@@ -86,7 +93,7 @@ Options:
   -h, --help                Show this help
 
 Env overrides: EVIDARA_PLATFORM_CONTROL_URL, EVIDARA_LEGAL_SEARCH_URL, TEMPLATE_ID,
-EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME, RUN_MODE,
+EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME, RUN_MODE, EXPECT_LANGUAGE,
 MAX_RESOURCES, MAX_POLLS, POLL_INTERVAL, DI_MAX_POLLS, DI_POLL_INTERVAL,
 SEARCH_MAX_POLLS, SEARCH_POLL_INTERVAL, SEARCH_QUERY, WORKDIR_ROOT, RUN_DIR.
 EOF
@@ -102,6 +109,7 @@ while [[ $# -gt 0 ]]; do
     --authority-id) AUTHORITY_ID="${2:?missing value for --authority-id}"; shift 2 ;;
     --source-name) SOURCE_NAME="${2:?missing value for --source-name}"; shift 2 ;;
     --mode) RUN_MODE="${2:?missing value for --mode}"; shift 2 ;;
+    --expect-language) EXPECT_LANGUAGE="${2:?missing value for --expect-language}"; shift 2 ;;
     --max-resources) MAX_RESOURCES="${2:?missing value for --max-resources}"; shift 2 ;;
     --query) SEARCH_QUERY="${2:?missing value for --query}"; shift 2 ;;
     --out-dir) RUN_DIR="${2:?missing value for --out-dir}"; shift 2 ;;
@@ -160,10 +168,20 @@ title_gate_checked() {
   esac
 }
 
-# Fedlex publishes every act as DE/FR/IT expressions and the templates are
-# per-language, so the template suffix IS the language the indexed document must
-# carry on its `language` facet (#572).
+# The language the indexed document must carry on its `language` facet (#572).
+#
+# `--expect-language` first, then the Fedlex template-suffix convention. Fedlex
+# publishes every act as DE/FR/IT expressions with per-language templates, so
+# there the suffix IS the language — but deriving ONLY from the suffix meant the
+# gate silently self-skipped for every corpus that does not follow that naming,
+# which is how the first municipal acceptance run reported `pass` with the facet
+# unverified (#735 review). The template declares `language_codes`, so this is
+# information the harness had all along and was not reading.
 expected_language() {
+  if [[ -n "${EXPECT_LANGUAGE}" ]]; then
+    printf '%s' "${EXPECT_LANGUAGE}"
+    return
+  fi
   case "${TEMPLATE_ID}" in
     *_de) printf '%s' 'de' ;;
     *_fr) printf '%s' 'fr' ;;
@@ -197,6 +215,7 @@ log "    jurisdiction_id=${JURISDICTION_ID}"
 log "    authority_id=${AUTHORITY_ID}"
 log "    source_name=${SOURCE_NAME}"
 log "    run_mode=${RUN_MODE}"
+log "    expect_language=${EXPECT_LANGUAGE:-<from template suffix>}"
 log "    max_resources=${MAX_RESOURCES}"
 log "    search_query=${SEARCH_QUERY}"
 log "    run_dir=${RUN_DIR}"
