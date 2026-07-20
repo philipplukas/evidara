@@ -24,9 +24,9 @@ For vertical-slice local development, use the repo compose stack plus helper scr
 - `bash scripts/local-vertical-slice.sh env` to print local env wiring
 - guide: [Local Vertical Slice Setup](./local-vertical-slice.md)
 
-For the **full acquisition → search loop** (NATS + MinIO + document-intelligence
-+ the projection bridge), use `bash scripts/dev-loop-stack.sh up` instead. It
-exists because two settings are inert by default and silent when wrong:
+For the **full acquisition → search loop** (NATS, MinIO, document-intelligence
+and the projection bridge), use `bash scripts/dev-loop-stack.sh up` instead.
+It exists because two settings are inert by default and silent when wrong:
 
 - `PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND` defaults to `noop`, so
   platform-control acquires documents and never publishes the artifact event.
