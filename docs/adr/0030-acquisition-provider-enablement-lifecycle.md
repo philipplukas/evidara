@@ -68,7 +68,8 @@ unrecognised.
 Production-readiness lives on the blueprint template, not the provider. A
 run may launch only when **both** keys are turned:
 
-- `provider.live_ready is True` (the provider is implemented), **and**
+- the provider's readiness is `LIVE` (see §1; amended from
+  `provider.live_ready is True` by #743), **and**
 - `template.enabled is True` in
   [`source_blueprints.yaml`](../../platform-control/src/platform_control/hierarchies/source_blueprints.yaml)
   (the operator has accepted it for live acquisition).
@@ -79,10 +80,12 @@ worker-backed dispatch cannot accept a run it can never run) and again from
 `_dispatch_run()` (the last gate before any outbound request, covering the
 scheduler, retry, and Temporal paths):
 
-- **Provider key.** `ensure_live_ready()` (shared by
-  `ProviderRegistry.require_live_ready()`, which resolves-then-checks for
-  loader-style callers) raises `ProviderNotLiveReadyError` when the provider
-  that will actually be called is a scaffold. Callers that only want to
+- **Provider key.** `ensure_launchable()` (renamed from `ensure_live_ready()`
+  by #743; shared by `ProviderRegistry.require_live_ready()`, which
+  resolves-then-checks for loader-style callers) raises
+  `ProviderNotLiveReadyError` when the provider that will actually be called has
+  a readiness the run's mode does not admit — naming *which* state blocked, since
+  a scaffold and a provider awaiting evidence have different remedies. Callers that only want to
   resolve-and-introspect keep using `resolve_for_spec()` /
   `resolve_for_version()`.
 - **Template key.** A source version created from a blueprint records its
@@ -103,10 +106,13 @@ provider and replay fixtures, so no request reaches the portal the lock
 protects — that is the rehearsal mode an operator uses *before* capturing
 acceptance-run evidence.
 
-Both keys default to the safe value (`live_ready = False`, `enabled`
-absent/false), so new work is inert until deliberately turned on. Templates
-state `enabled` explicitly, and a template may only be `enabled: true` if its
-provider is `live_ready` — both invariants are asserted by
+Both keys default to the safe value (readiness `SCAFFOLD` — including for any
+provider that declares nothing, or declares something unrecognised — and
+`enabled` absent/false), so new work is inert until deliberately turned on.
+Templates state `enabled` explicitly, and a template may only be `enabled: true`
+if its provider is `LIVE` (not merely `AWAITING_EVIDENCE`: an enabled template
+would dispatch production runs on evidence nobody captured) — both invariants are
+asserted by
 `tests/unit/test_blueprint_provider_parity.py`, and the lock itself by
 `tests/unit/test_provider_enablement_lock.py` (#559).
 
@@ -155,17 +161,18 @@ workflow, not a code change:
 1. Run the provider's acceptance harness against an environment
    (e.g. [`scripts/ch-fedlex-fast-loop.sh`](../../scripts/ch-fedlex-fast-loop.sh);
    the parallel `scripts/ch-bger-fast-loop.sh` court harness lands with the
-   `ch_court_decisions` provider), which drives a narrow preview run and
-   asserts provider capture, the
+   `ch_court_decisions` provider), which drives a narrow run — `mode=acceptance`
+   for a provider still awaiting evidence, since a preview run is subject to the
+   same lock (see §6) — and asserts provider capture, the
    downstream DI lifecycle (`accepted` → `processing` → `canonical_ready`
    → `document.processed`), and content-quality gates, emitting a `pass`
    verdict.
 2. Persist the evidence bundle under
    [`docs/runbooks/evidence/`](../runbooks/evidence/README.md)
    (the harness `--copy-evidence` flag writes it there).
-3. With a `pass` verdict as justification, the operator flips
-   `provider.live_ready` (if still a scaffold) and `template.enabled: true`
-   — turning both keys of the lock.
+3. With a `pass` verdict as justification, the provider's readiness moves to
+   `LIVE` (a code change, if it was `AWAITING_EVIDENCE`) and the operator flips
+   `template.enabled: true` from the admin — turning both keys of the lock.
 
 A `pass` verdict is only justification for the gates that actually ran. Several
 gates self-skip when they do not apply to a template (the title regex, the body
@@ -292,7 +299,8 @@ the Nth source never falls.
 ## References
 
 - [`platform-control/src/acquisition_core/providers.py`](../../platform-control/src/acquisition_core/providers.py)
-  — protocol, `live_ready`, `ensure_live_ready` / `require_live_ready`.
+  — protocol, `AcquisitionReadiness`, `provider_readiness()`,
+  `ensure_launchable()` / `require_live_ready()`.
 - [`platform-control/src/platform_control/services/run_service.py`](../../platform-control/src/platform_control/services/run_service.py)
   — `_require_launchable()`, the run-launch enforcement point for both keys.
 - [`platform-control/src/platform_control/services/source_blueprints.py`](../../platform-control/src/platform_control/services/source_blueprints.py)

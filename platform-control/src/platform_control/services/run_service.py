@@ -159,19 +159,44 @@ class RunService:
 
         ``RunMode.ACCEPTANCE`` is the other exemption, and the narrow one. It
         reaches the real portal, so it is *not* exempt from the code key — it
-        merely admits ``AWAITING_EVIDENCE`` alongside ``LIVE``. It does skip the
-        config key, because an acceptance run is what an operator does in order
-        to justify turning that key; requiring it first is the deadlock this
-        mode exists to break.
+        merely admits ``AWAITING_EVIDENCE`` alongside ``LIVE``.
+
+        It waives the config key ONLY for an ``AWAITING_EVIDENCE`` provider, and
+        that limit is load-bearing. The config key is not just "not vetted yet":
+        an operator override is the only audited way to stop traffic at one
+        portal without a deploy — the kill switch you reach for when an authority
+        complains about load. A blanket waiver would make that switch advisory
+        for every provider, including LIVE ones that never had a deadlock to
+        break: for those the operator already owns the config key and can simply
+        turn it. Only a provider that cannot otherwise earn its first key gets
+        the waiver.
+
+        The template must still *exist* in either case. A version pointing at a
+        template deleted from `source_blueprints.yaml` — the deploy-time way we
+        stop crawling a portal — is refused for acceptance runs too.
         """
         if source_version.execution_mode is ExecutionMode.SHADOW:
             return
         for_acceptance = run_mode is RunMode.ACCEPTANCE
-        if not for_acceptance and source_version.overlay_id and source_version.provider_template_id:
-            await BlueprintEnablementService(self.session).require_enabled(
-                source_version.overlay_id,
-                source_version.provider_template_id,
-            )
+        waive_config_key = (
+            for_acceptance
+            and provider_readiness(provider) is AcquisitionReadiness.AWAITING_EVIDENCE
+        )
+        if source_version.overlay_id and source_version.provider_template_id:
+            enablement = BlueprintEnablementService(self.session)
+            if waive_config_key:
+                # Raises NotFoundError for a template that no longer exists; the
+                # returned value is deliberately ignored, since the waiver is
+                # about the `enabled` flag alone.
+                await enablement.is_enabled(
+                    source_version.overlay_id,
+                    source_version.provider_template_id,
+                )
+            else:
+                await enablement.require_enabled(
+                    source_version.overlay_id,
+                    source_version.provider_template_id,
+                )
         ensure_launchable(
             provider,
             template_id=source_version.provider_template_id,
@@ -402,8 +427,32 @@ class RunService:
                 detail="Shadow mode replays fixtures; the live-portal lock does not apply.",
             )
 
+        # Resolve the provider BEFORE the config key: whether the config key may
+        # be waived depends on the provider's readiness, so the order here has to
+        # match `_require_launchable`.
         for_acceptance = run_mode is RunMode.ACCEPTANCE
-        if not for_acceptance and source_version.overlay_id and source_version.provider_template_id:
+        provider = self._resolve_provider_for_source_version(source_version)
+        if provider is None and self.provider_registry is None:
+            provider = build_provider_registry(get_settings()).resolve_for_version(source_version)
+
+        # A provider we cannot resolve is not one we can vouch for. `ensure_launchable`
+        # treats it as SCAFFOLD, so pre-flight must refuse rather than report an
+        # acceptance run as ready — the divergence this docstring promises to avoid.
+        if provider is None:
+            return RunReadinessCheck(
+                code="acquisition_lock_open",
+                ok=False,
+                detail=(
+                    "Code key closed: no acquisition provider could be resolved "
+                    "for this source version."
+                ),
+            )
+
+        readiness = provider_readiness(provider)
+        provider_name = getattr(provider, "provider_name", "unknown")
+        waive_config_key = for_acceptance and readiness is AcquisitionReadiness.AWAITING_EVIDENCE
+
+        if source_version.overlay_id and source_version.provider_template_id:
             try:
                 config_enabled = await BlueprintEnablementService(self.session).is_enabled(
                     source_version.overlay_id, source_version.provider_template_id
@@ -417,7 +466,7 @@ class RunService:
                         f"{source_version.provider_template_id}' no longer exists."
                     ),
                 )
-            if not config_enabled:
+            if not config_enabled and not waive_config_key:
                 return RunReadinessCheck(
                     code="acquisition_lock_open",
                     ok=False,
@@ -428,44 +477,38 @@ class RunService:
                     ),
                 )
 
-        provider = self._resolve_provider_for_source_version(source_version)
-        if provider is None and self.provider_registry is None:
-            provider = build_provider_registry(get_settings()).resolve_for_version(source_version)
-        if provider is not None:
-            readiness = provider_readiness(provider)
-            provider_name = getattr(provider, "provider_name", "unknown")
-            # The remedy differs per state, so the detail must too: telling an
-            # operator "escalate to engineering" about a finished provider is the
-            # misdirection #743 exists to remove.
-            if readiness is AcquisitionReadiness.SCAFFOLD:
-                return RunReadinessCheck(
-                    code="acquisition_lock_open",
-                    ok=False,
-                    detail=(
-                        f"Code key closed: provider '{provider_name}' is a scaffold "
-                        "(start_run is not implemented). This needs engineering."
-                    ),
-                )
-            if readiness is AcquisitionReadiness.AWAITING_EVIDENCE and not for_acceptance:
-                return RunReadinessCheck(
-                    code="acquisition_lock_open",
-                    ok=False,
-                    detail=(
-                        f"Code key closed: provider '{provider_name}' is implemented but "
-                        "has no acceptance-run evidence yet. Dispatch a run with "
-                        "mode=acceptance to capture it — this does not need an engineer "
-                        "(ADR-0030)."
-                    ),
-                )
+        # The remedy differs per state, so the detail must too: telling an
+        # operator "escalate to engineering" about a finished provider is the
+        # misdirection #743 exists to remove.
+        if readiness is AcquisitionReadiness.SCAFFOLD:
+            return RunReadinessCheck(
+                code="acquisition_lock_open",
+                ok=False,
+                detail=(
+                    f"Code key closed: provider '{provider_name}' is a scaffold "
+                    "(start_run is not implemented). This needs engineering."
+                ),
+            )
+        if readiness is AcquisitionReadiness.AWAITING_EVIDENCE and not for_acceptance:
+            return RunReadinessCheck(
+                code="acquisition_lock_open",
+                ok=False,
+                detail=(
+                    f"Code key closed: provider '{provider_name}' is implemented but "
+                    "has no acceptance-run evidence yet. Dispatch a run with "
+                    "mode=acceptance to capture it — this does not need an engineer "
+                    "(ADR-0030)."
+                ),
+            )
 
-        if for_acceptance:
+        if waive_config_key:
             return RunReadinessCheck(
                 code="acquisition_lock_open",
                 ok=True,
                 detail=(
-                    "Acceptance run: the provider is implemented, so it may reach the live "
-                    "portal to produce evidence. This is not a production run and does not "
-                    "imply either ADR-0030 key is turned."
+                    f"Acceptance run: provider '{provider_name}' is implemented, so it may "
+                    "reach the live portal to produce evidence. This is not a production run "
+                    "and does not imply either ADR-0030 key is turned."
                 ),
             )
         return RunReadinessCheck(

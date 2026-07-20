@@ -102,3 +102,42 @@ async def test_evaluator_runs_shadow_schedule(session) -> None:
     created = await evaluate_due_schedules(session)
 
     assert created == 1
+
+
+def test_an_acceptance_run_cannot_be_scheduled() -> None:
+    """A rehearsal must not become a cron (#743 review).
+
+    `RunMode.ACCEPTANCE` reaches a live portal on a provider with no acceptance
+    evidence, and for an AWAITING_EVIDENCE provider it waives the operator's
+    config key. `evaluate_due_schedules` stamps the schedule's mode straight onto
+    a Run without passing `_require_launchable`, so a scheduled acceptance run
+    would be permanent unattended crawling that the kill switch cannot stop.
+    The schema boundary is the only place that can refuse it.
+    """
+    import pytest as _pytest
+    from pydantic import ValidationError
+
+    from platform_control.schemas.schedule import CreateScheduleRequest, UpdateScheduleRequest
+
+    with _pytest.raises(ValidationError, match="cannot be scheduled"):
+        CreateScheduleRequest(
+            source_id="src_1",
+            source_version_id="sv_1",
+            cron_expression="*/5 * * * *",
+            mode=RunMode.ACCEPTANCE,
+        )
+
+    # PATCHing an existing schedule is the same hole from the other side.
+    with _pytest.raises(ValidationError, match="cannot be scheduled"):
+        UpdateScheduleRequest(mode=RunMode.ACCEPTANCE)
+
+    # The modes that were always schedulable still are.
+    assert (
+        CreateScheduleRequest(
+            source_id="src_1",
+            source_version_id="sv_1",
+            cron_expression="*/5 * * * *",
+            mode=RunMode.PREVIEW,
+        ).mode
+        is RunMode.PREVIEW
+    )

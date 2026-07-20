@@ -34,19 +34,20 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     )
     registry.register(BundeslandHttpProvider())
     registry.register(RegioneHttpProvider())
-    # Swiss federal court decisions (BGer/BVGer). Scaffold: live_ready=false,
-    # so its blueprint templates parse but the two-key lock rejects live runs
-    # until an operator captures acceptance-run evidence (#530).
+    # Swiss federal court decisions (BGer/BVGer). Implemented and unit-tested;
+    # readiness=awaiting_evidence, so the two-key lock rejects production runs
+    # until an operator captures acceptance-run evidence (#530). Not a scaffold —
+    # a mode=acceptance run may dispatch to produce that evidence (#743).
     registry.register(ChCourtDecisionsProvider())
-    # Swiss cantonal legislation portals. Scaffold: live_ready=false, so its
-    # blueprint templates parse but the two-key lock rejects live runs until an
-    # operator captures per-canton acceptance-run evidence.
+    # Swiss cantonal legislation portals. A genuine scaffold
+    # (readiness=scaffold): start_run is not implemented, so no run of any mode
+    # dispatches. Registered only so blueprint templates referencing it parse.
     registry.register(CantonHttpProvider())
-    # Swiss communal (Gemeinde) legal collections. Scaffold: live_ready=false.
-    # The municipal layer is where the ADR-0033 acceptance test lives, but the
-    # operative texts are PDFs and neither ProviderResource.body (str-typed) nor
-    # document-intelligence can carry them yet, so the two-key lock keeps its
-    # templates inert until a layout-aware PDF pipeline lands (#584).
+    # Swiss communal (Gemeinde) legal collections — where the ADR-0033 acceptance
+    # test lives. readiness=awaiting_evidence: the PDF blockers this comment used
+    # to cite have both landed (binary manifestations #590/ADR-0037, the
+    # layout-aware normaliser #650/ADR-0041). What remains is acceptance evidence,
+    # which a mode=acceptance run produces (#735, #743).
     registry.register(GemeindeHttpProvider())
     # Fixture-backed replay for SHADOW execution mode.
     registry.register(CassetteProvider(cassette_dir=settings.cassette_dir))
