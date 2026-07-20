@@ -9,6 +9,7 @@
 import type { SupportedLocale } from '../../../core/i18n';
 import {
   DEFAULT_LOCALE,
+  formatIsoDateDisplay,
   formatLanguageDisplay,
   formatLifecycleStatus,
   formatMessage,
@@ -146,7 +147,7 @@ function composeMetadata(doc: DocumentEntity, locale: SupportedLocale): Metadata
     const label = isDecision ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({
       label,
-      value: doc.effective_date,
+      value: formatIsoDateDisplay(doc.effective_date),
       iconKey: METADATA_ROW_ICONS.calendar,
       visibility: 'always',
     });

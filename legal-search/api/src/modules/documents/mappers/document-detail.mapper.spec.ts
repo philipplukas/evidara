@@ -92,7 +92,7 @@ describe('mapDocumentToDetailView', () => {
     });
     expect(view.metadata).toContainEqual({
       label: 'In Kraft',
-      value: '2024-01-01',
+      value: '01.01.2024',
       iconKey: 'meta-calendar',
       visibility: 'always',
     });
@@ -257,5 +257,19 @@ describe('mapDocumentToDetailView', () => {
       'de',
     );
     expect(view.subtitle).toBe('Dokument');
+  });
+});
+
+describe('date rendering', () => {
+  it('emits a Swiss-formatted date, not the raw ISO value', () => {
+    // #761: the frontend printed `2015-12-22` in a German-language legal UI while
+    // `formatSwissDate` sat unused with a passing cross-surface test over it. The
+    // assertion belongs where the value is actually produced for display, or the
+    // next regression passes the same way.
+    const view = mapDocumentToDetailView(lawDoc, [], [], 'de');
+    const dateRow = view.metadata.find((row) => row.iconKey === 'meta-calendar');
+
+    expect(dateRow?.value).toBe('01.01.2024');
+    expect(dateRow?.value).not.toContain('2024-01-01');
   });
 });

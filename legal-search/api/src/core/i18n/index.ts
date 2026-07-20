@@ -55,6 +55,29 @@ export function formatLanguageDisplay(languageCode: string): string {
   return LANGUAGE_DISPLAY_LABELS[normalized] ?? normalized.toUpperCase();
 }
 
+/**
+ * Format an ISO date for user-facing display as `DD.MM.YYYY`.
+ *
+ * Dates are rendered here rather than in the frontend for the same reason labels
+ * and `formatLanguageDisplay` are: these mappers emit display-ready rows, and the
+ * locale is already resolved at this boundary. Leaving the raw ISO value to the
+ * client meant a German-language legal UI printed `2015-12-22` — the frontend's
+ * own `formatSwissDate` existed, was tested, and had zero render sites (#761).
+ *
+ * Returns the input unchanged when it is not a parseable date: a value we cannot
+ * interpret is shown as-is rather than silently blanked, so a malformed date is
+ * visible instead of invisible.
+ */
+export function formatIsoDateDisplay(value: string): string {
+  const trimmed = value.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+  if (!match) {
+    return trimmed;
+  }
+  const [, year, month, day] = match;
+  return `${day}.${month}.${year}`;
+}
+
 /** Format a lifecycle status code for user-facing display. */
 export function formatLifecycleStatus(
   lifecycleStatus: string,
