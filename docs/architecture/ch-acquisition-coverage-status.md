@@ -3,13 +3,20 @@
 Honest snapshot of what Evidara actually acquires for Switzerland, what is
 plumbed but held disabled, and what is not built. Read alongside
 [ADR-0030: Acquisition provider enablement lifecycle](../adr/0030-acquisition-provider-enablement-lifecycle.md),
-which defines the two-key lock (`provider.live_ready` AND `template.enabled`)
+which defines the two-key lock (provider readiness AND `template.enabled`)
 and the acceptance-run → evidence → flip-live workflow that governs every
 transition below.
 
+> **Amended 2026-07-20 (#743).** The code key is three-state
+> (`scaffold` / `awaiting_evidence` / `live`), not a boolean. "Scaffold" below
+> now means specifically `readiness = scaffold` — `start_run` is not
+> implemented. A provider that is built but has no acceptance evidence is
+> `awaiting_evidence`, and an operator can dispatch a `mode=acceptance` run to
+> produce that evidence without an engineer.
+
 The status labels map directly onto the two keys:
 
-- **LIVE** — provider `live_ready: true` and at least one template
+- **LIVE** — provider readiness `live` and at least one template
   `enabled: true`; acquisition runs today.
 - **PLUMBED-BUT-DISABLED** — the provider and templates exist and parse,
   but one or both keys are off, so no run can fire. Awaiting operator
@@ -42,7 +49,9 @@ remaining key(s), per ADR-0030 §5.
 
 ### Federal court decisions — BGer / BVGer (#530)
 
-The `ch_court_decisions` provider is a **scaffold** (`live_ready: false`).
+The `ch_court_decisions` provider is **built but unproven**
+(`readiness: awaiting_evidence`) — implemented and unit-tested, awaiting an
+acceptance run, **not** a scaffold (#743).
 Templates `ch_court_decisions_bger` and `ch_court_decisions_bvger` ship
 `enabled: false` with placeholder seed URLs. Compliance is pre-declared:
 `cp_ch_court_decisions` is a public-official-tier policy (robots strict,

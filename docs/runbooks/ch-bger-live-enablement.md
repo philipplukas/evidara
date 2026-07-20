@@ -1,9 +1,9 @@
 # CH BGer / BVGer Live Enablement Runbook
 
 Owner: Platform / GA
-Last reviewed: 2026-07-13
-Last verified: not yet (provider ships `live_ready=false`; this runbook is the
-acceptance procedure that produces the first verification)
+Last reviewed: 2026-07-20
+Last verified: not yet (provider ships `readiness = AWAITING_EVIDENCE`; this
+runbook is the acceptance procedure that produces the first verification)
 Status: Active enablement procedure
 Applies to: turning the `ch_court_decisions` provider (Bundesgericht / BGer and
 Bundesverwaltungsgericht / BVGer) live on `dev`, then promoting.
@@ -14,8 +14,10 @@ The `ch_court_decisions` provider is fully implemented and unit-tested against a
 recorded fixture ("cassette"), but **no live source has been accepted yet**. It
 ships behind the loader's two-key lock:
 
-- `ChCourtDecisionsProvider.live_ready = False`
-  (`platform-control/src/platform_control/services/ch_court_decisions_provider.py`)
+- `ChCourtDecisionsProvider.readiness = AcquisitionReadiness.AWAITING_EVIDENCE`
+  (`platform-control/src/platform_control/services/ch_court_decisions_provider.py`).
+  **Not a scaffold** — the code key is shut only on the missing evidence, which is
+  what this runbook produces (#743).
 - blueprint templates `ch_court_decisions_bger` / `ch_court_decisions_bvger`
   ship `enabled: false`
   (`platform-control/src/platform_control/hierarchies/source_blueprints.yaml`)
@@ -107,9 +109,16 @@ first). Sequence:
      --pc-url "$EVIDARA_PLATFORM_CONTROL_URL" \
      --ls-url "$EVIDARA_LEGAL_SEARCH_URL" \
      --template ch_court_decisions_bger \
+     --mode acceptance \
      --max-resources 25 \
      --copy-evidence
    ```
+
+   `--mode acceptance` is required, not optional. `ch_court_decisions` is
+   `readiness = AWAITING_EVIDENCE`, and the two-key lock refuses `preview` for a
+   provider awaiting evidence — an acceptance run is precisely what produces the
+   evidence this step exists to capture (#743). Without the flag the script exits
+   1 at the readiness check.
 
    For BVGer, rerun with `--template ch_court_decisions_bvger` (the script maps
    this to `auth_bvger` automatically).
@@ -163,17 +172,23 @@ With committed `pass` evidence for each court you are enabling:
    ```python
    class ChCourtDecisionsProvider:
        provider_name = "ch_court_decisions"
-       live_ready = True   # was False
+       readiness = AcquisitionReadiness.LIVE   # was AWAITING_EVIDENCE
    ```
 
-   Also update `test_provider_is_scaffold_until_live_enablement` (which asserts
-   `live_ready is False`) in the same PR, or remove it — otherwise the unit suite
-   fails by design, which is the intended tripwire.
+   **Do not add `live_ready = True`.** Since #743 that attribute is only a
+   fallback for doubles that predate the enum: `provider_readiness()` reads
+   `readiness` first, so setting the boolean on this class does nothing, reports
+   no error, and leaves the lock exactly where it was.
+
+   Also update `test_provider_awaits_evidence_rather_than_being_a_scaffold`
+   (which asserts `AWAITING_EVIDENCE`) in the same PR, or remove it — otherwise
+   the unit suite fails by design, which is the intended tripwire.
 
 2. **Template config keys** — **from the admin panel, not from YAML.** ADR-0035
    moved this key out of the repo and into the database, and #668 gave it a
    screen: open **Blueprints** in the admin sidebar, filter to *Awaiting
-   evidence*, and use **Enable** on the template(s) you produced evidence for.
+   acceptance run* (before the provider key is flipped) or *Ready to enable*
+   (after), and use **Enable** on the template(s) you produced evidence for.
    The dialog requires an evidence note — paste the canary verdict and the path
    of the evidence file you committed in Step 2. This writes a
    `blueprint_template_overrides` row with `updated_by`/`updated_at`; no repo
@@ -232,8 +247,20 @@ If a live court run misbehaves after enablement:
 1. Hit **Disable** on the affected template in the admin **Blueprints** screen
    (fastest, per-court, no deploy) — this re-arms the two-key lock without
    touching the provider, and records the reason alongside the flip.
-2. If the provider itself regresses, set `live_ready = False` to disable all
-   court templates at once.
+
+   Note what this does **not** stop: an `AWAITING_EVIDENCE` provider waives the
+   config key for `mode=acceptance` runs, so Disable alone will not block those.
+   If acceptance runs are the problem, go to step 2.
+2. If the provider itself regresses, set `readiness = AcquisitionReadiness.SCAFFOLD`
+   to disable all court templates at once, in every mode.
+
+   **Do not roll back to `AWAITING_EVIDENCE`** to stop traffic: that is the one
+   state whose acceptance runs bypass the config key, so it would re-open the
+   route you just closed in step 1. `SCAFFOLD` is the only readiness that refuses
+   every mode.
+
+   **Setting `live_ready = False` does nothing** — the enum wins, so that edit
+   would look like a rollback while runs kept dispatching.
 3. Re-run the canary to confirm runs are blocked again, and capture a short
    incident note under `docs/runbooks/evidence/`.
 
@@ -242,7 +269,7 @@ If a live court run misbehaves after enablement:
 - [ ] Step 0 — permitted source confirmed (robots, rate, link pattern, attribution)
 - [ ] Step 1 — canary `pass` for BGer (and BVGer if enabling)
 - [ ] Step 2 — evidence committed under `docs/runbooks/evidence/`
-- [ ] Step 3 — `live_ready=True` (code) + template enabled from the admin
+- [ ] Step 3 — `readiness = LIVE` (code) + template enabled from the admin
       **Blueprints** screen with an evidence note (no deploy) + real seed/index URLs
 - [ ] Step 4 — post-flip canary `pass` + searchability confirmed
 - [ ] Promotion to staging/prod scheduled

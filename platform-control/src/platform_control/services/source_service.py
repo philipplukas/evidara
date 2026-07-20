@@ -19,6 +19,10 @@ from platform_control.schemas.source import (
     UpdateSourceVersionRequest,
     parse_acquisition_spec,
 )
+from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
+    provider_readiness,
+)
 from platform_control.services.blueprint_enablement import BlueprintEnablementService
 from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.source_blueprints import (
@@ -28,19 +32,39 @@ from platform_control.services.source_blueprints import (
 )
 
 
-def _describe_lock(provider: str, *, enabled: bool, live_ready: bool) -> dict[str, object]:
+def _describe_lock(
+    provider: str,
+    *,
+    enabled: bool,
+    readiness: AcquisitionReadiness,
+) -> dict[str, object]:
     """Render the ADR-0030 two-key lock, with a note per closed key.
 
     Shared by the single-template preview and the inventory listing so the two
     can never disagree about *why* a template is inert. The notes name which key
     is shut on purpose: the config key is the one an operator owns and can flip
-    themselves, the code key needs a provider change.
+    themselves; the code key's remedy depends on *which* code state is shut.
+
+    That distinction is the whole point (#743). The previous wording said the
+    provider "cannot yet acquire this format" for every closed code key, which
+    sent operators to an engineer to build something that already existed — the
+    #628 capability question failing at the UI layer.
     """
+    live_ready = readiness is AcquisitionReadiness.LIVE
     notes: list[str] = []
-    if not live_ready:
+    if readiness is AcquisitionReadiness.SCAFFOLD:
         notes.append(
-            f"Code key closed: provider '{provider}' is not live-ready — it cannot yet "
-            "acquire this format, so runs stay locked (ADR-0030)."
+            f"Code key closed: provider '{provider}' cannot acquire this format yet — it "
+            "is a scaffold or faces sources it cannot fetch. This needs engineering "
+            "(ADR-0030)."
+        )
+    elif readiness is AcquisitionReadiness.AWAITING_EVIDENCE:
+        notes.append(
+            f"Code key closed: provider '{provider}' is implemented and verified, but no "
+            "acceptance run has been captured for it yet. You can capture it yourself: run "
+            "the acceptance harness against the live source (a run with mode=acceptance). "
+            "Moving the provider to 'live' afterwards is still a code change, so attach the "
+            "evidence to that request (ADR-0030)."
         )
     if not enabled:
         notes.append(
@@ -50,6 +74,7 @@ def _describe_lock(provider: str, *, enabled: bool, live_ready: bool) -> dict[st
     return {
         "enabled": enabled,
         "live_ready": live_ready,
+        "acquisition_readiness": readiness.value,
         "launchable": enabled and live_ready,
         "notes": notes,
     }
@@ -171,8 +196,9 @@ class SourceService:
         """
         enablement = BlueprintEnablementService(self.session)
         enabled = await enablement.is_enabled(overlay_id, provider_template_id)
-        live_ready = self._provider_live_ready(provider)
-        return _describe_lock(provider, enabled=enabled, live_ready=live_ready)
+        return _describe_lock(
+            provider, enabled=enabled, readiness=self._provider_readiness(provider)
+        )
 
     def describe_blueprint_plan_notes(self, acquisition_spec: AcquisitionSpec) -> list[str]:
         """Return the provider's own `plan()` notes for a previewed spec (#634).
@@ -202,7 +228,7 @@ class SourceService:
             # fields carry the load-bearing verdict regardless.
             return []
 
-    def _provider_live_ready(self, provider: str) -> bool:
+    def _provider_readiness(self, provider: str) -> AcquisitionReadiness:
         # Cached per service instance: build_provider_registry instantiates every
         # provider, so a template listing must not rebuild it once per row.
         cache = getattr(self, "_live_ready_cache", None)
@@ -213,8 +239,9 @@ class SourceService:
         try:
             resolved = cache.get(provider)
         except Exception:
-            return False
-        return bool(getattr(resolved, "live_ready", False))
+            # An unresolvable provider is not a launchable one.
+            return AcquisitionReadiness.SCAFFOLD
+        return provider_readiness(resolved)
 
     async def list_source_blueprint_templates(self) -> list[dict[str, object]]:
         """The operator's coverage inventory: every template, with lock + provenance.
@@ -236,7 +263,7 @@ class SourceService:
             lock = _describe_lock(
                 provider,
                 enabled=state.enabled,
-                live_ready=self._provider_live_ready(provider),
+                readiness=self._provider_readiness(provider),
             )
             enriched.append(
                 {

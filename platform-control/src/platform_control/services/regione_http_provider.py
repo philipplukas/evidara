@@ -14,6 +14,7 @@ See `PortalHttpProviderBase` for the shared acquisition flow.
 from __future__ import annotations
 
 from platform_control.domain import AcquisitionProvider
+from platform_control.services.acquisition_provider import AcquisitionReadiness
 from platform_control.services.portal_http_provider_base import (
     PortalHttpProviderBase,
 )
@@ -25,7 +26,7 @@ class RegioneHttpProvider(PortalHttpProviderBase):
     provider_name = AcquisitionProvider.REGIONE_HTTP.value
     subdivision_spec_key = "regione"
     subdivision_country = "IT"
-    live_ready = True
+    readiness = AcquisitionReadiness.LIVE
     supported_portals: dict[str, str] = {
         # ISO 3166-2:IT code → portal host.
         "IT-25": "normelombardia.consiglio.regione.lombardia.it",

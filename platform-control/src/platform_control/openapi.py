@@ -52,7 +52,13 @@ API_TITLE = "Platform Control API"
 # collection, and `plan_notes` on blueprint-preview (#634).
 # 0.13.0: additive — blueprint coverage inventory fields on source responses,
 # so the admin can show which blueprints are enabled and which are not (#668).
-API_VERSION = "0.14.0"
+# 0.15.0: additive — `acquisition_readiness` on blueprint responses and a new
+# `acceptance` RunMode. The ADR-0030 code key became three-state so a provider
+# that is built but has no acceptance evidence is no longer reported as a
+# scaffold needing engineering (#743), and so it can run the acceptance loop
+# that produces its own evidence (#735). `live_ready` is retained as the boolean
+# projection (true only for `live`), so this is additive, not breaking.
+API_VERSION = "0.15.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

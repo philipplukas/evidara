@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import pytest
 
-from platform_control.domain import RunMode
-from platform_control.errors import NotFoundError
+from acquisition_core.providers import AcquisitionReadiness, ProviderNotLiveReadyError
+from platform_control.domain import RunMode, RunStatus, SourceVersionStatus
+from platform_control.errors import BlueprintTemplateNotEnabledError, NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
+from platform_control.schemas.run import CreateRunRequest
 from platform_control.schemas.source import (
     CreateSourceRequest,
     CreateSourceVersionRequest,
@@ -24,10 +26,12 @@ from platform_control.services.provider_registry_factory import build_provider_r
 from platform_control.services.run_service import RunService
 from platform_control.services.source_service import SourceService
 
-# See source_blueprints.yaml: canton_http_zh is a scaffold provider (live_ready
-# False) shipped disabled; fedlex_sparql_constitution_de is live + enabled.
+# See source_blueprints.yaml: canton_http_zh is a real scaffold (start_run is not
+# implemented) shipped disabled; fedlex_sparql_constitution_de is live + enabled;
+# the gemeinde template's provider is implemented but has no acceptance evidence.
 SCAFFOLD_TEMPLATE = ("ch", "canton_http_zh")
 LIVE_TEMPLATE = ("ch", "fedlex_sparql_constitution_de")
+AWAITING_EVIDENCE_TEMPLATE = ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
 
 
 async def _seed_reference(session) -> None:
@@ -108,6 +112,38 @@ async def test_templates_listing_surfaces_the_lock(session) -> None:
     assert live["notes"] == []
 
 
+@pytest.mark.asyncio
+async def test_the_listing_gives_each_code_key_state_its_own_remedy(session) -> None:
+    """The note bodies are the #743 fix; assert they cannot be swapped.
+
+    A mutation pass swapped the SCAFFOLD and AWAITING_EVIDENCE note strings — so
+    a scaffold told the operator "implemented and verified, dispatch an
+    acceptance run" and a finished provider was sent to an engineer — and
+    nothing failed. That is the original defect reintroduced on the server side,
+    which is the half the admin cannot compensate for.
+    """
+    rows = await SourceService(session).list_source_blueprint_templates()
+    by_id = {r["provider_template_id"]: r for r in rows}
+
+    scaffold_notes = " ".join(by_id["canton_http_zh"]["notes"]).lower()
+    assert by_id["canton_http_zh"]["acquisition_readiness"] == "scaffold"
+    assert "needs engineering" in scaffold_notes
+    # A scaffold must never be described as ready to gather evidence.
+    assert "acceptance harness" not in scaffold_notes
+
+    awaiting = by_id["gemeinde_http_zh_stadt_hundevorschriften"]
+    awaiting_notes = " ".join(awaiting["notes"]).lower()
+    assert awaiting["acquisition_readiness"] == "awaiting_evidence"
+    assert "implemented and verified" in awaiting_notes
+    assert "acceptance harness" in awaiting_notes
+    # …and must never be sent to an engineer, which is the whole point.
+    assert "needs engineering" not in awaiting_notes
+
+    # The boolean projection stays consistent with the enum on every row.
+    for row in rows:
+        assert row["live_ready"] is (row["acquisition_readiness"] == "live")
+
+
 async def _approved_version_from_template(session, template):
     await _seed_reference(session)
     source_service = SourceService(session)
@@ -163,7 +199,129 @@ async def test_readiness_code_key_still_holds_after_config_key_flipped(session) 
     )
     lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
     assert lock.ok is False
-    assert "live-ready" in lock.detail.lower()
+    # The detail must name the remedy, not just the refusal. canton_http genuinely
+    # needs engineering — though note its start_run IS implemented and inherited;
+    # `scaffold` is remedy-shaped, so the message says "cannot acquire its targets"
+    # rather than asserting a stub the code contradicts (#743).
+    assert "cannot acquire its targets" in lock.detail.lower()
+    assert "needs engineering" in lock.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_acceptance_run_is_admitted_for_a_provider_awaiting_evidence(session) -> None:
+    """The deadlock break (#743/#735).
+
+    Both ADR-0030 keys are shut for this template, and under the old binary lock
+    that was terminal: acceptance evidence required a live run, the live run
+    required the code key, and the code key required the evidence. A provider
+    could never earn its own first key without an engineer shipping a code change
+    — which made every new source an engineering project, the exact failure #628
+    measures against.
+    """
+    source, version = await _approved_version_from_template(session, AWAITING_EVIDENCE_TEMPLATE)
+    # Open the config key so the code key is what the production run refuses on.
+    # The lock reports the config key first and returns early, so leaving it shut
+    # would hide the message under test.
+    await BlueprintEnablementService(session).set_enabled(
+        *AWAITING_EVIDENCE_TEMPLATE, enabled=True, note="flip", actor="op_local_dev"
+    )
+    await session.commit()
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+
+    production = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+    production_lock = next(c for c in production.checks if c.code == "acquisition_lock_open")
+    assert production_lock.ok is False
+    # Crucially NOT "this needs engineering" — the remedy is a run the operator
+    # can dispatch themselves.
+    assert "acceptance" in production_lock.detail.lower()
+    assert "does not need an engineer" in production_lock.detail.lower()
+
+    acceptance = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.ACCEPTANCE,
+    )
+    acceptance_lock = next(c for c in acceptance.checks if c.code == "acquisition_lock_open")
+    assert acceptance_lock.ok is True
+    # A pass here must not read as "the keys are turned" — it is a rehearsal that
+    # produces the evidence for turning them.
+    assert "not a production run" in acceptance_lock.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_acceptance_run_is_still_refused_for_a_real_scaffold(session) -> None:
+    # The narrow exemption stays narrow: there is no implementation for an
+    # acceptance run to gather evidence about, so ACCEPTANCE must not become a
+    # general way past the code key. Open the config key so the code key is what
+    # refuses — otherwise the config key refuses first and this proves nothing
+    # about the scaffold.
+    source, version = await _approved_version_from_template(session, SCAFFOLD_TEMPLATE)
+    await BlueprintEnablementService(session).set_enabled(
+        *SCAFFOLD_TEMPLATE, enabled=True, note="flip", actor="op_local_dev"
+    )
+    await session.commit()
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.ACCEPTANCE,
+    )
+    lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
+    assert lock.ok is False
+    assert "cannot acquire its targets" in lock.detail.lower()
+    assert "needs engineering" in lock.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_acceptance_does_not_override_an_operator_disabling_a_live_template(session) -> None:
+    """The config key stays a kill switch, for every provider (#743 review).
+
+    An operator override is the only audited way to stop traffic at one portal
+    without a deploy — what you reach for when an authority complains about load.
+    The acceptance waiver exists to break a deadlock that only `AWAITING_EVIDENCE`
+    providers have; a `LIVE` provider's operator already owns the config key and
+    can simply turn it. Waiving it there would buy nothing and cost the switch.
+    """
+    source, version = await _approved_version_from_template(session, LIVE_TEMPLATE)
+    await BlueprintEnablementService(session).set_enabled(
+        *LIVE_TEMPLATE, enabled=False, note="STOP: authority complained about load", actor="op_x"
+    )
+    await session.commit()
+
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.ACCEPTANCE,
+    )
+    lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
+    assert lock.ok is False
+    assert "config key closed" in lock.detail.lower()
+
+    # And the enforcement path agrees — not just its pre-flight mirror.
+    provider = run_service._resolve_provider_for_source_version(version)
+    with pytest.raises(BlueprintTemplateNotEnabledError):
+        await run_service._require_launchable(version, provider, RunMode.ACCEPTANCE)
+
+
+@pytest.mark.asyncio
+async def test_acceptance_refuses_a_template_deleted_from_the_shipped_blueprints(session) -> None:
+    # Deleting a template from source_blueprints.yaml is the deploy-time way to
+    # stop crawling a portal. The waiver is about the `enabled` flag alone, so a
+    # version pointing at a template that no longer exists must still refuse.
+    source, version = await _approved_version_from_template(session, AWAITING_EVIDENCE_TEMPLATE)
+    version.provider_template_id = "gone_from_the_shipped_blueprints"
+    await session.commit()
+
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+    provider = run_service._resolve_provider_for_source_version(version)
+    with pytest.raises(NotFoundError):
+        await run_service._require_launchable(version, provider, RunMode.ACCEPTANCE)
 
 
 def _settings():
@@ -195,7 +353,7 @@ async def test_blueprint_preview_surfaces_the_providers_own_plan_notes(session) 
     # The gemeinde provider resolves the commune and names the open defect that
     # keeps its code key shut — the exact warning #634 found stranded.
     assert any("bfs_number=261" in note for note in plan_notes)
-    assert any("live_ready=false" in note for note in plan_notes)
+    assert any("readiness=awaiting_evidence" in note for note in plan_notes)
 
 
 @pytest.mark.asyncio
@@ -211,3 +369,143 @@ async def test_plan_notes_degrade_to_empty_rather_than_failing_the_preview(sessi
     spec.provider = "no_such_provider"
 
     assert service.describe_blueprint_plan_notes(spec) == []
+
+
+@pytest.mark.asyncio
+async def test_create_run_enforces_the_lock_not_just_the_preflight(session) -> None:
+    """`create_run`, not `get_run_readiness` (#743 review).
+
+    The original tests for the acceptance exemption only called
+    `get_run_readiness`, which exercises `_assess_launch_lock` — the *mirror* of
+    the lock, not the lock. A reviewer proved it: reverting
+    `for_acceptance = run_mode is RunMode.ACCEPTANCE` in `_require_launchable`
+    left 518 tests green. The two diverging is exactly the #634 defect the
+    method's own docstring warns about, so the enforcement path needs its own
+    assertions.
+    """
+    source, version = await _approved_version_from_template(session, AWAITING_EVIDENCE_TEMPLATE)
+    # `_approved_version_from_template` does not actually approve, and an
+    # unapproved version is refused by `_validate_version_for_run_mode` BEFORE the
+    # lock is reached — so without this the production assertion below would pass
+    # for the wrong reason and prove nothing about the lock.
+    version.status = SourceVersionStatus.APPROVED
+    await session.commit()
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+
+    # Production is refused on the config key by the enforcement path itself.
+    with pytest.raises(BlueprintTemplateNotEnabledError):
+        await run_service.create_run(
+            CreateRunRequest(
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                mode=RunMode.PRODUCTION,
+            )
+        )
+
+    # Acceptance is admitted all the way through run creation, on a template
+    # whose config key is shut — that is the deadlock break, enforced.
+    run = await run_service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.ACCEPTANCE,
+        )
+    )
+    assert run.mode is RunMode.ACCEPTANCE
+    # Persisted, so the dispatch-time re-check sees the same value the request
+    # carried and the evidence stays self-labelling.
+    assert run.run_id
+
+
+@pytest.mark.asyncio
+async def test_create_run_refuses_acceptance_for_a_scaffold(session) -> None:
+    # The exemption must not become a general way past the code key, asserted on
+    # the enforcement path rather than the mirror.
+    source, version = await _approved_version_from_template(session, SCAFFOLD_TEMPLATE)
+    version.status = SourceVersionStatus.APPROVED
+    await BlueprintEnablementService(session).set_enabled(
+        *SCAFFOLD_TEMPLATE, enabled=True, note="flip", actor="op_local_dev"
+    )
+    await session.commit()
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+
+    # Both keys would otherwise be open; the code key alone must refuse.
+    with pytest.raises(ProviderNotLiveReadyError):
+        await run_service.create_run(
+            CreateRunRequest(
+                source_id=source.source_id,
+                source_version_id=version.source_version_id,
+                mode=RunMode.ACCEPTANCE,
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_readiness_reports_an_unknown_provider_instead_of_500ing(session) -> None:
+    # Regression guard (#743 review round 2). Moving provider resolution ahead of
+    # the config-key check made `ProviderRegistry.get`'s KeyError reachable from
+    # the readiness endpoint, where the config-key branch used to answer first.
+    # Readiness is a read-only pre-flight; an unknown provider is a closed key,
+    # not a 500.
+    source, version = await _approved_version_from_template(session, LIVE_TEMPLATE)
+    version.acquisition_spec = {**(version.acquisition_spec or {}), "provider": "no_such_provider"}
+    await session.commit()
+
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+    lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
+    assert lock.ok is False
+    assert "unknown provider" in lock.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_a_failing_acceptance_run_is_not_retried_forever(session) -> None:
+    """A rehearsal must be one-shot even when dispatch throws (#743 review round 3).
+
+    A fresh reviewer demonstrated this against running code: an acceptance run
+    whose `start_run` raises (portal timeout, 5xx) stays PENDING, is re-dispatched
+    every poll cycle, and — because the acceptance waiver skips the config key —
+    the operator's `enabled: false` kill switch does not stop it. Three portal
+    hits landed after the switch was thrown. That is a second route to unattended
+    repetition beside the schedule ban ADR-0030 §6 relies on.
+    """
+
+    class _ExplodingProvider:
+        provider_name = "gemeinde_http"
+        readiness = AcquisitionReadiness.AWAITING_EVIDENCE
+        calls = 0
+
+        async def start_run(self, source, source_version, run):
+            type(self).calls += 1
+            raise RuntimeError("portal timed out")
+
+    source, version = await _approved_version_from_template(
+        session, ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
+    )
+    version.status = SourceVersionStatus.APPROVED
+    await session.commit()
+
+    provider = _ExplodingProvider()
+    service = RunService(session, provider=provider, run_dispatch_backend="worker")
+    run = await service.create_run(
+        CreateRunRequest(
+            source_id=source.source_id,
+            source_version_id=version.source_version_id,
+            mode=RunMode.ACCEPTANCE,
+        )
+    )
+    assert run.status is RunStatus.PENDING
+
+    await service.dispatch_pending_runs()
+    await session.refresh(run)
+    # Terminal, so no later poll cycle can pick it up again.
+    assert run.status is RunStatus.FAILED
+    assert "not retried" in (run.failure_reason or "")
+
+    calls_after_first = _ExplodingProvider.calls
+    await service.dispatch_pending_runs()
+    assert _ExplodingProvider.calls == calls_after_first

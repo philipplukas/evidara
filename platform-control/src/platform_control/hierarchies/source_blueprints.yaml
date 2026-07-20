@@ -267,9 +267,10 @@ overlays:
         enabled: true
       # ───────────────────────────────────────────────────────────────
       # Swiss federal court decisions (BGer / BVGer) — CH e2e Stream E (#530)
-      # Provider `ch_court_decisions` is a scaffold (live_ready=false); these
-      # templates stay `enabled: false` until scripts/ch-bger-fast-loop.sh
-      # captures acceptance-run evidence and an operator flips both keys.
+      # Provider `ch_court_decisions` is implemented but has no acceptance
+      # evidence (readiness=awaiting_evidence, NOT a scaffold); these templates
+      # stay `enabled: false` until an acceptance run captures that evidence and
+      # an operator flips both keys (#743).
       # seed_urls are placeholder court landing pages; the real discovery
       # (index_urls) URLs are set at live-enablement. Kept as a trailing block
       # to minimise merge conflict with the cantonal section added by #531.
@@ -306,9 +307,10 @@ overlays:
       # rulings are aggregated on entscheidsuche.ch, which is already in the
       # provider's host allow-list. Each template carries a lowercase cantonal
       # `court` hint (zh/be/bs) that flows into the decision metadata, and a
-      # cantonal corpus. Provider `ch_court_decisions` is a scaffold
-      # (live_ready=false); these templates stay `enabled: false` until an
-      # operator captures per-canton acceptance-run evidence and flips both keys.
+      # cantonal corpus. Provider `ch_court_decisions` is implemented but has no
+      # acceptance evidence (readiness=awaiting_evidence, NOT a scaffold); these
+      # templates stay `enabled: false` until an operator captures per-canton
+      # acceptance-run evidence and flips both keys (#743).
       # The index_urls below are PLACEHOLDER entscheidsuche.ch canton listings
       # and need verification at live-enablement (the exact canton-filter path /
       # or a cantonal court portal host must be confirmed, and a portal host
@@ -359,9 +361,14 @@ overlays:
       # Distinct from the Fedlex cantonal-concordat discovery path: this
       # provider scrapes the cantonal systematic collections directly, which
       # surface the bulk of cantonal/"state" legislation. Provider
-      # `canton_http` is a scaffold (live_ready=false); these templates stay
-      # `enabled: false` until an operator captures per-canton acceptance-run
-      # evidence and flips both keys. The seed_urls below are placeholder
+      # `canton_http` is readiness=scaffold — but note its start_run IS
+      # implemented (inherited from PortalHttpProviderBase). It cannot acquire
+      # because several cantonal collections are JavaScript SPA portals whose
+      # statute text deterministic HTTP never sees (#631); the shared density
+      # gate refuses the nav shell rather than reporting success on chrome.
+      # The remedy is engineering (SPA rendering or a data endpoint), which is
+      # what `scaffold` encodes — so no run of any mode dispatches, not even
+      # mode=acceptance (#743). The seed_urls below are placeholder
       # portal URLs and the portal hosts/paths need verification at
       # live-enablement. Kept as a trailing block to minimise merge conflict.
       # ───────────────────────────────────────────────────────────────
@@ -417,9 +424,9 @@ overlays:
       # in force 01.09.2017, not repealed). That page carries the metadata; the
       # operative text is a PDF.
       #
-      # STAYS `enabled: false`, and the provider is still `live_ready = False` —
-      # but NOT for the engineering reasons this comment used to give. Both of
-      # those blockers have since landed:
+      # STAYS `enabled: false`, and the provider's readiness is
+      # `awaiting_evidence` — NOT `scaffold`, and not for the engineering reasons
+      # this comment used to give. Both of those blockers have since landed:
       #
       #   - Binary manifestations are carried: `ProviderResource` has `body_bytes`
       #     alongside `body`, with `raw_bytes`/`is_binary` accessors (#590/ADR-0037).
@@ -430,7 +437,10 @@ overlays:
       #
       # What remains is the ADR-0030 **evidence** step: an operator has not yet
       # captured an acceptance run for this template. That is a loop to run, not
-      # code to write — see #735 and #628. Do not flip either key without it.
+      # code to write — dispatch a run with `mode=acceptance`, which the lock
+      # admits for an `awaiting_evidence` provider precisely so it can produce
+      # its own evidence (#743). See #735 and #628. Do not flip either key
+      # without it.
       # ───────────────────────────────────────────────────────────────
       gemeinde_http_zh_stadt_hundevorschriften:
         provider: gemeinde_http

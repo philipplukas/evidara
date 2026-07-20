@@ -1,4 +1,7 @@
-"""CH communal (Gemeinde) HTTP acquisition provider — SCAFFOLD (#584).
+"""CH communal (Gemeinde) HTTP acquisition provider — AWAITING ACCEPTANCE EVIDENCE (#584).
+
+Not a scaffold: `start_run` is implemented and verified against the live source.
+The ADR-0030 code key is shut only on the evidence step (see below, and #743).
 
 Swiss communal law is the layer the ADR-0033 acceptance test lives in
 ("Can the city ban a certain thing for dogs, year-round?"): the act being
@@ -45,8 +48,8 @@ Verified against live Zürich AS 554.510 ("Vollzugsvorschriften zum
 Hundegesetz", in force 2017-09-01): the landing page parses and the linked
 217 KB PDF is fetched intact.
 
-WHY THE PROVIDER STILL SHIPS DISABLED (`live_ready = False`)
-------------------------------------------------------------
+WHY THE PROVIDER STILL SHIPS DISABLED (`readiness = AWAITING_EVIDENCE`)
+-----------------------------------------------------------------------
 Not for an engineering reason any more. Both halves are built:
 
 - **Acquisition** (#584): the operative PDF is fetched and emitted as a binary
@@ -93,6 +96,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -269,7 +273,7 @@ class GemeindeHttpProvider:
     # The code-owner key stays shut on the remaining ADR-0030 requirement alone:
     # no operator has captured acceptance-run evidence for this template yet.
     # That is a loop to run (#628/#735), not code to write. ADR-0030 two-key lock.
-    live_ready: ClassVar[bool] = False
+    readiness: ClassVar[AcquisitionReadiness] = AcquisitionReadiness.AWAITING_EVIDENCE
 
     @property
     def supported_portals(self) -> dict[int, CommunalPortal]:
@@ -436,9 +440,9 @@ class GemeindeHttpProvider:
         except ProviderConfigurationError as exc:
             notes.append(f"config_error={exc}")
         notes.append(
-            "live_ready=false: acquisition (#584) and PDF normalisation (#650) are both "
-            "done; the remaining ADR-0030 requirement is operator acceptance-run "
-            "evidence for this template — see #735"
+            "readiness=awaiting_evidence: acquisition (#584) and PDF normalisation (#650) "
+            "are both done; the remaining ADR-0030 requirement is operator acceptance-run "
+            "evidence for this template — dispatch mode=acceptance, see #735"
         )
         return ProviderPlan(
             provider=self.provider_name,

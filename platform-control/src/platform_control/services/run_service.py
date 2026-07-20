@@ -12,7 +12,12 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from acquisition_core.normalization import ArtifactPipeline
-from acquisition_core.providers import ProviderNotLiveReadyError, ensure_live_ready
+from acquisition_core.providers import (
+    AcquisitionReadiness,
+    ProviderNotLiveReadyError,
+    ensure_launchable,
+    provider_readiness,
+)
 from platform_control.config import get_settings
 from platform_control.domain import (
     ExecutionMode,
@@ -133,6 +138,7 @@ class RunService:
         self,
         source_version: SourceVersion,
         provider: AcquisitionProvider,
+        run_mode: RunMode | None = None,
     ) -> None:
         """Two-key lock for the run-launch path (ADR-0030).
 
@@ -142,22 +148,60 @@ class RunService:
           the effective key resolved by `BlueprintEnablementService` (DB override
           an operator flipped, else the shipped `source_blueprints.yaml` default),
           and
-        - code owner: the provider that will actually be called declares
-          `live_ready = True` (i.e. `start_run` is not a stub).
+        - code owner: the provider that will actually be called is
+          ``AcquisitionReadiness.LIVE`` (i.e. `start_run` is not a stub, and
+          acceptance evidence has been accepted).
 
         SHADOW versions are exempt: they are routed to the cassette provider
         and replay fixtures, so no request ever reaches the portal the lock
-        protects — that is precisely the rehearsal mode an operator uses
-        *before* capturing acceptance-run evidence.
+        protects — a rehearsal that proves nothing about the live portal, which
+        is why it cannot serve as acceptance evidence.
+
+        ``RunMode.ACCEPTANCE`` is the other exemption, and the narrow one. It
+        reaches the real portal, so it is *not* exempt from the code key — it
+        merely admits ``AWAITING_EVIDENCE`` alongside ``LIVE``.
+
+        It waives the config key ONLY for an ``AWAITING_EVIDENCE`` provider, and
+        that limit is load-bearing. The config key is not just "not vetted yet":
+        an operator override is the only audited way to stop traffic at one
+        portal without a deploy — the kill switch you reach for when an authority
+        complains about load. A blanket waiver would make that switch advisory
+        for every provider, including LIVE ones that never had a deadlock to
+        break: for those the operator already owns the config key and can simply
+        turn it. Only a provider that cannot otherwise earn its first key gets
+        the waiver.
+
+        The template must still *exist* in either case. A version pointing at a
+        template deleted from `source_blueprints.yaml` — the deploy-time way we
+        stop crawling a portal — is refused for acceptance runs too.
         """
         if source_version.execution_mode is ExecutionMode.SHADOW:
             return
+        for_acceptance = run_mode is RunMode.ACCEPTANCE
+        waive_config_key = (
+            for_acceptance
+            and provider_readiness(provider) is AcquisitionReadiness.AWAITING_EVIDENCE
+        )
         if source_version.overlay_id and source_version.provider_template_id:
-            await BlueprintEnablementService(self.session).require_enabled(
-                source_version.overlay_id,
-                source_version.provider_template_id,
-            )
-        ensure_live_ready(provider, template_id=source_version.provider_template_id)
+            enablement = BlueprintEnablementService(self.session)
+            if waive_config_key:
+                # Raises NotFoundError for a template that no longer exists; the
+                # returned value is deliberately ignored, since the waiver is
+                # about the `enabled` flag alone.
+                await enablement.is_enabled(
+                    source_version.overlay_id,
+                    source_version.provider_template_id,
+                )
+            else:
+                await enablement.require_enabled(
+                    source_version.overlay_id,
+                    source_version.provider_template_id,
+                )
+        ensure_launchable(
+            provider,
+            template_id=source_version.provider_template_id,
+            for_acceptance=for_acceptance,
+        )
 
     async def _record_refused_run(
         self,
@@ -292,7 +336,7 @@ class RunService:
         provider = self._resolve_provider_for_source_version(source_version)
         if provider is not None:
             try:
-                await self._require_launchable(source_version, provider)
+                await self._require_launchable(source_version, provider, request.mode)
             except (BlueprintTemplateNotEnabledError, ProviderNotLiveReadyError) as exc:
                 await self._record_refused_run(source, source_version, request, str(exc))
                 raise
@@ -349,7 +393,7 @@ class RunService:
         # Readiness is the operator's pre-flight ("can I run this?"). It must
         # evaluate the two-key lock too, or it reports `ready: true` for a run
         # that create_run then 400s on the ADR-0030 lock (#634).
-        lock_check = await self._assess_launch_lock(source_version)
+        lock_check = await self._assess_launch_lock(source_version, mode)
         if lock_check is None:
             return readiness
         checks = [*readiness.checks, lock_check]
@@ -362,15 +406,17 @@ class RunService:
         )
 
     async def _assess_launch_lock(
-        self, source_version: SourceVersion | None
+        self, source_version: SourceVersion | None, run_mode: RunMode | None = None
     ) -> RunReadinessCheck | None:
         """Evaluate the ADR-0030 two-key lock as a readiness check.
 
         Returns None when there is no version to assess (earlier checks already
         fail). Mirrors `_require_launchable` exactly so pre-flight and dispatch
-        never disagree: SHADOW is exempt, the config key is the effective
-        enablement (DB override ?? shipped default), the code key is the
-        resolved provider's `live_ready`.
+        never disagree: SHADOW is exempt, ACCEPTANCE skips the config key and
+        admits AWAITING_EVIDENCE, the config key is the effective enablement (DB
+        override ?? shipped default), and the code key is the resolved provider's
+        readiness. Any divergence between the two here is a `ready: true` that
+        create_run then 400s on (#634) — keep them edited together.
         """
         if source_version is None:
             return None
@@ -380,6 +426,45 @@ class RunService:
                 ok=True,
                 detail="Shadow mode replays fixtures; the live-portal lock does not apply.",
             )
+
+        # Resolve the provider BEFORE the config key: whether the config key may
+        # be waived depends on the provider's readiness, so the order here has to
+        # match `_require_launchable`.
+        for_acceptance = run_mode is RunMode.ACCEPTANCE
+        # An unregistered provider name raises: `ProviderRegistry.get` adapts the
+        # core registry's KeyError into ProviderConfigurationError, and the bare
+        # core registry still raises KeyError — catch both, since either reaches
+        # here depending on which registry was injected. Readiness is a read-only
+        # pre-flight and must report this as a closed key rather than 500.
+        # Moving resolution ahead of the config-key check made it reachable for a
+        # version whose spec names an unknown provider, where the config-key
+        # branch used to answer first.
+        provider = None
+        try:
+            provider = self._resolve_provider_for_source_version(source_version)
+            if provider is None and self.provider_registry is None:
+                provider = build_provider_registry(get_settings()).resolve_for_version(
+                    source_version
+                )
+        except (ProviderConfigurationError, KeyError):
+            provider = None
+
+        # A provider we cannot resolve is not one we can vouch for. `ensure_launchable`
+        # treats it as SCAFFOLD, so pre-flight must refuse rather than report an
+        # acceptance run as ready — the divergence this docstring promises to avoid.
+        if provider is None:
+            return RunReadinessCheck(
+                code="acquisition_lock_open",
+                ok=False,
+                detail=(
+                    "Code key closed: no acquisition provider could be resolved for this "
+                    "source version (unknown provider name in the acquisition spec)."
+                ),
+            )
+
+        readiness = provider_readiness(provider)
+        provider_name = getattr(provider, "provider_name", "unknown")
+        waive_config_key = for_acceptance and readiness is AcquisitionReadiness.AWAITING_EVIDENCE
 
         if source_version.overlay_id and source_version.provider_template_id:
             try:
@@ -395,7 +480,7 @@ class RunService:
                         f"{source_version.provider_template_id}' no longer exists."
                     ),
                 )
-            if not config_enabled:
+            if not config_enabled and not waive_config_key:
                 return RunReadinessCheck(
                     code="acquisition_lock_open",
                     ok=False,
@@ -406,16 +491,38 @@ class RunService:
                     ),
                 )
 
-        provider = self._resolve_provider_for_source_version(source_version)
-        if provider is None and self.provider_registry is None:
-            provider = build_provider_registry(get_settings()).resolve_for_version(source_version)
-        if provider is not None and not getattr(provider, "live_ready", False):
+        # The remedy differs per state, so the detail must too: telling an
+        # operator "escalate to engineering" about a finished provider is the
+        # misdirection #743 exists to remove.
+        if readiness is AcquisitionReadiness.SCAFFOLD:
             return RunReadinessCheck(
                 code="acquisition_lock_open",
                 ok=False,
                 detail=(
-                    f"Code key closed: provider '{getattr(provider, 'provider_name', 'unknown')}' "
-                    "is not live-ready (start_run is still a scaffold)."
+                    f"Code key closed: provider '{provider_name}' cannot acquire its "
+                    "targets yet. This needs engineering."
+                ),
+            )
+        if readiness is AcquisitionReadiness.AWAITING_EVIDENCE and not for_acceptance:
+            return RunReadinessCheck(
+                code="acquisition_lock_open",
+                ok=False,
+                detail=(
+                    f"Code key closed: provider '{provider_name}' is implemented but "
+                    "has no acceptance-run evidence yet. Dispatch a run with "
+                    "mode=acceptance to capture it — this does not need an engineer "
+                    "(ADR-0030)."
+                ),
+            )
+
+        if waive_config_key:
+            return RunReadinessCheck(
+                code="acquisition_lock_open",
+                ok=True,
+                detail=(
+                    f"Acceptance run: provider '{provider_name}' is implemented, so it may "
+                    "reach the live portal to produce evidence. This is not a production run "
+                    "and does not imply either ADR-0030 key is turned."
                 ),
             )
         return RunReadinessCheck(
@@ -453,6 +560,21 @@ class RunService:
                 # of leaving it PENDING, or the worker retries it every poll cycle.
                 run.status = RunStatus.FAILED
                 run.failure_reason = str(exc)
+                run.completed_at = datetime.now(UTC)
+                locked += 1
+                continue
+            except Exception as exc:
+                # An acceptance run is a ONE-SHOT rehearsal by construction, and it
+                # is the one mode whose config key may be waived — so a PENDING
+                # acceptance run that keeps throwing is re-dispatched every poll
+                # cycle and the operator's `enabled: false` cannot stop it. That is
+                # a second route to unattended repetition, alongside the schedule
+                # ban ADR-0030 §6 relies on. Terminate it here; the operator can
+                # inspect the failure and dispatch a fresh one deliberately.
+                if run.mode is not RunMode.ACCEPTANCE:
+                    raise
+                run.status = RunStatus.FAILED
+                run.failure_reason = f"Acceptance run failed and is not retried: {exc}"
                 run.completed_at = datetime.now(UTC)
                 locked += 1
                 continue
@@ -1054,8 +1176,10 @@ class RunService:
             )
 
         # Last gate before any outbound request: no scaffold provider and no
-        # disabled blueprint template may reach a live portal (ADR-0030).
-        await self._require_launchable(source_version, provider)
+        # disabled blueprint template may reach a live portal (ADR-0030). The run
+        # carries its own mode, so an acceptance run re-checks as an acceptance run
+        # here — otherwise dispatch would refuse what creation admitted.
+        await self._require_launchable(source_version, provider, run.mode)
 
         # Bind the jurisdiction's rate limiter + robots context into the async
         # context so every outbound GET performed by the provider honours them.

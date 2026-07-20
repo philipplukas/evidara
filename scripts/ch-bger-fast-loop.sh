@@ -7,8 +7,13 @@ set -euo pipefail
 # provider and asserts case-law content gates (docket, court host, decision
 # markers) instead of legislation gates.
 #
-# SCAFFOLD NOTE: the `ch_court_decisions` provider ships live_ready=false and
-# its blueprint templates (ch_court_decisions_bger / _bvger) ship
+# READINESS NOTE: the `ch_court_decisions` provider ships
+# readiness=awaiting_evidence — NOT a scaffold. Its fetch/parse logic is
+# implemented and unit-tested; what is missing is acceptance evidence, which is
+# what this harness produces. Run it with `--mode acceptance`: the two-key lock
+# refuses `preview` for a provider awaiting evidence, and admits an acceptance
+# run precisely so the evidence can be captured without an engineer (#743).
+# Its blueprint templates (ch_court_decisions_bger / _bvger) ship
 # `enabled: false`. Until an operator flips both keys with acceptance evidence
 # (#530), a live run stops at readiness/two-key-lock. This script is the
 # acceptance harness to run *at* live-enablement: point --pc-url at an env whose
@@ -27,6 +32,10 @@ JSON_OUTPUT=0
 DRY_RUN=0
 COPY_EVIDENCE=0
 MAX_POLLS=60
+# `ch_court_decisions` is readiness=awaiting_evidence, so `preview` is refused by
+# the lock. Default stays `preview` for consistency with the sibling harnesses;
+# capture evidence with `--mode acceptance` (#743, #530).
+RUN_MODE="preview"
 POLL_INTERVAL=5
 WORKDIR_ROOT="${TMPDIR:-/tmp}/ch-bger-fast-loop"
 RUN_DIR=""
@@ -62,6 +71,10 @@ Options:
                                  Also read from EVIDARA_PLATFORM_CONTROL_API_KEY.
   --template <template-id>       Source blueprint template (default: ch_court_decisions_bger)
   --max-resources <n>            Preview scope max_resources (default: 25)
+  --mode <preview|acceptance|production>
+                                 Run mode (default: preview). `ch_court_decisions` is
+                                 readiness=awaiting_evidence, so capturing its first
+                                 evidence needs --mode acceptance (#743).
   --max-polls <n>                Maximum run polls (default: 60)
   --poll-interval <seconds>      Run poll interval (default: 5)
   --out-dir <path>               Exact directory for persisted evidence bundle
@@ -110,6 +123,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --max-resources)
       MAX_RESOURCES="${2:?missing value for --max-resources}"
+      shift 2
+      ;;
+    --mode)
+      RUN_MODE="${2:?missing value for --mode}"
       shift 2
       ;;
     --max-polls)
@@ -165,6 +182,14 @@ require_cmd() {
 
 require_cmd curl
 require_cmd jq
+case "${RUN_MODE}" in
+  preview|acceptance|production) ;;
+  *)
+    echo "error: --mode must be preview, acceptance or production (got '${RUN_MODE}')" >&2
+    exit 1
+    ;;
+esac
+
 
 mkdir -p "${WORKDIR_ROOT}"
 if [[ -z "${RUN_DIR}" ]]; then
@@ -266,6 +291,7 @@ log "    environment=${ENVIRONMENT}"
 log "    project=${PROJECT_ID}"
 log "    region=${REGION}"
 log "    template=${TEMPLATE_ID}"
+log "    run_mode=${RUN_MODE}"
 log "    authority=${AUTHORITY_ID}"
 log "    max_resources=${MAX_RESOURCES}"
 log "    max_polls=${MAX_POLLS}"
@@ -314,12 +340,13 @@ if [[ -z "${SOURCE_ID}" || -z "${SOURCE_VERSION_ID}" ]]; then
 fi
 
 log "==> Checking readiness"
-curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=preview" | tee "${RUN_DIR}/readiness.json" >/dev/null
+curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=${RUN_MODE}" | tee "${RUN_DIR}/readiness.json" >/dev/null
 READY="$(jq -r '.ready' < "${RUN_DIR}/readiness.json")"
 if [[ "${READY}" != "true" ]]; then
   echo "error: readiness returned ready=${READY}" >&2
-  echo "note: ch_court_decisions is a scaffold (live_ready=false) and its templates ship" >&2
-  echo "      enabled=false; enable the template + flip live_ready before this loop can run." >&2
+  echo "note: ch_court_decisions is readiness=awaiting_evidence — implemented, but no" >&2
+  echo "      acceptance evidence captured yet. Re-run with --mode acceptance to capture" >&2
+  echo "      it; the lock refuses --mode preview for a provider awaiting evidence (#743)." >&2
   cat "${RUN_DIR}/readiness.json" >&2
   exit 1
 fi
@@ -328,10 +355,10 @@ log "==> Approving source version"
 curl -fsS -X POST "${PC_URL}/v1/versions/${SOURCE_VERSION_ID}/approve" \
   "${PC_AUTH_HEADER[@]}" | tee "${RUN_DIR}/approve.json" >/dev/null
 
-RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --argjson max_resources "${MAX_RESOURCES}" '{
+RUN_PAYLOAD="$(jq -n --arg source_id "${SOURCE_ID}" --arg source_version_id "${SOURCE_VERSION_ID}" --arg run_mode "${RUN_MODE}" --argjson max_resources "${MAX_RESOURCES}" '{
   source_id: $source_id,
   source_version_id: $source_version_id,
-  mode: "preview",
+  mode: $run_mode,
   scope: {
     kind: "discovered_subset",
     max_resources: $max_resources
@@ -423,6 +450,7 @@ fi
 
 SUMMARY_JSON="$(jq -n \
   --arg environment "${ENVIRONMENT}" \
+  --arg run_mode "${RUN_MODE}" \
   --arg template_id "${TEMPLATE_ID}" \
   --arg authority_id "${AUTHORITY_ID}" \
   --arg source_id "${SOURCE_ID}" \
@@ -449,6 +477,7 @@ SUMMARY_JSON="$(jq -n \
   --argjson min_content_length_ok "${min_content_length_ok}" \
   '{
     environment: $environment,
+    run_mode: $run_mode,
     template_id: $template_id,
     authority_id: $authority_id,
     source_id: $source_id,

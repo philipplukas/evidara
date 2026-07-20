@@ -31,6 +31,7 @@ See `PortalHttpProviderBase` for the shared acquisition flow.
 from __future__ import annotations
 
 from platform_control.domain import AcquisitionProvider
+from platform_control.services.acquisition_provider import AcquisitionReadiness
 from platform_control.services.portal_http_provider_base import (
     PortalHttpProviderBase,
 )
@@ -44,7 +45,7 @@ class CantonHttpProvider(PortalHttpProviderBase):
     subdivision_country = "CH"
     # Scaffold: templates stay `enabled: false` and live runs are rejected
     # until an operator captures per-canton acceptance-run evidence.
-    live_ready = False
+    readiness = AcquisitionReadiness.SCAFFOLD
     supported_portals: dict[str, str] = {
         # ISO 3166-2:CH code → cantonal legislation portal host. Seed URLs
         # in each blueprint template must resolve to the matching host (or a

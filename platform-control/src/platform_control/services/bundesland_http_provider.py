@@ -17,6 +17,7 @@ per-portal-vs-multi-tenant rationale.
 from __future__ import annotations
 
 from platform_control.domain import AcquisitionProvider
+from platform_control.services.acquisition_provider import AcquisitionReadiness
 from platform_control.services.portal_http_provider_base import (
     PortalHttpProviderBase,
 )
@@ -28,7 +29,7 @@ class BundeslandHttpProvider(PortalHttpProviderBase):
     provider_name = AcquisitionProvider.BUNDESLAND_HTTP.value
     subdivision_spec_key = "bundesland"
     subdivision_country = "DE"
-    live_ready = True
+    readiness = AcquisitionReadiness.LIVE
     supported_portals: dict[str, str] = {
         # ISO 3166-2:DE code → portal host. Seed URLs in each blueprint
         # template must resolve to the matching host (or a subdomain of

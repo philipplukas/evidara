@@ -20,7 +20,12 @@ from dataclasses import dataclass, field
 import pytest
 from sqlalchemy import select
 
-from acquisition_core.providers import ProviderNotLiveReadyError
+from acquisition_core.providers import (
+    AcquisitionReadiness,
+    ProviderNotLiveReadyError,
+    ensure_launchable,
+    provider_readiness,
+)
 from platform_control.domain import RunMode, RunStatus
 from platform_control.errors import BlueprintTemplateNotEnabledError
 from platform_control.models.authority import Authority, Jurisdiction
@@ -273,3 +278,77 @@ async def test_a_refusal_is_auditable_through_the_run_collection(session) -> Non
     assert genuine_total == 1
     assert genuine[0].refused is False
     assert genuine[0].failure_reason == "upstream 503"
+
+
+# ─── provider_readiness fail-closed (#743 review round 2) ───────────────────
+#
+# The docstring promises "unknown must never mean launchable", and a mutation
+# pass proved both halves of that promise could be inverted to fail-OPEN with
+# 589 tests green: `provider_readiness` is only ever exercised against real
+# providers that all declare a valid `readiness`, so the legacy-bool path and
+# both SCAFFOLD defaults had no coverage at all. An unrecognised state opening
+# the lock means dispatching at a live portal on a provider nobody vouched for.
+
+
+class _NoReadinessDeclared:
+    provider_name = "no_readiness"
+
+
+class _BogusReadiness:
+    provider_name = "bogus"
+    readiness = "definitely_not_a_state"
+
+
+class _NoneReadiness:
+    provider_name = "none_readiness"
+    readiness = None
+
+
+class _TruthyNonEnum:
+    provider_name = "truthy"
+    readiness = 1
+
+
+class _LegacyBoolTrue:
+    provider_name = "legacy_true"
+    live_ready = True
+
+
+class _LegacyBoolFalse:
+    provider_name = "legacy_false"
+    live_ready = False
+
+
+@pytest.mark.parametrize(
+    "provider",
+    [_NoReadinessDeclared, _BogusReadiness, _NoneReadiness, _TruthyNonEnum, _LegacyBoolFalse],
+)
+def test_unknown_or_missing_readiness_fails_closed(provider) -> None:
+    assert provider_readiness(provider) is AcquisitionReadiness.SCAFFOLD
+    # And fails closed at the lock too, in BOTH modes — an unrecognised state
+    # must not be admitted by the acceptance exemption either.
+    with pytest.raises(ProviderNotLiveReadyError):
+        ensure_launchable(provider)
+    with pytest.raises(ProviderNotLiveReadyError):
+        ensure_launchable(provider, for_acceptance=True)
+
+
+def test_legacy_live_ready_bool_still_maps_to_live() -> None:
+    # Third-party and test doubles predating the enum keep working; this is the
+    # shim that let 576 of 580 existing tests pass untouched.
+    assert provider_readiness(_LegacyBoolTrue) is AcquisitionReadiness.LIVE
+    ensure_launchable(_LegacyBoolTrue)
+
+
+def test_readiness_wins_over_a_contradicting_legacy_bool() -> None:
+    # The enum is authoritative. A runbook telling an engineer to set
+    # `live_ready = False` as a rollback would be a silent no-op, which is why
+    # ch-bger-live-enablement.md now warns about exactly this.
+    class _Contradictory:
+        provider_name = "contradictory"
+        readiness = AcquisitionReadiness.AWAITING_EVIDENCE
+        live_ready = True
+
+    assert provider_readiness(_Contradictory) is AcquisitionReadiness.AWAITING_EVIDENCE
+    with pytest.raises(ProviderNotLiveReadyError):
+        ensure_launchable(_Contradictory)

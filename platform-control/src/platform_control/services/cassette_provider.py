@@ -36,6 +36,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -46,7 +47,7 @@ class CassetteProvider:
     provider_name = "cassette"
     # Implemented (replays fixtures, no network), so the two-key lock's
     # provider-side key is turned: SHADOW runs route here and must dispatch.
-    live_ready = True
+    readiness = AcquisitionReadiness.LIVE
 
     def __init__(self, cassette_dir: Path) -> None:
         self.cassette_dir = Path(cassette_dir)

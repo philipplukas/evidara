@@ -24,14 +24,15 @@ against a pinned host allow-list (the official court portals plus the open
 aggregator ``entscheidsuche.ch``) before any request is made, so a
 mis-configured seed cannot make the provider fetch an arbitrary host.
 
-Scaffold status
----------------
-``live_ready = False``: the fetch/parse logic is implemented and unit-tested
-against captured fixtures, but no live source has been accepted from a running
-environment yet. The loader's two-key lock (``provider.live_ready`` +
-``template.enabled``) keeps blueprint templates referencing this provider from
-firing until an operator captures acceptance-run evidence via
-``scripts/ch-bger-fast-loop.sh`` and flips both keys. See issue #530.
+Readiness status
+----------------
+``readiness = AWAITING_EVIDENCE`` — **not a scaffold**. The fetch/parse logic is
+implemented and unit-tested against captured fixtures; what is missing is that no
+live source has been accepted from a running environment yet. The two-key lock
+(provider readiness + ``template.enabled``) keeps production runs from firing
+until an operator captures acceptance-run evidence and flips both keys. A
+``mode=acceptance`` run may dispatch in the meantime — that is how the evidence
+gets produced without an engineer (#743). See issues #530 and #735.
 
 Compliance
 ----------
@@ -61,6 +62,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -229,7 +231,7 @@ class ChCourtDecisionsProvider:
     """Acquisition provider for Swiss federal court decisions (HTML)."""
 
     provider_name = "ch_court_decisions"
-    live_ready = False
+    readiness = AcquisitionReadiness.AWAITING_EVIDENCE
 
     async def start_run(
         self,

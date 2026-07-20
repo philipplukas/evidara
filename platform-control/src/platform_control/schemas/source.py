@@ -13,6 +13,7 @@ from pydantic import (
     model_validator,
 )
 
+from acquisition_core.providers import AcquisitionReadiness
 from platform_control.domain import (
     AcquisitionProvider,
     ExecutionMode,
@@ -397,8 +398,21 @@ class SourceBlueprintPreviewResponse(BaseModel):
         "else the shipped source_blueprints.yaml default (fail-closed).",
     )
     live_ready: bool = Field(
-        description="ADR-0030 code key: the resolved provider can physically acquire this "
-        "format. Stays in code — it is an engineering assertion, not operator state.",
+        description="ADR-0030 code key, as a boolean: true only when acquisition_readiness "
+        "is 'live'. Retained so existing clients keep working; prefer "
+        "acquisition_readiness, which distinguishes a scaffold from a provider that is "
+        "merely awaiting acceptance evidence (#743).",
+    )
+    acquisition_readiness: AcquisitionReadiness = Field(
+        default=AcquisitionReadiness.SCAFFOLD,
+        description=(
+            "ADR-0030 code key, three-state. 'scaffold' = the provider cannot acquire its "
+            "targets and needs engineering (usually a stub start_run, sometimes a real one "
+            "facing sources it cannot fetch); 'awaiting_evidence' = implemented and "
+            "verified, but no acceptance run captured yet (the operator can run one "
+            "themselves); 'live' = evidence accepted. `live_ready` is the legacy boolean "
+            "projection of this field and is true only for 'live'."
+        ),
     )
     launchable: bool = Field(
         description="Both keys turned — a live run will not be blocked by the two-key lock.",
@@ -427,7 +441,20 @@ class SourceBlueprintTemplateResponse(BaseModel):
         "else the shipped source_blueprints.yaml default (fail-closed).",
     )
     live_ready: bool = Field(
-        description="ADR-0030 code key: the resolved provider can physically acquire this format.",
+        description="ADR-0030 code key, as a boolean: true only when acquisition_readiness "
+        "is 'live'. Retained so existing clients keep working; prefer "
+        "acquisition_readiness (#743).",
+    )
+    acquisition_readiness: AcquisitionReadiness = Field(
+        default=AcquisitionReadiness.SCAFFOLD,
+        description=(
+            "ADR-0030 code key, three-state. 'scaffold' = the provider cannot acquire its "
+            "targets and needs engineering (usually a stub start_run, sometimes a real one "
+            "facing sources it cannot fetch); 'awaiting_evidence' = implemented and "
+            "verified, but no acceptance run captured yet (the operator can run one "
+            "themselves); 'live' = evidence accepted. `live_ready` is the legacy boolean "
+            "projection of this field and is true only for 'live'."
+        ),
     )
     launchable: bool = Field(
         description="Both keys turned — a live run will not be blocked by the two-key lock.",

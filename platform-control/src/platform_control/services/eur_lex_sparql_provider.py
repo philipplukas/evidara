@@ -33,6 +33,7 @@ from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.services.acquisition_provider import (
+    AcquisitionReadiness,
     ProviderPlan,
     ProviderResource,
     ProviderStartResult,
@@ -84,7 +85,7 @@ class EurLexSparqlProvider:
     """
 
     provider_name = AcquisitionProvider.EUR_LEX_SPARQL.value
-    live_ready = True
+    readiness = AcquisitionReadiness.LIVE
 
     _RESOLVE_ELI_QUERY = """
 PREFIX owl: <http://www.w3.org/2002/07/owl#>

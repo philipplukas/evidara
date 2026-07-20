@@ -26,8 +26,20 @@ class RunStatus(StrEnum):
 
 
 class RunMode(StrEnum):
+    """What a run is *for*, which decides which ADR-0030 keys it needs.
+
+    ``ACCEPTANCE`` is the operator's rehearsal against the live portal — the run
+    that produces the evidence for turning the keys, so it cannot require them to
+    be turned already. It admits a provider in ``AWAITING_EVIDENCE`` (never a
+    scaffold) and does not require the config key, because flipping that key is
+    the *outcome* of the acceptance, not its precondition. It is recorded on the
+    run so evidence is self-labelling and can never be mistaken for production
+    ingest afterwards.
+    """
+
     PREVIEW = "preview"
     PRODUCTION = "production"
+    ACCEPTANCE = "acceptance"
 
 
 class RunScopeKind(StrEnum):

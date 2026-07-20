@@ -19,6 +19,12 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
+from acquisition_core.providers import (
+    AcquisitionReadiness,
+    ProviderNotLiveReadyError,
+    ensure_launchable,
+    provider_readiness,
+)
 from platform_control.errors import ProviderConfigurationError
 from platform_control.services.canton_http_provider import CantonHttpProvider
 
@@ -267,7 +273,14 @@ async def test_canton_provider_refuses_javascript_navigation_shell(
     assert skipped["legal_marker_count"] == 0
 
 
-def test_canton_http_provider_is_not_live_ready() -> None:
-    # Scaffold guard: the provider ships disabled so the two-key lock rejects
-    # live runs until per-canton acceptance evidence is captured.
-    assert CantonHttpProvider.live_ready is False
+def test_canton_http_provider_is_a_scaffold() -> None:
+    # `scaffold` is remedy-shaped, not stub-shaped: start_run here is inherited
+    # from PortalHttpProviderBase and real, but the cantonal SPA portals never
+    # serve the statute to a deterministic fetch (#631), so it still needs
+    # engineering. Unlike gemeinde_http/ch_court_decisions there is nothing for
+    # an acceptance run to gather evidence about, so even mode=acceptance must
+    # refuse (#743).
+    assert provider_readiness(CantonHttpProvider) is AcquisitionReadiness.SCAFFOLD
+    with pytest.raises(ProviderNotLiveReadyError) as excinfo:
+        ensure_launchable(CantonHttpProvider, for_acceptance=True)
+    assert "scaffold" in str(excinfo.value)
