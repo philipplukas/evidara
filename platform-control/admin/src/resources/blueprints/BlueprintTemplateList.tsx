@@ -40,7 +40,8 @@ import { BlueprintEnablementDialog } from "./BlueprintEnablementDialog";
 type TemplateRecord = SourceBlueprintTemplate & { id: string };
 
 const CLASS_PRESET_LABEL: Record<TemplateLockClass, string> = {
-  "operator-actionable": "Awaiting evidence — you can fix",
+  "operator-actionable": "Ready to enable — you can fix",
+  "awaiting-acceptance": "Awaiting acceptance run — you can fix",
   "engineer-blocked": "Needs provider work",
   live: "Live",
 };

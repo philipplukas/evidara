@@ -43,7 +43,9 @@ export function buildRunDecisionSupport(run: RunRecord): RunDecisionSupport {
   const whyItMatters =
     run.mode === "production"
       ? "This production run reflects the live path for the source version and should be treated as operator-critical."
-      : "This preview run is the checkpoint before promotion, so its outcome decides whether the version is ready.";
+      : run.mode === "acceptance"
+        ? "This acceptance run reaches the live source to produce ADR-0030 evidence. A pass is the justification for enabling the template — it does not by itself mean either key is turned."
+        : "This preview run is the checkpoint before promotion, so its outcome decides whether the version is ready.";
 
   const whatIsBlocked =
     run.status === "failed"
