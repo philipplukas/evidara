@@ -17,6 +17,13 @@ COPY styles/shell ./styles/shell
 # `next build` via `turbopack.resolveAlias` in next.config.ts, which pins them
 # to THIS surface's node_modules. No repo-root node_modules is involved. See #588.
 
+# playwright.config.ts imports the shared run-identity helper from
+# scripts/e2e/ (another module outside any package, same shape as styles/).
+# `next build` type-checks it because tsconfig's include is `**/*.ts`, so the
+# file must exist in the image or the build fails with "Cannot find module
+# '../../scripts/e2e/playwright-server-identity.mjs'". See #719.
+COPY scripts/e2e ./scripts/e2e
+
 COPY platform-control/admin/package*.json ./platform-control/admin/
 WORKDIR /workspace/platform-control/admin
 RUN npm ci
