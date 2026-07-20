@@ -105,3 +105,30 @@ describe("run decision support helpers", () => {
     expect(support.whatHappensIfIgnored).not.toContain("stays blocked");
   });
 });
+
+describe("acceptance runs are not described as previews", () => {
+  it("names the acceptance mode and what a pass does and does not justify", () => {
+    // #743 fixed the `production ? … : "Preview"` mislabelling at the badge
+    // sites and missed this one, so the run detail called an acceptance run
+    // "this preview run" 400px below a section that named it correctly.
+    const support = buildPipelineDecisionSupport({
+      run: { ...baseRun, mode: "acceptance" },
+      health: null,
+    });
+
+    expect(support.whyItMatters).toContain("acceptance run");
+    expect(support.whyItMatters).toContain("does not by itself turn either key");
+    expect(support.whyItMatters).not.toContain("preview run");
+  });
+
+  it("still describes preview and production in their own terms", () => {
+    expect(
+      buildPipelineDecisionSupport({ run: { ...baseRun, mode: "preview" }, health: null })
+        .whyItMatters,
+    ).toContain("preview run");
+    expect(
+      buildPipelineDecisionSupport({ run: { ...baseRun, mode: "production" }, health: null })
+        .whyItMatters,
+    ).toContain("production run");
+  });
+});

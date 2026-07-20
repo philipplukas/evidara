@@ -117,12 +117,22 @@ export default function RunListV2() {
 
   // Whether the numbers on the preset chips mean anything, and if so what.
   // Everything below reads this instead of assuming `runs` is the whole queue.
-  const countScope = resolveQueueCountScope({
-    hasError: Boolean(controller.error),
-    isPending: controller.isPending,
-    loadedCount: runs.length,
-    total: controller.total,
-  });
+  //
+  // A server-side status filter makes the per-status counts unknowable, not zero:
+  // the page holds only the filtered status, so every other chip counted 0 and —
+  // because loadedCount >= total on that filtered page — `resolveQueueCountScope`
+  // called it `complete` and printed a confident `0` over a non-empty queue. The
+  // scope is `unknown` here so the chips render the `—` this module already has
+  // for exactly this case. Zero and "I could not ask" must not look the same.
+  const isStatusFiltered = Boolean(filterValues.status);
+  const countScope = isStatusFiltered
+    ? "unknown"
+    : resolveQueueCountScope({
+        hasError: Boolean(controller.error),
+        isPending: controller.isPending,
+        loadedCount: runs.length,
+        total: controller.total,
+      });
 
   const statusCounts = useMemo(() => {
     const seed: Record<RunStatus, number> = {
