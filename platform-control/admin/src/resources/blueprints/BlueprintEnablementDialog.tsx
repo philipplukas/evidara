@@ -55,6 +55,10 @@ export function BlueprintEnablementDialog({ template, onClose }: BlueprintEnable
   }
 
   const turningOn = !template.enabled;
+  // Fall back to the legacy boolean for payloads that predate #743. Never infer
+  // `awaiting_evidence` from it — only the server can assert that state.
+  const codeKeyState =
+    template.acquisition_readiness ?? (template.live_ready ? "live" : "scaffold");
   const noteRequired = turningOn;
   const noteMissing = noteRequired && note.trim().length === 0;
 
@@ -103,12 +107,24 @@ export function BlueprintEnablementDialog({ template, onClose }: BlueprintEnable
       description={`${template.overlay_id} · ${template.provider_template_id} · provider ${template.provider}`}
     >
       <div className="space-y-4">
-        {turningOn && !template.live_ready ? (
+        {turningOn && codeKeyState === "scaffold" ? (
           <InlineAlert tone="error" testId="blueprint-enablement-code-key-warning">
             <strong>This will not make the template launchable.</strong> The code key is shut —
-            provider <code>{template.provider}</code> cannot yet acquire this format. Turning the
-            config key on records your intent, but live runs stay blocked until the provider ships.
-            That half needs an engineer.
+            provider <code>{template.provider}</code> cannot acquire its targets yet — either
+            start_run is a stub, or it faces sources it cannot fetch. Turning the config key on
+            records your intent, but live runs stay blocked until the provider ships. That half
+            needs an engineer.
+          </InlineAlert>
+        ) : null}
+
+        {turningOn && codeKeyState === "awaiting_evidence" ? (
+          <InlineAlert tone="warning" testId="blueprint-enablement-acceptance-warning">
+            <strong>Capture an acceptance run first.</strong> Provider{" "}
+            <code>{template.provider}</code> is built and verified, but no acceptance evidence has
+            been captured for this template. Run the acceptance harness against the live source (a
+            run with <code>mode=acceptance</code>) — you can do that yourself. Note that moving the
+            provider to <code>live</code> afterwards is still a code change; attach your verdict to
+            that request, and paste it here as your evidence note.
           </InlineAlert>
         ) : null}
 
