@@ -30,6 +30,12 @@ jobs:
   # workflow, at job level, so `gate` can always report. See #719.
   changes:
     name: Detect changed paths
+    # dorny/paths-filter compares PR head/base via the GitHub API on
+    # pull_request; without this it fails "Resource not accessible by
+    # integration". Scoped to this job so no other job's permissions change.
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
