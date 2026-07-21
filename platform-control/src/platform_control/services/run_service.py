@@ -161,15 +161,29 @@ class RunService:
         reaches the real portal, so it is *not* exempt from the code key — it
         merely admits ``AWAITING_EVIDENCE`` alongside ``LIVE``.
 
-        It waives the config key ONLY for an ``AWAITING_EVIDENCE`` provider, and
-        that limit is load-bearing. The config key is not just "not vetted yet":
-        an operator override is the only audited way to stop traffic at one
-        portal without a deploy — the kill switch you reach for when an authority
-        complains about load. A blanket waiver would make that switch advisory
-        for every provider, including LIVE ones that never had a deadlock to
-        break: for those the operator already owns the config key and can simply
-        turn it. Only a provider that cannot otherwise earn its first key gets
-        the waiver.
+        The config-key waiver turns on *how the key came to be shut*, not on the
+        provider's readiness (#768). Two shut keys mean opposite things:
+
+        - **Never turned** (`source="default"`, shipped `enabled: false`). The
+          template has never earned evidence. This is the deadlock: acceptance is
+          the only sanctioned way to earn the key, so refusing it here makes the
+          refusal's own instruction — "capture acceptance-run evidence, then
+          enable it" — impossible to follow. Waived.
+        - **Explicitly closed** (`source="override"`, `enabled=False`). An
+          operator turned it off. This is the kill switch you reach for when an
+          authority complains about load, and it is the only audited way to stop
+          traffic at one portal without a deploy. Never waived — a waiver here
+          would make that switch advisory, which is the load-bearing limit the
+          pre-#768 code was protecting.
+
+        Keying on readiness conflated "new provider" with "new template". It
+        worked while every provider was new, and silently had no path for a new
+        template on a provider already promoted to ``LIVE`` — which is the common
+        case as coverage extends along an axis (#584, #731, #736), and is how
+        ADR-0033's dog axis stalled.
+
+        The code key is unchanged: ``SCAFFOLD`` still refuses, so a waived config
+        key never lets a provider that cannot acquire reach a portal.
 
         The template must still *exist* in either case. A version pointing at a
         template deleted from `source_blueprints.yaml` — the deploy-time way we
@@ -178,10 +192,14 @@ class RunService:
         if source_version.execution_mode is ExecutionMode.SHADOW:
             return
         for_acceptance = run_mode is RunMode.ACCEPTANCE
-        waive_config_key = (
-            for_acceptance
-            and provider_readiness(provider) is AcquisitionReadiness.AWAITING_EVIDENCE
-        )
+        waive_config_key = for_acceptance
+        if waive_config_key and source_version.overlay_id and source_version.provider_template_id:
+            state = await BlueprintEnablementService(self.session).get_state(
+                source_version.overlay_id, source_version.provider_template_id
+            )
+            # An operator's explicit close is absolute; only a never-turned key
+            # is waived.
+            waive_config_key = state.source != "override"
         if source_version.overlay_id and source_version.provider_template_id:
             enablement = BlueprintEnablementService(self.session)
             if waive_config_key:
@@ -412,11 +430,13 @@ class RunService:
 
         Returns None when there is no version to assess (earlier checks already
         fail). Mirrors `_require_launchable` exactly so pre-flight and dispatch
-        never disagree: SHADOW is exempt, ACCEPTANCE skips the config key and
-        admits AWAITING_EVIDENCE, the config key is the effective enablement (DB
-        override ?? shipped default), and the code key is the resolved provider's
-        readiness. Any divergence between the two here is a `ready: true` that
-        create_run then 400s on (#634) — keep them edited together.
+        never disagree: SHADOW is exempt, ACCEPTANCE admits AWAITING_EVIDENCE
+        alongside LIVE and waives a config key that was never turned but never
+        one an operator explicitly closed (#768), the config key is the effective
+        enablement (DB override ?? shipped default), and the code key is the
+        resolved provider's readiness. Any divergence between the two here is a
+        `ready: true` that create_run then 400s on (#634) — keep them edited
+        together.
         """
         if source_version is None:
             return None
@@ -464,11 +484,10 @@ class RunService:
 
         readiness = provider_readiness(provider)
         provider_name = getattr(provider, "provider_name", "unknown")
-        waive_config_key = for_acceptance and readiness is AcquisitionReadiness.AWAITING_EVIDENCE
 
         if source_version.overlay_id and source_version.provider_template_id:
             try:
-                config_enabled = await BlueprintEnablementService(self.session).is_enabled(
+                state = await BlueprintEnablementService(self.session).get_state(
                     source_version.overlay_id, source_version.provider_template_id
                 )
             except NotFoundError:
@@ -480,16 +499,37 @@ class RunService:
                         f"{source_version.provider_template_id}' no longer exists."
                     ),
                 )
-            if not config_enabled and not waive_config_key:
+            # Mirrors `_require_launchable`: an operator's explicit close is
+            # absolute, a never-turned key is waived for acceptance (#768).
+            operator_closed = state.source == "override"
+            waive_config_key = for_acceptance and not operator_closed
+            # Only a key that was actually shut got waived — an acceptance run
+            # over an enabled template must still report both keys turned.
+            config_key_waived = waive_config_key and not state.enabled
+            if not state.enabled and not waive_config_key:
+                detail = (
+                    f"Config key closed: template '{source_version.overlay_id}/"
+                    f"{source_version.provider_template_id}' is not enabled. "
+                )
+                # The remedy differs, so the message must too. Telling an operator
+                # who deliberately closed the key to "capture evidence" misreads
+                # their own kill switch as an un-earned key.
+                detail += (
+                    "An operator turned this key off; turn it back on from the "
+                    "admin panel's Blueprints inventory to run against this portal "
+                    "again (ADR-0030)."
+                    if operator_closed
+                    else "Capture acceptance-run evidence with `mode=acceptance`, "
+                    "then enable it (ADR-0030, #632)."
+                )
                 return RunReadinessCheck(
                     code="acquisition_lock_open",
                     ok=False,
-                    detail=(
-                        f"Config key closed: template '{source_version.overlay_id}/"
-                        f"{source_version.provider_template_id}' is not enabled. Capture "
-                        "acceptance-run evidence, then enable it (ADR-0030, #632)."
-                    ),
+                    detail=detail,
                 )
+        else:
+            # No template to gate on (operator-supplied acquisition spec).
+            config_key_waived = False
 
         # The remedy differs per state, so the detail must too: telling an
         # operator "escalate to engineering" about a finished provider is the
@@ -515,14 +555,25 @@ class RunService:
                 ),
             )
 
-        if waive_config_key:
+        # A rehearsal is any acceptance run where at least one key is not actually
+        # turned — either the config key was waived, or the code key is admitted
+        # rather than open. Reporting "both keys are turned" for those overstates
+        # the lock, which is the class of claim ADR-0030 exists to prevent.
+        code_key_admitted = readiness is AcquisitionReadiness.AWAITING_EVIDENCE
+        if config_key_waived or (for_acceptance and code_key_admitted):
+            unturned = []
+            if config_key_waived:
+                unturned.append("the config key has never been turned")
+            if code_key_admitted:
+                unturned.append("the provider has no acceptance evidence yet")
             return RunReadinessCheck(
                 code="acquisition_lock_open",
                 ok=True,
                 detail=(
                     f"Acceptance run: provider '{provider_name}' is implemented, so it may "
-                    "reach the live portal to produce evidence. This is not a production run "
-                    "and does not imply either ADR-0030 key is turned."
+                    f"reach the live portal to produce evidence ({', and '.join(unturned)}). "
+                    "This is not a production run and does not imply either ADR-0030 key "
+                    "is turned."
                 ),
             )
         return RunReadinessCheck(

@@ -107,10 +107,22 @@ class BlueprintEnablementService:
                 "so it cannot be launched for live acquisition."
             ) from exc
         if not enabled:
+            # The remedy differs by how the key came to be shut, so the message
+            # must too (#768). Telling an operator who deliberately closed the key
+            # to "capture acceptance-run evidence" misreads their own kill switch
+            # as a key that was never earned.
+            state = await self.get_state(overlay_id, provider_template_id)
+            if state.source == "override":
+                raise BlueprintTemplateNotEnabledError(
+                    f"Blueprint template '{overlay_id}/{provider_template_id}' was turned off "
+                    "by an operator. Turn the config key back on from the admin panel's "
+                    "Blueprints inventory to run against this portal again (ADR-0030)."
+                )
             raise BlueprintTemplateNotEnabledError(
                 f"Blueprint template '{overlay_id}/{provider_template_id}' is not enabled for "
-                "live acquisition. Capture acceptance-run evidence, then turn the config key on "
-                "from the admin panel's Blueprints inventory (ADR-0030, #632, #668)."
+                "live acquisition. Capture acceptance-run evidence with `mode=acceptance`, then "
+                "turn the config key on from the admin panel's Blueprints inventory "
+                "(ADR-0030, #632, #668)."
             )
 
     async def set_enabled(

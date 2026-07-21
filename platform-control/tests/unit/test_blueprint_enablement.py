@@ -37,6 +37,12 @@ LIVE_TEMPLATE = ("ch", "fedlex_sparql_constitution_de")
 # pinning these to one whose readiness has moved on would leave the
 # awaiting-evidence branch untested while still appearing covered.
 AWAITING_EVIDENCE_TEMPLATE = ("ch", "ch_court_decisions_bger")
+# A LIVE provider whose template still ships shut — the #768 case. `gemeinde_http`
+# is `readiness = LIVE` (gemeinde_http_provider.py:287) while
+# `gemeinde_http_zh_stadt_hundevorschriften` ships `enabled: false`, so the config
+# key here has never been turned by anyone. Distinct from LIVE_TEMPLATE, which
+# ships enabled.
+LIVE_BUT_SHUT_TEMPLATE = ("ch", "gemeinde_http_zh_stadt_hundevorschriften")
 
 
 async def _seed_reference(session) -> None:
@@ -288,9 +294,16 @@ async def test_acceptance_does_not_override_an_operator_disabling_a_live_templat
 
     An operator override is the only audited way to stop traffic at one portal
     without a deploy — what you reach for when an authority complains about load.
-    The acceptance waiver exists to break a deadlock that only `AWAITING_EVIDENCE`
-    providers have; a `LIVE` provider's operator already owns the config key and
-    can simply turn it. Waiving it there would buy nothing and cost the switch.
+    A waiver that ignored it would make the switch advisory.
+
+    The reason this holds is narrower than it was before #768. It is not "the
+    provider is LIVE, so its operator can simply turn the key" — that reasoning
+    was wrong, and #768 is what it cost: it also locked out every never-turned
+    key on a LIVE provider, whose operator could *not* simply turn it without
+    the evidence the lock demanded. What is load-bearing is that the key was
+    **explicitly closed**. See
+    `test_acceptance_is_admitted_for_a_never_turned_key_on_a_live_provider` for
+    the other side of that line.
     """
     source, version = await _approved_version_from_template(session, LIVE_TEMPLATE)
     await BlueprintEnablementService(session).set_enabled(
@@ -514,3 +527,113 @@ async def test_a_failing_acceptance_run_is_not_retried_forever(session) -> None:
     calls_after_first = _ExplodingProvider.calls
     await service.dispatch_pending_runs()
     assert _ExplodingProvider.calls == calls_after_first
+
+
+@pytest.mark.asyncio
+async def test_acceptance_is_admitted_for_a_never_turned_key_on_a_live_provider(session) -> None:
+    """The #768 deadlock: a new template on a provider already promoted to LIVE.
+
+    Before this, the waiver keyed off *provider* readiness, so a LIVE provider's
+    templates could never be acceptance-run while shut. The refusal told the
+    operator to "capture acceptance-run evidence, then enable it" — and the same
+    check is what forbade the acceptance run. The instruction was impossible to
+    follow, and the only exits were flipping the key blind or editing code.
+
+    This is the common case as coverage extends along an axis (#584, #731, #736):
+    same proven provider, new template.
+    """
+    source, version = await _approved_version_from_template(session, LIVE_BUT_SHUT_TEMPLATE)
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+
+    # Production is still refused — the config key is genuinely shut.
+    production = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+    production_lock = next(c for c in production.checks if c.code == "acquisition_lock_open")
+    assert production_lock.ok is False
+    assert "config key closed" in production_lock.detail.lower()
+    # And it must name the remedy that is actually available.
+    assert "acceptance" in production_lock.detail.lower()
+
+    # Acceptance is admitted, so the evidence can be earned.
+    acceptance = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.ACCEPTANCE,
+    )
+    acceptance_lock = next(c for c in acceptance.checks if c.code == "acquisition_lock_open")
+    assert acceptance_lock.ok is True
+    assert "never been turned" in acceptance_lock.detail.lower()
+    # A pass must not read as "the keys are turned".
+    assert "not a production run" in acceptance_lock.detail.lower()
+
+    # The enforcement path agrees with its pre-flight mirror — the #634 divergence.
+    provider = run_service._resolve_provider_for_source_version(version)
+    await run_service._require_launchable(version, provider, RunMode.ACCEPTANCE)
+
+
+@pytest.mark.asyncio
+async def test_an_operator_reclosing_a_key_still_blocks_acceptance_on_a_live_provider(
+    session,
+) -> None:
+    """The kill switch survives #768 for the template that motivated it.
+
+    The waiver turns on *how* the key came to be shut, so the same template that
+    earns acceptance while never-turned must lose it the moment an operator
+    closes it deliberately. Without this, #768's fix would have quietly widened
+    into the blanket waiver the pre-#768 code was right to refuse.
+    """
+    source, version = await _approved_version_from_template(session, LIVE_BUT_SHUT_TEMPLATE)
+    # Turn it on, then off — the second flip is a deliberate close, not a default.
+    enablement = BlueprintEnablementService(session)
+    await enablement.set_enabled(
+        *LIVE_BUT_SHUT_TEMPLATE, enabled=True, note="acceptance evidence captured", actor="op_x"
+    )
+    await enablement.set_enabled(
+        *LIVE_BUT_SHUT_TEMPLATE,
+        enabled=False,
+        note="STOP: authority complained about load",
+        actor="op_x",
+    )
+    await session.commit()
+
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.ACCEPTANCE,
+    )
+    lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
+    assert lock.ok is False
+    # And the remedy must name the switch, not send the operator to capture
+    # evidence they already have.
+    assert "operator turned this key off" in lock.detail.lower()
+    assert "capture acceptance-run evidence" not in lock.detail.lower()
+
+    provider = run_service._resolve_provider_for_source_version(version)
+    with pytest.raises(BlueprintTemplateNotEnabledError):
+        await run_service._require_launchable(version, provider, RunMode.ACCEPTANCE)
+
+
+@pytest.mark.asyncio
+async def test_a_waived_config_key_never_admits_a_scaffold(session) -> None:
+    """The config-key waiver must not leak into the code key.
+
+    #768 widened when the config key is waived; the code key is untouched. A
+    scaffold provider cannot acquire anything, so admitting it would send a run
+    at a live portal with no implementation behind it.
+    """
+    source, version = await _approved_version_from_template(session, SCAFFOLD_TEMPLATE)
+    run_service = RunService(session, provider_registry=build_provider_registry(_settings()))
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.ACCEPTANCE,
+    )
+    lock = next(c for c in readiness.checks if c.code == "acquisition_lock_open")
+    assert lock.ok is False
+    assert "code key closed" in lock.detail.lower()
+    assert "needs engineering" in lock.detail.lower()
