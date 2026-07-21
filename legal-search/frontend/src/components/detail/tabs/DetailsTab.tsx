@@ -2,7 +2,6 @@
 
 import { useTranslations } from "next-intl";
 import { MetadataList } from "@/components/detail/MetadataList";
-import { enrichMetadataRows } from "@/lib/metadata-visibility";
 import type { DetailViewModel } from "@/lib/types";
 import { SectionLabel } from "../../primitives";
 import { DocumentBody } from "../DocumentBody";
@@ -27,12 +26,7 @@ export function DetailsTab({ detail }: DetailsTabProps) {
         </p>
       </div>
 
-      {hasMetadata && (
-        <MetadataList
-          fields={enrichMetadataRows(detail.metadata, detail.type)}
-          initialDensity="default"
-        />
-      )}
+      {hasMetadata && <MetadataList fields={detail.metadata} initialDensity="default" />}
 
       {hasContent && detail.contentText && (
         <section className="space-y-3">

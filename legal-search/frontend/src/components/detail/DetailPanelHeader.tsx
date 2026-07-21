@@ -6,7 +6,6 @@ import { MetadataList } from "@/components/detail/MetadataList";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { toast } from "@/hooks/use-toast";
 import { AnalyticsEvent, track } from "@/lib/analytics";
-import { enrichMetadataRows } from "@/lib/metadata-visibility";
 import type { DetailViewModel } from "@/lib/types";
 import { AccentButton } from "../primitives";
 import { Breadcrumbs } from "./Breadcrumbs";
@@ -49,11 +48,7 @@ export function DetailPanelHeader({ detail, onPin, isPinned }: DetailPanelHeader
 
           {detail.metadata.length > 0 ? (
             <div className="mt-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-              <MetadataList
-                showHeading={false}
-                fields={enrichMetadataRows(detail.metadata, detail.type)}
-                initialDensity="compact"
-              />
+              <MetadataList showHeading={false} fields={detail.metadata} initialDensity="compact" />
             </div>
           ) : null}
         </div>

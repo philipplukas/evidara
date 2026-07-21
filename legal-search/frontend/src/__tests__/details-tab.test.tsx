@@ -60,7 +60,7 @@ describe("DetailsTab", () => {
   });
 
   it("renders a fallback label when metadata value is empty", () => {
-    const detail = buildDetail("", [{ label: "Jurisdiction", value: "" }]);
+    const detail = buildDetail("", [{ label: "Jurisdiction", value: "", visibility: "always" }]);
     renderWithProviders(<DetailsTab detail={detail} />);
 
     expect(screen.getByText("Jurisdiction")).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("DetailsTab", () => {
 
   it("renders metadata icons when icon keys are present", () => {
     const detail = buildDetail("", [
-      { label: "Document type", value: "Law", iconKey: "dtype-law" },
+      { label: "Document type", value: "Law", iconKey: "dtype-law", visibility: "always" },
     ]);
     const { container } = renderWithProviders(<DetailsTab detail={detail} />);
 
@@ -82,8 +82,11 @@ describe("DetailsTab", () => {
 
   it("hides expanded-only metadata until the expand control is used", () => {
     const detail = buildDetail("", [
-      { label: "Jurisdiction", value: "CH" },
-      { label: "Custom field", value: "Extra" },
+      { label: "Jurisdiction", value: "CH", visibility: "always" },
+      // `expanded` now comes from the BFF. This case used to rely on the client
+      // heuristic resolving an unrecognized English label to "expanded" — a rule
+      // that could never fire against the BFF's real German labels (#787).
+      { label: "Custom field", value: "Extra", visibility: "expanded" },
     ]);
     renderWithProviders(<DetailsTab detail={detail} />);
 

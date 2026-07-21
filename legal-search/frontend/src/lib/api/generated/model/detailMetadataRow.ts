@@ -19,20 +19,22 @@ particular, for what a coverage answer may and may not be read to mean.
 
  * OpenAPI spec version: 0.10.0
  */
-import type { InForceState } from './inForceState';
+import type { DetailMetadataRowVisibility } from './detailMetadataRowVisibility';
 
-export interface NormSummary {
-  document_id: string;
-  title: string;
-  document_type?: string;
-  official_citation?: string;
-  jurisdiction_ids: string[];
-  effective_date?: string;
-  /** First date the norm was in force. Falls back to `effective_date`. */
-  in_force_from?: string;
-  /** Last date the norm WAS in force (inclusive). Absent means "not known
-to be repealed" — which is not the same as "never repealed".
+/**
+ * A metadata row on the document-detail surface, where `MetadataList`
+filters by density. `visibility` is REQUIRED: the BFF owns the decision,
+because `label` is a localized display string (de/fr/it) and can never be
+a stable join key for a client-side rule (#787).
+
  */
-  in_force_until?: string;
-  in_force_state?: InForceState;
+export interface DetailMetadataRow {
+  label: string;
+  value: string;
+  iconKey?: string;
+  /** Density band for the detail `MetadataList`. `always` survives compact
+density, `default` shows at default density, `expanded` only when the
+reader expands the list.
+ */
+  visibility: DetailMetadataRowVisibility;
 }

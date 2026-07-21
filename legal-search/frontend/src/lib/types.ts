@@ -17,14 +17,20 @@ export interface BadgeViewModel {
 export type MetadataVisibility = "always" | "default" | "expanded";
 export type MetadataDensity = "compact" | "default" | "expanded";
 
+/** A metadata row on a search result card. Rendered in full — cards have no density control. */
 export interface MetadataRow {
   label: string;
   value: string;
   iconKey?: string;
-  /** When set by the BFF, overrides client-side `metadata-visibility` heuristics. */
-  visibility?: MetadataVisibility;
 }
 
+/**
+ * A metadata row on the detail surface, where `MetadataList` filters by density.
+ *
+ * `visibility` is required and always comes from the BFF. It is deliberately not
+ * derivable here: `label` is a localized display string ("Zustaendigkeit", "In Kraft"),
+ * so no client-side rule can key off it without breaking on the next locale (#787).
+ */
 export interface MetadataField extends MetadataRow {
   visibility: MetadataVisibility;
 }
@@ -123,7 +129,7 @@ export interface DetailViewModel {
   title: string;
   subtitle: string;
   breadcrumbs: string[];
-  metadata: MetadataRow[];
+  metadata: MetadataField[];
   /**
    * The document body as plain text, straight from `DetailView.content`.
    * Paragraphs are separated by blank lines; there is no markup. This replaced

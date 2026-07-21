@@ -17,19 +17,20 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
 particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
 
 /**
- * Optional UI density hint for the detail MetadataList. When omitted, the client derives
-visibility from document type and label heuristics (`metadata-visibility.ts`).
+ * Density band for the detail `MetadataList`. `always` survives compact
+density, `default` shows at default density, `expanded` only when the
+reader expands the list.
 
  */
-export type MetadataRowVisibility = typeof MetadataRowVisibility[keyof typeof MetadataRowVisibility];
+export type DetailMetadataRowVisibility = typeof DetailMetadataRowVisibility[keyof typeof DetailMetadataRowVisibility];
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const MetadataRowVisibility = {
+export const DetailMetadataRowVisibility = {
   always: 'always',
   default: 'default',
   expanded: 'expanded',

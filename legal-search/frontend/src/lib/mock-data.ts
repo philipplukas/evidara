@@ -320,11 +320,11 @@ export const articleDetail: DetailViewModel = {
     "Art. 754",
   ],
   metadata: [
-    { label: "Jurisdiction", value: "Switzerland", iconKey: "ch" },
-    { label: "Law", value: "Obligationenrecht (OR)" },
-    { label: "Systematic number", value: "SR 220" },
-    { label: "In force since", value: "01.01.2023" },
-    { label: "Last revision", value: "Aktienrechtsrevision 2020" },
+    { label: "Jurisdiction", value: "Switzerland", iconKey: "ch", visibility: "always" },
+    { label: "Law", value: "Obligationenrecht (OR)", visibility: "default" },
+    { label: "Systematic number", value: "SR 220", visibility: "default" },
+    { label: "In force since", value: "01.01.2023", visibility: "always" },
+    { label: "Last revision", value: "Aktienrechtsrevision 2020", visibility: "expanded" },
   ],
   // Plain text, as the API really sends it: paragraphs split by blank lines,
   // no markup. This mock used to hold hand-written HTML with styling classes —
@@ -440,12 +440,12 @@ export const decisionDetail: DetailViewModel = {
   subtitle: "Verantwortlichkeit des Verwaltungsrats – Beweislastverteilung",
   breadcrumbs: ["Federal Supreme Court", "I. Civil Law Division", "4A_123/2022"],
   metadata: [
-    { label: "Court", value: "Federal Supreme Court", iconKey: "ch" },
-    { label: "Date", value: "15.03.2022" },
-    { label: "Docket", value: "4A_123/2022" },
-    { label: "Publication", value: "BGE 148 III 234" },
-    { label: "Chamber", value: "I. Civil Law Division" },
-    { label: "Outcome", value: "Appeal dismissed" },
+    { label: "Court", value: "Federal Supreme Court", iconKey: "ch", visibility: "always" },
+    { label: "Date", value: "15.03.2022", visibility: "always" },
+    { label: "Docket", value: "4A_123/2022", visibility: "default" },
+    { label: "Publication", value: "BGE 148 III 234", visibility: "default" },
+    { label: "Chamber", value: "I. Civil Law Division", visibility: "default" },
+    { label: "Outcome", value: "Appeal dismissed", visibility: "always" },
   ],
   contentText: `Regeste
 
