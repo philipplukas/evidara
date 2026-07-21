@@ -51,24 +51,6 @@ type Jurisdiction = Schemas["JurisdictionResponse"];
 
 type Authority = Schemas["AuthorityResponse"];
 
-type SharedAcquisitionSpec = {
-  tenant_id?: string;
-  corpus_id?: string;
-  scope_type?: "global_public" | "tenant_private" | "tenant_shared";
-  source_origin_kind?:
-    | "official_primary"
-    | "official_mirror"
-    | "licensed_provider"
-    | "community_curated"
-    | "tenant_internal";
-  trust_tier?: "authoritative" | "preferred" | "supplemental" | "untrusted";
-  language_codes?: string[];
-  document_type_hint?: string | null;
-  request_timeout_seconds?: number;
-  user_agent?: string | null;
-  max_content_bytes?: number;
-};
-
 export type FirecrawlAcquisitionSpec = Schemas["FirecrawlAcquisitionSpec"];
 
 export type DeterministicHttpAcquisitionSpec = Schemas["DeterministicHttpAcquisitionSpec"];
@@ -216,10 +198,17 @@ export type RunPreviewSummaryDriftCheck = Schemas["RunPreviewSummaryDriftCheck"]
 export type RunPreviewSummary = Schemas["RunPreviewSummaryResponse"];
 
 /**
- * Endpoints that genuinely return an unbounded array under `data` — no
- * `limit`/`offset`/`total`, the whole table every time. These are the only
- * lists the client may sort and page itself. `sources` used to be listed here
- * and is not unbounded (#616).
+ * The reference-data collections, at `/v1/reference-data/*`.
+ *
+ * These are **server-paginated** as of #616 — they return the same
+ * `{data, limit, offset, total}` envelope as `/v1/sources` and `/v1/runs`. They
+ * are grouped separately only because they have no by-id endpoint, so `getOne`
+ * and `getMany` resolve records by paging the collection out
+ * (`fetchAllSimpleList`).
+ *
+ * `sources` used to be listed here on the false premise that it was unbounded,
+ * which is #616 itself; jurisdictions and authorities were the remaining half of
+ * that same mistake, at 2,169 rows per list render.
  */
 type SimpleListResourceName = "jurisdictions" | "authorities";
 type RunDetailResourceName =
@@ -389,13 +378,53 @@ const toRecord = <TItem extends Record<string, unknown>, TIdField extends keyof 
 const isRunDetailResource = (resource: string): resource is RunDetailResourceName =>
   resource in RUN_DETAIL_RESOURCE_CONFIG;
 
-const fetchSimpleList = async <TResource extends SimpleListResourceName>(
+/** One server page of a reference-data list. */
+const fetchSimpleListPage = async <TResource extends SimpleListResourceName>(
+  resource: TResource,
+  { limit, offset }: { limit: number; offset: number },
+): Promise<PaginatedListResponse<ResourceRecordMap[TResource]>> => {
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return requestJson<PaginatedListResponse<ResourceRecordMap[TResource]>>(
+    `${SIMPLE_LIST_PATHS[resource]}?${query}`,
+  );
+};
+
+/**
+ * Every record in a reference-data collection, by paging the endpoint out.
+ *
+ * `/v1/reference-data/{jurisdictions,authorities}` are server-paginated since
+ * #616 — before that they returned all 2,169 jurisdictions on every list render.
+ * Three callers genuinely need the whole table and cannot work from a page:
+ * `getOne` and `getMany` resolve records by id (there is no by-id endpoint), and
+ * the reference pickers must offer every jurisdiction or Zürich becomes
+ * unselectable again (#666).
+ *
+ * Requesting `limit=25000` would not serve them: the server clamps to 500 and
+ * says nothing, which is how #666 happened. Loop instead.
+ */
+const fetchAllSimpleList = async <TResource extends SimpleListResourceName>(
   resource: TResource,
 ): Promise<ResourceRecordMap[TResource][]> => {
-  const response = await requestJson<ListResponse<ResourceRecordMap[TResource]>>(
-    SIMPLE_LIST_PATHS[resource],
-  );
-  return response.data;
+  const collected: ResourceRecordMap[TResource][] = [];
+  let offset = 0;
+  for (;;) {
+    const response = await fetchSimpleListPage(resource, {
+      limit: MAX_SERVER_PAGE_SIZE,
+      offset,
+    });
+    collected.push(...response.data);
+    offset += MAX_SERVER_PAGE_SIZE;
+    // Continue only on an exactly-full page. A short page is the last one; an
+    // over-full page means the server ignored `limit`, in which case it has
+    // already given us everything and asking again would loop forever. Neither
+    // case may consult `total`, which the contract permits to be null.
+    if (response.data.length !== MAX_SERVER_PAGE_SIZE) {
+      return collected;
+    }
+    if (response.total != null && collected.length >= response.total) {
+      return collected;
+    }
+  }
 };
 
 const findInSimpleList = async <TResource extends SimpleListResourceName>(
@@ -403,7 +432,7 @@ const findInSimpleList = async <TResource extends SimpleListResourceName>(
   idField: keyof ResourceRecordMap[TResource],
   id: Identifier,
 ): Promise<ResourceRecordMap[TResource]> => {
-  const items = await fetchSimpleList(resource);
+  const items = await fetchAllSimpleList(resource);
   const match = items.find((item) => item[idField] === id);
   if (!match) {
     throw new HttpError(`${resource} record not found`, 404);
@@ -489,11 +518,16 @@ const applyClientSort = <T extends Record<string, unknown>>(
 };
 
 /**
- * Sort + page a list response **only** for endpoints that genuinely return the
- * whole collection in one unbounded array — `SIMPLE_LIST_PATHS` (reference
- * data) and `/v1/sources/{id}/versions`. Server-paginated endpoints must not
- * come through here: windowing a page re-derives `total` from the page length
- * and silently caps the list at the server default (#616).
+ * Sort + page an array the client already holds **in full**.
+ *
+ * Two callers qualify: `/v1/sources/{id}/versions` and
+ * `/v1/sources/blueprint-templates`, which genuinely return whole collections,
+ * and the reference-data pickers, which have paged the collection out
+ * themselves via `fetchAllSimpleList`.
+ *
+ * A single server *page* must never come through here — windowing one re-derives
+ * `total` from the page length and silently caps the list at the server default,
+ * which is exactly #616.
  */
 /**
  * Window an in-memory array the way `getList` promises to.
@@ -822,14 +856,36 @@ const toCommentaryInsightsQueryString = (params: GetListParams): string => {
   return queryString.length > 0 ? `?${queryString}` : "";
 };
 
+/**
+ * `getList` for the reference-data collections, which have two kinds of caller.
+ *
+ * The list views ask for a page (`perPage: 50`) and want the true hit count so
+ * their pager is honest — that is a server page, read straight through. The
+ * reference pickers ask for everything (`REFERENCE_PICKER_LIST_PARAMS`, 25,000)
+ * because a combobox over jurisdictions has to offer all of them (#666); that
+ * cannot be one request, since the server clamps `limit` to 500.
+ *
+ * Deciding on `perPage` keeps the distinction where the caller already states
+ * it, rather than adding a flag. Anything above the server ceiling means "the
+ * whole collection", and is served by paging out and then windowing in memory.
+ */
 const getSimpleListResult = async <TResource extends SimpleListResourceName>(
   resource: TResource,
   idField: keyof ResourceRecordMap[TResource],
   params: GetListParams,
 ): Promise<GetListResult<ResourceRecordMap[TResource] & RaRecord<Identifier>>> => {
-  const items = await fetchSimpleList(resource);
-  const records = items.map((item) => toRecord(item, idField));
-  return applyClientListWindow(records, params);
+  const perPage = Math.max(params.pagination?.perPage ?? 25, 1);
+
+  if (perPage > MAX_SERVER_PAGE_SIZE) {
+    const items = await fetchAllSimpleList(resource);
+    const records = items.map((item) => toRecord(item, idField));
+    return applyClientListWindow(records, params);
+  }
+
+  const { limit, offset } = toLimitOffset(params);
+  const response = await fetchSimpleListPage(resource, { limit, offset });
+  const records = response.data.map((item) => toRecord(item, idField));
+  return toServerPagedResult(records, response.total, params);
 };
 
 const buildRunScopedListQuery = (params: GetListParams): string => {
@@ -854,10 +910,10 @@ const fetchAllSources = async (): Promise<Source[]> => {
     const response = await requestJson<PaginatedListResponse<Source>>(`/v1/sources?${query}`);
     collected.push(...response.data);
     offset += MAX_SERVER_PAGE_SIZE;
-    // A short page is the terminating signal that does not depend on `total`:
-    // the contract permits `total: null`, and comparing against a null hit
-    // count would otherwise walk forever.
-    if (response.data.length < MAX_SERVER_PAGE_SIZE) {
+    // Continue only on an exactly-full page — see `fetchAllSimpleList` for why
+    // an over-full page must terminate too. The contract permits `total: null`,
+    // so neither check may depend on it.
+    if (response.data.length !== MAX_SERVER_PAGE_SIZE) {
       return collected;
     }
     if (response.total != null && collected.length >= response.total) {
@@ -1166,7 +1222,7 @@ export const controlPlaneDataProvider: DataProvider = {
 
   async getMany(resource, params): Promise<GetManyResult> {
     if (resource === ResourceName.Jurisdictions) {
-      const items = await fetchSimpleList(ResourceName.Jurisdictions);
+      const items = await fetchAllSimpleList(ResourceName.Jurisdictions);
       return {
         data: items
           .filter((item) => params.ids.includes(item.jurisdiction_id))
@@ -1175,7 +1231,7 @@ export const controlPlaneDataProvider: DataProvider = {
     }
 
     if (resource === ResourceName.Authorities) {
-      const items = await fetchSimpleList(ResourceName.Authorities);
+      const items = await fetchAllSimpleList(ResourceName.Authorities);
       return {
         data: items
           .filter((item) => params.ids.includes(item.authority_id))

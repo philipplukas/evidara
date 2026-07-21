@@ -95,13 +95,19 @@ def test_every_acquisition_provider_is_a_contract_variant(schema: dict) -> None:
 
 
 #: List responses whose endpoints paginate. Not all of them do — `GET
-#: /v1/sources/{source_id}/versions` and the reference-data lists return every
-#: row — and the contract now says so per endpoint instead of implying one rule.
+#: /v1/sources/{source_id}/versions` returns every row — and the contract says so
+#: per endpoint instead of implying one rule.
+#:
+#: The reference-data lists joined this set in #616. They were the remaining half
+#: of that issue: unbounded, so the admin fetched all 2,169 jurisdictions on
+#: every list render and reported the page length as the count.
 PAGINATED_LIST_RESPONSES = {
+    "AuthorityListResponse",
     "CapturedResourceListResponse",
     "CommentaryInsightListResponse",
     "CorpusListResponse",
     "CorrectionListResponse",
+    "JurisdictionListResponse",
     "ProviderJobListResponse",
     "RawArtifactListResponse",
     "RunListResponse",

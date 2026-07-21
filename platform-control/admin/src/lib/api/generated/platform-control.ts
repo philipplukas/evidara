@@ -1212,10 +1212,19 @@ export interface components {
             /** Compliance Policy Id */
             compliance_policy_id: string;
         };
-        /** AuthorityListResponse */
+        /**
+         * AuthorityListResponse
+         * @description One page of authorities plus the total hit count. See #616.
+         */
         AuthorityListResponse: {
             /** Data */
             data: components["schemas"]["AuthorityResponse"][];
+            /** Total */
+            total?: number | null;
+            /** Limit */
+            limit?: number | null;
+            /** Offset */
+            offset?: number | null;
         };
         /** AuthorityResponse */
         AuthorityResponse: {
@@ -2486,10 +2495,24 @@ export interface components {
             jurisdictions: components["schemas"]["HierarchySyncCountsResponse"];
             authorities: components["schemas"]["HierarchySyncCountsResponse"];
         };
-        /** JurisdictionListResponse */
+        /**
+         * JurisdictionListResponse
+         * @description One page of jurisdictions plus the total hit count.
+         *
+         *     ``total``/``limit``/``offset`` were added in #616. Before that this response
+         *     was ``data`` only, so the admin concluded the array was unbounded, paged it
+         *     client-side and reported the page length as the count — over 2,169 seeded
+         *     jurisdictions.
+         */
         JurisdictionListResponse: {
             /** Data */
             data: components["schemas"]["JurisdictionResponse"][];
+            /** Total */
+            total?: number | null;
+            /** Limit */
+            limit?: number | null;
+            /** Offset */
+            offset?: number | null;
         };
         /** JurisdictionPolicyAttachmentResponse */
         JurisdictionPolicyAttachmentResponse: {
@@ -3882,7 +3905,11 @@ export interface operations {
     };
     listJurisdictions: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                q?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3896,6 +3923,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JurisdictionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -3979,7 +4015,11 @@ export interface operations {
     };
     listAuthorities: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                q?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3993,6 +4033,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthorityListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

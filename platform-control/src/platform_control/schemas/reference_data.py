@@ -16,7 +16,18 @@ class JurisdictionResponse(BaseModel):
 
 
 class JurisdictionListResponse(BaseModel):
+    """One page of jurisdictions plus the total hit count.
+
+    ``total``/``limit``/``offset`` were added in #616. Before that this response
+    was ``data`` only, so the admin concluded the array was unbounded, paged it
+    client-side and reported the page length as the count — over 2,169 seeded
+    jurisdictions.
+    """
+
     data: list[JurisdictionResponse]
+    total: int | None = None
+    limit: int | None = None
+    offset: int | None = None
 
 
 class CreateJurisdictionRequest(BaseModel):
@@ -47,7 +58,12 @@ class AuthorityResponse(BaseModel):
 
 
 class AuthorityListResponse(BaseModel):
+    """One page of authorities plus the total hit count. See #616."""
+
     data: list[AuthorityResponse]
+    total: int | None = None
+    limit: int | None = None
+    offset: int | None = None
 
 
 class CreateAuthorityRequest(BaseModel):

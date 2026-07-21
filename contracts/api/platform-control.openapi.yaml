@@ -81,6 +81,31 @@ paths:
       - reference-data
       summary: List Jurisdictions
       operationId: listJurisdictions
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Offset
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Q
       responses:
         '200':
           description: Successful Response
@@ -88,19 +113,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JurisdictionListResponse'
-      security:
-      - APIKeyHeader: []
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
       - reference-data
       summary: Create Jurisdiction
       operationId: createJurisdiction
+      security:
+      - APIKeyHeader: []
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateJurisdictionRequest'
-        required: true
       responses:
         '201':
           description: Successful Response
@@ -114,8 +145,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-      security:
-      - APIKeyHeader: []
   /v1/reference-data/jurisdictions/{jurisdiction_id}:
     patch:
       tags:
@@ -162,6 +191,31 @@ paths:
       - reference-data
       summary: List Authorities
       operationId: listAuthorities
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Offset
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Q
       responses:
         '200':
           description: Successful Response
@@ -169,19 +223,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthorityListResponse'
-      security:
-      - APIKeyHeader: []
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
       - reference-data
       summary: Create Authority
       operationId: createAuthority
+      security:
+      - APIKeyHeader: []
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateAuthorityRequest'
-        required: true
       responses:
         '201':
           description: Successful Response
@@ -201,8 +261,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-      security:
-      - APIKeyHeader: []
   /v1/reference-data/authorities/{authority_id}:
     patch:
       tags:
@@ -3063,10 +3121,26 @@ components:
             $ref: '#/components/schemas/AuthorityResponse'
           type: array
           title: Data
+        total:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Total
+        limit:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Limit
+        offset:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Offset
       type: object
       required:
       - data
       title: AuthorityListResponse
+      description: 'One page of authorities plus the total hit count. See #616.'
     AuthorityResponse:
       properties:
         authority_id:
@@ -5286,10 +5360,32 @@ components:
             $ref: '#/components/schemas/JurisdictionResponse'
           type: array
           title: Data
+        total:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Total
+        limit:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Limit
+        offset:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Offset
       type: object
       required:
       - data
       title: JurisdictionListResponse
+      description: |-
+        One page of jurisdictions plus the total hit count.
+
+        ``total``/``limit``/``offset`` were added in #616. Before that this response
+        was ``data`` only, so the admin concluded the array was unbounded, paged it
+        client-side and reported the page length as the count — over 2,169 seeded
+        jurisdictions.
     JurisdictionPolicyAttachmentResponse:
       properties:
         jurisdiction_id:

@@ -1511,47 +1511,48 @@ describe("controlPlaneDataProvider", () => {
 });
 
 /**
- * #666, the half the issue did not name: raising the picker's `perPage` alone
- * would NOT have fixed the truncation. `/v1/reference-data/jurisdictions` returns
- * the whole table and the provider windows it client-side — but that windowing
- * reused `toLimitOffset`, which clamps to the *server's* `MAX_SERVER_PAGE_SIZE`
- * of 500. Any `perPage` above 500 was silently ignored, so a naive
- * "bump 250 → 5000" fix would still have shipped a picker showing 500 of 2,169.
+ * `/v1/reference-data/*` is server-paginated as of #616.
+ *
+ * This block previously asserted the opposite premise — "unbounded reference
+ * lists", the whole table in one response — and so pinned the remaining half of
+ * #616 as correct: 2,169 jurisdictions fetched on every list render, with the
+ * client windowing them itself.
+ *
+ * The two callers must both stay right, and they pull in opposite directions:
+ * the list views want one server page and the true hit count, while the
+ * reference pickers want every jurisdiction or Zürich is unselectable (#666).
+ * Raising the picker's `perPage` cannot serve the second, because the server
+ * clamps `limit` to 500 and says nothing — which is how #666 happened.
  */
-describe("client-side windowing of unbounded reference lists", () => {
+describe("reference-data list pagination (#616)", () => {
   const jurisdictions = Array.from({ length: 2169 }, (_, index) => ({
     jurisdiction_id: `jur_${String(index).padStart(4, "0")}`,
     name: `Jurisdiction ${String(index).padStart(4, "0")}`,
     slug: `jur-${index}`,
   }));
 
-  it("does not apply the server page-size ceiling to an in-memory array", async () => {
-    global.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ data: jurisdictions }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    ) as typeof fetch;
-
-    const result = await controlPlaneDataProvider.getList("jurisdictions", {
-      pagination: { page: 1, perPage: 25_000 },
-      sort: { field: "name", order: "ASC" },
-      filter: {},
+  /** A fetch mock that honours `limit`/`offset` the way the API does. */
+  const mockPagedJurisdictions = () =>
+    vi.fn().mockImplementation((url: string) => {
+      const query = new URL(url, "http://localhost").searchParams;
+      const limit = Number(query.get("limit") ?? "100");
+      const offset = Number(query.get("offset") ?? "0");
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: jurisdictions.slice(offset, offset + limit),
+            total: jurisdictions.length,
+            limit,
+            offset,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
     });
 
-    expect(result.total).toBe(2169);
-    // The bug: this used to be 500.
-    expect(result.data).toHaveLength(2169);
-    expect(result.data.map((record) => record.jurisdiction_id)).toContain("jur_2168");
-  });
-
-  it("still paginates normally for ordinary page sizes", async () => {
-    global.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ data: jurisdictions }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    ) as typeof fetch;
+  it("requests one server page for a list view and trusts the server total", async () => {
+    const fetchMock = mockPagedJurisdictions();
+    global.fetch = fetchMock as unknown as typeof fetch;
 
     const result = await controlPlaneDataProvider.getList("jurisdictions", {
       pagination: { page: 2, perPage: 50 },
@@ -1559,8 +1560,66 @@ describe("client-side windowing of unbounded reference lists", () => {
       filter: {},
     });
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "/api/platform-control/v1/reference-data/jurisdictions?limit=50&offset=50",
+    );
     expect(result.data).toHaveLength(50);
+    // The hit count, not the page length — the #616 assertion.
     expect(result.total).toBe(2169);
     expect(result.data[0].jurisdiction_id).toBe("jur_0050");
+  });
+
+  it("pages the whole collection out when the picker asks for everything", async () => {
+    const fetchMock = mockPagedJurisdictions();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("jurisdictions", {
+      pagination: { page: 1, perPage: 25_000 },
+      sort: { field: "name", order: "ASC" },
+      filter: {},
+    });
+
+    // 2169 rows at 500 per request: four full pages plus a short one.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(result.total).toBe(2169);
+    expect(result.data).toHaveLength(2169);
+    // #666: the last jurisdiction must be reachable, not truncated at 500.
+    expect(result.data.map((record) => record.jurisdiction_id)).toContain("jur_2168");
+  });
+
+  it("resolves getMany ids from beyond the first server page", async () => {
+    const fetchMock = mockPagedJurisdictions();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    // There is no by-id endpoint, so this must page out rather than read page 1.
+    const result = await controlPlaneDataProvider.getMany("jurisdictions", {
+      ids: ["jur_0001", "jur_2168"],
+    });
+
+    expect(result.data.map((record) => record.jurisdiction_id)).toEqual(["jur_0001", "jur_2168"]);
+  });
+
+  /**
+   * A server that ignores `limit` must not spin the paging loop forever. The
+   * loop continues only on an exactly-full page, so an over-full one stops it.
+   */
+  it("terminates when the server ignores limit and returns everything", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: jurisdictions }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("jurisdictions", {
+      pagination: { page: 1, perPage: 25_000 },
+      sort: { field: "name", order: "ASC" },
+      filter: {},
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.data).toHaveLength(2169);
   });
 });
