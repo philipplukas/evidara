@@ -544,6 +544,12 @@ processed_document_ids="$(jq -r '[.data[]? | select(.event_type=="document.proce
 indexed_language_checked=0
 indexed_language_ok=0
 indexed_language_observed=""
+# Follows the #744 skip convention: `checked=0` with `ok=1` is a gate that did not
+# run and is reported as skipped, never folded into the pass count. Only the loop
+# below sets `checked=1`, and only then does `ok` mean anything (#772).
+indexed_title_checked=0
+indexed_title_ok=1
+indexed_title_observed=""
 
 if [[ -z "${expected_lang}" ]]; then
   # Skipped, not passed. `indexed_language_checked` used to be set to 1 here, which
@@ -564,7 +570,9 @@ else
   read -ra doc_ids <<< "${processed_document_ids}"
   for attempt in $(seq 1 12); do
     indexed_language_observed=""
+    indexed_title_observed=""
     mismatches=0
+    title_mismatches=0
     all_present=1
     for doc_id in "${doc_ids[@]}"; do
       if ! curl_ls_json "${LS_URL}/v1/documents/${doc_id}" > "${RUN_DIR}/ls-document-${doc_id}.json" 2>/dev/null; then
@@ -577,10 +585,24 @@ else
         mismatches=$(( mismatches + 1 ))
         log "  language mismatch: ${doc_id} expected=${expected_lang} observed=${observed}"
       fi
+      # Title, read back from the index rather than from the capture (#772). The
+      # captured title was always correct in #771; the pipeline replaced it after.
+      observed_title="$(jq -r '.title // "missing"' < "${RUN_DIR}/ls-document-${doc_id}.json")"
+      indexed_title_observed="${indexed_title_observed}${indexed_title_observed:+,}${doc_id}=${observed_title}"
+      if ! printf '%s' "${observed_title}" | grep -Eq "${TITLE_REGEX}"; then
+        title_mismatches=$(( title_mismatches + 1 ))
+        log "  title mismatch: ${doc_id} expected=/${TITLE_REGEX}/ observed=${observed_title}"
+      fi
     done
     if [[ "${all_present}" -eq 1 ]]; then
       indexed_language_checked=1
       indexed_language_ok=$(( mismatches == 0 ? 1 : 0 ))
+      # Only meaningful when a real regex was supplied; the `.+` catch-all asserts
+      # nothing, which is what `title_gate_checked` already records.
+      if [[ "${title_checked}" -eq 1 ]]; then
+        indexed_title_checked=1
+        indexed_title_ok=$(( title_mismatches == 0 ? 1 : 0 ))
+      fi
       break
     fi
     log "  indexed-language poll ${attempt}/12: projection not queryable yet"
@@ -639,6 +661,7 @@ skipped_gates=()
 if [[ "${indexed_language_checked}" -eq 0 && "${indexed_language_ok}" -eq 1 ]]; then
   skipped_gates+=("indexed_language_ok")
 fi
+[[ "${indexed_title_checked}" -eq 1 ]] || skipped_gates+=("indexed_title_ok")
 skipped_gates_json="$(jq -nc '$ARGS.positional' --args "${skipped_gates[@]+"${skipped_gates[@]}"}")"
 
 if [[ "${#skipped_gates[@]}" -gt 0 ]]; then
@@ -658,6 +681,10 @@ elif [[ "${in_force_ok}" -lt 1 ]]; then
 elif [[ "${title_ok}" -lt 1 || "${url_pattern_ok}" -lt 1 || "${art1_ok}" -lt 1 ]]; then
   verdict="pipeline_pass_content_suspect"
 elif [[ "${art_density_ok}" -lt 1 || "${min_content_length_ok}" -lt 1 || "${lang_agreement_ok}" -lt 1 ]]; then
+  verdict="pipeline_pass_content_suspect"
+elif [[ "${indexed_title_checked}" -eq 1 && "${indexed_title_ok}" -lt 1 ]]; then
+  # `title_ok` above reads the captured title; this reads the indexed one. #771 was
+  # invisible to the first and obvious to the second (#772).
   verdict="pipeline_pass_content_suspect"
 fi
 
@@ -687,6 +714,9 @@ SUMMARY_JSON="$(jq -n \
   --argjson processed_count "${processed_count}" \
   --argjson title_ok "${title_ok}" \
   --argjson title_checked "${title_checked}" \
+  --argjson indexed_title_ok "${indexed_title_ok}" \
+  --argjson indexed_title_checked "${indexed_title_checked}" \
+  --arg indexed_title_observed "${indexed_title_observed}" \
   --argjson url_pattern_ok "${url_pattern_ok}" \
   --argjson art1_ok "${art1_ok}" \
   --argjson art_density_count "${art_density_count}" \
@@ -733,6 +763,9 @@ SUMMARY_JSON="$(jq -n \
       processed_count: $processed_count,
       title_ok: $title_ok,
       title_checked: $title_checked,
+      indexed_title_ok: $indexed_title_ok,
+      indexed_title_checked: $indexed_title_checked,
+      indexed_title_observed: $indexed_title_observed,
       url_pattern_ok: $url_pattern_ok,
       art1_ok: $art1_ok,
       art_density_count: $art_density_count,
