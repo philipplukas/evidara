@@ -17,25 +17,14 @@ from document_intelligence.normalize.html import (
     normalize_plain_text_document,
 )
 from document_intelligence.normalize.ir import Block, NormalizedDocumentIR
+from document_intelligence.normalize.titles import is_placeholder_title
 from document_intelligence.normalize.xml import normalize_xml_document
 
 
 def _is_placeholder_title(title: str | None) -> bool:
-    if title is None:
-        return True
-    normalized = title.strip()
-    if not normalized:
-        return True
-    lowered = normalized.lower()
-    if lowered in {"untitled document", "ris dokument"}:
-        return True
-    # Normalize whitespace + dashes for RIS placeholder variants
-    # ("RIS — Dokument", "RIS – Dokument", "RIS - Dokument", "RIS  -  Dokument")
-    collapsed = " ".join(lowered.split())
-    ris_normalized = collapsed.replace("\u2014", "-").replace("\u2013", "-")
-    if ris_normalized.startswith("ris -") or ris_normalized.startswith("ris-"):
-        return True
-    return False
+    # Delegates to the shared predicate (#771). `doc.name` below is docling's *file*
+    # name, so this path is one of the ways a filename reaches a title slot.
+    return is_placeholder_title(title)
 
 
 def normalize_with_docling(
