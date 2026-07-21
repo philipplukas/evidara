@@ -66,6 +66,26 @@ Differences between environments are limited to:
 | Secrets            | Google Secret Manager, referenced by name                 |
 | Feature flags      | Environment variables (simple) or config service (future) |
 
+### Which variable names an environment
+
+Each service names its environment **once**, under its own prefix. Every deployment must set
+these — they are what stamps the `environment` field on structured log lines, so log
+aggregation can filter and route by origin.
+
+| Service | Variable | Read by | Missing value |
+| --- | --- | --- | --- |
+| `platform-control` | `PLATFORM_CONTROL_ENVIRONMENT` | `Settings.environment`, and the `environment` log tag derived from it | **Startup error.** The setting has no default (#683), so a deployment cannot run without naming itself. |
+| `document-intelligence` | `DI_ENVIRONMENT` | The `environment` log tag | Falls back to `unknown` and logs an `environment_tag_unset` warning once per process. DI has no settings model and its entrypoints include one-shot CLI jobs, so a fatal error here would be disproportionate for a field that gates nothing. |
+
+There is deliberately **no unprefixed `ENVIRONMENT` variable.** Both services used to read one
+for their log tag, it was set in no deployment, and so every production log line was tagged
+`environment="unknown"` for as long as the field existed (#712). Two variables meaning the same
+thing is what let them drift; do not reintroduce the second one.
+
+In the live Hetzner runtime both keys live in `infra/hetzner/apps/configmap.yaml`, consumed via
+`envFrom` by every pod (ADR-0029). Locally they default to `development` in
+`docker-compose.local.yml`.
+
 ## Evidara CLI env vars (dev / staging / prod)
 
 Use `[tools/evidara-cli](../../tools/evidara-cli/README.md)` for quick HTTP checks against **platform-control** and **legal-search** in any environment. Set the variables below from **deploy-time config**, **Google Secret Manager**, or your **operator runbook** — never commit real URLs that embed credentials, API keys, or bearer tokens.
