@@ -101,6 +101,8 @@ services:
       dockerfile: document-intelligence/Dockerfile.document-service
     profiles: ["lean", "lean-stack"]
     environment:
+      # Tags structured log lines with their origin (#712). Unset => environment="unknown".
+      DI_ENVIRONMENT: ${DI_ENVIRONMENT:-development}
       DOCUMENT_SERVICE_CONTENT_DIR: /content
       PORT: "8090"
     volumes:

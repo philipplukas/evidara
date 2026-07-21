@@ -207,6 +207,8 @@ services:
     command: ["document_intelligence_nats_consumer", "--servers", "nats://nats:4222"]
     environment:
       PORT: "8092"
+      # Tags structured log lines with their origin (#712). Unset => environment="unknown".
+      DI_ENVIRONMENT: ${DI_ENVIRONMENT:-development}
       # Artifact-bundle storage. platform-control writes bundles to MinIO when it
       # runs with ARTIFACT_STORE_BACKEND=s3, but the consumer had no S3 config, so
       # `_default_s3_client_factory` fell back to real AWS and every bundle
@@ -243,6 +245,7 @@ services:
   document-service:
     profiles: ["nats"]
     environment:
+      DI_ENVIRONMENT: ${DI_ENVIRONMENT:-development}
       DI_SURFACES_ROOT_URI: file:///surfaces
       PORT: "8090"
     volumes:
@@ -278,6 +281,7 @@ services:
       - http://platform-control-api:8000
     environment:
       PORT: "8093"
+      DI_ENVIRONMENT: ${DI_ENVIRONMENT:-development}
     depends_on:
       nats-init:
         condition: service_completed_successfully

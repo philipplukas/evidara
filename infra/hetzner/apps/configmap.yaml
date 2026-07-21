@@ -19,6 +19,13 @@ data:
   PLATFORM_CONTROL_NATS_SERVERS: "nats://nats.evidara.svc:4222"
   PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: "inline"
   # document-intelligence
+  # Tags every structured log line with its origin. Was read from an unprefixed
+  # ENVIRONMENT var that this ConfigMap never set, so all production DI logs were
+  # tagged environment="unknown" and could not be filtered or routed (#712).
+  # Applies to document-service, di-consumer and projection-bridge — all three take
+  # this ConfigMap via envFrom. platform-control needs no equivalent key: it derives
+  # its tag from PLATFORM_CONTROL_ENVIRONMENT above.
+  DI_ENVIRONMENT: "production"
   DI_S3_ENDPOINT_URL: "http://minio.evidara.svc:9000"
   DI_S3_REGION: "us-east-1"
   NATS_SERVERS: "nats://nats.evidara.svc:4222"

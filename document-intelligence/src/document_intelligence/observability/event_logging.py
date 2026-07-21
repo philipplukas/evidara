@@ -5,10 +5,54 @@ from __future__ import annotations
 import json
 import logging
 import os
+from functools import lru_cache
 from typing import Any
 
-_ENVIRONMENT = os.environ.get("ENVIRONMENT", "unknown")
 _SERVICE = "di-consumer"
+
+_UNSET_ENVIRONMENT = "unknown"
+
+
+@lru_cache(maxsize=1)
+def _environment() -> str:
+    """Resolve the environment tag for document-intelligence log lines.
+
+    This used to read an unprefixed ``ENVIRONMENT`` variable that was set nowhere in
+    the repo, so every deployed log line was tagged ``"unknown"`` (#712). It now reads
+    ``DI_ENVIRONMENT``, matching the ``DI_`` prefix every other document-intelligence
+    setting already uses (``DI_S3_ENDPOINT_URL``, ``DI_GCP_PROJECT_ID``,
+    ``DI_EVENT_PUBLISHER_BACKEND``), and `infra/hetzner/apps/configmap.yaml` sets it for
+    every pod.
+
+    Unlike platform-control — which derives this from a *required* ``Settings.environment``
+    and so fails at startup when it is missing — document-intelligence has no settings
+    model, and its entrypoints include one-shot CLI jobs and the test suite. Making a
+    missing tag fatal would therefore break every local invocation for the sake of a
+    log field that, as #712 notes, gates nothing. So the fallback stays, but it no
+    longer fails *silently*: an unset value is reported once per process, which is what
+    was actually missing when this went unnoticed in production.
+
+    Resolved lazily and cached; tests use ``_environment.cache_clear()``.
+    """
+    value = (os.environ.get("DI_ENVIRONMENT") or "").strip()
+    if value:
+        return value
+
+    logging.getLogger(__name__).warning(
+        json.dumps(
+            {
+                "event": "environment_tag_unset",
+                "service": _SERVICE,
+                "environment": _UNSET_ENVIRONMENT,
+                "error_message": (
+                    "DI_ENVIRONMENT is not set; every log line from this process will be "
+                    "tagged environment=unknown and cannot be filtered or routed by "
+                    "environment. Set it in the deployment config (see #712)."
+                ),
+            }
+        )
+    )
+    return _UNSET_ENVIRONMENT
 
 
 def log_event(
@@ -39,7 +83,7 @@ def log_event(
     fields: dict[str, Any] = {
         "event": event,
         "service": _SERVICE,
-        "environment": _ENVIRONMENT,
+        "environment": _environment(),
     }
 
     for key, value in [
