@@ -99,7 +99,7 @@ generated/
 !legal-search/frontend/src/lib/api/generated/**
 # The admin's contract types must be tracked or its `openapi:check` gate is
 # vacuous: `git diff --exit-code` never reports an ignored file, so drift would
-# pass silently — the exact failure mode ADR-0045 exists to close.
+# pass silently — a gate that cannot fail, which ADR-0040 forbids (#690, #772).
 !platform-control/admin/src/lib/api/generated/
 !platform-control/admin/src/lib/api/generated/**
 *.generated.*
