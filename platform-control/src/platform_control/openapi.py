@@ -58,7 +58,11 @@ API_TITLE = "Platform Control API"
 # scaffold needing engineering (#743), and so it can run the acceptance loop
 # that produces its own evidence (#735). `live_ready` is retained as the boolean
 # projection (true only for `live`), so this is additive, not breaking.
-API_VERSION = "0.15.0"
+# 0.16.0: additive — pagination on the reference-data collections. Jurisdictions
+# and authorities now accept `limit`/`offset` and return a real `total`, so the
+# admin can page 2,169 jurisdictions instead of receiving them all in one array
+# and windowing client-side (#616).
+API_VERSION = "0.16.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks

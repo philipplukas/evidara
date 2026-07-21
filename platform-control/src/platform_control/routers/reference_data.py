@@ -23,11 +23,25 @@ from platform_control.services.reference_data_service import ReferenceDataServic
 router = APIRouter(prefix="/v1/reference-data", tags=["reference-data"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
+#: Server-side ceiling on ``limit``, matching ``/v1/sources`` and ``/v1/runs``.
+#: The admin's paging loop for reference dropdowns requests exactly this size.
+MAX_PAGE_SIZE = 500
+
 
 @router.get("/jurisdictions", response_model=JurisdictionListResponse)
-async def list_jurisdictions(session: SessionDep) -> JurisdictionListResponse:
+async def list_jurisdictions(
+    session: SessionDep,
+    limit: int = 100,
+    offset: int = 0,
+    q: str | None = None,
+) -> JurisdictionListResponse:
     service = ReferenceDataService(session)
-    return JurisdictionListResponse(data=await service.list_jurisdictions())
+    clamped_limit = max(1, min(limit, MAX_PAGE_SIZE))
+    clamped_offset = max(0, offset)
+    data, total = await service.list_jurisdictions(limit=clamped_limit, offset=clamped_offset, q=q)
+    return JurisdictionListResponse(
+        data=data, total=total, limit=clamped_limit, offset=clamped_offset
+    )
 
 
 @router.post(
@@ -58,9 +72,17 @@ async def update_jurisdiction(
 
 
 @router.get("/authorities", response_model=AuthorityListResponse)
-async def list_authorities(session: SessionDep) -> AuthorityListResponse:
+async def list_authorities(
+    session: SessionDep,
+    limit: int = 100,
+    offset: int = 0,
+    q: str | None = None,
+) -> AuthorityListResponse:
     service = ReferenceDataService(session)
-    return AuthorityListResponse(data=await service.list_authorities())
+    clamped_limit = max(1, min(limit, MAX_PAGE_SIZE))
+    clamped_offset = max(0, offset)
+    data, total = await service.list_authorities(limit=clamped_limit, offset=clamped_offset, q=q)
+    return AuthorityListResponse(data=data, total=total, limit=clamped_limit, offset=clamped_offset)
 
 
 @router.post(

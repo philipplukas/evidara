@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from platform_control.errors import NotFoundError
@@ -17,9 +17,27 @@ class ReferenceDataService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_jurisdictions(self) -> list[Jurisdiction]:
-        result = await self.session.scalars(select(Jurisdiction).order_by(Jurisdiction.name.asc()))
-        return list(result)
+    async def list_jurisdictions(
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        q: str | None = None,
+    ) -> tuple[list[Jurisdiction], int]:
+        """Return one page of jurisdictions and the total hit count.
+
+        Paginated since #616: 2,169 jurisdictions are seeded today and the
+        municipal work in #584 adds 2,110 Gemeinden, so serving the whole table
+        on every admin list render is neither cheap nor bounded. Mirrors
+        ``SourceService.list_sources``.
+        """
+        base = select(Jurisdiction).order_by(Jurisdiction.name.asc())
+        if q:
+            base = base.where(Jurisdiction.name.ilike(f"%{q}%"))
+        count_result = await self.session.execute(select(func.count()).select_from(base.subquery()))
+        total = count_result.scalar() or 0
+        result = await self.session.scalars(base.limit(limit).offset(offset))
+        return list(result), total
 
     async def create_jurisdiction(self, request: CreateJurisdictionRequest) -> Jurisdiction:
         jurisdiction = Jurisdiction(name=request.name, slug=request.slug)
@@ -44,9 +62,21 @@ class ReferenceDataService:
         await self.session.refresh(jurisdiction)
         return jurisdiction
 
-    async def list_authorities(self) -> list[Authority]:
-        result = await self.session.scalars(select(Authority).order_by(Authority.name.asc()))
-        return list(result)
+    async def list_authorities(
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        q: str | None = None,
+    ) -> tuple[list[Authority], int]:
+        """Return one page of authorities and the total hit count. See #616."""
+        base = select(Authority).order_by(Authority.name.asc())
+        if q:
+            base = base.where(Authority.name.ilike(f"%{q}%"))
+        count_result = await self.session.execute(select(func.count()).select_from(base.subquery()))
+        total = count_result.scalar() or 0
+        result = await self.session.scalars(base.limit(limit).offset(offset))
+        return list(result), total
 
     async def create_authority(self, request: CreateAuthorityRequest) -> Authority:
         if request.jurisdiction_id is not None:
