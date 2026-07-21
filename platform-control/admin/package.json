@@ -17,7 +17,9 @@
     "e2e:browsers": "playwright install chromium",
     "e2e:headed": "playwright test --headed",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "openapi:generate": "openapi-typescript ../../contracts/api/platform-control.openapi.yaml -o src/lib/api/generated/platform-control.ts",
+    "openapi:check": "npm run openapi:generate && git diff --exit-code src/lib/api/generated/",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run openapi:check"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -49,6 +51,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "jest-axe": "^10.0.0",
     "jsdom": "^29.0.1",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5.9.3",
     "vitest": "^4.1.2"

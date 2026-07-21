@@ -97,6 +97,11 @@ generated/
 !legal-search/api/src/lib/document-intelligence/generated/**
 !legal-search/frontend/src/lib/api/generated/
 !legal-search/frontend/src/lib/api/generated/**
+# The admin's contract types must be tracked or its `openapi:check` gate is
+# vacuous: `git diff --exit-code` never reports an ignored file, so drift would
+# pass silently — the exact failure mode ADR-0045 exists to close.
+!platform-control/admin/src/lib/api/generated/
+!platform-control/admin/src/lib/api/generated/**
 *.generated.*
 # Exception: the DI published-source contract YAML is rendered from Python but
 # checked in. A unit test keeps it in sync with surfaces.py, and dbt needs it

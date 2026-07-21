@@ -126,6 +126,94 @@ describe("controlPlaneDataProvider", () => {
     expect(result.data[0]?.run_id).toBe("run_page_3");
   });
 
+  /**
+   * #695 — the contract requires only `data` on `RunListResponse`; `total`,
+   * `limit` and `offset` are each `integer | null`. The admin used to declare
+   * all three as required `number`, so the `total ?? records.length` fallback
+   * was unreachable in the type system and untested — the one branch the
+   * contract explicitly permits and the suite never exercised. It is the #616
+   * behaviour (re-deriving the count from the page), so it must degrade
+   * visibly rather than crash.
+   */
+  it("falls back to the page length when the server sends a null total", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              run_id: "run_no_total",
+              source_id: "src_01",
+              source_version_id: "sv_01",
+              mode: "preview",
+              status: "completed",
+              started_at: "2026-04-03T08:00:00Z",
+              completed_at: "2026-04-03T08:05:00Z",
+              artifacts_count: 1,
+              captured_resources_count: 1,
+              failure_reason: null,
+              created_at: "2026-04-03T08:00:00Z",
+              updated_at: "2026-04-03T08:05:00Z",
+              source_name: "No total",
+              version_label: "v0",
+            },
+          ],
+          total: null,
+          limit: null,
+          offset: null,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("runs", {
+      pagination: { page: 1, perPage: 25 },
+      sort: { field: "created_at", order: "DESC" },
+      filter: {},
+    });
+
+    expect(result.total).toBe(1);
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]?.run_id).toBe("run_no_total");
+  });
+
+  /** #695 — same branch, with the keys absent entirely rather than null. */
+  it("falls back to the page length when the server omits total entirely", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              run_id: "run_absent_total",
+              source_id: "src_01",
+              source_version_id: "sv_01",
+              mode: "preview",
+              status: "completed",
+              started_at: null,
+              completed_at: null,
+              artifacts_count: 0,
+              captured_resources_count: 0,
+              failure_reason: null,
+              created_at: "2026-04-03T08:00:00Z",
+              updated_at: "2026-04-03T08:05:00Z",
+              source_name: "Absent total",
+              version_label: "v0",
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+
+    const result = await controlPlaneDataProvider.getList("runs", {
+      pagination: { page: 1, perPage: 25 },
+      sort: { field: "created_at", order: "DESC" },
+      filter: {},
+    });
+
+    expect(result.total).toBe(1);
+    expect(result.data[0]?.run_id).toBe("run_absent_total");
+  });
+
   it("sends limit/offset and the q search for source list pages", async () => {
     global.fetch = vi.fn().mockResolvedValue(
       new Response(

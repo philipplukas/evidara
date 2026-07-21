@@ -19,6 +19,7 @@ import {
 import { classifyTemplate } from "../../domain/blueprintLock";
 import { ResourceName } from "../../domain/resourceNames";
 import type { RunMode } from "../../domain/runMode";
+import type { Schemas } from "../api/schemas";
 
 type ListResponse<T> = {
   data: T[];
@@ -30,31 +31,25 @@ type ListResponse<T> = {
  * detail lists). `total` is the hit count, not the page length — see #616,
  * where the client re-derived it from the page and capped every list at the
  * server's default `limit=100`.
+ *
+ * `total`/`limit`/`offset` are optional and nullable because the contract says
+ * so: `Schemas["RunListResponse"]` requires only `data` and types the rest
+ * `number | null`. This type used to declare all three as required `number`,
+ * which is strictly narrower than what the server may send — the divergence
+ * #695 was filed over, and the same class of assumption that caused #616. The
+ * `?? records.length` fallback in `toServerPagedResult` is the branch that
+ * narrowing hid; it is now reachable in the type system and covered by a test.
  */
 type PaginatedListResponse<T> = {
   data: T[];
-  total: number;
-  limit: number;
-  offset: number;
+  total?: number | null;
+  limit?: number | null;
+  offset?: number | null;
 };
 
-type ReferenceDataBase = {
-  created_at: string;
-  updated_at: string;
-};
+type Jurisdiction = Schemas["JurisdictionResponse"];
 
-type Jurisdiction = ReferenceDataBase & {
-  jurisdiction_id: string;
-  name: string;
-  slug: string;
-};
-
-type Authority = ReferenceDataBase & {
-  authority_id: string;
-  jurisdiction_id: string | null;
-  name: string;
-  slug: string;
-};
+type Authority = Schemas["AuthorityResponse"];
 
 type SharedAcquisitionSpec = {
   tenant_id?: string;
@@ -118,20 +113,18 @@ export type AcquisitionSpec =
   | RisOgdAcquisitionSpec
   | FedlexSparqlAcquisitionSpec;
 
-type Source = {
-  source_id: string;
-  name: string;
-  description: string | null;
-  jurisdiction_id: string;
-  authority_id: string;
-  source_type: string;
-  document_family: string | null;
-  status: "active" | "inactive" | "archived";
-  created_at: string;
-  updated_at: string;
-};
+type Source = Schemas["SourceResponse"];
 
-type SourceVersion = {
+/**
+ * Still hand-written, and pinned field-by-field in `../api/contract.conformance.ts`.
+ *
+ * `Schemas["SourceVersionResponse"]` embeds the generated acquisition-spec
+ * union, which types `seed_url` as optional-nullable where the form state here
+ * requires it present. Aliasing it cascades into `sourceVersionForm.ts`, so
+ * #737 does it separately. The conformance pin catches a rename or a retype in
+ * the meantime; it cannot catch an added field.
+ */
+export type SourceVersion = {
   source_version_id: string;
   source_id: string;
   extractor_profile_id: string | null;
@@ -142,7 +135,15 @@ type SourceVersion = {
   updated_at: string;
 };
 
-type RunBase = {
+/**
+ * Still hand-written, and pinned field-by-field in `../api/contract.conformance.ts`.
+ *
+ * `Schemas["RunResponse"]` additionally carries `scope`, `replay`,
+ * `replay_checkpoint` and `refused`, and distinguishes `RunResponse` from
+ * `RunListItemResponse` where this collapses both onto one base. #737 aliases
+ * them; the pin below holds renames and retypes until it does.
+ */
+export type RunBase = {
   run_id: string;
   source_id: string;
   source_version_id: string;
@@ -157,7 +158,7 @@ type RunBase = {
   updated_at: string;
 };
 
-type RunListItem = RunBase & {
+export type RunListItem = RunBase & {
   source_name: string;
   version_label: string;
 };
@@ -170,38 +171,13 @@ export type RunCreateInput = {
   mode: RunMode;
 };
 
-export type RunReadinessCheck = {
-  code: string;
-  ok: boolean;
-  detail: string;
-};
+export type RunReadinessCheck = Schemas["RunReadinessCheck"];
 
-export type RunReadiness = {
-  source_id: string;
-  source_version_id: string;
-  mode: RunMode;
-  ready: boolean;
-  checks: RunReadinessCheck[];
-};
+export type RunReadiness = Schemas["RunReadinessResponse"];
 
-export type RunPipelineHealthStage = {
-  stage: "acquisition" | "document_intelligence" | "projection" | "search";
-  status: "pending" | "in_progress" | "blocked" | "failed" | "ok";
-  detail: string;
-  updated_at: string | null;
-};
+export type RunPipelineHealthStage = Schemas["RunPipelineHealthStage"];
 
-export type RunPipelineHealth = {
-  run_id: string;
-  source_id: string;
-  source_version_id: string;
-  mode: RunMode;
-  run_status: "pending" | "running" | "completed" | "failed" | "cancelled";
-  overall_status: "in_progress" | "blocked" | "failed" | "ok";
-  stages: RunPipelineHealthStage[];
-  processing_status_event_count: number;
-  document_lifecycle_event_count: number;
-};
+export type RunPipelineHealth = Schemas["RunPipelineHealthResponse"];
 
 export type SourceBlueprintPreviewInput = {
   overlay_id: string;
@@ -217,7 +193,7 @@ export type SourceBlueprintPreviewInput = {
  * is the code-owner key; `launchable` is both turned; `notes` explains any
  * closed key.
  */
-export type AcquisitionReadiness = "scaffold" | "awaiting_evidence" | "live";
+export type AcquisitionReadiness = Schemas["AcquisitionReadiness"];
 
 export type BlueprintTwoKeyLock = {
   enabled: boolean;
@@ -274,114 +250,23 @@ export type SourceBlueprintTemplate = {
   updated_at: string | null;
 } & BlueprintTwoKeyLock;
 
-type CapturedResource = {
-  captured_resource_id: string;
-  run_id: string;
-  source_url: string;
-  final_url: string;
-  title: string | null;
-  content_type: string;
-  http_status: number | null;
-  discovery_depth: number | null;
-  checksum: string | null;
-  fetched_at: string;
-  created_at: string;
-  updated_at: string;
-};
+type CapturedResource = Schemas["CapturedResourceResponse"];
 
-type RawArtifact = {
-  artifact_id: string;
-  run_id: string;
-  source_id: string;
-  source_version_id: string;
-  storage_path: string;
-  content_type: string;
-  artifact_metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-};
+type RawArtifact = Schemas["RawArtifactResponse"];
 
-type ProviderJob = {
-  provider_job_id: string;
-  run_id: string;
-  provider: string;
-  external_job_id: string | null;
-  status: "accepted" | "running" | "completed" | "failed";
-  last_event_type: string | null;
-  request_payload: Record<string, unknown>;
-  response_payload: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-};
+type ProviderJob = Schemas["ProviderJobResponse"];
 
-type ProcessingStatusUpdate = {
-  event_id: string;
-  processing_manifest_id: string;
-  processing_version: string;
-  status: string;
-  occurred_at: string;
-  source_snapshot_id: string | null;
-  bundle_manifest_id: string | null;
-  document_id: string | null;
-  document_revision: number | null;
-  error_code: string | null;
-  error_summary: string | null;
-  created_at: string;
-  updated_at: string;
-};
+type ProcessingStatusUpdate = Schemas["ProcessingStatusUpdateResponse"];
 
-type DocumentLifecycleEvent = {
-  event_id: string;
-  event_type: string;
-  run_id: string;
-  document_id: string;
-  document_revision: number;
-  processing_manifest_id: string;
-  processing_version: string | null;
-  lifecycle_status: string | null;
-  reason_code: string | null;
-  reason_summary: string | null;
-  search_disposition: string | null;
-  occurred_at: string;
-  created_at: string;
-  updated_at: string;
-};
+type DocumentLifecycleEvent = Schemas["DocumentLifecycleEventResponse"];
 
-export type RunPreviewSummarySample = {
-  captured_resource_id: string;
-  title: string | null;
-  final_url: string;
-  content_type: string;
-  http_status: number | null;
-  reason: string;
-};
+export type RunPreviewSummarySample = Schemas["RunPreviewSummarySample"];
 
-export type RunPreviewSummaryBreakdownEntry = {
-  content_type: string;
-  count: number;
-};
+export type RunPreviewSummaryBreakdownEntry = Schemas["RunPreviewSummaryBreakdownEntry"];
 
-export type RunPreviewSummaryDriftCheck = {
-  name: string;
-  status: "ok" | "warn";
-  detail: string;
-};
+export type RunPreviewSummaryDriftCheck = Schemas["RunPreviewSummaryDriftCheck"];
 
-export type RunPreviewSummary = {
-  run_id: string;
-  captured_url_count: number;
-  artifacts_count: number;
-  captured_resources_count: number;
-  pdf_count: number;
-  likely_decision_page_count: number;
-  likely_boilerplate_page_count: number;
-  likely_duplicate_page_count: number;
-  content_type_breakdown: RunPreviewSummaryBreakdownEntry[];
-  likely_decision_pages: RunPreviewSummarySample[];
-  likely_boilerplate_pages: RunPreviewSummarySample[];
-  likely_duplicate_pages: RunPreviewSummarySample[];
-  drift_checks: RunPreviewSummaryDriftCheck[];
-};
+export type RunPreviewSummary = Schemas["RunPreviewSummaryResponse"];
 
 /**
  * Endpoints that genuinely return an unbounded array under `data` — no
@@ -693,7 +578,7 @@ const applyClientListWindow = <T extends Record<string, unknown>>(
  */
 const toServerPagedResult = <T extends Record<string, unknown>>(
   records: T[],
-  total: number | undefined,
+  total: number | null | undefined,
   params: GetListParams,
 ): { data: T[]; total: number } => ({
   data: applyClientSort(records, params),
@@ -1022,7 +907,13 @@ const fetchAllSources = async (): Promise<Source[]> => {
     const response = await requestJson<PaginatedListResponse<Source>>(`/v1/sources?${query}`);
     collected.push(...response.data);
     offset += MAX_SERVER_PAGE_SIZE;
-    if (response.data.length === 0 || collected.length >= response.total) {
+    // A short page is the terminating signal that does not depend on `total`:
+    // the contract permits `total: null`, and comparing against a null hit
+    // count would otherwise walk forever.
+    if (response.data.length < MAX_SERVER_PAGE_SIZE) {
+      return collected;
+    }
+    if (response.total != null && collected.length >= response.total) {
       return collected;
     }
   }
@@ -1045,7 +936,7 @@ const getRunDetailList = async <TResource extends RunDetailResourceName>(
   );
   return {
     data: response.data.map((item) => toRecord(item, config.idField)),
-    total: response.total,
+    total: response.total ?? response.data.length,
   };
 };
 

@@ -94,6 +94,22 @@ type RecentHealthSummary = {
 };
 
 /**
+ * The `overall_status` values this dashboard has a bucket for.
+ *
+ * The contract types `RunPipelineHealthResponse.overall_status` as an open
+ * `string`, not an enum — the admin used to hand-declare it as a four-member
+ * union, which was narrower than what the server may send (#695). An
+ * unrecognised status counts as `unavailable` rather than silently landing in
+ * whichever bucket it happens to spell.
+ */
+const HEALTH_BUCKETS = ["ok", "blocked", "failed", "in_progress"] as const;
+
+type HealthBucket = (typeof HEALTH_BUCKETS)[number];
+
+const isHealthBucket = (value: string): value is HealthBucket =>
+  (HEALTH_BUCKETS as readonly string[]).includes(value);
+
+/**
  * What the ATTENTION card should point the operator at.
  *
  * `run`   — we have an actual run id worth opening.
@@ -131,7 +147,7 @@ export const summarizeRecentHealth = (recentHealth: RecentRunHealth[]): RecentHe
       }
 
       const key = entry.health.overall_status;
-      if (key in summary) {
+      if (isHealthBucket(key)) {
         summary[key] += 1;
       } else {
         summary.unavailable += 1;
