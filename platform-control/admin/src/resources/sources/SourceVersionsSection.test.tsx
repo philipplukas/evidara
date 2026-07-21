@@ -12,11 +12,8 @@ import { QueryClient } from "@tanstack/react-query";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { CoreAdminContext, testDataProvider } from "ra-core";
 import { describe, expect, it } from "vitest";
-import type {
-  AcquisitionSpec,
-  SourceRecord,
-  SourceVersionRecord,
-} from "../../lib/admin/dataProvider";
+import { buildAcquisitionSpec } from "../../lib/admin/__fixtures__/acquisitionSpecs";
+import type { SourceRecord, SourceVersionRecord } from "../../lib/admin/dataProvider";
 import { SourceVersionsSection } from "./SourceVersionsSection";
 
 const source: SourceRecord = {
@@ -41,12 +38,13 @@ const cantonVersion: SourceVersionRecord = {
   extractor_profile_id: null,
   version_label: "v1",
   status: "draft",
-  acquisition_spec: {
+  execution_mode: "off",
+  acquisition_spec: buildAcquisitionSpec({
     provider: "canton_http",
     canton_code: "CH-ZH",
     seed_url: "https://www.zh.ch/de/politik-staat/gesetze-beschluesse.html",
     seed_urls: [],
-  } as unknown as AcquisitionSpec,
+  }),
   created_at: "2026-05-01T09:00:00Z",
   updated_at: "2026-05-01T09:00:00Z",
 };

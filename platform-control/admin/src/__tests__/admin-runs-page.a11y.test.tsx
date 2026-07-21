@@ -15,14 +15,16 @@ import { render, waitFor } from "@testing-library/react";
 import { axe, toHaveNoViolations } from "jest-axe";
 import { CoreAdminContext, testDataProvider } from "ra-core";
 import { describe, expect, it } from "vitest";
-import type { RunListRecord } from "../lib/admin/dataProvider";
+import { buildRunListRecord } from "../lib/admin/__fixtures__/runs";
 import RunListV2 from "../resources/runs/RunListV2";
 import { AppShell } from "../ui/shell/AppShell";
 
 expect.extend(toHaveNoViolations);
 
-const runs: RunListRecord[] = [
-  {
+// One row per status the queue renders differently — a failed row carries the
+// failure reason, a running row has no completion time, a completed row has both.
+const runs = [
+  buildRunListRecord({
     id: "run_failed",
     run_id: "run_failed",
     source_id: "src_01",
@@ -38,8 +40,8 @@ const runs: RunListRecord[] = [
     failure_reason: "Provider jobs were throttled.",
     created_at: "2026-04-15T08:55:00Z",
     updated_at: "2026-04-15T09:30:00Z",
-  },
-  {
+  }),
+  buildRunListRecord({
     id: "run_running",
     run_id: "run_running",
     source_id: "src_01",
@@ -52,11 +54,10 @@ const runs: RunListRecord[] = [
     completed_at: null,
     artifacts_count: 2,
     captured_resources_count: 8,
-    failure_reason: null,
     created_at: "2026-04-15T09:05:00Z",
     updated_at: "2026-04-15T09:20:00Z",
-  },
-  {
+  }),
+  buildRunListRecord({
     id: "run_completed",
     run_id: "run_completed",
     source_id: "src_02",
@@ -69,10 +70,9 @@ const runs: RunListRecord[] = [
     completed_at: "2026-04-14T08:30:00Z",
     artifacts_count: 12,
     captured_resources_count: 40,
-    failure_reason: null,
     created_at: "2026-04-14T07:55:00Z",
     updated_at: "2026-04-14T08:30:00Z",
-  },
+  }),
 ];
 
 function renderRunsPage() {

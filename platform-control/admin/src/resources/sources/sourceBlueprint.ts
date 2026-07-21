@@ -17,7 +17,7 @@
  * No React, no MUI, no Tailwind — just data in, data out.
  */
 import type {
-  FedlexSparqlAcquisitionSpec,
+  AcquisitionSpec,
   SourceBlueprintPreview,
   SourceBlueprintTemplate,
 } from "../../lib/admin/dataProvider";
@@ -37,10 +37,29 @@ export const OVERLAY_NAMES: Record<string, string> = {
 };
 
 /**
+ * Seed URLs, for any provider that has them.
+ *
+ * Seven of the eleven providers carry `seed_url`/`seed_urls`; the SPARQL and
+ * OGD ones do not. Probing with `in` keeps this readable across the whole union
+ * instead of asserting a shape.
+ */
+const readSeeds = (spec: AcquisitionSpec): string[] => {
+  const seedUrl = "seed_url" in spec ? spec.seed_url : null;
+  const seedUrls = "seed_urls" in spec ? (spec.seed_urls ?? []) : [];
+  return seedUrl ? [seedUrl, ...seedUrls] : seedUrls;
+};
+
+/**
  * Provider-specific, human-readable summary of an expanded acquisition spec.
- * Returns one display line per salient field; the caller renders them as a
- * list. Falls through to a generic Firecrawl-style summary for any provider
- * that isn't specifically special-cased.
+ * Returns one display line per salient field; the caller renders them as a list.
+ *
+ * Providers without a dedicated branch get a **generic** summary built from the
+ * fields every spec shares. This used to fall through to a Firecrawl-shaped
+ * summary instead, so `canton_http`, `gemeinde_http` and the rest rendered
+ * `Mode: n/a · Limit/depth: n/a / n/a · Formats: n/a` — describing a spec they
+ * do not have, while omitting the fields they do. The four-provider
+ * `AcquisitionSpec` union hid that; the contract's eleven-provider union makes
+ * it a type error (#737).
  */
 export const summarizePreview = (preview: SourceBlueprintPreview): string[] => {
   const spec = preview.acquisition_spec;
@@ -54,35 +73,27 @@ export const summarizePreview = (preview: SourceBlueprintPreview): string[] => {
     ];
   }
   if (spec.provider === "fedlex_sparql") {
-    const fedlex = spec as FedlexSparqlAcquisitionSpec;
-    const seeds = fedlex.seed_url
-      ? [fedlex.seed_url, ...(fedlex.seed_urls ?? [])]
-      : (fedlex.seed_urls ?? []);
-    return [
-      `Provider: ${fedlex.provider}`,
-      `Seed work URIs: ${seeds.join(", ") || "n/a"}`,
-      `SPARQL endpoint: ${fedlex.sparql_endpoint ?? "n/a"}`,
-      `Preferred languages: ${(fedlex.preferred_languages ?? []).join(", ") || "n/a"}`,
-      `Query mode/max expressions: ${fedlex.query_mode ?? "n/a"} / ${fedlex.max_expressions ?? "n/a"}`,
-    ];
-  }
-  if (spec.provider === "deterministic_http") {
-    const seeds = spec.seed_url
-      ? [spec.seed_url, ...(spec.seed_urls ?? [])]
-      : (spec.seed_urls ?? []);
     return [
       `Provider: ${spec.provider}`,
-      `Seeds: ${seeds.join(", ") || "n/a"}`,
-      `Tenant/corpus: ${spec.tenant_id ?? "n/a"} / ${spec.corpus_id ?? "n/a"}`,
+      `Seed work URIs: ${readSeeds(spec).join(", ") || "n/a"}`,
+      `SPARQL endpoint: ${spec.sparql_endpoint ?? "n/a"}`,
+      `Preferred languages: ${(spec.preferred_languages ?? []).join(", ") || "n/a"}`,
+      `Query mode/max expressions: ${spec.query_mode ?? "n/a"} / ${spec.max_expressions ?? "n/a"}`,
     ];
   }
-  const seeds = spec.seed_url ? [spec.seed_url, ...(spec.seed_urls ?? [])] : (spec.seed_urls ?? []);
+  if (spec.provider === "firecrawl") {
+    return [
+      `Provider: ${spec.provider}`,
+      `Mode: ${spec.mode ?? "n/a"}`,
+      `Seeds: ${readSeeds(spec).join(", ") || "n/a"}`,
+      `Limit/depth: ${spec.limit ?? "n/a"} / ${spec.max_discovery_depth ?? "n/a"}`,
+      `Formats: ${(spec.scrape_formats ?? []).join(", ") || "n/a"}`,
+    ];
+  }
   return [
     `Provider: ${spec.provider}`,
-    `Mode: ${spec.mode ?? "n/a"}`,
-    `Seeds: ${seeds.join(", ") || "n/a"}`,
-    `Limit/depth: ${spec.limit ?? "n/a"} / ${spec.max_discovery_depth ?? "n/a"}`,
-    `Formats: ${(spec.scrape_formats ?? []).join(", ") || "n/a"}`,
+    `Seeds: ${readSeeds(spec).join(", ") || "n/a"}`,
+    `Tenant/corpus: ${spec.tenant_id ?? "n/a"} / ${spec.corpus_id ?? "n/a"}`,
   ];
 };
 

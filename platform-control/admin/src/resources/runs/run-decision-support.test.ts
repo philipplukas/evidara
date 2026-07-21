@@ -1,27 +1,20 @@
 import { describe, expect, it } from "vitest";
-import type {
-  RunPipelineHealth,
-  RunPipelineHealthStage,
-  RunRecord,
-} from "../../lib/admin/dataProvider";
+import { buildRunRecord } from "../../lib/admin/__fixtures__/runs";
+import type { RunPipelineHealth, RunPipelineHealthStage } from "../../lib/admin/dataProvider";
 import { buildRunDecisionSupport } from "./RunShow";
 import { buildPipelineDecisionSupport } from "./run-decision-support";
 
-const baseRun: RunRecord = {
+const baseRun = buildRunRecord({
   id: "run-123",
   run_id: "run-123",
-  source_id: "source-1",
-  source_version_id: "version-1",
   mode: "preview",
   status: "running",
   started_at: "2026-04-10T09:00:00Z",
   completed_at: null,
   artifacts_count: 3,
-  captured_resources_count: 12,
-  failure_reason: null,
   created_at: "2026-04-10T08:59:00Z",
   updated_at: "2026-04-10T09:15:00Z",
-};
+});
 
 const stage = (overrides: Partial<RunPipelineHealthStage>): RunPipelineHealthStage => ({
   stage: "acquisition",

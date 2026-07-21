@@ -69,101 +69,48 @@ type SharedAcquisitionSpec = {
   max_content_bytes?: number;
 };
 
-export type FirecrawlAcquisitionSpec = SharedAcquisitionSpec & {
-  provider: "firecrawl";
-  seed_url: string | null;
-  seed_urls: string[];
-  mode: "crawl" | "batch_scrape";
-  include_paths: string[];
-  exclude_paths: string[];
-  limit: number;
-  max_discovery_depth: number;
-  scrape_formats: string[];
-  zero_data_retention: boolean;
-};
+export type FirecrawlAcquisitionSpec = Schemas["FirecrawlAcquisitionSpec"];
 
-export type DeterministicHttpAcquisitionSpec = SharedAcquisitionSpec & {
-  provider: "deterministic_http";
-  seed_url: string | null;
-  seed_urls: string[];
-};
+export type DeterministicHttpAcquisitionSpec = Schemas["DeterministicHttpAcquisitionSpec"];
 
-export type RisOgdAcquisitionSpec = SharedAcquisitionSpec & {
-  provider: "ris_ogd";
-  base_url: string;
-  applikation: string | null;
-  preferred_formats: string[];
-  page_size: number;
-  max_pages: number;
-};
+export type RisOgdAcquisitionSpec = Schemas["RisOgdAcquisitionSpec"];
 
-export type FedlexSparqlAcquisitionSpec = SharedAcquisitionSpec & {
-  provider: "fedlex_sparql";
-  seed_url: string | null;
-  seed_urls: string[];
-  sparql_endpoint: string;
-  preferred_languages: string[];
-  query_mode: "work_to_expression";
-  max_expressions: number;
-};
+export type FedlexSparqlAcquisitionSpec = Schemas["FedlexSparqlAcquisitionSpec"];
 
-export type AcquisitionSpec =
-  | FirecrawlAcquisitionSpec
-  | DeterministicHttpAcquisitionSpec
-  | RisOgdAcquisitionSpec
-  | FedlexSparqlAcquisitionSpec;
+/**
+ * Every acquisition spec the API can serve — all eleven providers, straight
+ * from the contract.
+ *
+ * This union used to list the **four** providers the version dialog renders
+ * widgets for, which conflated "what the form can edit" with "what the wire
+ * carries". That conflation is #614: the admin coerced the other seven into
+ * `firecrawl` and persisted the corruption with an HTTP 200. The tests papered
+ * over it with `as unknown as AcquisitionSpec` casts on genuine `canton_http`
+ * payloads.
+ *
+ * The editable subset is a separate, explicit concept and stays that way —
+ * `EDITABLE_PROVIDERS` / `isEditableProvider` in `sourceVersionForm.ts`. A
+ * provider this form cannot edit must be *unrenderable*, never *unrepresentable*.
+ */
+export type AcquisitionSpec = Schemas["SourceVersionResponse"]["acquisition_spec"];
 
 type Source = Schemas["SourceResponse"];
 
-/**
- * Still hand-written, and pinned field-by-field in `../api/contract.conformance.ts`.
- *
- * `Schemas["SourceVersionResponse"]` embeds the generated acquisition-spec
- * union, which types `seed_url` as optional-nullable where the form state here
- * requires it present. Aliasing it cascades into `sourceVersionForm.ts`, so
- * #737 does it separately. The conformance pin catches a rename or a retype in
- * the meantime; it cannot catch an added field.
- */
-export type SourceVersion = {
-  source_version_id: string;
-  source_id: string;
-  extractor_profile_id: string | null;
-  version_label: string;
-  status: "draft" | "pending_approval" | "approved" | "rejected" | "superseded";
-  acquisition_spec: AcquisitionSpec;
-  created_at: string;
-  updated_at: string;
-};
+export type SourceVersion = Schemas["SourceVersionResponse"];
 
 /**
- * Still hand-written, and pinned field-by-field in `../api/contract.conformance.ts`.
+ * The full run, as `GET /v1/runs/{id}` serves it.
  *
- * `Schemas["RunResponse"]` additionally carries `scope`, `replay`,
- * `replay_checkpoint` and `refused`, and distinguishes `RunResponse` from
- * `RunListItemResponse` where this collapses both onto one base. #737 aliases
- * them; the pin below holds renames and retypes until it does.
+ * Distinct from `RunListItem` on purpose: only the detail response carries
+ * `scope`, `replay` and `replay_checkpoint`, and only the list row carries
+ * `source_name`/`version_label`. Both used to alias one hand-written `RunBase`,
+ * which typed neither honestly and left the admin unable to describe a refused
+ * run at all — `refused` is the ADR-0030 two-key-lock flag from #634.
  */
-export type RunBase = {
-  run_id: string;
-  source_id: string;
-  source_version_id: string;
-  mode: RunMode;
-  status: "pending" | "running" | "completed" | "failed" | "cancelled";
-  started_at: string | null;
-  completed_at: string | null;
-  artifacts_count: number;
-  captured_resources_count: number;
-  failure_reason: string | null;
-  created_at: string;
-  updated_at: string;
-};
+type RunResponse = Schemas["RunResponse"];
 
-export type RunListItem = RunBase & {
-  source_name: string;
-  version_label: string;
-};
-
-type RunResponse = RunBase;
+/** One row of `GET /v1/runs` — the run plus its denormalised source labels. */
+export type RunListItem = Schemas["RunListItemResponse"];
 
 export type RunCreateInput = {
   source_id: string;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildAcquisitionSpec } from "../../lib/admin/__fixtures__/acquisitionSpecs";
 import type { AcquisitionSpec, SourceVersionRecord } from "../../lib/admin/dataProvider";
 import {
   describeSourceVersionStatus,
@@ -18,18 +19,21 @@ const baseVersion = (overrides: Partial<SourceVersionRecord>): SourceVersionReco
   extractor_profile_id: overrides.extractor_profile_id ?? null,
   version_label: overrides.version_label ?? "v1",
   status: overrides.status ?? "draft",
-  acquisition_spec: overrides.acquisition_spec ?? {
-    provider: "firecrawl",
-    seed_url: null,
-    seed_urls: [],
-    mode: "crawl",
-    include_paths: [],
-    exclude_paths: [],
-    limit: 20,
-    max_discovery_depth: 2,
-    scrape_formats: [],
-    zero_data_retention: false,
-  },
+  execution_mode: overrides.execution_mode ?? "off",
+  acquisition_spec:
+    overrides.acquisition_spec ??
+    buildAcquisitionSpec({
+      provider: "firecrawl",
+      seed_url: null,
+      seed_urls: [],
+      mode: "crawl",
+      include_paths: [],
+      exclude_paths: [],
+      limit: 20,
+      max_discovery_depth: 2,
+      scrape_formats: [],
+      zero_data_retention: false,
+    }),
   created_at: overrides.created_at ?? "2026-04-10T10:00:00Z",
   updated_at: overrides.updated_at ?? "2026-04-10T10:00:00Z",
 });
@@ -38,25 +42,20 @@ const baseVersion = (overrides: Partial<SourceVersionRecord>): SourceVersionReco
  * A real `canton_http` spec, as the API serves it.
  *
  * `canton_http` is one of the seven providers the live API serves and this form
- * has no widgets for. The admin's `AcquisitionSpec` union models only the four
- * it can edit, hence the cast — the wire really does carry this shape (#614).
+ * has no widgets for. This used to need an `as unknown as AcquisitionSpec`
+ * cast, because the admin's union modelled only the four providers the form can
+ * *edit* — conflating editability with existence, which is #614. The union is
+ * now the contract's eleven, so this shape type-checks as what it is (#737).
  */
-const CANTON_HTTP_SPEC = {
+const CANTON_HTTP_SPEC = buildAcquisitionSpec({
   provider: "canton_http",
   canton_code: "CH-ZH",
   seed_url: "https://www.zh.ch/de/politik-staat/gesetze-beschluesse.html",
   seed_urls: [],
-  tenant_id: "tenant_public",
   corpus_id: "corpus_public_ch_zh_legislation",
-  scope_type: "global_public",
-  source_origin_kind: "official_primary",
-  trust_tier: "authoritative",
   language_codes: ["de"],
   document_type_hint: "legislation",
-  request_timeout_seconds: 30,
-  user_agent: null,
-  max_content_bytes: 2_000_000,
-} as unknown as AcquisitionSpec;
+});
 
 describe("SourceVersionsSection helpers", () => {
   it("summarizes lifecycle counts and the next operator action", () => {
@@ -215,7 +214,7 @@ describe("acquisition-spec form helpers", () => {
   it("round-trips a fedlex_sparql spec through the form state and back", () => {
     const version: SourceVersionRecord = baseVersion({
       status: "approved",
-      acquisition_spec: {
+      acquisition_spec: buildAcquisitionSpec({
         provider: "fedlex_sparql",
         seed_url: "https://fedlex.data.admin.ch/eli/cc/1999/404",
         seed_urls: ["https://fedlex.data.admin.ch/eli/cc/2000/1"],
@@ -223,7 +222,7 @@ describe("acquisition-spec form helpers", () => {
         preferred_languages: ["de", "fr"],
         query_mode: "work_to_expression",
         max_expressions: 3,
-      },
+      }),
     });
 
     const form = toFormState(version);
@@ -242,18 +241,20 @@ describe("acquisition-spec form helpers", () => {
   });
 
   it("summarizes an acquisition spec into operator-facing lines", () => {
-    const lines = summarizeAcquisitionSpec({
-      provider: "firecrawl",
-      seed_url: "https://example.test",
-      seed_urls: [],
-      mode: "crawl",
-      include_paths: [],
-      exclude_paths: [],
-      limit: 20,
-      max_discovery_depth: 2,
-      scrape_formats: ["markdown"],
-      zero_data_retention: false,
-    });
+    const lines = summarizeAcquisitionSpec(
+      buildAcquisitionSpec({
+        provider: "firecrawl",
+        seed_url: "https://example.test",
+        seed_urls: [],
+        mode: "crawl",
+        include_paths: [],
+        exclude_paths: [],
+        limit: 20,
+        max_discovery_depth: 2,
+        scrape_formats: ["markdown"],
+        zero_data_retention: false,
+      }),
+    );
 
     expect(lines[0]).toBe("provider: firecrawl");
     expect(lines).toContain("seeds: https://example.test");
@@ -275,18 +276,20 @@ describe("acquisition-spec form helpers", () => {
     // The Fedlex 50-act version printed all 50 work URIs into one table cell,
     // making a row several screens tall and pushing the row's other columns out
     // of view (#674).
-    const lines = summarizeAcquisitionSpec({
-      provider: "fedlex_sparql",
-      seed_url: "https://fedlex.data.admin.ch/eli/cc/0",
-      seed_urls: Array.from(
-        { length: 49 },
-        (_, index) => `https://fedlex.data.admin.ch/eli/cc/${index + 1}`,
-      ),
-      sparql_endpoint: "https://fedlex.data.admin.ch/sparqlendpoint",
-      preferred_languages: ["de"],
-      query_mode: "work_to_expression",
-      max_expressions: 1,
-    });
+    const lines = summarizeAcquisitionSpec(
+      buildAcquisitionSpec({
+        provider: "fedlex_sparql",
+        seed_url: "https://fedlex.data.admin.ch/eli/cc/0",
+        seed_urls: Array.from(
+          { length: 49 },
+          (_, index) => `https://fedlex.data.admin.ch/eli/cc/${index + 1}`,
+        ),
+        sparql_endpoint: "https://fedlex.data.admin.ch/sparqlendpoint",
+        preferred_languages: ["de"],
+        query_mode: "work_to_expression",
+        max_expressions: 1,
+      }),
+    );
 
     const workUris = lines.find((line) => line.startsWith("work URIs:")) ?? "";
     expect(workUris).toContain("… and 47 more");
@@ -294,11 +297,13 @@ describe("acquisition-spec form helpers", () => {
   });
 
   it("leaves a short list intact", () => {
-    const lines = summarizeAcquisitionSpec({
-      provider: "deterministic_http",
-      seed_url: "https://example.test/a",
-      seed_urls: ["https://example.test/b"],
-    });
+    const lines = summarizeAcquisitionSpec(
+      buildAcquisitionSpec({
+        provider: "deterministic_http",
+        seed_url: "https://example.test/a",
+        seed_urls: ["https://example.test/b"],
+      }),
+    );
 
     expect(lines).toContain("seeds: https://example.test/a, https://example.test/b");
   });
@@ -355,7 +360,7 @@ describe("acquisition-spec round-trip (#614)", () => {
   });
 
   it("round-trips a fedlex_sparql spec without duplicating seed_url into seed_urls", () => {
-    const spec: AcquisitionSpec = {
+    const spec = buildAcquisitionSpec({
       provider: "fedlex_sparql",
       seed_url: "https://fedlex.data.admin.ch/eli/cc/1999/404",
       seed_urls: ["https://fedlex.data.admin.ch/eli/cc/2000/1"],
@@ -365,7 +370,7 @@ describe("acquisition-spec round-trip (#614)", () => {
       max_expressions: 3,
       corpus_id: "corpus_public_ch_fedlex_constitution",
       language_codes: ["de"],
-    };
+    });
 
     const form = toFormState(baseVersion({ acquisition_spec: spec }));
 
@@ -375,7 +380,7 @@ describe("acquisition-spec round-trip (#614)", () => {
   it("carries base fields across a provider switch but drops the old provider's fields", () => {
     const form = toFormState(
       baseVersion({
-        acquisition_spec: {
+        acquisition_spec: buildAcquisitionSpec({
           provider: "firecrawl",
           seed_url: "https://example.test",
           seed_urls: [],
@@ -388,7 +393,7 @@ describe("acquisition-spec round-trip (#614)", () => {
           zero_data_retention: false,
           corpus_id: "corpus_public_ch_fedlex_constitution",
           language_codes: ["de"],
-        },
+        }),
       }),
     );
 

@@ -686,10 +686,10 @@ export const summarizeAcquisitionSpec = (spec: AcquisitionSpec): string[] => {
     `limit: ${firecrawl.limit}`,
     `depth: ${firecrawl.max_discovery_depth}`,
     (firecrawl.include_paths ?? []).length > 0
-      ? `include: ${firecrawl.include_paths.join(", ")}`
+      ? `include: ${(firecrawl.include_paths ?? []).join(", ")}`
       : "include: all",
     (firecrawl.exclude_paths ?? []).length > 0
-      ? `exclude: ${firecrawl.exclude_paths.join(", ")}`
+      ? `exclude: ${(firecrawl.exclude_paths ?? []).join(", ")}`
       : "exclude: none",
     `formats: ${(firecrawl.scrape_formats ?? []).join(", ")}`,
     `zero retention: ${firecrawl.zero_data_retention ? "yes" : "no"}`,
