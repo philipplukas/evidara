@@ -331,7 +331,7 @@ Expected result:
 Most new sources are "a portal we already reach, different documents". You do not need a
 new template for that, and you must not hand-write a full `acquisition_spec` for it —
 that discards blueprint provenance, and with it the ADR-0030 config key that gates the
-run. Send `blueprint_overrides` alongside the template instead (#710, ADR-0045):
+run. Send `blueprint_overrides` alongside the template instead (#710, ADR-0046):
 
 ```bash
 curl -X POST "$EVIDARA_PLATFORM_CONTROL_URL/v1/sources/blueprint-preview" \

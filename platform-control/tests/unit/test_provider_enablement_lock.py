@@ -363,7 +363,7 @@ def test_readiness_wins_over_a_contradicting_legacy_bool() -> None:
 
 @pytest.mark.asyncio
 async def test_seed_override_cannot_bypass_the_config_key(session) -> None:
-    """#710/ADR-0045: the "template plus my seeds" rung is inside the lock.
+    """#710/ADR-0046: the "template plus my seeds" rung is inside the lock.
 
     The obvious way to break the lock with an override path is to use it as a
     laundering device: name a disabled template, supply your own seeds, and hope

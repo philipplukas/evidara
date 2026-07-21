@@ -553,7 +553,7 @@ class SourceService:
             )
             if blueprint_overrides is not None:
                 # Seeds only, fenced to the template's own origins (#710,
-                # ADR-0045). Everything else on the template — provider,
+                # ADR-0046). Everything else on the template — provider,
                 # tenant/corpus/scope, trust tier, portal config — is untouched,
                 # so the result is still the blueprint's spec and keeps its
                 # ADR-0030 provenance and gating.

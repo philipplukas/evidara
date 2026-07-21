@@ -35,7 +35,7 @@ _NON_SPEC_TEMPLATE_KEYS = frozenset({"enabled", "extractor_profile_id"})
 
 
 # The only blueprint spec keys an operator may supply per source version — the
-# "template plus my seeds" rung of the reuse ladder (#710, ADR-0045).
+# "template plus my seeds" rung of the reuse ladder (#710, ADR-0046).
 #
 # Deliberately just the seeds. Every other key on a template is a claim the
 # blueprint author made and that the ADR-0030 config key was turned *for*:
@@ -124,7 +124,7 @@ def apply_blueprint_seed_override(
                 f"Seed override '{candidate}' is outside this blueprint template's own "
                 f"origins ({readable}). A template's enablement is evidence about a "
                 "specific portal, so an override may only choose different documents on "
-                "that portal (ADR-0045)."
+                "that portal (ADR-0046)."
             )
 
     merged = dict(blueprint)

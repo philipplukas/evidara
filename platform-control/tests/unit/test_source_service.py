@@ -821,7 +821,7 @@ async def test_update_source_version_clears_provenance_when_spec_edited(session)
     assert updated.provider_template_id is None
 
 
-# --- #710 / ADR-0045: the "template plus my seeds" rung ------------------------
+# --- #710 / ADR-0046: the "template plus my seeds" rung ------------------------
 #
 # The motivating case, verbatim: the federal animal-protection layer needed the
 # existing `fedlex_sparql_federal_law_batch_de` shape with two different ELIs.

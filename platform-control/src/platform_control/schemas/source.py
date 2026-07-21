@@ -272,7 +272,7 @@ class BlueprintSeedOverride(BaseModel):
     seeds". Only the seed lists are expressible here — the provider, the
     tenant/corpus/scope binding, the trust tier, and the portal-identifying
     config stay whatever the blueprint says, and the merged seeds must still sit
-    on an origin the template itself reaches. See ADR-0045.
+    on an origin the template itself reaches. See ADR-0046.
     """
 
     seed_url: HttpUrl | None = None

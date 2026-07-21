@@ -1,4 +1,4 @@
-# ADR-0045: A Blueprint Template Takes Operator Seeds, and Nothing Else
+# ADR-0046: A Blueprint Template Takes Operator Seeds, and Nothing Else
 
 ## Status
 
