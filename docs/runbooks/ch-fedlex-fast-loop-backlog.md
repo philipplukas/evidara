@@ -167,7 +167,11 @@ Nice-to-have later:
 
 - `--source-id`
 - `--source-version-id`
-- `--reuse-existing`
+
+Shipped (#766): reusing an existing acceptance source is no longer a flag — every
+`*-fast-loop.sh` harness now resolves a stable source by name and adds a version to it,
+falling back to creation only on the first run. Minting one per run also minted a document
+per run, which inflated `search_hits` — an ADR-0030 gate — by counting one law twice.
 
 Definition of done:
 

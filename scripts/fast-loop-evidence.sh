@@ -1,5 +1,68 @@
 #!/usr/bin/env bash
 
+# Resolve a STABLE acceptance source, reusing one if it already exists (#766).
+#
+# Every fast-loop harness used to POST /v1/sources/with-version unconditionally,
+# so each invocation minted a fresh source. The pipeline keys document identity
+# off the source (`_document_identity_key`, #652), so a fresh source per run also
+# minted a fresh DOCUMENT per run: the same law indexed again, `document_revision: 1`
+# on both, indistinguishable in search.
+#
+# That corrupted the harness's own evidence. `search_hits` is a gate, and a second
+# run turned `1` into `2` — reading like broader coverage when it was one law
+# counted twice. Re-acquiring under a *stable* source publishes the next revision
+# instead, which is what the pipeline was built for.
+#
+# Sets SOURCE_ID and SOURCE_VERSION_ID. Requires curl_json() and log() from the
+# calling script.
+resolve_fast_loop_source() {
+  local pc_url="${1:?missing pc_url}"
+  local source_name="${2:?missing source_name}"
+  local run_dir="${3:?missing run_dir}"
+  local version_label="${4:?missing version_label}"
+  local template_id="${5:?missing template_id}"
+  local overlay_id="${6:?missing overlay_id}"
+  local create_payload="${7:?missing create_payload}"
+
+  log "==> Resolving acceptance source"
+  curl_json "${pc_url}/v1/sources?q=$(printf '%s' "${source_name}" | jq -sRr @uri)&limit=100" \
+    | tee "${run_dir}/source-lookup.json" >/dev/null
+  SOURCE_ID="$(jq -r --arg name "${source_name}" \
+    'first(.data[]? | select(.name == $name) | .source_id // .id) // empty' \
+    < "${run_dir}/source-lookup.json")"
+
+  if [[ -n "${SOURCE_ID}" ]]; then
+    log "    reusing source ${SOURCE_ID} — re-acquisition publishes the next revision"
+    local version_payload
+    version_payload="$(jq -n \
+      --arg version_label "${version_label}" \
+      --arg template_id "${template_id}" \
+      --arg overlay_id "${overlay_id}" '{
+      version_label: $version_label,
+      overlay_id: $overlay_id,
+      provider_template_id: $template_id
+    }')"
+    curl_json -X POST "${pc_url}/v1/sources/${SOURCE_ID}/versions" \
+      -H "Content-Type: application/json" \
+      -d "${version_payload}" | tee "${run_dir}/create.json" >/dev/null
+    SOURCE_VERSION_ID="$(jq -r '.source_version_id // .id // empty' < "${run_dir}/create.json")"
+  else
+    log "    no existing acceptance source — creating one"
+    curl_json -X POST "${pc_url}/v1/sources/with-version" \
+      -H "Content-Type: application/json" \
+      -d "${create_payload}" | tee "${run_dir}/create.json" >/dev/null
+    SOURCE_ID="$(jq -r '.source.source_id // .source.id // .source_id // empty' < "${run_dir}/create.json")"
+    SOURCE_VERSION_ID="$(jq -r '.source_version.source_version_id // .source_version.id // .source_version_id // empty' < "${run_dir}/create.json")"
+  fi
+
+  if [[ -z "${SOURCE_ID}" || -z "${SOURCE_VERSION_ID}" ]]; then
+    echo "error: source resolution did not return source/source_version ids" >&2
+    cat "${run_dir}/create.json" >&2
+    return 1
+  fi
+  log "    source_id=${SOURCE_ID} source_version_id=${SOURCE_VERSION_ID}"
+}
+
 fast_loop_next_action() {
   local verdict="${1:-}"
   case "${verdict}" in

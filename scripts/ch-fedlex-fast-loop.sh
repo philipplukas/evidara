@@ -88,7 +88,8 @@ Options:
   --out-dir <path>               Exact directory for persisted evidence bundle
   --json                         Emit final machine-readable summary JSON
   --dry-run                      Print resolved settings and exit before mutating APIs
-  --keep-source                  Do not report cleanup guidance as follow-up work
+  --keep-source                  Suppress the acceptance-source note. The source is stable and
+                                 reused across runs (#766); there is nothing to clean up.
   --copy-evidence                Copy evidence markdown to docs/runbooks/evidence/
   --workdir-root <path>          Directory for persisted evidence bundles
   -h, --help                     Show this help
@@ -411,20 +412,9 @@ CREATE_PAYLOAD="$(jq -n \
   }
 }')"
 
-log "==> Creating source + version"
-curl -fsS -X POST "${PC_URL}/v1/sources/with-version" \
-  "${PC_AUTH_HEADER[@]}" \
-  -H "Content-Type: application/json" \
-  -d "${CREATE_PAYLOAD}" | tee "${RUN_DIR}/create.json" >/dev/null
-
-SOURCE_ID="$(jq -r '.source.source_id // .source.id // .source_id // empty' < "${RUN_DIR}/create.json")"
-SOURCE_VERSION_ID="$(jq -r '.source_version.source_version_id // .source_version.id // .source_version_id // empty' < "${RUN_DIR}/create.json")"
-
-if [[ -z "${SOURCE_ID}" || -z "${SOURCE_VERSION_ID}" ]]; then
-  echo "error: source creation did not return source/source_version ids" >&2
-  cat "${RUN_DIR}/create.json" >&2
-  exit 1
-fi
+resolve_fast_loop_source \
+  "${PC_URL}" "${SOURCE_NAME}" "${RUN_DIR}" \
+  "${VERSION_LABEL}" "${TEMPLATE_ID}" "ch" "${CREATE_PAYLOAD}"
 
 log "==> Checking readiness"
 curl_json "${PC_URL}/v1/runs/readiness?source_id=${SOURCE_ID}&source_version_id=${SOURCE_VERSION_ID}&mode=${RUN_MODE}" | tee "${RUN_DIR}/readiness.json" >/dev/null
@@ -776,7 +766,7 @@ else
   log "==> Evidence markdown"
   cat "${RUN_DIR}/evidence-summary.md" >&2
   if [[ "${KEEP_SOURCE}" -eq 0 ]]; then
-    log "==> Note: created source_id=${SOURCE_ID} source_version_id=${SOURCE_VERSION_ID}"
+    log "==> Acceptance source (stable, reused across runs): source_id=${SOURCE_ID} source_version_id=${SOURCE_VERSION_ID}"
   fi
 fi
 

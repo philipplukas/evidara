@@ -328,7 +328,11 @@ Expected result:
 
 ## Step 4: Create source + initial version
 
-Prefer `POST /v1/sources/with-version` for the thin-slice path.
+Prefer `POST /v1/sources/with-version` for the thin-slice path — but only the **first**
+time. Re-running these snippets mints a second source for the same law, and because the
+pipeline keys document identity off the source, a second document too. To re-acquire, add
+a version to the source you already have: `POST /v1/sources/{source_id}/versions`. The
+`*-fast-loop.sh` harnesses do this automatically (#766).
 
 ### CH slice 1: Fedlex legislation
 
