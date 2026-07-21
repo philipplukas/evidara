@@ -192,10 +192,6 @@ from the UI and paste it into the ConfigMap, or the next apply overwrites them.
    and `PodMonitor` target ports by name.
 3. Add a block to `infra/hetzner/observability/scrape-targets.yaml`.
 4. `kubectl apply -k infra/hetzner/observability`.
-
-The Prometheus Operator watches all namespaces (the Helm values nil the namespace-scoped
-selectors), so no Helm change is needed.
-
 5. If the service emits structured logs via an `observability/event_logging.py`, make sure
    it can name its environment — `PLATFORM_CONTROL_ENVIRONMENT` for platform-control,
    `DI_ENVIRONMENT` for document-intelligence, both set in
@@ -205,6 +201,9 @@ selectors), so no Helm change is needed.
    [environment-strategy.md](environment-strategy.md#which-variable-names-an-environment).
    A tag that is silently wrong is the same failure mode as this page's opening warning:
    the signal looks healthy precisely because nothing errored.
+
+The Prometheus Operator watches all namespaces (the Helm values nil the namespace-scoped
+selectors), so no Helm change is needed.
 
 ## Cost
 
