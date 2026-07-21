@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import AsyncIterator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
 import pytest_asyncio
-from ci_skip_guard import CiSkipGuard
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from temporalio.testing import WorkflowEnvironment
 
@@ -15,6 +15,21 @@ from platform_control import models as _models  # noqa: F401
 from platform_control.config import get_settings
 from platform_control.database import reset_database_caches
 from platform_control.models.base import Base
+
+# The "CI may not skip" guard is shared across platform-control, document-intelligence
+# and eval (#690). These are three separate Python projects with no common package, so
+# the one implementation lives in the repo's shared entry point, `scripts/`.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+
+from ci_skip_guard import CiSkipGuard  # noqa: E402
+
+# Substrings of skip reasons that are legitimate in CI, each with the reason it is
+# excused. Empty today, and that is the honest state: a full run of this suite is
+# `547 passed, 0 skipped` (#690). Nothing here is optional, so nothing is excused.
+# Adding an entry requires saying why, here:
+ALLOWED_SKIPS: dict[str, str] = {
+    # "requires a live LLM": "DI_EVAL_LIVE evals cost money and need a key.",
+}
 
 # Auth fails closed when no API key is configured (see `platform_control.auth`).
 # The suite runs keyless by design, so it opts into the local-development open path
@@ -46,9 +61,10 @@ def pytest_configure(config: pytest.Config) -> None:
 
     Generalises the per-site rule below to every skip in the suite: in CI, a
     skipped test fails the run unless its reason is allowlisted. See
-    tests/ci_skip_guard.py for the rationale and the allowlist.
+    scripts/ci_skip_guard.py for the rationale, and ALLOWED_SKIPS above for the
+    (currently empty) list of skips this suite excuses.
     """
-    config.pluginmanager.register(CiSkipGuard(), "ci-skip-guard")
+    config.pluginmanager.register(CiSkipGuard(ALLOWED_SKIPS), "ci-skip-guard")
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

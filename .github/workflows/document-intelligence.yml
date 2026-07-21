@@ -84,8 +84,11 @@ jobs:
         with:
           node-version: 22
 
+      # Keep the extras in sync with scripts/check-document-intelligence.sh. `llm`
+      # carries `dspy`, without which 12 tests over the production LLM extraction
+      # path silently never ran (#685).
       - name: Install document-intelligence dependencies
-        run: python -m pip install -e "./document-intelligence[dev,service,test]"
+        run: python -m pip install -e "./document-intelligence[dev,service,test,llm]"
 
       - name: Check (ruff + pytest + contracts + dbt)
         run: bash scripts/check-document-intelligence.sh

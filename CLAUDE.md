@@ -29,7 +29,7 @@ Run the narrowest gate for the surface you touched before pushing:
 |---|---|
 | `platform-control/` | `bash scripts/check-platform-control.sh` — ruff check + ruff format --check + pytest **and** the OpenAPI contract-drift gate **and** the full admin gate. A bare `uv run pytest` is narrower than CI. |
 | `platform-control/admin/` | `cd platform-control/admin && npm run check && npm run build` |
-| `document-intelligence/` | `cd document-intelligence && uv run --extra dev --extra service --extra test pytest && uv run ruff check . && uv run ruff format --check .` |
+| `document-intelligence/` | `cd document-intelligence && uv run --extra dev --extra service --extra test --extra llm pytest && uv run ruff check . && uv run ruff format --check .` |
 | `legal-search/api/` | `cd legal-search/api && npm run check` |
 | `legal-search/frontend/` | `cd legal-search/frontend && npm run check && npm run build` — build is a separate CI step; it catches SSR issues `tsc` misses |
 | `legal-search/` (both surfaces) | `bash scripts/check-legal-search.sh` |
@@ -46,7 +46,10 @@ narrower gate means nothing, and the gap surfaces as a surprise red (#664, #688)
 
 For `document-intelligence/`, the extras are not optional: a bare `uv run pytest` cannot collect
 `test_instructor_extractor` or `test_eval_docling_extractor` and reports green over a smaller suite
-than CI runs. `ruff format --check` is likewise part of the CI job, not just `ruff check`. The full
+than CI runs. `--extra llm` is on that list as of #685 — without it `test_dspy_modules.py` (11 tests)
+is dropped at collection and `test_eval_dspy_extraction.py::test_eval_harness_runs_mock` skips,
+covering the production LLM metadata extractor with nothing. `ruff format --check` is likewise part
+of the CI job, not just `ruff check`. The full
 CI gate is `scripts/check-document-intelligence.sh`, but it installs into the ambient `python3`
 rather than a uv environment, so prefer the command above locally.
 

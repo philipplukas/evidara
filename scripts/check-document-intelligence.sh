@@ -14,8 +14,15 @@ if ! python3 -c 'import sys; assert sys.version_info >= (3, 12), "need 3.12+"' 2
   echo "hint: use uv (e.g. cd document-intelligence && uv sync --extra dev --extra service --extra test && uv run pytest tests/ -v)" >&2
   exit 1
 fi
-# Keep in sync with .github/workflows/document-intelligence.yml (dev + service + test).
-python3 -m pip install -e ".[dev,service,test]"
+# Keep in sync with .github/workflows/document-intelligence.yml (dev + service + test + llm).
+#
+# `llm` is here for coverage, not for the runtime. It carries `dspy`, and without it
+# `tests/test_dspy_modules.py` (11 tests) was dropped at collection and
+# `test_eval_dspy_extraction.py::test_eval_harness_runs_mock` skipped — 12 tests over
+# `extractors/dspy_modules.py`, which is on the production extraction path, executing
+# nowhere while their docstring advertised CI mock coverage (#685). These tests mock the
+# LM layer, so they need the import, not credentials or a network.
+python3 -m pip install -e ".[dev,service,test,llm]"
 
 echo "Linting (ruff check)..."
 python3 -m ruff check .

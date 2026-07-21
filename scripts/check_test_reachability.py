@@ -16,7 +16,7 @@ The two cases that motivated this check:
   `main` unnoticed, and the panel-geometry guard added by #605 has been inert
   since the day it landed.
 
-Design (deliberately mirrors `platform-control/tests/ci_skip_guard.py`):
+Design (deliberately mirrors `scripts/ci_skip_guard.py`):
 
 - **Derive, do not declare.** A hand-maintained list of "what CI runs" is the
   same class of artifact that rotted in the first place. This script reads the
@@ -32,7 +32,7 @@ CI collects can still contain a test that never executes — `e2e/smoke.spec.ts`
 guards its only real-backend test with
 `test.skip(!USE_REAL_BACKEND, ...)`, and no CI job sets that variable (#686
 case 3). That is a skip, not a reachability gap, and it is the JS analogue of
-what `platform-control/tests/ci_skip_guard.py` catches on the Python side.
+what `scripts/ci_skip_guard.py` catches on the Python side.
 There is no equivalent for vitest/Playwright yet. Do not read a passing run of
 this check as "everything in these files executed".
 
