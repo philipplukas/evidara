@@ -119,6 +119,38 @@ leave the portal still clear provenance, as before.
 - The admin panel's source-create form does not yet expose the field; the API
   and CLI do. Surfacing it in the wizard is follow-up work.
 
+### The invariant this ADR asks the next change to keep
+
+`blueprint_seed_origins()` in `services/source_blueprints.py` is **the single place
+that answers "which origins may this source version seed?"** Keep it that way.
+
+This is not tidiness. Every open proposal for scaling commune registration (#736)
+differs *only* in where that origin set comes from:
+
+| proposal | backs the set with |
+|---|---|
+| a portal registry table | operator-editable DB rows |
+| per-commune generated templates | 2,110 entries in `source_blueprints.yaml` |
+| jurisdiction-derived origins | the commune's `country-overlays/ch` entry |
+| the registry that already exists | `hierarchies/communal_portals.yaml`, keyed by BFS number |
+
+All four are implementations behind this one function, so while there is exactly
+one answering point they stay interchangeable and nothing is committed. A second
+path — a host list inside a provider, a special case in a router, a registry
+lookup at dispatch time — silently picks one of them by accident, and the choice
+becomes expensive to revisit precisely because it is no longer visible in one
+place.
+
+Note that `gemeinde_http` *already* carries a portal registry
+(`communal_portals.yaml`, BFS number → host). That it is not currently consulted
+here is the reason a second commune still needs its own template. Whether to route
+it through this function is exactly the #736 decision, and it should be made
+against evidence from running the loop on communes 2 and 3 — not from the armchair.
+The overlay data cannot settle it today: all ten `law_collection` blocks in
+`country-overlays/ch/municipalities.yaml` record a publisher and a format but say
+"URL to be confirmed", so there is no per-commune URL in the repo to derive an
+origin from.
+
 ## Alternatives considered
 
 **A general sparse merge over the whole spec.** What the issue originally
