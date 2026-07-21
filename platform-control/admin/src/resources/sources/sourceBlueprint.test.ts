@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { buildAcquisitionSpec } from "../../lib/admin/__fixtures__/acquisitionSpecs";
 import type {
-  DeterministicHttpAcquisitionSpec,
-  FedlexSparqlAcquisitionSpec,
-  FirecrawlAcquisitionSpec,
-  RisOgdAcquisitionSpec,
+  AcquisitionSpec,
   SourceBlueprintPreview,
   SourceBlueprintTemplate,
 } from "../../lib/admin/dataProvider";
@@ -15,15 +13,11 @@ import {
 } from "./sourceBlueprint";
 
 const previewFor = (
-  spec:
-    | FirecrawlAcquisitionSpec
-    | DeterministicHttpAcquisitionSpec
-    | RisOgdAcquisitionSpec
-    | FedlexSparqlAcquisitionSpec,
+  spec: { provider: AcquisitionSpec["provider"] } & Record<string, unknown>,
 ): SourceBlueprintPreview => ({
   overlay_id: "ch",
   provider_template_id: "template-1",
-  acquisition_spec: spec,
+  acquisition_spec: buildAcquisitionSpec(spec),
   enabled: true,
   live_ready: true,
   launchable: true,
@@ -103,6 +97,35 @@ describe("summarizePreview", () => {
     expect(lines).toContain("Provider: deterministic_http");
     expect(lines).toContain("Seeds: https://static/a, https://static/b");
     expect(lines).toContain("Tenant/corpus: tenant-1 / corpus-1");
+  });
+
+  /**
+   * #737 — a provider with no dedicated branch gets a generic summary built
+   * from fields every spec has. It used to fall through to the *firecrawl*
+   * branch, so `canton_http` was described by a spec it does not have: three
+   * lines of `n/a` for mode, limit/depth and formats, and no `canton_code`.
+   * The four-provider union made that unrepresentable-and-therefore-untestable;
+   * the contract's eleven-provider union makes it plain.
+   */
+  it("summarizes a provider without a dedicated branch from its shared fields", () => {
+    const lines = summarizePreview(
+      previewFor({
+        provider: "canton_http",
+        canton_code: "CH-ZH",
+        seed_url: "https://www.zh.ch/gesetzessammlung",
+        seed_urls: [],
+        tenant_id: "tenant_public",
+        corpus_id: "corpus_public_ch_zh_legislation",
+      }),
+    );
+
+    expect(lines).toContain("Provider: canton_http");
+    expect(lines).toContain("Seeds: https://www.zh.ch/gesetzessammlung");
+    expect(lines).toContain("Tenant/corpus: tenant_public / corpus_public_ch_zh_legislation");
+    // The firecrawl fallthrough used to emit these over a spec that has none.
+    expect(lines.join("\n")).not.toContain("Mode:");
+    expect(lines.join("\n")).not.toContain("Limit/depth:");
+    expect(lines.join("\n")).not.toContain("Formats:");
   });
 
   it("falls through to a firecrawl-style summary for the firecrawl provider", () => {

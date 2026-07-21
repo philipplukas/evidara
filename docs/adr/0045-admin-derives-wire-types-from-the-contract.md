@@ -53,11 +53,12 @@ and pre-commit without a new entry point.
 transport is react-admin's data provider, not a generated fetch client, and
 generating one would create a second, unused HTTP path through the app.
 
-Where a type genuinely cannot be aliased yet — because doing so cascades past the
-data provider into form state — it stays hand-written **and is pinned
-field-by-field** in `src/lib/api/contract.conformance.ts`. The pin is honest about
-its limit: it catches a renamed or retyped field, and it does **not** catch a field
-added to the contract. That gap is tracked, not tolerated indefinitely (#737).
+There is no hand-written wire type left. #695 landed with three exceptions —
+`RunBase`, `RunListItem`, `SourceVersion` — pinned field-by-field in a
+`contract.conformance.ts` that could catch a rename or a retype but not an added
+field. #737 aliased all three and deleted that file. A pin is a stopgap for a
+change in flight, not a resting place: the fields it could not see (`scope`,
+`replay`, `refused`, `execution_mode`) were exactly the ones missing.
 
 ## Consequences
 
@@ -69,6 +70,12 @@ added to the contract. That gap is tracked, not tolerated indefinitely (#737).
   guarded by a type that claimed it was unreachable.
 - ~20 hand-written wire types are retired; the contract is the single source of
   truth end to end, server to browser.
+- The `AcquisitionSpec` union is the contract's **eleven** providers, not the
+  **four** the version dialog renders widgets for. Conflating those two is #614.
+  Editability is now an explicit, separate concept (`EDITABLE_PROVIDERS`), so a
+  provider the form cannot edit is *unrenderable*, never *unrepresentable* — and
+  the `as unknown as AcquisitionSpec` casts that hid real `canton_http` payloads
+  in tests are gone.
 
 **Costs.**
 

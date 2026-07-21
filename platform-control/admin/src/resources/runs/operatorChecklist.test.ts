@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { RunPipelineHealth, RunRecord } from "../../lib/admin/dataProvider";
+import { buildRunRecord } from "../../lib/admin/__fixtures__/runs";
+import type { RunPipelineHealth } from "../../lib/admin/dataProvider";
 import { deriveOperatorChecklist } from "./operatorChecklist";
 
-const baseRun: RunRecord = {
+const baseRun = buildRunRecord({
   id: "run_01",
   run_id: "run_01",
   source_id: "src_01",
@@ -13,10 +14,9 @@ const baseRun: RunRecord = {
   completed_at: null,
   artifacts_count: 0,
   captured_resources_count: 0,
-  failure_reason: null,
   created_at: "2026-04-07T09:59:00Z",
   updated_at: "2026-04-07T10:00:00Z",
-};
+});
 
 const healthyPipeline: RunPipelineHealth = {
   run_id: "run_01",

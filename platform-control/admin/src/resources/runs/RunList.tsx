@@ -78,7 +78,17 @@ export const describeQueueScope = ({
   return filterSummary.length > 0 ? `Filtering ${filterSummary} · ${base}` : base;
 };
 
-export const describeRunState = (record: RunRecord): string => {
+/**
+ * Takes only the field it reads.
+ *
+ * It used to take a full `RunRecord`, and the run queue passed it a
+ * `RunListRecord` — which compiled only because both aliased one hand-written
+ * `RunBase`. The contract distinguishes them (`RunResponse` carries `scope` and
+ * `replay`; `RunListItemResponse` carries `source_name`/`version_label`), so
+ * once the types were derived from it (#737) the mismatch became visible. The
+ * fix is to ask for what is used, not to widen either record.
+ */
+export const describeRunState = (record: Pick<RunRecord, "status">): string => {
   if (record.status === "pending") {
     return "Queued. Review readiness or open the run when it becomes active.";
   }
@@ -145,7 +155,8 @@ export type RunQueueKeyboardShortcutAction =
 export const getRunQueueKeyboardShortcutAction = (
   event: Pick<KeyboardEvent, "altKey" | "ctrlKey" | "defaultPrevented" | "key" | "metaKey">,
   target: EventTarget | null,
-  attentionRun: RunRecord | null,
+  // Only the id is read; see `describeRunState` for why this is a `Pick`.
+  attentionRun: Pick<RunRecord, "run_id"> | null,
 ): RunQueueKeyboardShortcutAction | null => {
   if (
     event.defaultPrevented ||
