@@ -141,3 +141,114 @@ class RunModeTests(unittest.TestCase):
 
         self.assertIn("- Run mode: `unspecified`", markdown)
         self.assertIn("> Run mode: `unspecified`.", markdown)
+
+
+def resolve(lookup_response: str) -> tuple[str, str, list[str]]:
+    """Run `resolve_fast_loop_source` against a stubbed curl_json.
+
+    Returns (source_id, source_version_id, urls_posted_to).
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        run_dir = Path(tmp)
+        calls_path = run_dir / "calls.log"
+
+        # Stub curl_json: record every POST target, answer the source lookup with
+        # the caller's fixture, and answer either create path with a fresh id.
+        stub = f"""
+        curl_json() {{
+          local url="" prev=""
+          for a in "$@"; do
+            case "$prev" in
+              -X) ;;
+              *) [[ "$a" == http* ]] && url="$a" ;;
+            esac
+            prev="$a"
+          done
+          if [[ "$*" == *"-X POST"* ]]; then
+            printf '%s\\n' "$url" >> "{calls_path}"
+          fi
+          case "$url" in
+            *"/v1/sources?q="*) printf '%s' '{lookup_response}' ;;
+            *"/versions") printf '%s' '{{"source_version_id":"sv_new"}}' ;;
+            *"with-version") printf '%s' '{{"source":{{"source_id":"src_created"}},"source_version":{{"source_version_id":"sv_created"}}}}' ;;
+          esac
+        }}
+        log() {{ :; }}
+        source "{EVIDENCE_LIB}"
+        resolve_fast_loop_source "https://pc.test" "CH Fedlex fast-loop source" "{run_dir}" \\
+          "vlabel" "tmpl" "ch" '{{"source":{{}},"source_version":{{}}}}'
+        printf '%s %s' "$SOURCE_ID" "$SOURCE_VERSION_ID"
+        """
+
+        result = subprocess.run(
+            ["bash", "-c", stub], capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0:
+            raise AssertionError(f"resolve failed: {result.stderr}")
+
+        source_id, version_id = result.stdout.strip().split(" ")
+        calls = (
+            calls_path.read_text(encoding="utf-8").split()
+            if calls_path.exists()
+            else []
+        )
+        return source_id, version_id, calls
+
+
+class ResolveFastLoopSource(unittest.TestCase):
+    """A rehearsal must not mint a new source per run (#766).
+
+    The pipeline keys document identity off the source, so a fresh source per run
+    minted a fresh document per run — and `search_hits`, which is an ADR-0030 gate,
+    counted one law twice. Reuse is what makes the evidence mean what it says.
+    """
+
+    def test_an_existing_source_is_reused_rather_than_minted(self) -> None:
+        existing = '{"data":[{"source_id":"src_existing","name":"CH Fedlex fast-loop source"}]}'
+
+        source_id, version_id, calls = resolve(existing)
+
+        self.assertEqual(source_id, "src_existing")
+        self.assertEqual(version_id, "sv_new")
+        self.assertTrue(
+            any(c.endswith("/v1/sources/src_existing/versions") for c in calls),
+            f"expected a version POST under the existing source, got {calls}",
+        )
+        self.assertFalse(
+            any("with-version" in c for c in calls),
+            f"reuse path must not POST /v1/sources/with-version, got {calls}",
+        )
+
+    def test_a_name_that_does_not_match_is_not_treated_as_a_hit(self) -> None:
+        # Substring/prefix matching here would reuse an unrelated operator source.
+        other = '{"data":[{"source_id":"src_other","name":"CH Fedlex fast-loop source (old)"}]}'
+
+        source_id, _version_id, calls = resolve(other)
+
+        self.assertEqual(source_id, "src_created")
+        self.assertTrue(any("with-version" in c for c in calls))
+
+    def test_the_first_run_still_creates_a_source(self) -> None:
+        source_id, version_id, calls = resolve('{"data":[]}')
+
+        self.assertEqual(source_id, "src_created")
+        self.assertEqual(version_id, "sv_created")
+        self.assertTrue(any("with-version" in c for c in calls))
+
+
+class EveryHarnessResolvesRatherThanCreates(unittest.TestCase):
+    """The #766 fix landed for one script and was reported as landing for all seven.
+
+    This asserts the property across the whole family so the next port cannot be
+    partial and still read as complete.
+    """
+
+    def test_no_fast_loop_script_posts_with_version_directly(self) -> None:
+        offenders = []
+        for script in sorted((REPO_ROOT / "scripts").glob("*-fast-loop.sh")):
+            body = script.read_text(encoding="utf-8")
+            if "resolve_fast_loop_source" not in body:
+                offenders.append(f"{script.name}: never calls resolve_fast_loop_source")
+            if "/v1/sources/with-version" in body:
+                offenders.append(f"{script.name}: still POSTs /v1/sources/with-version")
+        self.assertEqual(offenders, [], "; ".join(offenders))
