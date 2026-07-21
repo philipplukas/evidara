@@ -16,6 +16,26 @@
 
   /* Corner radius shared by the three workspace panels. */
   --radius-panel: 1.35rem;
+
+  /* ─── Keyboard focus (#696) ───────────────────────────────────────────
+   * Selection in this workspace is drawn in `--accent-core` (violet): the tab
+   * underline, the active chip fill, the active-tab ring. A focus indicator
+   * tinted from the same token — which is exactly what `--focus-ring` is,
+   * `--accent-core` at 24% — makes "this tab is selected" and "this tab has
+   * keyboard focus" the same picture.
+   *
+   * So keyboard focus gets its own high-contrast neutral, deliberately outside
+   * the accent family, and is always drawn as an OFFSET OUTLINE around the
+   * whole control — never as a border or underline, which are the shapes that
+   * encode selection. Colour, geometry and position all differ.
+   *
+   * Workspace-local on purpose: `styles/tokens/tokens.css` is shared with the
+   * admin app under ADR-0027, and re-hueing the shared `--focus-ring` is a
+   * both-products decision that #696 asks to be agreed first. This token needs
+   * no such agreement and does not weaken the indicator anywhere else. */
+  --focus-ring-strong: var(--foreground);
+  --focus-ring-strong-offset: 2px;
+  --focus-ring-strong-width: 2px;
 }
 
 @theme inline {
@@ -87,6 +107,7 @@
 
   /* ─── Focus ─── */
   --color-focus-ring: var(--focus-ring);
+  --color-focus-ring-strong: var(--focus-ring-strong);
 
   /* ─── Attention ─── */
   --color-attention: var(--attention);
@@ -348,8 +369,16 @@
     @apply flex min-w-0 flex-wrap items-center gap-1.5;
   }
 
+  /* All three context-bar controls share one focus recipe (#696). They used to
+   * disagree: the toggle had a violet `ring-focus-ring`, the chip and the tab
+   * had no focus-visible style at all — while `--chip--active` and
+   * `--tab--active` both use a *ring* to mean "selected". Ring-for-selection
+   * beside ring-for-focus, with two of three controls unreachable by eye from
+   * the keyboard. Focus is now an offset outline everywhere; the selection
+   * rings below are left alone, because outline and ring can no longer be
+   * confused. */
   .context-bar__official-toggle {
-    @apply inline-flex min-h-9 whitespace-nowrap items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+    @apply focus-ring-offset inline-flex min-h-9 whitespace-nowrap items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs font-medium transition-colors;
   }
 
   .context-bar__official-toggle--active {
@@ -365,7 +394,7 @@
   }
 
   .context-bar__chip {
-    @apply inline-flex min-h-9 whitespace-nowrap items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all;
+    @apply focus-ring-offset inline-flex min-h-9 whitespace-nowrap items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all;
   }
 
   .context-bar__chip--active {
@@ -381,7 +410,7 @@
   }
 
   .context-bar__tab {
-    @apply inline-flex min-h-9 whitespace-nowrap items-center rounded-full px-3 py-1.5 text-xs font-medium transition-all;
+    @apply focus-ring-offset inline-flex min-h-9 whitespace-nowrap items-center rounded-full px-3 py-1.5 text-xs font-medium transition-all;
   }
 
   .context-bar__tab--active {
@@ -421,6 +450,26 @@
   .transition-motion-medium {
     transition-duration: var(--motion-duration-medium);
     transition-timing-function: var(--motion-easing-standard);
+  }
+
+}
+
+/* The single keyboard-focus recipe for this workspace (#696).
+ *
+ * One name, one definition: every interactive control that is not already
+ * covered by a shadcn default carries `focus-ring-offset` rather than
+ * hand-rolling a `focus-visible:ring-*`. An offset outline can never be
+ * confused with the accent-core underline/fill that means "selected", and it
+ * sits outside the box so it does not shift layout.
+ *
+ * `outline` (not `box-shadow`/`ring`) so forced-colors / Windows High Contrast
+ * Mode keeps the indicator. Declared with `@utility` so it is a real Tailwind
+ * utility: usable both as a class in TSX and via `@apply` in the component
+ * classes below. */
+@utility focus-ring-offset {
+  &:focus-visible {
+    outline: var(--focus-ring-strong-width) solid var(--focus-ring-strong);
+    outline-offset: var(--focus-ring-strong-offset);
   }
 }
 

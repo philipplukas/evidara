@@ -71,10 +71,12 @@ describe("DetailsTab", () => {
     const detail = buildDetail("", [
       { label: "Document type", value: "Law", iconKey: "dtype-law" },
     ]);
-    renderWithProviders(<DetailsTab detail={detail} />);
+    const { container } = renderWithProviders(<DetailsTab detail={detail} />);
 
     expect(screen.getByText("Document type")).toBeInTheDocument();
-    expect(screen.getByText("§")).toBeInTheDocument();
+    // Was `getByText("§")`. Document-meta icons are lucide components now, not
+    // text glyphs, so the icon is an <svg> rather than a text node (issue 694).
+    expect(container.querySelector("svg.lucide-scroll")).toBeInTheDocument();
     expect(screen.getByText("Law")).toBeInTheDocument();
   });
 
