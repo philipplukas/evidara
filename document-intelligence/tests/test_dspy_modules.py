@@ -2,6 +2,14 @@
 
 These tests mock the DSPy LM layer so they run without credentials.
 They verify module signatures, output validation, and error handling.
+
+They also actually run, as of #685. A module-level `pytest.importorskip("dspy")`
+used to drop this entire file from every run — 11 tests over
+`extractors/dspy_modules.py`, which is on the production extraction path via
+`processing_runtime.py:43` → `dspy_metadata_extractor.py:58`. `dspy` is in the
+`llm` extra, which no CI job installed; the suite reported green without ever
+naming the file. CI installs `llm` now, and `scripts/ci_skip_guard.py` fails the
+run if a skip like that reappears.
 """
 
 from __future__ import annotations
@@ -9,8 +17,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-pytest.importorskip("dspy")
 
 
 @pytest.fixture(autouse=True)

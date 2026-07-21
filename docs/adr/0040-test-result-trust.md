@@ -149,14 +149,14 @@ building a machine to refuse to guess, using tooling that guesses.
   inverted `grep -qv` passed review because nobody asked it to fail. A guard
   that has only been observed passing is indistinguishable from a guard that
   cannot fail.
-- Prefer checking **outcomes over syntax**. `platform-control/tests/ci_skip_guard.py`
+- Prefer checking **outcomes over syntax**. `scripts/ci_skip_guard.py`
   observes that a test was skipped rather than grepping for `importorskip`,
   because a grep sees one spelling and misses a runtime `pytest.skip()` inside
   an `except OSError`.
 - Debt is **registered, not silenced**. Where a violation is knowingly left in
   place, it goes in a named register with a reason that is printed on every run,
   and a stale entry fails the build. Registers used this way:
-  `ALLOWED_SKIPS` (`ci_skip_guard.py`), `KNOWN_UNREACHABLE`
+  `ALLOWED_SKIPS` (per suite, wired to `scripts/ci_skip_guard.py`), `KNOWN_UNREACHABLE`
   (`scripts/check_test_reachability.py`).
 
 ## Status of the work
@@ -168,7 +168,9 @@ building a machine to refuse to guess, using tooling that guesses.
 | `document-intelligence` gate row, so the local command collects what CI collects | #664 (`CLAUDE.md` per-surface gate table) |
 | Silent skips catalogued across the suite | #698 |
 | Inverted `grep -qv` guard rewritten, with a fixture-tree self-test asserting both directions | #702 (`scripts/check-js-workspace-hygiene.sh`, `scripts/tests/test_check_js_workspace_hygiene.py`) |
-| "CI may not skip" generalised from the #564 Temporal site to the whole platform-control suite | #704 (`platform-control/tests/ci_skip_guard.py`) |
+| "CI may not skip" generalised from the #564 Temporal site to the whole platform-control suite | #704 (then `platform-control/tests/ci_skip_guard.py`; moved to `scripts/` by #690) |
+| The same guard adopted as a repo convention — shared by platform-control, document-intelligence and eval, and extended to catch whole modules dropped at collection | #690 (`scripts/ci_skip_guard.py`) |
+| DSPy tests over the production LLM extractor made to actually run, via the `llm` extra in CI | #685 (`scripts/check-document-intelligence.sh`) |
 | Visual baselines re-blessed outside the bug window | #700 |
 | Reachability check — enumerates specs, enumerates what CI invokes, fails on any spec no job can reach | #686 (`scripts/check_test_reachability.py`) |
 | ADR number-collision guard — two files may not claim one number | #686 (`scripts/check_adr_numbers.py`) |
@@ -253,7 +255,7 @@ A suite bound to a stale container reports high coverage of the wrong binary.
 - ADR-0033 — agentic legal reasoning; the refusal-over-plausible-answer principle
   this ADR applies to tooling
 - ADR-0034 — hand-maintained artifacts drift; the same argument for contracts
-- `platform-control/tests/ci_skip_guard.py` — outcome-over-syntax guard, prior art
+- `scripts/ci_skip_guard.py` — outcome-over-syntax guard, shared by every Python suite
 - `scripts/check-js-workspace-hygiene.sh` — both-directions self-test, prior art
 - `scripts/check_test_reachability.py` — the coverage-honesty check this ADR ships with
 - Issues: #564, #588, #605, #611, #646, #664, #686, #688, #690, #698, #700, #702, #704

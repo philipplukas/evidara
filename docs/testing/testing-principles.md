@@ -28,8 +28,9 @@ runs asserts nothing.
 Two guards enforce this today —
 [`scripts/check_test_reachability.py`](../../scripts/check_test_reachability.py)
 (no committed test file may be unreachable from CI) and
-[`platform-control/tests/ci_skip_guard.py`](../../platform-control/tests/ci_skip_guard.py)
-(CI may not skip without an allowlisted reason).
+[`scripts/ci_skip_guard.py`](../../scripts/ci_skip_guard.py)
+(CI may not skip without an allowlisted reason; registered by the
+`platform-control`, `document-intelligence` and `eval` suites).
 
 ### Maximize confidence with minimal effort
 
