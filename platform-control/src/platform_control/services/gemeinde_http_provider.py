@@ -73,11 +73,23 @@ Templates still ship `enabled: false`. The config key is the operator's, flipped
 from the admin panel with the evidence attached; this key only says the code
 works. See #735.
 
-The design generalises past Zürich: the BFS → host allow-list lives in
-`communal_portals.yaml`, so adding a commune is a config edit to that data
-file, not a code change (#632). Landing one city is deliberate (#584) —
-communal law lives on ~2,000 independent sites and full coverage is a separate,
-much larger problem.
+HOW FAR THIS GENERALISES PAST ZÜRICH — read before quoting the next paragraph
+-----------------------------------------------------------------------------
+The BFS → host allow-list lives in `communal_portals.yaml`, so registering a
+commune's *host* is a config edit, not a code change (#632).
+
+The **parser is not** config. Everything above reads Stadt Zürich's Amtliche
+Sammlung schema specifically: the `ASZ` field id, the `rechtstexte` link field,
+`erlassdatum` / `inkrafttretendatum` / `ausserkrafttretendatum`, and a page title
+of the form `<Erlass> | Stadt Zürich`. A commune whose portal has a different
+page shape yields no manifestation link, and the run fails with the reason built
+in `start_run` — correctly, but the remedy is a parser, not a config edit.
+
+The earlier wording here ("adding a commune is a config change, not code") was
+read as covering both halves, and sent #736 looking for a registration mechanism
+when the binding constraint is per-portal parsing (see that issue's 2026-07-21
+evidence comment). Landing one city is deliberate (#584) — communal law lives on
+~2,000 independent sites and full coverage is a separate, much larger problem.
 """
 
 from __future__ import annotations
@@ -139,6 +151,11 @@ _TEXT_CONTENT_TYPES = frozenset(
 _BINARY_CONTENT_TYPES = frozenset({"application/pdf"})
 # Anything outside both sets is still recorded and skipped rather than guessed at.
 _CARRIABLE_CONTENT_TYPES = _TEXT_CONTENT_TYPES | _BINARY_CONTENT_TYPES
+
+# Shared so the per-URL failure and the run-level failure_reason cannot drift; the
+# run-level message keys off this exact string to tell "unparseable page shape" apart
+# from "seeds wrong / portal down" (#784).
+_NO_MANIFESTATION_ERROR = "no operative-text manifestation found on landing page"
 
 _SWISS_DATE_RE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
 
@@ -345,7 +362,7 @@ class GemeindeHttpProvider:
                         failures.append(
                             {
                                 "url": url,
-                                "error": "no operative-text manifestation found on landing page",
+                                "error": _NO_MANIFESTATION_ERROR,
                             }
                         )
                         continue
@@ -417,9 +434,28 @@ class GemeindeHttpProvider:
                     "unrecognised content type rather than a missing capability."
                 )
             else:
-                inline_failure_reason = (
-                    f"{self.provider_name} did not capture any resources for BFS {bfs_number}"
-                )
+                # The per-URL reasons are already in `failures`; the operator only ever
+                # saw the generic sentence below, which cannot distinguish "the seeds
+                # are wrong" from "this portal is not a schema I can read" (#784). The
+                # sibling branch above explains its case precisely; this one now does
+                # too — the information was collected and then thrown away.
+                unparsed = [f["url"] for f in failures if f.get("error") == _NO_MANIFESTATION_ERROR]
+                if unparsed and len(unparsed) == len(failures):
+                    inline_failure_reason = (
+                        f"{self.provider_name} reached all {len(unparsed)} page(s) for BFS "
+                        f"{bfs_number} but found no operative-text link on any of them. "
+                        "Either these are not Amtliche-Sammlung-shaped landing pages, or "
+                        "the commune publishes law in a layout this provider does not "
+                        "parse. Adding a commune is a config change only where the portal "
+                        "shares Zürich's page shape; a different shape needs a parser."
+                    )
+                else:
+                    detail = "; ".join(f"{f.get('url')}: {f.get('error')}" for f in failures[:3])
+                    suffix = f" (+{len(failures) - 3} more)" if len(failures) > 3 else ""
+                    inline_failure_reason = (
+                        f"{self.provider_name} did not capture any resources for BFS "
+                        f"{bfs_number}" + (f" — {detail}{suffix}" if detail else "")
+                    )
 
         return ProviderStartResult(
             provider=self.provider_name,

@@ -478,3 +478,83 @@ async def test_provider_consumes_the_run_rate_limiter(monkeypatch: pytest.Monkey
     # Landing page + the linked PDF: both go through the limiter, both on the
     # commune's host — which is what the flat per-host ceiling binds.
     assert acquired == ["www.stadt-zuerich.ch", "www.stadt-zuerich.ch"]
+
+
+@pytest.mark.asyncio
+async def test_an_unparseable_portal_says_so_rather_than_just_captured_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#784: the run already failed; it just would not say why.
+
+    A commune on a differently-shaped portal reaches a real page with no
+    Amtliche-Sammlung fields on it. The run correctly fails, but the operator-facing
+    reason used to be `did not capture any resources for BFS 261` — which reads
+    identically to wrong seeds or a portal outage, and points at neither remedy.
+
+    The distinguishing fact was already collected in `failures`; it was thrown away
+    on the way to `failure_reason`.
+    """
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                200,
+                "<html><head><title>Willkommen</title></head><body><p>Kein AS</p></body></html>",
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    source_version = SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL})
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_zh_261_unparseable"),
+    )
+
+    assert result.response_payload["captured"] == 0
+    # It still fails — this was already true and is the half #784 got wrong.
+    assert result.inline_failure_reason is not None
+
+    reason = result.inline_failure_reason
+    # …and now names the actual condition and the actual remedy.
+    assert "no operative-text link" in reason
+    assert "needs a parser" in reason
+    # The old generic sentence must not be what an operator reads here.
+    assert reason != "gemeinde_http did not capture any resources for BFS 261"
+
+
+@pytest.mark.asyncio
+async def test_a_transport_failure_is_not_reported_as_an_unparseable_portal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The two causes must stay distinguishable, or the new message is just a new lie.
+
+    An unreachable page and an unrecognised page shape need different remedies —
+    retry/fix the seed versus write a parser. A message that claimed "needs a
+    parser" for a 500 would be worse than the generic one it replaced.
+    """
+    _install_fake_client(
+        monkeypatch,
+        {
+            "https://www.stadt-zuerich.ch/de/": (
+                500,
+                "upstream exploded",
+                {"content-type": "text/html; charset=utf-8"},
+            ),
+        },
+    )
+    provider = GemeindeHttpProvider()
+    source_version = SimpleNamespace(acquisition_spec={"bfs_number": 261, "seed_url": LANDING_URL})
+    result = await provider.start_run(
+        SimpleNamespace(),
+        source_version,
+        SimpleNamespace(run_id="run_zh_261_transport"),
+    )
+
+    assert result.response_payload["captured"] == 0
+    reason = result.inline_failure_reason
+    assert reason is not None
+    assert "needs a parser" not in reason
+    # The per-URL cause is surfaced instead of being left in the payload.
+    assert "https://www.stadt-zuerich.ch/de/" in reason

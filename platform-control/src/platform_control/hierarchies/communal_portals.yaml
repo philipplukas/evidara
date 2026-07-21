@@ -7,9 +7,11 @@
 # norm-hierarchy walk links municipal documents up to ("which cantonal law
 # delegates this competence?"). It varies per commune, so it is registered here.
 #
-# Adding commune #2 is an edit to this data file — NOT a Python change. This is
-# what makes gemeinde_http_provider's "adding a commune is a config change, not
-# code" claim true.
+# Registering commune #2's HOST is an edit to this data file — not a Python
+# change. That is the half of "adding a commune is a config change, not code"
+# which is true. The other half is not: gemeinde_http parses Stadt Zürich's
+# Amtliche Sammlung page schema, so a commune on a differently-shaped portal
+# needs a parser as well as a row here. See #736 and #784.
 #
 # It is NOT, however, operator-reachable the way blueprint enablement became in
 # #632/ADR-0035: this file ships inside the Python package, so editing it is
