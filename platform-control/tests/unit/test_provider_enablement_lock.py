@@ -27,12 +27,19 @@ from acquisition_core.providers import (
     provider_readiness,
 )
 from platform_control.domain import RunMode, RunStatus
-from platform_control.errors import BlueprintTemplateNotEnabledError
+from platform_control.errors import (
+    BlueprintTemplateNotEnabledError,
+    InvalidStateTransitionError,
+)
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.provider_job import ProviderJob
 from platform_control.models.run import Run
 from platform_control.schemas.run import CreateRunRequest
-from platform_control.schemas.source import CreateSourceRequest, CreateSourceVersionRequest
+from platform_control.schemas.source import (
+    BlueprintSeedOverride,
+    CreateSourceRequest,
+    CreateSourceVersionRequest,
+)
 from platform_control.services.acquisition_provider import ProviderStartResult
 from platform_control.services.blueprint_enablement import BlueprintEnablementService
 from platform_control.services.canton_http_provider import CantonHttpProvider
@@ -352,3 +359,90 @@ def test_readiness_wins_over_a_contradicting_legacy_bool() -> None:
     assert provider_readiness(_Contradictory) is AcquisitionReadiness.AWAITING_EVIDENCE
     with pytest.raises(ProviderNotLiveReadyError):
         ensure_launchable(_Contradictory)
+
+
+@pytest.mark.asyncio
+async def test_seed_override_cannot_bypass_the_config_key(session) -> None:
+    """#710/ADR-0045: the "template plus my seeds" rung is inside the lock.
+
+    The obvious way to break the lock with an override path is to use it as a
+    laundering device: name a disabled template, supply your own seeds, and hope
+    the resulting version reads as hand-written (provenance NULL) — because a
+    version with no provenance is never measured against any config key at all
+    (`run_service._assert_launchable` only consults the enablement service when
+    both provenance fields are set).
+
+    So the override must *keep* provenance, not drop it. bundesland_http is
+    live_ready, so `enabled: false` on the Bavarian template is the only thing
+    between this run and the live portal — with or without operator seeds.
+    """
+    overlay_id, provider_template_id = DISABLED_TEMPLATE
+    session.add(Jurisdiction(jurisdiction_id="jur_de_by", name="Bayern", slug="de-by"))
+    session.add(
+        Authority(
+            authority_id="auth_de_by",
+            jurisdiction_id="jur_de_by",
+            name="Bayern",
+            slug="de-by",
+        )
+    )
+    await session.commit()
+
+    source_service = SourceService(session)
+    source = await source_service.create_source(
+        CreateSourceRequest(
+            name="Bayern Landesrecht",
+            jurisdiction_id="jur_de_by",
+            authority_id="auth_de_by",
+        )
+    )
+    version = await source_service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="v1",
+            overlay_id=overlay_id,
+            provider_template_id=provider_template_id,
+            blueprint_overrides=BlueprintSeedOverride(
+                seed_url="https://www.gesetze-bayern.de/Content/Document/BayTierSchG"
+            ),
+        ),
+    )
+
+    # Provenance is intact, so the config key still applies to this version.
+    assert (version.overlay_id, version.provider_template_id) == DISABLED_TEMPLATE
+
+    registry, live = _registry()
+    run_service = RunService(session, provider_registry=registry)
+    with pytest.raises(BlueprintTemplateNotEnabledError):
+        await run_service.create_run(_preview_run(source.source_id, version.source_version_id))
+
+    assert live["bundesland_http"].calls == []
+
+
+@pytest.mark.asyncio
+async def test_seed_override_cannot_redirect_an_enabled_template_at_a_new_portal(
+    session,
+) -> None:
+    """The other half: an *enabled* template's key is evidence about one portal.
+
+    ch/fedlex_sparql_constitution_de is enabled and live_ready — the one template
+    combination in this file that does launch. If an operator could hand it an
+    arbitrary seed origin, every enabled template would be a general-purpose
+    licence to crawl, and the acceptance-run evidence behind that key would mean
+    nothing. The refusal happens before any version exists.
+    """
+    source, _ = await _source_version_from_template(session, LIVE_TEMPLATE)
+    source_service = SourceService(session)
+
+    with pytest.raises(InvalidStateTransitionError, match="outside this blueprint template"):
+        await source_service.create_source_version(
+            source.source_id,
+            CreateSourceVersionRequest(
+                version_label="v2",
+                overlay_id=LIVE_TEMPLATE[0],
+                provider_template_id=LIVE_TEMPLATE[1],
+                blueprint_overrides=BlueprintSeedOverride(
+                    seed_url="https://evil.example/eli/cc/1999/404"
+                ),
+            ),
+        )

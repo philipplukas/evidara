@@ -7,12 +7,14 @@ from platform_control.errors import InvalidStateTransitionError, NotFoundError
 from platform_control.models.authority import Authority, Jurisdiction
 from platform_control.models.extractor_profile import ExtractorProfile
 from platform_control.schemas.source import (
+    BlueprintSeedOverride,
     CreateSourceRequest,
     CreateSourceVersionRequest,
     CreateSourceWithVersionRequest,
     FirecrawlAcquisitionSpec,
     SourceBlueprintPreviewRequest,
     UpdateSourceVersionRequest,
+    parse_acquisition_spec,
 )
 from platform_control.services.source_service import SourceService
 
@@ -815,5 +817,231 @@ async def test_update_source_version_clears_provenance_when_spec_edited(session)
     )
 
     assert updated.acquisition_spec["provider"] == "firecrawl"
+    assert updated.overlay_id is None
+    assert updated.provider_template_id is None
+
+
+# --- #710 / ADR-0045: the "template plus my seeds" rung ------------------------
+#
+# The motivating case, verbatim: the federal animal-protection layer needed the
+# existing `fedlex_sparql_federal_law_batch_de` shape with two different ELIs.
+# Every other field was already right. Before this, the only paths were a new
+# template (repo edit + image rebuild + redeploy, #736) or a hand-written spec
+# that reproduces 13 fields and discards blueprint provenance.
+
+TSCHG = "https://fedlex.data.admin.ch/eli/cc/2008/414"
+TSCHV = "https://fedlex.data.admin.ch/eli/cc/2008/416"
+
+
+@pytest.mark.asyncio
+async def test_blueprint_seed_override_keeps_every_other_template_field(session) -> None:
+    await _seed_ch_federal(session)
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="CH animal protection",
+            jurisdiction_id="jur_ch_federal",
+            authority_id="auth_fedlex",
+        )
+    )
+
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="tschg-v1",
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_federal_law_batch_de",
+            blueprint_overrides=BlueprintSeedOverride(seed_urls=[TSCHG, TSCHV]),
+        ),
+    )
+
+    spec = version.acquisition_spec
+    assert spec["seed_urls"] == [TSCHG, TSCHV]
+    # Everything the operator did NOT ask to change is still the template's.
+    assert spec["provider"] == "fedlex_sparql"
+    assert spec["sparql_endpoint"] == "https://fedlex.data.admin.ch/sparqlendpoint"
+    assert spec["tenant_id"] == "tenant_public"
+    assert spec["corpus_id"] == "corpus_public_ch_fedlex_small_batch"
+    assert spec["scope_type"] == "global_public"
+    assert spec["trust_tier"] == "authoritative"
+    assert spec["preferred_languages"] == ["de"]
+    assert spec["document_type_hint"] == "legislation"
+    # The template's extractor default still applies.
+    assert version.extractor_profile_id == "exp_legislation_v1"
+    # ADR-0030 provenance survives, so the run-launch path still consults the
+    # template's config key for this version.
+    assert version.overlay_id == "ch"
+    assert version.provider_template_id == "fedlex_sparql_federal_law_batch_de"
+
+
+@pytest.mark.asyncio
+async def test_blueprint_seed_override_rejects_a_foreign_origin(session) -> None:
+    """A template's enablement is evidence about one portal, not about the web."""
+    await _seed_ch_federal(session)
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="CH animal protection",
+            jurisdiction_id="jur_ch_federal",
+            authority_id="auth_fedlex",
+        )
+    )
+
+    with pytest.raises(InvalidStateTransitionError, match="outside this blueprint template"):
+        await service.create_source_version(
+            source.source_id,
+            CreateSourceVersionRequest(
+                version_label="evil-v1",
+                overlay_id="ch",
+                provider_template_id="fedlex_sparql_federal_law_batch_de",
+                blueprint_overrides=BlueprintSeedOverride(
+                    seed_urls=["https://evil.example/eli/cc/2008/414"]
+                ),
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_blueprint_seed_override_refused_for_a_template_without_seeds(session) -> None:
+    """ris_ogd is not seed-driven: it has no vetted origin to inherit."""
+    session.add(Jurisdiction(jurisdiction_id="jur_at", name="Austria", slug="at"))
+    session.add(
+        Authority(authority_id="auth_at_ris", jurisdiction_id="jur_at", name="RIS", slug="ris")
+    )
+    await session.commit()
+
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(name="AT RIS", jurisdiction_id="jur_at", authority_id="auth_at_ris")
+    )
+
+    with pytest.raises(InvalidStateTransitionError, match="declares no seed URLs"):
+        await service.create_source_version(
+            source.source_id,
+            CreateSourceVersionRequest(
+                version_label="at-v1",
+                overlay_id="at",
+                provider_template_id="ris_ogd_bundesrecht",
+                blueprint_overrides=BlueprintSeedOverride(
+                    seed_urls=["https://data.bka.gv.at/whatever"]
+                ),
+            ),
+        )
+
+
+def test_blueprint_overrides_cannot_accompany_a_handwritten_spec() -> None:
+    """The override is a *template* modifier; pairing it with a spec is nonsense."""
+    with pytest.raises(ValueError, match="cannot accompany"):
+        CreateSourceVersionRequest(
+            version_label="v1",
+            acquisition_spec=FirecrawlAcquisitionSpec(seed_url="https://example.com/"),
+            blueprint_overrides=BlueprintSeedOverride(seed_urls=["https://example.com/a"]),
+        )
+
+
+def test_blueprint_overrides_cannot_smuggle_non_seed_fields() -> None:
+    """Only seeds are expressible. tenant/corpus/scope/trust are not operator-owned."""
+    for smuggled in ("tenant_id", "corpus_id", "scope_type", "trust_tier", "provider"):
+        with pytest.raises(ValueError):
+            BlueprintSeedOverride.model_validate({"seed_urls": [TSCHG], smuggled: "x"})
+
+
+@pytest.mark.asyncio
+async def test_blueprint_preview_applies_the_seed_override(session) -> None:
+    """The pre-flight must show the spec that would actually run, seeds included."""
+    service = SourceService(session)
+    spec = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_federal_law_batch_de",
+            blueprint_overrides=BlueprintSeedOverride(seed_urls=[TSCHG, TSCHV]),
+        )
+    )
+    assert [str(url) for url in spec.seed_urls] == [TSCHG, TSCHV]
+    assert str(spec.sparql_endpoint) == "https://fedlex.data.admin.ch/sparqlendpoint"
+
+
+@pytest.mark.asyncio
+async def test_update_keeps_provenance_when_only_the_seeds_moved(session) -> None:
+    """#619's rule, widened by #710.
+
+    Provenance means "this spec is still that template's output". Since a version
+    may now legally carry operator seeds, an exact-equality test would read every
+    template-plus-seeds version as hand-written and silently drop the ADR-0030
+    config-key gate from exactly the versions this feature creates.
+    """
+    await _seed_ch_federal(session)
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="CH animal protection",
+            jurisdiction_id="jur_ch_federal",
+            authority_id="auth_fedlex",
+        )
+    )
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="tschg-v1",
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_federal_law_batch_de",
+            blueprint_overrides=BlueprintSeedOverride(seed_urls=[TSCHG]),
+        ),
+    )
+
+    # The admin editor round-trips the whole spec on every save (#619).
+    resent = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_federal_law_batch_de",
+            blueprint_overrides=BlueprintSeedOverride(seed_urls=[TSCHG, TSCHV]),
+        )
+    )
+    updated = await service.update_source_version(
+        version.source_version_id,
+        UpdateSourceVersionRequest(version_label="tschg-v2", acquisition_spec=resent),
+    )
+
+    assert updated.overlay_id == "ch"
+    assert updated.provider_template_id == "fedlex_sparql_federal_law_batch_de"
+
+
+@pytest.mark.asyncio
+async def test_update_still_clears_provenance_when_seeds_leave_the_portal(session) -> None:
+    """The widened rule must not become "any spec naming a template is that template"."""
+    await _seed_ch_federal(session)
+    service = SourceService(session)
+    source = await service.create_source(
+        CreateSourceRequest(
+            name="CH animal protection",
+            jurisdiction_id="jur_ch_federal",
+            authority_id="auth_fedlex",
+        )
+    )
+    version = await service.create_source_version(
+        source.source_id,
+        CreateSourceVersionRequest(
+            version_label="tschg-v1",
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_federal_law_batch_de",
+            blueprint_overrides=BlueprintSeedOverride(seed_urls=[TSCHG]),
+        ),
+    )
+
+    drifted = await service.preview_source_blueprint(
+        SourceBlueprintPreviewRequest(
+            overlay_id="ch",
+            provider_template_id="fedlex_sparql_federal_law_batch_de",
+        )
+    )
+    drifted = parse_acquisition_spec(
+        {**drifted.model_dump(mode="json"), "seed_urls": ["https://evil.example/eli"]}
+    )
+
+    updated = await service.update_source_version(
+        version.source_version_id,
+        UpdateSourceVersionRequest(acquisition_spec=drifted),
+    )
+
     assert updated.overlay_id is None
     assert updated.provider_template_id is None

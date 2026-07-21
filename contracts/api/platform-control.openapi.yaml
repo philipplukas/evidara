@@ -3174,6 +3174,37 @@ components:
       - created_at
       - updated_at
       title: AuthorityResponse
+    BlueprintSeedOverride:
+      properties:
+        seed_url:
+          anyOf:
+          - type: string
+            maxLength: 2083
+            minLength: 1
+            format: uri
+          - type: 'null'
+          title: Seed Url
+        seed_urls:
+          anyOf:
+          - items:
+              type: string
+              maxLength: 2083
+              minLength: 1
+              format: uri
+            type: array
+          - type: 'null'
+          title: Seed Urls
+      additionalProperties: false
+      type: object
+      title: BlueprintSeedOverride
+      description: |-
+        Operator-supplied seeds applied over a blueprint template's spec (#710).
+
+        The middle rung of the reuse ladder: "the existing template's shape, with my
+        seeds". Only the seed lists are expressible here — the provider, the
+        tenant/corpus/scope binding, the trust tier, and the portal-identifying
+        config stay whatever the blueprint says, and the merged seeds must still sit
+        on an origin the template itself reaches. See ADR-0045.
     BlueprintTemplateEnablementRequest:
       properties:
         enabled:
@@ -4546,6 +4577,10 @@ components:
           - type: string
           - type: 'null'
           title: Provider Template Id
+        blueprint_overrides:
+          anyOf:
+          - $ref: '#/components/schemas/BlueprintSeedOverride'
+          - type: 'null'
         extractor_profile_id:
           anyOf:
           - type: string
@@ -6843,6 +6878,10 @@ components:
         provider_template_id:
           type: string
           title: Provider Template Id
+        blueprint_overrides:
+          anyOf:
+          - $ref: '#/components/schemas/BlueprintSeedOverride'
+          - type: 'null'
       type: object
       required:
       - overlay_id
@@ -7532,6 +7571,10 @@ components:
           - type: string
           - type: 'null'
           title: Provider Template Id
+        blueprint_overrides:
+          anyOf:
+          - $ref: '#/components/schemas/BlueprintSeedOverride'
+          - type: 'null'
         extractor_profile_id:
           anyOf:
           - type: string

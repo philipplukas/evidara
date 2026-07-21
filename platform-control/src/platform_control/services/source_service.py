@@ -12,6 +12,7 @@ from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
 from platform_control.schemas.source import (
     AcquisitionSpec,
+    BlueprintSeedOverride,
     CreateSourceRequest,
     CreateSourceVersionRequest,
     CreateSourceWithVersionRequest,
@@ -26,9 +27,11 @@ from platform_control.services.acquisition_provider import (
 from platform_control.services.blueprint_enablement import BlueprintEnablementService
 from platform_control.services.provider_registry_factory import build_provider_registry
 from platform_control.services.source_blueprints import (
+    apply_blueprint_seed_override,
     list_source_blueprint_templates,
     resolve_blueprint_extractor_profile_id,
     resolve_source_blueprint,
+    spec_is_blueprint_output,
 )
 
 
@@ -142,6 +145,7 @@ class SourceService:
             acquisition_spec=request.source_version.acquisition_spec,
             overlay_id=request.source_version.overlay_id,
             provider_template_id=request.source_version.provider_template_id,
+            blueprint_overrides=request.source_version.blueprint_overrides,
         )
 
         source = Source(
@@ -181,6 +185,7 @@ class SourceService:
             acquisition_spec=None,
             overlay_id=request.overlay_id,
             provider_template_id=request.provider_template_id,
+            blueprint_overrides=request.blueprint_overrides,
         )
 
     async def describe_blueprint_lock(
@@ -304,6 +309,7 @@ class SourceService:
             acquisition_spec=request.acquisition_spec,
             overlay_id=request.overlay_id,
             provider_template_id=request.provider_template_id,
+            blueprint_overrides=request.blueprint_overrides,
         )
 
         version = SourceVersion(
@@ -351,6 +357,7 @@ class SourceService:
             "acquisition_spec" in request.model_fields_set
             or "overlay_id" in request.model_fields_set
             or "provider_template_id" in request.model_fields_set
+            or "blueprint_overrides" in request.model_fields_set
         ):
             # A partial update must not reconstruct provenance from the request
             # alone: fields the client left unset still hold on the row (#619).
@@ -368,6 +375,7 @@ class SourceService:
                 acquisition_spec=request.acquisition_spec,
                 overlay_id=overlay_id,
                 provider_template_id=provider_template_id,
+                blueprint_overrides=request.blueprint_overrides,
             )
             spec_payload = acquisition_spec.model_dump(mode="json")
             version.acquisition_spec = spec_payload
@@ -506,6 +514,13 @@ class SourceService:
         while the persisted spec still *is* the blueprint's output. Editing the
         spec away from the template still clears it, so the run-launch path can
         never gate a hand-written spec on a template it no longer follows.
+
+        Since #710 "the blueprint's output" includes operator-chosen seeds on the
+        template's own origins, because that is now a legal way to build a
+        version. Widening the test here is what keeps the config key *attached*
+        to those versions: an exact-equality test would read every
+        template-plus-seeds version as hand-written and drop the ADR-0030 gate
+        from precisely the versions the new rung creates.
         """
         if not (overlay_id and provider_template_id):
             return {"overlay_id": None, "provider_template_id": None}
@@ -517,7 +532,7 @@ class SourceService:
             expected = parse_acquisition_spec(blueprint).model_dump(mode="json")
         except Exception:
             return {"overlay_id": None, "provider_template_id": None}
-        if expected != spec_payload:
+        if not spec_is_blueprint_output(expected, spec_payload):
             return {"overlay_id": None, "provider_template_id": None}
         return {"overlay_id": overlay_id, "provider_template_id": provider_template_id}
 
@@ -527,6 +542,7 @@ class SourceService:
         acquisition_spec: AcquisitionSpec | None,
         overlay_id: str | None,
         provider_template_id: str | None,
+        blueprint_overrides: BlueprintSeedOverride | None = None,
     ) -> AcquisitionSpec:
         if acquisition_spec is not None:
             return acquisition_spec
@@ -535,6 +551,25 @@ class SourceService:
                 overlay_id=overlay_id,
                 provider_template_id=provider_template_id,
             )
+            if blueprint_overrides is not None:
+                # Seeds only, fenced to the template's own origins (#710,
+                # ADR-0045). Everything else on the template — provider,
+                # tenant/corpus/scope, trust tier, portal config — is untouched,
+                # so the result is still the blueprint's spec and keeps its
+                # ADR-0030 provenance and gating.
+                blueprint = apply_blueprint_seed_override(
+                    blueprint,
+                    seed_url=(
+                        str(blueprint_overrides.seed_url)
+                        if blueprint_overrides.seed_url is not None
+                        else None
+                    ),
+                    seed_urls=(
+                        [str(url) for url in blueprint_overrides.seed_urls]
+                        if blueprint_overrides.seed_urls is not None
+                        else None
+                    ),
+                )
             return parse_acquisition_spec(blueprint)
         raise InvalidStateTransitionError(
             "Provide acquisition_spec or overlay_id/provider_template_id."

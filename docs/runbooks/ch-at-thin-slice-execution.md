@@ -326,6 +326,45 @@ Expected result:
   - `firecrawl`
   - `fedlex_sparql`
 
+### Reusing a template with your own seeds
+
+Most new sources are "a portal we already reach, different documents". You do not need a
+new template for that, and you must not hand-write a full `acquisition_spec` for it —
+that discards blueprint provenance, and with it the ADR-0030 config key that gates the
+run. Send `blueprint_overrides` alongside the template instead (#710, ADR-0045):
+
+```bash
+curl -X POST "$EVIDARA_PLATFORM_CONTROL_URL/v1/sources/blueprint-preview" \
+  -H "Authorization: Bearer $EVIDARA_PLATFORM_CONTROL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "overlay_id": "ch",
+    "provider_template_id": "fedlex_sparql_federal_law_batch_de",
+    "blueprint_overrides": {
+      "seed_urls": [
+        "https://fedlex.data.admin.ch/eli/cc/2008/414",
+        "https://fedlex.data.admin.ch/eli/cc/2008/416"
+      ]
+    }
+  }'
+```
+
+The same `blueprint_overrides` object is accepted by `POST /v1/sources/with-version` and
+`POST /v1/sources/{source_id}/versions`. Everything except the seeds — provider, tenant,
+corpus, scope, trust tier, SPARQL endpoint, extractor profile — stays the template's.
+
+Two refusals are expected and correct:
+
+- `409` for a seed on a host the template's own seeds do not reach — a template's
+  enablement is acceptance-run evidence about **one** portal, not a licence to crawl;
+- `409` for any override on a template that declares no seeds of its own (`ris_ogd`,
+  `legifrance`) — those providers are not seed-driven and have no vetted origin to
+  inherit.
+
+Needing a *non-seed* field to differ still means you need a template, which is a repo
+change and a deploy. That is deliberate: `source_blueprints.yaml` is the list of portals
+the platform may reach, and adding one is a reviewed decision.
+
 ## Step 4: Create source + initial version
 
 Prefer `POST /v1/sources/with-version` for the thin-slice path — but only the **first**

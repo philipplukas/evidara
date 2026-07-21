@@ -62,7 +62,12 @@ API_TITLE = "Platform Control API"
 # and authorities now accept `limit`/`offset` and return a real `total`, so the
 # admin can page 2,169 jurisdictions instead of receiving them all in one array
 # and windowing client-side (#616).
-API_VERSION = "0.16.0"
+# 0.17.0: additive — `blueprint_seed_override` on the source-create, version-create
+# and blueprint-preview requests. A source version may now carry the template's
+# spec with operator-chosen seeds, fenced to the template's own origins, instead
+# of forcing a hand-written `acquisition_spec` that loses the ADR-0030 config key
+# (#710, ADR-0046).
+API_VERSION = "0.17.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks
