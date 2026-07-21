@@ -4,11 +4,30 @@ from __future__ import annotations
 
 import json
 import logging
-import os
+from functools import lru_cache
 from typing import Any
 
-_ENVIRONMENT = os.environ.get("ENVIRONMENT", "unknown")
 _SERVICE = "platform-control"
+
+
+@lru_cache(maxsize=1)
+def _environment() -> str:
+    """Resolve the environment tag from the one setting that already names it.
+
+    This used to read a *separate*, unprefixed ``ENVIRONMENT`` variable that was set
+    nowhere in the repo, so every deployed log line was tagged ``"unknown"`` (#712).
+    Two variables meaning the same thing is what let them drift apart, so the fix is
+    not to also set the second one — it is to delete it. ``Settings.environment``
+    (``PLATFORM_CONTROL_ENVIRONMENT``) deliberately has no default since #683, so a
+    deployment that fails to name its environment now fails loudly at startup rather
+    than mislabelling its own audit trail.
+
+    Resolved lazily and cached: importing this module must not require settings, and
+    the value cannot change within a process. Tests use ``_environment.cache_clear()``.
+    """
+    from platform_control.config import get_settings
+
+    return get_settings().environment
 
 
 def log_event(
@@ -37,7 +56,7 @@ def log_event(
     fields: dict[str, Any] = {
         "event": event,
         "service": _SERVICE,
-        "environment": _ENVIRONMENT,
+        "environment": _environment(),
     }
 
     for key, value in [

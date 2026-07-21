@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+import unittest.mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -112,7 +113,16 @@ class RuntimeSettingsTests(unittest.TestCase):
             }
         )
 
-        pipeline = build_processing_pipeline(runtime_settings=settings)
+        # `DI_ENABLE_LLM_EXTRACTOR=true` makes `build_processing_pipeline` construct a
+        # real Instructor/OpenAI client, which reads OPENAI_API_KEY at construction
+        # time and raises without one. Until #685 this test never reached that code:
+        # `openai` was not installed in CI, `_build_llm_metadata_extractor` swallowed
+        # the ImportError and returned None, and the assertions below passed over a
+        # pipeline whose LLM extractor was silently absent. Constructing the client
+        # makes no network call, so a placeholder key is enough to exercise the branch
+        # the flag actually selects.
+        with unittest.mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test-key-not-used"}):
+            pipeline = build_processing_pipeline(runtime_settings=settings)
 
         self.assertEqual(pipeline._parser_backend, "docling")
         self.assertTrue(pipeline._enable_spacy)

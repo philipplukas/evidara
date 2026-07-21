@@ -391,3 +391,119 @@ class TestArticleCitationPrecision:
     def test_heading_is_not_a_citation(self):
         citations = extract_citations("Art. 36 Einschränkungen von Grundrechten")
         assert [c for c in citations if c.citation_type == "article"] == []
+
+
+class TestSwissCantonalParagraphCitations:
+    """Swiss cantonal and communal `§` references (#769).
+
+    Cantonal and communal law spells its statutes out ("Hundegesetz") instead
+    of abbreviating them, so `_DE_PARAGRAPH_PATTERN`'s curated list of GERMAN
+    FEDERAL abbreviations matched nothing and the entire municipal rung
+    extracted zero citations. The strings below are the ones actually observed
+    in the Zürich ``Vollzugsvorschriften zum Hundegesetz`` acquired through the
+    platform.
+    """
+
+    # Verbatim from the acquired ordinance: preamble, Art. 2-6.
+    _ORDINANCE = (
+        "gestützt auf § 2 Hundegesetz vom 14. April 2008 "
+        "und § 17 Hundeverordnung vom 25. November 2009. "
+        "Die Meldung erfolgt nach § 20 Hundeverordnung. "
+        "Die Kosten richten sich nach § 24 Abs. 1 Hundegesetz. "
+        "Vorbehalten bleibt § 24 Abs. 2 Hundegesetz. "
+        "Es gelten § 17 Abs. 2 lit. a Hundeverordnung und "
+        "§ 17 Abs. 2 lit. b Hundeverordnung. "
+        "Der Vorsteher stützt sich auf § 2 Abs. 2 lit. d Hundegesetz sowie "
+        "§ 2 Abs. 2 lit. e Hundegesetz."
+    )
+
+    def test_real_ordinance_references_are_extracted(self):
+        """The nine references #769 reported as producing zero citations."""
+        citations = extract_citations(self._ORDINANCE)
+        texts = {c.text for c in citations if c.citation_type == "ch_paragraph"}
+
+        assert texts == {
+            "§ 2 Hundegesetz",
+            "§ 17 Hundeverordnung",
+            "§ 20 Hundeverordnung",
+            "§ 24 Abs. 1 Hundegesetz",
+            "§ 24 Abs. 2 Hundegesetz",
+            "§ 17 Abs. 2 lit. a Hundeverordnung",
+            "§ 17 Abs. 2 lit. b Hundeverordnung",
+            "§ 2 Abs. 2 lit. d Hundegesetz",
+            "§ 2 Abs. 2 lit. e Hundegesetz",
+        }
+
+    def test_subdivisions_are_recorded(self):
+        citations = extract_citations("Der Vorsteher stützt sich auf § 2 Abs. 2 lit. d Hundegesetz.")
+        ch = [c for c in citations if c.citation_type == "ch_paragraph"]
+        assert len(ch) == 1
+        assert ch[0].metadata == {
+            "statute": "Hundegesetz",
+            "paragraph": "2",
+            "subsection": "2",
+            "letter": "d",
+        }
+
+    def test_bare_paragraph_records_no_subdivisions(self):
+        citations = extract_citations("Die Meldung erfolgt nach § 20 Hundeverordnung.")
+        ch = [c for c in citations if c.citation_type == "ch_paragraph"]
+        assert len(ch) == 1
+        assert ch[0].metadata == {"statute": "Hundeverordnung", "paragraph": "20"}
+
+    def test_stays_unresolved_rather_than_guessing(self):
+        """A spelled-out cantonal title mints no key -- it is honestly unresolved.
+
+        `citation-targets` keys short-title nodes off `title_short`, which a
+        cantonal statute does not publish. The value of #769 is that the
+        citation EXISTS and carries no target, so the ordinance presents as
+        depending on a norm the corpus does not hold.
+        """
+        citations = extract_citations("Vorbehalten bleibt § 24 Abs. 1 Hundegesetz.")
+        ch = [c for c in citations if c.citation_type == "ch_paragraph"]
+        assert len(ch) == 1
+        assert normalize_citation(ch[0]) is None
+
+
+class TestSwissCantonalParagraphPrecision:
+    """The suffix gate that keeps `§` from swallowing ordinary German prose."""
+
+    def test_own_headings_are_not_citations(self):
+        """A statute's own `§` headings have the same shape as a citation.
+
+        This is the defect `_ARTICLE_PATTERN` was fixed for (187 phantoms out
+        of 188 matches on the real BV). Heading words do not end in a legal
+        instrument suffix, which is exactly what the gate tests.
+        """
+        headings = "§ 1 Zweck\n§ 2 Bewilligungspflicht\n§ 7 Hundehaltung\n§ 12 Geltungsbereich\n§ 15 Strafbestimmungen"
+        assert [c for c in extract_citations(headings) if c.citation_type == "ch_paragraph"] == []
+
+    def test_bare_prose_nouns_are_not_statutes(self):
+        """ "Gesetz"/"Verordnung" alone name nothing addressable."""
+        prose = "Dieses Gesetz tritt in Kraft nach § 5 Gesetz und § 6 Verordnung."
+        assert [c for c in extract_citations(prose) if c.citation_type == "ch_paragraph"] == []
+
+    def test_german_federal_paragraphs_are_untouched(self):
+        """The curated German pattern must keep working and must not double-fire."""
+        citations = extract_citations("§ 823 BGB begründet die Haftung; §§ 242, 243 StGB regeln den Diebstahl.")
+
+        de = [c for c in citations if c.citation_type == "de_paragraph"]
+        assert {c.metadata["statute"] for c in de} == {"BGB", "StGB"}
+        assert [c for c in citations if c.citation_type == "ch_paragraph"] == []
+
+    def test_spelled_out_german_statute_is_a_genuine_match(self):
+        """German law spelled out is a real reference, not a false positive."""
+        citations = extract_citations("Vgl. § 5 Bundesnaturschutzgesetz zur Landwirtschaft.")
+        ch = [c for c in citations if c.citation_type == "ch_paragraph"]
+        assert len(ch) == 1
+        assert ch[0].metadata["statute"] == "Bundesnaturschutzgesetz"
+
+    def test_real_bundesverfassung_yields_no_paragraph_citations(self):
+        """The BV uses `Art.`, never `§` -- the new pattern must add nothing."""
+        import re
+        from pathlib import Path
+
+        fixture = Path(__file__).parent / "golden" / "ch_fedlex_bv_html" / "document.html"
+        text = re.sub(r"<[^>]+>", " ", fixture.read_text(encoding="utf-8", errors="ignore"))
+
+        assert [c for c in extract_citations(text) if c.citation_type == "ch_paragraph"] == []

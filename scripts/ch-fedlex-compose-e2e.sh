@@ -433,9 +433,55 @@ else
   fi
 fi
 
-# ── 9. Content gates (reused from ch-fedlex-fast-loop.sh) ───────────────────
+# ── 8c. Assert the INDEXED title, not just the captured one (#772) ─────────
+# `title_ok` below reads `captured-resources.json` — the provider's title at
+# acquisition. Anything the pipeline does to a title afterwards is invisible to it,
+# and #771 is what that cost: Fedlex leaked a source filename into `<title>`, the
+# pipeline ranked it above the correct captured title, and the Tierschutzgesetz was
+# indexed under `fedlex-data-admin-ch-eli-cc-2008-414-20230901-de-docx`. The run
+# reported `title_ok=2` and passed, while the law was unfindable by its own name.
+#
+# The language gate above already reads back from legal-search. Title now does too:
+# a title is what every reader searches by, so an unasserted one is not a lesser
+# defect than a wrong language facet.
 TITLE_REGEX="$(expected_title_regex)"
 title_checked="$(title_gate_checked)"
+indexed_title_ok=0
+indexed_title_checked=0
+indexed_title_observed=""
+indexed_title_expected_count=0
+if [[ "${title_checked}" -eq 0 ]]; then
+  log "==> Indexed-title gate: SKIPPED — no title regex to assert for template ${TEMPLATE_ID}"
+else
+  processed_document_ids="$(jq -r '[.data[]? | select(.event_type=="document.processed") | .document_id] | unique | join(" ")' < "${RUN_DIR}/document-lifecycle.json")"
+  if [[ -z "${processed_document_ids}" ]]; then
+    log "==> Indexed-title gate: no processed documents to assert"
+  else
+    indexed_title_checked=1
+    read -ra title_doc_ids <<< "${processed_document_ids}"
+    indexed_title_expected_count="${#title_doc_ids[@]}"
+    log "==> Asserting indexed title matches /${TITLE_REGEX}/ for: ${processed_document_ids}"
+    for doc_id in "${title_doc_ids[@]}"; do
+      observed_title="missing"
+      for i in $(seq 1 "${SEARCH_MAX_POLLS}"); do
+        if curl_json "${LS_URL}/v1/documents/${doc_id}" > "${RUN_DIR}/ls-document-${doc_id}.json" 2>/dev/null; then
+          observed_title="$(jq -r '.title // "missing"' < "${RUN_DIR}/ls-document-${doc_id}.json")"
+          break
+        fi
+        log "  title poll ${i}/${SEARCH_MAX_POLLS}: ${doc_id} not projected yet"
+        sleep "${SEARCH_POLL_INTERVAL}"
+      done
+      indexed_title_observed="${indexed_title_observed}${indexed_title_observed:+,}${doc_id}=${observed_title}"
+      if printf '%s' "${observed_title}" | grep -Eq "${TITLE_REGEX}"; then
+        indexed_title_ok=$((indexed_title_ok + 1))
+      else
+        log "  title mismatch: ${doc_id} expected=/${TITLE_REGEX}/ observed=${observed_title}"
+      fi
+    done
+  fi
+fi
+
+# ── 9. Content gates (reused from ch-fedlex-fast-loop.sh) ───────────────────
 content_type_count="$(jq -r --arg expect_content_type "${EXPECT_CONTENT_TYPE}" '[.content_type_breakdown[]? | select(.content_type==$expect_content_type) | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
 captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
@@ -449,6 +495,7 @@ processing_count="$(jq -r '[.data[]? | select(.status=="processing")] | length' 
 # `enabled: true` under ADR-0030: proof every gate actually ran.
 skipped_gates=()
 [[ "${title_checked}" -eq 1 ]] || skipped_gates+=("title_ok")
+[[ "${indexed_title_checked}" -eq 1 ]] || skipped_gates+=("indexed_title_ok")
 # checked=0 with ok=1 is a genuine skip; checked=0 with ok=0 is a real failure the
 # verdict already catches.
 if [[ "${indexed_language_checked}" -eq 0 && "${indexed_language_ok}" -eq 1 ]]; then
@@ -474,6 +521,11 @@ elif [[ ! "${search_hits}" =~ ^[0-9]+$ || "${search_hits}" -lt 1 ]]; then
   # projection-bridge and be searchable.
   verdict="search_failed"
 elif [[ "${title_ok}" -lt 1 || "${indexed_language_ok}" -lt 1 ]]; then
+  verdict="pipeline_pass_content_suspect"
+elif [[ "${indexed_title_checked}" -eq 1 && "${indexed_title_ok}" -lt "${indexed_title_expected_count}" ]]; then
+  # EVERY processed document must carry a matching title, not just one of them
+  # (#772). `title_ok` is a count tested against 1, so a run where 1 of 20 titles
+  # survived reported `pass`. A partial failure is a failure.
   verdict="pipeline_pass_content_suspect"
 fi
 
@@ -501,6 +553,10 @@ SUMMARY_JSON="$(jq -n \
   --argjson processed_count "${processed_count}" \
   --argjson title_ok "${title_ok}" \
   --argjson title_checked "${title_checked}" \
+  --argjson indexed_title_ok "${indexed_title_ok}" \
+  --argjson indexed_title_checked "${indexed_title_checked}" \
+  --argjson indexed_title_expected_count "${indexed_title_expected_count}" \
+  --arg indexed_title_observed "${indexed_title_observed}" \
   --argjson skipped_gates "${skipped_gates_json}" \
   --argjson search_hits "${search_hits}" \
   --argjson indexed_language_ok "${indexed_language_ok}" \
@@ -533,6 +589,10 @@ SUMMARY_JSON="$(jq -n \
       processed_count: $processed_count,
       title_ok: $title_ok,
       title_checked: $title_checked,
+      indexed_title_ok: $indexed_title_ok,
+      indexed_title_checked: $indexed_title_checked,
+      indexed_title_expected_count: $indexed_title_expected_count,
+      indexed_title_observed: $indexed_title_observed,
       skipped_gates: $skipped_gates,
       search_hits: $search_hits,
       indexed_language_expected: $indexed_language_expected,

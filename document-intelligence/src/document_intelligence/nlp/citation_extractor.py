@@ -15,6 +15,8 @@ Extracts references to:
 - IT Cassazione decisions: e.g., "Cass. civ. n. 1234/2020", "Cass. pen., sez. III, n. 5678/2019"
 - Article references: e.g., "Art. 8 EMRK", "Art. 261bis StGB"
 - Named statute abbreviations: e.g., "OR", "ZGB", "StGB", "SchKG"
+- CH cantonal/communal paragraphs: e.g., "§ 24 Abs. 1 Hundegesetz",
+  "§ 2 Abs. 2 lit. d Hundegesetz", "§ 17 Hundeverordnung"
 """
 
 from __future__ import annotations
@@ -52,6 +54,50 @@ _SR_PATTERN = re.compile(
 # BGE decisions: "BGE 147 III 49", "BGE 148 IV 234 E. 3.2"
 _BGE_PATTERN = re.compile(
     r"\bBGE\s+\d{1,3}\s+[IV]+\s+\d+(?:\s+E\.\s+[\d.]+)?\b",
+)
+
+# Swiss CANTONAL and COMMUNAL paragraph references:
+# "§ 2 Hundegesetz", "§ 24 Abs. 1 Hundegesetz", "§ 2 Abs. 2 lit. d Hundegesetz",
+# "§ 17 Abs. 2 lit. a Hundeverordnung".
+#
+# Why this cannot be `_DE_PARAGRAPH_PATTERN` (below): that pattern requires the
+# statute to be one of a curated list of GERMAN FEDERAL abbreviations (BGB,
+# StGB, …). Cantonal and communal law does not abbreviate — it spells the
+# statute out ("Hundegesetz"), so the curated list matches nothing and the
+# entire cantonal/communal tier extracted ZERO citations (#769).
+#
+# PRECISION GATE — the law-instrument suffix.
+# A `§` followed by any capitalized word is far too greedy: a statute's OWN
+# headings have exactly that shape ("§ 7 Bewilligungspflicht"), and that is the
+# same defect `_ARTICLE_PATTERN` was fixed for, where 187 of 188 BV matches were
+# its own headings. `_LEGAL_ABBREVIATION_SHAPE` cannot help here, because a
+# spelled-out title has ONE capital by construction.
+#
+# So the discriminator is the suffix: a German-language legal instrument is
+# named by a compound ending in -gesetz / -verordnung / -ordnung / -reglement /
+# -verfassung / -vorschriften / -statut / -erlass / -beschluss / -dekret /
+# -konkordat. Headings ("Bewilligungspflicht", "Hundehaltung", "Zweck") do not
+# end that way, so they never match.
+#
+# The suffixes are matched LOWERCASE, and the leading capital is consumed
+# before them, so the bare prose nouns "Gesetz", "Ordnung" and "Verfassung"
+# cannot match at all. "Verordnung" is the one that leaks -- "V" + "er" +
+# "ordnung" reads as a compound -- so it is excluded explicitly. "§ 6
+# Verordnung über die Hundehaltung" names its statute in the words that
+# FOLLOW, and capturing "Verordnung" alone would key a citation on a noun
+# every second Swiss enactment shares.
+#
+# The tradeoff is stated plainly: this trades recall for precision. A cantonal
+# statute named without one of these suffixes is missed, and a missed citation
+# is an honest coverage gap. A greedy match would instead manufacture a WRONG
+# edge, which ADR-0033 treats as strictly worse.
+_CH_PARAGRAPH_PATTERN = re.compile(
+    r"§§?\s*(?P<paragraph>\d+[a-z]?)(?:\s*,\s*\d+[a-z]?)*"
+    r"(?:\s+Abs\.?\s*(?P<subsection>\d+[a-z]?))?"
+    r"(?:\s+(?:lit|Bst)\.?\s*(?P<letter>[a-z]))?"
+    r"\s+(?!Verordnung\b)(?P<statute>[A-ZÄÖÜ][A-Za-zÄÖÜäöüß]*?"
+    r"(?:gesetz|verordnung|ordnung|reglement|verfassung|vorschriften|"
+    r"statut|erlass|beschluss|dekret|konkordat))\b",
 )
 
 # Austrian Federal Law Gazette:
@@ -297,6 +343,29 @@ def extract_citations(text: str) -> list[Citation]:
                 citation_type="bge",
                 start=m.start(),
                 end=m.end(),
+            )
+        )
+
+    for m in _CH_PARAGRAPH_PATTERN.finditer(text):
+        # The `§` number is the addressable unit, exactly as the article number
+        # is for `Art.` references. Abs./lit. subdivide WITHIN it: they are
+        # recorded so the citation text stays reconstructable, but they are not
+        # what makes the reference addressable (#573).
+        ch_metadata: dict[str, Any] = {
+            "statute": m.group("statute"),
+            "paragraph": m.group("paragraph"),
+        }
+        if m.group("subsection"):
+            ch_metadata["subsection"] = m.group("subsection")
+        if m.group("letter"):
+            ch_metadata["letter"] = m.group("letter")
+        citations.append(
+            Citation(
+                text=m.group(0),
+                citation_type="ch_paragraph",
+                start=m.start(),
+                end=m.end(),
+                metadata=ch_metadata,
             )
         )
 
@@ -633,5 +702,17 @@ def normalize_citation(citation: Citation) -> str | None:
         if article and is_legal_abbreviation(abbrev):
             return f"abbrev_art:{abbrev}/{article}"
 
-    # Fuzzy -- needs search-based resolution
+    # Fuzzy -- needs search-based resolution.
+    #
+    # `ch_paragraph` lands here deliberately. A spelled-out cantonal title
+    # ("Hundegesetz") is not yet an identifier the corpus can be keyed on:
+    # `citation-targets` mints short-title nodes from `title_short`, and a
+    # cantonal statute publishes none. Minting a `statute_para:` key that no
+    # producer can ever match would dress a dead end up as a resolvable one.
+    #
+    # Returning None is not a loss -- it is the point of #769. The citation is
+    # now EXTRACTED and carries `resolved=false`, so the Zürich ordinance
+    # finally presents as a document with an unsatisfied dependency on the
+    # cantonal Hundegesetz instead of one with no references at all. That
+    # signal is what stops an agent synthesizing over a truncated chain.
     return None

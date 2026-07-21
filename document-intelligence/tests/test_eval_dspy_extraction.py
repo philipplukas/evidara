@@ -1,6 +1,11 @@
 """Pytest wrapper for the DSPy extraction eval harness.
 
-In CI (default): runs with mock LLM — validates the harness plumbing.
+In CI (default): runs with mock LLM — validates the harness plumbing. This is
+now true. It was not until #685: the mock test was guarded on `dspy` being
+importable, and no CI job installed the `llm` extra, so the one test this
+docstring advertised skipped on every run while the docstring claimed coverage.
+CI installs `llm` as of #685 — see scripts/check-document-intelligence.sh.
+
 With live LLM:   DI_EVAL_LIVE=1 pytest tests/test_eval_dspy_extraction.py
 """
 
@@ -14,16 +19,7 @@ from eval_dspy_extraction import EVAL_SET, run_cascade_eval, run_eval
 
 LIVE = os.environ.get("DI_EVAL_LIVE", "").strip().lower() in {"1", "true", "yes"}
 
-_HAS_DSPY = False
-try:
-    import dspy  # noqa: F401
 
-    _HAS_DSPY = True
-except ImportError:
-    pass
-
-
-@pytest.mark.skipif(not _HAS_DSPY, reason="dspy not installed — skipping DSPy-specific mock eval")
 def test_eval_harness_runs_mock():
     """Eval harness runs successfully with mock LLM."""
     report = run_eval(use_mock=True)
