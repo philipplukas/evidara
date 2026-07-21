@@ -252,3 +252,69 @@ class EveryHarnessResolvesRatherThanCreates(unittest.TestCase):
             if "/v1/sources/with-version" in body:
                 offenders.append(f"{script.name}: still POSTs /v1/sources/with-version")
         self.assertEqual(offenders, [], "; ".join(offenders))
+
+
+class IndexedTitleIsAsserted(unittest.TestCase):
+    """A harness that reads back from legal-search must assert the title there (#772).
+
+    #771 shipped green because the title gate read `captured-resources.json` while
+    the language gate read the index. The captured title was always correct; the
+    pipeline replaced it afterwards. Any harness close enough to the index to check
+    a language facet is close enough to check the name of the law.
+    """
+
+    # The four harnesses below never contact legal-search at all, so they cannot
+    # assert an indexed anything. Named here rather than silently excluded, so the
+    # gap is visible in the test that would otherwise imply full coverage.
+    NO_LEGAL_SEARCH_READBACK = {
+        "at-ris-fast-loop.sh",
+        "de-bundesrecht-fast-loop.sh",
+        "eu-eurlex-fast-loop.sh",
+        "fr-legifrance-fast-loop.sh",
+    }
+
+    def _harnesses(self):
+        scripts_dir = REPO_ROOT / "scripts"
+        return sorted(
+            [*scripts_dir.glob("*-fast-loop.sh"), scripts_dir / "ch-fedlex-compose-e2e.sh"]
+        )
+
+    def test_a_harness_that_checks_language_also_checks_title(self) -> None:
+        offenders = []
+        for script in self._harnesses():
+            body = script.read_text(encoding="utf-8")
+            checks_language = "indexed_language_ok" in body
+            checks_title = "indexed_title_ok" in body
+            if checks_language and not checks_title:
+                offenders.append(
+                    f"{script.name}: reads back the language facet but not the title"
+                )
+        self.assertEqual(offenders, [], "; ".join(offenders))
+
+    def test_the_indexed_title_can_block_the_verdict(self) -> None:
+        # Present-but-inert is the failure mode this repo keeps paying for: the gate
+        # must reach the verdict, not merely appear in the summary JSON.
+        offenders = []
+        for script in self._harnesses():
+            body = script.read_text(encoding="utf-8")
+            if "indexed_title_ok" not in body:
+                continue
+            verdict_lines = [
+                line
+                for line in body.splitlines()
+                if "indexed_title_ok" in line and "verdict" not in line and "elif" in line
+            ]
+            if not verdict_lines:
+                offenders.append(f"{script.name}: indexed_title_ok never gates the verdict")
+        self.assertEqual(offenders, [], "; ".join(offenders))
+
+    def test_the_documented_gap_matches_reality(self) -> None:
+        # If one of these gains a legal-search readback, this list must shrink with
+        # it — otherwise the exclusion quietly becomes a hiding place.
+        for name in self.NO_LEGAL_SEARCH_READBACK:
+            body = (REPO_ROOT / "scripts" / name).read_text(encoding="utf-8")
+            self.assertNotIn(
+                "indexed_language_ok",
+                body,
+                f"{name} now reads back from legal-search and must assert the indexed title",
+            )
