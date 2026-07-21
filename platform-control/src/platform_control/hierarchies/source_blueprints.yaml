@@ -265,6 +265,39 @@ overlays:
         language_codes: [de]
         document_type_hint: legislation
         enabled: true
+      # Federal animal-protection layer — the middle rung of ADR-0033's dog axis.
+      # The corpus previously held the constitutional layer (BV) and the Zürich
+      # municipal ordinance with nothing between them, so the delegation chain
+      # `BV -> TSchG/TSchV -> cantonal Hundegesetz -> communal Vollzugsvorschriften`
+      # could not be walked and the question could only be refused.
+      #
+      # ELI URIs verified against the fedlex SPARQL endpoint (2026-07-21):
+      # `jolux:inForceStatus` = enforcement-status/0 (in force) for both, entry
+      # into force 2008-09-01. The superseded 1978/1981 acts carry the SAME SR
+      # numbers (455 / 455.1) at `/eli/cc/1981/562_562_562` and
+      # `/eli/cc/1981/572_572_572` with enforcement-status/3 — selecting by SR
+      # number alone picks up repealed law, which is #628's named trap.
+      fedlex_sparql_tierschutz_de:
+        provider: fedlex_sparql
+        seed_urls:
+          - https://fedlex.data.admin.ch/eli/cc/2008/414   # TSchG (SR 455), 16.12.2005
+          - https://fedlex.data.admin.ch/eli/cc/2008/416   # TSchV (SR 455.1), 23.04.2008
+        sparql_endpoint: https://fedlex.data.admin.ch/sparqlendpoint
+        preferred_languages: [de]
+        query_mode: work_to_expression
+        max_expressions: 1
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_fedlex_tierschutz
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        # Ships shut. The sibling fedlex templates are enabled defaults, but
+        # ADR-0030 turns the config key per template *after* that template's own
+        # acceptance evidence — an inherited default is not evidence.
+        enabled: false
       # ───────────────────────────────────────────────────────────────
       # Swiss federal court decisions (BGer / BVGer) — CH e2e Stream E (#530)
       # Provider `ch_court_decisions` is implemented but has no acceptance
