@@ -46,6 +46,7 @@ from document_intelligence.normalize.html import (
 )
 from document_intelligence.normalize.ir import NormalizedDocumentIR
 from document_intelligence.normalize.pdf import normalize_pdf_document
+from document_intelligence.normalize.titles import is_placeholder_title
 from document_intelligence.normalize.xml import normalize_xml_document
 from document_intelligence.persist.sinks import CanonicalSink, InMemoryCanonicalSink
 from document_intelligence.persist.surfaces import PUBLISHED_DOCUMENTS, PUBLISHED_SECTIONS
@@ -464,19 +465,10 @@ def _merge_extraction_hints_into_ir(
 
 
 def _is_placeholder_title(title: str | None) -> bool:
-    if title is None:
-        return True
-    t = title.strip()
-    if not t:
-        return True
-    lower = t.lower()
-    if lower in {"untitled document", "ris dokument", "fedlex"}:
-        return True
-    if lower in {"input-de", "input-en", "input-fr", "input-it", "input-rm"}:
-        return True
-    if lower.startswith("ris —") or lower.startswith("ris -"):
-        return True
-    return False
+    # Delegates to the shared predicate: this list and the two in
+    # `ingest.docling_adapter` and platform-control had drifted, and the gap is what
+    # let a leaked filename outrank a correct acquisition hint (#771).
+    return is_placeholder_title(title)
 
 
 def _effective_title_from_normalized(
