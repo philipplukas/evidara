@@ -106,10 +106,16 @@ export function buildPipelineDecisionSupport(options: {
 }): PipelineDecisionSupport {
   const { run, health } = options;
 
+  // Three modes, not two. The `production`-vs-everything-else ternary this
+  // replaces called an acceptance run "this preview run" — the same mislabelling
+  // #743 fixed at the badge sites and missed here, so the page contradicted its
+  // own header 400px above.
   const whyItMatters =
     run.mode === "production"
       ? "This production run determines whether the source version can safely flow into the live operator surface."
-      : "This preview run is the gate before promotion, so the result tells operators whether the version is ready.";
+      : run.mode === "acceptance"
+        ? "This acceptance run reaches the live source to produce ADR-0030 evidence. A pass is the justification for enabling the template — it does not by itself turn either key."
+        : "This preview run is the gate before promotion, so the result tells operators whether the version is ready.";
 
   if (!health) {
     return {

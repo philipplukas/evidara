@@ -147,7 +147,14 @@ export function RunLaunchButton({
   buttonVariant = "contained",
   buttonColor = "primary",
   defaultMode = "production",
-  allowedModes = ["preview", "production"],
+  // `acceptance` is offered by default because every other surface tells the
+  // operator to capture acceptance evidence and, until now, no control launched
+  // one — the panel talked them up to an action it did not offer (#743/#735).
+  // Offering it is safe: the server decides. `ensure_launchable` refuses a
+  // SCAFFOLD provider in every mode, and the config-key waiver applies only to
+  // AWAITING_EVIDENCE, so acceptance against a LIVE provider still needs both
+  // keys. The pre-flight readiness check states which of those applies.
+  allowedModes = ["preview", "acceptance", "production"],
   redirectResource = ResourceName.Runs,
 }: RunLaunchButtonProps) {
   const dataProvider = useDataProvider();
