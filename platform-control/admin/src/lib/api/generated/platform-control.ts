@@ -1248,6 +1248,22 @@ export interface components {
             updated_at: string;
         };
         /**
+         * BlueprintSeedOverride
+         * @description Operator-supplied seeds applied over a blueprint template's spec (#710).
+         *
+         *     The middle rung of the reuse ladder: "the existing template's shape, with my
+         *     seeds". Only the seed lists are expressible here — the provider, the
+         *     tenant/corpus/scope binding, the trust tier, and the portal-identifying
+         *     config stay whatever the blueprint says, and the merged seeds must still sit
+         *     on an origin the template itself reaches. See ADR-0046.
+         */
+        BlueprintSeedOverride: {
+            /** Seed Url */
+            seed_url?: string | null;
+            /** Seed Urls */
+            seed_urls?: string[] | null;
+        };
+        /**
          * BlueprintTemplateEnablementRequest
          * @description Operator flip of the ADR-0030 config key (#632).
          */
@@ -1996,6 +2012,7 @@ export interface components {
             overlay_id?: string | null;
             /** Provider Template Id */
             provider_template_id?: string | null;
+            blueprint_overrides?: components["schemas"]["BlueprintSeedOverride"] | null;
             /** Extractor Profile Id */
             extractor_profile_id?: string | null;
             /** @default live */
@@ -3326,6 +3343,7 @@ export interface components {
             overlay_id: string;
             /** Provider Template Id */
             provider_template_id: string;
+            blueprint_overrides?: components["schemas"]["BlueprintSeedOverride"] | null;
         };
         /** SourceBlueprintPreviewResponse */
         SourceBlueprintPreviewResponse: {
@@ -3654,6 +3672,7 @@ export interface components {
             overlay_id?: string | null;
             /** Provider Template Id */
             provider_template_id?: string | null;
+            blueprint_overrides?: components["schemas"]["BlueprintSeedOverride"] | null;
             /** Extractor Profile Id */
             extractor_profile_id?: string | null;
             execution_mode?: components["schemas"]["ExecutionMode"] | null;

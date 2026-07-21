@@ -265,9 +265,34 @@ class CreateSourceWithVersionRequest(BaseModel):
     source_version: CreateSourceVersionRequest
 
 
+class BlueprintSeedOverride(BaseModel):
+    """Operator-supplied seeds applied over a blueprint template's spec (#710).
+
+    The middle rung of the reuse ladder: "the existing template's shape, with my
+    seeds". Only the seed lists are expressible here — the provider, the
+    tenant/corpus/scope binding, the trust tier, and the portal-identifying
+    config stay whatever the blueprint says, and the merged seeds must still sit
+    on an origin the template itself reaches. See ADR-0046.
+    """
+
+    seed_url: HttpUrl | None = None
+    seed_urls: list[HttpUrl] | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_not_empty(self) -> BlueprintSeedOverride:
+        if self.seed_url is None and self.seed_urls is None:
+            raise ValueError("blueprint_overrides must set seed_url and/or seed_urls.")
+        if self.seed_urls is not None and not self.seed_urls:
+            raise ValueError("blueprint_overrides.seed_urls must not be empty.")
+        return self
+
+
 class SourceBlueprintPreviewRequest(BaseModel):
     overlay_id: str
     provider_template_id: str
+    blueprint_overrides: BlueprintSeedOverride | None = None
 
 
 class SourceResponse(BaseModel):
@@ -297,6 +322,7 @@ class CreateSourceVersionRequest(BaseModel):
     acquisition_spec: AcquisitionSpec | None = None
     overlay_id: str | None = None
     provider_template_id: str | None = None
+    blueprint_overrides: BlueprintSeedOverride | None = None
     extractor_profile_id: str | None = None
     execution_mode: ExecutionMode = ExecutionMode.LIVE
 
@@ -316,9 +342,16 @@ class CreateSourceVersionRequest(BaseModel):
         has_blueprint = bool(self.overlay_id or self.provider_template_id)
         if has_spec and has_blueprint:
             raise ValueError(
-                "Provide either acquisition_spec or overlay_id/provider_template_id, not both."
+                "Provide either acquisition_spec or overlay_id/provider_template_id, not both. "
+                "To reuse a template with different seeds, send overlay_id/"
+                "provider_template_id plus blueprint_overrides."
             )
         if has_spec:
+            if self.blueprint_overrides is not None:
+                raise ValueError(
+                    "blueprint_overrides applies to a blueprint template; it cannot accompany "
+                    "a hand-written acquisition_spec."
+                )
             return self
         if self.overlay_id and self.provider_template_id:
             return self
@@ -330,6 +363,7 @@ class UpdateSourceVersionRequest(BaseModel):
     acquisition_spec: AcquisitionSpec | None = None
     overlay_id: str | None = None
     provider_template_id: str | None = None
+    blueprint_overrides: BlueprintSeedOverride | None = None
     extractor_profile_id: str | None = None
     execution_mode: ExecutionMode | None = None
 
@@ -349,7 +383,14 @@ class UpdateSourceVersionRequest(BaseModel):
         has_blueprint = bool(self.overlay_id or self.provider_template_id)
         if has_spec and has_blueprint:
             raise ValueError(
-                "Provide either acquisition_spec or overlay_id/provider_template_id, not both."
+                "Provide either acquisition_spec or overlay_id/provider_template_id, not both. "
+                "To reuse a template with different seeds, send overlay_id/"
+                "provider_template_id plus blueprint_overrides."
+            )
+        if has_spec and self.blueprint_overrides is not None:
+            raise ValueError(
+                "blueprint_overrides applies to a blueprint template; it cannot accompany "
+                "a hand-written acquisition_spec."
             )
         if has_blueprint and not (self.overlay_id and self.provider_template_id):
             raise ValueError("overlay_id and provider_template_id must be provided together.")
@@ -359,6 +400,7 @@ class UpdateSourceVersionRequest(BaseModel):
             and self.acquisition_spec is None
             and self.overlay_id is None
             and self.provider_template_id is None
+            and self.blueprint_overrides is None
             and self.extractor_profile_id is None
             and self.execution_mode is None
         ):

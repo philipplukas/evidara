@@ -1,4 +1,4 @@
-version: "2.21.0"
+version: "2.22.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -22,7 +22,7 @@ apis:
     # platform_control.openapi.API_VERSION, which is what the app serves as
     # info.version; check_contract_manifest.py compares the two.
     file: "contracts/api/platform-control.openapi.yaml"
-    version: "0.16.0"
+    version: "0.17.0"
     locked_paths:
       - "/v1/sources"
       - "/v1/sources/{source_id}/versions"
