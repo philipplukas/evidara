@@ -134,3 +134,7 @@ scripts/deploy-hetzner-runner.sh
 
 # macOS Spotlight "do not index" markers
 .metadata_never_index
+
+# Survey HTTP cache — a scratch artifact of scripts/survey_communal_portals.py,
+# not evidence. The JSONL checkpoint beside it IS the work product.
+docs/runbooks/evidence/.portal-cache/
