@@ -23,3 +23,48 @@ spec:
     requests:
       cpu: 100m
       memory: 512Mi
+  # Backups: base backup + continuous WAL archiving, giving point-in-time recovery.
+  # ADR-0038 §2b -- platform_control (and later zitadel) are unrecoverable-by-rebuild:
+  # losing them loses every run, approval, operator and credential.
+  #
+  # !! INTERIM TARGET !! MinIO's PVC is `local-path` on the SAME disk as this
+  # cluster's PVC (both /dev/md2 on the single node). So this protects against
+  # logical damage -- a bad migration, a wrong DELETE, table corruption -- but NOT
+  # against loss of the node or the disk. It is deliberately not yet a real backup.
+  #
+  # ADR-0038 step 2 requires a restore-tested path before anything depends on it.
+  # An OFFSITE destination is a prerequisite before Zitadel holds real user
+  # credentials; only `destinationPath`/`endpointURL`/`s3Credentials` change to move.
+  backup:
+    retentionPolicy: 30d
+    barmanObjectStore:
+      destinationPath: s3://evidara-pg-backups/
+      endpointURL: http://minio.evidara.svc:9000
+      # Scoped MinIO user -- can reach ONLY evidara-pg-backups, verified by an
+      # explicit deny test against evidara-raw-artifacts and evidara-lakehouse.
+      # Provisioned out-of-band (password never committed); see README Stage 1.
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-minio-backup
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-minio-backup
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+---
+# Nightly base backup. WAL archiving above runs continuously between these, so
+# recovery granularity is the WAL stream, not this schedule.
+# Schedule is CNPG's 6-field cron (seconds first): 02:30 UTC daily.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: evidara-pg-nightly
+  namespace: evidara
+spec:
+  schedule: "0 30 2 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: evidara-pg
