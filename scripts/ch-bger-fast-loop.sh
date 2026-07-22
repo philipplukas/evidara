@@ -383,20 +383,26 @@ curl_json "${PC_URL}/v1/runs/${RUN_ID}/preview-summary" | tee "${RUN_DIR}/previe
 curl_json "${PC_URL}/v1/runs/${RUN_ID}/captured-resources" | tee "${RUN_DIR}/captured-resources.json" >/dev/null
 curl_json "${PC_URL}/v1/runs/${RUN_ID}/raw-artifacts" | tee "${RUN_DIR}/raw-artifacts.json" >/dev/null
 
-log "==> Waiting for DI processing and lifecycle signals"
+# Computed here, not with the content gates below, because the wait loop needs
+# to know how many documents it is waiting FOR. See the break condition.
+captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
+log "==> Waiting for DI processing and lifecycle signals (${captured_count} captured)"
 for i in $(seq 1 24); do
   curl_json "${PC_URL}/v1/runs/${RUN_ID}/processing-status" | tee "${RUN_DIR}/processing-status.json" >/dev/null
   curl_json "${PC_URL}/v1/runs/${RUN_ID}/document-lifecycle" | tee "${RUN_DIR}/document-lifecycle.json" >/dev/null
   canonical_ready_count="$(jq -r '[.data[]? | select(.status=="canonical_ready")] | length' < "${RUN_DIR}/processing-status.json")"
   processed_count="$(jq -r '[.data[]? | select(.event_type=="document.processed")] | length' < "${RUN_DIR}/document-lifecycle.json")"
-  if [[ "${canonical_ready_count}" -gt 0 && "${processed_count}" -gt 0 ]]; then
+  log "  di poll ${i}: canonical_ready=${canonical_ready_count}/${captured_count} processed=${processed_count}"
+  # Wait for EVERY captured document, not the first. This used to break on
+  # `canonical_ready > 0`, which sampled the pipeline mid-flight and let the
+  # verdict below report `pass` over a partial delivery (#731).
+  if [[ "${canonical_ready_count}" -ge "${captured_count}" && "${processed_count}" -gt 0 ]]; then
     break
   fi
   sleep 5
 done
 
 content_type_count="$(jq -r '[.content_type_breakdown[]? | select(.content_type=="text/html") | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
-captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
 title_ok="$(jq -r '[.data[]? | select((.title // "") | test(".+"))] | length' < "${RUN_DIR}/captured-resources.json")"
 court_host_ok="$(jq -r --arg host_regex "${COURT_HOST_REGEX}" '[.data[]? | select((.final_url // "") | test($host_regex))] | length' < "${RUN_DIR}/captured-resources.json")"
@@ -434,6 +440,13 @@ if [[ "${content_type_count}" -lt 1 || "${captured_count}" -lt 1 || "${raw_artif
   verdict="provider_failed"
 elif [[ "${accepted_count}" -lt 1 || "${processing_count}" -lt 1 || "${canonical_ready_count}" -lt 1 || "${processed_count}" -lt 1 ]]; then
   verdict="downstream_failed"
+elif [[ "${canonical_ready_count}" -lt "${captured_count}" ]]; then
+  # Every captured document must reach canonical, not just one. Nothing compared
+  # these two counts, so a run capturing 4 and canonicalising 1 reported `pass` —
+  # and this bundle is the evidence an operator flips `enabled: true` on
+  # (ADR-0030). #772 established "a partial failure is a failure" for titles; it
+  # was never applied to document count (#731).
+  verdict="downstream_incomplete"
 elif [[ "${title_ok}" -lt 1 || "${court_host_ok}" -lt 1 || "${docket_ok}" -lt 1 ]]; then
   verdict="pipeline_pass_content_suspect"
 elif [[ "${decision_marker_ok}" -lt 1 || "${min_content_length_ok}" -lt 1 ]]; then
