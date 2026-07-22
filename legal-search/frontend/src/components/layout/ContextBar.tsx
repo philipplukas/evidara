@@ -5,13 +5,13 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import { AnalyticsEvent, track } from "@/lib/analytics";
-import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import {
   countActiveSearchConstraints,
   hasActiveSearchConstraints,
   useSearchConstraints,
 } from "@/lib/search-constraints-store";
 import type { SearchContextViewModel } from "@/lib/types";
+import { MetadataIcon } from "../primitives";
 
 interface ContextBarProps {
   context: SearchContextViewModel;
@@ -191,20 +191,7 @@ function ChipGroup({
                 : "context-bar__chip--idle bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
             }`}
           >
-            {item.iconKey && isFlagIcon(item.iconKey) ? (
-              <img
-                src={getFlagSrc(item.iconKey)!}
-                alt=""
-                width={14}
-                height={14}
-                className="inline-block"
-              />
-            ) : (
-              (() => {
-                const icon = getIcon(item.iconKey);
-                return icon ? <span className="text-sm leading-none">{icon}</span> : null;
-              })()
-            )}
+            <MetadataIcon iconKey={item.iconKey} size={14} />
             {item.label}
           </button>
         );

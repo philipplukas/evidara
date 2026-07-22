@@ -4,10 +4,9 @@ import { ChevronDown, ChevronRight, Info, Search, SlidersHorizontal } from "luci
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { useSearchConstraints } from "@/lib/search-constraints-store";
 import type { FilterViewModel } from "@/lib/types";
-import { SectionLabel } from "../primitives";
+import { MetadataIcon, SectionLabel } from "../primitives";
 import { FilterBar } from "./FilterBar";
 
 interface FilterPanelProps {
@@ -226,26 +225,15 @@ function FilterGroup({ filter }: { filter: FilterViewModel }) {
                         key={opt.value}
                         onClick={() => toggle(opt.value)}
                         aria-pressed={isSelected}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${
+                        // #696: focus is an offset outline, not a violet ring —
+                        // `bg-accent-core` below is what "selected" looks like.
+                        className={`focus-ring-offset inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all ${
                           isSelected
                             ? "border-accent-core bg-accent-core text-white shadow-sm"
                             : "border-border/70 bg-surface-panel text-muted-foreground hover:border-accent-core/30 hover:text-foreground"
                         }`}
                       >
-                        {opt.iconKey && isFlagIcon(opt.iconKey) ? (
-                          <img
-                            src={getFlagSrc(opt.iconKey)!}
-                            alt=""
-                            width={14}
-                            height={14}
-                            className="inline-block"
-                          />
-                        ) : (
-                          (() => {
-                            const icon = getIcon(opt.iconKey);
-                            return icon ? <span className="text-xs">{icon}</span> : null;
-                          })()
-                        )}
+                        <MetadataIcon iconKey={opt.iconKey} size={13} />
                         <span>{opt.label}</span>
                         {opt.count != null && (
                           <span

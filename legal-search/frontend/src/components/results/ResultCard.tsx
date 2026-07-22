@@ -4,10 +4,9 @@ import { ArrowRight, Bookmark, BookOpen, FileText, Globe, Link, MapPin, Scale } 
 import { useTranslations } from "next-intl";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { useResultHrefBuilder } from "@/hooks/use-result-href";
-import { getFlagSrc, getIcon, isFlagIcon } from "@/lib/icons";
 import { isModifiedClick } from "@/lib/result-href";
 import type { SearchResultViewModel } from "@/lib/types";
-import { AccentButton, Badge } from "../primitives";
+import { AccentButton, Badge, MetadataIcon } from "../primitives";
 import { HighlightedSnippet } from "./HighlightedSnippet";
 
 const iconComponents: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -19,24 +18,6 @@ const iconComponents: Record<string, React.ComponentType<{ className?: string }>
   link: Link,
   globe: Globe,
 };
-
-function IconCell({ iconKey, className }: { iconKey?: string; className?: string }) {
-  if (!iconKey) return null;
-  if (isFlagIcon(iconKey)) {
-    return (
-      <img
-        src={getFlagSrc(iconKey)!}
-        alt={iconKey.toUpperCase()}
-        width={14}
-        height={14}
-        className={className}
-      />
-    );
-  }
-  const text = getIcon(iconKey);
-  if (!text) return null;
-  return <span className={className}>{text}</span>;
-}
 
 interface ResultCardProps {
   result: SearchResultViewModel;
@@ -105,7 +86,7 @@ export function ResultCard({
           )}
           {result.badges.map((badge, i) => (
             <span key={i} className="inline-flex items-center gap-1">
-              <IconCell iconKey={badge.iconKey} className="text-xs leading-none" />
+              <MetadataIcon iconKey={badge.iconKey} size={13} alt={badge.iconKey?.toUpperCase()} />
               <Badge label={badge.label} colorKey={badge.colorKey} />
             </span>
           ))}
@@ -134,7 +115,7 @@ export function ResultCard({
               key={i}
               className="inline-flex min-w-0 items-center gap-1 text-[11px] text-text-meta"
             >
-              <IconCell iconKey={row.iconKey} className="shrink-0 text-xs text-text-meta" />
+              <MetadataIcon iconKey={row.iconKey} size={13} className="text-text-meta" />
               <span className="shrink-0 font-medium text-text-meta">{row.label}:</span>
               <span className="min-w-0 truncate text-foreground/80">{row.value}</span>
             </span>
