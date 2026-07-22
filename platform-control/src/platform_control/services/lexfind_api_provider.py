@@ -24,29 +24,30 @@ file is byte-identical to the canton's own:
 Every record also carries `original_url` back to the canton's own page, so the
 canonical citation survives the mirror.
 
-WHAT IS VERIFIED AND WHAT IS NOT
---------------------------------
-This module is deliberately explicit about which half of its contract has been
-exercised against the live service, because #731 gates live discovery on a
-question we have not yet asked the Staatsschreiberkonferenz (their terms and
-rate expectations — it is a public-sector service, and we ask rather than find
-out by crawling).
+THE CONTRACT, VERIFIED LIVE 2026-07-22
+--------------------------------------
+`robots.txt` declares no rules at all — nothing is disallowed. Requests were made
+one at a time with several seconds between them and an identifying User-Agent.
 
-  VERIFIED (#716, reproduced end-to-end in curl, no browser, no auth):
-    GET /tol/{tol_id}/{lang}                    -> 200 application/pdf
-    GET /api/frontend/v1/{lang}/texts-of-law/{tol_id}
-    GET /api/frontend/v1/{lang}/entities/extended
-    GET /api/frontend/v1/{lang}/categories
+    POST /api/frontend/v1/{lang}/fulltext-search   -> {id, session_id, search}
+    GET  /api/frontend/v1/{lang}/fulltext-search/{id}?session_id=&page_no=&results_per_page=
+    GET  /tol/{tol_id}/{lang}                      -> 200 application/pdf
 
-  INFERRED — the request body is NOT verified:
-    POST /api/frontend/v1/{lang}/fulltext-search
+Four findings, each of which the first draft of this module got wrong:
 
-#716 records only that an empty body returns 400 listing 11 required fields; it
-does not record their names. :data:`_SEARCH_PAYLOAD_TEMPLATE` is therefore this
-module's best reading of the contract and is expected to need correction on
-first live contact. It is isolated in one place, and
-:meth:`LexFindApiProvider.plan` reports it as unverified so an operator sees that
-before dispatching rather than after.
+  1. **All eleven POST fields are required** and none is named what the issue
+     text implied. See :data:`_SEARCH_PAYLOAD_TEMPLATE`.
+  2. **`search_text` must be non-empty.** `""` returns 400. There is no
+     "list everything for this entity" call — see `_discover` for what replaces it.
+  3. **Results are under `texts_of_law_with_matches`.** `results` is a
+     per-language *count* array; reading it as the hit list yields four rows of
+     nothing.
+  4. **Dates are `DD.MM.YYYY`**, not ISO. See :func:`_iso_date_or_none` for why
+     passing them through unconverted is a live data-corruption defect.
+
+Temporal fields live on the **version** record inside `matches[]`, and the
+canton's `original_url` on the **download** entry inside `dta_urls[]` — neither
+is at the record root.
 
 TWO GATES, BOTH APPLIED
 -----------------------
@@ -66,6 +67,7 @@ Captures are PDFs, so both acquisition gates matter and neither is redundant:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -109,31 +111,96 @@ _DEFAULT_MIN_PDF_BYTES = 2_000
 _LEXFIND_IN_FORCE_FROM_FIELD = "version_active_since"
 _LEXFIND_IN_FORCE_UNTIL_FIELD = "version_inactive_since"
 
-# UNVERIFIED (see module docstring). #716 established that an empty body returns
-# 400 naming 11 required fields but did not record the names. Isolated here so a
-# single correction fixes the provider once the live contract is confirmed.
+# LexFind publishes Swiss-format dates (`01.06.2025`), not ISO. See
+# `_iso_date_or_none` for why passing them through unconverted is a live defect.
+_SWISS_DATE_RE = re.compile(r"\d{2}\.\d{2}\.\d{4}")
+_ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+# VERIFIED against the live endpoint 2026-07-22. All eleven fields are required:
+# an empty body returns 400 naming every one of them.
+#
+# `search_text` must be NON-EMPTY -- `""` returns 400 "Ungültige Anfrage". There
+# is therefore no "list everything for this entity" call, which is the single
+# most consequential fact about this API's discovery model. See `_discover`.
 _SEARCH_PAYLOAD_TEMPLATE: dict[str, Any] = {
-    "query": "",
+    "search_text": "",
+    "active_only": True,
+    "search_in_systematic_number": True,
+    "search_in_title": True,
+    "search_in_keywords": True,
+    "search_in_content": False,
     "entity_filter": [],
+    "systematic_filter": [],
     "category_filter": [],
-    "in_force_only": True,
-    "page_no": 1,
-    "results_per_page": _DEFAULT_PAGE_SIZE,
+    "use_global_systematics": False,
+    "direct_search": False,
 }
-_SEARCH_PAYLOAD_VERIFIED = False
+_SEARCH_PAYLOAD_VERIFIED = True
+
+# Results live here. `results` is NOT the hit list -- it is a per-language count
+# array (`[{language: de, number_of_results: 2}, ...]`), and reading it as hits
+# yields four rows of nothing for every query.
+_RESULTS_KEY = "texts_of_law_with_matches"
 
 
 def _iso_date_or_none(value: Any) -> str | None:
     """Normalise a LexFind date to ISO-8601, or drop it.
 
+    **LexFind publishes `DD.MM.YYYY`**, verified live: `"01.06.2025"`,
+    `"14.04.2008"`. It is not ISO and must not be passed through as though it
+    were — a naive truncation turns 1 June 2025 into "01.06.2025", which any ISO
+    reader downstream parses as a different date or not at all. That value would
+    land on `document.metadata.in_force_from`, which the search projection
+    coalesces, so a wrong date here becomes a wrong in-force answer with no
+    visible failure anywhere in between.
+
+    ISO input is accepted too, so a future format change on their side does not
+    silently start dropping every date.
+
     A key that is absent means "unknown", and must stay absent rather than
-    becoming a fabricated boundary — the in-force model is four-valued precisely
+    becoming a fabricated boundary — the in-force model is multi-valued precisely
     so it can answer `unknown` (ADR-0033).
     """
     if not value or not isinstance(value, str):
         return None
     text = value.strip()
-    return text[:10] if len(text) >= 10 else None
+    if _SWISS_DATE_RE.fullmatch(text):
+        day, month, year = text.split(".")
+        return f"{year}-{month}-{day}"
+    if _ISO_DATE_RE.match(text):
+        return text[:10]
+    # Unrecognised shape: refuse rather than guess. A mangled date is worse than
+    # an absent one, because absence is honest and downstream can say "unknown".
+    logger.warning("lexfind: unrecognised date format %r — dropped", text)
+    return None
+
+
+def _download_entry(record: dict[str, Any], language: str) -> dict[str, Any] | None:
+    """The `dta_urls` entry for ``language``, or the first available.
+
+    Falling back to the first entry is deliberate: a canton that publishes only
+    in French should still be captured, and the language actually captured is
+    recorded on the resource rather than assumed.
+    """
+    entries = record.get("dta_urls") or []
+    for entry in entries:
+        if entry.get("language") == language:
+            return entry
+    return entries[0] if entries else None
+
+
+def _current_version(record: dict[str, Any]) -> dict[str, Any] | None:
+    """The version record carrying temporal validity.
+
+    Temporal fields live on `matches[]`, not on the text-of-law record — reading
+    them from the root yields nothing at all, silently. Prefer the entry LexFind
+    badges `current`; otherwise take the first.
+    """
+    matches = record.get("matches") or []
+    for match in matches:
+        if match.get("info_badge") == "current":
+            return match
+    return matches[0] if matches else None
 
 
 def temporal_metadata(record: dict[str, Any]) -> dict[str, str]:
@@ -202,15 +269,22 @@ class LexFindApiProvider:
         page_size = int(spec.get("results_per_page") or _DEFAULT_PAGE_SIZE)
         max_pages = int(spec.get("max_pages") or _MAX_PAGES)
 
+        search_text = str(spec.get("search_text") or "").strip()
+
         notes = [
             "Capture path verified live (#716): /tol/{id}/{lang} returns "
             "application/pdf, md5-identical to the canton's own file.",
+            "Search contract verified live 2026-07-22: all 11 fields required, "
+            "results under `texts_of_law_with_matches`, dates DD.MM.YYYY.",
+            "COVERAGE LIMIT: LexFind has no list-everything call — `search_text` "
+            "must be non-empty. A systematic-number prefix is the enumeration "
+            "strategy ('554' + entity 26 returns the whole ZH animal-protection "
+            "branch); full-corpus coverage means iterating prefixes, not one sweep.",
         ]
-        if not _SEARCH_PAYLOAD_VERIFIED:
+        if not search_text:
             notes.append(
-                "DISCOVERY UNVERIFIED: the POST /fulltext-search request body is "
-                "this provider's reading of the contract, not a measured one. "
-                "Expect the first live run to correct it (#731)."
+                "BLOCKING: acquisition_spec.search_text is missing — this run "
+                "would be refused before any request is made."
             )
         if not entity_ids:
             notes.append(
@@ -245,6 +319,7 @@ class LexFindApiProvider:
         language = spec.get("language") or _DEFAULT_LANGUAGE
         entity_ids = list(spec.get("entity_ids") or [])
         category_ids = list(spec.get("category_ids") or [])
+        search_text = str(spec.get("search_text") or "").strip()
         page_size = int(spec.get("results_per_page") or _DEFAULT_PAGE_SIZE)
         max_pages = int(spec.get("max_pages") or _MAX_PAGES)
         max_documents = int(spec.get("max_documents") or 0)
@@ -255,6 +330,24 @@ class LexFindApiProvider:
         skipped: list[dict[str, Any]] = []
         failures: list[dict[str, str]] = []
 
+        if not search_text:
+            # Fail here rather than send a request the API will reject: an empty
+            # `search_text` is a 400, and a spec missing it is a configuration
+            # error the operator must see named, not a transport failure.
+            return ProviderStartResult(
+                external_job_id=f"lexfind-{run.run_id}",
+                provider=self.provider_name,
+                request_payload={"language": language, "entity_ids": entity_ids},
+                response_payload={"captured": 0, "skipped": [], "failures": []},
+                inline_resources=[],
+                inline_failure_reason=(
+                    "acquisition_spec.search_text is required and must be non-empty — "
+                    "LexFind has no list-everything call. Use a systematic-number "
+                    "prefix (e.g. '554' with entity_ids [26] returns the ZH "
+                    "animal-protection branch)."
+                ),
+            )
+
         async with httpx.AsyncClient(
             base_url=_BASE_URL,
             timeout=httpx.Timeout(timeout_seconds, connect=min(10.0, timeout_seconds)),
@@ -262,9 +355,10 @@ class LexFindApiProvider:
             follow_redirects=True,
         ) as client:
             try:
-                tol_ids = await self._discover(
+                records = await self._discover(
                     client,
                     language=language,
+                    search_text=search_text,
                     entity_ids=entity_ids,
                     category_ids=category_ids,
                     page_size=page_size,
@@ -277,16 +371,18 @@ class LexFindApiProvider:
                         "error": str(exc),
                     }
                 )
-                tol_ids = []
+                records = []
 
             if max_documents:
-                tol_ids = tol_ids[:max_documents]
+                records = records[:max_documents]
 
-            for tol_id in tol_ids:
+            for record in records:
+                tol_id = record.get("id")
                 try:
                     resource = await self._capture(
                         client,
                         tol_id=tol_id,
+                        record=record,
                         language=language,
                         run=run,
                         min_pdf_bytes=min_pdf_bytes,
@@ -321,20 +417,39 @@ class LexFindApiProvider:
         client: httpx.AsyncClient,
         *,
         language: str,
+        search_text: str,
         entity_ids: list[int],
         category_ids: list[int],
         page_size: int,
         max_pages: int,
-    ) -> list[int]:
-        """Return tol ids for the requested entities.
+    ) -> list[dict[str, Any]]:
+        """Return full texts-of-law records for the requested search.
 
-        Two calls per page by the API's design: a POST that opens a search
-        session, then a GET that pages through it.
+        **There is no "list everything" call.** `search_text` must be non-empty
+        (verified: `""` returns 400), so discovery is always a query, never an
+        enumeration. The workable strategy — also verified — is a **systematic
+        number prefix** with `search_in_systematic_number`: `"554"` scoped to
+        entity 26 returns the whole ZH animal-protection branch, all four acts,
+        in one call:
+
+            22888  554.51  Hundeverordnung
+            22871  554.5   Hundegesetz
+            21954  554.11  Kantonale Tierschutzverordnung
+            22765  554.1   Kantonales Tierschutzgesetz
+
+        Full-corpus coverage therefore means iterating prefixes, not one sweep.
+        That is a real limitation of this API and is recorded rather than papered
+        over; `plan()` reports it.
+
+        Records are returned whole because the search response already carries
+        the download URL, the canton's `original_url` and the version's temporal
+        fields — re-fetching each `texts-of-law/{id}` would double the request
+        count for data already in hand.
         """
         payload = dict(_SEARCH_PAYLOAD_TEMPLATE)
+        payload["search_text"] = search_text
         payload["entity_filter"] = entity_ids
         payload["category_filter"] = category_ids
-        payload["results_per_page"] = page_size
 
         opened = await client.post(f"{_API_PREFIX}/{language}/fulltext-search", json=payload)
         opened.raise_for_status()
@@ -344,7 +459,7 @@ class LexFindApiProvider:
         if search_id is None:
             return []
 
-        tol_ids: list[int] = []
+        records: list[dict[str, Any]] = []
         seen: set[int] = set()
         for page_no in range(1, max_pages + 1):
             page = await client.get(
@@ -356,32 +471,32 @@ class LexFindApiProvider:
                 },
             )
             page.raise_for_status()
-            rows = page.json().get("results") or []
-            if not rows:
-                break
+            body = page.json()
+            rows = body.get(_RESULTS_KEY) or []
             for row in rows:
-                tol_id = row.get("text_of_law_id") or row.get("tol_id") or row.get("id")
+                tol_id = row.get("id")
                 if isinstance(tol_id, int) and tol_id not in seen:
                     seen.add(tol_id)
-                    tol_ids.append(tol_id)
-        return tol_ids
+                    records.append(row)
+            if page_no >= int(body.get("number_of_pages") or 1):
+                break
+        return records
 
     async def _capture(
         self,
         client: httpx.AsyncClient,
         *,
         tol_id: int,
+        record: dict[str, Any],
         language: str,
         run: Run,
         min_pdf_bytes: int,
         skipped: list[dict[str, Any]],
     ) -> ProviderResource | None:
         """Fetch one text of law as PDF, guarded, with its temporal window."""
-        record_response = await client.get(f"{_API_PREFIX}/{language}/texts-of-law/{tol_id}")
-        record_response.raise_for_status()
-        record = record_response.json() or {}
+        dta = _download_entry(record, language)
+        pdf_url = (dta or {}).get("url") or f"/tol/{tol_id}/{language}"
 
-        pdf_url = f"/tol/{tol_id}/{language}"
         pdf = await client.get(pdf_url)
         pdf.raise_for_status()
         body = pdf.content
@@ -420,24 +535,39 @@ class LexFindApiProvider:
             "legal_text_assessment": "abstained_binary_manifestation",
             "legal_text_evidence": assessment.as_evidence(),
         }
-        # `original_url` is what keeps the canonical citation pointing at the
-        # canton rather than at the mirror.
-        if record.get("original_url"):
-            metadata["original_url"] = record["original_url"]
-        if record.get("entity_id") is not None:
-            metadata["lexfind_entity_id"] = record["entity_id"]
-        metadata.update(temporal_metadata(record))
+        # `original_url` lives on the download entry, not the record root, and is
+        # what keeps the canonical citation pointing at the canton rather than at
+        # the mirror.
+        original_url = (dta or {}).get("original_url")
+        if original_url:
+            metadata["original_url"] = original_url
+        if record.get("systematic_number"):
+            metadata["systematic_number"] = record["systematic_number"]
+        entity = record.get("entity") or {}
+        if entity.get("id") is not None:
+            metadata["lexfind_entity_id"] = entity["id"]
+            metadata["lexfind_entity"] = entity.get("abbreviation")
 
-        in_force = is_in_force(record)
+        # Temporal validity is on the VERSION record, not the text-of-law record.
+        version = _current_version(record)
+        if version:
+            metadata["lexfind_version_id"] = version.get("id")
+            if version.get("info_badge"):
+                metadata["lexfind_info_badge"] = version["info_badge"]
+        metadata.update(temporal_metadata(version or {}))
+
+        in_force = is_in_force(version or record)
         if in_force is not None:
             metadata["in_force"] = in_force
 
+        title = (version or {}).get("title") or record.get("title")
+
         return ProviderResource(
-            source_url=record.get("original_url") or f"{_BASE_URL}{pdf_url}",
+            source_url=original_url or f"{_BASE_URL}{pdf_url}",
             final_url=f"{_BASE_URL}{pdf_url}",
             content_type="application/pdf",
             body_bytes=body,
-            title=record.get("title") or record.get("short_title"),
+            title=title,
             http_status=pdf.status_code,
             discovery_depth=0,
             metadata=metadata,

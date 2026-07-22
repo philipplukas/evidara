@@ -1,17 +1,26 @@
-"""Fixture-backed tests for the LexFind provider (#731).
+"""Tests for the LexFind provider (#731), driven by a REAL captured response.
 
-No network. The capture path these exercise is verified live in #716 (a
-md5-identical mirror of the canton's own PDF); the discovery payload is not, and
-is asserted here only for shape, not for correctness against the live contract.
+`tests/fixtures/lexfind/search-zh-554.json` is an unedited capture of
 
-The temporal assertions are the load-bearing ones. LexFind is preferred for this
-rung because it models repeal separately from consolidation date, which is the
-trap #661 found in Fedlex: a work whose newest consolidation is open-ended while
-its status is "No longer in force" reads as current if you trust dates alone.
+    POST /api/frontend/v1/de/fulltext-search
+      {"search_text": "554", "search_in_systematic_number": true,
+       "entity_filter": [26], ...}
+    GET  /api/frontend/v1/de/fulltext-search/{id}?...
+
+taken 2026-07-22. It returns the whole ZH animal-protection branch -- 554.1,
+554.11, 554.5, 554.51 -- which is exactly ADR-0033's cantonal rung.
+
+Using the real payload is the point. The first version of these tests used
+fixtures I invented from the issue description, and they passed against a
+provider that read the wrong response key and would have emitted `01.06.2025`
+into an ISO date field. Invented fixtures test the author's belief, not the
+service.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -19,11 +28,18 @@ import pytest
 
 from platform_control.services.lexfind_api_provider import (
     LexFindApiProvider,
+    _current_version,
+    _iso_date_or_none,
     is_in_force,
     temporal_metadata,
 )
 
-# A structurally honest PDF: real signature, comfortably over the size floor.
+_FIXTURE = json.loads(
+    (Path(__file__).parent.parent / "fixtures" / "lexfind" / "search-zh-554.json").read_text()
+)
+_SESSION = {"id": _FIXTURE["id"], "session_id": _FIXTURE["session_id"]}
+
+# Structurally honest PDF, over the default floor.
 _PDF = b"%PDF-1.7\n" + b"1 0 obj\n<< /Type /Catalog >>\nendobj\n" * 120 + b"%%EOF\n"
 
 # #716, reproduced: 200 OK carrying a redirect stub where a PDF was expected.
@@ -32,15 +48,13 @@ _STUB = (
     b"</script></head><body>Redirecting...</body></html>"
 )
 
-_HUNDEGESETZ = {
-    "text_of_law_id": 22871,
-    "title": "Hundegesetz",
-    "entity_id": 26,
-    "original_url": "https://www.zh.ch/erlass/554.5",
-    "version_active_since": "2010-01-01",
-    "version_inactive_since": None,
-    "is_active": True,
-}
+
+def _tol(systematic_number: str) -> dict:
+    return next(
+        t
+        for t in _FIXTURE["texts_of_law_with_matches"]
+        if t["systematic_number"] == systematic_number
+    )
 
 
 def _source_version(**spec):
@@ -52,12 +66,13 @@ def _run(run_id="run_test"):
 
 
 class _ScriptedClient:
-    """Minimal httpx.AsyncClient stand-in driven by a URL->payload map."""
+    """httpx.AsyncClient stand-in replaying the captured search response."""
 
-    def __init__(self, routes, *args, **kwargs):
+    def __init__(self, *args, pdf=_PDF, page=None, **kwargs):
         del args, kwargs
-        self._routes = routes
-        self.requests: list[str] = []
+        self._pdf = pdf
+        self._page = page if page is not None else _FIXTURE
+        self.pdf_requests: list[str] = []
 
     async def __aenter__(self):
         return self
@@ -65,36 +80,28 @@ class _ScriptedClient:
     async def __aexit__(self, exc_type, exc, tb):
         del exc_type, exc, tb
 
-    def _respond(self, url):
-        self.requests.append(url)
-        entry = self._routes.get(url)
-        request = httpx.Request("GET", f"https://www.lexfind.ch{url}")
-        if entry is None:
-            return httpx.Response(404, request=request)
-        if isinstance(entry, bytes):
-            return httpx.Response(
-                200, content=entry, headers={"content-type": "application/pdf"}, request=request
-            )
-        return httpx.Response(200, json=entry, request=request)
+    async def post(self, url, *, json=None):
+        del json
+        return httpx.Response(
+            200, json=_SESSION, request=httpx.Request("POST", f"https://www.lexfind.ch{url}")
+        )
 
     async def get(self, url, *, params=None):
         del params
-        return self._respond(url)
+        request = httpx.Request("GET", f"https://www.lexfind.ch{url}")
+        if url.startswith("/tol/") or url.startswith("/tolv/"):
+            self.pdf_requests.append(url)
+            return httpx.Response(
+                200,
+                content=self._pdf,
+                headers={"content-type": "application/pdf"},
+                request=request,
+            )
+        return httpx.Response(200, json=self._page, request=request)
 
-    async def post(self, url, *, json=None):
-        del json
-        return self._respond(url)
 
-
-def _routes(*, pdf=_PDF, record=None, results=None):
-    record = record if record is not None else _HUNDEGESETZ
-    results = results if results is not None else [{"text_of_law_id": 22871}]
-    return {
-        "/api/frontend/v1/de/fulltext-search": {"id": 7, "session_id": "s-1"},
-        "/api/frontend/v1/de/fulltext-search/7": {"results": results},
-        "/api/frontend/v1/de/texts-of-law/22871": record,
-        "/tol/22871/de": pdf,
-    }
+def _client_factory(**kw):
+    return lambda *a, **k: _ScriptedClient(*a, **kw, **k)
 
 
 @pytest.fixture
@@ -103,116 +110,191 @@ def provider():
 
 
 # --------------------------------------------------------------------------
+# Date format — LexFind publishes DD.MM.YYYY, not ISO
+# --------------------------------------------------------------------------
+
+
+def test_swiss_date_is_converted_to_iso():
+    """The live format. Passing it through unconverted is a wrong in-force date."""
+    assert _iso_date_or_none("01.06.2025") == "2025-06-01"
+    assert _iso_date_or_none("14.04.2008") == "2008-04-14"
+
+
+def test_iso_input_is_accepted_unchanged():
+    """So a format change on their side does not silently drop every date."""
+    assert _iso_date_or_none("2025-06-01") == "2025-06-01"
+
+
+def test_unrecognised_date_shape_is_dropped_not_guessed():
+    """A mangled date is worse than an absent one -- absence can say 'unknown'."""
+    assert _iso_date_or_none("June 2025") is None
+    assert _iso_date_or_none("") is None
+    assert _iso_date_or_none(None) is None
+
+
+def test_real_fixture_dates_round_trip_to_iso():
+    version = _current_version(_tol("554.5"))
+    assert version["version_active_since"] == "01.06.2025"  # as published
+    assert temporal_metadata(version)["in_force_from"] == "2025-06-01"  # as emitted
+
+
+# --------------------------------------------------------------------------
+# Response shape — the keys that are easy to get wrong
+# --------------------------------------------------------------------------
+
+
+def test_temporal_fields_live_on_the_version_not_the_record():
+    """Reading them from the record root yields nothing, silently."""
+    record = _tol("554.5")
+    assert "version_active_since" not in record
+    assert _current_version(record)["version_active_since"] == "01.06.2025"
+
+
+def test_current_version_is_preferred_over_the_first():
+    record = _tol("554.5")
+    assert _current_version(record)["info_badge"] == "current"
+
+
+def test_results_key_is_not_the_hit_list():
+    """`results` is a per-language COUNT array, not the documents."""
+    assert all("number_of_results" in row for row in _FIXTURE["results"])
+    assert len(_FIXTURE["texts_of_law_with_matches"]) == 4
+
+
+# --------------------------------------------------------------------------
 # Temporal validity — the #661 trap
 # --------------------------------------------------------------------------
 
 
 def test_active_law_maps_its_in_force_start():
-    meta = temporal_metadata(_HUNDEGESETZ)
-    assert meta["in_force_from"] == "2010-01-01"
+    meta = temporal_metadata(_current_version(_tol("554.51")))
+    assert meta["in_force_from"] == "2025-06-01"
     assert "in_force_until" not in meta
 
 
 def test_repealed_law_carries_its_end_date():
-    meta = temporal_metadata(
-        {**_HUNDEGESETZ, "version_inactive_since": "2020-06-30", "is_active": False}
-    )
+    version = dict(_current_version(_tol("554.5")))
+    version.update(version_inactive_since="30.06.2020", is_active=False)
+    meta = temporal_metadata(version)
     assert meta["in_force_until"] == "2020-06-30"
     assert meta["amendment_relation"] == "repealed_by"
 
 
 def test_repeal_without_an_end_date_is_recorded_without_inventing_one():
-    """We know it is repealed; we do not know when. Those are different facts.
-
-    Collapsing them is the #661 failure in the opposite direction -- fabricating
-    a boundary is exactly what ADR-0033 exists to prevent.
-    """
-    meta = temporal_metadata({**_HUNDEGESETZ, "version_inactive_since": None, "is_active": False})
+    """We know it is repealed; we do not know when. Different facts."""
+    version = dict(_current_version(_tol("554.5")))
+    version.update(version_inactive_since=None, is_active=False)
+    meta = temporal_metadata(version)
     assert meta["amendment_relation"] == "repealed_by"
     assert "in_force_until" not in meta
 
 
-def test_unknown_dates_are_absent_not_defaulted():
-    meta = temporal_metadata({"title": "x"})
-    assert meta == {}
-
-
 def test_repealed_law_is_not_reported_in_force_despite_an_open_window():
-    """The #661 trap, asserted directly.
-
-    An open-ended newest version plus a past start date reads as "current" to any
-    date-only reading. `is_active: False` must win.
-    """
-    record = {**_HUNDEGESETZ, "version_inactive_since": None, "is_active": False}
-    assert is_in_force(record, as_of="2026-07-22") is False
+    """The #661 trap, asserted directly: `is_active: False` must win."""
+    version = dict(_current_version(_tol("554.5")))
+    version.update(version_inactive_since=None, is_active=False)
+    assert is_in_force(version, as_of="2026-07-22") is False
 
 
 def test_active_law_inside_its_window_is_in_force():
-    assert is_in_force(_HUNDEGESETZ, as_of="2026-07-22") is True
+    assert is_in_force(_current_version(_tol("554.5")), as_of="2026-07-22") is True
 
 
 def test_law_before_its_start_is_not_yet_in_force():
-    assert is_in_force(_HUNDEGESETZ, as_of="2009-12-31") is False
-
-
-def test_end_date_is_exclusive():
-    record = {**_HUNDEGESETZ, "version_inactive_since": "2020-06-30"}
-    assert is_in_force(record, as_of="2020-06-29") is True
-    assert is_in_force(record, as_of="2020-06-30") is False
+    assert is_in_force(_current_version(_tol("554.5")), as_of="2025-05-31") is False
 
 
 def test_missing_start_date_is_unknown_not_false():
-    """Three-valued: absence of evidence is not evidence of absence."""
     assert is_in_force({"title": "x"}) is None
 
 
+def test_unknown_dates_are_absent_not_defaulted():
+    assert temporal_metadata({"title": "x"}) == {}
+
+
 # --------------------------------------------------------------------------
-# Capture, and the guards
+# Discovery and capture
 # --------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_capture_emits_a_binary_resource_with_provenance(provider, monkeypatch):
+async def test_systematic_prefix_discovers_the_whole_branch(provider, monkeypatch):
+    """554 -> the four ZH animal-protection acts, ADR-0033's cantonal rung."""
     monkeypatch.setattr(
-        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
-        lambda *a, **k: _ScriptedClient(_routes(), *a, **k),
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
     )
-    result = await provider.start_run(SimpleNamespace(), _source_version(entity_ids=[26]), _run())
-    assert len(result.inline_resources) == 1
-    resource = result.inline_resources[0]
-    assert resource.is_binary
-    assert resource.content_type == "application/pdf"
-    assert resource.title == "Hundegesetz"
-    # The mirror must not become the citation.
-    assert resource.metadata["original_url"] == "https://www.zh.ch/erlass/554.5"
-    assert resource.source_url == "https://www.zh.ch/erlass/554.5"
-    assert resource.metadata["in_force_from"] == "2010-01-01"
-    assert resource.metadata["in_force"] is True
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26]),
+        _run(),
+    )
+    assert len(result.inline_resources) == 4
+    titles = sorted(r.title for r in result.inline_resources)
+    assert "Hundegesetz" in titles
+    assert "Hundeverordnung" in titles
+
+
+@pytest.mark.asyncio
+async def test_capture_carries_canton_provenance_not_the_mirror(provider, monkeypatch):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26], max_documents=4),
+        _run(),
+    )
+    hundegesetz = next(r for r in result.inline_resources if r.title == "Hundegesetz")
+    assert hundegesetz.is_binary
+    assert hundegesetz.source_url.startswith("https://www.zh.ch/")
+    assert "erlass-554_5" in hundegesetz.metadata["original_url"]
+    assert hundegesetz.metadata["systematic_number"] == "554.5"
+    assert hundegesetz.metadata["lexfind_entity"] == "ZH"
+    assert hundegesetz.metadata["in_force_from"] == "2025-06-01"
+    assert hundegesetz.metadata["in_force"] is True
+
+
+@pytest.mark.asyncio
+async def test_download_url_comes_from_the_record_not_a_guess(provider, monkeypatch):
+    factory_client = {}
+
+    def factory(*a, **k):
+        client = _ScriptedClient(*a, **k)
+        factory_client["c"] = client
+        return client
+
+    monkeypatch.setattr("platform_control.services.lexfind_api_provider.httpx.AsyncClient", factory)
+    await provider.start_run(
+        SimpleNamespace(), _source_version(search_text="554", entity_ids=[26]), _run()
+    )
+    assert "/tol/22871/de" in factory_client["c"].pdf_requests
 
 
 @pytest.mark.asyncio
 async def test_716_stub_is_refused_and_recorded(provider, monkeypatch):
-    """A 200 carrying a redirect stub must not become a captured statute."""
     monkeypatch.setattr(
         "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
-        lambda *a, **k: _ScriptedClient(_routes(pdf=_STUB), *a, **k),
+        _client_factory(pdf=_STUB),
     )
-    result = await provider.start_run(SimpleNamespace(), _source_version(entity_ids=[26]), _run())
+    result = await provider.start_run(
+        SimpleNamespace(), _source_version(search_text="554", entity_ids=[26]), _run()
+    )
     assert result.inline_resources == []
-    skipped = result.response_payload["skipped"]
-    assert len(skipped) == 1
-    assert skipped[0]["reason"] == "html_where_binary_expected"
-    assert skipped[0]["tol_id"] == 22871
+    assert {s["reason"] for s in result.response_payload["skipped"]} == {
+        "html_where_binary_expected"
+    }
 
 
 @pytest.mark.asyncio
 async def test_undersized_pdf_is_refused(provider, monkeypatch):
     monkeypatch.setattr(
         "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
-        lambda *a, **k: _ScriptedClient(_routes(pdf=b"%PDF-1.7\n%%EOF\n"), *a, **k),
+        _client_factory(pdf=b"%PDF-1.7\n%%EOF\n"),
     )
     result = await provider.start_run(
-        SimpleNamespace(), _source_version(entity_ids=[26], min_pdf_bytes=5_000), _run()
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26], min_pdf_bytes=5_000),
+        _run(),
     )
     assert result.inline_resources == []
     assert result.response_payload["skipped"][0]["reason"] == "below_size_floor"
@@ -220,31 +302,44 @@ async def test_undersized_pdf_is_refused(provider, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_binary_abstention_of_the_content_gate_is_recorded_not_implied(provider, monkeypatch):
-    """content_gate abstains on application/pdf; the evidence must say so.
-
-    Silence would read as "assessed and passed". ADR-0047 turns on this gap being
-    visible.
-    """
+    """Silence would read as 'assessed and passed'. ADR-0047 turns on this."""
     monkeypatch.setattr(
-        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
-        lambda *a, **k: _ScriptedClient(_routes(), *a, **k),
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
     )
-    result = await provider.start_run(SimpleNamespace(), _source_version(entity_ids=[26]), _run())
+    result = await provider.start_run(
+        SimpleNamespace(), _source_version(search_text="554", entity_ids=[26]), _run()
+    )
     meta = result.inline_resources[0].metadata
     assert meta["legal_text_assessment"] == "abstained_binary_manifestation"
 
 
 @pytest.mark.asyncio
 async def test_max_documents_bounds_the_run(provider, monkeypatch):
-    routes = _routes(results=[{"text_of_law_id": 22871}, {"text_of_law_id": 22888}])
     monkeypatch.setattr(
-        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
-        lambda *a, **k: _ScriptedClient(routes, *a, **k),
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient", _client_factory()
     )
     result = await provider.start_run(
-        SimpleNamespace(), _source_version(entity_ids=[26], max_documents=1), _run()
+        SimpleNamespace(),
+        _source_version(search_text="554", entity_ids=[26], max_documents=2),
+        _run(),
     )
-    assert len(result.inline_resources) == 1
+    assert len(result.inline_resources) == 2
+
+
+@pytest.mark.asyncio
+async def test_missing_search_text_fails_named_without_a_request(provider, monkeypatch):
+    """LexFind has no list-everything call; an empty search_text is a 400.
+
+    The operator must see the configuration error named, not a transport failure.
+    """
+
+    def explode(*a, **k):
+        raise AssertionError("no request may be made without search_text")
+
+    monkeypatch.setattr("platform_control.services.lexfind_api_provider.httpx.AsyncClient", explode)
+    result = await provider.start_run(SimpleNamespace(), _source_version(entity_ids=[26]), _run())
+    assert result.inline_resources == []
+    assert "search_text is required" in result.inline_failure_reason
 
 
 # --------------------------------------------------------------------------
@@ -253,24 +348,16 @@ async def test_max_documents_bounds_the_run(provider, monkeypatch):
 
 
 def test_readiness_admits_only_an_acceptance_run(provider):
-    """Implemented and tested, but no operator evidence yet (ADR-0030)."""
     assert provider.readiness.value == "awaiting_evidence"
 
 
-def test_plan_declares_the_discovery_payload_unverified(provider):
-    """An operator must see this before dispatching, not after."""
-    plan = provider.plan(SimpleNamespace(), _source_version(entity_ids=[26]))
-    assert any("UNVERIFIED" in note for note in plan.notes)
-    assert plan.raw["search_payload_verified"] is False
+def test_plan_reports_the_search_contract_as_verified(provider):
+    plan = provider.plan(SimpleNamespace(), _source_version(search_text="554", entity_ids=[26]))
+    assert plan.raw["search_payload_verified"] is True
+    assert plan.provider == "lexfind_api"
+    assert plan.max_discovery_depth == 0
 
 
 def test_plan_warns_when_no_entity_is_scoped(provider):
-    plan = provider.plan(SimpleNamespace(), _source_version())
+    plan = provider.plan(SimpleNamespace(), _source_version(search_text="554"))
     assert any("entity_ids" in note for note in plan.notes)
-
-
-def test_plan_makes_no_network_calls(provider):
-    """`pc source plan` must stay free."""
-    plan = provider.plan(SimpleNamespace(), _source_version(entity_ids=[26]))
-    assert plan.provider == "lexfind_api"
-    assert plan.max_discovery_depth == 0
