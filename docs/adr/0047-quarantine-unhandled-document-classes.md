@@ -1,4 +1,4 @@
-# ADR-0046: Quarantine — the corpus holds only documents whose class we have implemented
+# ADR-0047: Quarantine — the corpus holds only documents whose class we have implemented
 
 Status: Proposed
 Date: 2026-07-22
