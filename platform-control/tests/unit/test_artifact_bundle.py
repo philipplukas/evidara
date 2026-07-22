@@ -150,3 +150,42 @@ def test_build_bundle_extraction_hints_omits_unknown_ris_end_date() -> None:
 
     assert hints["in_force_from_hint"] == "2020-01-01"
     assert "in_force_until_hint" not in hints
+
+
+def test_build_bundle_extraction_hints_carries_a_communal_as_number() -> None:
+    """AS 554.510 is how a lawyer looks the Zürich ordinance up (#755).
+
+    The provider captured it all along; it had no hint key, so it stopped at the
+    bundle boundary. DI's artifact loader keeps only the body bytes, and the
+    number is stripped from the text as page furniture during marginalia removal,
+    so if it does not travel as a hint it is gone.
+    """
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={"as_number": "554.510", "title": "Vollzugsvorschriften"}
+    )
+    assert hints["official_citation_hint"] == "554.510"
+
+
+def test_build_bundle_extraction_hints_carries_a_cantonal_systematic_number() -> None:
+    """Same identifier, different provider vocabulary: LS 554.5 from lexfind_api."""
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={"systematic_number": "554.5", "title": "Hundegesetz"}
+    )
+    assert hints["official_citation_hint"] == "554.5"
+
+
+def test_build_bundle_extraction_hints_prefers_an_explicit_official_citation() -> None:
+    """A provider that already knows the full citation is not second-guessed."""
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "official_citation": "SR 455",
+            "systematic_number": "455",
+        }
+    )
+    assert hints["official_citation_hint"] == "SR 455"
+
+
+def test_build_bundle_extraction_hints_omits_an_absent_citation() -> None:
+    """Absent stays absent — an unknown citation must never be guessed."""
+    hints = build_bundle_extraction_hints(artifact_metadata={"title": "Some act"})
+    assert "official_citation_hint" not in hints

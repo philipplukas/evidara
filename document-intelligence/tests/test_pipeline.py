@@ -974,3 +974,41 @@ class CommentaryInsightPipelineTests(unittest.TestCase):
         finally:
             os.unlink(artifact_path)
             os.unlink(manifest_path)
+
+
+def test_official_citation_comes_from_the_acquisition_hint() -> None:
+    """A statute must be retrievable by its own citation (#755).
+
+    The index field and the projection both existed; the number never reached DI,
+    because `extraction_hints` had no key for it. It also cannot be recovered from
+    the body: marginalia removal strips it as page furniture.
+    """
+    citation = _resolve_official_citation(
+        {"extraction_hints": {"official_citation_hint": "554.510"}},
+        {},
+    )
+    assert citation == "554.510"
+
+
+def test_explicit_official_citation_outranks_the_hint() -> None:
+    citation = _resolve_official_citation(
+        {
+            "official_citation": "SR 455",
+            "extraction_hints": {"official_citation_hint": "455"},
+        },
+        {},
+    )
+    assert citation == "SR 455"
+
+
+def test_citation_hint_outranks_the_publication_organ() -> None:
+    """The hint identifies the act; the organ names the gazette it appeared in."""
+    citation = _resolve_official_citation(
+        {"extraction_hints": {"official_citation_hint": "554.5"}},
+        {"publication_organ": "Amtsblatt"},
+    )
+    assert citation == "554.5"
+
+
+def test_missing_citation_stays_none_rather_than_guessed() -> None:
+    assert _resolve_official_citation({"extraction_hints": {}}, {}) is None

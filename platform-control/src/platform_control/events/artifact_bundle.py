@@ -41,6 +41,24 @@ def build_bundle_extraction_hints(
         if value is not None:
             hints[hint_key] = value
 
+    # The official citation — the identifier a lawyer actually looks a statute up
+    # by. Every Swiss legislative act carries one and providers already capture
+    # it, under a different name per corpus: `as_number` for a communal Amtliche
+    # Sammlung, `systematic_number` for a cantonal/federal systematic collection.
+    #
+    # It had no hint key, so it stopped here: DI's artifact loader keeps only the
+    # body bytes, and `_resolve_official_citation` looked only for an explicit
+    # `official_citation` or a publication organ. The index field
+    # (`official_citation` on the documents mapping) and the projection that reads
+    # it BOTH already existed — this was the one missing link, which is why
+    # `q=554.510` returned nothing for a number printed on both pages of the PDF
+    # (#755).
+    for metadata_key in ("official_citation", "systematic_number", "as_number"):
+        value = _extract_metadata_string(artifact_metadata, metadata_key)
+        if value is not None:
+            hints["official_citation_hint"] = value
+            break
+
     if document_type_hint is not None:
         stripped = document_type_hint.strip()
         if stripped:
