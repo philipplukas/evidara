@@ -310,6 +310,7 @@ if [[ -n "${SOURCE_ID}" ]]; then
   log "    reusing source ${SOURCE_ID} — re-acquisition publishes the next revision"
   VERSION_PAYLOAD="$(jq -n \
     --arg version_label "${VERSION_LABEL}" \
+    --arg overlay_id "${OVERLAY_ID}" \
     --arg template_id "${TEMPLATE_ID}" '{
     version_label: $version_label,
     overlay_id: $overlay_id,
