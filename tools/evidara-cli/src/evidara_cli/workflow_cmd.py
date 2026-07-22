@@ -23,6 +23,7 @@ from evidara_cli.client import (
     request_json,
     request_status,
 )
+from evidara_cli.coverage import acceptance_evidence_verdict
 from evidara_cli.envelope import (
     build_envelope,
     evidence_assertion,
@@ -890,7 +891,14 @@ def run_evidence(
     human: Annotated[bool, typer.Option("--human", help="Pretty-print JSON")] = False,
     correlation_id: Annotated[str | None, typer.Option("--correlation-id")] = None,
 ) -> None:
-    """Collect evidence artifacts for a completed platform-control run."""
+    """Collect evidence artifacts for a completed platform-control run.
+
+    Also renders the **ADR-0030 acceptance verdict**: whether this run may be cited as
+    the acceptance evidence that justifies flipping a template's config key. The verdict
+    refuses a SHADOW-mode version outright — it replays cassettes and never reaches the
+    live portal, so it proves nothing about it (ADR-0030 §2) — as well as a refused run,
+    a non-acceptance mode, and a run that captured nothing.
+    """
     step = "run.evidence"
     inputs: dict[str, Any] = {"run_id": run_id}
     pc_base = platform_control_base_url()
@@ -948,6 +956,80 @@ def run_evidence(
                 )
             )
 
+        # Pipeline health names where the loop actually stopped: acquisition,
+        # document_intelligence, projection, search. Non-fatal if unavailable.
+        try:
+            health_payload = request_json(
+                "GET",
+                join_url(pc_base, f"/v1/runs/{run_id}/pipeline-health"),
+                headers=pc_headers,
+            )
+            if isinstance(health_payload, dict):
+                artifacts["pipeline_health"] = health_payload
+                ev.append(
+                    evidence_assertion(
+                        f"platform-control:/v1/runs/{run_id}/pipeline-health",
+                        value=health_payload.get("overall_status"),
+                        passed=health_payload.get("overall_status") not in ("blocked", "failed"),
+                        note=f"Pipeline overall status: {health_payload.get('overall_status')}",
+                    )
+                )
+        except HttpJsonError:
+            ev.append(
+                evidence_assertion(
+                    f"platform-control:/v1/runs/{run_id}/pipeline-health",
+                    value="unavailable",
+                    passed=True,
+                    note="Pipeline-health endpoint not available for this run.",
+                )
+            )
+
+        # ADR-0030 acceptance verdict. `execution_mode` lives on the source version, and
+        # there is no GET /v1/versions/{id}, so resolve it through the source's list.
+        execution_mode: str | None = None
+        source_id = run_payload.get("source_id") if isinstance(run_payload, dict) else None
+        version_id = run_payload.get("source_version_id") if isinstance(run_payload, dict) else None
+        if source_id and version_id:
+            try:
+                versions_payload = request_json(
+                    "GET",
+                    join_url(pc_base, f"/v1/sources/{source_id}/versions"),
+                    headers=pc_headers,
+                )
+                versions = (
+                    versions_payload.get("data", [])
+                    if isinstance(versions_payload, dict)
+                    else versions_payload or []
+                )
+                for version in versions:
+                    if isinstance(version, dict) and version.get("source_version_id") == version_id:
+                        execution_mode = version.get("execution_mode")
+                        break
+            except HttpJsonError:
+                execution_mode = None
+
+        verdict = acceptance_evidence_verdict(
+            run=run_payload if isinstance(run_payload, dict) else {},
+            execution_mode=execution_mode,
+            captured_resources_count=artifacts.get("captured_resource_count"),
+        )
+        artifacts["acceptance_verdict"] = verdict
+        ev.append(
+            evidence_assertion(
+                "adr-0030:acceptance-evidence",
+                value=verdict["is_acceptance_evidence"],
+                # Not a failure of the command: most runs are legitimately not
+                # acceptance evidence. Reported, never silently implied.
+                passed=True,
+                note=(
+                    "This run may be cited as ADR-0030 acceptance evidence."
+                    if verdict["is_acceptance_evidence"]
+                    else "REFUSED as acceptance evidence: "
+                    + "; ".join(r["code"] for r in verdict["refusals"])
+                ),
+            )
+        )
+
         all_passed = all(e.get("passed", True) for e in ev)
         envelope = build_envelope(
             ok=all_passed,
@@ -959,8 +1041,16 @@ def run_evidence(
             artifacts=artifacts,
             evidence=ev,
             decision={
-                "recommended_action": "verify",
-                "reason": "Evidence collected. Review artifacts before next step.",
+                "recommended_action": "flip-enablement"
+                if verdict["is_acceptance_evidence"]
+                else "verify",
+                "reason": (
+                    "Acceptance evidence captured. Read the harness's skipped-gate list "
+                    "before flipping `enabled: true` (ADR-0030 §5)."
+                    if verdict["is_acceptance_evidence"]
+                    else "Evidence collected, but this run is not ADR-0030 acceptance "
+                    "evidence. Review `acceptance_verdict.refusals`."
+                ),
             },
             next_actions=["verify", "inspect"],
             compensation={"available": False},
