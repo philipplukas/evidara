@@ -22,6 +22,7 @@ import {
   formatMessage,
   t,
 } from '../../../core/i18n';
+import { effectiveDateLabel } from '../../../core/presentation/effective-date';
 import {
   iconKeyForDocumentType,
   METADATA_ROW_ICONS,
@@ -226,10 +227,8 @@ export function composeMetadata(
     });
   }
   if (hit.effective_date) {
-    const label =
-      hit.document_type === 'decision' ? t('metadata.date', locale) : t('metadata.inForce', locale);
     rows.push({
-      label,
+      label: effectiveDateLabel(hit.document_type, locale),
       value: formatIsoDateDisplay(hit.effective_date),
       iconKey: METADATA_ROW_ICONS.calendar,
     });

@@ -11,7 +11,7 @@
   "counts.courtDecisions": "Décisions judiciaires",
   "counts.citations": "Citations",
 
-  "metadata.date": "Date",
+  "metadata.dateUnverified": "Date (non vérifiée)",
   "metadata.inForce": "En vigueur",
   "metadata.authority": "Autorité",
   "metadata.citation": "Citation officielle",
