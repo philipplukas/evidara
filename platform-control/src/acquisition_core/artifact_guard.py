@@ -1,27 +1,44 @@
 """Refuse captured bytes that are not the document they claim to be.
 
 Every provider that fetches a manifestation faces the same failure: the transport
-succeeds and the payload is not law. It has now bitten twice, differently:
+succeeds and the payload is not law. It has bitten twice, in ways that need
+*different* checks — which is why there are two gates here, not one.
 
 - **#631** — a ZH-Lex SPA served `200 text/html` for a statute URL, carrying the
-  application shell rather than the statute. A provider trusting the status code
-  captured a page with zero `§` in it and reported success.
-- **#716** — `OpenAttachment?…` returned `200` with a **142-byte JavaScript
-  redirect stub** where a PDF was expected. Same shape, different mechanism.
+  application shell rather than the statute. **This module cannot detect that**, and
+  is not trying to: a navigation shell is well-formed HTML with real visible text, so
+  it passes every byte-level check there is. It is caught by
+  :func:`acquisition_core.content_gate.assess_legal_text_density`, added by #635,
+  which counts legal-text markers and is inherited by every portal HTTP provider via
+  ``portal_http_provider_base.py``.
+- **#716** — `OpenAttachment?…` returned `200` with a **142-byte JavaScript redirect
+  stub** where a PDF was expected. `content_gate` cannot detect *this*: its
+  ``_ASSESSABLE_CONTENT_TYPES`` is HTML/XML only, so it abstains on binary bodies
+  rather than guessing. That abstention is correct, and it is the gap this module
+  fills.
 
-Neither is detectable from the HTTP status, which is why this module exists and why
+**Use both.** They answer different questions — "are these the bytes I asked for?"
+here, "does this text look like law?" there — and a provider fetching binary
+manifestations needs the first before the second is even meaningful. Neither
+subsumes the other, and this module must not grow a marker check of its own: the
+vocabulary and threshold live in `content_gate`, and two opinions about what law
+looks like is how they drift apart.
+
 #731 calls the guard non-negotiable: *"A provider that cannot tell a stub from a
 statute is worse than none."* Worse, because a silent stub capture reports coverage
 the corpus does not have — the confident fabrication ADR-0033 exists to prevent.
 
 **Scope, stated honestly.** This guard works on the *bytes as received*: declared
-content type, format magic number, and a size floor. That is sufficient to defeat
-both failures above, and it deliberately stops short of extracting text to assert a
-`§`/`Art.` marker floor. Extraction is document-intelligence's job (ADR-0041's
-layout-aware normaliser), and platform-control carries no PDF stack — adding one
-here would duplicate a capability that already exists one hop downstream. A valid
-PDF that is a cover sheet or an error page therefore passes this guard and must be
-caught by DI's gate; see #731's acceptance criteria.
+content type, format magic number, and a size floor. It defeats #716 and nothing
+more, by design.
+
+The gap the two gates together still leave: a **structurally valid PDF whose text is
+not law** — a cover sheet, an error page, a consent interstitial. `content_gate`
+abstains on `application/pdf`, and judging it needs extraction, which lives in
+document-intelligence (ADR-0041's layout-aware normaliser). platform-control carries
+no PDF stack, and adding one here would duplicate a capability one hop downstream —
+the parallel-copy pattern that produced #675 and #713. That case therefore belongs to
+DI's gate; see #731's acceptance criteria and ADR-0047.
 """
 
 from __future__ import annotations

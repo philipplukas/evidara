@@ -52,18 +52,40 @@ damaging instance, because coverage is what the corpus is *for*. A document that
 but empty reports coverage we do not have. For a human reader that is a confusing result;
 for an agent answering ADR-0033's dog question it is a citation to nothing.
 
-### Three failure classes, currently indistinguishable
+### What acquisition already guards, and what it cannot
 
-1. **Not the format at all** — #716's 142-byte JavaScript redirect stub served where a PDF
-   was expected; #631's SPA shell served as a statute. Detectable from the bytes.
+Two gates now exist at the acquisition layer, and they are complementary rather than
+overlapping. Stating the split precisely, because the first draft of this ADR got it wrong:
+
+- **`acquisition_core/content_gate.py`** — `assess_legal_text_density()`, added by #635 for
+  #631. Counts legal-text markers (`Art.`, `§`, `Abs.`, `comma`, `lett.`) in *visible* text
+  and requires at least 3. Wired into `portal_http_provider_base.py:120`, so every portal
+  HTTP provider inherits it. This is what catches a JavaScript navigation shell — an SPA
+  shell is valid HTML carrying real text, so **no byte-level check can detect it**.
+- **`acquisition_core/artifact_guard.py`** — declared content type, format magic number,
+  size floor. This catches #716's 142-byte redirect stub, which `content_gate` cannot:
+  `_ASSESSABLE_CONTENT_TYPES` is HTML/XML only, so it **abstains** on binary bodies.
+
+The gap that remains after both is narrower than it first appears, and it is precisely the
+one #731 names: **`content_gate` abstains on `application/pdf`.** A structurally valid PDF
+whose text is a cover page, an error page or a consent interstitial passes acquisition
+entirely, because the only gate that could judge it declines to look at that content type.
+
+### Three failure classes at the document layer
+
+1. **Not the format at all** — #716's redirect stub. Detectable from the bytes; handled by
+   `artifact_guard`.
 2. **Valid PDF, no text layer** — a scanned ordinance **or** an image-only stub. These are
    *not distinguishable from each other*, which is why "empty ⇒ reject" is wrong: it would
    discard legitimate scanned communal law, precisely the corpus #584 targets.
-3. **Valid document, text present, but not law** — a cover page, an error page, a
-   consent interstitial. Requires extraction to detect.
+3. **Valid document, text present, but not law** — for HTML this is `content_gate`'s job and
+   is done. **For PDF it is unguarded**, because assessing it requires extraction, and
+   extraction lives in document-intelligence (ADR-0041), not in acquisition.
 
-Class 1 is a transport concern and is being handled at acquisition
-(`acquisition_core/artifact_guard.py`). Classes 2 and 3 are semantic and belong here.
+Class 1 is a transport concern and is handled. Classes 2 and 3-for-PDF are semantic, need
+extraction, and are what this ADR is about. The marker vocabulary and threshold should be
+**reused from `content_gate`, not reimplemented** — the two must not drift into separate
+opinions about what law looks like.
 
 ### Why the DLQ does not already solve this
 
