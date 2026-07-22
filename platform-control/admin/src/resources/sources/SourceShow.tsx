@@ -155,7 +155,13 @@ export default function SourceShow() {
         <div className="flex flex-wrap items-center gap-1.5">
           <Pill level={sourceStatusToLevel(source.status)}>{statusMeta.label}</Pill>
           <Pill variant="meta">{`Type: ${source.source_type}`}</Pill>
-          <Pill variant="meta">{`Family: ${source.document_family ?? "none"}`}</Pill>
+          {/*
+            One record, one placeholder. This pill said "Family: none" while the
+            `Document family` cell in the grid below said "—" for the same field
+            on the same page (#674). "—" is the convention everywhere else in the
+            admin, so the header follows it rather than the reverse.
+          */}
+          <Pill variant="meta">{`Family: ${source.document_family ?? "—"}`}</Pill>
         </div>
       </header>
 

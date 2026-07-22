@@ -12,7 +12,7 @@ import { render, waitFor } from "@testing-library/react";
 import { CoreAdminContext, testDataProvider } from "ra-core";
 import { describe, expect, it } from "vitest";
 import type { CorrectionRecord } from "../../lib/admin/dataProvider";
-import { CorrectionsList } from "./CorrectionsList";
+import { CorrectionsList, describeActiveCorrectionFilters } from "./CorrectionsList";
 
 const corrections: CorrectionRecord[] = [
   {
@@ -61,5 +61,31 @@ describe("CorrectionsList", () => {
 
     expect(container.textContent).toContain("pending");
     expect(container.textContent).toContain("Claim contradicted the cited article.");
+  });
+});
+
+/**
+ * #674: the queue defaults to `status=pending`, so "No corrections match the
+ * current filter." was equally true of an empty database and of a database full
+ * of applied corrections. The empty state now names the filters in force, which
+ * is what makes the two distinguishable.
+ */
+describe("describeActiveCorrectionFilters", () => {
+  it("names nothing when no filter is applied", () => {
+    expect(describeActiveCorrectionFilters({})).toEqual([]);
+  });
+
+  it("names the default pending filter with its preset label", () => {
+    expect(describeActiveCorrectionFilters({ status: "pending" })).toEqual(["status: Pending"]);
+  });
+
+  it("names every applied filter", () => {
+    expect(
+      describeActiveCorrectionFilters({
+        status: "applied",
+        correction_type: "rescore_request",
+        target_entity_type: "commentary_insight",
+      }),
+    ).toEqual(["status: Applied", "type: Rescore request", "target: Commentary insight"]);
   });
 });

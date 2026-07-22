@@ -105,4 +105,15 @@ describe("admin shell responsive grid", () => {
     expect(appBar).toContain("lg:flex-row");
     expect(appBar).not.toContain("md:flex-row");
   });
+
+  it("paints the page gradient once instead of tiling it every viewport height", () => {
+    // `background-attachment: fixed` sizes the gradient to the viewport, but the
+    // `background` shorthand resets `background-repeat` to `repeat` — so every
+    // page taller than the window restarted the gradient with a hard seam at
+    // exactly one viewport height (#674). Both declarations are load-bearing;
+    // dropping either brings the seam back.
+    const bodyRule = globalsCss.match(/\nbody \{[\s\S]*?\n\}/g)?.join("\n") ?? "";
+    expect(bodyRule).toContain("background-attachment: fixed");
+    expect(bodyRule).toContain("background-repeat: no-repeat");
+  });
 });

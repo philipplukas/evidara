@@ -18,7 +18,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CorrectionRecord } from "../../lib/admin/dataProvider";
 import { formatSwissDateTime } from "../../lib/format/date";
-import { DataTable, type DataTableColumn, Pill, type PillLevel } from "../../ui/primitives";
+import { Button, DataTable, type DataTableColumn, Pill, type PillLevel } from "../../ui/primitives";
 
 type CorrectionStatus = CorrectionRecord["status"];
 type CorrectionFilterValues = Partial<
@@ -51,6 +51,34 @@ const TARGET_PRESETS: Array<{ key: CorrectionRecord["target_entity_type"]; label
   { key: "document", label: "Document" },
   { key: "commentary_insight", label: "Commentary insight" },
 ];
+
+/**
+ * The active filters, named the way the preset bar names them.
+ *
+ * The queue defaults to `status=pending`, so its empty state read "No
+ * corrections match the current filter." — which an operator cannot tell apart
+ * from "no corrections exist" (#674). Naming the filters that are actually
+ * applied makes the distinction readable, and an empty result gets the
+ * "Show all corrections" escape hatch that an unfiltered empty result does not
+ * need.
+ *
+ * Pure on purpose: the labels are the assertable part, so they are unit-tested
+ * without rendering the list.
+ */
+export const describeActiveCorrectionFilters = (filters: CorrectionFilterValues): string[] => {
+  const labelOf = <T extends string>(presets: Array<{ key: T; label: string }>, key: T) =>
+    presets.find((preset) => preset.key === key)?.label ?? key;
+
+  const active: string[] = [];
+  if (filters.status) active.push(`status: ${labelOf(STATUS_PRESETS, filters.status)}`);
+  if (filters.correction_type) {
+    active.push(`type: ${labelOf(TYPE_PRESETS, filters.correction_type)}`);
+  }
+  if (filters.target_entity_type) {
+    active.push(`target: ${labelOf(TARGET_PRESETS, filters.target_entity_type)}`);
+  }
+  return active;
+};
 
 interface PresetButtonProps {
   isActive: boolean;
@@ -88,6 +116,23 @@ export function CorrectionsList() {
 
   const setFilter = (patch: CorrectionFilterValues) =>
     controller.setFilters({ ...filterValues, ...patch }, undefined, false);
+
+  const activeFilters = describeActiveCorrectionFilters(filterValues);
+  const emptyState =
+    activeFilters.length > 0 ? (
+      <div className="flex flex-col items-center gap-2">
+        <span>{`No corrections match ${activeFilters.join(" · ")}.`}</span>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => controller.setFilters({}, undefined, false)}
+        >
+          Show all corrections
+        </Button>
+      </div>
+    ) : (
+      "No corrections exist yet."
+    );
 
   const columns: DataTableColumn<CorrectionRecord>[] = useMemo(
     () => [
@@ -242,7 +287,7 @@ export function CorrectionsList() {
             page={controller.page}
             perPage={controller.perPage}
             onPageChange={controller.setPage}
-            empty="No corrections match the current filter."
+            empty={emptyState}
             caption={
               controller.total !== undefined
                 ? `${controller.total} correction${controller.total === 1 ? "" : "s"}`
