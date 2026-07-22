@@ -6,7 +6,12 @@ Repo-wide conventions live in `AGENTS.md` (imported above). This file only adds 
 
 ### Planning anchor
 
-The current anchor is **issue #628 — M13: prove the coverage loop**. It executes
+**#628 (M13) closed 2026-07-19** and has no successor planning issue. Do not scope work against
+it — read its closing comments for what iterations 1 and 2 measured, then work the live issues
+below. (This file pointed at #628 as "the current anchor" until 2026-07-22, three days after it
+closed; if you were briefed from a stale pointer, that is why.)
+
+The programme is unchanged and still executes
 [ADR-0033](docs/adr/0033-agentic-legal-reasoning.md) (Accepted): the bet is that a thorough data
 platform for law makes AI use cases easy, so the deliverable is the **loop** — blueprint → source
 version → acceptance run → evidence → `enabled: true` → approval — not the corpus, which is its
@@ -16,10 +21,21 @@ Acceptance test: ADR-0033's dog question, answered over a corpus **assembled thr
 — or refused correctly because the ordinance is not in it.
 
 ADR-0033 §4 is a standing guardrail: **do not build the MCP server first.** Its build order is
-dependency-forced, and #628 tracks which steps are done.
+dependency-forced; #628's closing comments track which steps were done.
+
+**Current lead: #731 — the LexFind provider** (26 cantons + Bund behind one unauthenticated JSON
+API). It carries the cantonal rung of the dog question — `tol/22871` is the ZH Hundegesetz, md5-identical
+to the canton's own PDF — and its `version_inactive_since` field models repeal separately from
+consolidation date, which is what the #661 trap needed.
+
+It was prioritised above the municipal rung (#736, #584) on measured evidence, not preference: the
+2026-07-22 full survey of all 2,110 Swiss communes found platform clustering covers only ~5% of the
+registry, and that share did not improve as coverage went from 61% to 100%. #736's premise — that
+clustering turns ~2,110 units into ~15 — is not currently supported. #731 is the same scaling
+question an order of magnitude cheaper, against a homogeneous source.
 
 The predecessor M1–M6 roadmap (#279) closed 2026-04-20. When opening new work, prefer
-`/issue-execute <number>` if a ticket exists; otherwise scope inline against #628.
+`/issue-execute <number>` if a ticket exists; otherwise scope inline against ADR-0033's build order.
 
 ### Per-surface quality gates
 
