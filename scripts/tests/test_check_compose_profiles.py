@@ -85,14 +85,14 @@ class EvaluateTests(unittest.TestCase):
 
 class RepositoryTests(unittest.TestCase):
     def test_repository_compose_profiles_all_resolve(self) -> None:
-        defined, references = MODULE.collect(REPO_ROOT)
+        defined, _documents, references = MODULE.collect(REPO_ROOT)
 
         self.assertEqual(MODULE.evaluate(defined, references), [])
 
     def test_lean_stack_profile_is_wired_up(self) -> None:
         # Regression guard: scripts/dev-lean-search-stack.sh and the lean setup doc
         # shipped against a `lean-stack` profile that no compose file defined.
-        defined, _ = MODULE.collect(REPO_ROOT)
+        defined, _documents, _references = MODULE.collect(REPO_ROOT)
 
         self.assertIn("lean-stack", defined)
         self.assertIn("lean", defined)

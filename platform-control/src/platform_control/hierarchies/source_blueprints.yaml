@@ -474,7 +474,7 @@ overlays:
       # engineer (#743); flip `enabled` from the admin panel with the evidence
       # attached, not from this file.
       # ───────────────────────────────────────────────────────────────
-      lexfind_zh_tierschutz:
+      lexfind_api_zh_tierschutz:
         provider: lexfind_api
         search_text: "554"
         entity_ids: [26]           # ZH

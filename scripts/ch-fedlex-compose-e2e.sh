@@ -13,7 +13,18 @@ set -euo pipefail
 # started by:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.local.yml \
-#     --profile apps --profile nats --profile minio up -d --wait
+#     --profile apps --profile nats --profile minio --profile search up -d --wait
+#
+# `--profile search` is REQUIRED and was missing here until 2026-07-22. OpenSearch
+# declares `profiles: [search, full, lean-stack]`, and `legal-search-api` (profile
+# `apps`) depends on it, so without it compose refuses the whole project:
+#
+#   service "legal-search-api" depends on undefined service "opensearch":
+#   invalid compose project
+#
+# Nothing starts at all, so the failure is loud rather than silent — but the
+# command as documented could never have worked, which means nobody had run this
+# harness from its own instructions.
 #
 # with PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats and
 # PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 so the real publish + projection path
