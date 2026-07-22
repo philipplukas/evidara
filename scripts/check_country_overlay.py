@@ -64,6 +64,7 @@ _SUPPORTED_PROVIDERS = {
     "bundesland_http",
     "regione_http",
     "canton_http",
+    "lexfind_api",
     "gemeinde_http",
     "legifrance",
     "ch_court_decisions",
@@ -112,6 +113,20 @@ def _validate_template(
         ):
             return [
                 f"Overlay '{overlay_id}' template '{template_id}' {provider} requires seed_url or seed_urls."
+            ]
+        return []
+
+    # LexFind (#731) is API-driven, so it has no seed URLs at all. What it needs
+    # instead is a non-empty `search_text`: the API rejects an empty search with
+    # 400 and offers no list-everything call, so a template without one is
+    # inert. Checked here as well as in `LexFindAcquisitionSpec` because this
+    # gate runs against the YAML without importing platform-control.
+    if provider == "lexfind_api":
+        if not _has_nonempty_str(payload.get("search_text")):
+            return [
+                f"Overlay '{overlay_id}' template '{template_id}' lexfind_api requires "
+                "a non-empty search_text (the API has no list-everything call; use a "
+                "systematic-number prefix such as '554')."
             ]
         return []
 

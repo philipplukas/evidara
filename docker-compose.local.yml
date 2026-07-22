@@ -160,7 +160,8 @@ services:
   # profile; the default `apps` stack still runs with the noop publisher. To exercise the
   # real publish path:
   #   PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats \
-  #     docker compose -f docker-compose.local.yml --profile apps --profile nats up
+  #     docker compose -f docker-compose.yml -f docker-compose.local.yml \
+  #       --profile apps --profile nats --profile search up
   nats:
     image: nats:2.10-alpine
     profiles: ["nats"]
@@ -297,7 +298,8 @@ services:
   # `minio` profile; the default stack still uses the local artifact store. To exercise
   # the S3 path:
   #   PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 \
-  #     docker compose -f docker-compose.local.yml --profile apps --profile minio up
+  #     docker compose -f docker-compose.yml -f docker-compose.local.yml \
+  #       --profile apps --profile minio --profile search up
   # The raw-artifacts bucket is created in-process, just before `minio server` execs,
   # rather than by a companion one-shot container. A one-shot `minio-init` used to do
   # this, but nothing in the `minio` profile could depend on it with

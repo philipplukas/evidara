@@ -1,0 +1,261 @@
+{
+    "id": 842127,
+    "session_id": "036d42d80f4b2fba12ee638c1e89f5",
+    "created_at": "22.07.2026",
+    "result_lang": "de",
+    "results_per_page": 100,
+    "number_of_pages": 1,
+    "page_number": 1,
+    "allow_forwarding": false,
+    "search_parameters": {
+        "search_text": "554",
+        "active_only": true,
+        "search_in_systematic_number": true,
+        "search_in_title": false,
+        "search_in_keywords": false,
+        "search_in_content": false,
+        "entity_filter": [
+            26
+        ],
+        "systematic_filter": [],
+        "category_filter": [],
+        "use_global_systematics": false,
+        "direct_search": false
+    },
+    "results": [
+        {
+            "language": "de",
+            "language_full": "Deutsch",
+            "number_of_results": 4
+        },
+        {
+            "language": "fr",
+            "language_full": "Franz\u00f6sisch",
+            "number_of_results": 0
+        },
+        {
+            "language": "it",
+            "language_full": "Italienisch",
+            "number_of_results": 0
+        },
+        {
+            "language": "rm",
+            "language_full": "R\u00e4toromanisch",
+            "number_of_results": 0
+        }
+    ],
+    "texts_of_law_with_matches": [
+        {
+            "id": 22888,
+            "systematic_number": "554.51",
+            "systematic_number_hl": "<span class=\"match\">554</span>.51",
+            "is_active": true,
+            "dta_urls": [
+                {
+                    "language": "de",
+                    "url": "/tol/22888/de",
+                    "file_size": 180129,
+                    "original_url": "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung/zhlex-ls/erlass-554_51-2009_11_25-2010_01_01-129.html"
+                }
+            ],
+            "entity": {
+                "id": 26,
+                "abbreviation": "ZH",
+                "name": "Z\u00fcrich",
+                "icon_endpoint": "/api/fe/entities/26/icon",
+                "image_endpoint": "/api/fe/entities/26/image"
+            },
+            "matches": [
+                {
+                    "title_hl": "Hundeverordnung",
+                    "keywords_hl": "HuV",
+                    "snippet": null,
+                    "dtah_urls": [
+                        {
+                            "language": "de",
+                            "url": "/tolv/253109/de",
+                            "file_size": 180129
+                        }
+                    ],
+                    "id": 253109,
+                    "title": "Hundeverordnung",
+                    "keywords": "HuV",
+                    "info_badge": "current",
+                    "info_badge_date": null,
+                    "type": "version",
+                    "continuation_type": null,
+                    "previous_type": "revised",
+                    "version_active_since": "01.06.2025",
+                    "family_active_since": "25.11.2009",
+                    "version_inactive_since": null,
+                    "version_found_at": "01.06.2025",
+                    "is_active": true,
+                    "category": {
+                        "id": 6,
+                        "name": "Verordnung"
+                    }
+                }
+            ],
+            "total_match_count": 1
+        },
+        {
+            "id": 22871,
+            "systematic_number": "554.5",
+            "systematic_number_hl": "<span class=\"match\">554</span>.5",
+            "is_active": true,
+            "dta_urls": [
+                {
+                    "language": "de",
+                    "url": "/tol/22871/de",
+                    "file_size": 84740,
+                    "original_url": "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung/zhlex-ls/erlass-554_5-2008_04_14-2010_01_01-129.html"
+                }
+            ],
+            "entity": {
+                "id": 26,
+                "abbreviation": "ZH",
+                "name": "Z\u00fcrich",
+                "icon_endpoint": "/api/fe/entities/26/icon",
+                "image_endpoint": "/api/fe/entities/26/image"
+            },
+            "matches": [
+                {
+                    "title_hl": "Hundegesetz",
+                    "keywords_hl": "HuG",
+                    "snippet": null,
+                    "dtah_urls": [
+                        {
+                            "language": "de",
+                            "url": "/tolv/253107/de",
+                            "file_size": 84740
+                        }
+                    ],
+                    "id": 253107,
+                    "title": "Hundegesetz",
+                    "keywords": "HuG",
+                    "info_badge": "current",
+                    "info_badge_date": null,
+                    "type": "version",
+                    "continuation_type": null,
+                    "previous_type": "revised",
+                    "version_active_since": "01.06.2025",
+                    "family_active_since": "14.04.2008",
+                    "version_inactive_since": null,
+                    "version_found_at": "01.06.2025",
+                    "is_active": true,
+                    "category": {
+                        "id": 4,
+                        "name": "Gesetz"
+                    }
+                }
+            ],
+            "total_match_count": 1
+        },
+        {
+            "id": 21954,
+            "systematic_number": "554.11",
+            "systematic_number_hl": "<span class=\"match\">554</span>.11",
+            "is_active": true,
+            "dta_urls": [
+                {
+                    "language": "de",
+                    "url": "/tol/21954/de",
+                    "file_size": 101782,
+                    "original_url": "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung/zhlex-ls/erlass-554_11-1992_03_11-1992_04_01-101.html"
+                }
+            ],
+            "entity": {
+                "id": 26,
+                "abbreviation": "ZH",
+                "name": "Z\u00fcrich",
+                "icon_endpoint": "/api/fe/entities/26/icon",
+                "image_endpoint": "/api/fe/entities/26/image"
+            },
+            "matches": [
+                {
+                    "title_hl": "Kantonale Tierschutzverordnung",
+                    "keywords_hl": "KTSchV",
+                    "snippet": null,
+                    "dtah_urls": [
+                        {
+                            "language": "de",
+                            "url": "/tolv/121460/de",
+                            "file_size": 101782
+                        }
+                    ],
+                    "id": 121460,
+                    "title": "Kantonale Tierschutzverordnung",
+                    "keywords": "KTSchV",
+                    "info_badge": "current",
+                    "info_badge_date": null,
+                    "type": "formless",
+                    "continuation_type": null,
+                    "previous_type": "formless",
+                    "version_active_since": "01.06.2018",
+                    "family_active_since": "11.03.1992",
+                    "version_inactive_since": null,
+                    "version_found_at": "05.07.2018",
+                    "is_active": true,
+                    "category": {
+                        "id": 6,
+                        "name": "Verordnung"
+                    }
+                }
+            ],
+            "total_match_count": 1
+        },
+        {
+            "id": 22765,
+            "systematic_number": "554.1",
+            "systematic_number_hl": "<span class=\"match\">554</span>.1",
+            "is_active": true,
+            "dta_urls": [
+                {
+                    "language": "de",
+                    "url": "/tol/22765/de",
+                    "file_size": 89368,
+                    "original_url": "https://www.zh.ch/de/politik-staat/gesetze-beschluesse/gesetzessammlung/zhlex-ls/erlass-554_1-1991_06_02-1992_04_01-101.html"
+                }
+            ],
+            "entity": {
+                "id": 26,
+                "abbreviation": "ZH",
+                "name": "Z\u00fcrich",
+                "icon_endpoint": "/api/fe/entities/26/icon",
+                "image_endpoint": "/api/fe/entities/26/image"
+            },
+            "matches": [
+                {
+                    "title_hl": "Kantonales Tierschutzgesetz",
+                    "keywords_hl": null,
+                    "snippet": null,
+                    "dtah_urls": [
+                        {
+                            "language": "de",
+                            "url": "/tolv/127445/de",
+                            "file_size": 89368
+                        }
+                    ],
+                    "id": 127445,
+                    "title": "Kantonales Tierschutzgesetz",
+                    "keywords": null,
+                    "info_badge": "current",
+                    "info_badge_date": null,
+                    "type": "version",
+                    "continuation_type": null,
+                    "previous_type": "revised",
+                    "version_active_since": "01.06.2018",
+                    "family_active_since": "02.06.1991",
+                    "version_inactive_since": null,
+                    "version_found_at": "02.06.2018",
+                    "is_active": true,
+                    "category": {
+                        "id": 4,
+                        "name": "Gesetz"
+                    }
+                }
+            ],
+            "total_match_count": 1
+        }
+    ]
+}

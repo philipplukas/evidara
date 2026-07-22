@@ -181,6 +181,31 @@ class CantonHttpAcquisitionSpec(BaseAcquisitionSpec):
         return self
 
 
+class LexFindAcquisitionSpec(BaseAcquisitionSpec):
+    provider: Literal[AcquisitionProvider.LEXFIND_API] = AcquisitionProvider.LEXFIND_API
+    # LexFind has NO list-everything call: `search_text` is required by the API
+    # and an empty string is a 400 (verified live 2026-07-22). Discovery is
+    # therefore always a query, and the enumeration strategy is a systematic
+    # number prefix -- "554" scoped to entity 26 returns the whole ZH
+    # animal-protection branch. Required here, with a min_length, so a template
+    # that would be refused by the API is refused at config time instead.
+    search_text: str = Field(min_length=1)
+    # LexFind's own entity ids, not ISO codes: 26 = Zürich. There are 28
+    # (26 cantons + Bund + a federal-court entity); an empty list means every
+    # entity, which is legal but almost never intended.
+    entity_ids: list[int] = Field(default_factory=list)
+    category_ids: list[int] = Field(default_factory=list)
+    language: LanguageCode = "de"
+    results_per_page: int = Field(default=50, ge=1, le=100)
+    max_pages: int = Field(default=40, ge=1, le=200)
+    max_documents: int = Field(default=0, ge=0)
+    # Floor for the capture guard. The smallest real cantonal act measured was
+    # 84 740 bytes (Hundegesetz, 33 pages); this sits far below it so a short
+    # ordinance is not refused, while #716's 142-byte stub cannot pass.
+    min_pdf_bytes: int = Field(default=2000, ge=0)
+    request_timeout_seconds: float = Field(default=20.0, gt=0)
+
+
 class GemeindeHttpAcquisitionSpec(BaseAcquisitionSpec):
     provider: Literal[AcquisitionProvider.GEMEINDE_HTTP] = AcquisitionProvider.GEMEINDE_HTTP
     # Swiss municipalities have NO ISO 3166-2 code (that standard stops at the
@@ -239,6 +264,7 @@ AcquisitionSpec = Annotated[
     | EurLexSparqlAcquisitionSpec
     | ChCourtDecisionsAcquisitionSpec
     | CantonHttpAcquisitionSpec
+    | LexFindAcquisitionSpec
     | GemeindeHttpAcquisitionSpec
     | BundeslandHttpAcquisitionSpec
     | RegioneHttpAcquisitionSpec,

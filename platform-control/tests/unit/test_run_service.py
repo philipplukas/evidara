@@ -342,6 +342,65 @@ async def test_get_run_readiness_rejects_empty_legifrance_code_ids(session) -> N
 
 
 @pytest.mark.asyncio
+async def test_get_run_readiness_accepts_lexfind_search_text_without_seeds(session) -> None:
+    """A query-driven provider must not be refused for lacking seed URLs.
+
+    LexFind has no list-everything call — its API rejects an empty search with
+    400 — so `search_text` is the entire discovery surface and there is no seed
+    URL to give. Readiness that only knows how to look for seeds refuses a
+    correctly-configured source and tells the operator to add a field the
+    provider does not take. That is #706 repeating, and it blocked the first
+    ZH cantonal acceptance run (#731).
+    """
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {
+        "provider": "lexfind_api",
+        "search_text": "554",
+        "entity_ids": [26],
+    }
+    await session.commit()
+    run_service = RunService(session, StubProvider())
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    seed_check = next(
+        check for check in readiness.checks if check.code == "acquisition_seed_present"
+    )
+    assert readiness.ready is True
+    assert seed_check.ok is True
+
+
+@pytest.mark.asyncio
+async def test_get_run_readiness_rejects_lexfind_without_search_text(session) -> None:
+    """And the refusal must name the field that provider actually needs."""
+    source, version, source_service = await _seed_source_version(session)
+    await source_service.approve_source_version(version.source_version_id)
+    version.acquisition_spec = {"provider": "lexfind_api", "entity_ids": [26]}
+    await session.commit()
+    run_service = RunService(session, StubProvider())
+
+    readiness = await run_service.get_run_readiness(
+        source_id=source.source_id,
+        source_version_id=version.source_version_id,
+        mode=RunMode.PRODUCTION,
+    )
+
+    seed_check = next(
+        check for check in readiness.checks if check.code == "acquisition_seed_present"
+    )
+    assert readiness.ready is False
+    assert seed_check.ok is False
+    assert "search_text" in seed_check.detail
+    # The old message would have sent the operator looking for a seed URL.
+    assert "seed_url" not in seed_check.detail.split("Seed URLs are not used")[0]
+
+
+@pytest.mark.asyncio
 async def test_overlay_template_source_version_passes_readiness_checks(session) -> None:
     session.add(Jurisdiction(jurisdiction_id="jur_at", name="Austria", slug="at"))
     session.add(

@@ -94,6 +94,17 @@ class PendingDispatchPublications:
     run_id: str | None = None
 
 
+# Providers whose discovery is a QUERY rather than a URL, mapped to the spec field
+# that actually carries it. Used by the `acquisition_seed_present` readiness check
+# so an API-driven source is not refused for lacking seeds it does not take.
+#
+# `lexfind_api` has no list-everything call at all: its API rejects an empty
+# search with 400, so `search_text` is the entire discovery surface (#731).
+_QUERY_DISCOVERY_KEY_BY_PROVIDER: dict[str, str] = {
+    "lexfind_api": "search_text",
+}
+
+
 class RunService:
     _ASYNC_PROVIDER_NAMES = frozenset({"ris_ogd"})
     _DECISION_PATTERN = re.compile(
@@ -1003,30 +1014,53 @@ class RunService:
                 else []
             )
             normalized_base_url = base_url.strip() if isinstance(base_url, str) else ""
+            provider_name = acquisition_spec.get("provider")
             normalized_code_ids = (
                 [
                     code_id.strip()
                     for code_id in code_ids
                     if isinstance(code_id, str) and code_id.strip()
                 ]
-                if acquisition_spec.get("provider") == "legifrance" and isinstance(code_ids, list)
+                if provider_name == "legifrance" and isinstance(code_ids, list)
                 else []
             )
+            # Not every provider discovers from a URL. Readiness that only knows
+            # how to look for seeds refuses a correctly-configured source and
+            # tells the operator to add a field their provider does not take —
+            # that is #706, where readiness demanded seeds the platform's own
+            # blueprint emits empty. Each entry names the field that provider
+            # actually needs, and the refusal message says so.
+            #
+            # This is the second such provider. A third should stop the table
+            # growing and ask the provider itself: `ProviderPlan` already
+            # reports what a run would execute without touching the network.
+            discovery_key = _QUERY_DISCOVERY_KEY_BY_PROVIDER.get(provider_name or "")
+            normalized_discovery_value = ""
+            if discovery_key:
+                raw = acquisition_spec.get(discovery_key)
+                normalized_discovery_value = raw.strip() if isinstance(raw, str) else ""
+
             has_seed = bool(
                 normalized_seed_url
                 or normalized_seed_urls
                 or normalized_base_url
                 or normalized_code_ids
+                or normalized_discovery_value
             )
-            seed_detail = (
-                "Acquisition spec has at least one seed, base URL, or provider-specific seed."
-                if has_seed
-                else (
-                    "Legifrance acquisition spec must define code_ids."
-                    if acquisition_spec.get("provider") == "legifrance"
-                    else "Acquisition spec must define seed_url, seed_urls, or base_url."
+            if has_seed:
+                seed_detail = (
+                    "Acquisition spec has at least one seed, base URL, or provider-specific seed."
                 )
-            )
+            elif provider_name == "legifrance":
+                seed_detail = "Legifrance acquisition spec must define code_ids."
+            elif discovery_key:
+                seed_detail = (
+                    f"Provider '{provider_name}' discovers by query, not by URL: its "
+                    f"acquisition spec must define a non-empty '{discovery_key}'. "
+                    "Seed URLs are not used and will not satisfy this check."
+                )
+            else:
+                seed_detail = "Acquisition spec must define seed_url, seed_urls, or base_url."
         checks.append(
             RunReadinessCheck(
                 code="acquisition_seed_present",

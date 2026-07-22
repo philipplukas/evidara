@@ -2007,7 +2007,7 @@ export interface components {
             /** Version Label */
             version_label: string;
             /** Acquisition Spec */
-            acquisition_spec?: (components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"]) | null;
+            acquisition_spec?: (components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["LexFindAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"]) | null;
             /** Overlay Id */
             overlay_id?: string | null;
             /** Provider Template Id */
@@ -2620,6 +2620,89 @@ export interface components {
              * @default 25
              */
             page_size: number;
+        };
+        /** LexFindAcquisitionSpec */
+        LexFindAcquisitionSpec: {
+            /**
+             * Tenant Id
+             * @default tenant_public
+             */
+            tenant_id: string;
+            /**
+             * Corpus Id
+             * @default corpus_public_default
+             */
+            corpus_id: string;
+            /**
+             * Scope Type
+             * @default global_public
+             * @enum {string}
+             */
+            scope_type: "global_public" | "tenant_private" | "tenant_shared";
+            /**
+             * Source Origin Kind
+             * @default official_primary
+             * @enum {string}
+             */
+            source_origin_kind: "official_primary" | "official_mirror" | "licensed_provider" | "community_curated" | "tenant_internal";
+            /**
+             * Trust Tier
+             * @default authoritative
+             * @enum {string}
+             */
+            trust_tier: "authoritative" | "preferred" | "supplemental" | "untrusted";
+            /** Language Codes */
+            language_codes?: string[];
+            /** Document Type Hint */
+            document_type_hint?: string | null;
+            /**
+             * Request Timeout Seconds
+             * @default 20
+             */
+            request_timeout_seconds: number;
+            /** User Agent */
+            user_agent?: string | null;
+            /**
+             * Max Content Bytes
+             * @default 2000000
+             */
+            max_content_bytes: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            provider: "lexfind_api";
+            /** Search Text */
+            search_text: string;
+            /** Entity Ids */
+            entity_ids?: number[];
+            /** Category Ids */
+            category_ids?: number[];
+            /**
+             * Language
+             * @default de
+             */
+            language: string;
+            /**
+             * Results Per Page
+             * @default 50
+             */
+            results_per_page: number;
+            /**
+             * Max Pages
+             * @default 40
+             */
+            max_pages: number;
+            /**
+             * Max Documents
+             * @default 0
+             */
+            max_documents: number;
+            /**
+             * Min Pdf Bytes
+             * @default 2000
+             */
+            min_pdf_bytes: number;
         };
         /** OperatorThroughputEntry */
         OperatorThroughputEntry: {
@@ -3352,7 +3435,7 @@ export interface components {
             /** Provider Template Id */
             provider_template_id: string;
             /** Acquisition Spec */
-            acquisition_spec: components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"];
+            acquisition_spec: components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["LexFindAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"];
             /**
              * Enabled
              * @description Effective ADR-0030 config key: DB override an operator flipped, else the shipped source_blueprints.yaml default (fail-closed).
@@ -3516,7 +3599,7 @@ export interface components {
             status: components["schemas"]["SourceVersionStatus"];
             execution_mode: components["schemas"]["ExecutionMode"];
             /** Acquisition Spec */
-            acquisition_spec: components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"];
+            acquisition_spec: components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["LexFindAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"];
             /**
              * Created At
              * Format: date-time
@@ -3667,7 +3750,7 @@ export interface components {
             /** Version Label */
             version_label?: string | null;
             /** Acquisition Spec */
-            acquisition_spec?: (components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"]) | null;
+            acquisition_spec?: (components["schemas"]["FirecrawlAcquisitionSpec"] | components["schemas"]["DeterministicHttpAcquisitionSpec"] | components["schemas"]["FedlexSparqlAcquisitionSpec"] | components["schemas"]["RisOgdAcquisitionSpec"] | components["schemas"]["LegifranceAcquisitionSpec"] | components["schemas"]["EurLexSparqlAcquisitionSpec"] | components["schemas"]["ChCourtDecisionsAcquisitionSpec"] | components["schemas"]["CantonHttpAcquisitionSpec"] | components["schemas"]["LexFindAcquisitionSpec"] | components["schemas"]["GemeindeHttpAcquisitionSpec"] | components["schemas"]["BundeslandHttpAcquisitionSpec"] | components["schemas"]["RegioneHttpAcquisitionSpec"]) | null;
             /** Overlay Id */
             overlay_id?: string | null;
             /** Provider Template Id */

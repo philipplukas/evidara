@@ -12,12 +12,27 @@ set -euo pipefail
 # driver assumes the full stack is already up on localhost with NO auth, exactly as
 # started by:
 #
-#   docker compose -f docker-compose.yml -f docker-compose.local.yml \
-#     --profile apps --profile nats --profile minio up -d --wait
+#   PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats \
+#   PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 \
+#     docker compose -f docker-compose.yml -f docker-compose.local.yml \
+#       --profile apps --profile nats --profile minio --profile search up -d --wait
 #
-# with PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats and
-# PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 so the real publish + projection path
-# runs (di-consumer → NATS → projection-bridge → legal-search).
+# BOTH env vars are required, or the real publish path never runs: the defaults
+# are `noop`/`local`, so platform-control captures the documents, reports the run
+# `completed`, and publishes nothing. DI then sits idle and the harness times out
+# waiting for a document that was never handed to it.
+#
+# `--profile search` is likewise REQUIRED, and was missing from this header until
+# 2026-07-22. OpenSearch declares `profiles: [search, full, lean-stack]`, and
+# `legal-search-api` (profile `apps`) depends on it, so without it compose refuses
+# the whole project:
+#
+#   service "legal-search-api" depends on undefined service "opensearch":
+#   invalid compose project
+#
+# Nothing starts at all, so that failure is loud rather than silent — but the
+# command as documented could never have worked, which means nobody had run this
+# harness from its own instructions.
 #
 # It reuses the content-gate/verdict logic from ch-fedlex-fast-loop.sh and the
 # evidence renderer from fast-loop-evidence.sh. Emits a verdict and exits nonzero on
@@ -31,6 +46,10 @@ source "${SCRIPT_DIR}/fast-loop-evidence.sh"
 PC_URL="${EVIDARA_PLATFORM_CONTROL_URL:-http://localhost:8000}"
 LS_URL="${EVIDARA_LEGAL_SEARCH_URL:-http://localhost:3102}"
 TEMPLATE_ID="${TEMPLATE_ID:-fedlex_sparql_constitution_de}"
+# Overlay the template lives under. Hardcoded to "ch" until 2026-07-22, which
+# made every --template outside the CH overlay 404 at source creation while the
+# script advertised itself as template-parameterised (#798).
+OVERLAY_ID="${OVERLAY_ID:-ch}"
 MAX_RESOURCES="${MAX_RESOURCES:-25}"
 MAX_POLLS="${MAX_POLLS:-60}"
 POLL_INTERVAL="${POLL_INTERVAL:-5}"
@@ -76,6 +95,8 @@ Options:
   --pc-url <url>            platform-control base URL (default: http://localhost:8000)
   --ls-url <url>            legal-search base URL (default: http://localhost:3102)
   --template <template-id>  Source blueprint template (default: fedlex_sparql_constitution_de)
+  --overlay <overlay-id>    Overlay the template lives under (default: ch).
+                            Required for non-CH corpora — at, de, eu, fr.
   --expect-content-type <mime>
                             Content type the capture gate counts (default: text/html).
                             A PDF corpus needs application/pdf, or the run reports
@@ -101,7 +122,7 @@ Options:
 
 Env overrides: EVIDARA_PLATFORM_CONTROL_URL, EVIDARA_LEGAL_SEARCH_URL, TEMPLATE_ID,
 EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME, RUN_MODE, EXPECT_LANGUAGE, EXPECT_TITLE,
-MAX_RESOURCES, MAX_POLLS, POLL_INTERVAL, DI_MAX_POLLS, DI_POLL_INTERVAL,
+OVERLAY_ID, MAX_RESOURCES, MAX_POLLS, POLL_INTERVAL, DI_MAX_POLLS, DI_POLL_INTERVAL,
 SEARCH_MAX_POLLS, SEARCH_POLL_INTERVAL, SEARCH_QUERY, WORKDIR_ROOT, RUN_DIR.
 EOF
 }
@@ -111,6 +132,7 @@ while [[ $# -gt 0 ]]; do
     --pc-url) PC_URL="${2:?missing value for --pc-url}"; shift 2 ;;
     --ls-url) LS_URL="${2:?missing value for --ls-url}"; shift 2 ;;
     --template) TEMPLATE_ID="${2:?missing value for --template}"; shift 2 ;;
+    --overlay) OVERLAY_ID="${2:?missing value for --overlay}"; shift 2 ;;
     --expect-content-type) EXPECT_CONTENT_TYPE="${2:?missing value for --expect-content-type}"; shift 2 ;;
     --jurisdiction-id) JURISDICTION_ID="${2:?missing value for --jurisdiction-id}"; shift 2 ;;
     --authority-id) AUTHORITY_ID="${2:?missing value for --authority-id}"; shift 2 ;;
@@ -247,6 +269,7 @@ VERSION_LABEL="ch-fedlex-compose-e2e-$(date -u +%Y%m%dT%H%M%SZ)"
 CREATE_PAYLOAD="$(jq -n \
   --arg version_label "${VERSION_LABEL}" \
   --arg template_id "${TEMPLATE_ID}" \
+  --arg overlay_id "${OVERLAY_ID}" \
   --arg source_name "${SOURCE_NAME}" \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" '{
@@ -259,7 +282,7 @@ CREATE_PAYLOAD="$(jq -n \
   },
   source_version: {
     version_label: $version_label,
-    overlay_id: "ch",
+    overlay_id: $overlay_id,
     provider_template_id: $template_id
   }
 }')"
@@ -287,9 +310,10 @@ if [[ -n "${SOURCE_ID}" ]]; then
   log "    reusing source ${SOURCE_ID} — re-acquisition publishes the next revision"
   VERSION_PAYLOAD="$(jq -n \
     --arg version_label "${VERSION_LABEL}" \
+    --arg overlay_id "${OVERLAY_ID}" \
     --arg template_id "${TEMPLATE_ID}" '{
     version_label: $version_label,
-    overlay_id: "ch",
+    overlay_id: $overlay_id,
     provider_template_id: $template_id
   }')"
   curl_json -X POST "${PC_URL}/v1/sources/${SOURCE_ID}/versions" \
@@ -361,7 +385,10 @@ curl_json "${PC_URL}/v1/runs/${RUN_ID}/captured-resources" | tee "${RUN_DIR}/cap
 curl_json "${PC_URL}/v1/runs/${RUN_ID}/raw-artifacts" | tee "${RUN_DIR}/raw-artifacts.json" >/dev/null
 
 # ── 7. Wait for DI processing + lifecycle ──────────────────────────────────
-log "==> Waiting for DI canonical_ready + document.processed"
+# Computed here, not with the other content gates below, because the DI wait now
+# needs it: the loop must know how many documents it is waiting FOR.
+captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
+log "==> Waiting for DI canonical_ready + document.processed (${captured_count} captured)"
 canonical_ready_count=0
 processed_count=0
 for i in $(seq 1 "${DI_MAX_POLLS}"); do
@@ -369,12 +396,36 @@ for i in $(seq 1 "${DI_MAX_POLLS}"); do
   curl_json "${PC_URL}/v1/runs/${RUN_ID}/document-lifecycle" | tee "${RUN_DIR}/document-lifecycle.json" >/dev/null
   canonical_ready_count="$(jq -r '[.data[]? | select(.status=="canonical_ready")] | length' < "${RUN_DIR}/processing-status.json")"
   processed_count="$(jq -r '[.data[]? | select(.event_type=="document.processed")] | length' < "${RUN_DIR}/document-lifecycle.json")"
-  log "  di poll ${i}/${DI_MAX_POLLS}: canonical_ready=${canonical_ready_count} processed=${processed_count}"
-  if [[ "${canonical_ready_count}" -gt 0 && "${processed_count}" -gt 0 ]]; then
+  log "  di poll ${i}/${DI_MAX_POLLS}: canonical_ready=${canonical_ready_count}/${captured_count} processed=${processed_count}"
+  # Wait for EVERY captured document, not the first one. This used to break on
+  # `canonical_ready > 0`, which made the harness sample the pipeline mid-flight:
+  # a 4-document run was reported as 4 captured / 3 canonical_ready and the
+  # missing one looked like a silent loss when it was merely still processing.
+  # Worse, the verdict below then declared `pass` over the partial result.
+  if [[ "${canonical_ready_count}" -ge "${captured_count}" && "${processed_count}" -gt 0 ]]; then
     break
   fi
   sleep "${DI_POLL_INTERVAL}"
 done
+
+# NOTHING arriving is a different failure from SOME arriving, and it has one
+# overwhelmingly likely cause. platform-control defaults to the `noop` publisher
+# and the `local` artifact store, so it captures the documents, reports the run
+# `completed`, and publishes no event at all — DI then sits idle and this loop
+# burns its whole budget waiting for a handoff that was never made.
+#
+# Every `docker compose up platform-control-api` re-applies those defaults unless
+# the env vars are passed again, so this survives a correct initial bring-up and
+# reappears after any rebuild. It cost three debugging cycles before being named
+# here; the diagnostic is cheaper than the fourth.
+di_diag_artifacts="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
+if [[ "${canonical_ready_count}" -eq 0 && "${di_diag_artifacts}" -gt 0 ]]; then
+  log "    NOTE: nothing reached DI at all — not a slow pipeline."
+  log "          platform-control captured ${captured_count} document(s) and published no event."
+  log "          Check the publisher backend; the defaults are noop/local:"
+  log "            docker exec <platform-control-api> sh -c 'echo \$PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND'"
+  log "          Expected 'nats'. Re-up with BOTH env vars set (see this file's header)."
+fi
 
 # ── 8. Assert searchable in legal-search ───────────────────────────────────
 # The projection-bridge forwards document.processed into legal-search asynchronously,
@@ -483,7 +534,6 @@ fi
 
 # ── 9. Content gates (reused from ch-fedlex-fast-loop.sh) ───────────────────
 content_type_count="$(jq -r --arg expect_content_type "${EXPECT_CONTENT_TYPE}" '[.content_type_breakdown[]? | select(.content_type==$expect_content_type) | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
-captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
 title_ok="$(jq -r --arg title_regex "${TITLE_REGEX}" '[.data[]? | select((.title // "") | test($title_regex))] | length' < "${RUN_DIR}/captured-resources.json")"
 accepted_count="$(jq -r '[.data[]? | select(.status=="accepted")] | length' < "${RUN_DIR}/processing-status.json")"
@@ -516,6 +566,14 @@ if [[ "${content_type_count}" -lt 1 || "${captured_count}" -lt 1 || "${raw_artif
   verdict="provider_failed"
 elif [[ "${accepted_count}" -lt 1 || "${canonical_ready_count}" -lt 1 || "${processed_count}" -lt 1 ]]; then
   verdict="downstream_failed"
+elif [[ "${canonical_ready_count}" -lt "${captured_count}" ]]; then
+  # Every captured document must reach canonical, not just one. Nothing compared
+  # these two counts, so a run that captured 4 and canonicalised 1 reported
+  # `pass` — and this bundle is the evidence an operator flips `enabled: true`
+  # on (ADR-0030). Evidence over a pipeline that dropped three quarters of the
+  # corpus is not evidence. #772 already established the principle for titles
+  # ("a partial failure is a failure"); it was never applied to document count.
+  verdict="downstream_incomplete"
 elif [[ ! "${search_hits}" =~ ^[0-9]+$ || "${search_hits}" -lt 1 ]]; then
   # The whole point of Stream H: DI output must reach legal-search via the
   # projection-bridge and be searchable.
@@ -531,6 +589,7 @@ fi
 
 SUMMARY_JSON="$(jq -n \
   --arg template_id "${TEMPLATE_ID}" \
+  --arg overlay_id "${OVERLAY_ID}" \
   --arg run_mode "${RUN_MODE}" \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" \
@@ -566,6 +625,7 @@ SUMMARY_JSON="$(jq -n \
   '{
     environment: "compose-local",
     template_id: $template_id,
+    overlay_id: $overlay_id,
     run_mode: $run_mode,
     jurisdiction_id: $jurisdiction_id,
     authority_id: $authority_id,
