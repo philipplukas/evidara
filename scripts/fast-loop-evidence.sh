@@ -75,6 +75,9 @@ fast_loop_next_action() {
     downstream_failed)
       printf '%s' 'Inspect processing-status, document-lifecycle, and worker/API artifact-event parity before rerunning.'
       ;;
+    downstream_incomplete)
+      printf '%s' 'Some captured documents never reached canonical. Compare captured-resources.json against processing-status.json to find which, then raise DI_MAX_POLLS if they were merely slow or inspect the consumer if they were dropped. Do NOT treat this bundle as acceptance evidence.'
+      ;;
     pipeline_pass_content_suspect)
       printf '%s' 'Keep the slice narrow and tighten the acquisition/content gates before widening.'
       ;;

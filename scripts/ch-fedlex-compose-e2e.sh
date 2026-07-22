@@ -12,23 +12,27 @@ set -euo pipefail
 # driver assumes the full stack is already up on localhost with NO auth, exactly as
 # started by:
 #
-#   docker compose -f docker-compose.yml -f docker-compose.local.yml \
-#     --profile apps --profile nats --profile minio --profile search up -d --wait
+#   PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats \
+#   PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 \
+#     docker compose -f docker-compose.yml -f docker-compose.local.yml \
+#       --profile apps --profile nats --profile minio --profile search up -d --wait
 #
-# `--profile search` is REQUIRED and was missing here until 2026-07-22. OpenSearch
-# declares `profiles: [search, full, lean-stack]`, and `legal-search-api` (profile
-# `apps`) depends on it, so without it compose refuses the whole project:
+# BOTH env vars are required, or the real publish path never runs: the defaults
+# are `noop`/`local`, so platform-control captures the documents, reports the run
+# `completed`, and publishes nothing. DI then sits idle and the harness times out
+# waiting for a document that was never handed to it.
+#
+# `--profile search` is likewise REQUIRED, and was missing from this header until
+# 2026-07-22. OpenSearch declares `profiles: [search, full, lean-stack]`, and
+# `legal-search-api` (profile `apps`) depends on it, so without it compose refuses
+# the whole project:
 #
 #   service "legal-search-api" depends on undefined service "opensearch":
 #   invalid compose project
 #
-# Nothing starts at all, so the failure is loud rather than silent — but the
+# Nothing starts at all, so that failure is loud rather than silent — but the
 # command as documented could never have worked, which means nobody had run this
 # harness from its own instructions.
-#
-# with PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats and
-# PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 so the real publish + projection path
-# runs (di-consumer → NATS → projection-bridge → legal-search).
 #
 # It reuses the content-gate/verdict logic from ch-fedlex-fast-loop.sh and the
 # evidence renderer from fast-loop-evidence.sh. Emits a verdict and exits nonzero on
@@ -372,7 +376,10 @@ curl_json "${PC_URL}/v1/runs/${RUN_ID}/captured-resources" | tee "${RUN_DIR}/cap
 curl_json "${PC_URL}/v1/runs/${RUN_ID}/raw-artifacts" | tee "${RUN_DIR}/raw-artifacts.json" >/dev/null
 
 # ── 7. Wait for DI processing + lifecycle ──────────────────────────────────
-log "==> Waiting for DI canonical_ready + document.processed"
+# Computed here, not with the other content gates below, because the DI wait now
+# needs it: the loop must know how many documents it is waiting FOR.
+captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
+log "==> Waiting for DI canonical_ready + document.processed (${captured_count} captured)"
 canonical_ready_count=0
 processed_count=0
 for i in $(seq 1 "${DI_MAX_POLLS}"); do
@@ -380,8 +387,13 @@ for i in $(seq 1 "${DI_MAX_POLLS}"); do
   curl_json "${PC_URL}/v1/runs/${RUN_ID}/document-lifecycle" | tee "${RUN_DIR}/document-lifecycle.json" >/dev/null
   canonical_ready_count="$(jq -r '[.data[]? | select(.status=="canonical_ready")] | length' < "${RUN_DIR}/processing-status.json")"
   processed_count="$(jq -r '[.data[]? | select(.event_type=="document.processed")] | length' < "${RUN_DIR}/document-lifecycle.json")"
-  log "  di poll ${i}/${DI_MAX_POLLS}: canonical_ready=${canonical_ready_count} processed=${processed_count}"
-  if [[ "${canonical_ready_count}" -gt 0 && "${processed_count}" -gt 0 ]]; then
+  log "  di poll ${i}/${DI_MAX_POLLS}: canonical_ready=${canonical_ready_count}/${captured_count} processed=${processed_count}"
+  # Wait for EVERY captured document, not the first one. This used to break on
+  # `canonical_ready > 0`, which made the harness sample the pipeline mid-flight:
+  # a 4-document run was reported as 4 captured / 3 canonical_ready and the
+  # missing one looked like a silent loss when it was merely still processing.
+  # Worse, the verdict below then declared `pass` over the partial result.
+  if [[ "${canonical_ready_count}" -ge "${captured_count}" && "${processed_count}" -gt 0 ]]; then
     break
   fi
   sleep "${DI_POLL_INTERVAL}"
@@ -494,7 +506,6 @@ fi
 
 # ── 9. Content gates (reused from ch-fedlex-fast-loop.sh) ───────────────────
 content_type_count="$(jq -r --arg expect_content_type "${EXPECT_CONTENT_TYPE}" '[.content_type_breakdown[]? | select(.content_type==$expect_content_type) | .count] | add // 0' < "${RUN_DIR}/preview-summary.json")"
-captured_count="$(jq -r '.captured_resources_count // (.data | length) // 0' < "${RUN_DIR}/preview-summary.json")"
 raw_artifact_count="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
 title_ok="$(jq -r --arg title_regex "${TITLE_REGEX}" '[.data[]? | select((.title // "") | test($title_regex))] | length' < "${RUN_DIR}/captured-resources.json")"
 accepted_count="$(jq -r '[.data[]? | select(.status=="accepted")] | length' < "${RUN_DIR}/processing-status.json")"
@@ -527,6 +538,14 @@ if [[ "${content_type_count}" -lt 1 || "${captured_count}" -lt 1 || "${raw_artif
   verdict="provider_failed"
 elif [[ "${accepted_count}" -lt 1 || "${canonical_ready_count}" -lt 1 || "${processed_count}" -lt 1 ]]; then
   verdict="downstream_failed"
+elif [[ "${canonical_ready_count}" -lt "${captured_count}" ]]; then
+  # Every captured document must reach canonical, not just one. Nothing compared
+  # these two counts, so a run that captured 4 and canonicalised 1 reported
+  # `pass` — and this bundle is the evidence an operator flips `enabled: true`
+  # on (ADR-0030). Evidence over a pipeline that dropped three quarters of the
+  # corpus is not evidence. #772 already established the principle for titles
+  # ("a partial failure is a failure"); it was never applied to document count.
+  verdict="downstream_incomplete"
 elif [[ ! "${search_hits}" =~ ^[0-9]+$ || "${search_hits}" -lt 1 ]]; then
   # The whole point of Stream H: DI output must reach legal-search via the
   # projection-bridge and be searchable.
