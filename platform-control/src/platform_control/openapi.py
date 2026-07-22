@@ -67,7 +67,7 @@ API_TITLE = "Platform Control API"
 # spec with operator-chosen seeds, fenced to the template's own origins, instead
 # of forcing a hand-written `acquisition_spec` that loses the ADR-0030 config key
 # (#710, ADR-0046).
-API_VERSION = "0.17.0"
+API_VERSION = "0.18.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks
