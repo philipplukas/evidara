@@ -712,23 +712,6 @@ def _resolve_official_citation(
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
 
-    # The acquisition-supplied citation, carried as `official_citation_hint` in
-    # extraction_hints. This is where a Swiss systematic number arrives — AS
-    # 554.510 for a communal ordinance, LS 554.5 for a cantonal act, an SR number
-    # for federal law. It ranks ABOVE the publication organ below because it
-    # identifies the act itself, where the organ names the gazette it appeared in.
-    #
-    # Without it, a statute could not be retrieved by its own citation even though
-    # the index field and the projection both existed — the number simply never
-    # reached DI (#755). Note it is also stripped from the body text as page
-    # furniture during marginalia removal, so recovering it from content is not an
-    # alternative.
-    hints = normalized_metadata.get("extraction_hints")
-    if isinstance(hints, dict):
-        hinted = hints.get("official_citation_hint")
-        if isinstance(hinted, str) and hinted.strip():
-            return hinted.strip()
-
     for field_name in ("publication_organ", "kundmachungsorgan"):
         candidate = extracted_metadata.get(field_name)
         if isinstance(candidate, str) and candidate.strip():

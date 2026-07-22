@@ -71,7 +71,6 @@ _EXTRACTION_HINTS_V1_KEYS = frozenset(
         "in_force_until_hint",
         "docket_numbers",
         "jurisdiction_hint",
-        "official_citation_hint",
     }
 )
 
