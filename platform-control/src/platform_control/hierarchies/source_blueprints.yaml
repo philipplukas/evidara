@@ -491,6 +491,57 @@ overlays:
         language_codes: [de]
         document_type_hint: legislation
         enabled: false
+      # Second and third cantons on the same provider, and the actual test of
+      # #628's metric: the cost of the Nth source. Zero engineering — same
+      # provider, same contract, one config act each.
+      #
+      # NOTE the search shape differs from ZH above, and must. Swiss systematic
+      # numbering is PER CANTON, not national: the dog law is 554.5 in ZH,
+      # 916.31 in BE and 365.100 in BS. A prefix that enumerates a branch in one
+      # canton is meaningless in another, so cross-canton templates search title
+      # and keywords instead (both are on in the provider's payload).
+      #
+      # Both verified live 2026-07-22 against the entity ids below.
+      lexfind_api_be_hunde:
+        provider: lexfind_api
+        search_text: "Hund"
+        entity_ids: [4]            # BE — returns 916.31 Hundegesetz,
+        language: de               #      916.812 V. über den Tierschutz und die Hunde
+        results_per_page: 100
+        max_pages: 5
+        min_pdf_bytes: 2000
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_be_legislation
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      # Basel-Stadt also carries COMMUNAL law in LexFind — this search returns
+      # `BeE 365.100`, a Beschluss der Einwohnergemeindeversammlung, alongside the
+      # cantonal acts. That is the municipal rung arriving for free on the
+      # cantonal provider, and it does NOT generalise: #716 measured 0 hits for
+      # Zürich Gemeindeerlasse. Relevant to #584 as a per-canton opportunity, not
+      # a solution.
+      lexfind_api_bs_hunde:
+        provider: lexfind_api
+        search_text: "Hund"
+        entity_ids: [6]            # BS — returns 365.100 / 365.110 / 365.101
+        language: de               #      and BeE 365.100 (communal)
+        results_per_page: 100
+        max_pages: 5
+        min_pdf_bytes: 2000
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_bs_legislation
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
       # ───────────────────────────────────────────────────────────────
       # Swiss COMMUNAL legislation — Stadt Zürich (BFS 261) — #584 / ADR-0033
       # The municipal layer the dog question is decided in. 2,110
