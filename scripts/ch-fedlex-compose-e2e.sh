@@ -46,6 +46,10 @@ source "${SCRIPT_DIR}/fast-loop-evidence.sh"
 PC_URL="${EVIDARA_PLATFORM_CONTROL_URL:-http://localhost:8000}"
 LS_URL="${EVIDARA_LEGAL_SEARCH_URL:-http://localhost:3102}"
 TEMPLATE_ID="${TEMPLATE_ID:-fedlex_sparql_constitution_de}"
+# Overlay the template lives under. Hardcoded to "ch" until 2026-07-22, which
+# made every --template outside the CH overlay 404 at source creation while the
+# script advertised itself as template-parameterised (#798).
+OVERLAY_ID="${OVERLAY_ID:-ch}"
 MAX_RESOURCES="${MAX_RESOURCES:-25}"
 MAX_POLLS="${MAX_POLLS:-60}"
 POLL_INTERVAL="${POLL_INTERVAL:-5}"
@@ -91,6 +95,8 @@ Options:
   --pc-url <url>            platform-control base URL (default: http://localhost:8000)
   --ls-url <url>            legal-search base URL (default: http://localhost:3102)
   --template <template-id>  Source blueprint template (default: fedlex_sparql_constitution_de)
+  --overlay <overlay-id>    Overlay the template lives under (default: ch).
+                            Required for non-CH corpora — at, de, eu, fr.
   --expect-content-type <mime>
                             Content type the capture gate counts (default: text/html).
                             A PDF corpus needs application/pdf, or the run reports
@@ -116,7 +122,7 @@ Options:
 
 Env overrides: EVIDARA_PLATFORM_CONTROL_URL, EVIDARA_LEGAL_SEARCH_URL, TEMPLATE_ID,
 EXPECT_CONTENT_TYPE, JURISDICTION_ID, AUTHORITY_ID, SOURCE_NAME, RUN_MODE, EXPECT_LANGUAGE, EXPECT_TITLE,
-MAX_RESOURCES, MAX_POLLS, POLL_INTERVAL, DI_MAX_POLLS, DI_POLL_INTERVAL,
+OVERLAY_ID, MAX_RESOURCES, MAX_POLLS, POLL_INTERVAL, DI_MAX_POLLS, DI_POLL_INTERVAL,
 SEARCH_MAX_POLLS, SEARCH_POLL_INTERVAL, SEARCH_QUERY, WORKDIR_ROOT, RUN_DIR.
 EOF
 }
@@ -126,6 +132,7 @@ while [[ $# -gt 0 ]]; do
     --pc-url) PC_URL="${2:?missing value for --pc-url}"; shift 2 ;;
     --ls-url) LS_URL="${2:?missing value for --ls-url}"; shift 2 ;;
     --template) TEMPLATE_ID="${2:?missing value for --template}"; shift 2 ;;
+    --overlay) OVERLAY_ID="${2:?missing value for --overlay}"; shift 2 ;;
     --expect-content-type) EXPECT_CONTENT_TYPE="${2:?missing value for --expect-content-type}"; shift 2 ;;
     --jurisdiction-id) JURISDICTION_ID="${2:?missing value for --jurisdiction-id}"; shift 2 ;;
     --authority-id) AUTHORITY_ID="${2:?missing value for --authority-id}"; shift 2 ;;
@@ -262,6 +269,7 @@ VERSION_LABEL="ch-fedlex-compose-e2e-$(date -u +%Y%m%dT%H%M%SZ)"
 CREATE_PAYLOAD="$(jq -n \
   --arg version_label "${VERSION_LABEL}" \
   --arg template_id "${TEMPLATE_ID}" \
+  --arg overlay_id "${OVERLAY_ID}" \
   --arg source_name "${SOURCE_NAME}" \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" '{
@@ -274,7 +282,7 @@ CREATE_PAYLOAD="$(jq -n \
   },
   source_version: {
     version_label: $version_label,
-    overlay_id: "ch",
+    overlay_id: $overlay_id,
     provider_template_id: $template_id
   }
 }')"
@@ -304,7 +312,7 @@ if [[ -n "${SOURCE_ID}" ]]; then
     --arg version_label "${VERSION_LABEL}" \
     --arg template_id "${TEMPLATE_ID}" '{
     version_label: $version_label,
-    overlay_id: "ch",
+    overlay_id: $overlay_id,
     provider_template_id: $template_id
   }')"
   curl_json -X POST "${PC_URL}/v1/sources/${SOURCE_ID}/versions" \
@@ -580,6 +588,7 @@ fi
 
 SUMMARY_JSON="$(jq -n \
   --arg template_id "${TEMPLATE_ID}" \
+  --arg overlay_id "${OVERLAY_ID}" \
   --arg run_mode "${RUN_MODE}" \
   --arg jurisdiction_id "${JURISDICTION_ID}" \
   --arg authority_id "${AUTHORITY_ID}" \
@@ -615,6 +624,7 @@ SUMMARY_JSON="$(jq -n \
   '{
     environment: "compose-local",
     template_id: $template_id,
+    overlay_id: $overlay_id,
     run_mode: $run_mode,
     jurisdiction_id: $jurisdiction_id,
     authority_id: $authority_id,
