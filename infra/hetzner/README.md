@@ -57,6 +57,47 @@ helm upgrade --install minio minio/minio -n evidara -f infra/hetzner/values/mini
 # Postgres (CloudNativePG operator, then the cluster)
 kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.24/releases/cnpg-1.24.0.yaml
 kubectl -n cnpg-system rollout status deploy/cnpg-controller-manager
+```
+
+**Backup credentials first** — `postgres-cluster.yaml` references Secret
+`cnpg-minio-backup`, so provision it before applying the cluster. This creates a MinIO
+user scoped to the backup bucket *only*, so a leak of it cannot reach
+`evidara-raw-artifacts` or `evidara-lakehouse`. The password is generated inline and
+never printed or committed:
+
+```bash
+NS=evidara
+POD=$(kubectl -n $NS get pod -l app=minio -o jsonpath='{.items[0].metadata.name}')
+RU=$(kubectl -n $NS get secret minio -o jsonpath='{.data.rootUser}' | base64 -d)
+RP=$(kubectl -n $NS get secret minio -o jsonpath='{.data.rootPassword}' | base64 -d)
+PW=$(openssl rand -hex 24)
+MC="mc --config-dir /tmp/mccfg"   # throwaway: default config persists root creds in-pod
+
+kubectl -n $NS exec "$POD" -- sh -c "$MC alias set bk http://localhost:9000 '$RU' '$RP'"
+kubectl -n $NS exec "$POD" -- sh -c "$MC mb --ignore-existing bk/evidara-pg-backups"
+printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::evidara-pg-backups","arn:aws:s3:::evidara-pg-backups/*"]}]}' \
+  | kubectl -n $NS exec -i "$POD" -- sh -c 'cat > /tmp/pol.json'
+kubectl -n $NS exec "$POD" -- sh -c "$MC admin policy create bk cnpg-backup /tmp/pol.json"
+kubectl -n $NS exec "$POD" -- sh -c "$MC admin user add bk cnpg-backup '$PW'"
+kubectl -n $NS exec "$POD" -- sh -c "$MC admin policy attach bk cnpg-backup --user cnpg-backup"
+kubectl -n $NS create secret generic cnpg-minio-backup \
+  --from-literal=ACCESS_KEY_ID=cnpg-backup --from-literal=ACCESS_SECRET_KEY="$PW"
+kubectl -n $NS exec "$POD" -- sh -c 'rm -rf /tmp/mccfg /tmp/pol.json'
+unset PW RP
+```
+
+Verify the scoping actually holds (both `ls` commands must be denied):
+
+```bash
+# using the cnpg-backup credential, not root
+mc ls v/evidara-pg-backups/     # allowed
+mc ls v/evidara-raw-artifacts/  # MUST be "Access Denied"
+mc ls v/evidara-lakehouse/      # MUST be "Access Denied"
+```
+
+Then the cluster:
+
+```bash
 kubectl apply -f infra/hetzner/postgres-cluster.yaml
 ```
 
