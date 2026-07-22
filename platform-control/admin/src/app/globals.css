@@ -93,7 +93,16 @@ body {
       var(--admin-page-bottom) 100%
     );
   font-family: var(--font-admin-sans), system-ui, sans-serif;
+  /*
+   * `fixed` sizes the gradient to the viewport, but the `background` shorthand
+   * resets `background-repeat` to `repeat` — so on any page taller than the
+   * window the gradient *tiled*, restarting from `--admin-page-top` with a hard
+   * horizontal seam at exactly one viewport height (y=900 on 1440x900, #674).
+   * `no-repeat` paints the viewport-anchored gradient once; the page can be any
+   * height and the chrome stays continuous.
+   */
   background-attachment: fixed;
+  background-repeat: no-repeat;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

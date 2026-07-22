@@ -162,18 +162,21 @@ describe('composeMetadata', () => {
     });
   });
 
-  it('should produce "Datum" row for decision', () => {
+  it('should qualify the decision date as unverified rather than label it bare "Datum"', () => {
     const rows = composeMetadata(decisionHit);
     expect(rows).toContainEqual({
       label: 'Dokumenttyp',
       value: 'Gerichtsentscheid',
       iconKey: 'dtype-decision',
     });
+    // A decision's `effective_date` is scraped from the body and wrong on most
+    // documents (#759). The card must not give it a verified field's authority.
     expect(rows).toContainEqual({
-      label: 'Datum',
+      label: 'Datum (unbestätigt)',
       value: '15.06.2018',
       iconKey: 'meta-calendar',
     });
+    expect(rows.map((row) => row.label)).not.toContain('Datum');
   });
 
   it('should produce a language row when language is present without a date', () => {

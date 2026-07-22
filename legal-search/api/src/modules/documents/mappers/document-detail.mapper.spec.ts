@@ -129,6 +129,21 @@ describe('mapDocumentToDetailView', () => {
     expect(authorityRow?.visibility).toBe('always');
   });
 
+  it('should qualify a decision date as unverified in the glance strip and Details tab', () => {
+    // Both surfaces read `view.metadata`, so one assertion covers both render
+    // sites. `effective_date` is body-scraped for decisions and wrong on 16 of
+    // 20 seeded documents (#759) — it must not read as a checked field.
+    const decisionDoc = { ...lawDoc, document_type: 'decision' };
+    const view = mapDocumentToDetailView(decisionDoc, sections, citations);
+    expect(view.metadata).toContainEqual({
+      label: 'Datum (unbestätigt)',
+      value: '01.01.2024',
+      iconKey: 'meta-calendar',
+      visibility: 'always',
+    });
+    expect(view.metadata.map((row) => row.label)).not.toContain('Datum');
+  });
+
   it('should include a non-active lifecycle status row when present', () => {
     const view = mapDocumentToDetailView(
       { ...lawDoc, lifecycle_status: 'superseded' },
