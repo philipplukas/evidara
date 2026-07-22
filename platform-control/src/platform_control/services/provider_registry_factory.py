@@ -11,6 +11,7 @@ from platform_control.services.fedlex_sparql_provider import FedlexSparqlProvide
 from platform_control.services.firecrawl_provider import FirecrawlProvider
 from platform_control.services.gemeinde_http_provider import GemeindeHttpProvider
 from platform_control.services.legifrance_provider import LegifranceProvider
+from platform_control.services.lexfind_api_provider import LexFindApiProvider
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.regione_http_provider import RegioneHttpProvider
 from platform_control.services.ris_ogd_provider import RisOgdProvider
@@ -44,6 +45,14 @@ def build_provider_registry(settings: Settings) -> ProviderRegistry:
     # to a deterministic fetch (#631), so the remedy is engineering and no run of
     # any mode dispatches.
     registry.register(CantonHttpProvider())
+    # Swiss cantonal legislation via LexFind (26 cantons + Bund behind one
+    # unauthenticated JSON API) — the answer to CantonHttpProvider's scaffold
+    # above, which cannot work because ZH-Lex serves metadata-only pages whose
+    # only text link is a host that refuses TCP (#716). readiness=awaiting_evidence:
+    # the capture path is verified live and md5-identical to the canton's own PDF,
+    # but no operator has captured acceptance evidence and the discovery payload is
+    # not yet confirmed against the live contract (#731).
+    registry.register(LexFindApiProvider())
     # Swiss communal (Gemeinde) legal collections — where the ADR-0033 acceptance
     # test lives. readiness=awaiting_evidence: the PDF blockers this comment used
     # to cite have both landed (binary manifestations #590/ADR-0037, the
