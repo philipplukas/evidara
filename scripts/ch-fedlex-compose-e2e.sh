@@ -399,6 +399,25 @@ for i in $(seq 1 "${DI_MAX_POLLS}"); do
   sleep "${DI_POLL_INTERVAL}"
 done
 
+# NOTHING arriving is a different failure from SOME arriving, and it has one
+# overwhelmingly likely cause. platform-control defaults to the `noop` publisher
+# and the `local` artifact store, so it captures the documents, reports the run
+# `completed`, and publishes no event at all — DI then sits idle and this loop
+# burns its whole budget waiting for a handoff that was never made.
+#
+# Every `docker compose up platform-control-api` re-applies those defaults unless
+# the env vars are passed again, so this survives a correct initial bring-up and
+# reappears after any rebuild. It cost three debugging cycles before being named
+# here; the diagnostic is cheaper than the fourth.
+di_diag_artifacts="$(jq -r '.total // (.data | length) // 0' < "${RUN_DIR}/raw-artifacts.json")"
+if [[ "${canonical_ready_count}" -eq 0 && "${di_diag_artifacts}" -gt 0 ]]; then
+  log "    NOTE: nothing reached DI at all — not a slow pipeline."
+  log "          platform-control captured ${captured_count} document(s) and published no event."
+  log "          Check the publisher backend; the defaults are noop/local:"
+  log "            docker exec <platform-control-api> sh -c 'echo \$PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND'"
+  log "          Expected 'nats'. Re-up with BOTH env vars set (see this file's header)."
+fi
+
 # ── 8. Assert searchable in legal-search ───────────────────────────────────
 # The projection-bridge forwards document.processed into legal-search asynchronously,
 # so poll the search endpoint until the doc is indexed.
