@@ -41,6 +41,22 @@ def build_bundle_extraction_hints(
         if value is not None:
             hints[hint_key] = value
 
+    # The legislative identifier — the number a lawyer actually cites (#755).
+    # Same failure as the in-force window above: the provider reads it from the
+    # publisher's own structured payload (`gemeinde_http` AS numbers, LexFind
+    # systematic numbers), and it dies here unless promoted, because DI's
+    # artifact loader keeps only the body bytes. It is also stripped from the
+    # text itself during page-furniture removal, since it lives in the running
+    # header — so the document body is not a fallback.
+    #
+    # First non-empty wins; these are per-provider names for one concept and no
+    # provider emits more than one.
+    for metadata_key in ("as_number", "systematic_number"):
+        value = _extract_metadata_string(artifact_metadata, metadata_key)
+        if value is not None:
+            hints["official_citation_hint"] = value
+            break
+
     if document_type_hint is not None:
         stripped = document_type_hint.strip()
         if stripped:
