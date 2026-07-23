@@ -318,3 +318,66 @@ class IndexedTitleIsAsserted(unittest.TestCase):
                 body,
                 f"{name} now reads back from legal-search and must assert the indexed title",
             )
+
+
+class EveryHarnessRunsOnTheSelfHostedRuntime(unittest.TestCase):
+    """A harness that hard-requires `gcloud` cannot produce evidence at all (#799).
+
+    ADR-0029 retired the GCP runtime. Four of the six harnesses kept a top-level
+    `require_cmd gcloud` and resolved their URL via `gcloud run services describe`,
+    so AT/DE/EU/FR had no runnable way to produce or refresh the evidence an
+    operator attaches when flipping `enabled: true` under ADR-0030. That is why
+    #798's AT RIS evidence could not simply be re-run: it did not go stale, it
+    became unreproducible when the runtime changed, and nothing failed loudly.
+
+    These assert the property across the whole family, so the next harness added
+    cannot reintroduce a hard GCP dependency and still read as complete.
+    """
+
+    def _harnesses(self) -> list[Path]:
+        found = sorted((REPO_ROOT / "scripts").glob("*-fast-loop.sh"))
+        # Guard the glob itself: an empty list would make every check below vacuous.
+        self.assertGreaterEqual(len(found), 6, "fast-loop harnesses disappeared from scripts/")
+        return found
+
+    def test_gcloud_is_never_required_unconditionally(self) -> None:
+        offenders = []
+        for script in self._harnesses():
+            for lineno, line in enumerate(
+                script.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                # Top-level (column 0) means it runs before any mode is chosen.
+                if line.startswith("require_cmd gcloud"):
+                    offenders.append(f"{script.name}:{lineno}: unconditional require_cmd gcloud")
+        self.assertEqual(offenders, [], "; ".join(offenders))
+
+    def test_every_harness_accepts_a_self_hosted_api_key(self) -> None:
+        offenders = []
+        for script in self._harnesses():
+            body = script.read_text(encoding="utf-8")
+            if "--api-key" not in body:
+                offenders.append(f"{script.name}: no --api-key flag")
+            if "EVIDARA_PLATFORM_CONTROL_API_KEY" not in body:
+                offenders.append(f"{script.name}: does not read EVIDARA_PLATFORM_CONTROL_API_KEY")
+            if "X-API-Key" not in body:
+                offenders.append(f"{script.name}: never sends an X-API-Key header")
+        self.assertEqual(offenders, [], "; ".join(offenders))
+
+    def test_no_call_site_hardcodes_the_cloud_run_bearer_token(self) -> None:
+        # Every request must go through PC_AUTH_HEADER. A call site that pins the
+        # Bearer header directly sends an empty credential in self-hosted mode —
+        # present-but-inert, the failure this repo keeps rediscovering (#728).
+        offenders = []
+        for script in self._harnesses():
+            for lineno, line in enumerate(
+                script.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                if "Authorization: Bearer" not in line:
+                    continue
+                # Assignments into a header array are the sanctioned form: the
+                # managed-branch PC_AUTH_HEADER, and ch-fedlex's LS_AUTH_HEADER for
+                # legal-search, which is public-by-default when self-hosted.
+                if "_AUTH_HEADER=(" in line:
+                    continue
+                offenders.append(f"{script.name}:{lineno}: Bearer header outside an auth array")
+        self.assertEqual(offenders, [], "; ".join(offenders))
