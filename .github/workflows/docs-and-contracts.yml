@@ -95,6 +95,9 @@ jobs:
       - name: Check Docker Compose profiles resolve
         run: python scripts/check_compose_profiles.py
 
+      - name: Check Hetzner image pins roll together
+        run: python scripts/check_hetzner_image_pins.py
+
       - name: Enforce contract manifest version bump
         run: |
           python scripts/check_contract_version_bump.py \
