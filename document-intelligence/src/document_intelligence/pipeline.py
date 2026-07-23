@@ -589,7 +589,7 @@ def _build_document(
     in_force_window = _resolve_in_force_window(eh, extracted_metadata)
     for field_name, (value, _source) in in_force_window.items():
         metadata[field_name] = value
-    official_citation = _resolve_official_citation(normalized_document.metadata, extracted_metadata)
+    official_citation = _resolve_official_citation(normalized_document.metadata, extracted_metadata, eh)
     if official_citation:
         metadata["official_citation"] = official_citation
     original_language = _resolve_original_language(normalized_document.metadata, manifest.source_defaults)
@@ -707,7 +707,25 @@ def _build_document(
 def _resolve_official_citation(
     normalized_metadata: dict[str, Any],
     extracted_metadata: dict[str, Any],
+    hints: Any = None,
 ) -> str | None:
+    """Resolve the citation a reader would use to look this document up.
+
+    Three sources, in precedence order:
+
+    1. An explicit ``official_citation`` on the normalized document.
+    2. The publication organ from structured metadata (AT ``kundmachungsorgan``,
+       e.g. ``BGBl. II Nr. 219/2026``).
+    3. ``official_citation_hint`` from acquisition — the legislative identifier
+       the provider read off the publisher's own payload (#755).
+
+    The hint ranks last deliberately: it is a bare systematic number, so a
+    richer citation already on the document should win. But it must rank above
+    ``None``, because for Swiss legislation it is the *only* source. The number
+    appears in the running header of the source PDF, and page-furniture removal
+    strips exactly that — so a statute ends up unfindable by its own citation
+    while the value sat in acquisition metadata all along.
+    """
     explicit = normalized_metadata.get("official_citation")
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
@@ -716,6 +734,11 @@ def _resolve_official_citation(
         candidate = extracted_metadata.get(field_name)
         if isinstance(candidate, str) and candidate.strip():
             return candidate.strip()
+
+    if isinstance(hints, dict):
+        hinted = hints.get("official_citation_hint")
+        if isinstance(hinted, str) and hinted.strip():
+            return hinted.strip()
 
     return None
 

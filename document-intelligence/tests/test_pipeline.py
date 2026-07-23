@@ -90,6 +90,42 @@ class ProcessingPipelineTests(unittest.TestCase):
         )
         self.assertEqual(citation, "BGBl. I Nr. 12/2026")
 
+    def test_official_citation_falls_back_to_acquisition_hint(self) -> None:
+        """Swiss legislation has no publication organ in its text (#755).
+
+        `554.510` is how the Zürich Hundegesetz is cited, and acquisition is the
+        only source for it: the number sits in the running header, which
+        page-furniture removal strips before this code ever sees the body.
+        Without this fallback the statute is unfindable by its own number.
+        """
+        citation = _resolve_official_citation(
+            {},
+            {},
+            {"official_citation_hint": "554.510"},
+        )
+        self.assertEqual(citation, "554.510")
+
+    def test_official_citation_prefers_publication_organ_over_hint(self) -> None:
+        """The hint is a bare systematic number, so a richer citation wins.
+
+        Both can be present on an Austrian norm; `BGBl. II Nr. 219/2026` is
+        more useful to a reader than a bare number, so precedence is not
+        arbitrary.
+        """
+        citation = _resolve_official_citation(
+            {},
+            {"publication_organ": "BGBl. II Nr. 219/2026"},
+            {"official_citation_hint": "554.510"},
+        )
+        self.assertEqual(citation, "BGBl. II Nr. 219/2026")
+
+    def test_official_citation_ignores_blank_hint(self) -> None:
+        """An empty citation is worse than none: it renders as a blank citation
+        line that a reader takes as authoritative."""
+        self.assertIsNone(_resolve_official_citation({}, {}, {"official_citation_hint": "  "}))
+        self.assertIsNone(_resolve_official_citation({}, {}, {}))
+        self.assertIsNone(_resolve_official_citation({}, {}, None))
+
     def test_processes_local_html_bundle_into_contract_valid_outputs(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as html_handle:
             html_handle.write(SAMPLE_HTML)

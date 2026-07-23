@@ -42,6 +42,14 @@ All values are optional. Unknown keys are ignored (forward-compatible).
     not establish the window — downstream in-force logic is four-valued and
     must be free to answer ``unknown`` rather than be handed a guess.
 
+``official_citation_hint`` (string)
+    The legislative identifier the act is cited by — a communal AS number
+    (``554.510``), a cantonal LexFind systematic number, a federal SR number.
+    Applied to ``document.metadata["official_citation"]`` when the normalizer
+    found nothing better. Without it a statute is unfindable by its own
+    citation (#755): the number lives in the running header, which
+    page-furniture removal strips, so the body text is not a fallback.
+
 ``docket_numbers`` (list of strings)
     Case numbers / Geschäftszahlen hints for LLM context or future IR.
 
@@ -69,6 +77,7 @@ _EXTRACTION_HINTS_V1_KEYS = frozenset(
         "effective_date_hint",
         "in_force_from_hint",
         "in_force_until_hint",
+        "official_citation_hint",
         "docket_numbers",
         "jurisdiction_hint",
     }

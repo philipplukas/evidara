@@ -150,3 +150,61 @@ def test_build_bundle_extraction_hints_omits_unknown_ris_end_date() -> None:
 
     assert hints["in_force_from_hint"] == "2020-01-01"
     assert "in_force_until_hint" not in hints
+
+
+def test_build_bundle_extraction_hints_carries_communal_as_number() -> None:
+    """The legislative identifier must survive into the manifest DI receives (#755).
+
+    `554.510` is the official citation of the Zürich Hundegesetz — the number a
+    lawyer types to look it up. `gemeinde_http` captures it, and before this it
+    died at the manifest boundary exactly as the in-force window did above:
+    DI's artifact loader keeps only the body bytes. The body is not a fallback
+    either, because the number lives in the running header and page-furniture
+    removal strips it. Result: a statute unfindable by its own citation.
+    """
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "provider_metadata": {
+                "provider": "gemeinde_http",
+                "as_number": "554.510",
+            }
+        }
+    )
+
+    assert hints["official_citation_hint"] == "554.510"
+
+
+def test_build_bundle_extraction_hints_carries_lexfind_systematic_number() -> None:
+    """The same hop on the cantonal path — one provider, 26 cantons (#731).
+
+    LexFind names the concept `systematic_number` rather than `as_number`.
+    Pinning both here keeps the promotion provider-agnostic, so the cantonal
+    rung is addressable by citation without a second code path.
+    """
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "provider_metadata": {
+                "provider": "lexfind_api",
+                "systematic_number": "554.510",
+            }
+        }
+    )
+
+    assert hints["official_citation_hint"] == "554.510"
+
+
+def test_build_bundle_extraction_hints_omits_absent_legislative_identifier() -> None:
+    """Absent stays absent. A court decision has no systematic number, and an
+    empty-string citation would be worse than none: it renders as a blank
+    citation line the reader reads as authoritative."""
+    hints = build_bundle_extraction_hints(
+        artifact_metadata={
+            "provider_metadata": {
+                "provider": "gemeinde_http",
+                "as_number": None,
+                "short_title": "Ein Entscheid",
+            }
+        }
+    )
+
+    assert "official_citation_hint" not in hints
