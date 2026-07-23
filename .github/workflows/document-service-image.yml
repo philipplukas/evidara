@@ -15,7 +15,7 @@ concurrency:
 jobs:
   document-service:
     name: Build document-intelligence document-service image
-    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
+    runs-on: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy-v2' }}
     environment: dev
 
     steps:

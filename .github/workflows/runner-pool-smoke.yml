@@ -22,7 +22,7 @@ jobs:
     name: Heavy runner smoke
     uses: ./.github/workflows/runner-bootstrap-preflight.yml
     with:
-      runner_scale_set: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy' }}
+      runner_scale_set: ${{ vars.HEAVY_RUNNER_SCALE_SET || 'evidara-heavy-v2' }}
       node_version: "22"
       python_version: "3.11"
       frontend_playwright_smoke: true
