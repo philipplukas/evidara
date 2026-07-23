@@ -1,0 +1,63 @@
+name: Zitadel values
+
+# The static half of this gate (no committed credential, ingress matches the
+# cert-manager pattern, ExternalDomain matches the ingress host) runs in
+# docs-and-contracts.yml on every PR. This job adds the half that needs helm and
+# the upstream chart: rendering `infra/hetzner/values/zitadel.yaml` against the
+# pinned chart, so the chart's own values schema gets a vote before an operator
+# discovers the problem at `helm upgrade` time.
+#
+# Paths-filtered, because it is only meaningful when the values or the guard
+# change — and because it reaches a third-party chart registry, which is not a
+# dependency worth putting in front of every PR.
+
+on:
+  pull_request:
+    paths:
+      - "infra/hetzner/values/zitadel.yaml"
+      - "infra/hetzner/deploy-stage8.sh"
+      - "scripts/check_hetzner_zitadel.py"
+      - ".github/workflows/zitadel-values.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/hetzner/values/zitadel.yaml"
+      - "infra/hetzner/deploy-stage8.sh"
+      - "scripts/check_hetzner_zitadel.py"
+      - ".github/workflows/zitadel-values.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-zitadel-chart:
+    # GitHub-hosted, NOT the self-hosted pools — same reasoning as
+    # architecture.yml: the ARC runners are plain k8s pods with no helm, and
+    # installing one there would make a required check depend on it.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyYAML
+        run: python -m pip install --upgrade pip pyyaml
+
+      - name: Set up helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "v3.16.3"
+
+      - name: Render the Zitadel chart with the committed values
+        run: |
+          helm repo add zitadel https://charts.zitadel.com
+          helm repo update zitadel
+          python scripts/check_hetzner_zitadel.py --render

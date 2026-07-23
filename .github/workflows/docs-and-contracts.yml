@@ -108,6 +108,15 @@ jobs:
       - name: Validate k8s GitOps kustomizations
         run: bash scripts/validate_k8s_gitops_kustomize.sh
 
+      - name: Validate Zitadel deployment values
+        # Deliberately WITHOUT --render. This job runs on the self-hosted ARC pool
+        # and owns a required check; adding a helm install + chart download to it
+        # would put PR merges behind a tool and a third-party registry it does not
+        # need. The credential and ingress checks are pure Python and are the part
+        # that matters (see #792). The chart render runs in zitadel-values.yml,
+        # GitHub-hosted and paths-filtered — same split as architecture.yml.
+        run: python scripts/check_hetzner_zitadel.py
+
       - name: Validate country overlay blueprint templates
         run: |
           python scripts/check_country_overlay.py --country AT

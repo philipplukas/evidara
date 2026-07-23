@@ -1,4 +1,5 @@
-# CloudNativePG Postgres cluster for Evidara (platform-control DB + Nessie catalog DB).
+# CloudNativePG Postgres cluster for Evidara: platform-control DB, Nessie catalog DB,
+# and the Zitadel identity DB.
 # Requires the CNPG operator (see infra/hetzner/README.md Stage 1). ADR-0029.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -16,6 +17,15 @@ spec:
       owner: platform_control
   # Nessie gets its own database in the same instance (created post-bootstrap):
   #   kubectl -n evidara exec -it evidara-pg-1 -- psql -c "CREATE DATABASE nessie OWNER platform_control;"
+  #
+  # Zitadel follows the same precedent (ADR-0038 §2 reason 2) with one deliberate
+  # difference: it gets its OWN role rather than sharing `platform_control`.
+  #   CREATE ROLE zitadel LOGIN PASSWORD '<generated>';
+  #   CREATE DATABASE zitadel OWNER zitadel;
+  # An IdP is the highest-value target in this runtime (ADR-0038 §2b); a leak of its
+  # DSN must not also hand over every run, approval and operator row. Both statements
+  # are issued idempotently by infra/hetzner/deploy-stage8.sh — the password is
+  # generated there and never committed.
   postgresql:
     parameters:
       max_connections: "200"
@@ -24,8 +34,16 @@ spec:
       cpu: 100m
       memory: 512Mi
   # Backups: base backup + continuous WAL archiving, giving point-in-time recovery.
-  # ADR-0038 §2b -- platform_control (and later zitadel) are unrecoverable-by-rebuild:
+  # ADR-0038 §2b -- platform_control and zitadel are unrecoverable-by-rebuild:
   # losing them loses every run, approval, operator and credential.
+  #
+  # barman backs up the INSTANCE, not a database list, so `zitadel` joined this path
+  # the moment the database was created -- there is nothing per-database to add, and
+  # adding a second backup story would be the mistake. What is NOT automatic is proof:
+  # see docs/runbooks/zitadel-identity-provider.md for the restore drill that has to
+  # pass before anything depends on the IdP, and note that a database backup alone
+  # does NOT restore Zitadel -- the `zitadel-masterkey` Secret is a separate artifact
+  # and without it the restored rows are undecryptable.
   #
   # !! INTERIM TARGET !! MinIO's PVC is `local-path` on the SAME disk as this
   # cluster's PVC (both /dev/md2 on the single node). So this protects against

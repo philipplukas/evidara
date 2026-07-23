@@ -119,7 +119,33 @@ verify() {
     log "    artifact store   = ${store}"
   fi
 
-  # 2. Migrations. A stale platform-control-init image reports success while
+  # 2. The dispatch path. RunService._should_dispatch_via_worker() forces worker
+  #    dispatch for _ASYNC_PROVIDER_NAMES (currently `ris_ogd`) whatever
+  #    PLATFORM_CONTROL_RUN_DISPATCH_BACKEND says, so without this container an
+  #    AT RIS run sits PENDING forever with refused=false and no failure_reason.
+  #    Same class of silent failure as the publisher above: nothing errors.
+  local worker_publisher
+  if ! docker inspect evidara-platform-control-worker-1 >/dev/null 2>&1; then
+    fail "platform-control-worker is not running: runs for async providers" \
+      "(ris_ogd) will stay PENDING and never dispatch, with no error anywhere." \
+      "Fix: bash scripts/dev-loop-stack.sh up" || failures=1
+  else
+    # Parity, not just presence. A worker on `noop`/`local` completes the run
+    # and publishes nothing the DI consumer can read — the 2026-04-14 AT RIS
+    # break, which cost a live debugging cycle on dev.
+    worker_publisher="$(docker exec evidara-platform-control-worker-1 \
+      printenv PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND 2>/dev/null || printf 'unset')"
+    if [[ "${worker_publisher}" != "${publisher}" ]]; then
+      fail "worker event publisher is '${worker_publisher}' but the API's is" \
+        "'${publisher}'. The worker owns acquisition dispatch, so its backends —" \
+        "not the API's — decide whether anything reaches document-intelligence." \
+        "Fix: bash scripts/dev-loop-stack.sh up" || failures=1
+    else
+      log "    worker publisher = ${worker_publisher} (matches API)"
+    fi
+  fi
+
+  # 3. Migrations. A stale platform-control-init image reports success while
   #    applying nothing, so compare the database against the repo rather than
   #    trusting the init container's exit code.
   local expected actual
@@ -137,7 +163,7 @@ verify() {
     log "    alembic head     = ${actual}"
   fi
 
-  # 3. Health. Last, because the two above are true even when everything is
+  # 4. Health. Last, because the two above are true even when everything is
   #    reporting healthy — that is the whole point.
   local name url code
   for pair in "platform-control=http://localhost:8000/health" \

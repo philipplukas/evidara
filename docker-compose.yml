@@ -185,23 +185,13 @@ services:
   #     opensearch:
   #       condition: service_healthy
 
-  # Optional: Platform-control connector worker
-  # Polls for pending runs and dispatches them to connector providers.
-  # Uncomment to run the worker alongside the API.
-  # platform-control-worker:
-  #   build:
-  #     context: ./platform-control
-  #     dockerfile: Dockerfile.worker
-  #   container_name: evidara-platform-control-worker
-  #   env_file: ./platform-control/.env
-  #   environment:
-  #     PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
-  #     PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: worker
-  #   command: ["platform-control-connector-worker", "--limit", "10", "--interval-seconds", "5"]
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   restart: unless-stopped
+  # The platform-control connector worker is a real service in
+  # docker-compose.local.yml, under the `apps` profile. It used to live here
+  # commented out, which was worse than absent: the block set only
+  # DATABASE_URL and RUN_DISPATCH_BACKEND, so uncommenting it produced a worker
+  # on the default local/noop backends whose bundle manifests the DI consumer
+  # could not read — the same env-parity break the 2026-04-14 AT RIS evidence
+  # bundle root-caused. It now shares the API's environment via a YAML anchor.
 
 volumes:
   platform-control-postgres-data:

@@ -8,10 +8,19 @@ Applies to: prod (self-hosted Hetzner k3s, ADR-0029)
 
 ## Overview
 
-`evidara-pg` (CloudNativePG, `instances: 1`) holds **`platform_control`** and
-**`nessie`**. Per ADR-0038 §2b these are *unrecoverable by rebuild*: losing
-`platform_control` loses every run, approval, source and operator row. `nessie` is the
-Iceberg catalog — losing it orphans the lakehouse data in MinIO.
+`evidara-pg` (CloudNativePG, `instances: 1`) holds **`platform_control`**,
+**`nessie`** and **`zitadel`**. Per ADR-0038 §2b these are *unrecoverable by rebuild*:
+losing `platform_control` loses every run, approval, source and operator row. `nessie`
+is the Iceberg catalog — losing it orphans the lakehouse data in MinIO. `zitadel` is
+the identity provider's store — losing it loses every user, organization and
+credential.
+
+> **`zitadel` needed no backup configuration.** barman archives the *instance*, so the
+> database joined this path the moment it was created (ADR-0038 §8 step 2 says to join
+> it, not to build a second story). But a Postgres restore alone does **not** restore
+> Zitadel: its rows are encrypted with the `zitadel-masterkey` Secret, which is a
+> separate artifact with a separate backup rule. See
+> [zitadel-identity-provider.md](zitadel-identity-provider.md).
 
 Backups are **base backup + continuous WAL archiving**, which gives point-in-time
 recovery, not just "whatever the last snapshot had". Config lives in
@@ -139,6 +148,12 @@ kubectl -n evidara get pvc | grep restoretest    # expect: no rows
 A restored cluster also contains an extra empty `app` database. That is CNPG's default
 bootstrap database, not corruption.
 
+The restore brings back **every** database in the instance, `zitadel` included. Its
+own ground-truth query and the masterkey half of the check — which row counts cannot
+prove — are in
+[zitadel-identity-provider.md](zitadel-identity-provider.md#restore-drill-the-gate).
+Run both in the same sitting.
+
 ### Point-in-time recovery
 
 To recover to a moment (e.g. just before a bad migration at 14:05), add a
@@ -177,6 +192,8 @@ and is the fastest way to get bytes out under pressure.
 
 - **Single instance.** `instances: 1` — no replica, no failover. A node loss is an outage
   regardless of backups (ADR-0038 §2b).
-- **Destination is not offsite.** See the warning above. This is the blocking item.
+- **Destination is not offsite.** See the warning above. This is the blocking item, and
+  it now gates ADR-0038 §8 step 2 explicitly: Zitadel may be deployed, but it must not
+  hold real user credentials until the destination moves.
 - **CNPG 1.24.0 is past upstream EOL.** Worth an upgrade before an IdP depends on it.
 - **Restore drill is manual.** Not yet wired to CI or a reminder.

@@ -1,0 +1,121 @@
+# Zitadel — self-hosted OIDC identity provider. Chart: zitadel/zitadel. ADR-0038 step 2.
+#
+# Deployed by `infra/hetzner/deploy-stage8.sh`. Nothing depends on this yet: standing
+# it up is deliberately separate from wiring login (ADR-0038 §8 steps 4-7), because
+# §8 step 2 says it has to be *boring* first.
+#
+# THERE ARE NO CREDENTIALS IN THIS FILE, AND THERE MUST NEVER BE. Both secrets it
+# needs are created out-of-band by deploy-stage8.sh and referenced by name:
+#   - `zitadel-db`        -> ZITADEL_DATABASE_POSTGRES_DSN  (envVarsSecret, below)
+#   - `zitadel-masterkey` -> masterkey                      (masterkeySecretName)
+# `scripts/check_hetzner_zitadel.py` fails the build if a literal password, DSN or
+# masterkey appears here. See #792 for why that guard exists at all.
+
+zitadel:
+  configmapConfig:
+    # Public hostname. Must match `ingress.hosts[].host` below and the DNS A record.
+    ExternalDomain: id.evidara.veyo.dev
+    # TLS is terminated by Traefik + cert-manager at the ingress, exactly like
+    # admin./search. (auth/ingress-tls.yaml), so Zitadel itself serves cleartext h2c
+    # in-cluster but must still generate https:// issuer and redirect URLs.
+    ExternalSecure: true
+    ExternalPort: 443
+    TLS:
+      Enabled: false
+    # DSN mode: the connection string arrives as an env var from the `zitadel-db`
+    # Secret (see envVarsSecret), so no Database.Postgres.* fields are set here.
+    # Zitadel ignores the discrete fields entirely when a DSN is present.
+    Machine:
+      Identification:
+        Hostname:
+          Enabled: true
+
+  # Created once by deploy-stage8.sh (`openssl rand`-derived, 32 bytes) and never
+  # rotated casually: the masterkey encrypts every private key and token Zitadel
+  # holds. Losing it is losing the instance even with a good database backup —
+  # which is why the runbook treats it as a separate backup artifact.
+  masterkeySecretName: zitadel-masterkey
+
+# Single replica, matching every other stateful-ish workload on this one node
+# (ADR-0038 §2b: single-node availability is the real ceiling, stated not hidden).
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# The DSN lives here, not in configmapConfig. `envVarsSecret` is consumed by the
+# deployment AND by the init/setup jobs, which is what makes DSN mode work at all.
+envVarsSecret: zitadel-db
+
+# `init zitadel` only — initialise Zitadel's own schema inside a database that
+# already exists. It must NOT try to CREATE DATABASE or CREATE ROLE: this is a
+# CloudNativePG-managed cluster and, per zitadel's own defaults.yaml, "in DSN mode
+# zitadel init cannot use the Admin connection to create a separate target
+# database/user". The `zitadel` role and database are created by deploy-stage8.sh,
+# the same way Nessie's database is (see postgres-cluster.yaml).
+initJob:
+  enabled: true
+  command: zitadel
+
+# Bundled Bitnami Postgres subchart OFF. The whole point of ADR-0038 §2 reason 2 is
+# to reuse the CNPG cluster we already back up. Turning this on would silently
+# create a second, unbacked-up Postgres holding every user credential.
+postgresql:
+  enabled: false
+
+# --- Ingress -----------------------------------------------------------------
+# Same shape as auth/ingress-tls.yaml: traefik ingressClass, cert-manager
+# `letsencrypt-prod` ClusterIssuer (auth/letsencrypt-issuer.yaml), HTTP-01 solved
+# over Traefik on port 80, cert written to the named Secret.
+#
+# For a first apply on a new host, switch BOTH annotations to `letsencrypt-staging`
+# to dodge Let's Encrypt rate limits, then flip back — the same procedure the
+# README documents for admin./search.
+#
+# NOT behind the evidara-basicauth middleware, deliberately. A login page that
+# requires the shared password to reach it cannot replace the shared password, and
+# the OIDC redirect flow (ADR-0038 §8 steps 5/7) would break on the challenge.
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: id.evidara.veyo.dev
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - id.evidara.veyo.dev
+      secretName: id-evidara-tls
+
+# Zitadel v4 serves its login UI from a separate container/service on the SAME
+# hostname under /ui/v2/login. Without this second Ingress the host resolves but
+# every login attempt 404s — Traefik sorts by rule specificity, so this longer
+# prefix wins over the `/` rule above.
+#
+# It keeps the `tls:` block (a Traefik ingress with no TLS block gets an HTTP-only
+# router and would never answer on 443) but deliberately carries NO
+# `cert-manager.io/cluster-issuer` annotation. cert-manager's ingress-shim names the
+# Certificate it creates after `secretName`; two annotated Ingresses asking for the
+# same `id-evidara-tls` would both try to own one Certificate object. One issuer
+# annotation, one Certificate, one cert — served for this host by SNI regardless of
+# which Ingress produced the router.
+login:
+  enabled: true
+  replicaCount: 1
+  ingress:
+    enabled: true
+    className: traefik
+    hosts:
+      - host: id.evidara.veyo.dev
+        paths:
+          - path: /ui/v2/login
+            pathType: Prefix
+    tls:
+      - hosts:
+          - id.evidara.veyo.dev
+        secretName: id-evidara-tls

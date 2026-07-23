@@ -1,3 +1,24 @@
+# Shared by platform-control-api and platform-control-worker. The worker owns
+# acquisition dispatch for async providers, so it must resolve the SAME artifact
+# store and event publisher as the API — a worker on the default `local`/`noop`
+# backends writes bundle manifests the DI consumer cannot read, and the run
+# completes having published nothing. That exact drift is what the 2026-04-14 AT
+# RIS evidence bundle root-caused on dev; an anchor makes parity structural
+# instead of something a second env block has to remember.
+x-platform-control-env: &platform-control-env
+  # Required — Settings.environment has no default (#683).
+  PLATFORM_CONTROL_ENVIRONMENT: ${PLATFORM_CONTROL_ENVIRONMENT:-development}
+  PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
+  PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: ${PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND:-local}
+  PLATFORM_CONTROL_RAW_ARTIFACT_LOCAL_DIR: .data/raw-artifacts
+  PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET: ${PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET:-evidara-raw-artifacts-dev}
+  PLATFORM_CONTROL_S3_ENDPOINT_URL: ${PLATFORM_CONTROL_S3_ENDPOINT_URL:-http://minio:9000}
+  PLATFORM_CONTROL_S3_REGION: ${PLATFORM_CONTROL_S3_REGION:-us-east-1}
+  PLATFORM_CONTROL_S3_ACCESS_KEY_ID: ${PLATFORM_CONTROL_S3_ACCESS_KEY_ID:-minioadmin}
+  PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY: ${PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY:-minioadmin}
+  PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: ${PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND:-noop}
+  PLATFORM_CONTROL_NATS_SERVERS: ${PLATFORM_CONTROL_NATS_SERVERS:-nats://nats:4222}
+
 services:
   platform-control-init:
     build:
@@ -32,18 +53,11 @@ services:
       dockerfile: platform-control/Dockerfile
     profiles: ["apps"]
     environment:
-      # Required — Settings.environment has no default (#683).
-      PLATFORM_CONTROL_ENVIRONMENT: ${PLATFORM_CONTROL_ENVIRONMENT:-development}
-      PLATFORM_CONTROL_DATABASE_URL: postgresql+asyncpg://platform_control:platform_control@postgres:5432/platform_control
-      PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND: ${PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND:-local}
-      PLATFORM_CONTROL_RAW_ARTIFACT_LOCAL_DIR: .data/raw-artifacts
-      PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET: ${PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET:-evidara-raw-artifacts-dev}
-      PLATFORM_CONTROL_S3_ENDPOINT_URL: ${PLATFORM_CONTROL_S3_ENDPOINT_URL:-http://minio:9000}
-      PLATFORM_CONTROL_S3_REGION: ${PLATFORM_CONTROL_S3_REGION:-us-east-1}
-      PLATFORM_CONTROL_S3_ACCESS_KEY_ID: ${PLATFORM_CONTROL_S3_ACCESS_KEY_ID:-minioadmin}
-      PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY: ${PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY:-minioadmin}
-      PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND: ${PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND:-noop}
-      PLATFORM_CONTROL_NATS_SERVERS: ${PLATFORM_CONTROL_NATS_SERVERS:-nats://nats:4222}
+      <<: *platform-control-env
+      # `inline` is NOT universal: RunService._should_dispatch_via_worker()
+      # forces worker dispatch for providers in _ASYNC_PROVIDER_NAMES
+      # (currently `ris_ogd`) regardless of this setting. Those runs sit PENDING
+      # forever unless platform-control-worker is up — see that service below.
       PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: inline
       # Local stack runs keyless. Auth fails closed by default, so the open path
       # must be opted into by name. LOCAL ONLY — never set in a deployment.
@@ -63,6 +77,39 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+
+  # Dispatches PENDING runs for async providers. Not optional for `ris_ogd`:
+  # without it `scripts/ch-fedlex-compose-e2e.sh --overlay at` polls a run that
+  # never leaves PENDING, with refused=false and no failure_reason — a stall that
+  # reads like a provider bug and is really a missing worker.
+  #
+  # --no-schedules: local-only. Schedule evaluation creates runs on its own, and
+  # on this stack those would fetch live government portals unprompted. The
+  # acceptance loop dispatches runs explicitly, so it needs dispatch, not cron.
+  platform-control-worker:
+    build:
+      context: .
+      dockerfile: platform-control/Dockerfile.worker
+    profiles: ["apps"]
+    environment:
+      <<: *platform-control-env
+      PLATFORM_CONTROL_RUN_DISPATCH_BACKEND: worker
+    command:
+      - platform-control-connector-worker
+      - --limit
+      - "10"
+      - --interval-seconds
+      - "5"
+      - --no-schedules
+    mem_limit: 768m
+    depends_on:
+      platform-control-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
       interval: 15s
       timeout: 5s
       retries: 12

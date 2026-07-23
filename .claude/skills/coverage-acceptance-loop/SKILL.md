@@ -93,19 +93,35 @@ Despite the name it is corpus-parameterised. Pass the corpus-shape flags: withou
 and without `--expect-language` / `--expect-title` those gates **self-skip while still
 reporting a pass** (#735, #744).
 
-### The stack env vars whose defaults silently break the loop
+### Bringing the stack up
 
 ```bash
-PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND=nats \
-PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND=s3 \
-  docker compose -f docker-compose.yml -f docker-compose.local.yml \
-    --profile apps --profile nats --profile minio --profile search up -d --wait
+bash scripts/dev-loop-stack.sh up       # rebuild, start, then verify
+bash scripts/dev-loop-stack.sh verify   # check a stack that is already running
 ```
 
-Both env vars are required. The defaults are `noop`/`local`: platform-control captures
-the documents, reports the run `completed`, and **publishes nothing**, so DI sits idle
-and the harness times out waiting for a document it was never handed. `--profile search`
-is required too, or compose refuses the whole project.
+Prefer this over a hand-rolled `docker compose up`. It exists because the loop has
+settings that are inert by default and silent when wrong, and its `verify` re-derives
+them from the repo instead of trusting that every container reports healthy — which,
+in each of these failures, they all do:
+
+- `PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND` defaults to `noop` and
+  `PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND` to `local`. platform-control then captures
+  the documents, reports the run `completed`, and **publishes nothing**, so DI sits idle
+  and the harness times out waiting for a document it was never handed.
+- **`platform-control-worker` must be running.** `RunService._should_dispatch_via_worker()`
+  forces worker dispatch for `_ASYNC_PROVIDER_NAMES` — currently `ris_ogd`, i.e. every AT
+  RIS template — no matter what `PLATFORM_CONTROL_RUN_DISPATCH_BACKEND` says. With no
+  worker the run sits `PENDING` forever with `refused: false` and no `failure_reason`,
+  which reads like a broken provider and is not one.
+- The worker's artifact-store and event-publisher backends must match the API's. It owns
+  acquisition dispatch, so *its* backends decide whether anything reaches DI; a worker on
+  `local`/`noop` writes bundle manifests the consumer cannot read while the run still
+  reports `completed`.
+- `--profile search` is required alongside `apps`, or compose refuses the whole project.
+
+If you do bring compose up by hand, pass `--profile apps --profile nats --profile minio
+--profile search` and both env vars above, then run `dev-loop-stack.sh verify` anyway.
 
 ## 4. Watch a run, and diagnose a stall
 
@@ -120,7 +136,7 @@ instead of a bare timeout:
 | `cause` | What to do |
 |---|---|
 | `run_refused_by_lock` | Not a stall. The two-key lock refused it and persisted a FAILED run with `refused: true`. Read `failure_reason`; go back to step 1. |
-| `no_dispatch_worker` | Run never left PENDING — nothing dispatched it. The local compose stack does not start a worker for every provider. |
+| `no_dispatch_worker` | Run never left PENDING — nothing dispatched it. `platform-control-worker` is down or was never started; `bash scripts/dev-loop-stack.sh verify` names this directly. |
 | `publish_path_disabled` | Completed with zero DI events. `PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND` is on `noop`. See §3. |
 | `di_consumer_silent` | DI got events but stopped. Check the consumer container. |
 | `projection_stalled` | DI processed, nothing projected. Check the projection bridge. |
