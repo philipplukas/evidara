@@ -441,11 +441,50 @@ def test_run_status_emits_envelope(_pc_base, req_json_mock, emit_mock):
 @patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
 def test_run_evidence_collects_resources(_pc_base, req_json_mock, emit_mock):
     req_json_mock.side_effect = [
-        {"run_id": "run_abc", "status": "completed"},
+        {
+            "run_id": "run_abc",
+            "status": "completed",
+            "mode": "acceptance",
+            "refused": False,
+            "source_id": "src_1",
+            "source_version_id": "ver_1",
+        },
         [{"resource_id": "r1"}, {"resource_id": "r2"}],
+        {"overall_status": "ok", "stages": []},
+        {"data": [{"source_version_id": "ver_1", "execution_mode": "live"}]},
     ]
     run_evidence(run_id="run_abc", human=False, correlation_id=None)
     payload = emit_mock.call_args.args[0]
     assert payload["ok"] is True
     assert payload["step"] == "run.evidence"
     assert payload["artifacts"]["captured_resource_count"] == 2
+    assert payload["artifacts"]["acceptance_verdict"]["is_acceptance_evidence"] is True
+    assert payload["decision"]["recommended_action"] == "flip-enablement"
+
+
+@patch("evidara_cli.workflow_cmd._emit_envelope")
+@patch("evidara_cli.workflow_cmd.request_json")
+@patch("evidara_cli.workflow_cmd.platform_control_base_url", return_value="http://pc.test")
+def test_run_evidence_refuses_a_shadow_run_as_acceptance_evidence(
+    _pc_base, req_json_mock, emit_mock
+):
+    """ADR-0030 §2: SHADOW replays cassettes, so a green run proves nothing about the portal."""
+    req_json_mock.side_effect = [
+        {
+            "run_id": "run_abc",
+            "status": "completed",
+            "mode": "acceptance",
+            "refused": False,
+            "source_id": "src_1",
+            "source_version_id": "ver_1",
+        },
+        [{"resource_id": "r1"}],
+        {"overall_status": "ok", "stages": []},
+        {"data": [{"source_version_id": "ver_1", "execution_mode": "shadow"}]},
+    ]
+    run_evidence(run_id="run_abc", human=False, correlation_id=None)
+    payload = emit_mock.call_args.args[0]
+    verdict = payload["artifacts"]["acceptance_verdict"]
+    assert verdict["is_acceptance_evidence"] is False
+    assert [r["code"] for r in verdict["refusals"]] == ["execution_mode_shadow"]
+    assert payload["decision"]["recommended_action"] == "verify"

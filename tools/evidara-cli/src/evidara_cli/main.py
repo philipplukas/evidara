@@ -24,6 +24,7 @@ from evidara_cli.client import (
     request_status,
     use_human_output,
 )
+from evidara_cli.coverage_cmd import coverage_app
 from evidara_cli.openapi_cmd import openapi_app
 from evidara_cli.repo_root import resolve_repo_root
 from evidara_cli.workflow_cmd import workflow_run_app, workflow_search_app, workflow_source_app
@@ -41,6 +42,7 @@ app.add_typer(workflow, name="workflow")
 workflow.add_typer(workflow_source_app, name="source")
 workflow.add_typer(workflow_search_app, name="search")
 workflow.add_typer(workflow_run_app, name="run")
+workflow.add_typer(coverage_app, name="coverage")
 
 pc = typer.Typer(
     no_args_is_help=True,
