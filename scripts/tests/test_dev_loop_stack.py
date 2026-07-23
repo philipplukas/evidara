@@ -21,6 +21,8 @@ import re
 import unittest
 from pathlib import Path
 
+import yaml
+
 SCRIPT = Path(__file__).resolve().parents[1] / "dev-loop-stack.sh"
 
 
@@ -106,6 +108,94 @@ class DevLoopStackDefaultsTests(unittest.TestCase):
             "PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND",
             self.source.split("verify()", 1)[1],
             "verify must read the publisher backend out of the running container",
+        )
+
+    def test_verify_catches_a_missing_or_drifted_connector_worker(self) -> None:
+        # A third silent trap, same shape as the other two. RunService
+        # ._should_dispatch_via_worker() forces worker dispatch for
+        # _ASYNC_PROVIDER_NAMES whatever RUN_DISPATCH_BACKEND says, so with no
+        # worker container an AT RIS run sits PENDING with refused=false and no
+        # failure_reason — indistinguishable from a broken provider.
+        body = self.source.split("verify()", 1)[1]
+        self.assertIn(
+            "evidara-platform-control-worker-1",
+            body,
+            "verify must check that the connector worker is actually running",
+        )
+        self.assertIn(
+            "worker_publisher",
+            body,
+            "presence is not enough: a worker on noop/local completes the run and "
+            "publishes nothing DI can read, which is the 2026-04-14 AT RIS break",
+        )
+
+
+class DevLoopStackComposeTests(unittest.TestCase):
+    """The worker must exist as a service, with the API's event-path env.
+
+    It used to be a commented-out block in docker-compose.yml that set only
+    DATABASE_URL and RUN_DISPATCH_BACKEND. Uncommenting it produced a worker on
+    the default local/noop backends — acquisition succeeded and document
+    -intelligence received nothing.
+    """
+
+    PARITY_VARS = (
+        "PLATFORM_CONTROL_ARTIFACT_STORE_BACKEND",
+        "PLATFORM_CONTROL_EVENT_PUBLISHER_BACKEND",
+        "PLATFORM_CONTROL_NATS_SERVERS",
+        "PLATFORM_CONTROL_S3_ENDPOINT_URL",
+        "PLATFORM_CONTROL_RAW_ARTIFACT_BUCKET",
+    )
+
+    def setUp(self) -> None:
+        path = SCRIPT.parent.parent / "docker-compose.local.yml"
+        self.raw = path.read_text(encoding="utf-8")
+        # safe_load resolves the `<<` merge key, so this compares the environment
+        # each service actually receives rather than how it was written.
+        self.services = yaml.safe_load(self.raw)["services"]
+
+    def test_worker_service_is_defined(self) -> None:
+        self.assertIn(
+            "platform-control-worker",
+            self.services,
+            "async-provider runs (ris_ogd) cannot dispatch without this service",
+        )
+
+    def test_worker_and_api_resolve_identical_event_path_env(self) -> None:
+        api = self.services["platform-control-api"]["environment"]
+        worker = self.services["platform-control-worker"]["environment"]
+        for var in self.PARITY_VARS:
+            self.assertIn(var, worker, f"worker is missing {var}")
+            self.assertEqual(
+                worker[var],
+                api.get(var),
+                f"{var} differs between platform-control-api and "
+                "platform-control-worker. The worker owns acquisition dispatch, so a "
+                "worker on local/noop writes bundles document-intelligence cannot "
+                "read while the run still reports completed.",
+            )
+
+    def test_worker_is_worker_backed_and_api_is_not(self) -> None:
+        var = "PLATFORM_CONTROL_RUN_DISPATCH_BACKEND"
+        self.assertEqual(self.services["platform-control-worker"]["environment"][var], "worker")
+        self.assertEqual(self.services["platform-control-api"]["environment"][var], "inline")
+
+    def test_parity_is_inherited_from_a_shared_anchor(self) -> None:
+        # Equality above could also be satisfied by two copy-pasted blocks, which
+        # is the arrangement that drifted on dev. Require the anchor itself.
+        self.assertIn("x-platform-control-env: &platform-control-env", self.raw)
+        self.assertEqual(
+            self.raw.count("<<: *platform-control-env"),
+            2,
+            "both platform-control-api and platform-control-worker must inherit the "
+            "shared environment anchor rather than repeat it",
+        )
+
+    def test_worker_shares_the_apps_profile(self) -> None:
+        # A worker behind its own profile is a worker nobody starts.
+        self.assertEqual(
+            self.services["platform-control-worker"].get("profiles"),
+            self.services["platform-control-api"].get("profiles"),
         )
 
 
