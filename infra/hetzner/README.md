@@ -21,6 +21,7 @@ whole node.
 | Lakehouse query | **Trino** | helm `trino/trino` |
 | Apps | Evidara services | `k8s/gitops` overlay (adapted) |
 | Observability | **Prometheus + Alertmanager + Grafana** | helm `prometheus-community/kube-prometheus-stack` |
+| Identity | **Zitadel** (OIDC provider) | helm `zitadel/zitadel`, Postgres-backed — ADR-0038 |
 
 Stateful services use the k3s built-in `local-path` storage class and the RAID-5 root.
 
@@ -322,3 +323,48 @@ HTTP, so it does **not** retry. It bounds the connect at
 `PLATFORM_CONTROL_NATS_CONNECT_TIMEOUT_SECONDS` (default 5s) and fails the rest of the
 batch immediately for a 30s cooldown, so a run against a down broker returns a 502 naming
 the cause in seconds and records the run `failed` (#707) rather than hanging for minutes.
+
+## Stage 8 — identity provider (ADR-0038 step 2)
+
+Zitadel, self-hosted OIDC, on `https://id.evidara.veyo.dev`. This stage **stands it up
+and stops**. Nothing authenticates against it: both UIs remain behind the shared
+BasicAuth password, and ADR-0038 §8 orders the wiring (operator schema → assertion seam
+→ Auth.js login → role enforcement) strictly after this. §8 step 2's words are that
+this has to be *boring* before anything depends on it.
+
+```sh
+# Prereq: DNS A record id.evidara.veyo.dev -> 88.99.26.120 (IPv4 only), resolving.
+bash infra/hetzner/deploy-stage8.sh
+```
+
+Idempotent. It creates a dedicated `zitadel` Postgres role and database in the existing
+CNPG cluster, generates the two Secrets it needs (`zitadel-db` holding the DSN,
+`zitadel-masterkey` holding the 32-byte encryption key) **once**, and installs the
+pinned chart. Re-runs never mint new credentials over a working instance — the same
+create-once rule as `evidara-auth` in Stage 5.
+
+- **No credential is committed.** `values/zitadel.yaml` contains only Secret *names*;
+  `scripts/check_hetzner_zitadel.py` fails the build if a password, DSN or masterkey
+  ever appears in it. (`values/minio.yaml` still carries a placeholder root password on
+  `main` — that is #792, and this stage deliberately does not repeat it.)
+- **Its own Postgres role, unlike Nessie.** Nessie shares the `platform_control` owner;
+  Zitadel does not. An IdP is the highest-value target in the runtime (ADR-0038 §2b),
+  and a leak of its DSN must not also expose every run, approval and operator row.
+- **Backups needed no new configuration.** barman archives the whole instance, so the
+  `zitadel` database joined the Stage 1 backup path the moment it existed. What is not
+  automatic is the *proof* — and the masterkey is a separate backup artifact a Postgres
+  restore cannot recover.
+- **Two Ingresses, one certificate.** Zitadel v4 serves its login UI from a separate
+  deployment under `/ui/v2/login`. Both Ingresses carry `tls:` (a Traefik ingress
+  without it never answers on 443) but only one carries the cert-manager annotation, or
+  the two contend for a single Certificate object.
+- **Not behind `evidara-basicauth`, deliberately.** A login page you need the shared
+  password to reach cannot replace the shared password.
+
+Operations, the restore drill that gates this step, and the break-glass procedure:
+[`docs/runbooks/zitadel-identity-provider.md`](../../docs/runbooks/zitadel-identity-provider.md).
+
+> **The offsite-backup gate is real.** MinIO's backup PVC is on the same disk as the
+> Postgres PVC, so a disk loss takes the IdP and its backup together. ADR-0038 §2b makes
+> an offsite destination a prerequisite **before Zitadel holds real user credentials** —
+> deploying it empty is fine; onboarding people into it is not.

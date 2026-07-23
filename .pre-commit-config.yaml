@@ -72,6 +72,18 @@ repos:
         pass_filenames: false
         files: ^k8s/gitops/
 
+      # An IdP values file is the worst place to repeat #792 (a placeholder MinIO
+      # root password committed to main). Also catches the ExternalDomain/ingress-host
+      # drift that yields a Zitadel whose OIDC redirects land nowhere — a
+      # misconfiguration nothing else in the pipeline can see. Mirrored in CI
+      # (.github/workflows/docs-and-contracts.yml), where --render also runs.
+      - id: check-hetzner-zitadel
+        name: Zitadel deployment values (no committed credential, ingress matches)
+        entry: python3 scripts/check_hetzner_zitadel.py
+        language: system
+        pass_filenames: false
+        files: ^(infra/hetzner/(values/zitadel\.yaml|auth/letsencrypt-issuer\.yaml)|scripts/check_hetzner_zitadel\.py)$
+
       # Skips when Docker is unavailable locally; CI runs it with --strict
       # (.github/workflows/architecture.yml), same as the kustomize gate above.
       - id: check-architecture

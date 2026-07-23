@@ -64,6 +64,15 @@ workspace "Evidara" "Document intelligence platform for legal research" {
             openSearch = container "OpenSearch" "Serving index and aliases for legal document projections" "OpenSearch" "Database"
             objectStorage = container "Object Storage" "Raw artifact files and immutable manifest objects" "MinIO (S3-compatible)" "Database"
             broker = container "NATS JetStream" "Asynchronous event transport for bundle, processing-status, publication, and withdrawal events" "NATS JetStream"
+
+            # --- Identity (ADR-0038) ---
+            # Deployed (ADR-0038 §8 step 2) and load-bearing for NOTHING yet. There
+            # are deliberately no arrows from any application to this container: no
+            # app authenticates against it, and both UIs are still behind one shared
+            # BasicAuth password. The edges appear with §8 steps 4-7 (assertion seam,
+            # then Auth.js login on admin, then on legal-search). Drawing them now
+            # would model an intention, not the runtime.
+            zitadel = container "Zitadel" "Self-hosted OIDC provider: users, organizations, sessions, login UI" "Kubernetes (k3s) / Zitadel (Go), Postgres-backed"
         }
 
         # --- External systems ---
@@ -94,6 +103,11 @@ workspace "Evidara" "Document intelligence platform for legal research" {
         broker -> legalSearch "Delivers document publication, withdrawal, and index update events"
 
         legalSearch -> openSearch "Writes and queries search projections"
+
+        # The one real edge Zitadel has today: its own database in the same CNPG
+        # instance as platform-control's (ADR-0038 §2 reason 2 — one backup story,
+        # not two), under its own Postgres role.
+        zitadel -> postgres "Persists users, organizations, and sessions in the `zitadel` database"
 
         # --- Internal component relationships ---
         frontend -> bff "API calls" "HTTPS / OpenAPI"

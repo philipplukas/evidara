@@ -63,6 +63,8 @@ Cross-cutting **contracts** (build-time): OpenAPI, JSON Schemas, and events in `
 | [TAR-89 workstreams](runbooks/tar-89-workstreams.md)                                           | Child-issue split: data / serving / staging metadata credibility |
 | [Internal beta user-flow evidence](runbooks/internal-beta-user-flow-evidence.md)                | Hetzner staging packet for seeded search/detail, HITL rescore, and recovery evidence |
 | [Post-MVP engineering workstreams](runbooks/post-mvp-engineering-workstreams.md)               | TAR-66 → TAR-62 → TAR-63 → TAR-67 after TAR-64 green |
+| [Postgres backup and restore](runbooks/postgres-backup-and-restore.md)                        | CNPG barman/PITR config, health checks, the quarterly restore drill |
+| [Zitadel identity provider](runbooks/zitadel-identity-provider.md)                            | ADR-0038 step 2: deploy checklist, restore drill gate, break-glass |
 | [Hetzner runner secret capture](runbooks/hetzner-runner-secret-capture.md)                    | Preserve-before-wipe checklist for the old Hetzner runner host secrets |
 | [Hetzner runner secret capture checklist](runbooks/hetzner-runner-secret-capture-checklist.md) | Step-by-step archive and classification checklist for the legacy runner host |
 | [MacConfig GitOps migration](migration/README.md)                                             | Platform vs product inventory, Argo cutover, slimming plan, contract changelog |
