@@ -141,6 +141,31 @@ and operator procedure in
 > `OPENSEARCH_BOOTSTRAP_ON_STARTUP=false` on the deployment if a versioned cutover manages the
 > aliases out-of-band (see `docs/runbooks/projection-reindex-backfill.md`).
 
+### Rolling out a newer build
+
+Bump **two** files to the same commit SHA — `apps/kustomization.yaml` (`images:`, which covers
+the six app images) and `apps/migrate-job.yaml` (which the `images:` transformer deliberately
+does not reach, because the Job is applied on its own before the apps roll). The long comment
+at the top of `apps/kustomization.yaml` explains how to choose a SHA and records what each
+rollout changed.
+
+`scripts/check_hetzner_image_pins.py` fails the build if those two drift apart — it runs in
+pre-commit and in the `docs-and-contracts` workflow, so this is not something to remember.
+The guard exists because the drift already reached production: the migrate Job sat at
+6e1816a7 while the apps rolled at da39660d, so revision `20260714_0021` was never applied and
+`jurisdictions` had no `level` column under code that maps it. **The Job reported success the
+whole time** — from its own older image there was nothing left to apply — so the only visible
+symptom was `UndefinedColumn` at request time.
+
+Always confirm the migration actually landed rather than trusting the Job's exit status:
+
+```sh
+kubectl -n evidara exec evidara-pg-1 -- \
+  psql -U postgres -d platform_control -tAc 'select version_num from alembic_version;'
+```
+
+It must match the newest revision in `platform-control/alembic/versions/`.
+
 ## Stage 5 — real auth (ADR-0020)
 
 `deploy-stage5.sh` puts both apps behind real auth. Idempotent; rebuild the admin and

@@ -107,6 +107,13 @@ repos:
         pass_filenames: false
         files: ^(docker-compose.*\.yml|scripts/.*\.sh|docs/.*\.md|\.github/workflows/.*\.yml|justfile|README\.md)$
 
+      - id: check-hetzner-image-pins
+        name: Check Hetzner image pins roll together
+        entry: python scripts/check_hetzner_image_pins.py
+        language: system
+        pass_filenames: false
+        files: ^infra/hetzner/apps/(kustomization|migrate-job)\.yaml$
+
       - id: check-component-doc-headings
         name: Check component doc headings
         entry: python scripts/check_component_docs.py

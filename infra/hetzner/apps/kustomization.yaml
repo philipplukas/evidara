@@ -22,16 +22,59 @@ resources:
 # what is actually running. `runtime-images.yml` tags each image with the full
 # `github.sha`, so this pin is exactly reproducible.
 #
-# Pick a SHA that actually *built* — the workflow is path-filtered, so a
-# docs- or test-only commit publishes no images at all and would leave every
-# reference here unpullable. Check `gh run list --workflow=runtime-images.yml
-# --commit <sha>` before pinning.
+# Pick a SHA that actually *built*. The gate is the workflow's `push` path
+# filter, NOT the per-image filter: a docs-, `scripts/`- or `tools/`-only commit
+# does not start `runtime-images.yml` at all and publishes nothing, which would
+# leave every reference here unpullable. But once the workflow *does* run on a
+# push, every image job's `if:` is `push || workflow_dispatch || <changed>`, so
+# all six build and publish regardless of which paths changed. There is no such
+# thing as a partial image set on a `main` push — do not hunt per-image for the
+# "newest SHA where all six exist" (that reasoning is what under-pinned this file
+# at d695b990 while three newer complete sets existed). Confirm with
+# `gh run list --workflow=runtime-images.yml --commit <sha>`.
 #
-# da39660d (#626) is the current `main` tip. All six images built and are
-# published at this SHA (runtime-images.yml run 29498811577 — every image job
-# green; verified published via the packages API, not an anonymous docker probe,
-# which fails closed on an expired credential and looks identical to a missing
-# image). It advances the live site past 5c5c13f5 (#617) with:
+# 8759bec5 (#804) is the current `main` tip and all seven image jobs are green on
+# its push (run 30027046837).
+#
+# This rollout is large. Production was pinned at da39660d (2026-07-16), 109
+# commits behind, and that gap is why the platform has no corpus: the deployed
+# image contained exactly two acquisition providers, `fedlex_sparql` and
+# `gemeinde_http`. Everything that makes a Swiss corpus possible was built after
+# it. What this pin adds:
+#   - the LexFind provider (#797): 26 cantons plus federal behind one
+#     unauthenticated JSON API. This is the cantonal rung, and it carries the
+#     ADR-0033 dog question — `tol/22871` is the ZH Hundegesetz, md5-identical to
+#     the canton's own PDF.
+#   - `blueprint_enablement` and the ADR-0030 two-key lock, so template
+#     enablement is an operator action against evidence rather than a repo edit.
+#   - `RunMode.ACCEPTANCE` (#743), without which no run can be recorded as
+#     acceptance evidence at all.
+#   - the legislative identifier reaches the index (#755 / #804), so a law is
+#     findable by its own citation. `official_citation` is `null` on every
+#     document in the live index today: the mapping defines the field and the
+#     query boosts it, but nothing populated it. Pinning below this SHA and then
+#     rebuilding the index would rebuild it still-null — which is why #804 was
+#     merged before this pin rather than after.
+#
+# NOT zero alembic delta — unlike the previous two pins. THREE forward revisions
+# apply on rollout, and the migrate job must complete before the API rolls:
+#   20260714_0021_jurisdiction_norm_level      <- already overdue, see below
+#   20260717_0022_blueprint_template_overrides
+#   20260720_0023_run_mode_acceptance
+#
+# Three, not two, because the migrate Job had drifted exactly the way the warning
+# in migrate-job.yaml predicts: it was pinned at 6e1816a7 (#574), 143 commits
+# back and older than the da39660d pin it was supposed to migrate for. So the
+# previous rollout shipped code containing 0021 and never ran it. Verified against
+# the live DB, not inferred: `alembic_version` reads 20260713_0020, and
+# `jurisdictions` has 2169 rows but no `level` column — while the deployed
+# da39660d image maps `level` on the Jurisdiction model. Every ORM read of a
+# jurisdiction in production currently raises UndefinedColumn, which is one
+# concrete reason ADR-0033's `norm_hierarchy` cannot answer anything there.
+# migrate-job.yaml is bumped to this same SHA in this change; keep the two in
+# lockstep, since the `images:` transformer below deliberately does not reach it.
+#
+# Prior pin da39660d (#626) advanced the site past 5c5c13f5 (#617) with:
 #   - document body text reaches the screen at all (#621 / #613 / #609). The BFF
 #     suppressed `content` for EVERY document that had a body: the docling fetch
 #     was skipped whenever `content` was present, and the mapper emitted `content`
@@ -56,14 +99,14 @@ resources:
 # healthy one. Zero alembic delta.)
 images:
   - name: ghcr.io/philipplukas/evidara-platform-control
-    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
+    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
   - name: ghcr.io/philipplukas/evidara-platform-control-admin
-    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
+    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
   - name: ghcr.io/philipplukas/evidara-legal-search-api
-    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
+    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
   - name: ghcr.io/philipplukas/evidara-legal-search-frontend
-    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
+    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
   - name: ghcr.io/philipplukas/evidara-document-intelligence-document-service
-    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
+    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
   - name: ghcr.io/philipplukas/evidara-document-intelligence-consumer
-    newTag: da39660d0a3014e2829718f877e93ef68b7686b9
+    newTag: 8759bec51fc55fa02a155f5b63ddf23adf942bcc
