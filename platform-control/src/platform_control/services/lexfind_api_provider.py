@@ -273,9 +273,19 @@ class LexFindApiProvider:
     # This key says the CODE works. The config key — whether a corpus is accepted —
     # is the operator's, and every lexfind template still ships `enabled: false`.
     #
-    # What is still NOT verified: coverage. LexFind has no list-everything call
-    # (`search_text` cannot be empty), so each template enumerates one branch. A
-    # live run proves the branch it asked for, never the canton's corpus.
+    # What is still NOT verified: coverage. Every current template enumerates via
+    # search, so a live run proves the branch it asked for, never the canton's
+    # corpus.
+    #
+    # That is a property of the strategy, not of LexFind. Measured 2026-07-28:
+    # `/texts-of-law/{id}` answers densely over 1..~35000 (404 past the end) and
+    # each record carries entity, systematic_number, is_active and the PDF — so an
+    # id sweep reaches the whole corpus without touching search, and
+    # `entities/extended` publishes per-entity counts (ZH 1377/944 active; 33314
+    # total across 28 entities) to verify it against. #816 tracks both.
+    #
+    # An earlier version of this comment read "a branch is not a corpus", implying
+    # the corpus was expensive. It is not; the search endpoint just cannot reach it.
     #
     # If this is ever rolled back, roll back to SCAFFOLD, not AWAITING_EVIDENCE:
     # the latter is the one state whose acceptance runs waive the operator's config
@@ -296,10 +306,14 @@ class LexFindApiProvider:
             "application/pdf, md5-identical to the canton's own file.",
             "Search contract verified live 2026-07-22: all 11 fields required, "
             "results under `texts_of_law_with_matches`, dates DD.MM.YYYY.",
-            "COVERAGE LIMIT: LexFind has no list-everything call — `search_text` "
-            "must be non-empty. A systematic-number prefix is the enumeration "
-            "strategy ('554' + entity 26 returns the whole ZH animal-protection "
-            "branch); full-corpus coverage means iterating prefixes, not one sweep.",
+            "COVERAGE LIMIT: this template enumerates via search, and the search "
+            "endpoint has no list-everything call — `search_text` must be non-empty. "
+            "So a run covers the branch it asked for ('554' + entity 26 returns the "
+            "ZH animal-protection branch), not the canton's corpus. This is a limit "
+            "of the CHOSEN STRATEGY, not of the source: `/texts-of-law/{id}` is "
+            "densely enumerable over 1..~35000 and carries entity, systematic "
+            "number, is_active and the PDF, so the full corpus is reachable by an "
+            "id sweep with no search at all (#816).",
         ]
         if not search_text:
             notes.append(

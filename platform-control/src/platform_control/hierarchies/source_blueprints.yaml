@@ -485,8 +485,14 @@ overlays:
       # without an engineer (#743), and it was.
       #
       # A pass justifies only the gates that ran. All three bundles record
-      # `skipped_gates=[]`, so for these templates that is the whole set — but a
-      # branch is not a corpus: see the COVERAGE LIMIT note above.
+      # `skipped_gates=[]`, so for these templates that is the whole gate set —
+      # over the branch each template searched, which is not the canton's corpus.
+      #
+      # The corpus IS reachable: `/texts-of-law/{id}` is densely enumerable and
+      # `entities/extended` publishes the per-entity counts to verify a sweep
+      # against (ZH 1377 total / 944 active). These search-scoped templates are a
+      # strategy choice, and #816 replaces it with id enumeration plus a coverage
+      # ledger. Do not read "3 cantons onboarded" as "3 cantons held".
       # ───────────────────────────────────────────────────────────────
       lexfind_api_zh_tierschutz:
         provider: lexfind_api
