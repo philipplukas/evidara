@@ -24,12 +24,19 @@ kubectl -n "$NS" patch serviceaccount default \
 
 echo "==> App secrets (DB URL from CNPG password + MinIO creds)"
 PGPW="$(kubectl -n "$NS" get secret evidara-pg-app -o jsonpath='{.data.password}' | base64 -d)"
+# MinIO creds are read from the `minio-root` Secret, never hardcoded — this script used
+# to seed the committed `change-me-minio-root`, which meant re-running it silently
+# reinstated the leaked credential after any rotation (#792).
+MINIO_USER="$(kubectl -n "$NS" get secret minio-root -o jsonpath='{.data.rootUser}' | base64 -d)"
+MINIO_PW="$(kubectl -n "$NS" get secret minio-root -o jsonpath='{.data.rootPassword}' | base64 -d)"
+: "${MINIO_USER:?Secret minio-root not found — provision it first (infra/hetzner/README.md)}"
+: "${MINIO_PW:?Secret minio-root has no rootPassword key}"
 kubectl -n "$NS" create secret generic evidara-app-secrets \
   --from-literal=PLATFORM_CONTROL_DATABASE_URL="postgresql+asyncpg://platform_control:${PGPW}@evidara-pg-rw:5432/platform_control" \
-  --from-literal=PLATFORM_CONTROL_S3_ACCESS_KEY_ID=evidara \
-  --from-literal=PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY=change-me-minio-root \
-  --from-literal=DI_S3_ACCESS_KEY_ID=evidara \
-  --from-literal=DI_S3_SECRET_ACCESS_KEY=change-me-minio-root \
+  --from-literal=PLATFORM_CONTROL_S3_ACCESS_KEY_ID="${MINIO_USER}" \
+  --from-literal=PLATFORM_CONTROL_S3_SECRET_ACCESS_KEY="${MINIO_PW}" \
+  --from-literal=DI_S3_ACCESS_KEY_ID="${MINIO_USER}" \
+  --from-literal=DI_S3_SECRET_ACCESS_KEY="${MINIO_PW}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> Config"

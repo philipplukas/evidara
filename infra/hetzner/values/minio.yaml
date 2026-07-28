@@ -12,9 +12,18 @@ resources:
   requests:
     memory: 512Mi
 
-# TODO: move these to a pre-created Secret before exposing MinIO beyond the cluster.
-rootUser: evidara
-rootPassword: change-me-minio-root
+# Root credentials come from a pre-created Secret — never from this file. The previous
+# inline `rootPassword: change-me-minio-root` was the live credential and is in git
+# history from #504, so it was rotated, not merely deleted (#792).
+#
+# The Secret needs keys `rootUser` and `rootPassword`; provisioning is in
+# infra/hetzner/README.md, before Stage 1. Chart contract: when `existingSecret` is set,
+# `rootUser`/`rootPassword` here must stay empty or the chart prefers the inline values.
+#
+# Rotating root re-encrypts MinIO's IAM data. Rotate with MINIO_ROOT_USER_OLD /
+# MINIO_ROOT_PASSWORD_OLD set for one deploy, or the `cnpg-backup` and `console` users
+# are orphaned and Postgres backups fail — see the runbook.
+existingSecret: minio-root
 
 # Buckets created on first start.
 buckets:

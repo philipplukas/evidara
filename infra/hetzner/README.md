@@ -48,9 +48,19 @@ kubectl get nodes                # expect: evidara-k3s Ready
 
 ## Stage 1 — foundation (storage + database)
 
-```bash
-kubectl apply -f infra/hetzner/00-namespace.yaml
+**MinIO root credentials first** — `values/minio.yaml` sets `existingSecret: minio-root`
+and carries no password, so the Secret must exist before the chart is installed. The
+password is generated inline and never printed or committed:
 
+```bash
+NS=evidara
+kubectl apply -f infra/hetzner/00-namespace.yaml
+kubectl -n $NS create secret generic minio-root \
+  --from-literal=rootUser=evidara \
+  --from-literal=rootPassword="$(openssl rand -hex 24)"
+```
+
+```bash
 # MinIO
 helm repo add minio https://charts.min.io/ && helm repo update
 helm upgrade --install minio minio/minio -n evidara -f infra/hetzner/values/minio.yaml
@@ -94,6 +104,48 @@ Verify the scoping actually holds (both `ls` commands must be denied):
 mc ls v/evidara-pg-backups/     # allowed
 mc ls v/evidara-raw-artifacts/  # MUST be "Access Denied"
 mc ls v/evidara-lakehouse/      # MUST be "Access Denied"
+```
+
+### Rotating the MinIO root credential
+
+**MinIO encrypts its IAM data with the root credential.** Rotating root without telling
+MinIO the previous value orphans every IAM user — here `cnpg-backup` and `console` —
+and Postgres backups start failing with an auth error that looks nothing like the cause.
+Pass the old credential for exactly one deploy so MinIO re-encrypts:
+
+```bash
+NS=evidara
+OLD_U=$(kubectl -n $NS get secret minio-root -o jsonpath='{.data.rootUser}' | base64 -d)
+OLD_P=$(kubectl -n $NS get secret minio-root -o jsonpath='{.data.rootPassword}' | base64 -d)
+
+kubectl -n $NS create secret generic minio-root \
+  --from-literal=rootUser=evidara \
+  --from-literal=rootPassword="$(openssl rand -hex 24)" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+helm upgrade --install minio minio/minio -n $NS -f infra/hetzner/values/minio.yaml \
+  --set environment.MINIO_ROOT_USER_OLD="$OLD_U" \
+  --set environment.MINIO_ROOT_PASSWORD_OLD="$OLD_P" --wait
+unset OLD_U OLD_P
+```
+
+Confirm both users survived, then re-run the same `helm upgrade` **without** the two
+`--set` flags so the old credential stops being passed:
+
+```bash
+POD=$(kubectl -n $NS get pod -l app=minio -o jsonpath='{.items[0].metadata.name}')
+kubectl -n $NS exec $POD -- sh -c "mc --config-dir /tmp/c alias set r http://localhost:9000 \
+  \$MINIO_ROOT_USER \$MINIO_ROOT_PASSWORD && mc --config-dir /tmp/c admin user list r"
+# MUST list cnpg-backup and console
+```
+
+Then propagate to the consumers — they each hold their own copy:
+
+```bash
+bash infra/hetzner/deploy-stage4.sh        # re-seeds evidara-app-secrets from minio-root
+helm upgrade --install trino trino/trino -n $NS -f infra/hetzner/values/trino.yaml --wait
+kubectl -n $NS rollout restart deploy/platform-control-api deploy/di-consumer \
+  deploy/document-service deploy/projection-bridge
 ```
 
 Then the cluster:
