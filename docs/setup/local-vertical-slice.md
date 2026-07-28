@@ -156,6 +156,37 @@ uv run document_intelligence_document_service
 - confirm downstream processing status and lifecycle events are visible in run detail endpoints
 - query `legal-search/api` and verify projected content is searchable
 
+## Troubleshooting: every index creation returns 403
+
+```
+403 index_create_block_exception
+    blocked by: [FORBIDDEN/10/cluster create-index blocked (api)]
+```
+
+This is a **disk** fault wearing a permissions costume. When OpenSearch's high disk
+watermark (90% full) is breached, `DiskThresholdMonitor` blocks index creation across
+the whole cluster — the seed, the bootstrap and the acceptance loop all fail with the
+403 above. It is what broke the nightly `E2E CH Fedlex Loop` for six nights from
+2026-07-22.
+
+`docker-compose.yml` now sets `cluster.routing.allocation.disk.threshold_enabled=false`
+on the local OpenSearch, so a fresh cluster never installs the block — disk-based shard
+allocation is meaningless on a single node anyway, since there is nowhere to relocate a
+shard to.
+
+That setting does **not** rescue a cluster that is already blocked. The monitor records
+the block as a *persistent* cluster setting stored in the `opensearch-data` volume, and
+once thresholds are disabled the monitor stops running and never removes it. If you hit
+the 403 before this fix, clear it once — free some disk first, or it will simply return:
+
+```bash
+curl -X PUT localhost:9200/_cluster/settings \
+  -H 'Content-Type: application/json' \
+  -d '{"persistent":{"cluster.blocks.create_index":null}}'
+```
+
+Or discard the volume entirely with `docker compose down -v`.
+
 ## Teardown
 
 ```bash

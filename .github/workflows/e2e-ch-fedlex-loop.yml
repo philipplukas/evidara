@@ -49,6 +49,21 @@ jobs:
         with:
           fetch-depth: 1
 
+      # The stack pulls ~10 GB of images onto a runner that ships ~45 GB already
+      # consumed by preinstalled toolchains, leaving OpenSearch's data volume on a
+      # disk that was measured at 91.5% full (6.1 GB free) on 2026-07-27. None of
+      # these toolchains are used by this job — it is docker compose and bash — so
+      # reclaiming them buys ~25 GB of headroom. Paired with the disk-watermark
+      # setting on the compose OpenSearch service: this removes the disk pressure,
+      # that one stops a nearly-full disk from manifesting as an opaque 403.
+      - name: Reclaim runner disk
+        run: |
+          set -uo pipefail
+          echo "Before:"; df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          echo "After:"; df -h /
+
       - name: Bring up the full local stack
         run: |
           set -euo pipefail
