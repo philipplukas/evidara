@@ -48,6 +48,11 @@ type PaginatedListResponse<T> = {
 };
 
 type Jurisdiction = Schemas["JurisdictionResponse"];
+// Aliased from the generated contract, never hand-written: a hand-rolled shape here
+// is a divergence nothing can detect (AGENTS.md rule 4).
+type AcquisitionCoverageEntry = Schemas["AcquisitionCoverageEntry"];
+type AcquisitionCoverageListResponse = Schemas["AcquisitionCoverageListResponse"];
+export type AcquisitionCoverageSummary = Schemas["AcquisitionCoverageSummary"];
 
 type Authority = Schemas["AuthorityResponse"];
 
@@ -253,6 +258,7 @@ type RequestOptions = {
 };
 
 export type JurisdictionRecord = Jurisdiction & RaRecord<Identifier>;
+export type AcquisitionCoverageRecord = AcquisitionCoverageEntry & RaRecord<Identifier>;
 export type AuthorityRecord = Authority & RaRecord<Identifier>;
 export type SourceRecord = Source & RaRecord<Identifier>;
 export type SourceVersionRecord = SourceVersion & RaRecord<Identifier>;
@@ -579,6 +585,36 @@ const normalizeRunPreviewSummary = (raw: RunPreviewSummary): RunPreviewSummary =
     status: normalizeDriftStatus(check.status),
   })),
 });
+
+/**
+ * Coalesce every field of the coverage summary before it reaches React.
+ *
+ * #623: a raw `res.json()` whose shape had drifted took down the whole SPA. The summary
+ * is rendered above a 2110-row table, so a single missing counter would blank the page
+ * an operator opened precisely to find out what is missing.
+ *
+ * Returns null rather than a zeroed object when the block is absent — zeros here would
+ * read as "measured, found nothing", which is the ledger's own cardinal sin.
+ */
+const normalizeAcquisitionCoverageSummary = (
+  raw: AcquisitionCoverageSummary | undefined | null,
+): AcquisitionCoverageSummary | null => {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const count = (value: unknown): number => (typeof value === "number" ? value : 0);
+  return {
+    ...raw,
+    jurisdictions_total: count(raw.jurisdictions_total),
+    jurisdictions_with_any_acquired: count(raw.jurisdictions_with_any_acquired),
+    jurisdictions_with_any_processed: count(raw.jurisdictions_with_any_processed),
+    jurisdictions_with_published_denominator: count(raw.jurisdictions_with_published_denominator),
+    jurisdictions_with_registry_denominator: count(raw.jurisdictions_with_registry_denominator),
+    reconciliations_unattributed: count(raw.reconciliations_unattributed),
+    processed_documents_unattributable: count(raw.processed_documents_unattributable),
+    unmeasured_stages: Array.isArray(raw.unmeasured_stages) ? raw.unmeasured_stages : [],
+  };
+};
 
 const isMissingFilterValue = (value: string | undefined): boolean =>
   value === undefined || value.length === 0 || value === EMPTY_FILTER_VALUE;
@@ -1020,6 +1056,21 @@ export const controlPlaneActions = {
   },
 
   /**
+   * Fetch the acquisition-coverage summary (#816).
+   *
+   * Separate from `getList` because a react-admin list result has nowhere to carry a
+   * summary block, and the summary is the headline: it is what makes "1 mapped commune
+   * of 2110" legible instead of leaving it to be inferred from 2110 mostly-empty rows.
+   */
+  async getAcquisitionCoverageSummary(): Promise<AcquisitionCoverageSummary | null> {
+    // limit=1 — we want the envelope's summary, not the page.
+    const response = await requestJson<AcquisitionCoverageListResponse>(
+      "/v1/acquisition-coverage?limit=1",
+    );
+    return normalizeAcquisitionCoverageSummary(response?.summary);
+  },
+
+  /**
    * Fetch the correction metrics aggregate for the admin dashboard (#432).
    *
    * Backed by `GET /v1/corrections/metrics`. Caller controls the
@@ -1052,6 +1103,24 @@ export const controlPlaneActions = {
 
 export const controlPlaneDataProvider: DataProvider = {
   async getList(resource, params): Promise<GetListResult> {
+    if (resource === ResourceName.AcquisitionCoverage) {
+      const page = params.pagination?.page ?? 1;
+      const perPage = Math.min(params.pagination?.perPage ?? 50, MAX_SERVER_PAGE_SIZE);
+      const query = new URLSearchParams({
+        limit: String(perPage),
+        offset: String((page - 1) * perPage),
+      });
+      const level = params.filter?.level;
+      if (typeof level === "string" && level.length > 0) {
+        query.set("level", level);
+      }
+      const response = await requestJson<AcquisitionCoverageListResponse>(
+        `/v1/acquisition-coverage?${query.toString()}`,
+      );
+      const records = (response.data ?? []).map((item) => toRecord(item, "jurisdiction_id"));
+      return toServerPagedResult(records, response.total ?? undefined, params);
+    }
+
     if (resource === ResourceName.Jurisdictions) {
       return getSimpleListResult(ResourceName.Jurisdictions, "jurisdiction_id", params);
     }

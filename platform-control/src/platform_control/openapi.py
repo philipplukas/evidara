@@ -67,7 +67,12 @@ API_TITLE = "Platform Control API"
 # spec with operator-chosen seeds, fenced to the template's own origins, instead
 # of forcing a hand-written `acquisition_spec` that loses the ADR-0030 config key
 # (#710, ADR-0046).
-API_VERSION = "0.19.0"
+# 0.20.0: additive -- `GET /v1/acquisition-coverage`, the platform-control half of
+# the ADR-0042 SS4 split: expected -> discovered -> acquired -> processed per
+# jurisdiction, with a denominator tier. Deliberately carries no percentage or
+# completeness score (ADR-0042 rejected those outright), and names `indexed` as
+# unmeasured because it lives in legal-search's index (#816).
+API_VERSION = "0.20.0"
 
 API_DESCRIPTION = """\
 API for managing sources, source versions, runs, approvals, and provider webhooks
@@ -84,6 +89,19 @@ API_CONTACT: dict[str, Any] = {"name": "Evidara Team"}
 # part of the contract: they carry semantics the schemas cannot.
 OPENAPI_TAGS: list[dict[str, Any]] = [
     {"name": "reference-data"},
+    {
+        "name": "acquisition-coverage",
+        "description": (
+            "What were we asked to acquire, and did it succeed? Per jurisdiction:\n"
+            "``expected -> discovered -> acquired -> processed``, with a\n"
+            "``denominator_tier`` recording how trustworthy ``expected`` is.\n\n"
+            "This is the platform-control half of the ADR-0042 SS4 split. The other\n"
+            "half -- *what does the corpus hold?* -- is legal-search ``GET /v1/coverage``,\n"
+            "and the ``indexed`` stage is reported there rather than here, because this\n"
+            "service has no dependency on the search index.\n\n"
+            "Carries no percentage, ratio or completeness score by design.\n"
+        ),
+    },
     {"name": "sources"},
     {"name": "source-versions"},
     {"name": "runs"},

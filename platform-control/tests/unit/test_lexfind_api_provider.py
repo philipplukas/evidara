@@ -601,3 +601,35 @@ def test_enumerating_plan_reports_the_verified_measurement(provider):
     assert any("ENUMERATION" in note for note in plan.notes)
     assert not any("COVERAGE LIMIT" in note for note in plan.notes)
     assert not any("search_text is missing" in note for note in plan.notes)
+
+
+@pytest.mark.asyncio
+async def test_zero_published_total_is_unstatable_not_complete(provider, monkeypatch):
+    """A reported entity with a zero/missing count must not read as fully covered.
+
+    `int(... or 0)` used to turn a missing `total_texts_of_law` into `expected: 0`, and
+    `observed == 0` against `expected == 0` left `complete: True` — "this canton
+    publishes zero laws and we hold all zero of them". The existing
+    `test_unknown_denominator_never_rounds_up_to_complete` misses it: that covers the
+    ABSENT entity, this covers the empty count.
+    """
+    client = _EnumerationClient(
+        slices=dict.fromkeys("0123456789", []),
+        totals=[{"id": 26, "status": {"total_texts_of_law": 0, "active_texts_of_law": 0}}],
+    )
+    result = await _enumerate(provider, monkeypatch, client)
+
+    coverage = result.response_payload["coverage"]
+    assert coverage["entities"][0]["expected"] is None
+    assert coverage["entities"][0]["gap"] is None
+    assert coverage["complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_missing_total_key_is_unstatable(provider, monkeypatch):
+    client = _EnumerationClient(totals=[{"id": 26, "status": {"active_texts_of_law": 3}}])
+    result = await _enumerate(provider, monkeypatch, client)
+
+    coverage = result.response_payload["coverage"]
+    assert coverage["entities"][0]["expected"] is None
+    assert coverage["complete"] is False

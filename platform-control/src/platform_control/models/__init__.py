@@ -5,6 +5,7 @@ from platform_control.models.commentary_insight import CommentaryInsight
 from platform_control.models.compliance_policy import CompliancePolicy
 from platform_control.models.corpus import Corpus
 from platform_control.models.correction import Correction
+from platform_control.models.coverage_reconciliation import CoverageReconciliation
 from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
 from platform_control.models.extractor_profile import ExtractorProfile
 from platform_control.models.operator import Operator
@@ -29,6 +30,7 @@ __all__ = [
     "CompliancePolicy",
     "Corpus",
     "Correction",
+    "CoverageReconciliation",
     "DocumentLifecycleEvent",
     "ExtractorProfile",
     "Jurisdiction",

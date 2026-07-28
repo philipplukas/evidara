@@ -19,6 +19,10 @@ export const ResourceName = {
   Runs: "runs",
   Corrections: "corrections",
   CommentaryInsights: "commentary-insights",
+  // Acquisition coverage, NOT "coverage": legal-search serves its own /v1/coverage
+  // (what the corpus holds). This is the other half of the ADR-0042 §4 split —
+  // what we were asked to acquire, and whether it succeeded.
+  AcquisitionCoverage: "acquisition-coverage",
 } as const;
 
 export type ResourceName = (typeof ResourceName)[keyof typeof ResourceName];

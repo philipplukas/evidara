@@ -31,6 +31,7 @@ import { CommentaryInsightList } from "../resources/corrections/CommentaryInsigh
 import { CommentaryInsightShow } from "../resources/corrections/CommentaryInsightShow";
 import { CorrectionShow } from "../resources/corrections/CorrectionShow";
 import { CorrectionsList } from "../resources/corrections/CorrectionsList";
+import { AcquisitionCoverageList } from "../resources/coverage/AcquisitionCoverageList";
 import { Dashboard } from "../resources/dashboard/Dashboard";
 import AuthorityCreate from "../resources/reference-data/AuthorityCreate";
 import AuthorityEdit from "../resources/reference-data/AuthorityEdit";
@@ -153,6 +154,12 @@ export default function AdminApp() {
         show={CorrectionShow}
         recordRepresentation="correction_id"
         options={{ label: "Corrections" }}
+      />
+      <Resource
+        name={ResourceName.AcquisitionCoverage}
+        list={AcquisitionCoverageList}
+        recordRepresentation="jurisdiction_id"
+        options={{ label: "Coverage" }}
       />
       <Resource
         name={ResourceName.CommentaryInsights}

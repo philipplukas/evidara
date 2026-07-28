@@ -75,6 +75,7 @@ import httpx
 
 from acquisition_core.artifact_guard import check_capture
 from acquisition_core.content_gate import assess_legal_text_density
+from platform_control.domain import DenominatorTier
 from platform_control.models.run import Run
 from platform_control.models.source import Source
 from platform_control.models.source_version import SourceVersion
@@ -221,6 +222,18 @@ def _iso_date_or_none(value: Any) -> str | None:
     # an absent one, because absence is honest and downstream can say "unknown".
     logger.warning("lexfind: unrecognised date format %r — dropped", text)
     return None
+
+
+def _positive_int_or_none(value: Any) -> int | None:
+    """A denominator, or None — never zero.
+
+    Zero is not a count we can reconcile against: a source reporting no law at all is
+    unstatable, and treating it as a denominator makes `observed == 0` read as complete
+    coverage. Anything non-numeric is likewise unknown rather than empty.
+    """
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return int(value) if value > 0 else None
 
 
 def _download_entry(record: dict[str, Any], language: str) -> dict[str, Any] | None:
@@ -752,7 +765,7 @@ class LexFindApiProvider:
 
         return {
             "strategy": _ENUMERATION_STRATEGY_DIGIT_UNION,
-            "denominator_tier": "published",
+            "denominator_tier": DenominatorTier.PUBLISHED.value,
             "denominator_source": f"{_API_PREFIX}/{{lang}}/{_ENTITIES_PATH}",
             "complete": complete,
             "entities": entities,
@@ -777,8 +790,19 @@ class LexFindApiProvider:
             status = entity.get("status") or {}
             if isinstance(entity_id, int):
                 totals[entity_id] = {
-                    "total": int(status.get("total_texts_of_law") or 0),
-                    "active": int(status.get("active_texts_of_law") or 0),
+                    # `or 0` here was a live defect. A reported entity whose
+                    # `total_texts_of_law` is missing or zero became `expected: 0`, and
+                    # `_reconcile` then compared `found == 0` against `expected == 0` and
+                    # left `complete: True` — "this canton publishes zero laws and we hold
+                    # all zero of them". That is the fabricated completeness claim this
+                    # module exists to prevent, arriving through a door
+                    # `test_unknown_denominator_never_rounds_up_to_complete` does not
+                    # cover: it exercises the ABSENT entity, not the empty count.
+                    #
+                    # Zero is not a denominator. A source claiming to publish no law at
+                    # all is unstatable, not complete.
+                    "total": _positive_int_or_none(status.get("total_texts_of_law")),
+                    "active": _positive_int_or_none(status.get("active_texts_of_law")),
                     "changed_last_30d": int(status.get("changes_in_last_n_days") or 0),
                 }
         return totals

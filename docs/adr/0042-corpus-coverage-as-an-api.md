@@ -163,6 +163,19 @@ Named here so they are visible as gaps rather than discovered as surprises:
   inventory — merged as of 2026-07-19 — is the natural place to hang it: it already
   surfaces per-template lock state (`enabled` / `live_ready` / `launchable`), which is
   exactly the "were we even asked to acquire this?" half that legal-search cannot see.
+
+  **Shipped 2026-07-28 as `GET /v1/acquisition-coverage` (#816), as its own read model
+  rather than hung off the blueprint inventory** — the value is browsing every
+  jurisdiction, which is what makes "1 mapped commune of 2110" visible. It reports
+  `expected → discovered → acquired → processed` with a `denominator_tier`
+  (`published` / `registry` / `none`) recording what the number may support, and names
+  `indexed` in `unmeasured_stages` rather than inferring it — §4's split, kept.
+
+  This does **not** reopen the completeness score rejected below: the endpoint emits raw
+  counts and gaps and no ratio, enforced by
+  `test_coverage_never_publishes_a_completeness_score`. Surfacing `expected` in
+  legal-search's `/v1/coverage` — which would be the first fact there whose `basis` is
+  not `index` — remains deferred and would revisit this ADR.
 - **Coverage annotation on search responses.** The `q=Tierschutz` failure happened on
   `/v1/search`, and a caller that only searches never sees `/v1/coverage`. Attaching a coverage
   block to `SearchResponse` is the fix that most directly addresses the measured incident. It is
