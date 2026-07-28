@@ -15,13 +15,34 @@ maxRunners: 2
 
 template:
   spec:
+    # The runner image is a PRIVATE GHCR package (an anonymous manifest request
+    # returns 401), so the pod needs registry credentials — exactly like every other
+    # ghcr.io/philipplukas/evidara-* image. The secret is namespaced, so `arc-runners`
+    # needs its own copy; the one `deploy-stage4.sh` creates in `evidara` is not
+    # visible here. `infra/hetzner/deploy-runners.sh` step 2 creates this one, and
+    # requires GHCR_TOKEN (read:packages) to do it.
+    #
+    # This file previously asserted the package "must be public — ARC pulls it with
+    # no imagePullSecret". It never was public, and no secret existed here, so the
+    # image below could not have been pulled at all. See the note on the image.
+    imagePullSecrets:
+      - name: ghcr-pull
     containers:
       - name: runner
         # Custom image: stock actions-runner ships no browser system libraries, so
         # Playwright's Chromium dies with `libnspr4.so: cannot open shared object file`.
-        # Built by .github/workflows/runner-image.yml from runners/Dockerfile.heavy.
-        # The GHCR package must be public — ARC pulls it with no imagePullSecret, same
-        # as every other ghcr.io/philipplukas/evidara-* image (k8s/gitops/base/).
+        # Built by .github/workflows/runner-image.yml from runners/Dockerfile.heavy,
+        # which launches Chromium as the unprivileged `runner` user before it pushes.
+        #
+        # Editing this file changes NOTHING until `deploy-runners.sh` re-runs: the
+        # values reach the cluster through `helm upgrade`, not through a merge to main.
+        # That gap is why the heavy Playwright smoke was red for three months — #534
+        # added this image on 2026-07-11, but the Helm release was still revision 1
+        # from 2026-07-01 and the pool kept running stock `actions/actions-runner`,
+        # which has no browser libraries. Check with:
+        #   helm history evidara-heavy-v2 -n arc-runners
+        #   kubectl get autoscalingrunnerset evidara-heavy-v2 -n arc-runners \
+        #     -o jsonpath='{.spec.template.spec.containers[0].image}'
         image: ghcr.io/philipplukas/evidara-runner-heavy:latest
         command: ["/home/runner/run.sh"]
         resources:
