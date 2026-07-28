@@ -190,3 +190,40 @@ class ReviewTaskStatus(StrEnum):
     PENDING = "pending"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class DenominatorTier(StrEnum):
+    """How trustworthy a coverage denominator is — and therefore what may be claimed.
+
+    A ledger that reports "100%" against an unknown denominator is worse than no ledger:
+    it manufactures the false green this repo keeps getting caught by. So the tier travels
+    with every expected count, and it decides what the number is allowed to support.
+
+    PUBLISHED  the source states its own count (LexFind `entities/extended`).
+               Completeness is claimable, with a gap.
+    REGISTRY   we know the UNITS but not their contents — 2110 seeded communes, whose
+               individual law counts nobody publishes. Breadth only. A gap here would
+               subtract documents from units and yield a number in no unit at all.
+    NONE       no denominator exists. Completeness is unstatable; the held count is the
+               only honest output.
+    """
+
+    PUBLISHED = "published"
+    REGISTRY = "registry"
+    NONE = "none"
+
+
+class CoverageAttributionStatus(StrEnum):
+    """Whether a reconciliation could be tied to a jurisdiction.
+
+    Providers speak their own entity ids (LexFind `26`), never `jur_ch_zh`; the mapping
+    exists only through `Source.jurisdiction_id`, which holds one jurisdiction. A run
+    covering several entities therefore cannot be attributed without inventing the split.
+
+    Following the `Run.refused` precedent, the unattributable case is still WRITTEN —
+    the attempt leaves evidence rather than silence, so it can be counted and explained
+    rather than looking like a run that never measured anything.
+    """
+
+    ATTRIBUTED = "attributed"
+    AMBIGUOUS_MULTI_ENTITY = "ambiguous_multi_entity"

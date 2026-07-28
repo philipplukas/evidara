@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.19.0
+  version: 0.20.0
 paths:
   /health:
     get:
@@ -2757,6 +2757,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/acquisition-coverage:
+    get:
+      tags:
+      - acquisition-coverage
+      - agent-discovery
+      summary: Acquisition coverage per jurisdiction
+      description: |-
+        Report `expected -> discovered -> acquired -> processed` per jurisdiction.
+
+        `indexed` is absent by design and named in `summary.unmeasured_stages`: it lives in
+        legal-search's index, which this service has no dependency on. Reporting it from here
+        would be an inference presented as a measurement.
+      operationId: getAcquisitionCoverage
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: level
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/NormLevel'
+          - type: 'null'
+          title: Level
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcquisitionCoverageListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/commentary-insights:
     get:
       tags:
@@ -3076,6 +3130,193 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    AcquisitionCoverageEntry:
+      properties:
+        jurisdiction_id:
+          type: string
+          title: Jurisdiction Id
+        name:
+          type: string
+          title: Name
+        slug:
+          type: string
+          title: Slug
+        level:
+          $ref: '#/components/schemas/NormLevel'
+        expected:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Expected
+        denominator_tier:
+          $ref: '#/components/schemas/DenominatorTier'
+          default: none
+        denominator_source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Denominator Source
+        denominator_as_of:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Denominator As Of
+        denominator_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Denominator Run Id
+        denominator_run_mode:
+          anyOf:
+          - $ref: '#/components/schemas/RunMode'
+          - type: 'null'
+        denominator_truncated:
+          type: boolean
+          title: Denominator Truncated
+          default: false
+        provider_complete_claim:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Provider Complete Claim
+        reconciliation_count:
+          type: integer
+          minimum: 0.0
+          title: Reconciliation Count
+          default: 0
+        discovered:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Discovered
+        acquired_resources:
+          type: integer
+          minimum: 0.0
+          title: Acquired Resources
+          default: 0
+        acquired_distinct_urls:
+          type: integer
+          minimum: 0.0
+          title: Acquired Distinct Urls
+          default: 0
+        processed_documents:
+          type: integer
+          minimum: 0.0
+          title: Processed Documents
+          default: 0
+        withdrawn_documents:
+          type: integer
+          minimum: 0.0
+          title: Withdrawn Documents
+          default: 0
+        acquired_gap:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Acquired Gap
+        processed_gap:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Processed Gap
+      type: object
+      required:
+      - jurisdiction_id
+      - name
+      - slug
+      - level
+      title: AcquisitionCoverageEntry
+    AcquisitionCoverageListResponse:
+      properties:
+        basis:
+          type: string
+          title: Basis
+          default: platform_control_runs
+        as_of:
+          type: string
+          format: date-time
+          title: As Of
+        summary:
+          $ref: '#/components/schemas/AcquisitionCoverageSummary'
+        data:
+          items:
+            $ref: '#/components/schemas/AcquisitionCoverageEntry'
+          type: array
+          title: Data
+        total:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Total
+        limit:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Limit
+        offset:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Offset
+      type: object
+      required:
+      - as_of
+      - summary
+      - data
+      title: AcquisitionCoverageListResponse
+    AcquisitionCoverageSummary:
+      properties:
+        jurisdictions_total:
+          type: integer
+          minimum: 0.0
+          title: Jurisdictions Total
+        jurisdictions_with_any_acquired:
+          type: integer
+          minimum: 0.0
+          title: Jurisdictions With Any Acquired
+        jurisdictions_with_any_processed:
+          type: integer
+          minimum: 0.0
+          title: Jurisdictions With Any Processed
+        jurisdictions_with_published_denominator:
+          type: integer
+          minimum: 0.0
+          title: Jurisdictions With Published Denominator
+        jurisdictions_with_registry_denominator:
+          type: integer
+          minimum: 0.0
+          title: Jurisdictions With Registry Denominator
+        reconciliations_unattributed:
+          type: integer
+          minimum: 0.0
+          title: Reconciliations Unattributed
+        processed_documents_unattributable:
+          type: integer
+          minimum: 0.0
+          title: Processed Documents Unattributable
+        reconciliations_recorded_since:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Reconciliations Recorded Since
+        unmeasured_stages:
+          items:
+            type: string
+          type: array
+          title: Unmeasured Stages
+      type: object
+      required:
+      - jurisdictions_total
+      - jurisdictions_with_any_acquired
+      - jurisdictions_with_any_processed
+      - jurisdictions_with_published_denominator
+      - jurisdictions_with_registry_denominator
+      - reconciliations_unattributed
+      - processed_documents_unattributable
+      title: AcquisitionCoverageSummary
     AcquisitionReadiness:
       type: string
       enum:
@@ -4627,6 +4868,27 @@ components:
       required:
       - name
       title: CreateWizardProjectRequest
+    DenominatorTier:
+      type: string
+      enum:
+      - published
+      - registry
+      - none
+      title: DenominatorTier
+      description: |-
+        How trustworthy a coverage denominator is — and therefore what may be claimed.
+
+        A ledger that reports "100%" against an unknown denominator is worse than no ledger:
+        it manufactures the false green this repo keeps getting caught by. So the tier travels
+        with every expected count, and it decides what the number is allowed to support.
+
+        PUBLISHED  the source states its own count (LexFind `entities/extended`).
+                   Completeness is claimable, with a gap.
+        REGISTRY   we know the UNITS but not their contents — 2110 seeded communes, whose
+                   individual law counts nobody publishes. Breadth only. A gap here would
+                   subtract documents from units and yield a number in no unit at all.
+        NONE       no denominator exists. Completeness is unstatable; the held count is the
+                   only honest output.
     DependencyCheck:
       properties:
         status:
@@ -5680,6 +5942,27 @@ components:
       additionalProperties: false
       type: object
       title: LexFindAcquisitionSpec
+    NormLevel:
+      type: string
+      enum:
+      - constitutional
+      - international
+      - federal
+      - cantonal
+      - municipal
+      title: NormLevel
+      description: |-
+        Rank of a norm in the hierarchy of norms (ADR-0033).
+
+        A *jurisdiction* carries the level its own legislation sits at; a
+        *document* inherits that level unless the canonical metadata declares a
+        higher rank (only ``CONSTITUTIONAL`` can be declared this way — a
+        constitution is enacted by a federal jurisdiction but outranks its
+        ordinary statutes, so it cannot be derived from the jurisdiction alone).
+
+        Ordering is authoritative and lives in
+        ``contracts/vocabularies/norm-level.json``; ``NORM_LEVEL_RANK`` below is
+        the Python mirror. Lower rank = higher authority.
     OperatorThroughputEntry:
       properties:
         operator_id:
@@ -7970,6 +8253,18 @@ components:
       name: X-API-Key
 tags:
 - name: reference-data
+- name: acquisition-coverage
+  description: |
+    What were we asked to acquire, and did it succeed? Per jurisdiction:
+    ``expected -> discovered -> acquired -> processed``, with a
+    ``denominator_tier`` recording how trustworthy ``expected`` is.
+
+    This is the platform-control half of the ADR-0042 SS4 split. The other
+    half -- *what does the corpus hold?* -- is legal-search ``GET /v1/coverage``,
+    and the ``indexed`` stage is reported there rather than here, because this
+    service has no dependency on the search index.
+
+    Carries no percentage, ratio or completeness score by design.
 - name: sources
 - name: source-versions
 - name: runs

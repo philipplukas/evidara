@@ -11,6 +11,7 @@ scripts/check-platform-control.sh, because it compares a file, not behaviour.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -102,6 +103,7 @@ def test_every_acquisition_provider_is_a_contract_variant(schema: dict) -> None:
 #: of that issue: unbounded, so the admin fetched all 2,169 jurisdictions on
 #: every list render and reported the page length as the count.
 PAGINATED_LIST_RESPONSES = {
+    "AcquisitionCoverageListResponse",
     "AuthorityListResponse",
     "CapturedResourceListResponse",
     "CommentaryInsightListResponse",
@@ -328,3 +330,41 @@ def test_firecrawl_webhook_declares_no_request_body(schema: dict) -> None:
     `anyOf: [$ref Settings, null]`.
     """
     assert "requestBody" not in schema["paths"]["/v1/firecrawl/webhooks"]["post"]
+
+
+_COMPLETENESS_SCORE_PATTERN = re.compile(
+    r"percent|ratio|completeness|score|fraction|searchable", re.IGNORECASE
+)
+_COVERAGE_SCHEMAS = (
+    "AcquisitionCoverageEntry",
+    "AcquisitionCoverageSummary",
+    "AcquisitionCoverageListResponse",
+)
+
+
+def test_coverage_never_publishes_a_completeness_score(schema: dict) -> None:
+    """ADR-0042 rejected a completeness score outright — as a gate, not a rule to recall.
+
+    > "Every such number needs a denominator ... A completeness score would be the single
+    > most dangerous field we could ship here."
+
+    The ledger reports raw counts and gaps so an operator reads `1377 / 1377` and draws
+    their own conclusion. `searchable` is in the pattern for a different reason: this
+    service cannot observe the index (ADR-0042 §4), so a field claiming to would be an
+    inference dressed as a measurement.
+    """
+    schemas = schema["components"]["schemas"]
+    offenders = []
+    checked = 0
+    for name in _COVERAGE_SCHEMAS:
+        assert name in schemas, f"{name} is missing — this test would pass vacuously."
+        for field in schemas[name].get("properties", {}):
+            checked += 1
+            if _COMPLETENESS_SCORE_PATTERN.search(field):
+                offenders.append(f"{name}.{field}")
+    assert checked, "No coverage fields were checked — this assertion would pass vacuously."
+    assert not offenders, (
+        "Acquisition coverage must not publish a percentage, ratio or completeness score "
+        "(ADR-0042 'Rejected outright'), nor claim the index stage it cannot observe:\n  "
+        + "\n  ".join(offenders)
+    )

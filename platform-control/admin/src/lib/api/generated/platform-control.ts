@@ -995,6 +995,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/acquisition-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Acquisition coverage per jurisdiction
+         * @description Report `expected -> discovered -> acquired -> processed` per jurisdiction.
+         *
+         *     `indexed` is absent by design and named in `summary.unmeasured_stages`: it lives in
+         *     legal-search's index, which this service has no dependency on. Reporting it from here
+         *     would be an inference presented as a measurement.
+         */
+        get: operations["getAcquisitionCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/commentary-insights": {
         parameters: {
             query?: never;
@@ -1181,6 +1205,108 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcquisitionCoverageEntry */
+        AcquisitionCoverageEntry: {
+            /** Jurisdiction Id */
+            jurisdiction_id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            level: components["schemas"]["NormLevel"];
+            /** Expected */
+            expected?: number | null;
+            /** @default none */
+            denominator_tier: components["schemas"]["DenominatorTier"];
+            /** Denominator Source */
+            denominator_source?: string | null;
+            /** Denominator As Of */
+            denominator_as_of?: string | null;
+            /** Denominator Run Id */
+            denominator_run_id?: string | null;
+            denominator_run_mode?: components["schemas"]["RunMode"] | null;
+            /**
+             * Denominator Truncated
+             * @default false
+             */
+            denominator_truncated: boolean;
+            /** Provider Complete Claim */
+            provider_complete_claim?: boolean | null;
+            /**
+             * Reconciliation Count
+             * @default 0
+             */
+            reconciliation_count: number;
+            /** Discovered */
+            discovered?: number | null;
+            /**
+             * Acquired Resources
+             * @default 0
+             */
+            acquired_resources: number;
+            /**
+             * Acquired Distinct Urls
+             * @default 0
+             */
+            acquired_distinct_urls: number;
+            /**
+             * Processed Documents
+             * @default 0
+             */
+            processed_documents: number;
+            /**
+             * Withdrawn Documents
+             * @default 0
+             */
+            withdrawn_documents: number;
+            /** Acquired Gap */
+            acquired_gap?: number | null;
+            /** Processed Gap */
+            processed_gap?: number | null;
+        };
+        /** AcquisitionCoverageListResponse */
+        AcquisitionCoverageListResponse: {
+            /**
+             * Basis
+             * @default platform_control_runs
+             */
+            basis: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            summary: components["schemas"]["AcquisitionCoverageSummary"];
+            /** Data */
+            data: components["schemas"]["AcquisitionCoverageEntry"][];
+            /** Total */
+            total?: number | null;
+            /** Limit */
+            limit?: number | null;
+            /** Offset */
+            offset?: number | null;
+        };
+        /** AcquisitionCoverageSummary */
+        AcquisitionCoverageSummary: {
+            /** Jurisdictions Total */
+            jurisdictions_total: number;
+            /** Jurisdictions With Any Acquired */
+            jurisdictions_with_any_acquired: number;
+            /** Jurisdictions With Any Processed */
+            jurisdictions_with_any_processed: number;
+            /** Jurisdictions With Published Denominator */
+            jurisdictions_with_published_denominator: number;
+            /** Jurisdictions With Registry Denominator */
+            jurisdictions_with_registry_denominator: number;
+            /** Reconciliations Unattributed */
+            reconciliations_unattributed: number;
+            /** Processed Documents Unattributable */
+            processed_documents_unattributable: number;
+            /** Reconciliations Recorded Since */
+            reconciliations_recorded_since?: string | null;
+            /** Unmeasured Stages */
+            unmeasured_stages?: string[];
+        };
         /**
          * AcquisitionReadiness
          * @description Code-owner key of the ADR-0030 two-key lock.
@@ -2033,6 +2159,24 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * DenominatorTier
+         * @description How trustworthy a coverage denominator is — and therefore what may be claimed.
+         *
+         *     A ledger that reports "100%" against an unknown denominator is worse than no ledger:
+         *     it manufactures the false green this repo keeps getting caught by. So the tier travels
+         *     with every expected count, and it decides what the number is allowed to support.
+         *
+         *     PUBLISHED  the source states its own count (LexFind `entities/extended`).
+         *                Completeness is claimable, with a gap.
+         *     REGISTRY   we know the UNITS but not their contents — 2110 seeded communes, whose
+         *                individual law counts nobody publishes. Breadth only. A gap here would
+         *                subtract documents from units and yield a number in no unit at all.
+         *     NONE       no denominator exists. Completeness is unstatable; the held count is the
+         *                only honest output.
+         * @enum {string}
+         */
+        DenominatorTier: "published" | "registry" | "none";
         /** DependencyCheck */
         DependencyCheck: {
             /** Status */
@@ -2706,6 +2850,22 @@ export interface components {
              */
             min_pdf_bytes: number;
         };
+        /**
+         * NormLevel
+         * @description Rank of a norm in the hierarchy of norms (ADR-0033).
+         *
+         *     A *jurisdiction* carries the level its own legislation sits at; a
+         *     *document* inherits that level unless the canonical metadata declares a
+         *     higher rank (only ``CONSTITUTIONAL`` can be declared this way — a
+         *     constitution is enacted by a federal jurisdiction but outranks its
+         *     ordinary statutes, so it cannot be derived from the jurisdiction alone).
+         *
+         *     Ordering is authoritative and lives in
+         *     ``contracts/vocabularies/norm-level.json``; ``NORM_LEVEL_RANK`` below is
+         *     the Python mirror. Lower rank = higher authority.
+         * @enum {string}
+         */
+        NormLevel: "constitutional" | "international" | "federal" | "cantonal" | "municipal";
         /** OperatorThroughputEntry */
         OperatorThroughputEntry: {
             /** Operator Id */
@@ -6823,6 +6983,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getAcquisitionCoverage: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                level?: components["schemas"]["NormLevel"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcquisitionCoverageListResponse"];
                 };
             };
             /** @description Validation Error */

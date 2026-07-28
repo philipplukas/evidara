@@ -20,6 +20,7 @@ from acquisition_core.providers import (
 )
 from platform_control.config import get_settings
 from platform_control.domain import (
+    CoverageAttributionStatus,
     ExecutionMode,
     ProviderJobStatus,
     RunMode,
@@ -43,6 +44,7 @@ from platform_control.ids import generate_prefixed_id
 from platform_control.integrations import get_artifact_store, get_raw_artifact_publisher
 from platform_control.models.authority import Authority
 from platform_control.models.captured_resource import CapturedResource
+from platform_control.models.coverage_reconciliation import CoverageReconciliation
 from platform_control.models.document_lifecycle_event import DocumentLifecycleEvent
 from platform_control.models.processing_status_update import ProcessingStatusUpdate
 from platform_control.models.provider_job import ProviderJob
@@ -77,6 +79,7 @@ from platform_control.services.compliance_policy_service import (
     resolve_rate_limiter_for_source,
     resolve_robots_context_for_source,
 )
+from platform_control.services.coverage_reconciliation import parse_coverage_payload
 from platform_control.services.politeness import current_rate_limiter
 from platform_control.services.provider_registry import ProviderRegistry
 from platform_control.services.provider_registry_factory import build_provider_registry
@@ -1040,14 +1043,30 @@ class RunService:
                 raw = acquisition_spec.get(discovery_key)
                 normalized_discovery_value = raw.strip() if isinstance(raw, str) else ""
 
+            # An enumerating spec has no query and no seed and is still perfectly
+            # launchable: it walks the source's own key space rather than asking it a
+            # question (#816). Without this, `enumeration: systematic_digit_union`
+            # is refused at preflight for missing the `search_text` it does not use.
+            normalized_enumeration = (
+                acquisition_spec.get("enumeration")
+                if isinstance(acquisition_spec.get("enumeration"), str)
+                else ""
+            )
+
             has_seed = bool(
                 normalized_seed_url
                 or normalized_seed_urls
                 or normalized_base_url
                 or normalized_code_ids
                 or normalized_discovery_value
+                or normalized_enumeration
             )
-            if has_seed:
+            if normalized_enumeration:
+                seed_detail = (
+                    f"Acquisition spec enumerates the source's key space "
+                    f"('{normalized_enumeration}'), so it needs no seed or query."
+                )
+            elif has_seed:
                 seed_detail = (
                     "Acquisition spec has at least one seed, base URL, or provider-specific seed."
                 )
@@ -1333,6 +1352,14 @@ class RunService:
             run.completed_at = datetime.now(UTC)
             run.failure_reason = provider_result.inline_failure_reason
 
+        self._record_coverage_reconciliation(
+            run=run,
+            source=source,
+            source_version=source_version,
+            provider_job=provider_job,
+            response_payload=provider_result.response_payload,
+        )
+
         if run.status is RunStatus.RUNNING:
             # The run is now in the provider's hands and will only ever complete via a
             # webhook (Firecrawl) or a later poll. Commit the ProviderJob immediately
@@ -1348,6 +1375,55 @@ class RunService:
             # than consuming it.
             await self.session.commit()
         return pending_publications
+
+    def _record_coverage_reconciliation(
+        self,
+        *,
+        run: Run,
+        source: Source,
+        source_version: SourceVersion,
+        provider_job: ProviderJob,
+        response_payload: dict[str, Any],
+    ) -> None:
+        """Persist a run's coverage measurement, if it reported one (#816).
+
+        Rides this dispatch's transaction on purpose. The row is derived from the SAME
+        in-memory payload object that becomes `provider_job.response_payload`, so the two
+        cannot drift — there is no re-read and no second code path where they could.
+
+        Attribution comes from `source.jurisdiction_id`, captured now rather than resolved
+        at read time: a source later re-pointed at another jurisdiction must not
+        retroactively re-attribute this measurement.
+        """
+        parsed = parse_coverage_payload(response_payload)
+        if parsed is None:
+            return
+
+        attributed = parsed.attribution_status is CoverageAttributionStatus.ATTRIBUTED
+        self.session.add(
+            CoverageReconciliation(
+                run_id=run.run_id,
+                source_id=source.source_id,
+                source_version_id=source_version.source_version_id,
+                # `provider_job_id` comes from a column default evaluated at flush, so it
+                # is still None here. Flushing just to read it would buy nothing: the FK
+                # is nullable precisely so this row can be added in the same unit of work,
+                # and the payload it was distilled from is reachable via `run_id` anyway.
+                provider_job_id=None,
+                jurisdiction_id=source.jurisdiction_id if attributed else None,
+                attribution_status=parsed.attribution_status,
+                entity_id=parsed.entity_id,
+                strategy=parsed.strategy,
+                denominator_tier=parsed.denominator_tier,
+                denominator_source=parsed.denominator_source,
+                expected=parsed.expected,
+                observed=parsed.observed,
+                provider_complete_claim=parsed.provider_complete_claim,
+                truncated=parsed.truncated,
+                run_mode=run.mode,
+                as_of=parsed.as_of,
+            )
+        )
 
     async def _persist_inline_resources(
         self,
