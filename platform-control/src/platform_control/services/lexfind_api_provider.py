@@ -137,6 +137,54 @@ _SEARCH_PAYLOAD_TEMPLATE: dict[str, Any] = {
 }
 _SEARCH_PAYLOAD_VERIFIED = True
 
+# ---------------------------------------------------------------------------
+# Enumeration (#816) — how to hold a whole corpus rather than a branch
+# ---------------------------------------------------------------------------
+#
+# The search endpoint has no list-everything call, but that constrains the QUERY,
+# not the corpus. Matching on `search_in_systematic_number` is **contains**, and
+# every systematic number contains at least one digit, so the UNION over digits
+# 0-9 is the entire entity by construction. Dedup by `tol id` collapses it.
+#
+# The sum is meaningless and the union is exact — measured on ZH 2026-07-28:
+#
+#     naive sum over digits : 2613   (a systematic number holds ~1.9 distinct digits)
+#     deduplicated union    : 1377
+#     entities/extended     : 1377   <- published total, exact match
+#     requests used         :   40
+#
+# ~40 requests per entity, so ~1100 for all 28 — against ~35 000 for sweeping the
+# `/texts-of-law/{id}` space, which remains the fallback if a canton's numbering
+# ever breaks the digit assumption.
+#
+# This payload differs from _SEARCH_PAYLOAD_TEMPLATE in two ways that the proof
+# depends on, so it is declared separately rather than patched at the call site:
+#
+#   active_only: False          — ZH's 1377 includes 433 REPEALED acts. Enumerating
+#                                 with active_only=True reconciles against 944 and
+#                                 looks correct while silently dropping a third of
+#                                 the corpus. Point-in-time questions need repealed law.
+#   title/keywords: False       — the union is proven over systematic numbers alone.
+#                                 Leaving these on cannot lose records, but it makes
+#                                 the observed count mean something other than what
+#                                 was verified against the published denominator.
+_ENUMERATION_DIGITS = "0123456789"
+_ENUMERATION_STRATEGY_DIGIT_UNION = "systematic_digit_union"
+_ENUMERATION_PAYLOAD_TEMPLATE: dict[str, Any] = {
+    "search_text": "",
+    "active_only": False,
+    "search_in_systematic_number": True,
+    "search_in_title": False,
+    "search_in_keywords": False,
+    "search_in_content": False,
+    "entity_filter": [],
+    "systematic_filter": [],
+    "category_filter": [],
+    "use_global_systematics": False,
+    "direct_search": False,
+}
+_ENTITIES_PATH = "entities/extended"
+
 # Results live here. `results` is NOT the hit list -- it is a per-language count
 # array (`[{language: de, number_of_results: 2}, ...]`), and reading it as hits
 # yields four rows of nothing for every query.
@@ -301,21 +349,45 @@ class LexFindApiProvider:
 
         search_text = str(spec.get("search_text") or "").strip()
 
+        enumeration = str(spec.get("enumeration") or "").strip()
+        enumerating = enumeration == _ENUMERATION_STRATEGY_DIGIT_UNION
+
         notes = [
             "Capture path verified live (#716): /tol/{id}/{lang} returns "
             "application/pdf, md5-identical to the canton's own file.",
             "Search contract verified live 2026-07-22: all 11 fields required, "
             "results under `texts_of_law_with_matches`, dates DD.MM.YYYY.",
-            "COVERAGE LIMIT: this template enumerates via search, and the search "
-            "endpoint has no list-everything call — `search_text` must be non-empty. "
-            "So a run covers the branch it asked for ('554' + entity 26 returns the "
-            "ZH animal-protection branch), not the canton's corpus. This is a limit "
-            "of the CHOSEN STRATEGY, not of the source: `/texts-of-law/{id}` is "
-            "densely enumerable over 1..~35000 and carries entity, systematic "
-            "number, is_active and the PDF, so the full corpus is reachable by an "
-            "id sweep with no search at all (#816).",
         ]
-        if not search_text:
+        if enumerating:
+            notes.append(
+                "ENUMERATION: digit union over systematic numbers (0-9, deduplicated "
+                "by tol id), which is the whole corpus for the scoped entities rather "
+                "than a branch. Verified on ZH 2026-07-28: 1377 unique records against "
+                "a published total of 1377, in ~40 requests. The run reconciles itself "
+                "against entities/extended and reports observed/expected/gap (#816)."
+            )
+            notes.append(
+                "Repealed law IS included (active_only=False). ZH's 1377 carries 433 "
+                "repealed acts; enumerating active-only would reconcile against 944 and "
+                "silently drop a third of the corpus."
+            )
+        else:
+            notes.append(
+                "COVERAGE LIMIT: this template enumerates via search, and the search "
+                "endpoint has no list-everything call — `search_text` must be non-empty. "
+                "So a run covers the branch it asked for ('554' + entity 26 returns the "
+                "ZH animal-protection branch), not the canton's corpus. This is a limit "
+                "of the CHOSEN STRATEGY, not of the source: set "
+                f"`enumeration: {_ENUMERATION_STRATEGY_DIGIT_UNION}` to hold the whole "
+                "corpus and have the run prove it against the published count (#816)."
+            )
+        if enumeration and not enumerating:
+            notes.append(
+                f"BLOCKING: acquisition_spec.enumeration '{enumeration}' is not a "
+                f"supported strategy — the only one is "
+                f"'{_ENUMERATION_STRATEGY_DIGIT_UNION}'."
+            )
+        if not search_text and not enumerating:
             notes.append(
                 "BLOCKING: acquisition_spec.search_text is missing — this run "
                 "would be refused before any request is made."
@@ -360,11 +432,42 @@ class LexFindApiProvider:
         min_pdf_bytes = int(spec.get("min_pdf_bytes") or _DEFAULT_MIN_PDF_BYTES)
         timeout_seconds = float(spec.get("request_timeout_seconds") or 20.0)
 
+        coverage: dict[str, Any] | None = None
         resources: list[ProviderResource] = []
         skipped: list[dict[str, Any]] = []
         failures: list[dict[str, str]] = []
 
-        if not search_text:
+        enumeration = str(spec.get("enumeration") or "").strip()
+        if enumeration and enumeration != _ENUMERATION_STRATEGY_DIGIT_UNION:
+            return ProviderStartResult(
+                external_job_id=f"lexfind-{run.run_id}",
+                provider=self.provider_name,
+                request_payload={"language": language, "entity_ids": entity_ids},
+                response_payload={"captured": 0, "skipped": [], "failures": []},
+                inline_resources=[],
+                inline_failure_reason=(
+                    f"acquisition_spec.enumeration '{enumeration}' is not supported — "
+                    f"the only strategy is '{_ENUMERATION_STRATEGY_DIGIT_UNION}'."
+                ),
+            )
+        enumerating = enumeration == _ENUMERATION_STRATEGY_DIGIT_UNION
+        if enumerating and not entity_ids:
+            # Without a scope this would enumerate all 28 entities — ~33 000 texts
+            # of law — from a config that looks like every other template.
+            return ProviderStartResult(
+                external_job_id=f"lexfind-{run.run_id}",
+                provider=self.provider_name,
+                request_payload={"language": language, "entity_ids": []},
+                response_payload={"captured": 0, "skipped": [], "failures": []},
+                inline_resources=[],
+                inline_failure_reason=(
+                    "acquisition_spec.entity_ids is required when enumeration is "
+                    f"'{_ENUMERATION_STRATEGY_DIGIT_UNION}' — an unscoped sweep would "
+                    "pull every entity LexFind carries."
+                ),
+            )
+
+        if not search_text and not enumerating:
             # Fail here rather than send a request the API will reject: an empty
             # `search_text` is a 400, and a spec missing it is a configuration
             # error the operator must see named, not a transport failure.
@@ -389,15 +492,25 @@ class LexFindApiProvider:
             follow_redirects=True,
         ) as client:
             try:
-                records = await self._discover(
-                    client,
-                    language=language,
-                    search_text=search_text,
-                    entity_ids=entity_ids,
-                    category_ids=category_ids,
-                    page_size=page_size,
-                    max_pages=max_pages,
-                )
+                if enumerating:
+                    records = await self._enumerate_digit_union(
+                        client,
+                        language=language,
+                        entity_ids=entity_ids,
+                        category_ids=category_ids,
+                        page_size=page_size,
+                        max_pages=max_pages,
+                    )
+                else:
+                    records = await self._discover(
+                        client,
+                        language=language,
+                        search_text=search_text,
+                        entity_ids=entity_ids,
+                        category_ids=category_ids,
+                        page_size=page_size,
+                        max_pages=max_pages,
+                    )
             except Exception as exc:  # noqa: BLE001 — recorded, not swallowed
                 failures.append(
                     {
@@ -407,7 +520,27 @@ class LexFindApiProvider:
                 )
                 records = []
 
-            if max_documents:
+            # Reconcile against the published denominator. Only meaningful for an
+            # enumeration: a search covers a branch, and comparing a branch to the
+            # canton's total would manufacture a coverage gap that is not one.
+            if enumerating:
+                try:
+                    totals = await self._entity_totals(client, language=language)
+                except Exception as exc:  # noqa: BLE001 — a missing denominator is
+                    # recorded as unknown, never as complete.
+                    failures.append(
+                        {"url": f"{_API_PREFIX}/{language}/{_ENTITIES_PATH}", "error": str(exc)}
+                    )
+                else:
+                    coverage = self._reconcile(records, entity_ids=entity_ids, totals=totals)
+
+            if max_documents and len(records) > max_documents:
+                # A cap makes the run a sample, so the coverage claim has to stop
+                # being a completeness claim — otherwise `complete: true` from the
+                # enumeration would sit next to a fraction of the documents.
+                if coverage is not None:
+                    coverage["truncated_by_max_documents"] = True
+                    coverage["complete"] = False
                 records = records[:max_documents]
 
             for record in records:
@@ -441,6 +574,7 @@ class LexFindApiProvider:
                 "captured": len(resources),
                 "skipped": skipped,
                 "failures": failures,
+                **({"coverage": coverage} if coverage is not None else {}),
             },
             inline_resources=resources,
             inline_failure_reason=failures[0]["error"] if failures and not resources else None,
@@ -484,7 +618,30 @@ class LexFindApiProvider:
         payload["search_text"] = search_text
         payload["entity_filter"] = entity_ids
         payload["category_filter"] = category_ids
+        return await self._search_once(
+            client,
+            language=language,
+            payload=payload,
+            page_size=page_size,
+            max_pages=max_pages,
+        )
 
+    async def _search_once(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        language: str,
+        payload: dict[str, Any],
+        page_size: int,
+        max_pages: int,
+        seen: set[int] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Open one search and page it out, deduplicating by `tol id`.
+
+        `seen` is shared across calls by the digit-union enumeration so that a
+        record matched by several digits is captured once. Passing None keeps the
+        per-search behaviour a single query needs.
+        """
         opened = await client.post(f"{_API_PREFIX}/{language}/fulltext-search", json=payload)
         opened.raise_for_status()
         session = opened.json()
@@ -494,7 +651,8 @@ class LexFindApiProvider:
             return []
 
         records: list[dict[str, Any]] = []
-        seen: set[int] = set()
+        if seen is None:
+            seen = set()
         for page_no in range(1, max_pages + 1):
             page = await client.get(
                 f"{_API_PREFIX}/{language}/fulltext-search/{search_id}",
@@ -515,6 +673,115 @@ class LexFindApiProvider:
             if page_no >= int(body.get("number_of_pages") or 1):
                 break
         return records
+
+    async def _enumerate_digit_union(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        language: str,
+        entity_ids: list[int],
+        category_ids: list[int],
+        page_size: int,
+        max_pages: int,
+    ) -> list[dict[str, Any]]:
+        """Return EVERY text of law for the scoped entities, not a branch.
+
+        Ten queries — one per digit — unioned and deduplicated. See the
+        `_ENUMERATION_*` constants for why the union is complete and why the sum
+        is not, and why `active_only` must stay False.
+
+        The `seen` set is shared across all ten so overlap costs pages, not
+        duplicates: on ZH the ten queries report 2613 hits and yield 1377 records.
+        """
+        seen: set[int] = set()
+        records: list[dict[str, Any]] = []
+        for digit in _ENUMERATION_DIGITS:
+            payload = dict(_ENUMERATION_PAYLOAD_TEMPLATE)
+            payload["search_text"] = digit
+            payload["entity_filter"] = entity_ids
+            payload["category_filter"] = category_ids
+            records.extend(
+                await self._search_once(
+                    client,
+                    language=language,
+                    payload=payload,
+                    page_size=page_size,
+                    max_pages=max_pages,
+                    seen=seen,
+                )
+            )
+        return records
+
+    @staticmethod
+    def _reconcile(
+        records: list[dict[str, Any]],
+        *,
+        entity_ids: list[int],
+        totals: dict[int, dict[str, int]],
+    ) -> dict[str, Any]:
+        """Observed vs published, per entity — the coverage ledger's raw material.
+
+        `complete` is only ever True when every scoped entity has a published
+        denominator AND observed equals it. An entity LexFind does not report is
+        `expected: None` and makes the whole run incomplete: an unknown
+        denominator must never round up to full coverage (#816).
+        """
+        observed: dict[int, int] = {}
+        for record in records:
+            entity_id = (record.get("entity") or {}).get("id")
+            if isinstance(entity_id, int):
+                observed[entity_id] = observed.get(entity_id, 0) + 1
+
+        entities: list[dict[str, Any]] = []
+        complete = True
+        for entity_id in entity_ids:
+            published = totals.get(entity_id)
+            expected = published.get("total") if published else None
+            found = observed.get(entity_id, 0)
+            if expected is None or found != expected:
+                complete = False
+            entities.append(
+                {
+                    "entity_id": entity_id,
+                    "expected": expected,
+                    "observed": found,
+                    "gap": None if expected is None else expected - found,
+                    "changed_last_30d": published.get("changed_last_30d") if published else None,
+                }
+            )
+
+        return {
+            "strategy": _ENUMERATION_STRATEGY_DIGIT_UNION,
+            "denominator_tier": "published",
+            "denominator_source": f"{_API_PREFIX}/{{lang}}/{_ENTITIES_PATH}",
+            "complete": complete,
+            "entities": entities,
+        }
+
+    async def _entity_totals(
+        self, client: httpx.AsyncClient, *, language: str
+    ) -> dict[int, dict[str, int]]:
+        """Published per-entity counts — the denominator a sweep is checked against.
+
+        This is what makes coverage a measurement rather than a hope: the run
+        reports `observed` against `expected` and the gap, instead of reporting
+        success for whatever it happened to find (#816).
+        """
+        response = await client.get(
+            f"{_API_PREFIX}/{language}/{_ENTITIES_PATH}", params={"n_days": 30}
+        )
+        response.raise_for_status()
+        totals: dict[int, dict[str, int]] = {}
+        for entity in response.json() or []:
+            entity_id = entity.get("id")
+            status = entity.get("status") or {}
+            if isinstance(entity_id, int):
+                totals[entity_id] = {
+                    "total": int(status.get("total_texts_of_law") or 0),
+                    "active": int(status.get("active_texts_of_law") or 0),
+                    "changed_last_30d": int(status.get("changes_in_last_n_days") or 0),
+                }
+        return totals
 
     async def _capture(
         self,

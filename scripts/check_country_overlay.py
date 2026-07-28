@@ -116,17 +116,37 @@ def _validate_template(
             ]
         return []
 
-    # LexFind (#731) is API-driven, so it has no seed URLs at all. What it needs
-    # instead is a non-empty `search_text`: the API rejects an empty search with
-    # 400 and offers no list-everything call, so a template without one is
-    # inert. Checked here as well as in `LexFindAcquisitionSpec` because this
-    # gate runs against the YAML without importing platform-control.
+    # LexFind (#731) is API-driven, so it has no seed URLs at all. A template
+    # either SEARCHES a branch (non-empty `search_text` — the API rejects an empty
+    # search with 400 and offers no list-everything call) or ENUMERATES a corpus
+    # (`enumeration: systematic_digit_union`, #816), which does not search at all.
+    # Neither means the template is inert.
+    #
+    # Mirrors `LexFindAcquisitionSpec._require_a_discovery_strategy`, restated here
+    # because this gate runs against the YAML without importing platform-control.
     if provider == "lexfind_api":
+        enumeration = payload.get("enumeration")
+        if enumeration is not None:
+            if enumeration != "systematic_digit_union":
+                return [
+                    f"Overlay '{overlay_id}' template '{template_id}' lexfind_api "
+                    f"enumeration '{enumeration}' is not supported — the only "
+                    "strategy is 'systematic_digit_union'."
+                ]
+            # An unscoped sweep would pull every entity LexFind carries.
+            if not payload.get("entity_ids"):
+                return [
+                    f"Overlay '{overlay_id}' template '{template_id}' lexfind_api "
+                    "enumeration requires entity_ids (ZH = 26); unscoped it would "
+                    "sweep all 28 entities."
+                ]
+            return []
         if not _has_nonempty_str(payload.get("search_text")):
             return [
                 f"Overlay '{overlay_id}' template '{template_id}' lexfind_api requires "
                 "a non-empty search_text (the API has no list-everything call; use a "
-                "systematic-number prefix such as '554')."
+                "systematic-number prefix such as '554') or "
+                "enumeration: systematic_digit_union to hold the whole corpus."
             ]
         return []
 

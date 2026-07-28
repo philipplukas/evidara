@@ -488,11 +488,13 @@ overlays:
       # `skipped_gates=[]`, so for these templates that is the whole gate set —
       # over the branch each template searched, which is not the canton's corpus.
       #
-      # The corpus IS reachable: `/texts-of-law/{id}` is densely enumerable and
-      # `entities/extended` publishes the per-entity counts to verify a sweep
-      # against (ZH 1377 total / 944 active). These search-scoped templates are a
-      # strategy choice, and #816 replaces it with id enumeration plus a coverage
-      # ledger. Do not read "3 cantons onboarded" as "3 cantons held".
+      # The corpus IS reachable, and `lexfind_api_zh_full` below now reaches it:
+      # the digit-union enumeration holds the whole canton and reconciles itself
+      # against the published count. These three stay search-scoped on purpose —
+      # they are the dog-question slice ADR-0033 asks for, and their evidence is
+      # about the acquisition path, not about coverage.
+      #
+      # Do not read "3 cantons onboarded" as "3 cantons held".
       # ───────────────────────────────────────────────────────────────
       lexfind_api_zh_tierschutz:
         provider: lexfind_api
@@ -555,6 +557,46 @@ overlays:
         min_pdf_bytes: 2000
         tenant_id: tenant_public
         corpus_id: corpus_public_ch_canton_bs_legislation
+        extractor_profile_id: exp_legislation_v1
+        scope_type: global_public
+        source_origin_kind: official_primary
+        trust_tier: authoritative
+        language_codes: [de]
+        document_type_hint: legislation
+        enabled: false
+      # ───────────────────────────────────────────────────────────────
+      # WHOLE-CORPUS enumeration — ZH, the first template that holds a canton
+      # rather than a branch (#816).
+      #
+      # `enumeration: systematic_digit_union` ignores `search_text` and instead
+      # runs one query per digit 0-9 over systematic numbers, deduplicated by tol
+      # id. Matching is `contains` and every systematic number carries a digit, so
+      # the union is the entire entity by construction. Measured on ZH 2026-07-28:
+      # 1377 unique records against a published total of 1377, in ~40 requests.
+      #
+      # The run reconciles ITSELF: it reads `entities/extended` and reports
+      # observed/expected/gap. `complete` is true only when they match, and never
+      # when a denominator is missing — an unknown denominator must not round up.
+      #
+      # COST, before anyone flips this on: ~40 discovery requests, then a PDF
+      # fetch per act — about 1377 for ZH, including 433 repealed ones. That is a
+      # real load on a public-sector API whose terms we have not confirmed, so it
+      # is a deliberate operator act, not a nightly default. Set `max_documents`
+      # to sample instead, which correctly downgrades `complete` to false.
+      #
+      # `active_only` is False by design. Point-in-time questions need repealed
+      # law, and reconciling against the active count (944) would look right while
+      # dropping a third of the corpus.
+      lexfind_api_zh_full:
+        provider: lexfind_api
+        enumeration: systematic_digit_union
+        entity_ids: [26]           # ZH — 1377 total / 944 active
+        language: de
+        results_per_page: 100
+        max_pages: 40
+        min_pdf_bytes: 2000
+        tenant_id: tenant_public
+        corpus_id: corpus_public_ch_canton_zh_legislation
         extractor_profile_id: exp_legislation_v1
         scope_type: global_public
         source_origin_kind: official_primary

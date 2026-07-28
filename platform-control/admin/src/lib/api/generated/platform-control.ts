@@ -2672,8 +2672,10 @@ export interface components {
              * @enum {string}
              */
             provider: "lexfind_api";
+            /** Enumeration */
+            enumeration?: "systematic_digit_union" | null;
             /** Search Text */
-            search_text: string;
+            search_text?: string | null;
             /** Entity Ids */
             entity_ids?: number[];
             /** Category Ids */
