@@ -1,10 +1,24 @@
 # Trino — distributed SQL over Iceberg-on-MinIO via the Nessie catalog.
 # Chart: trino/trino. ADR-0029. Coordinator + 1 worker.
 #
-# NOTE: MinIO creds are inline here for bring-up and match infra/hetzner/values/minio.yaml.
-# Hardening TODO: create a scoped MinIO access key and inject via a Secret, not plaintext.
+# MinIO credentials are injected from the `minio-root` Secret and referenced in the
+# catalog below via Trino's ${ENV:...} substitution — they are never written here. The
+# previous inline `s3.aws-secret-key=change-me-minio-root` was the live credential (#792).
 server:
   workers: 1
+
+# Added to every pod (coordinator + worker); the catalog properties below read these.
+env:
+  - name: MINIO_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: minio-root
+        key: rootUser
+  - name: MINIO_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: minio-root
+        key: rootPassword
 
 # Heap must exceed query.max-memory-per-node (chart default 1GB) + heap headroom
 # (~0.3x heap), so keep this comfortably above ~1.5GB. 4G is ample on a 64GB box.
@@ -26,5 +40,5 @@ catalogs:
     s3.endpoint=http://minio.evidara.svc:9000
     s3.region=us-east-1
     s3.path-style-access=true
-    s3.aws-access-key=evidara
-    s3.aws-secret-key=change-me-minio-root
+    s3.aws-access-key=${ENV:MINIO_ACCESS_KEY}
+    s3.aws-secret-key=${ENV:MINIO_SECRET_KEY}

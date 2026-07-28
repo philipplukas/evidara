@@ -5,11 +5,12 @@ There is no cluster in CI, so this cannot prove Zitadel runs. It proves the four
 things that are checkable from the file alone and that would each be a silent,
 expensive defect:
 
-1. **No credential is committed.** #792 is exactly this failure in
-   `values/minio.yaml` (`change-me-minio-root`, on `main`). An IdP values file is
-   the worst possible place to repeat it. Both of Zitadel's secrets — the database
-   DSN and the masterkey — must be *references* to Secrets created out-of-band by
-   `deploy-stage8.sh`.
+1. **No credential is committed.** #792 was exactly this failure in
+   `values/minio.yaml` (`change-me-minio-root`, live on `main` until it was rotated;
+   `scripts/check_hetzner_minio_credentials.py` now guards that pair). An IdP values
+   file is the worst possible place to repeat it. Both of Zitadel's secrets — the
+   database DSN and the masterkey — must be *references* to Secrets created
+   out-of-band by `deploy-stage8.sh`.
 2. **The bundled Postgres subchart stays off.** `postgresql.enabled: true` would
    spin up a second, unbacked-up Postgres holding every user credential, while
    the cluster still looked healthy. It defaults to `false`; this asserts nobody

@@ -84,6 +84,17 @@ repos:
         pass_filenames: false
         files: ^(infra/hetzner/(values/zitadel\.yaml|auth/letsencrypt-issuer\.yaml)|scripts/check_hetzner_zitadel\.py)$
 
+      # The same rule for the storage credential, which is where #792 actually
+      # happened: `rootPassword` on main, live, plus Trino's own copy of it. Covers
+      # both files, because fixing only the obvious one leaves the leak in place.
+      # Mirrored in CI (.github/workflows/docs-and-contracts.yml).
+      - id: check-hetzner-minio-credentials
+        name: MinIO credentials referenced, not committed (minio + trino values)
+        entry: python3 scripts/check_hetzner_minio_credentials.py
+        language: system
+        pass_filenames: false
+        files: ^(infra/hetzner/values/(minio|trino)\.yaml|scripts/check_hetzner_minio_credentials\.py)$
+
       # Skips when Docker is unavailable locally; CI runs it with --strict
       # (.github/workflows/architecture.yml), same as the kustomize gate above.
       - id: check-architecture
