@@ -11,16 +11,30 @@
 #
 # The heavy pool runs a custom image (ghcr.io/philipplukas/evidara-runner-heavy) that
 # bakes in Playwright's system libraries. It is built by runner-image.yml on push to
-# main; the GHCR package must be public, since ARC pulls it without an imagePullSecret.
+# main. That package is PRIVATE — an anonymous GHCR manifest request returns 401 — so
+# the runner pod needs a pull secret, exactly like every other
+# ghcr.io/philipplukas/evidara-* image (deploy-stage4.sh does the same for `evidara`).
+# This script creates `ghcr-pull` in arc-runners; values-heavy.yaml references it.
+# The secret is namespaced: the copy in `evidara` is not visible here.
+#
+# This header used to assert the package "must be public, since ARC pulls it without an
+# imagePullSecret". It never was public and no secret existed here, so the heavy pool
+# could not pull the image at all and silently kept running stock actions-runner —
+# which has no browser libraries. That is why Runner Pool Smoke was red every week
+# from 2026-06-15 on.
 #
 # Idempotent: `helm upgrade --install` throughout.
 #
-# ONE-TIME CREDENTIAL you must supply (I can't mint it for you):
-#   Create a *classic* Personal Access Token with the `repo` scope
-#   (https://github.com/settings/tokens/new?scopes=repo&description=evidara-arc-runners)
-#   — or a GitHub App — then:
+# ONE-TIME CREDENTIALS you must supply (I can't mint them for you):
+#   1. A *classic* Personal Access Token with the `repo` scope
+#      (https://github.com/settings/tokens/new?scopes=repo&description=evidara-arc-runners)
+#      — or a GitHub App — to register the runners.
+#   2. A token with `read:packages` to pull the private runner image. The `repo` scope
+#      does NOT imply it, so this is a second credential even if you reuse one PAT with
+#      both scopes selected.
 #
 #   export GITHUB_RUNNER_PAT=ghp_xxx
+#   export GHCR_TOKEN=ghp_yyy          # read:packages
 #   bash infra/hetzner/deploy-runners.sh
 set -euo pipefail
 
@@ -32,7 +46,10 @@ CONTROLLER_CHART=oci://ghcr.io/actions/actions-runner-controller-charts/gha-runn
 LIGHT_NAME=evidara-light
 HEAVY_NAME=evidara-heavy-v2
 
+GHCR_USER="${GHCR_USER:-philipplukas}"
+
 : "${GITHUB_RUNNER_PAT:?Set GITHUB_RUNNER_PAT to a classic PAT with 'repo' scope (see header)}"
+: "${GHCR_TOKEN:?Set GHCR_TOKEN to a PAT with 'read:packages' — the heavy runner image is private (see header)}"
 
 # The ARC charts are public on ghcr.io, but a leftover `credsStore: desktop` in
 # ~/.docker/config.json makes helm shell out to a docker-credential-desktop helper
@@ -48,10 +65,16 @@ echo "==> 1/4 ARC controller (namespace ${CONTROLLER_NS})"
 helm upgrade --install arc "${CONTROLLER_CHART}" \
   --namespace "${CONTROLLER_NS}" --create-namespace --wait
 
-echo "==> 2/4 GitHub credential secret (namespace ${RUNNERS_NS})"
+echo "==> 2/4 Credential secrets (namespace ${RUNNERS_NS})"
 kubectl create namespace "${RUNNERS_NS}" --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n "${RUNNERS_NS}" create secret generic evidara-runner-github \
   --from-literal=github_token="${GITHUB_RUNNER_PAT}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Pull secret for the private heavy runner image. Referenced by values-heavy.yaml;
+# without it the pod cannot pull and ARC falls back to stock actions-runner.
+kubectl -n "${RUNNERS_NS}" create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io --docker-username="${GHCR_USER}" --docker-password="${GHCR_TOKEN}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> 3/4 LIGHT scale set (${LIGHT_NAME})"
