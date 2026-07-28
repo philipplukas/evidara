@@ -24,6 +24,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # `security` is here because the repo already uses it for issues — #792 was
+          # titled `security(infra): ...` — and a PR mirroring its own issue's title
+          # was rejected (#811). Two conventions for the same work is a papercut that
+          # recurs on exactly the changes least worth adding friction to.
           types: |
             feat
             fix
@@ -34,15 +38,17 @@ jobs:
             test
             style
             perf
+            security
           requireScope: false
           subjectPattern: ^.+$
           subjectPatternError: |
             The PR title "{title}" does not follow conventional commit format.
 
-            Use one of: feat, fix, chore, docs, ci, refactor, test, style, perf
+            Use one of: feat, fix, chore, docs, ci, refactor, test, style, perf, security
             Optional scope: feat(legal-search): ...
 
             Examples:
               feat: add jurisdiction filter
               fix(platform-control): correct run state transition
               docs(adr): ADR-0008 caching strategy
+              security(infra): rotate a credential that reached main
