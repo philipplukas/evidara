@@ -183,13 +183,22 @@ class CantonHttpAcquisitionSpec(BaseAcquisitionSpec):
 
 class LexFindAcquisitionSpec(BaseAcquisitionSpec):
     provider: Literal[AcquisitionProvider.LEXFIND_API] = AcquisitionProvider.LEXFIND_API
-    # LexFind has NO list-everything call: `search_text` is required by the API
-    # and an empty string is a 400 (verified live 2026-07-22). Discovery is
-    # therefore always a query, and the enumeration strategy is a systematic
-    # number prefix -- "554" scoped to entity 26 returns the whole ZH
-    # animal-protection branch. Required here, with a min_length, so a template
-    # that would be refused by the API is refused at config time instead.
-    search_text: str = Field(min_length=1)
+    # A template either SEARCHES a branch or ENUMERATES a corpus. Exactly one is
+    # required, and the model validator below enforces it — so a config that would
+    # be refused by the API, or that would silently sweep every entity, is refused
+    # here instead of at request time.
+    #
+    # `systematic_digit_union`: one query per digit 0-9 over systematic numbers,
+    # deduplicated by tol id. Matching is `contains` and every systematic number
+    # carries a digit, so the union is the whole entity by construction. Verified
+    # on ZH 2026-07-28 — 1377 unique records against a published total of 1377
+    # (#816). The run reconciles itself against `entities/extended`.
+    enumeration: Literal["systematic_digit_union"] | None = None
+    # LexFind has NO list-everything call: the search endpoint rejects an empty
+    # `search_text` with a 400 (verified live 2026-07-22), so a searching template
+    # must supply one. Optional at this level only because an enumerating template
+    # does not search at all.
+    search_text: str | None = Field(default=None, min_length=1)
     # LexFind's own entity ids, not ISO codes: 26 = Zürich. There are 28
     # (26 cantons + Bund + a federal-court entity); an empty list means every
     # entity, which is legal but almost never intended.
@@ -204,6 +213,20 @@ class LexFindAcquisitionSpec(BaseAcquisitionSpec):
     # ordinance is not refused, while #716's 142-byte stub cannot pass.
     min_pdf_bytes: int = Field(default=2000, ge=0)
     request_timeout_seconds: float = Field(default=20.0, gt=0)
+
+    @model_validator(mode="after")
+    def _require_a_discovery_strategy(self) -> LexFindAcquisitionSpec:
+        if self.enumeration is None and not self.search_text:
+            raise ValueError(
+                "lexfind_api requires search_text (a systematic-number prefix, e.g. "
+                "'554') or enumeration: systematic_digit_union to hold the whole corpus"
+            )
+        if self.enumeration is not None and not self.entity_ids:
+            raise ValueError(
+                "lexfind_api enumeration requires entity_ids — an unscoped sweep "
+                "would pull every entity LexFind carries (~33 000 texts of law)"
+            )
+        return self
 
 
 class GemeindeHttpAcquisitionSpec(BaseAcquisitionSpec):

@@ -368,3 +368,236 @@ def test_plan_reports_the_search_contract_as_verified(provider):
 def test_plan_warns_when_no_entity_is_scoped(provider):
     plan = provider.plan(SimpleNamespace(), _source_version(search_text="554"))
     assert any("entity_ids" in note for note in plan.notes)
+
+
+# --------------------------------------------------------------------------
+# Enumeration and coverage reconciliation (#816)
+# --------------------------------------------------------------------------
+
+
+class _EnumerationClient:
+    """Serves a distinct slice per digit, plus the published entity totals.
+
+    Digits deliberately OVERLAP, because that is the real API's behaviour:
+    matching is `contains`, so on ZH the ten queries report 2613 hits over 1377
+    records. A union that failed to deduplicate would pass a test built on
+    disjoint slices and capture the same law many times against production.
+    """
+
+    def __init__(self, *args, slices=None, totals=None, **kwargs):
+        del args, kwargs
+        # ids 1..5, each reachable from more than one digit.
+        self._slices = (
+            slices
+            if slices is not None
+            else {
+                "0": [1],
+                "1": [1, 2],
+                "2": [2, 3],
+                "3": [3, 4],
+                "4": [4, 5],
+                "5": [5, 1],
+                "6": [],
+                "7": [],
+                "8": [],
+                "9": [2],
+            }
+        )
+        self._totals = totals
+        self.payloads: list[dict] = []
+        self._by_search: dict[int, str] = {}
+        self._next_id = 0
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        del exc_type, exc, tb
+
+    async def post(self, url, *, json=None):
+        self.payloads.append(json)
+        self._next_id += 1
+        self._by_search[self._next_id] = json["search_text"]
+        return httpx.Response(
+            200,
+            json={"id": self._next_id, "session_id": "s"},
+            request=httpx.Request("POST", f"https://www.lexfind.ch{url}"),
+        )
+
+    async def get(self, url, *, params=None):
+        request = httpx.Request("GET", f"https://www.lexfind.ch{url}")
+        if url.startswith("/tol/"):
+            return httpx.Response(
+                200, content=_PDF, headers={"content-type": "application/pdf"}, request=request
+            )
+        if url.endswith("entities/extended"):
+            body = (
+                self._totals
+                if self._totals is not None
+                else [
+                    {
+                        "id": 26,
+                        "status": {
+                            "total_texts_of_law": 5,
+                            "active_texts_of_law": 3,
+                            "changes_in_last_n_days": 2,
+                        },
+                    }
+                ]
+            )
+            return httpx.Response(200, json=body, request=request)
+        search_id = int(url.rsplit("/", 1)[-1])
+        digit = self._by_search[search_id]
+        rows = [
+            {
+                "id": i,
+                "systematic_number": f"55{i}",
+                "entity": {"id": 26},
+                "dta_urls": [
+                    {"language": "de", "url": f"/tol/{i}/de", "original_url": f"https://zh/{i}"}
+                ],
+                "matches": [],
+            }
+            for i in self._slices.get(digit, [])
+        ]
+        return httpx.Response(
+            200, json={"texts_of_law_with_matches": rows, "number_of_pages": 1}, request=request
+        )
+
+
+def _enum_factory(**kw):
+    return lambda *a, **k: _EnumerationClient(*a, **kw, **k)
+
+
+async def _enumerate(provider, monkeypatch, client, **spec):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        lambda *a, **k: client,
+    )
+    return await provider.start_run(
+        SimpleNamespace(),
+        _source_version(enumeration="systematic_digit_union", entity_ids=[26], **spec),
+        _run(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_digit_union_queries_every_digit_and_deduplicates(provider, monkeypatch):
+    """Ten queries, overlapping slices, five distinct laws — captured once each."""
+    client = _EnumerationClient()
+    result = await _enumerate(provider, monkeypatch, client)
+
+    assert [p["search_text"] for p in client.payloads] == list("0123456789")
+    assert len(result.inline_resources) == 5
+    assert result.response_payload["captured"] == 5
+
+
+@pytest.mark.asyncio
+async def test_enumeration_includes_repealed_law(provider, monkeypatch):
+    """`active_only` must be False, or a third of ZH's corpus goes missing while
+    the run reconciles against 944 and looks correct."""
+    client = _EnumerationClient()
+    await _enumerate(provider, monkeypatch, client)
+
+    assert all(p["active_only"] is False for p in client.payloads)
+    assert all(p["search_in_systematic_number"] is True for p in client.payloads)
+
+
+@pytest.mark.asyncio
+async def test_coverage_is_complete_when_observed_matches_published(provider, monkeypatch):
+    client = _EnumerationClient()
+    result = await _enumerate(provider, monkeypatch, client)
+
+    coverage = result.response_payload["coverage"]
+    assert coverage["complete"] is True
+    assert coverage["denominator_tier"] == "published"
+    assert coverage["entities"] == [
+        {"entity_id": 26, "expected": 5, "observed": 5, "gap": 0, "changed_last_30d": 2}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_coverage_reports_the_gap_rather_than_a_pass(provider, monkeypatch):
+    """Published 9, found 5 — the run must say 4 short, not report success."""
+    client = _EnumerationClient(
+        totals=[{"id": 26, "status": {"total_texts_of_law": 9, "active_texts_of_law": 9}}]
+    )
+    result = await _enumerate(provider, monkeypatch, client)
+
+    coverage = result.response_payload["coverage"]
+    assert coverage["complete"] is False
+    assert coverage["entities"][0]["gap"] == 4
+
+
+@pytest.mark.asyncio
+async def test_unknown_denominator_never_rounds_up_to_complete(provider, monkeypatch):
+    """An entity LexFind does not report has no denominator, so completeness is
+    unstatable — never True. This is the failure the ledger exists to prevent."""
+    client = _EnumerationClient(totals=[])
+    result = await _enumerate(provider, monkeypatch, client)
+
+    coverage = result.response_payload["coverage"]
+    assert coverage["complete"] is False
+    assert coverage["entities"][0]["expected"] is None
+    assert coverage["entities"][0]["gap"] is None
+
+
+@pytest.mark.asyncio
+async def test_max_documents_downgrades_the_completeness_claim(provider, monkeypatch):
+    """A capped run is a sample. `complete: true` beside 2 of 5 documents would be
+    the exact overstatement this reconciliation exists to stop."""
+    client = _EnumerationClient()
+    result = await _enumerate(provider, monkeypatch, client, max_documents=2)
+
+    coverage = result.response_payload["coverage"]
+    assert coverage["complete"] is False
+    assert coverage["truncated_by_max_documents"] is True
+    assert len(result.inline_resources) == 2
+
+
+@pytest.mark.asyncio
+async def test_enumeration_without_entity_ids_is_refused(provider, monkeypatch):
+    """Unscoped, this would sweep all 28 entities from a config that looks
+    unremarkable."""
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        lambda *a, **k: _EnumerationClient(),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(enumeration="systematic_digit_union"),
+        _run(),
+    )
+    assert result.inline_resources == []
+    assert "entity_ids is required" in result.inline_failure_reason
+
+
+@pytest.mark.asyncio
+async def test_unsupported_enumeration_strategy_is_named(provider, monkeypatch):
+    monkeypatch.setattr(
+        "platform_control.services.lexfind_api_provider.httpx.AsyncClient",
+        lambda *a, **k: _EnumerationClient(),
+    )
+    result = await provider.start_run(
+        SimpleNamespace(),
+        _source_version(enumeration="id_sweep", entity_ids=[26]),
+        _run(),
+    )
+    assert result.inline_resources == []
+    assert "is not supported" in result.inline_failure_reason
+
+
+def test_search_templates_still_report_the_coverage_limit(provider):
+    """A search-scoped template must keep saying it holds a branch, not a corpus."""
+    plan = provider.plan(SimpleNamespace(), _source_version(search_text="554", entity_ids=[26]))
+    assert any("COVERAGE LIMIT" in note for note in plan.notes)
+
+
+def test_enumerating_plan_reports_the_verified_measurement(provider):
+    plan = provider.plan(
+        SimpleNamespace(),
+        _source_version(enumeration="systematic_digit_union", entity_ids=[26]),
+    )
+    assert any("ENUMERATION" in note for note in plan.notes)
+    assert not any("COVERAGE LIMIT" in note for note in plan.notes)
+    assert not any("search_text is missing" in note for note in plan.notes)

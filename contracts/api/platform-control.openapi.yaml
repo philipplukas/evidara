@@ -25,7 +25,7 @@ info:
     change the models or routes and run `scripts/generate_platform_control_contract.py`.
   contact:
     name: Evidara Team
-  version: 0.18.0
+  version: 0.19.0
 paths:
   /health:
     get:
@@ -5628,9 +5628,17 @@ components:
           const: lexfind_api
           title: Provider
           default: lexfind_api
+        enumeration:
+          anyOf:
+          - type: string
+            const: systematic_digit_union
+          - type: 'null'
+          title: Enumeration
         search_text:
-          type: string
-          minLength: 1
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
           title: Search Text
         entity_ids:
           items:
@@ -5671,8 +5679,6 @@ components:
           default: 2000
       additionalProperties: false
       type: object
-      required:
-      - search_text
       title: LexFindAcquisitionSpec
     OperatorThroughputEntry:
       properties:
