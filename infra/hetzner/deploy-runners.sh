@@ -43,6 +43,14 @@ CONTROLLER_NS=arc-systems
 RUNNERS_NS=arc-runners
 CHART=oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set
 CONTROLLER_CHART=oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
+# Pinned deliberately. Unpinned, `helm upgrade` resolves to whatever is newest at the
+# moment someone runs this, so a deploy aimed at one pool's values would also upgrade
+# the controller and BOTH scale sets — an unrelated, unreviewed change riding along
+# with every run. ARC additionally requires the scale-set chart and the controller to
+# be the SAME version, so one variable drives all three releases.
+#
+# To upgrade: bump this, run the script, then re-run Runner Pool Smoke.
+CHART_VERSION=0.14.2
 LIGHT_NAME=evidara-light
 HEAVY_NAME=evidara-heavy-v2
 
@@ -62,7 +70,7 @@ DOCKER_CONFIG="$(mktemp -d)"
 export DOCKER_CONFIG
 
 echo "==> 1/4 ARC controller (namespace ${CONTROLLER_NS})"
-helm upgrade --install arc "${CONTROLLER_CHART}" \
+helm upgrade --install arc "${CONTROLLER_CHART}" --version "${CHART_VERSION}" \
   --namespace "${CONTROLLER_NS}" --create-namespace --wait
 
 echo "==> 2/4 Credential secrets (namespace ${RUNNERS_NS})"
@@ -78,13 +86,13 @@ kubectl -n "${RUNNERS_NS}" create secret docker-registry ghcr-pull \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> 3/4 LIGHT scale set (${LIGHT_NAME})"
-helm upgrade --install "${LIGHT_NAME}" "${CHART}" \
+helm upgrade --install "${LIGHT_NAME}" "${CHART}" --version "${CHART_VERSION}" \
   --namespace "${RUNNERS_NS}" \
   --set runnerScaleSetName="${LIGHT_NAME}" \
   -f "${SCRIPT_DIR}/runners/values-light.yaml" --wait
 
 echo "==> 4/4 HEAVY scale set (${HEAVY_NAME})"
-helm upgrade --install "${HEAVY_NAME}" "${CHART}" \
+helm upgrade --install "${HEAVY_NAME}" "${CHART}" --version "${CHART_VERSION}" \
   --namespace "${RUNNERS_NS}" \
   --set runnerScaleSetName="${HEAVY_NAME}" \
   -f "${SCRIPT_DIR}/runners/values-heavy.yaml" --wait
