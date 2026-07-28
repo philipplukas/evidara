@@ -256,11 +256,31 @@ class LexFindApiProvider:
     """Acquisition provider for LexFind's texts-of-law API."""
 
     provider_name = "lexfind_api"
-    # start_run is implemented and unit-tested against fixtures, and the capture
-    # path is verified live (#716). No operator has captured an ADR-0030
-    # acceptance run yet, and the discovery payload is unverified, so the code key
-    # admits an ACCEPTANCE run and nothing else.
-    readiness = AcquisitionReadiness.AWAITING_EVIDENCE
+    # Promoted from AWAITING_EVIDENCE on 2026-07-28 against three ADR-0030
+    # acceptance runs, each `execution_mode: live` and each `skipped_gates=[]`, so
+    # for these corpora the pass covers the whole gate set rather than a subset:
+    #
+    #   docs/runbooks/evidence/2026-07-22-ch-canton-zh-lexfind-acceptance-v3
+    #     ZH — 4 PDFs (554.1 / 554.11 / 554.5 / 554.51), 4/4 through DI, 9 hits
+    #   docs/runbooks/evidence/2026-07-28-ch-canton-be-lexfind-acceptance
+    #     BE — 2 PDFs (916.31 Hundegesetz, 916.812 THV), 2/2 through DI, 1 hit
+    #   docs/runbooks/evidence/2026-07-28-ch-canton-bs-lexfind-acceptance
+    #     BS — 5 PDFs (365.100 / .110 / .101 + two communal), 5/5 through DI, 7 hits
+    #
+    # Three cantons, three systematic-numbering schemes, one unchanged provider.
+    # That is the evidence the promotion rests on: it is not one corpus generalised.
+    #
+    # This key says the CODE works. The config key — whether a corpus is accepted —
+    # is the operator's, and every lexfind template still ships `enabled: false`.
+    #
+    # What is still NOT verified: coverage. LexFind has no list-everything call
+    # (`search_text` cannot be empty), so each template enumerates one branch. A
+    # live run proves the branch it asked for, never the canton's corpus.
+    #
+    # If this is ever rolled back, roll back to SCAFFOLD, not AWAITING_EVIDENCE:
+    # the latter is the one state whose acceptance runs waive the operator's config
+    # key, so it would re-open the route a rollback is trying to close.
+    readiness = AcquisitionReadiness.LIVE
 
     def plan(self, source: Source, source_version: SourceVersion) -> ProviderPlan:
         spec = source_version.acquisition_spec or {}
