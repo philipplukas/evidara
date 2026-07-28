@@ -347,8 +347,15 @@ async def test_missing_search_text_fails_named_without_a_request(provider, monke
 # --------------------------------------------------------------------------
 
 
-def test_readiness_admits_only_an_acceptance_run(provider):
-    assert provider.readiness.value == "awaiting_evidence"
+def test_readiness_is_live_on_three_cantons_of_acceptance_evidence(provider):
+    """Promoted 2026-07-28 on ZH + BE + BS, all live, all `skipped_gates=[]`.
+
+    Asserted as a distinct value rather than "not awaiting_evidence", because
+    SCAFFOLD is the correct rollback target and AWAITING_EVIDENCE is not: only the
+    latter waives the operator's config key for acceptance runs, so rolling back to
+    it would re-open the route a rollback is closing.
+    """
+    assert provider.readiness.value == "live"
 
 
 def test_plan_reports_the_search_contract_as_verified(provider):

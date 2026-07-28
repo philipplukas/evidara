@@ -468,23 +468,25 @@ overlays:
       # each is a scoped, reviewable unit rather than one unbounded sweep.
       #
       # STAYS `enabled: false` — but NOT for want of evidence, which this comment
-      # claimed until 2026-07-28 and which was wrong by then. Two ADR-0030
-      # acceptance runs exist, both `execution_mode: live`, both `skipped_gates=[]`:
+      # claimed until 2026-07-28 and which was wrong by then. Three ADR-0030
+      # acceptance runs exist, all `execution_mode: live`, all `skipped_gates=[]`:
       #
       #   docs/runbooks/evidence/2026-07-22-ch-canton-zh-lexfind-acceptance-v3
       #     ZH — 4 PDFs (554.1 / 554.11 / 554.5 / 554.51), 4/4 through DI, 9 hits
       #   docs/runbooks/evidence/2026-07-28-ch-canton-be-lexfind-acceptance
       #     BE — 2 PDFs (916.31 Hundegesetz, 916.812 THV), 2/2 through DI, 1 hit
+      #   docs/runbooks/evidence/2026-07-28-ch-canton-bs-lexfind-acceptance
+      #     BS — 5 PDFs (365.100 / .110 / .101 + two communal), 5/5 through DI, 7 hits
       #
-      # What is actually unturned is the pair of keys. The provider is still
-      # readiness=awaiting_evidence in lexfind_api_provider.py — a CODE change, to
-      # be made against the bundles above, not on confidence. `enabled` is the
-      # operator's key: flip it from the admin panel with the evidence linked in
-      # `note`, not from this file. The lock admits `--mode acceptance` precisely
-      # so evidence can be produced without an engineer (#743).
+      # The CODE key is now turned: the provider is readiness=LIVE as of 2026-07-28.
+      # `enabled` is the OPERATOR's key and stays shut — flip it from the admin
+      # panel with the evidence linked in `note`, not from this file. The lock
+      # admitted `--mode acceptance` precisely so that evidence could be produced
+      # without an engineer (#743), and it was.
       #
-      # A pass justifies only the gates that ran. Both bundles record
-      # `skipped_gates=[]`, so for these two templates that is the whole set.
+      # A pass justifies only the gates that ran. All three bundles record
+      # `skipped_gates=[]`, so for these templates that is the whole set — but a
+      # branch is not a corpus: see the COVERAGE LIMIT note above.
       # ───────────────────────────────────────────────────────────────
       lexfind_api_zh_tierschutz:
         provider: lexfind_api

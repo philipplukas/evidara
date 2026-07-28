@@ -307,6 +307,38 @@ SOURCE_ID="$(jq -r --arg name "${SOURCE_NAME}" \
   < "${RUN_DIR}/source-lookup.json")"
 
 if [[ -n "${SOURCE_ID}" ]]; then
+  # Reuse is keyed on NAME ALONE, and every invocation shares one default name. So a
+  # second template run against the same stack silently inherits the first run's
+  # jurisdiction/authority: the documents land under the STORED pair while
+  # summary.json reports the pair that was REQUESTED. The bundle then asserts a
+  # jurisdiction nothing verified — the #735/#744 failure shape, one field over.
+  #
+  # Found by running the BE and BS cantonal templates back to back: five
+  # Basel-Stadt acts were filed under `jur_ch_be` with the run reporting
+  # `jurisdiction_id: jur_ch_bs` and a green verdict.
+  #
+  # Reuse is still right for re-running the SAME corpus (it publishes the next
+  # revision), so this refuses only the mismatch, and names the fix.
+  FOUND_JURISDICTION="$(jq -r --arg name "${SOURCE_NAME}" \
+    'first(.data[]? | select(.name == $name) | .jurisdiction_id) // empty' \
+    < "${RUN_DIR}/source-lookup.json")"
+  FOUND_AUTHORITY="$(jq -r --arg name "${SOURCE_NAME}" \
+    'first(.data[]? | select(.name == $name) | .authority_id) // empty' \
+    < "${RUN_DIR}/source-lookup.json")"
+  if [[ "${FOUND_JURISDICTION}" != "${JURISDICTION_ID}" \
+     || "${FOUND_AUTHORITY}" != "${AUTHORITY_ID}" ]]; then
+    {
+      echo "error: refusing to reuse source ${SOURCE_ID} (\"${SOURCE_NAME}\")"
+      echo "  stored:    jurisdiction=${FOUND_JURISDICTION} authority=${FOUND_AUTHORITY}"
+      echo "  requested: jurisdiction=${JURISDICTION_ID} authority=${AUTHORITY_ID}"
+      echo
+      echo "  Documents would be filed under the STORED pair while this run's evidence"
+      echo "  reported the requested one, so the bundle would be wrong rather than red."
+      echo "  Pass a distinct --source-name for this corpus, e.g.:"
+      echo "    --source-name '${SOURCE_NAME} ${JURISDICTION_ID}'"
+    } >&2
+    exit 1
+  fi
   log "    reusing source ${SOURCE_ID} — re-acquisition publishes the next revision"
   VERSION_PAYLOAD="$(jq -n \
     --arg version_label "${VERSION_LABEL}" \
