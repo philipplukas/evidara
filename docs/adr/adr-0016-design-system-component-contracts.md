@@ -21,7 +21,7 @@
 | `primitives/Badge.tsx` | legal-search | `colorKey`, `size` | Hex from `badge-tokens.ts`; no semantic status |
 | `ui/tabs.tsx` | legal-search | `variant` (default, line) | Radix triggers expose `aria-selected`; polish two-dimensional active styling via tokens (`TAR-254`) |
 | `DetailTabs.tsx` | legal-search | `tabs` + nuqs `tab` | Composes Radix `Tabs`; URL sync covered by tests — strengthen token-driven active contrast (`TAR-254`) |
-| `MetadataList.tsx` | legal-search | `fields`, `initialDensity?`, `showHeading?` | Density + progressive disclosure shipped; OpenAPI `MetadataRow.visibility` is optional — client prefers BFF value when present, else `metadata-visibility` heuristics (`TAR-258`) |
+| `MetadataList.tsx` | legal-search | `fields`, `initialDensity?`, `showHeading?` | Density + progressive disclosure shipped; `DetailMetadataRow.visibility` is **required** and BFF-owned — the client-side label heuristics were removed in #787 |
 | `FilterPanel.tsx` | legal-search | `filters` | Delegates refinement chips to `FilterBar`; panel layout / filter groups still evolve with `TAR-255` |
 | `ContextBar.tsx` | legal-search | `context` | Jurisdiction / language / source chips; refinements live in `FilterPanel` / `FiltersSheet` + `FilterBar` — document vs `ResultsControlRegion` (`TAR-256`) |
 | MUI `Chip` | admin | `color`, `variant`, `size` | Status color maps are local to each file (`STATUS_COLORS`, `HEALTH_COLORS`, `TONE_ACCENTS`) |
@@ -295,5 +295,7 @@ The contracts have dependencies. Recommended sequence:
 **Risks:**
 
 - Two-renderer approach for `StatusBadge` (MUI + Tailwind) adds complexity.
-- `MetadataList` density depends on a content-modelling decision (which fields are "always" vs "on demand"). **Decision (TAR-258):** BFF-owned `visibility` is the target state; the OpenAPI contract already supports an optional `MetadataRow.visibility` enum (`always | default | expanded`). The frontend fallback in `metadata-visibility.ts` remains as a graceful degradation path until the BFF populates `visibility` for all document types. No contract or codegen changes needed — the current optional-field design supports progressive adoption.
+- `MetadataList` density depends on a content-modelling decision (which fields are "always" vs "on demand"). **Decision (TAR-258):** BFF-owned `visibility` is the target state; the frontend fallback in `metadata-visibility.ts` remains as a graceful degradation path until the BFF populates `visibility` for all document types.
+
+  **Amended (#787, 2026-07-21):** the fallback is deleted and `visibility` is now **required**, on its own schema `DetailMetadataRow`. The graceful-degradation path was never graceful: it matched rows against English label regexes (`/^(court|jurisdiction|date|enacted)$/i`) while the BFF emits localized labels ("Zuständigkeit", "In Kraft"), so it could not fire and every unmatched row resolved to `expanded` — which `filterByDensity` hides at both compact and default density. A row would simply not render, with no error. A localized display label is not a join key; keying on it would have needed a fresh pattern set per locale. The BFF already set `visibility` on all 8 of its `rows.push` branches, so requiring it matches the behaviour that was already shipping. Search-result rows keep the visibility-free `MetadataRow` — result cards have no density control.
 - `Button` consequence tier is the largest blast radius change — every action in the system needs tier classification.

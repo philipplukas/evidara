@@ -39,7 +39,7 @@ The mapper assembles up to seven rows per document ([`document-detail.mapper.ts`
 6. **Jurisdiction** — e.g. Switzerland · Federal
 7. **Language** — e.g. Deutsch / Französisch / Italienisch
 
-Document type and label heuristics ([`metadata-icons.ts`](../../legal-search/api/src/core/presentation/metadata-icons.ts) referenced from the mapper) decide which rows are "always" / "default" / "expanded" visibility, then the frontend's `enrichMetadataRows` ([`metadata-visibility.ts`](../../legal-search/frontend/src/lib/metadata-visibility.ts)) makes the final cut by document `type`.
+The BFF's `composeMetadata` ([`document-detail.mapper.ts`](../../legal-search/api/src/modules/documents/mappers/document-detail.mapper.ts)) decides which rows are "always" / "default" / "expanded" visibility, and every row carries one — it is required on `DetailMetadataRow`. The frontend only applies the reader's chosen density via `filterByDensity` ([`metadata-visibility.ts`](../../legal-search/frontend/src/lib/metadata-visibility.ts)); it derives nothing from the label, which is localized (#787).
 
 For a Swiss federal **law**, expect rows 1, 2, 3, 4, 6, 7 to be present (≥6 rows). Row 5 ("Source") is currently a label; it should still appear.
 

@@ -40,12 +40,7 @@ export interface DetailView {
   title: string;
   subtitle: string;
   breadcrumbs?: string[];
-  metadata: {
-    label: string;
-    value: string;
-    iconKey?: string;
-    visibility?: 'always' | 'default' | 'expanded';
-  }[];
+  metadata: DetailMetadataRowView[];
   /** The document body text — plain text, paragraphs split by blank lines. */
   content?: string;
   contentLanguage?: {
@@ -114,15 +109,22 @@ function composeSubtitle(doc: DocumentEntity, locale: SupportedLocale, warn?: Wa
   return parts.join(' · ') || t('labels.document', locale);
 }
 
-type MetadataRowView = {
+/**
+ * A detail metadata row. `visibility` is REQUIRED — the BFF owns the density
+ * decision because `label` is localized ("Zuständigkeit", "In Kraft") and the
+ * frontend cannot key a rule off it across locales (#787). Making it required
+ * here is what stops a new `rows.push` from silently reaching the reader with
+ * no visibility, which `filterByDensity` would then hide at default density.
+ */
+export type DetailMetadataRowView = {
   label: string;
   value: string;
   iconKey?: string;
-  visibility?: 'always' | 'default' | 'expanded';
+  visibility: 'always' | 'default' | 'expanded';
 };
 
-function composeMetadata(doc: DocumentEntity, locale: SupportedLocale): MetadataRowView[] {
-  const rows: MetadataRowView[] = [];
+function composeMetadata(doc: DocumentEntity, locale: SupportedLocale): DetailMetadataRowView[] {
+  const rows: DetailMetadataRowView[] = [];
   const documentTypeLabel = doc.document_type
     ? getDocumentTypeLabel(doc.document_type, locale)
     : undefined;

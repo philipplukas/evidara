@@ -84,10 +84,14 @@ function buildDetail(documentId: string) {
     title: "BGer 4A_123/2026 — Verantwortlichkeit des Verwaltungsrats",
     subtitle: "Bundesgericht, I. zivilrechtliche Abteilung · Schweiz",
     breadcrumbs: ["Schweiz", "Bundesgericht", documentId],
+    // `visibility` is REQUIRED on a detail metadata row (#787). The BFF sets it
+    // on every row it emits; a mock that omits it is not a smaller response,
+    // it is a shape the API cannot produce — and the glance strip (compact
+    // density) would silently render nothing.
     metadata: [
-      { label: "Court", value: "Bundesgericht", iconKey: "ch" },
-      { label: "Date", value: "03.04.2026" },
-      { label: "Docket", value: "4A_123/2026" },
+      { label: "Court", value: "Bundesgericht", iconKey: "ch", visibility: "always" },
+      { label: "Date", value: "03.04.2026", visibility: "always" },
+      { label: "Docket", value: "4A_123/2026", visibility: "default" },
     ],
     content: "Das Bundesgericht bestätigt die Verantwortlichkeit der Verwaltungsratsmitglieder gemäss Art. 754 OR.",
     tabs: [
@@ -109,13 +113,16 @@ function buildRichDetail(documentId: string) {
     title: "BGer 4A_123/2022",
     subtitle: "Verantwortlichkeit des Verwaltungsrats — Beweislastverteilung",
     breadcrumbs: ["Federal Supreme Court", "I. Civil Law Division", "4A_123/2022"],
+    // See buildDetail: `visibility` is required, and these values reproduce
+    // exactly what the deleted label heuristics resolved for a `decision`, so
+    // the visual baselines are unchanged by #787.
     metadata: [
-      { label: "Court", value: "Federal Supreme Court", iconKey: "ch" },
-      { label: "Date", value: "15.03.2022" },
-      { label: "Docket", value: "4A_123/2022" },
-      { label: "Publication", value: "BGE 148 III 234" },
-      { label: "Chamber", value: "I. Civil Law Division" },
-      { label: "Outcome", value: "Appeal dismissed" },
+      { label: "Court", value: "Federal Supreme Court", iconKey: "ch", visibility: "always" },
+      { label: "Date", value: "15.03.2022", visibility: "always" },
+      { label: "Docket", value: "4A_123/2022", visibility: "default" },
+      { label: "Publication", value: "BGE 148 III 234", visibility: "default" },
+      { label: "Chamber", value: "I. Civil Law Division", visibility: "default" },
+      { label: "Outcome", value: "Appeal dismissed", visibility: "always" },
     ],
     // `content` — the field the API actually sends, carrying plain text.
     // This mock used to emit `contentHtml`, which is a *view-model* field that

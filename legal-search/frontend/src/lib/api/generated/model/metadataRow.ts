@@ -17,16 +17,17 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
 particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
-import type { MetadataRowVisibility } from './metadataRowVisibility';
 
+/**
+ * A label/value metadata row on a search result card. Rendered in full —
+result cards have no density control, so there is no visibility field
+here. The detail surface uses `DetailMetadataRow` instead.
+
+ */
 export interface MetadataRow {
   label: string;
   value: string;
   iconKey?: string;
-  /** Optional UI density hint for the detail MetadataList. When omitted, the client derives
-visibility from document type and label heuristics (`metadata-visibility.ts`).
- */
-  visibility?: MetadataRowVisibility;
 }

@@ -17,7 +17,7 @@ See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
 See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
 particular, for what a coverage answer may and may not be read to mean.
 
- * OpenAPI spec version: 0.9.0
+ * OpenAPI spec version: 0.10.0
  */
 
 export * from './acceptLanguageParameter';
@@ -40,6 +40,8 @@ export * from './coverageDimension';
 export * from './coverageGroup';
 export * from './coverageHolding';
 export * from './coverageScope';
+export * from './detailMetadataRow';
+export * from './detailMetadataRowVisibility';
 export * from './detailView';
 export * from './detailViewLocalStructure';
 export * from './filterFacetView';
@@ -56,7 +58,6 @@ export * from './indexedProjectionDocumentPage';
 export * from './listIndexedProjectionDocumentsParams';
 export * from './localStructureItem';
 export * from './metadataRow';
-export * from './metadataRowVisibility';
 export * from './normHierarchyCoverage';
 export * from './normHierarchyJurisdiction';
 export * from './normHierarchyLevel';

@@ -1,52 +1,16 @@
-import type { MetadataField, MetadataRow, MetadataVisibility } from "./types";
+import type { MetadataField } from "./types";
 
-type FieldVisibilityRule = {
-  labelPattern: string | RegExp;
-  visibility: MetadataVisibility;
-};
-
-const SHARED_RULES: FieldVisibilityRule[] = [
-  { labelPattern: /^(court|jurisdiction|date|enacted)$/i, visibility: "always" },
-  {
-    labelPattern: /^(docket|publication|chamber|edition|article|law|document type)$/i,
-    visibility: "default",
-  },
-];
-
-const DOCUMENT_TYPE_RULES: Record<string, FieldVisibilityRule[]> = {
-  decision: [
-    { labelPattern: /^outcome$/i, visibility: "always" },
-    { labelPattern: /^chamber$/i, visibility: "default" },
-  ],
-  law: [{ labelPattern: /^(in force|systematic number|last revision)$/i, visibility: "always" }],
-  commentary: [{ labelPattern: /^(edition|article)$/i, visibility: "always" }],
-};
-
-function matchesRule(label: string, rule: FieldVisibilityRule): boolean {
-  if (typeof rule.labelPattern === "string") {
-    return label.toLowerCase() === rule.labelPattern.toLowerCase();
-  }
-  return rule.labelPattern.test(label);
-}
-
-function resolveVisibility(label: string, documentType: string): MetadataVisibility {
-  const typeRules = DOCUMENT_TYPE_RULES[documentType] ?? [];
-  for (const rule of typeRules) {
-    if (matchesRule(label, rule)) return rule.visibility;
-  }
-  for (const rule of SHARED_RULES) {
-    if (matchesRule(label, rule)) return rule.visibility;
-  }
-  return "expanded";
-}
-
-export function enrichMetadataRows(rows: MetadataRow[], documentType: string): MetadataField[] {
-  return rows.map((row) => ({
-    ...row,
-    visibility: row.visibility ?? resolveVisibility(row.label, documentType),
-  }));
-}
-
+/**
+ * Filter detail metadata rows by the reader's chosen density.
+ *
+ * `visibility` is decided by the BFF and is required on every row — see
+ * `MetadataField` in `./types`. There is deliberately no client-side fallback:
+ * this module used to carry label-matching rules (`/^(court|jurisdiction)$/i`)
+ * that could never fire, because the BFF emits localized labels
+ * ("Zuständigkeit", "In Kraft"). A display label is not a stable join key
+ * across a translation boundary; adding German patterns would only have moved
+ * the same defect to French (#787).
+ */
 export function filterByDensity(
   fields: MetadataField[],
   density: "compact" | "default" | "expanded",

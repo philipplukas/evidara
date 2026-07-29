@@ -16,7 +16,7 @@ info:
     See ADR-0033 for the norm-hierarchy surface (`/v1/norm-hierarchy`).
     See ADR-0042 for the corpus-coverage surface (`/v1/coverage`) and, in
     particular, for what a coverage answer may and may not be read to mean.
-  version: 0.9.0
+  version: 0.10.0
   contact:
     name: Evidara Team
   license:
@@ -740,8 +740,28 @@ components:
           type: string
 
     MetadataRow:
+      description: |
+        A label/value metadata row on a search result card. Rendered in full —
+        result cards have no density control, so there is no visibility field
+        here. The detail surface uses `DetailMetadataRow` instead.
       type: object
       required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        iconKey:
+          type: string
+
+    DetailMetadataRow:
+      description: |
+        A metadata row on the document-detail surface, where `MetadataList`
+        filters by density. `visibility` is REQUIRED: the BFF owns the decision,
+        because `label` is a localized display string (de/fr/it) and can never be
+        a stable join key for a client-side rule (#787).
+      type: object
+      required: [label, value, visibility]
       properties:
         label:
           type: string
@@ -752,8 +772,9 @@ components:
         visibility:
           type: string
           description: |
-            Optional UI density hint for the detail MetadataList. When omitted, the client derives
-            visibility from document type and label heuristics (`metadata-visibility.ts`).
+            Density band for the detail `MetadataList`. `always` survives compact
+            density, `default` shows at default density, `expanded` only when the
+            reader expands the list.
           enum: [always, default, expanded]
 
     RelatedCount:
@@ -881,7 +902,7 @@ components:
         metadata:
           type: array
           items:
-            $ref: "#/components/schemas/MetadataRow"
+            $ref: "#/components/schemas/DetailMetadataRow"
           default: []
         content:
           type: string

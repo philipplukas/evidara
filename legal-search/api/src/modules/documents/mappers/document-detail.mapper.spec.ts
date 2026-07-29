@@ -144,6 +144,52 @@ describe('mapDocumentToDetailView', () => {
     expect(view.metadata.map((row) => row.label)).not.toContain('Datum');
   });
 
+  // #787: the frontend has no fallback. A row that arrives without a
+  // `visibility` is not rendered at a lower priority — `filterByDensity`
+  // drops it at compact AND default density, so the reader never sees it and
+  // nothing errors. The BFF is the only place this can be guaranteed, so it
+  // is guaranteed here, over every branch of `composeMetadata` and every
+  // locale — not just the `lawDoc` happy path.
+  it('should set visibility on every metadata row, for every doc type and locale', () => {
+    const docTypes = ['law', 'decision', 'commentary', 'regulation'];
+    // Every locale the BFF supports — the point of the test is that the
+    // guarantee does not depend on which language the labels come out in.
+    const locales = ['de', 'fr'] as const;
+
+    // `lawDoc` + a non-active lifecycle status satisfies the condition on all 8
+    // `rows.push` branches in `composeMetadata`, so the loop below covers every
+    // row the mapper can emit rather than a convenient subset. If a branch is
+    // added without being exercised here, this count goes stale and says so.
+    const allBranches = mapDocumentToDetailView(
+      { ...lawDoc, lifecycle_status: 'superseded' },
+      sections,
+      citations,
+      'de',
+    );
+    expect(allBranches.metadata).toHaveLength(8);
+
+    for (const documentType of docTypes) {
+      for (const locale of locales) {
+        const view = mapDocumentToDetailView(
+          { ...lawDoc, document_type: documentType, lifecycle_status: 'superseded' },
+          sections,
+          citations,
+          locale,
+        );
+
+        // 8, or 7 for a type with no localized label — that branch drops its row.
+        expect(view.metadata.length).toBeGreaterThanOrEqual(7);
+
+        for (const row of view.metadata) {
+          expect(
+            ['always', 'default', 'expanded'],
+            `${documentType}/${locale} row "${row.label}" has visibility ${String(row.visibility)}`,
+          ).toContain(row.visibility);
+        }
+      }
+    }
+  });
+
   it('should include a non-active lifecycle status row when present', () => {
     const view = mapDocumentToDetailView(
       { ...lawDoc, lifecycle_status: 'superseded' },

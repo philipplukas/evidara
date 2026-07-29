@@ -1,4 +1,4 @@
-version: "2.25.0"
+version: "2.26.0"
 last_reviewed: "2026-07-20"
 owner: "Platform Team"
 
@@ -47,7 +47,13 @@ apis:
     # ADR-0033 §2's refusal capability needs. Additive, so a minor. Deliberately
     # NOT locked while its shape is validated against real agent use; lock it
     # once an MCP tool (ADR-0033 §3) depends on it.
-    version: "0.9.0"
+    # 0.10.0: splits `DetailMetadataRow` out of `MetadataRow` and makes
+    # `visibility` required on it (#787). Touches the locked
+    # `/v1/documents/{id}` response. Not breaking for readers — a response
+    # field going from optional to required only strengthens what a client can
+    # rely on, and the BFF already set it on every row. The search-card
+    # `MetadataRow` drops the optional `visibility` it never populated.
+    version: "0.10.0"
     locked_paths:
       - "/v1/search"
       - "/v1/documents/{id}"
