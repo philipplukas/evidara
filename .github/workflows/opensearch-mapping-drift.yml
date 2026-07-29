@@ -1,0 +1,111 @@
+name: OpenSearch Mapping Drift
+
+# The gate that never ran.
+#
+# `legal-search/api/src/core/opensearch/documents-index.mapping.ts` has been the
+# declared single source of truth since #675, and `npm run mapping:check-drift`
+# has existed to compare it against a LIVE index for just as long — but nothing
+# ever invoked it. `mapping-drift.integration.spec.ts` guards the *creation
+# path* against a Testcontainer, which proves a freshly-bootstrapped index is
+# correct and says nothing about the index actually serving production.
+#
+# The cost of that gap, measured against `evidara-k3s` on 2026-07-29: the live
+# `documents-000001` was missing five mapped fields — `level`, `in_force_from`,
+# `in_force_until`, `delegates_to`, `subordinate_to`. Neither drift surfaces as
+# an error at query time. Aggregating an absent field returns EMPTY BUCKETS, and
+# a range filter over one matches NOTHING, so `group_by=level` and ADR-0033's
+# `in_force_at` were both silently inert in production. That is the same failure
+# mode as #675, #713 and #728: a feature that reports success while doing
+# nothing.
+#
+# Deliberately NOT part of `npm run check` — that gate must stay runnable with
+# no cluster reachable (see the header of check-opensearch-mapping-drift.ts).
+# This workflow is where the live half belongs.
+
+on:
+  schedule:
+    # 04:15 UTC daily — after the 03:30 Fedlex loop, so a drift introduced by a
+    # nightly reindex is caught in the same cycle that caused it.
+    - cron: "15 4 * * *"
+  workflow_dispatch:
+    inputs:
+      opensearch_index:
+        description: "Index or alias to compare against the canonical mapping"
+        required: false
+        default: "documents-read"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  mapping-drift:
+    # MUST be an in-cluster ARC runner: the OpenSearch service is ClusterIP-only
+    # and has no ingress. A GitHub-hosted runner cannot resolve
+    # `opensearch-cluster-master.evidara.svc` and would fail with `fetch failed`,
+    # which reads like drift-check failure but is only a networking failure.
+    # Cross-namespace reachability arc-runners -> evidara verified 2026-07-29.
+    runs-on: ${{ vars.LIGHT_RUNNER_SCALE_SET || 'evidara-light' }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: legal-search/api
+    env:
+      # Hardcoded on purpose, not a `vars.*` override. This is a fixed
+      # cluster-internal Service DNS name, not an operator knob — the same
+      # address `evidara-config` gives every runtime pod. Making it overridable
+      # would only create a way to point the gate at something unreachable,
+      # where `fetch failed` reads like drift and the real index goes unchecked.
+      # If the Service is ever renamed, this changes with it, in this file.
+      OPENSEARCH_NODE: http://opensearch-cluster-master.evidara.svc:9200
+      OPENSEARCH_INDEX: ${{ github.event_name == 'workflow_dispatch' && inputs.opensearch_index || 'documents-read' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          # Read the pin from `.nvmrc` so CI and local cannot drift.
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compare live index against the canonical mapping
+        id: drift
+        run: |
+          set -o pipefail
+          npm run mapping:check-drift 2>&1 | tee /tmp/drift.log
+
+      - name: Report drift
+        if: always()
+        run: |
+          {
+            echo "## OpenSearch mapping drift"
+            echo
+            echo "- index: \`${OPENSEARCH_INDEX}\`"
+            echo "- node: \`${OPENSEARCH_NODE}\`"
+            echo
+            if [ "${{ steps.drift.outcome }}" = "success" ]; then
+              echo "✅ The live index satisfies the canonical mapping."
+            else
+              echo "❌ **The live index disagrees with the canonical mapping.**"
+              echo
+              echo '```'
+              cat /tmp/drift.log 2>/dev/null || echo "(no output captured — check the step log)"
+              echo '```'
+              echo
+              echo "Fix the **index**, never the query — a drifted index that is queried"
+              echo "around stays drifted for every other consumer. Recreate/reindex via"
+              echo "\`scripts/opensearch-alias-cutover.ts\`; see"
+              echo "\`docs/runbooks/projection-reindex-backfill.md\`."
+              echo
+              echo "Note a reindex fixes the *mapping* only. If the drifted fields are"
+              echo "also absent from \`_source\`, the documents are stale projections and"
+              echo "must be re-projected for the fields to carry values."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
