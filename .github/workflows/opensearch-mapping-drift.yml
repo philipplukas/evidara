@@ -51,7 +51,13 @@ jobs:
       run:
         working-directory: legal-search/api
     env:
-      OPENSEARCH_NODE: ${{ vars.RUNTIME_OPENSEARCH_NODE || 'http://opensearch-cluster-master.evidara.svc:9200' }}
+      # Hardcoded on purpose, not a `vars.*` override. This is a fixed
+      # cluster-internal Service DNS name, not an operator knob — the same
+      # address `evidara-config` gives every runtime pod. Making it overridable
+      # would only create a way to point the gate at something unreachable,
+      # where `fetch failed` reads like drift and the real index goes unchecked.
+      # If the Service is ever renamed, this changes with it, in this file.
+      OPENSEARCH_NODE: http://opensearch-cluster-master.evidara.svc:9200
       OPENSEARCH_INDEX: ${{ github.event_name == 'workflow_dispatch' && inputs.opensearch_index || 'documents-read' }}
 
     steps:
