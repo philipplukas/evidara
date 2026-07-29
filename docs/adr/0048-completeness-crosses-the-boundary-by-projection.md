@@ -72,7 +72,7 @@ changes before acceptance, the two must be reconciled rather than read independe
 
 ## Decision
 
-### 1. `holding` is not extended. Completeness is a separate, orthogonal claim.
+### 1. `holding` is not extended. Completeness is a separate, orthogonal claim
 
 `CoverageHolding` stays exactly `held | not_held`.
 
@@ -90,7 +90,7 @@ completeness: { … } | absent       how much of what exists do we hold?
 A group may be `held` with no completeness block at all. That is the common case and it is
 honest: we hold something, and we cannot say what fraction.
 
-### 2. The denominator crosses the boundary by **projection**, not by pull.
+### 2. The denominator crosses the boundary by **projection**, not by pull
 
 ADR-0042 §4 rejected two mechanisms, and both are **pull**:
 
@@ -132,7 +132,7 @@ argument rests on push being *sound*, not on it being *already there*.
 **Availability consequence, stated plainly:** if the projection path stops, the denominator
 goes stale rather than absent. §5 below is how that is prevented from lying.
 
-### 3. The response carries **two bases**, and says which is which.
+### 3. The response carries **two bases**, and says which is which
 
 `CorpusCoverageView.basis` is `"index"` today and stays that way — the counts are still
 derived solely from what we hold. The completeness block carries its own:
@@ -159,7 +159,7 @@ One response, two provenances, neither disguised as the other. A reader who trus
 index count and distrusts the acquisition figure can act on that; collapsing them into one
 number would remove the choice.
 
-### 4. No percentage, ratio, or score. Still.
+### 4. No percentage, ratio, or score. Still
 
 ADR-0042 rejected these outright:
 
@@ -172,7 +172,7 @@ present, and a caller that wants a ratio computes it and owns it. The API ships 
 `test_coverage_never_publishes_a_completeness_score` already guards the platform-control
 side; the legal-search side gets the same gate.
 
-### 5. A stale or missing denominator degrades to **absent**, never to a number.
+### 5. A stale or missing denominator degrades to **absent**, never to a number
 
 Three rules, each a test:
 
@@ -192,7 +192,7 @@ Three rules, each a test:
   ADR-0042 §3's naming discipline: `last_processed_at` is *"exactly as strong as its
   name."*
 
-### 6. What this makes sayable, and what it does not.
+### 6. What this makes sayable, and what it does not
 
 Sayable: *"I hold all 1377 texts of law Zürich publishes, and the governing norm for this
 question is not among them — so I will not answer."*
