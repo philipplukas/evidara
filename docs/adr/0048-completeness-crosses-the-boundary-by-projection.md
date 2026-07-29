@@ -251,9 +251,11 @@ read path knows that.
 
 ## Sequencing — this is designed now and built later, deliberately
 
-Verified against `evidara-k3s` on 2026-07-28: the live `documents-000001` index carries **32
-mapped fields against the canonical mapping's 37**, and the missing five are exactly
-`level`, `in_force_from`, `in_force_until`, `delegates_to`, `subordinate_to`.
+Verified against `evidara-k3s` on 2026-07-28 and re-confirmed 2026-07-29 by running the
+comparator itself (`npm run mapping:check-drift` against `documents-read`, exit 1): the live
+`documents-000001` index carries **32 mapped fields against the canonical mapping's 37**,
+and the missing five are exactly `level`, `in_force_from`, `in_force_until`, `delegates_to`,
+`subordinate_to`.
 
 That is not only the norm-hierarchy module's problem. It is `/v1/coverage`'s:
 
@@ -275,13 +277,30 @@ guard cannot see this class at all.
 
 Building completeness onto that surface would add a field an operator could trust to an
 endpoint several of whose existing answers are hollow. So this ADR is **Proposed and
-unimplemented on purpose**. The prerequisite is a production reindex onto the canonical
-mapping — hours of work with tooling that already exists (`npm run mapping:check-drift`,
-`scripts/opensearch-alias-cutover.ts`) — and nothing here should be built before it lands.
+unimplemented on purpose**.
 
-The wider point this ADR inherits: nothing runs the drift comparator against production.
-The comparator exists, the canonical mapping exists, the discipline is written down — and
-five fields still drifted unnoticed. A gate that never runs is the same as no gate.
+The prerequisite is larger than "a reindex", and the distinction matters enough to state:
+
+- **The mapping is one problem.** `scripts/opensearch-alias-cutover.ts` fixes it — a new
+  index created from the canonical mapping, then an atomic alias swap.
+- **The documents are a second one.** All five fields are also absent from `_source` on all
+  six live documents, not merely unmapped. They are stale projections, written before
+  `projections.service.ts:257-265` derived `level` / `subordinate_to` / `in_force_from`.
+  Reindexing them yields a correct mapping over documents that still carry no values, so
+  `group_by=level` would return empty buckets *for a second reason* and look identical.
+  They must be **re-projected**, which is the `--stage-write` → Delta backfill →
+  `--promote-read` path, not `--reindex`.
+- **`delegates_to` is a third case** and is not fixed by either: `projections.repository.ts:111`
+  marks it *"declared, not yet produced."* Nothing emits it yet.
+
+Anyone who reindexes, re-runs the comparator, sees green, and concludes the feature works
+will have fixed the measurement and not the thing measured.
+
+The wider point this ADR inherits: nothing ran the drift comparator against production. The
+comparator existed, the canonical mapping existed, the discipline was written down — and five
+fields still drifted unnoticed, silently, for months. A gate that never runs is the same as no
+gate. That specific gap is now closed by a scheduled workflow; the reindex and re-projection
+it reports on are still owed.
 
 ## Related
 
