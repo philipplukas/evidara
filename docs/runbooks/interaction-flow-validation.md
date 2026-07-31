@@ -107,7 +107,7 @@ This runbook should not become a second home for API-only acceptance evidence.
 | Operator route auth denial parity    | `platform-control/tests/integration/test_auth_route_guards.py`                                   | Service key gets `403` on operator routes; operator key gets `200` |
 | Service route auth contract parity   | `platform-control/tests/integration/test_auth_route_guards.py`                                   | Missing/wrong key gets `401`; scoped keys reach handler (`422` with empty payload) |
 | CI evidence pack (local CI)          | `.github/workflows/legal-search.yml` (`interaction-flow-evidence` job)                           | Uploaded Playwright reports/results + evidence manifest        |
-| CI evidence pack (staging parity)    | `.github/workflows/interaction-flow-staging-evidence.yml`                                        | Smoke+contract suites run against staging frontend/admin URLs with artifacts |
+| CI evidence pack (staging parity)    | `.github/workflows/interaction-flow-staging-evidence.yml`                                        | Smoke+contract suites run against staging frontend/admin URLs with artifacts. **Manual dispatch only** as of 2026-07-31 — GCP staging is wound down (ADR-0029); re-enable the `push`/`schedule` triggers when a Hetzner UI surface exists (#826) |
 
 ## Autonomous local run (matches CI suites)
 
